@@ -39,5 +39,10 @@ grep -q '"barcode_ui"' <<<"$MANIFEST" || { echo "Fehler: Im Manifest fehlt das S
 grep -q 'dataExtractionRules' <<<"$MANIFEST" && grep -q 'fullBackupContent' <<<"$MANIFEST" || { echo "Fehler: Im Manifest fehlen die Regeln gegen die Cloud-Sicherung." >&2; rm -f "$OUT"; exit 1; }
 RULES="$("$BUILD_TOOLS/aapt2" dump resources "$OUT" | grep -A1 'xml/data_extraction_rules$' | grep -o 'res/[^ ]*')"  # der Build kürzt die Pfade
 "$BUILD_TOOLS/aapt2" dump xmltree --file "$RULES" "$OUT" | grep -q 'cloud-backup' || { echo "Fehler: data_extraction_rules.xml fehlt in der APK." >&2; rm -f "$OUT"; exit 1; }
+# Nur Handys: keine x86-Bibliotheken in der APK (die Texterkennung bringt je Prozessorfamilie eine mit)
+if "$BUILD_TOOLS/aapt2" dump badging "$OUT" | grep -q "native-code:.*x86"; then
+  echo "Fehler: Die APK enthält x86-Bibliotheken, sie ist nur für Handys gedacht." >&2; rm -f "$OUT"; exit 1
+fi
+"$BUILD_TOOLS/aapt2" dump badging "$OUT" | grep -o 'native-code:.*' | sed 's/^/Prozessoren: /'
 "$BUILD_TOOLS/aapt2" dump permissions "$OUT" | grep '^uses-permission' | sed 's/^/Recht: /'
 echo "Fertig: $OUT"

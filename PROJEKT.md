@@ -4,34 +4,38 @@ Android-App, die festhält, welches Futter ein Haustier mag. Mehrere Personen ei
 
 ## Zweck und Grundsätze
 
-- **Füttern:** Barcode scannen, Packung mit der eigenen Kamera fotografieren (ein Tipp, ohne Bestätigung; im Haushalt erkennt die KI Marke und Sorte) oder eine bekannte Sorte antippen. Gespeichert wird sofort, bewertet mit einem Tipp auf der Skala der Futterart, auf Wunsch mit Erinnerung.
-- **Zwei Modi:** „Nur auf diesem Handy“ (`lokal`) oder verbunden (`haushalt`). Der erste Start fragt, „Verbindung trennen“ wechselt zu `lokal`, die Daten bleiben. In `lokal` zeigt die App außer unter „Datenschutz“ nirgends Hinweise auf Server, Abgleich oder Erkennung: Ein Foto führt direkt zu „Futter benennen“ (Status `noserver`), unbekannte Barcodes zum Foto.
+- **Füttern:** Barcode scannen, Packung mit der eigenen Kamera fotografieren (ein Tipp, ohne Bestätigung; Marke und Sorte kommen aus der Erkennungskette) oder eine bekannte Sorte antippen. Gespeichert wird sofort, bewertet mit einem Tipp auf der Skala der Futterart, auf Wunsch mit Erinnerung.
+- **Zwei Modi:** „Nur auf diesem Handy“ (`lokal`) oder verbunden (`haushalt`). Der erste Start fragt, „Verbindung trennen“ wechselt zu `lokal`, die Daten bleiben. In `lokal` zeigt die App außer unter „Datenschutz“ nirgends Hinweise auf Server, Abgleich oder Erkennung: Ein Foto führt direkt zu „Futter benennen“ (Status `reading`, dann `noserver`), vorgefüllt mit dem, was das Handy auf der Packung gelesen hat; unbekannte Barcodes führen zum Foto.
 
 Bedienung: wenige Tipps, nichts fragen, was sich ableiten lässt, Rückgängig statt Sicherheitsabfrage, deutsche Texte, eigene SVG-Icons, keine Emojis. Qualität: keine Eingabe geht verloren (offline, Server aus, App beendet), kein Framework, kleine Module mit einer Aufgabe, feste Gestaltungsregeln, getestet ausliefern.
 
 ## Aufbau
 
-`app/www/` ist die App (ES-Module ohne Build-Werkzeuge), `app/native/` eigene Android-Dateien, `app/android/` erzeugt `scripts/prepare.py`.
+`app/www/` ist die App (ES-Module ohne Build-Werkzeuge), `app/native/` eigene Android-Dateien, `app/android/` erzeugt `scripts/prepare.py`. In `shared/` steht, was App und Server teilen: `recognize-prompt.txt`, der Prompt der Foto-Erkennung.
 
-**App:** Capacitor 8.5, Ziel-SDK 36, ab Android 7, WebView ab 123 (`light-dark()`), sonst zeigt `webview-update.html` einen Hinweis. App-ID `de.schmeckts.app`. Die Version steht nur in `app/package.json` (1.2.3 wird `versionCode` 10203). `prepare.py` ändert die Capacitor-Vorlagen gezielt und bricht ab, wenn sich eine geändert hat.
+**App:** Capacitor 8.5, Ziel-SDK 36, ab Android 7, WebView ab 123 (`light-dark()`), sonst zeigt `webview-update.html` einen Hinweis. App-ID `de.schmeckts.app`. Die Version steht nur in `app/package.json` (1.2.3 wird `versionCode` 10203). `prepare.py` ändert die Capacitor-Vorlagen gezielt und bricht ab, wenn sich eine geändert hat; es erzeugt außerdem aus `shared/recognize-prompt.txt` das Modul `js/prompt.js` und die Kopie `server/recognize-prompt.txt` (beide nicht mitgepackt, `--nur-prompt` reicht dafür). Gebaut wird nur für ARM (`abiFilters`): Die App ist für Handys, x86 würde die APK verdoppeln.
 
 **Server:** ein Go-Programm nur mit der Standardbibliothek, Zustand in einer atomar ersetzten Datei, Version in `server/VERSION`. Als .deb (amd64, arm64) ein systemd-Dienst auf dem Ubuntu-Mini-PC, Daten in `/var/lib/schmeckts`, Port ab 8486, unterwegs über WireGuard. Notfälle: `sudo schmeckts-server verbindung | uebersicht | wiederherstellen <backup>`, Anleitung in `docs/INSTALLATION.md`.
 
 **Module** in `app/www/js/`, jedes importiert nur aus Schichten über seiner, ohne Kreise:
 
-1. Grundlagen: `dom`, `text`, `dates`, `native` (Android-Brücke), `icons`, `config`, `fields`, `clock`, `disk`
-2. Daten: `store`, `api`, `sync`, `smart`, `derive`, `images`, `recognize`
+1. Grundlagen: `dom`, `text`, `dates`, `native` (Android-Brücke), `icons`, `config`, `fields`, `clock`, `disk`, `prompt` (erzeugt)
+2. Daten: `store`, `api`, `sync`, `smart`, `derive`, `images`, `recognize`, `ocr`, `online`
 3. Oberfläche: `ui/theme`, `ui/toast`, `ui/sheet`, `ui/crop`, `ui/camera`
 4. Ansichten: `views/parts`, `views/mood`, `views/home`, `views/sheets`
-5. Logik: `logic/products`, `logic/reminders`, `logic/feeding`, `logic/scan`, `logic/editing`, `logic/pets`, `logic/data`
+5. Logik: `logic/products`, `logic/reminders`, `logic/feeding`, `logic/scan`, `logic/editing`, `logic/pets`, `logic/data`, `logic/exchange`
 6. Steuerung: `actions`, `main`
 
 - Muss eine untere Schicht eine obere erreichen, hängt sich die obere an (`hooks`, `syncHooks`, `diskHooks`, `setSheetView()`); `main.js` verbindet sie.
 - Datenbank verändern und `save()`, komplett ersetzen nur über `replaceDb()`. Buttons tragen `data-action`, ausgeführt wird der gleichnamige Eintrag in `ACTIONS`.
 - `Native` ist das Objekt mit den Capacitor-Plugins, im Browser `null`; dort ist `localStorage` der Speicher. So läuft derselbe Code in App, Browser und Tests.
 - **Speicherung:** `db.json`, `prefs.json`, `sync.json`, `queue.json` im privaten App-Speicher, atomar (temporäre Datei, umbenennen), in der Reihenfolge Warteschlange, Daten, Uhren. Nach einem Absturz spielt der Start die Warteschlange nach. Eine beschädigte Datei wird beiseitegelegt.
-- **Scannen:** Googles fertige Scan-Oberfläche (`scan()` aus `@capacitor-mlkit/barcode-scanning`, Modul `barcode_ui`), ohne Kamerarecht. Bekannter Code: servieren, bei mehreren Sorten Auswahl. Unbekannt: Server fragen (Feature `barcode`), sonst Foto der Vorderseite. `linkProduct` hängt den `scanCode` der Mahlzeit an jede Sorte, die sie bekommt; so wächst ein Multipack.
+- **Scannen:** Googles fertige Scan-Oberfläche (`scan()` aus `@capacitor-mlkit/barcode-scanning`, Modul `barcode_ui`), ohne Kamerarecht. Bekannter Code: servieren, bei mehreren Sorten Auswahl. Unbekannt: die Erkennungskette fragen, sonst Foto der Vorderseite. `linkProduct` hängt den `scanCode` der Mahlzeit an jede Sorte, die sie bekommt; so wächst ein Multipack.
 - **Kamera:** `getUserMedia`, der Stream stoppt beim Auslösen, Abbrechen, Zurück und im Hintergrund. Geht sie nicht, folgt das Plugin `Foto` (Kamera-App), im Browser die Dateiauswahl. Wartende Fotos erkennt die App später, höchstens fünf kostenpflichtige Versuche.
+- **Erkennung:** `identify()` in `js/recognize.js` hält die Kette an einer Stelle, von billig nach teuer: bekannter Barcode im Haushalt → Produktsuche im Internet (wenn erlaubt) → Server (Barcode-Suche oder Foto-Erkennung, wenn verbunden und er sie anbietet) → eigener KI-Schlüssel (wenn gesetzt) → Texterkennung auf dem Gerät → leeres Formular. Jede Stufe darf fehlen, ein Fehler führt zur nächsten, und die Oberfläche sagt ruhig, was gerade läuft.
+- **Texterkennung** (`@capacitor-mlkit/text-recognition`, nur `processImage`, lateinische Schrift): auf dem Gerät, ohne Netz, ohne Schlüssel und ohne zusätzliches Recht; das Foto liegt dafür kurz im privaten Cache. `js/ocr.js` macht daraus Marke, Sorte, Art, Tierart und Konsistenz: erst die eigenen Sorten (unempfindlich gegen Groß/klein, Bindestriche, Leerzeichen), sonst Marke aus `BRANDS` und die auffälligste Zeile als Sorte, ohne Mengen, Werbung, Zutaten und reine Zahlen, höchstens 40 Zeichen. Das Ergebnis steht als `guess` an der Mahlzeit und füllt „Futter benennen“ vor; bestätigt wird von Hand.
+- **Produktsuche im Internet** (`js/online.js`, `prefs.lookup`, Standard aus): fragt bei unbekannten Barcodes Open Pet Food Facts, dann Open Food Facts (API v2, je 5 Sekunden), bereitet Marke und Sorte auf wie der Server und merkt sich Treffer 90 Tage, Fehlanzeigen 7 Tage (`prefs.codes`). Übertragen wird nur die Nummer.
+- **Eigener KI-Schlüssel** (`prefs.aiKey`, verdecktes Feld, bleibt auf dem Handy): ruft Anthropic direkt auf (Kopfzeile `anthropic-dangerous-direct-browser-access`), Modell und Prompt wie der Server, etwa 0,5 Cent je Foto.
 - **Erinnerung ans Bewerten:** Nur das servierende Handy plant, ohne exakten Alarm, für Mahlzeiten bis 10 Minuten Alter; `syncReminders()` sagt ab oder plant um.
 - **Erinnerung ans Füttern** (`prefs.feedRemind`, pro Gerät, Standard aus): gefragt wird nichts, die üblichen Zeiten kommen aus dem Verlauf (`feedSlots()`, siehe Auswertung). `syncReminders()` plant je Zeit für heute und zwei Tage „Schon gefüttert?“ und sagt ab, sobald zur üblichen Zeit eine Mahlzeit serviert ist; ein Tipp öffnet das Füttern-Sheet. Im Haushalt erfährt ein Handy im Hintergrund nicht, was andere serviert haben; deshalb fragt der Text nur.
 - **Rechte:** Internet, Vibration, Netzwerkstatus, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `CAMERA`; `build-apk.sh` prüft das Manifest. Deep Links: `schmeckts://fuettern`, `schmeckts://scan`, `schmeckts://foto`.
@@ -44,8 +48,9 @@ db = { version: 3,
   products: [{ id, brand, variety, type, animal, texture, thumb, lastPets, createdAt, codes: { [ean]: true }, kaufen }],
   servings: [{ id, productId, servedAt, note, by, thumb,
                pets: { [petId]: { r: <Schlüssel aus RATINGS>|null, at, by } },
-               photo, status, error, autoPets, scanCode }] }   // letzte Zeile: nur auf diesem Handy
-prefs = { theme, hiddenHints, closedWeek, milestones, remind, feedRemind, backdrop, mode, server, code, name, activePet, lastPets }
+               photo, status, error, autoPets, scanCode, guess }] }   // letzte Zeile: nur auf diesem Handy
+prefs = { theme, hiddenHints, closedWeek, milestones, remind, feedRemind, backdrop, mode, server, code, name, activePet, lastPets,
+          lookup, aiKey, codes, exchange }
 ```
 
 `kaufen`: `'immer'`, `'nicht'` oder fehlt. `texture`: Konsistenz oder Snack-Art, ein Schlüssel aus `TEXTURES` oder fehlt. `hiddenHints`: `'art:sorte'`, beim Appetit `'appetit:tier:JJJJ-MM-TT'`. `closedWeek`: Montag der Woche. `milestones`: `'meals:100'`. `remind`: Minuten, 0 = aus, sonst ganze Stunden bis 24. `backdrop`: Tierfotos hinter der Kopfzeile, Standard an. `mode`: `'lokal'`, `'haushalt'` oder `''`. Bilder verkleinert das Handy: Vorschau 200 px, Profilbild 320 px, Album (bis 8) längste Seite 960 px als JPEG 0,72, notfalls schwächer, bis es in ein Feld passt (500 KB), jedes Foto sofort gespeichert. Das Packungsfoto bleibt auf dem Handy. Barcodes: EAN-13, EAN-8, UPC-A mit Prüfziffer, UPC-A wird EAN-13 mit führender 0. Beispieldaten (nur in `lokal`) tragen Kennungen mit `demo` und verschwinden beim Verbinden. Unbekannte Werte anderer Geräte bleiben unangetastet; Einträge einer Karte, die dieses Gerät nicht kennt (neuere Version), hält es nicht und löscht sie auch nicht (`setField()` meldet das, `applyRecord()` merkt sie sich nicht).
@@ -61,6 +66,7 @@ prefs = { theme, hiddenHints, closedWeek, milestones, remind, feedRemind, backdr
 - **Epoche:** Weicht sie ab (Wiederherstellung), liefert der Server alles; die App führt zusammen und sendet jedes Feld mit neuerer Uhr erneut.
 - **Selbstprüfung:** `GET /api/checksum`, SHA-256 über die sortierten Zeilen `sammlung/id/feld@uhr\n`. Die App vergleicht bei leerer Warteschlange und gleicht bei Abweichung vollständig ab.
 - **Live:** `GET /api/events?code=…` (Server-Sent Events), `event: seq` mit `{"epoch","seq"}`.
+- **Austausch von Hand** (`logic/exchange.js`, ohne Server, in beiden Modi): „Änderungen teilen“ schreibt `schmeckts-austausch-<Datum>.json` mit allen eigenen Feld-Uhren und den Datensätzen, die seit dem letzten Austausch dazugekommen sind (beim ersten Mal alles), und gibt sie ans Teilen-Menü. „Austausch empfangen“ führt nach denselben Regeln zusammen und meldet, was übernommen wurde und was dem anderen Gerät fehlt; „Antwort senden“ schickt genau das zurück, danach sind beide gleich. Der Stand je Gerät steht in `prefs.exchange`. Die Datei enthält keine Einstellungen, keinen Haushaltscode und keinen Schlüssel; fremde, beschädigte und zu neue Dateien werden abgelehnt. Geteilte Dateien nimmt die App auch aus anderen Apps an (Intent-Filter auf `application/json`).
 
 ## Server-Schnittstelle
 
@@ -158,20 +164,20 @@ Verbindlich für jede Änderung, `tests/design_test.py` prüft sie.
 
 ## Sicherheit und Datenschutz
 
-- **API-Schlüssel nur auf dem Server,** nie in Logs. Kostenschutz: festes Modell, feste Antwortlänge, Grenzen für Bildgröße und Erkennungen.
+- **API-Schlüssel auf dem Server,** ein eigener nur auf dem Handy, das ihn hat, nie in Logs. Kostenschutz: festes Modell, feste Antwortlänge, Grenzen für Bildgröße und Erkennungen.
 - **Haushaltscode** für jede Anfrage; geht ein Handy verloren, gibt es einen neuen.
 - **Server:** nimmt nur Anfragen aus privaten Adressbereichen an und prüft Größe und Aufbau jeder Anfrage; eigenes Konto, systemd-Härtung. Die App zeigt fremde Texte nur maskiert.
 - **http nur im Heimnetz:** erlaubt für 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 127.0.0.0/8, fc00::/7, fe80::/10, `localhost`, `*.local`, `*.home.arpa`. Alles andere braucht https. Geprüft für jede Anfrage in `normServer()` (`js/api.js`); Androids Netzwerkregeln kennen keine Adressbereiche.
 - **Auf dem Handy:** Daten im privaten App-Speicher, nie in Googles Cloud-Sicherung, aber direkt auf ein neues Gerät übertragbar: `data_extraction_rules.xml` (ab Android 12), `backup_rules.xml` (Android 7 und 8 nichts, ab Android 9 in `xml-v28` nur `deviceToDeviceTransfer`); `build-apk.sh` prüft die APK. Fotos kommen nie in die Galerie, das Foto-Plugin löscht seine Cache-Datei, geteilte Backups verschwinden beim nächsten Start aus dem Cache.
-- **Modus `lokal`:** keine einzige Netzwerkanfrage (Test). Ausnahme ist Googles Scanner in den Play-Diensten: Laut Google bleibt das Bild auf dem Gerät, gespeichert wird nichts; ML Kit sendet aber Diagnose- und Nutzungsdaten (Gerät, App, Kennungen, Leistung) an Google.
-- **Modus `haushalt`:** Die App spricht nur mit dem eigenen Server. Von dort gehen Packungsfotos zur Erkennung an Anthropic und die Nummer unbekannter Barcodes an Open Pet Food Facts und Open Food Facts. Keine Werbung, kein Tracking. In den Einstellungen öffnet der Knopf „Datenschutz“ unter „Daten“ ein Sheet, das beide Modi in vier kurzen Absätzen sachlich erklärt, ohne Versprechen (`PRIVACY` in `views/sheets.js`).
+- **Modus `lokal`:** keine einzige Netzwerkanfrage, solange Produktsuche und eigener Schlüssel aus sind (Test). Ausnahme ist Googles Scanner in den Play-Diensten: Laut Google bleibt das Bild auf dem Gerät, gespeichert wird nichts; ML Kit sendet aber Diagnose- und Nutzungsdaten (Gerät, App, Kennungen, Leistung) an Google.
+- **Modus `haushalt`:** Die App spricht nur mit dem eigenen Server, außer die beiden Einstellungen dieses Handys sind gesetzt. Von dort gehen Packungsfotos zur Erkennung an Anthropic und die Nummer unbekannter Barcodes an Open Pet Food Facts und Open Food Facts. Keine Werbung, kein Tracking. In den Einstellungen öffnet der Knopf „Datenschutz“ unter „Daten“ ein Sheet, das beide Modi in fünf kurzen Absätzen sachlich erklärt, ohne Versprechen (`PRIVACY` in `views/sheets.js`).
 - **Backups** des Servers täglich, 30 Tage. „Alle Daten löschen“ und „Backup importieren“ gelten für den Haushalt.
 
 ## Arbeitsweise
 
 - **Befehle:** `scripts/test.sh`, `scripts/build-apk.sh <schmeckts-signatur.txt>`, `scripts/build-deb.sh`, Ergebnisse in `dist/`. Gebaut wird nur mit grünen Tests. `scripts/setup-build-env.sh` richtet JDK 21, Android SDK 36, Go und lintian ein; vorausgesetzt sind Node.js 22+ und Python 3 mit Pillow und Playwright.
 - **Tests:** `tests/*.test.js` prüfen reine Module in Node, die übrigen laufen in Chromium mit simulierten Plugins: `ui_test.py` (Abläufe), `storage_test.py`, `design_test.py` (auch pack/unpack), `sync_test.py` (mehrere Handys gegen den echten Server), `perf_test.py` (Neuzeichnen nach einer Bewertung unter 40 ms bei 5 Jahren Daten, CPU 4-fach gedrosselt). Einzeln: `python3 tests/ui_test.py modi`.
-- **Austausch:** Es gilt Git. Der Austausch über die beiden Quellen-Dateien entfällt; sie liegen nicht mehr im Projekt. Eine Sitzung beginnt mit `git clone` oder `git pull` und einem eigenen Zweig, dann `setup-build-env.sh` und `test.sh`, am Ende Commit und Pull Request. Was `scripts/prepare.py` oder der Build wieder erzeugt (`app/node_modules/`, `app/android/`, `dist/`, die Schriften), steht in `.gitignore` und gehört nicht ins Repository. `.github/workflows/tests.yml` fährt die Testsuite bei jedem Push und Pull Request auf `ubuntu-latest`.
+- **Austausch:** Es gilt Git. Der Austausch über die beiden Quellen-Dateien entfällt; sie liegen nicht mehr im Projekt. Eine Sitzung beginnt mit `git clone` oder `git pull` und einem eigenen Zweig, dann `setup-build-env.sh` und `test.sh`, am Ende Commit und Pull Request. Was `scripts/prepare.py` oder der Build wieder erzeugt (`app/node_modules/`, `app/android/`, `dist/`, die Schriften, `app/www/js/prompt.js` und `server/recognize-prompt.txt`), steht in `.gitignore` und gehört nicht ins Repository. `.github/workflows/tests.yml` fährt die Testsuite bei jedem Push und Pull Request auf `ubuntu-latest`.
 - **Notfälle:** `scripts/pack.py` und `scripts/unpack.py` bleiben. `pack.py` schreibt den Arbeitsbaum weiterhin nach `dist/schmeckts-quellen.txt` (App, Tests, Skripte, `PROJEKT.md`) und `dist/schmeckts-server-quellen.txt` (`server/`, `packaging/`, `scripts/build-deb.sh`, `docs/INSTALLATION.md`), `unpack.py` liest beide in denselben Ordner zurück, `design_test.py` prüft den Weg hin und zurück. Gebraucht wird das nur noch, wenn der Quelltext einmal ohne Git weitergereicht werden muss — im Alltag nicht mehr.
 - **Signaturschlüssel:** immer derselbe, sonst sind keine Updates über die installierte App möglich; eine Kopie gehört an einen sicheren Ort. `schmeckts-signatur.txt` (Schlüssel mit Passwort, `scripts/signatur.py`) liegt außerhalb des Repositorys und wird `build-apk.sh` als Pfad übergeben; weder er noch ein `.jks` gehören je in Git. Handys eines Haushalts gemeinsam aktualisieren.
 

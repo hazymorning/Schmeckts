@@ -557,9 +557,9 @@ async def main():
             await idle(f)
             await f.click('#serverBox [data-then=disconnect]')
             await idle(f)
-            box = await f.inner_text('#serverBox')
-            await expect(await state(f, f"prefs.mode === 'lokal' && prefs.code === '' && db.servings.length === {n} && db.pets.length > 0") and box.strip() == 'Mit Haushalt verbinden'
-                         and 'Alle Daten bleiben auf diesem Gerät' in await f.inner_text('#sheet .foot'), '„Verbindung trennen“ wechselt zu „lokal“, die Daten bleiben, im Abschnitt „Haushalt“ nur noch der Knopf')
+            box = await f.eval_on_selector_all('#serverBox .btn', "l => l.map(b => b.innerText.trim())")
+            await expect(await state(f, f"prefs.mode === 'lokal' && prefs.code === '' && db.servings.length === {n} && db.pets.length > 0") and box == ['Änderungen teilen', 'Austausch empfangen', 'Mit Haushalt verbinden']
+                         and 'Alle Daten bleiben auf diesem Gerät' in await f.inner_text('#sheet .foot'), '„Verbindung trennen“ wechselt zu „lokal“, die Daten bleiben, im Abschnitt „Haushalt“ nur noch der Verbinden-Knopf')
             await f.click('#serverBox [data-action=connect-form]')
             await idle(f)
             await expect(await f.input_value('#f-server') == srv.url, 'erneut verbinden: die zuletzt genutzte Adresse steht im Feld')

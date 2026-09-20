@@ -13,13 +13,14 @@ import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openSheet, renderSheet, sheet, sheetBody} from './ui/sheet.js';
 import {expandCard, showOlderDays, timelineGroups, toggleOverview, update} from './views/home.js';
 import {paintServerBox, renderSuggestions} from './views/sheets.js';
-import {retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
+import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
 import {setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
 import {addAlbumPhotos, albumToProfile, closeCrop, deletePet, openPet, removeAlbumPhoto, savePet, setPetPhoto} from './logic/pets.js';
 import {exportData, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
+import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 
 /* Mit dem Haushalt verbinden: erst Adresse, Protokoll und Code prüfen, dann Beispieldaten entfernen und abgleichen */
 async function connectServer(){
@@ -95,11 +96,11 @@ const ACTIONS = {
   'open-serving'(el){
     const s = getServing(el.dataset.id); if (!s) return;
     const unknown = !s.productId && s.status !== 'recognizing';
-    openSheet({kind:'serving', id:s.id, step:unknown ? 'name' : null, brand:'', variety:'', type:'Nassfutter'});
+    openSheet({kind:'serving', id:s.id, step:unknown ? 'name' : null, ...guessOf(s)}); // gelesene Marke und Sorte stehen schon da
   },
   'edit-name'(){
     const s = getServing(sheet.id), p = getProduct(s?.productId);
-    Object.assign(sheet, {step:'name', brand:p?.brand || '', variety:p?.variety || '', type:p?.type || 'Nassfutter', texture:p?.texture}); renderSheet();
+    Object.assign(sheet, {step:'name', ...(p ? {brand:p.brand, variety:p.variety, type:p.type || 'Nassfutter', texture:p.texture} : guessOf(s))}); renderSheet();
   },
   'save-name'(){ saveName(); },
   'use-product'(el){ useProduct(el.dataset.id); },
@@ -143,6 +144,7 @@ const ACTIONS = {
   'album-remove'(el){ removeAlbumPhoto(el.dataset.key); },
   'album-profile'(){ albumToProfile(); },
   backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // Tierfotos im Hintergrund
+  lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // Produktsuche im Internet, Standard aus
   'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // Erinnerung ans Füttern zu den üblichen Zeiten
   remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // Erinnerung zum Bewerten, fragt nach der Erlaubnis
   'remind-own'(){ // „Eigene“: Feld für ganze Stunden, beginnt mit dem geltenden Abstand, von „Aus“ mit 2 Stunden
@@ -151,6 +153,8 @@ const ACTIONS = {
   },
   theme(el){ prefs.theme = el.dataset.v; savePrefs(); applyTheme(); renderSheet(); haptic('select'); },
   'export'(){ exportData(); },
+  'share-changes'(){ haptic('select'); shareChanges(); },                      // Austausch von Hand, Abschnitt „Haushalt“
+  'send-answer'(){ haptic('select'); shareChanges(sheet?.exchange?.peer); },   // genau das, was dem anderen Gerät fehlt
   demo(){ loadDemo(); },
   expand(el){ haptic('select'); expandCard(el.dataset.v); },
   'toggle-overview'(){ haptic('select'); toggleOverview(); }, // der ganze Text der Übersicht und zurück
@@ -174,7 +178,9 @@ const ACTIONS = {
    bleibt das Füttern-Sheet offen. */
 const LINKS = ['fuettern', 'scan', 'foto'];
 export async function openLink(url){
-  const path = String(url || '').replace(/^schmeckts:\/*/i, '').replace(/[/?#].*$/, '').toLowerCase();
+  const raw = String(url || '');
+  if (/^(content|file):/i.test(raw)) { await receiveUri(raw); return true; } // Austausch-Datei aus einer anderen App
+  const path = raw.replace(/^schmeckts:\/*/i, '').replace(/[/?#].*$/, '').toLowerCase();
   if (!LINKS.includes(path)) return false;
   if (!db.pets.length) { openSheet({kind:'pet', name:'', species:'Katze', photo:null, from:null}); toast('Leg zuerst dein Tier an.'); return true; }
   await closeSheet();
@@ -236,3 +242,4 @@ onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code 
 onFile('#petPhotoInput', setPetPhoto);
 $('#albumInput').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; addAlbumPhotos(files); });
 onFile('#importInput', importData);
+onFile('#exchangeInput', receiveFile);

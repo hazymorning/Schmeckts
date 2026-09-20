@@ -7,7 +7,7 @@ import {isConnected} from '../sync.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
 import {cropSquare, fileToImage, memPhotos, resize} from '../images.js';
 import {milestones} from '../smart.js';
-import {recognize} from '../recognize.js';
+import {identify} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, dlg, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
@@ -79,7 +79,7 @@ export async function servePhoto(file, scanCode = ''){
   update(); scrollTop();
   if (local) openSheet({kind:'serving', id:s.id, step:'name', brand:'', variety:'', type:'Nassfutter'}); // Sorte direkt eintippen
   toast(withMilestone(`Serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}${local ? '' : '. Sorte wird erkannt …'}`), () => undoServe(s.id));
-  if (!local) recognizeServing(s.id);
+  recognizeServing(s.id); // die Erkennungskette entscheidet, was möglich ist – im Modus „lokal“ liest das Handy den Text
 }
 
 const running = new Set();                    // laufende Erkennungen
@@ -96,20 +96,28 @@ async function recognizeServing(id){
     return;
   }
   running.add(id);
-  s.status = 'recognizing'; delete s.error; save(); refreshServing(id);
-  let recognized = null, err = null;
-  try { recognized = await recognize(b64); } catch (e) { err = e; console.warn('Erkennung fehlgeschlagen:', e.message); }
+  const house = isConnected(); // im Haushalt erkennt der Server, sonst liest das Handy den Text auf dem Foto
+  s.status = house ? 'recognizing' : 'reading'; delete s.error; save(); refreshServing(id);
+  let found = {source:'', error:null};
+  try { found = await identify({code:s.scanCode || '', photo:b64}); } catch (e) { console.warn('Erkennung:', e?.message || e); }
   running.delete(id);
   const cur = getServing(id); if (!cur) return;
   if (cur.productId) { settle(cur); save(); refreshServing(id); return; } // inzwischen benannt, hier oder auf einem anderen Handy
-  const brand = String(recognized?.brand || '').trim(), variety = String(recognized?.variety || '').trim();
-  if (brand || variety) {
+  const err = found.error;
+  if (found.products?.length) {                       // der Barcode gehört inzwischen zu einer bekannten Sorte
     tries.delete(id);
-    refinePets(cur, findProduct(brand, variety), recognized.animal);
-    applyProduct(cur, {brand, variety, type:recognized.type, animal:recognized.animal, texture:recognized.texture});
+    linkProduct(cur, found.products[0]);
+  } else if (found.details && found.source !== 'text') {
+    tries.delete(id);
+    refinePets(cur, findProduct(found.details.brand, found.details.variety), found.details.animal);
+    applyProduct(cur, found.details);
     if (sheet?.kind === 'serving' && sheet.id === id && sheet.step === 'name' && !sheet.brand && !sheet.variety) sheet.step = null;
-  } else if (err?.kind === 'none') {
-    cur.status = 'noserver'; delete cur.error; // inzwischen getrennt: wie ein Foto im Modus „lokal“
+  } else if (found.details) {                         // vom Handy gelesen: der Mensch bestätigt oder ändert beim Benennen
+    tries.delete(id);
+    cur.guess = found.details; cur.status = 'noserver'; delete cur.error;
+    fillName(id, found.details);
+  } else if (!house || err?.kind === 'none') {
+    cur.status = 'noserver'; delete cur.error; // ohne Server und ohne Schlüssel: die Sorte wird eingetippt
   } else if (err?.retry) {
     const t = tries.get(id) || {n:0, next:0};
     if (err.kind !== 'offline' || err.timeout) t.n++; // Server nicht erreichbar kostet nichts und zählt nicht
@@ -126,10 +134,19 @@ async function recognizeServing(id){
   save(); refreshServing(id);
 }
 
+/* Gelesene Marke und Sorte in den offenen Benennen-Ablauf schreiben, solange dort nichts eingetippt wurde */
+function fillName(id, guess){
+  if (sheet?.kind !== 'serving' || sheet.id !== id || sheet.step !== 'name' || sheet.brand || sheet.variety) return;
+  Object.assign(sheet, {brand:guess.brand || '', variety:guess.variety || '', type:guess.type || sheet.type, texture:guess.texture});
+}
+/* Was das Handy gelesen hat, füllt das Formular beim Benennen vor (actions.js) */
+export const guessOf = s => ({brand:s?.guess?.brand || '', variety:s?.guess?.variety || '',
+  type:s?.guess?.type || 'Nassfutter', texture:s?.guess?.texture});
+
 function settle(s){ // benannt, hier oder auf einem anderen Handy: Foto und Erkennungsstatus werden nicht mehr gebraucht
   const p = getProduct(s.productId);
   if (p) linkProduct(s, p); // räumt auf und hängt einen gescannten Code an
-  else { delete s.photo; delete s.status; delete s.error; delete s.autoPets; memPhotos.delete(s.id); }
+  else { delete s.photo; delete s.status; delete s.error; delete s.autoPets; delete s.guess; memPhotos.delete(s.id); }
   tries.delete(s.id);
 }
 
@@ -142,6 +159,7 @@ export async function retryWaiting(){
     for (const s of [...db.servings]) {
       if (s.productId) { if (s.status || s.photo) { settle(s); save(); refreshServing(s.id); } continue; }
       if (s.status !== 'waiting' && s.status !== 'noserver') continue;
+      if (s.guess) continue; // das Handy hat den Text schon gelesen, der Mensch bestätigt beim Benennen
       if ((tries.get(s.id)?.next || 0) > Date.now()) continue;
       await recognizeServing(s.id);
     }

@@ -1,10 +1,9 @@
-/* Scannen beim Füttern. Bekannter Code: servieren, bei mehreren Sorten Auswahl. Unbekannt: den Server fragen, falls er
-   die Barcode-Suche kann; ohne Treffer weiter mit dem Foto der Vorderseite. */
+/* Scannen beim Füttern. Die Erkennungskette (recognize.js) sagt, was der Code ist: bekannte Sorte servieren, bei
+   mehreren Sorten Auswahl, sonst Produktsuche im Internet oder über den Server. Ohne Treffer folgt das Foto der Vorderseite. */
 import {normBarcode} from '../text.js';
 import {haptic, scanBarcode} from '../native.js';
-import {serverCan} from '../sync.js';
-import {findProduct, productsByCode} from '../derive.js';
-import {lookupBarcode} from '../recognize.js';
+import {findProduct} from '../derive.js';
+import {identify} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {serveProduct, shootPhoto} from './feeding.js';
@@ -41,23 +40,17 @@ async function run(feed){
   if (!raw || !open(feed)) return; // abgebrochen: das Füttern-Sheet bleibt
   const code = normBarcode(raw);
   if (!code) { haptic('strong'); toast('Das ist kein gültiger Barcode.'); return; }
-  const known = productsByCode(code);
+  const found = await identify({code, note:text => note(feed, text)});
+  if (!open(feed)) return;
+  const known = found.products || [];
   if (known.length === 1) return serve(known[0], code);
   if (known.length > 1) { haptic('select'); Object.assign(feed, {step:'pick', code}); renderSheet(); return; }
-  const hit = await lookup(feed, code);
-  if (!open(feed)) return;
-  if (hit) { const p = findProduct(hit.brand, hit.variety); if (p) applyTexture(p, hit); return serve(p || newProduct(hit), code); }
+  if (found.details) {
+    const hit = found.details, p = findProduct(hit.brand, hit.variety);
+    if (p) applyTexture(p, hit);
+    return serve(p || newProduct(hit), code);
+  }
   await photo(feed, code);
-}
-
-/* Unbekannter Code: nur fragen, wenn der Server die Barcode-Suche kann. null ohne Treffer oder ohne Verbindung */
-async function lookup(feed, code){
-  if (!await serverCan('barcode')) return null;
-  note(feed, 'Barcode wird nachgeschlagen …');
-  const hit = await lookupBarcode(code).catch(e => { console.warn('Barcode-Suche:', e.message); return null; });
-  note(feed, '');
-  const brand = String(hit?.brand || '').trim(), variety = String(hit?.variety || '').trim();
-  return hit?.found && (brand || variety) ? {brand, variety, type:hit.type, animal:hit.animal, texture:hit.texture} : null;
 }
 
 async function serve(p, code){

@@ -15,7 +15,8 @@ PACK = ROOT / 'dist/test/packung.jpg'  # wird beim Start erzeugt
 SHEBA, UPC = '4008429087455', '036000291452'  # gültige Testcodes, UPC-A wird zu 0036000291452
 
 # Simulierte Android-Plugins. Das Dateisystem liegt in localStorage unter „__fs:“, damit es ein Neuladen
-# (= App-Neustart) übersteht. rename ersetzt das Ziel wie unter Linux. Aufrufe landen in window.__calls.
+# (= App-Neustart) übersteht; auch geteilte Dateien im CACHE stehen dort, damit Tests ihren Inhalt lesen können. rename ersetzt das Ziel wie unter Linux. Aufrufe landen in window.__calls.
+# Eine Datei aus einer anderen App (content://…) liefert convertFileSrc aus dem simulierten Dateisystem.
 # Deep Links: window.__urlOpen({url}) löst appUrlOpen aus; steht beim Laden sessionStorage.__launchUrl, kommt das
 # Ereignis wie beim Kaltstart sofort nach dem Anmelden (Capacitor hält es zurück). Das eigene Foto-Plugin
 # liefert window.__photo (Base64) oder lehnt ab, wenn es fehlt. Der Barcode-Scanner (nur scan(), wie in der App)
@@ -46,14 +47,19 @@ const LocalNotifications = {
 const Filesystem = {
   readFile: ({path}) => { const v = localStorage.getItem(key(path)); return v == null ? missing() : Promise.resolve({data: v}); },
   writeFile: ({path, data, directory}) => { window.__calls.push(['writeFile', {path, directory}]);
-    if (directory === 'CACHE') (window.__cache ||= []).push(path); else localStorage.setItem(key(path), data); return Promise.resolve({uri: 'file:///' + directory + '/' + path}); },
+    if (directory === 'CACHE' && !(window.__cache ||= []).includes(path)) window.__cache.push(path);
+    localStorage.setItem(key(path), data); return Promise.resolve({uri: 'file:///' + directory + '/' + path}); },
   rename: ({from, to}) => { window.__calls.push(['rename', {from, to}]); const v = localStorage.getItem(key(from));
     if (v == null) return missing(); localStorage.setItem(key(to), v); localStorage.removeItem(key(from)); return Promise.resolve(); },
-  deleteFile: ({path, directory}) => { window.__calls.push(['deleteFile', {path, directory}]); localStorage.removeItem(key(path)); return Promise.resolve(); },
+  deleteFile: ({path, directory}) => { window.__calls.push(['deleteFile', {path, directory}]); localStorage.removeItem(key(path));
+    window.__cache = (window.__cache || []).filter(n => n !== path); return Promise.resolve(); },
   readdir: ({directory}) => Promise.resolve({files: directory === 'CACHE' ? (window.__cache || []).map(name => ({name})) : []}),
   stat: ({path}) => localStorage.getItem(key(path)) == null ? missing() : Promise.resolve({type: 'file'})
 };
-window.Capacitor = {isNativePlatform: () => true, Plugins: {
+window.Capacitor = {isNativePlatform: () => true,
+  convertFileSrc: uri => { const v = localStorage.getItem(key(String(uri).split('/').pop()));   // Datei aus einer anderen App
+    return v == null ? uri : 'data:application/json;charset=utf-8,' + encodeURIComponent(v); },
+  Plugins: {
   Haptics: {impact: rec('impact')}, SystemBars: {setStyle: rec('setStyle')},
   App: {addListener: (e, fn) => { if (e === 'backButton') window.__back = fn;
         if (e === 'appUrlOpen') { window.__urlOpen = fn; const u = sessionStorage.getItem('__launchUrl'); if (u) fn({url: u}); } },
@@ -70,6 +76,9 @@ window.Capacitor = {isNativePlatform: () => true, Plugins: {
     scan: o => { window.__calls.push(['scan', o ?? null]); const c = window.__barcode;
       if (window.__scanError) return Promise.reject(new Error(window.__scanError));
       return c ? Promise.resolve({barcodes: [{rawValue: c, format: c.length === 12 ? 'UPC_A' : 'EAN_13'}]}) : Promise.reject(new Error('scan canceled.')); }},
+  TextRecognition: {processImage: o => { window.__calls.push(['processImage', o ?? null]);
+    if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
+    return new Promise(done => setTimeout(() => done({text: window.__ocrText || '', blocks: []}), window.__ocrDelay || 0)); }},
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 

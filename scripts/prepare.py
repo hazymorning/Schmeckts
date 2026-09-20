@@ -2,6 +2,8 @@
 """Erzeugt alles, was nicht als Quelltext im Projekt liegt. Macht nur, was fehlt.
 
   - die Schriften Figtree und Fraunces in app/www/fonts/ (Download von Google Fonts, per SHA-256 geprüft)
+  - aus shared/recognize-prompt.txt das Modul app/www/js/prompt.js und die Kopie server/recognize-prompt.txt
+    (die bindet server/recognize.go mit //go:embed ein; gepflegt wird nur die Datei in shared/)
   - das Android-Projekt app/android/ (von Capacitor erzeugt, dann mit app/native/ angepasst:
     Ressourcen, das Foto-Plugin, Manifest mit Deep Links, Kurzbefehlen, Scanner-Modul und ohne exakte Alarme,
     Startbildschirm, Version)
@@ -9,9 +11,10 @@
 
 Aufruf: scripts/prepare.py                  normal
         scripts/prepare.py --neu            Android-Projekt vorher löschen und neu erzeugen
-        scripts/prepare.py --nur-schriften  nur die Schriften (reicht für Tests im Browser)
+        scripts/prepare.py --nur-schriften  nur Schriften und Prompt (reicht für Tests im Browser)
+        scripts/prepare.py --nur-prompt     nur den Prompt (reicht, um den Server zu bauen)
 """
-import hashlib, os, pathlib, shutil, subprocess, sys, urllib.request
+import hashlib, json, os, pathlib, shutil, subprocess, sys, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / 'app'
@@ -43,6 +46,19 @@ def fonts():
             sys.exit(f'Prüfsumme stimmt nicht: {name}')
         path.write_bytes(data)
         print('Schrift geladen:', name)
+
+
+def prompt():
+    """Der Prompt der Foto-Erkennung steht nur in shared/recognize-prompt.txt: einmal als Modul für die App,
+    einmal als Kopie im Go-Paket, weil //go:embed nicht aus dem Paketordner herausreicht."""
+    text = (ROOT / 'shared/recognize-prompt.txt').read_text(encoding='utf-8').strip()
+    module = ('/* Erzeugt von scripts/prepare.py aus shared/recognize-prompt.txt, bitte dort ändern.\n'
+              '   Denselben Text bindet server/recognize.go ein (//go:embed recognize-prompt.txt). */\n'
+              f'export const PROMPT = {json.dumps(text, ensure_ascii=False)};\n')
+    for path, data in ((APP / 'www/js/prompt.js', module), (ROOT / 'server/recognize-prompt.txt', text + '\n')):
+        if not path.exists() or path.read_text(encoding='utf-8') != data:
+            path.write_text(data, encoding='utf-8')
+            print('Prompt erzeugt:', path.relative_to(ROOT))
 
 
 def edit(path, old, new):
@@ -93,7 +109,19 @@ def android(fresh):
          '                <category android:name="android.intent.category.BROWSABLE" />\n'
          '                <data android:scheme="schmeckts" />\n'
          '            </intent-filter>\n'
-         '            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />\n')
+         '            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />\n'
+         # Austausch-Dateien aus einer anderen App: geöffnet (VIEW) oder geteilt (SEND); MainActivity macht aus SEND ein VIEW
+         '            <intent-filter>\n'
+         '                <action android:name="android.intent.action.VIEW" />\n'
+         '                <category android:name="android.intent.category.DEFAULT" />\n'
+         '                <category android:name="android.intent.category.BROWSABLE" />\n'
+         '                <data android:mimeType="application/json" />\n'
+         '            </intent-filter>\n'
+         '            <intent-filter>\n'
+         '                <action android:name="android.intent.action.SEND" />\n'
+         '                <category android:name="android.intent.category.DEFAULT" />\n'
+         '                <data android:mimeType="application/json" />\n'
+         '            </intent-filter>\n')
 
     # Googles Scanner-Modul (scan() aus @capacitor-mlkit/barcode-scanning) schon bei der Installation laden.
     edit(MAIN / 'AndroidManifest.xml',
@@ -124,7 +152,25 @@ def android(fresh):
          '    @Override\n'
          '    public void onCreate(android.os.Bundle savedInstanceState) {\n'
          '        registerPlugin(FotoPlugin.class); // app/native/java, für den Kurzbefehl „Packung fotografieren“\n'
+         '        geteilt(getIntent());\n'
          '        super.onCreate(savedInstanceState);\n'
+         '    }\n'
+         '\n'
+         '    @Override\n'
+         '    public void onNewIntent(android.content.Intent intent) {\n'
+         '        geteilt(intent);\n'
+         '        super.onNewIntent(intent);\n'
+         '    }\n'
+         '\n'
+         '    // Eine aus einer anderen App geteilte Datei (ACTION_SEND) trägt ihre Adresse im Extra. Als ACTION_VIEW\n'
+         '    // reicht Capacitor sie als appUrlOpen weiter, und die App öffnet damit den Empfangen-Ablauf.\n'
+         '    private void geteilt(android.content.Intent intent) {\n'
+         '        if (intent == null || !android.content.Intent.ACTION_SEND.equals(intent.getAction())) return;\n'
+         '        android.os.Parcelable datei = intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM);\n'
+         '        if (datei instanceof android.net.Uri) {\n'
+         '            intent.setAction(android.content.Intent.ACTION_VIEW);\n'
+         '            intent.setData((android.net.Uri) datei);\n'
+         '        }\n'
          '    }\n'
          '}')
 
@@ -142,7 +188,10 @@ def android(fresh):
          "def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version\n"
          "def appVersionCode = appVersion.tokenize('.').collect { it as int }.inject(0) { acc, n -> acc * 100 + n }\n")
     edit(gradle, '        versionCode 1\n        versionName "1.0"',
-         '        versionCode appVersionCode\n        versionName appVersion')
+         '        versionCode appVersionCode\n        versionName appVersion\n'
+         # Die App läuft auf Handys, also nur ARM. Die Texterkennung bringt ihre Bibliothek je Prozessorfamilie mit,
+         # x86 und x86_64 (nur Emulatoren und Chromebooks) würden die APK etwa verdoppeln. build-apk.sh prüft das.
+         '        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }')
 
     # Nur scan(): Barcodes liest Googles Scanner in den Play-Diensten. Das mitgelieferte ML-Kit-Modell für die
     # eigene Kameravorschau des Plugins (startScan) braucht die App nicht, ohne es ist die APK rund 20 MB kleiner.
@@ -158,7 +207,9 @@ def android(fresh):
 
 
 if __name__ == '__main__':
-    fonts()
-    if '--nur-schriften' not in sys.argv:
+    prompt()
+    if '--nur-prompt' not in sys.argv:
+        fonts()
+    if not {'--nur-schriften', '--nur-prompt'} & set(sys.argv):
         android('--neu' in sys.argv)
     print('Vorbereitung fertig')

@@ -9,7 +9,8 @@ import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validI
 
 export {flush, storageOK};
 export const defaults = () => ({version:3, pets:[], products:[], servings:[]});
-const defaultPrefs = () => ({theme:'system', hiddenHints:[], closedWeek:'', milestones:null, remind:0, feedRemind:false, backdrop:true, mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[]});
+const defaultPrefs = () => ({theme:'system', hiddenHints:[], closedWeek:'', milestones:null, remind:0, feedRemind:false, backdrop:true,
+  mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, aiKey:'', codes:{}, exchange:{}});
 export const hooks = {changed(){}, saved(){}}; // Oberfläche und Abgleich hängen sich hier an
 
 export function tidy(d){
@@ -20,7 +21,8 @@ export function tidy(d){
   }
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
   for (const s of out.servings) {
-    if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed'; // Erkennung wurde unterbrochen
+    if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed';  // Erkennung wurde unterbrochen
+    if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed';     // Lesen wurde unterbrochen: eintippen
   }
   out.servings.sort((a, b) => b.servedAt - a.servedAt);
   return out;
@@ -33,6 +35,10 @@ function tidyPrefs(p){
   out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // Tierfotos hinter der Kopfzeile, Standard an ('off': Wert aus 1.1.0)
   out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: noch nie gesetzt, siehe load()
+  out.lookup = out.lookup === true;                                    // Produktsuche im Internet, Standard aus
+  out.aiKey = typeof out.aiKey === 'string' ? out.aiKey.trim() : '';   // eigener KI-Schlüssel, nur auf diesem Handy
+  out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};       // gemerkte Barcode-Antworten
+  out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // Stand je Gerät, mit dem getauscht wurde
   return out;
 }
 function tidyState(s){
@@ -172,14 +178,41 @@ function change(c, r, json){
 let changedTimer = null;
 function notify(){ clearTimeout(changedTimer); changedTimer = setTimeout(() => hooks.changed(), 120); } // gebündelt
 
-/* records: [{c, r, f: {feld: {v, t}}}], jeweils komplett, so wie der Server sie liefert */
+/* records: [{c, r, f: {feld: {v, t}}}], jeweils komplett, so wie der Server sie liefert. Liefert die Zahl der
+   geänderten Datensätze (0 = nichts Neues). */
 export function merge(records){
   save(); // eigene, noch nicht erfasste Änderungen zuerst festhalten
-  let changed = false;
-  for (const x of records) if (applyRecord(x.c, x.r, x.f || {}, true)) changed = true;
+  let changed = 0;
+  for (const x of records) if (applyRecord(x.c, x.r, x.f || {}, true)) changed++;
   if (changed) { sortServings(); notify(); }
   persist('db', 'sync');
   return changed;
+}
+
+/* Austausch von Hand (logic/exchange.js): alle eigenen Feld-Uhren, und die Datensätze, die dieses Gerät neuer hat als
+   die Gegenseite. peer: deren Uhren (aus ihrer Datei), sonst eine Marke (höchste Uhr beim letzten Austausch), null: alles. */
+export const allClocks = () => Object.fromEntries(COLLECTIONS.map(c => [c, state.clocks[c]]));
+export const topClock = () => {
+  let top = '';
+  for (const c of COLLECTIONS) for (const clocks of Object.values(state.clocks[c])) for (const t of Object.values(clocks)) if (t > top) top = t;
+  return top;
+};
+export function changesSince(peer){
+  const out = [];
+  for (const c of COLLECTIONS) {
+    const visible = new Map(db[c].map(r => [r.id, r]));
+    for (const [id, clocks] of Object.entries(state.clocks[c])) {
+      const theirs = peer && typeof peer === 'object' ? peer[c]?.[id] || {} : null;
+      const newer = ([k, t]) => theirs ? !theirs[k] || t > theirs[k] : !peer || t > peer;
+      if (!Object.entries(clocks).some(newer)) continue;
+      const rec = visible.get(id), f = {};
+      if (rec) for (const [k, t] of Object.entries(clocks)) f[k] = k === '_del' ? {v:false, t} : {v:valueOf(c, rec, k), t};
+      else if (clocks._del) f._del = {v:true, t:clocks._del};  // gelöscht: die übrigen Werte kennt dieses Gerät nicht mehr
+      else continue;
+      out.push({c, r:id, f});
+    }
+  }
+  return out;
 }
 
 /* Führt Felder eines Datensatzes zusammen. full: fields enthält alle Felder, die der Server kennt. */

@@ -58,7 +58,7 @@ export function linkProduct(s, p){
   s.productId = p.id;
   p.lastPets = Object.keys(s.pets);
   if (s.scanCode) (p.codes ||= {})[s.scanCode] = true;
-  delete s.photo; delete s.thumb; delete s.status; delete s.error; delete s.autoPets;
+  delete s.photo; delete s.thumb; delete s.status; delete s.error; delete s.autoPets; delete s.guess;
   memPhotos.delete(s.id);
   if (prev && prev !== p.id) cleanupProduct(prev);
 }

@@ -12,6 +12,9 @@ export const haptic = (level = 'select') => {
   try { Native?.Haptics ? Native.Haptics.impact({style}).catch(() => {}) : navigator.vibrate?.(ms); } catch (e) {}
 };
 
+/* Eine Datei aus einer anderen App (content:// oder file://) über Capacitors eigenen Server lesbar machen */
+export const fileUrl = uri => window.Capacitor?.convertFileSrc?.(uri) || uri;
+
 /* Text weitergeben: in der App über das Teilen-Menü (Share-Plugin), im Browser navigator.share, sonst die Zwischenablage.
    Liefert 'copied', wenn der Text nur kopiert wurde, sonst 'shared'. Abbrechen ist kein Fehler. */
 export async function shareText(title, text){
@@ -53,6 +56,20 @@ export async function takePhoto(hint){ // Blob des Fotos, null bei Abbruch
   const r = await Foto.aufnehmen(hint ? {hinweis:hint} : undefined);
   if (!r?.base64) return null;
   return fetch('data:image/jpeg;base64,' + r.base64).then(x => x.blob());
+}
+
+/* Text auf einem Foto lesen (Plugin @capacitor-mlkit/text-recognition, nur processImage, lateinische Schrift).
+   Das läuft auf dem Gerät, ohne Netz und ohne Schlüssel; ein Kamerarecht braucht es nicht, das Foto kommt aus dem
+   bestehenden Ablauf. Es liegt dafür kurz im privaten Cache und wird gleich wieder gelöscht. Liefert '', wenn nichts geht. */
+const TextReader = plugin('TextRecognition');
+const TEXT_FILE = 'schmeckts-lesen.jpg';
+export async function readPhotoText(b64){
+  if (!TextReader || !Native?.Filesystem || !b64) return '';
+  try {
+    const {uri} = await Native.Filesystem.writeFile({path:TEXT_FILE, data:b64, directory:'CACHE'});
+    try { return String((await TextReader.processImage({path:uri}))?.text || ''); }
+    finally { await Native.Filesystem.deleteFile({path:TEXT_FILE, directory:'CACHE'}).catch(() => {}); }
+  } catch (e) { console.warn('Text auf dem Foto:', e?.message || e); return ''; }
 }
 
 /* Barcode lesen mit Googles fertiger Scan-Oberfläche (Plugin @capacitor-mlkit/barcode-scanning, nur scan()).

@@ -9,6 +9,7 @@ import json, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKIP_DIRS = {'node_modules', 'android', 'dist', '.gradle', '.git'}
+SKIP_FILES = {'app/www/js/prompt.js', 'server/recognize-prompt.txt'}  # erzeugt scripts/prepare.py aus shared/recognize-prompt.txt
 SERVER = ('server/', 'packaging/', 'scripts/build-deb.sh', 'docs/INSTALLATION.md')
 MARK = re.compile(r'^===== DATEI: ', re.M)
 
@@ -16,7 +17,7 @@ MARK = re.compile(r'^===== DATEI: ', re.M)
 def files():
     for path in sorted(ROOT.rglob('*'), key=lambda p: (p.name != 'PROJEKT.md', str(p))):
         rel = path.relative_to(ROOT)
-        if path.is_dir() or SKIP_DIRS & set(rel.parts):
+        if path.is_dir() or SKIP_DIRS & set(rel.parts) or rel.as_posix() in SKIP_FILES:
             continue
         try:
             text = path.read_text(encoding='utf-8')

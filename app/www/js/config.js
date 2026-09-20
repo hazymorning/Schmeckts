@@ -43,6 +43,19 @@ export const TEXTURES = {
 /* textureOf: Eintrag zu einem Schlüssel, nur wenn er zur Art der Sorte passt; guessTexture: Schlüssel nach den Stichwörtern */
 export const textureOf = (product, key) => TEXTURES[typeOf(product)]?.items.find(([k]) => k === key);
 export const guessTexture = product => TEXTURES[typeOf(product)]?.items.find(([, , re]) => re.test(`${product.brand} ${product.variety}`))?.[0];
+/* Texterkennung auf der Packung (js/ocr.js). BRANDS: gängige Futtermarken für Katze und Hund samt deutschen
+   Handelsmarken; steht eine davon im Text, gilt sie mit dieser Schreibweise. Bei mehreren gewinnt die längste.
+   TYPE_WORDS und ANIMAL_WORDS: Stichwörter für Art und Tierart, die Konsistenz kommt aus TEXTURES. */
+export const BRANDS = ['Whiskas', 'Sheba', 'Felix', 'Kitekat', 'Gourmet', 'Perfect Fit', 'Purina One', 'Pro Plan', 'Friskies', 'Beneful',
+  'Cesar', 'Pedigree', 'Frolic', 'Chappi', 'Dreamies', 'Catessy', 'Vitakraft', 'Animonda', 'Miamor', 'Schesir',
+  'Catz Finefood', 'MAC’s', 'Wildes Land', 'Terra Canis', 'Herrmann’s', 'Lukullus', 'Rocco', 'Cosma', 'Feringa', 'Smilla',
+  'Concept for Life', 'Wolf of Wilderness', 'Purizon', 'Josera', 'Happy Cat', 'Happy Dog', 'Bosch', 'Sanabelle', 'Royal Canin', 'Hill’s',
+  'Eukanuba', 'Iams', 'Select Gold', 'Real Nature', 'Multifit', 'Wolfsblut', 'Belcando', 'Dr. Clauder’s', 'Granatapet', 'Leonardo',
+  'Almo Nature', 'Applaws', 'Yarrah', 'Defu', 'Christopherus', 'Mera', 'MjAMjAM', 'Rinti', 'Bozita', 'Platinum',
+  'Kattovit', 'Lily’s Kitchen', 'Edgard & Cooper', 'Coshida', 'Orlando', 'Winston', 'Cachet', 'Romeo', 'K-Classic', 'Dein Bestes'];
+export const TYPE_WORDS = [['Trockenfutter', /trockenfutter|trockennahrung|kroketten|kibble|dry food/i],
+  ['Snack', /snack|leckerli|leckerchen|belohnung|treat/i], ['Nassfutter', /nassfutter|nassnahrung|wet food/i]];
+export const ANIMAL_WORDS = [['Katze', /katze|kätzchen|kitten|\bcat\b/i], ['Hund', /hund|welpe|puppy|\bdog\b/i]];
 export const FLAVORS = [['Thunfisch',/thunfisch|tuna/i],['Lachs',/lachs|salmon/i],['Huhn',/huhn|hühn|chicken|geflügel/i],
   ['Pute',/pute|truthahn|turkey/i],['Rind',/rind|beef/i],['Ente',/ente|duck/i],['Lamm',/lamm|lamb/i],
   ['Kaninchen',/kaninchen|rabbit/i],['Wild',/wild|hirsch|reh/i],['Fisch',/fisch|fish|forelle|kabeljau/i],['Käse',/käse|cheese/i]];

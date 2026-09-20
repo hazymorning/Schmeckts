@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Abläufe und Oberfläche der App in Chromium, ohne Server, mit simulierten Android-Plugins.
 Aufruf: python3 tests/ui_test.py [name …] [--bilder]   (--bilder legt Screenshots in dist/test/ ab)"""
-import asyncio, base64, json, re
+import asyncio, base64, json, re, time
 import xml.etree.ElementTree as ET
 from common import PACK, ROOT, SAVED, SHEBA, UPC, check, contrast, debounced, idle, make_pictures, open_page, phone, real_errors, run_tests, seeded, shot, started, state, until
 
@@ -44,9 +44,11 @@ async def test_tour(browser, url, scheme='light'):
     bg = await pg.evaluate('getComputedStyle(document.documentElement).backgroundColor')
     meta = await pg.eval_on_selector('meta[name=theme-color]', 'm => m.content')
     check(bg == meta and await pg.get_attribute('html', 'data-theme') == other, f'Theme gewechselt: Grund und Browserleiste folgen ({meta})')
-    box = await pg.inner_text('#serverBox')
-    check(box.strip() == 'Mit Haushalt verbinden' and await pg.locator('#serverBox button').count() == 1 and await pg.locator('#f-code, #f-server').count() == 0,
-          f'Einstellungen, Abschnitt „Haushalt“ im Modus „lokal“: nur der Knopf „Mit Haushalt verbinden“ ({box.strip()!r})')
+    rows = await pg.eval_on_selector_all('#serverBox .label, #serverBox .btn, #serverBox input', "l => l.map(e => e.innerText?.trim() || e.id)")
+    check(rows == ['Produktsuche im Internet', 'Eigener KI-Schlüssel', 'f-aikey', 'Austausch von Hand', 'Änderungen teilen',
+                   'Austausch empfangen', 'Mit Haushalt verbinden']
+          and await pg.locator('#f-code, #f-server').count() == 0 and await pg.locator('#f-aikey[type=password]').count() == 1,
+          f'Einstellungen, Abschnitt „Haushalt“ im Modus „lokal“: Produktsuche, verdeckter Schlüssel, Austausch, Verbinden ({rows})')
     await pg.locator('#serverBox').scroll_into_view_if_needed()
     await shot(pg, f'{scheme}-einstellungen')
     await pg.click('[data-action=close]'); await idle(pg)
@@ -864,8 +866,9 @@ SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn
 
 PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
            'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
+           'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
            'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
-           'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“.']
+           'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.']
 
 
 async def texts(pg):
@@ -925,7 +928,8 @@ async def test_modes(browser, url):
     await pg.click('#fab'); await idle(pg)
     seen.append(await texts(pg))
     await pg.evaluate('window.__calls.length = 0')
-    await pg.set_input_files('#camInputSheet', str(PACK)); await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'"); await idle(pg)   # das Handy liest den Text, hier ohne Ergebnis
     seen.append(await texts(pg))
     view = await pg.evaluate("""import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.kind, m.sheet?.step, document.querySelector('#sheet h2')?.innerText,
       !!document.querySelector('#sheet .name-photo'), document.querySelectorAll('#sheet .note, #sheet .warn, #sheet .spin').length, document.getElementById('toast').innerText.trim()])""")
@@ -965,7 +969,8 @@ async def test_modes(browser, url):
     check(not found, f'Modus „lokal“: nirgends Hinweise auf Server, Abgleich oder Erkennung (Willkommen, So geht’s, Einstellungen, Füttern, Foto, Scannen) {found}')
     check(await pg.locator('#syncChip').is_hidden(), 'kein Sync-Hinweis in der Kopfzeile')
     foreign = [r for r in requests if not r.startswith((url.rsplit('/', 1)[0], 'data:', 'blob:'))]
-    check(len(requests) > 20 and not foreign, f'Modus „lokal“: keine einzige Netzwerkanfrage außer an die App selbst ({len(requests)} Anfragen) {foreign[:3]}')
+    check(len(requests) > 20 and not foreign and await state(pg, '!prefs.lookup && !prefs.aiKey'),
+          f'Modus „lokal“: keine einzige Netzwerkanfrage außer an die App selbst, solange Produktsuche und eigener Schlüssel aus sind ({len(requests)} Anfragen) {foreign[:3]}')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     data = await pg.eval_on_selector_all('#sheet .btn-col:has([data-action=open-privacy]) > *', "l => l.map(b => [b.innerText.trim(), b.classList.contains('btn'), !!b.querySelector('svg')])")
     check([d[0] for d in data] == ['Backup exportieren', 'Backup importieren', 'Beispieldaten laden', 'Datenschutz', 'Alle Daten löschen'] and all(d[1] and d[2] for d in data)
@@ -978,7 +983,8 @@ async def test_modes(browser, url):
     await pg.click('[data-action=open-settings]'); await idle(pg)
     await pg.click('[data-action=export]'); await idle(pg)
     await pg.click('[data-action=export]'); await idle(pg)
-    gone = [c[1]['path'] for c in await pg.evaluate('window.__calls') if c[0] == 'deleteFile' and c[1]['directory'] == 'CACHE']
+    gone = [c[1]['path'] for c in await pg.evaluate('window.__calls')
+            if c[0] == 'deleteFile' and c[1]['directory'] == 'CACHE' and c[1]['path'].startswith('schmeckts-backup-')]
     check(len(gone) == 1 and gone[0].startswith('schmeckts-backup-'), f'ein geteiltes Backup bleibt nicht im Cache liegen: vor dem nächsten Export gelöscht ({gone})')
     await pg.click('[data-action=close]'); await idle(pg)
     check(not real_errors(errors), f'keine Fehler in der Konsole {real_errors(errors)}')
@@ -1050,6 +1056,10 @@ async def test_shortcuts(browser, url):
     foto = (ROOT / 'app/native/java/de/schmeckts/app/FotoPlugin.java').read_text()
     check('ACTION_IMAGE_CAPTURE' in foto and 'hinweis' in foto, 'Foto-Plugin nutzt die System-Kamera, mit Hinweis darüber')
     check('com.google.mlkit.vision.DEPENDENCIES' in prep and 'barcode_ui' in prep, 'prepare.py meldet Googles Scanner-Modul im Manifest an (barcode_ui)')
+    check('android:mimeType="application/json"' in prep and 'android.intent.action.SEND' in prep and 'EXTRA_STREAM' in prep and 'ACTION_VIEW' in prep,
+          'prepare.py nimmt geteilte Austausch-Dateien an: Intent-Filter auf den Dateityp, aus SEND wird VIEW')
+    check('abiFilters "armeabi-v7a", "arm64-v8a"' in prep and 'x86' in (ROOT / 'scripts/build-apk.sh').read_text(),
+          'nur Handys: prepare.py baut ohne x86, build-apk.sh bricht ab, wenn doch welche in der APK sind')
     build = (ROOT / 'scripts/build-apk.sh').read_text()
     check(re.search(r"grep -q '\"android\.permission\.CAMERA\"' <<<\"\$MANIFEST\" \|\| \{[^}]*exit 1", build) and '<uses-permission android:name="android.permission.CAMERA" />' in prep
           and 'android:name="android.hardware.camera" android:required="false"' in prep, 'Kamerarecht: prepare.py trägt es ins Manifest ein (Kamera nicht vorausgesetzt), build-apk.sh bricht ab, wenn es fehlt')
@@ -1169,6 +1179,261 @@ async def test_scan(browser, url):
     await pg.evaluate("sessionStorage.clear()")
     check(not real_errors(errors), 'keine Fehler in der Konsole' + (f': {real_errors(errors)}' if real_errors(errors) else ''))
     await ctx.close()
+
+
+SRV = 'http://192.168.99.9:8486'   # Server nur simuliert, Adresse im Heimnetz
+OFF_HIT = {'status': 1, 'product': {'product_name_de': 'Sheba Fresh Choice Huhn in Sauce 4x50g', 'brands': 'Sheba, Mars',
+                                    'categories_tags': ['en:cat-food', 'en:wet-cat-food']}}
+
+
+async def test_recognize(browser, url):
+    print('Erkennungskette: bekannter Code, Produktsuche, Server, eigener Schlüssel, Text auf dem Gerät')
+    fail = {'online': False, 'server': False, 'key': False}      # damit jede Stufe gezielt scheitern kann
+    seen = {'online': 0, 'key': 0, 'headers': {}}
+
+    async def off_route(route, request):                          # Open Pet Food Facts und Open Food Facts
+        seen['online'] += 1
+        if fail['online']:
+            await route.fulfill(status=500, headers={'access-control-allow-origin': '*'}, body='')
+            return
+        found = 'openpetfoodfacts' in request.url and '4008429087455' in request.url
+        await route.fulfill(status=200, content_type='application/json', headers={'access-control-allow-origin': '*'},
+                            body=json.dumps(OFF_HIT if found else {'status': 0}))
+
+    async def ai_route(route, request):                           # api.anthropic.com, eigener Schlüssel
+        cors = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'}
+        if request.method == 'OPTIONS':
+            await route.fulfill(status=204, headers=cors)
+            return
+        seen['key'] += 1
+        seen['headers'] = {k: v for k, v in request.headers.items() if k.startswith(('x-api', 'anthropic'))}
+        seen['body'] = json.loads(request.post_data)
+        if fail['key']:
+            await route.fulfill(status=401, headers=cors, content_type='application/json', body='{"error":"nope"}')
+            return
+        answer = '{"brand":"Cosma","variety":"Thunfisch","type":"Nassfutter","animal":"Katze"}'
+        await route.fulfill(status=200, headers=cors, content_type='application/json',
+                            body=json.dumps({'content': [{'type': 'text', 'text': answer}]}))
+
+    async def srv_route(route, request):                          # der Haushalts-Server
+        path, now = request.url.split(':8486')[1], int(time.time() * 1000)
+        if fail['server'] and ('/api/barcode/' in path or '/api/recognize' in path):
+            await route.fulfill(status=503, content_type='application/json', body=json.dumps({'error': 'aus', 'now': now}))
+            return
+        if path.startswith('/api/info'):
+            body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': ['barcode'], 'auth': True, 'now': now}
+        elif '/api/barcode/' in path:
+            body = {'found': True, 'brand': 'Felix', 'variety': 'Huhn in Gelee', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/recognize'):
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/changes') and request.method == 'POST':
+            body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])], 'now': now}
+        elif path.startswith('/api/changes'):
+            body = {'epoch': 'test', 'seq': 0, 'records': [], 'now': now}
+        else:
+            body = {'epoch': 'test', 'seq': 0, 'sum': '', 'fields': 0, 'now': now}
+        await route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+    ctx = await phone(browser)
+    for pattern, handler in (('https://world.openpetfoodfacts.org/**', off_route), ('https://world.openfoodfacts.org/**', off_route),
+                             ('https://api.anthropic.com/**', ai_route), (f'{SRV}/**', srv_route)):
+        await ctx.route(pattern, handler)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]'); await idle(pg)
+    await pg.fill('#f-name', 'Minka'); await pg.click('[data-action=save-pet]'); await idle(pg)
+
+    async def ident(**kw):
+        return await pg.evaluate("o => import('./js/recognize.js').then(r => r.identify(o))", kw)
+
+    async def setp(**kw):
+        await pg.evaluate("p => import('./js/store.js').then(m => { Object.assign(m.prefs, p); })", kw)
+
+    # Texterkennung auf dem Gerät: Das Foto im Modus „lokal“ füllt „Futter benennen“ vor
+    await pg.evaluate("window.__ocrText = 'Sheba\\nNEU\\nSelection in Sauce\\nmit Lachs\\n4 x 85 g\\nZutaten: Fleisch 40 %'; window.__ocrDelay = 400")
+    await pg.click('#fab'); await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await pg.wait_for_selector('#sheet .note .spin')
+    reading = [await pg.inner_text('#sheet .note'), await pg.eval_on_selector('.tl-item .t-main b', 'e => e.textContent'),
+               await pg.locator('#sheet .note.warn').count()]
+    check(reading == ['Packung wird gelesen …', 'Wird gelesen …', 0], f'während das Handy liest: ruhiger Hinweis im Sheet und im Verlauf, ohne Warnfarbe ({reading})')
+    await until(pg, "!!db.servings[0]?.guess"); await idle(pg)
+    await pg.evaluate('window.__ocrDelay = 0')
+    filled = await pg.evaluate("[document.getElementById('f-brand').value, document.getElementById('f-variety').value, document.querySelector('.chip[aria-pressed=true]')?.innerText]")
+    read = [c[1]['path'] for c in await pg.evaluate('window.__calls') if c[0] == 'processImage']
+    gone = [c[1]['path'] for c in await pg.evaluate('window.__calls') if c[0] == 'deleteFile' and c[1]['directory'] == 'CACHE']
+    s = await state(pg, "(s => [s.status, s.error ?? null])(db.servings[0])")
+    check(filled == ['Sheba', 'Selection in Sauce mit Lachs', 'Nassfutter'] and len(read) == 1 and gone == ['schmeckts-lesen.jpg'] and s == ['noserver', None],
+          f'Foto ohne Server: das Handy liest den Text und füllt Marke, Sorte und Art vor ({filled}, {s})')
+    await shot(pg, 'text-gelesen')
+    await pg.click('[data-action=save-name]'); await idle(pg)
+    await pg.click('[data-action=close]'); await idle(pg)
+    p = await state(pg, "(p => [p.brand, p.variety, p.type, p.texture])(db.products[0])")
+    check(p == ['Sheba', 'Selection in Sauce mit Lachs', 'Nassfutter', 'sosse'] and not await state(pg, 'db.servings[0].guess'),
+          f'bestätigt: die Sorte entsteht samt Konsistenz, das Geratene ist weg ({p})')
+    # dieselbe Packung noch einmal: die eigene Sorte wird wiedererkannt, auch anders geschrieben
+    await pg.evaluate("window.__ocrText = 'SHEBA  selection-in-sauce mit LACHS 85g'")
+    got = await ident(photo='AAA')
+    check(got['source'] == 'text' and got['details']['brand'] == 'Sheba' and got['details']['variety'] == 'Selection in Sauce mit Lachs',
+          f'bekannte Sorte im Text wiedererkannt ({got.get("details")})')
+    await pg.evaluate("window.__ocrText = '12345\\n850 g'")
+    got = await ident(photo='AAA')
+    check(got['source'] == '' and not got.get('details'), f'ohne brauchbaren Text bleibt alles leer ({got})')
+
+    # Produktsuche im Internet: aus heißt keine Anfrage
+    await pg.evaluate("window.__ocrText = ''")
+    got = await ident(code='4008429087455')
+    check(got['source'] == '' and seen['online'] == 0, f'Produktsuche aus: keine Anfrage ({seen["online"]})')
+    await setp(lookup=True)
+    got = await ident(code='4008429087455')
+    kept = await state(pg, "prefs.codes['4008429087455']")
+    hit = got.get('details') or {}
+    check(got['source'] == 'online' and [hit.get(k) for k in ('brand', 'variety', 'type', 'animal')] == ['Sheba', 'Fresh Choice Huhn in Sauce', 'Nassfutter', 'Katze']
+          and kept['found'] is True, f'Produktsuche an: Marke und Sorte aufbereitet wie auf dem Server ({hit})')
+    before = seen['online']
+    await ident(code='4008429087455')
+    miss = await ident(code='96385074')
+    kept = await state(pg, "prefs.codes['96385074']")
+    check(seen['online'] == before + 2 and miss['source'] == '' and kept['found'] is False,
+          f'Treffer und Fehlanzeige gemerkt: derselbe Code geht nicht noch einmal hinaus ({seen["online"] - before} Anfragen für 2 Codes)')
+
+    # Server: verbunden schlägt er den Code nach und erkennt das Foto
+    await setp(server=SRV, code='K7PM-3QXD', lookup=False)
+    got = await ident(code='96385074')
+    check(got['source'] == 'server' and got['details']['brand'] == 'Felix', f'verbunden: der Server schlägt den Barcode nach ({got.get("details")})')
+    got = await ident(photo='AAA')
+    check(got['source'] == 'server' and got['details']['variety'] == 'Gold Pastete', f'verbunden: der Server erkennt das Foto ({got.get("details")})')
+
+    # eigener Schlüssel: richtiger Kopf, und er springt ein, wenn der Server nicht kann
+    fail['server'] = True
+    await setp(aiKey='sk-ant-test')
+    got = await ident(photo='AAA')
+    check(got['source'] == 'key' and got['details']['brand'] == 'Cosma' and seen['headers'].get('x-api-key') == 'sk-ant-test'
+          and seen['headers'].get('anthropic-version') == '2023-06-01' and seen['headers'].get('anthropic-dangerous-direct-browser-access') == 'true'
+          and seen['body']['model'] == 'claude-sonnet-5' and 'Tierfutter-Verpackung' in seen['body']['messages'][0]['content'][1]['text'],
+          f'eigener Schlüssel: direkter Aufruf mit Kopfzeile und Modell des Servers ({seen["headers"]})')
+
+    # jede Stufe fällt sauber zur nächsten durch, von billig nach teuer
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
+    await setp(lookup=True)
+    kette = []
+    fail.update(online=False, server=False, key=False)
+    kette.append((await ident(code='4008429087455', photo='AAA'))['source'])   # Produktsuche vor dem Server
+    fail['online'] = True
+    kette.append((await ident(code='96385074', photo='AAA'))['source'])        # Produktsuche kaputt → Server
+    fail['server'] = True
+    kette.append((await ident(code='96385074', photo='AAA'))['source'])        # Server kaputt → eigener Schlüssel
+    fail['key'] = True
+    kette.append((await ident(code='96385074', photo='AAA'))['source'])        # Schlüssel kaputt → Text auf dem Gerät
+    await pg.evaluate("window.__ocrText = ''")
+    kette.append((await ident(code='96385074', photo='AAA'))['source'])        # nichts geht → leeres Formular
+    check(kette == ['online', 'server', 'key', 'text', ''], f'Kette: jede Stufe greift, jede fällt sauber zur nächsten durch ({kette})')
+    await pg.evaluate("p => import('./js/store.js').then(m => { m.db.products[0].codes = {'4008429087455': true}; })")
+    first = await ident(code='4008429087455', photo='AAA')
+    check(first['source'] == 'codes' and len(first['products']) == 1, f'ein bekannter Barcode im Haushalt geht allem vor ({first["source"]})')
+    await setp(code='', server='', aiKey='', lookup=False)
+    check(not real_errors(errors), f'keine Fehler in der Konsole {real_errors(errors)[:2]}')
+    await ctx.close()
+
+
+async def test_exchange(browser, url):
+    print('Austausch von Hand: teilen, empfangen, antworten – zwei Handys ohne Server')
+
+    async def settings(pg):
+        if await pg.locator('#sheet [data-action=open-settings]').count() == 0 and await pg.evaluate("document.getElementById('sheet').open"):
+            await pg.click('[data-action=close]'); await idle(pg)
+        await pg.click('[data-action=open-settings]'); await idle(pg)
+
+    async def datei(pg):                        # die zuletzt geteilte Austausch-Datei aus dem Cache
+        return await pg.evaluate("""(() => { const k = Object.keys(localStorage).filter(n => n.includes('austausch')).sort();
+          return localStorage.getItem(k[k.length - 1]); })()""")
+
+    async def empfangen(pg, text):              # wie „Austausch empfangen“ mit dieser Datei
+        await settings(pg)
+        await pg.set_input_files('#exchangeInput', files=[{'name': 'schmeckts-austausch-2026-01-01.json',
+                                                           'mimeType': 'application/json', 'buffer': text.encode()}])
+        await idle(pg)
+        return await pg.inner_text('#serverBox .note')
+
+    async def daten(pg):
+        # Daten vergleichbar machen: Schlüssel sortiert, und wie im Protokoll zählt ein leeres Feld wie ein fehlendes
+        return await state(pg, """JSON.stringify([db.pets, db.products, db.servings], (k, v) => v === null ? undefined
+          : v && typeof v === 'object' && !Array.isArray(v) ? (Object.keys(v).length ? Object.fromEntries(Object.entries(v).sort()) : undefined) : v)""")
+
+    ctx_a, a, err_a = await seeded(browser, url, {'db': SAVED}, native=True)
+    ctx_b = await phone(browser)
+    b, err_b = await open_page(ctx_b, url, native=True)
+    await a.evaluate("import('./js/store.js').then(m => { m.prefs.aiKey = 'sk-ant-geheim'; m.savePrefs(); })")
+
+    # Erstes Teilen: alles, mit den eigenen Uhren, ohne Einstellungen
+    await settings(a)
+    await a.click('[data-action=share-changes]'); await idle(a)
+    text = await datei(a)
+    file = json.loads(text)
+    shared = ['share' == c[0] for c in await a.evaluate('window.__calls')]
+    check(sorted(file) == ['app', 'at', 'clocks', 'device', 'kind', 'protokoll', 'records'] and file['app'] == 'schmeckts'
+          and file['kind'] == 'austausch' and len(file['records']) == 5 and len(file['clocks']['servings']) == 3
+          and 'sk-ant' not in text and any(shared),
+          f'erstes Teilen: alle {len(file["records"])} Datensätze samt Uhren, nichts aus den Einstellungen')
+    await shot(a, 'austausch-teilen')
+
+    # Empfangen auf dem leeren Handy B
+    note = await empfangen(b, text)
+    da, dbb = await daten(a), await daten(b)
+    check(note == '5 Änderungen übernommen. Beide Geräte sind gleich.' and dbb == da
+          and await b.locator('[data-action=send-answer]').count() == 0,
+          f'empfangen: alles übernommen, keine Antwort nötig („{note}“)')
+    await shot(b, 'austausch-empfangen')
+
+    # Beide ändern etwas anderes am selben Datensatz, B löscht dazu eine Mahlzeit
+    await a.evaluate("import('./js/store.js').then(m => { m.db.products[0].variety = 'Lachs pur'; m.save(); })")
+    await b.evaluate("""import('./js/store.js').then(m => { m.db.products[0].kaufen = 'immer';
+      m.db.servings = m.db.servings.filter(s => s.id !== 'lxserv0001'); m.save(); })""")
+    await idle(a); await idle(b)
+    await settings(b)
+    await b.click('[data-action=share-changes]'); await idle(b)
+    zweite = json.loads(await datei(b))
+    note = await empfangen(a, json.dumps(zweite))
+    check(len(zweite['records']) == 2 and note == '2 Änderungen übernommen. 1 Änderung fehlt auf dem anderen Gerät.'
+          and await a.locator('#serverBox [data-action=send-answer]').count() == 1,
+          f'zweites Teilen: nur das Neue, drüben fehlt etwas → Knopf „Antwort senden“ („{note}“)')
+    check(await state(a, "db.products[0].kaufen === 'immer' && db.products[0].variety === 'Lachs pur' && db.servings.length === 2"),
+          'pro Feld zusammengeführt: beide Änderungen stehen da, die gelöschte Mahlzeit bleibt gelöscht')
+
+    # Antwort schließt die Lücke: danach sind beide gleich
+    await a.click('#serverBox [data-action=send-answer]'); await idle(a)
+    antwort = json.loads(await datei(a))
+    note = await empfangen(b, json.dumps(antwort))
+    check(len(antwort['records']) == 1 and note == '1 Änderung übernommen. Beide Geräte sind gleich.'
+          and await daten(b) == await daten(a) and await a.locator('[data-action=send-answer]').count() == 0,
+          f'Antwort schickt genau das Fehlende, danach sind beide Geräte gleich („{note}“)')
+
+    # Aus einer anderen App geteilt: die App öffnet den Empfangen-Ablauf von selbst
+    await b.click('[data-action=close]'); await idle(b)
+    await b.evaluate("t => localStorage.setItem('__fs:schmeckts-austausch-geteilt.json', t)", json.dumps(antwort))
+    await b.evaluate("window.__urlOpen({url: 'content://media/external/file/schmeckts-austausch-geteilt.json'})")
+    await idle(b)
+    offen = await b.evaluate("[document.getElementById('sheet').open, document.querySelector('#sheet h2')?.innerText]")
+    check(offen == [True, 'Einstellungen'] and 'Beide Geräte sind gleich' in await b.inner_text('#serverBox .note'),
+          f'aus einer anderen App geteilt: die Einstellungen öffnen sich mit der Meldung ({offen})')
+
+    # Fremde und beschädigte Dateien
+    fremd = [(json.dumps({'app': 'anders', 'kind': 'austausch'}), 'Diese Datei ist kein Schmeckt’s-Austausch.'),
+             ('kein json', 'Diese Datei ist kein Schmeckt’s-Austausch.'),
+             (json.dumps({'version': 3, 'pets': [], 'products': [], 'servings': []}), 'Das ist ein Backup. Es gehört unter „Daten“ zu „Backup importieren“.'),
+             (json.dumps({'app': 'schmeckts', 'kind': 'austausch', 'protokoll': 1, 'device': 'x'}), 'Diese Austausch-Datei ist beschädigt.'),
+             (json.dumps({'app': 'schmeckts', 'kind': 'austausch', 'protokoll': 9, 'device': 'x', 'clocks': {}, 'records': []}),
+              'Die Datei kommt von einer neueren App. Bitte diese App aktualisieren.')]
+    vorher = await daten(b)
+    meldungen = []
+    for inhalt, want in fremd:
+        await settings(b)
+        await b.set_input_files('#exchangeInput', files=[{'name': 'fremd.json', 'mimeType': 'application/json', 'buffer': inhalt.encode()}])
+        await idle(b)
+        meldungen.append((await b.inner_text('#toast')).split('\n')[0])
+    check(meldungen == [w for _, w in fremd] and await daten(b) == vorher,
+          f'fremde oder beschädigte Dateien: verständliche Meldung, nichts verändert ({meldungen})')
+    check(not real_errors(err_a) and not real_errors(err_b), f'keine Fehler in der Konsole {real_errors(err_a)[:2]}{real_errors(err_b)[:2]}')
+    await ctx_a.close(); await ctx_b.close()
 
 
 async def one_pet(browser, url, scheme='light', **kw):
@@ -1491,5 +1756,5 @@ async def test_no_camera(browser, url):
 
 run_tests({'rundgang': test_tour, 'ablauf': test_flow, 'kaufen': test_kaufen, 'karten': test_cards, 'woche': test_week, 'uebersicht': test_overview, 'skalen': test_scales, 'konsistenz': test_texture, 'meilensteine': test_milestones,
            'erinnerung': test_reminders, 'eigene': test_remind, 'fuettern-erinnern': test_feed_remind, 'tiere': test_petbar, 'modi': test_modes, 'netz': test_network, 'kurzbefehle': test_shortcuts,
-           'scannen': test_scan, 'zuschnitt': test_crop, 'album': test_album, 'stimmung': test_mood, 'kamera': test_camera, 'ohne-kamera': test_no_camera},
+           'scannen': test_scan, 'erkennung': test_recognize, 'austausch': test_exchange, 'zuschnitt': test_crop, 'album': test_album, 'stimmung': test_mood, 'kamera': test_camera, 'ohne-kamera': test_no_camera},
           camera=('kamera',))
