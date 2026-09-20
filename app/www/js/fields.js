@@ -3,7 +3,7 @@
 
 export const COLLECTIONS = ['pets', 'products', 'servings'];
 const MAPS = {servings:['pets'], products:['codes'], pets:['photos']};    // Karten, Eintrag für Eintrag abgeglichen
-const LOCAL = new Set(['photo', 'status', 'error', 'autoPets', 'scanCode']); // nur in servings
+const LOCAL = new Set(['photo', 'status', 'error', 'autoPets', 'scanCode', 'guess']); // nur in servings
 const ID_RE = /^[A-Za-z0-9_-]{4,40}$/;                         // wie auf dem Server
 export const validId = id => typeof id === 'string' && ID_RE.test(id); // test(undefined) wäre sonst wahr
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

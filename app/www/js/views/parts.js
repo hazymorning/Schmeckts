@@ -22,7 +22,8 @@ export function thumbOf(s, p, cls = ''){
   return `<span class="thumb ${cls}">${esc(letter)}</span>`;
 }
 export function nameBlock(s, p, exact = false){
-  if (s.status === 'recognizing') return `<b><span class="skel" style="width:68%"></span></b><small>Sorte wird erkannt …</small>`;
+  if (s.status === 'recognizing' || s.status === 'reading') // der Server erkennt, oder das Handy liest den Text
+    return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
   if (!p) {
     const sub = {waiting:'Wird erkannt, sobald der Server erreichbar ist', failed:'Nicht erkannt, tippen zum Benennen'}[s.status] || 'Tippen zum Benennen';
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (Modus „lokal“): ohne Fehlerton

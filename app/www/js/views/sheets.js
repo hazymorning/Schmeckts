@@ -39,7 +39,8 @@ function viewName(){
   const photo = serving && (serving.photo || serving.thumb);
   let note = '';
   const retry = label => serving.photo && isConnected() ? `<button class="link" data-action="retry">${label}</button>` : '';
-  if (serving?.status === 'recognizing') note = `<p class="note"><span class="spin"></span>Sorte wird erkannt …</p>`;
+  if (serving?.status === 'reading') note = `<p class="note"><span class="spin"></span>Packung wird gelesen …</p>`;
+  else if (serving?.status === 'recognizing') note = `<p class="note"><span class="spin"></span>Sorte wird erkannt …</p>`;
   else if (serving?.status === 'waiting') note = `<p class="note">${esc(serving.error || 'Wird erkannt, sobald der Server erreichbar ist.')} ${retry('Jetzt versuchen')}</p>`;
   else if (serving?.status === 'failed') note = `<p class="note warn">${esc(serving.error || 'Nicht erkannt.')} ${retry('Nochmal versuchen')}</p>`;
   return `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
@@ -220,9 +221,10 @@ function viewSettings(){
     <p class="foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
 }
 
-/* Abschnitt „Haushalt“. Modus „lokal“: nur der Knopf „Mit Haushalt verbinden“, er öffnet die Felder für Adresse und Code.
-   Verbunden: Zustand des Abgleichs, „Jetzt abgleichen“ und „Verbindung trennen“. Einen Fortschritt zeigt nur der von Hand
-   gestartete Abgleich (sheet.syncing, siehe actions.js), Abgleiche im Hintergrund bleiben unsichtbar. */
+/* Abschnitt „Haushalt“. Modus „lokal“: die Einstellungen dieses Handys und der Knopf „Mit Haushalt verbinden“, der die
+   Felder für Adresse und Code öffnet. Verbunden: Zustand des Abgleichs, „Jetzt abgleichen“ und „Verbindung trennen“,
+   darunter dieselben Einstellungen. Einen Fortschritt zeigt nur der von Hand gestartete Abgleich (sheet.syncing,
+   siehe actions.js), Abgleiche im Hintergrund bleiben unsichtbar. */
 function serverSection(notice = syncInfo()){
   const s = sheet || {};
   const codeRow = `<div class="connect mt-s">
@@ -233,9 +235,9 @@ function serverSection(notice = syncInfo()){
   const addrField = `<label class="label" for="f-server">Adresse des Servers</label>
       <input id="f-server" class="field" data-field="server" value="${esc(s.server ?? prefs.server)}" placeholder="http://192.168.… oder https://…"
         autocomplete="off" inputmode="url" spellcheck="false" enterkeyhint="next">`;
-  if (!isConnected()) return s.connectForm
+  if (!isConnected()) return deviceSection() + (s.connectForm
     ? `<p class="hint">Verbunden sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen. Adresse und Code zeigt „Schmeckt’s-Server einrichten“ auf dem Mini-PC.</p>${addrField}${codeRow}`
-    : `<button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`;
+    : `<button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`);
   const needCode = status.kind === 'auth';
   return `<div class="srv ${notice.tone}" role="status"><span class="srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
     <span class="t-main"><b>${esc(notice.title)}</b><small>${esc(notice.detail)}</small></span></div>
@@ -245,7 +247,30 @@ function serverSection(notice = syncInfo()){
       ${needCode ? '' : s.syncing === 'shown' ? `<button class="btn soft" disabled><span class="spin"></span>Abgleich läuft …</button>`
         : status.state === 'ok' && !queue.length ? '' // alles abgeglichen: nichts zu tun
         : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Jetzt abgleichen</button>`}
-      ${armBtn('disconnect', 'Verbindung trennen', 'Nochmal tippen: trennen, die Daten bleiben hier', {ic:'unplug', cls:'plain'})}</div>`;
+      ${armBtn('disconnect', 'Verbindung trennen', 'Nochmal tippen: trennen, die Daten bleiben hier', {ic:'unplug', cls:'plain'})}</div>
+    ${deviceSection()}`;
+}
+
+/* Einstellungen und Wege dieses Handys: Produktsuche im Internet, eigener KI-Schlüssel und der Austausch von Hand.
+   Die Hinweise sagen, was dabei hinausgeht. Nach einem Empfang steht hier die Meldung und, wenn dem anderen Gerät
+   etwas fehlt, „Antwort senden“ (sheet.exchange, siehe logic/exchange.js). */
+function deviceSection(){
+  const ex = sheet?.exchange;
+  return `<span class="label">Produktsuche im Internet</span>
+    <p class="hint">${prefs.lookup ? 'Bei unbekannten Barcodes fragt dieses Handy zwei freie Produktdatenbanken. Übertragen wird nur die Nummer.'
+      : 'Unbekannte Barcodes führen gleich zum Foto. Es geht keine Nummer hinaus.'}</p>
+    <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${prefs.lookup === (v === 'on')}" data-action="lookup" data-v="${v}">${l}</button>`).join('')}</div>
+    <label class="label" for="f-aikey">Eigener KI-Schlüssel</label>
+    <p class="hint">Mit einem eigenen Schlüssel von Anthropic liest Claude die Packung vom Foto, etwa ein halber Cent je Foto. Der Schlüssel liegt nur auf diesem Handy.</p>
+    <input id="f-aikey" class="field" type="password" data-setting="aiKey" value="${esc(prefs.aiKey)}" placeholder="sk-ant-…"
+      autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <span class="label">Austausch von Hand</span>
+    <p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält nur Tiere, Futter und Mahlzeiten.</p>
+    <div class="btn-col">
+      <button class="btn soft" data-action="share-changes">${icon('phone')}Änderungen teilen</button>
+      <label class="btn soft" for="exchangeInput">${icon('upload')}Austausch empfangen</label>
+    </div>
+    ${ex ? `<p class="note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
 }
 /* Server-Kasten zeichnen. Neu geschrieben wird er nur, wenn sich sein sichtbarer Inhalt ändert: Statuswechsel ohne sichtbare
    Folge (busy bei jedem kurzen Abgleich) tun nichts, und ändert sich nur die Zeile unter dem Titel, etwa die Zeitangabe
@@ -266,8 +291,9 @@ export function paintServerBox(fresh = false){
 /* Datenschutz: erklärt beide Modi sachlich, ohne Versprechen; geöffnet aus den Einstellungen, Abschnitt „Daten“ */
 const PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
-  'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“.'];
+  'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.'];
 const viewPrivacy = () => `<div class="sh-head"><h2>Datenschutz</h2>${closeBtn}</div><div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
 const VIEWS = {serving:viewServing, feed:viewFeed, new:viewName, product:viewProduct, pet:viewPet, settings:viewSettings, privacy:viewPrivacy};

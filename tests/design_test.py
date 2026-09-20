@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gestaltungsregeln aus PROJEKT.md: Palette und Kontraste, Schriften, Logo, Animationen, jede Ansicht in Hell und Dunkel.
 Aufruf: python3 tests/design_test.py [name …]"""
-import contextlib, io, pathlib, re, sys, tempfile
+import contextlib, io, json, pathlib, re, sys, tempfile
 import xml.etree.ElementTree as ET
 from common import RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
 
@@ -370,10 +370,28 @@ def test_pack():
         check(f"Version {(ROOT / 'server/VERSION').read_text().strip()}," in first, f'die Server-Datei nennt die Version des Servers, sie ändert sich nicht mit der App ({first})')
 
 
+def test_prompt():
+    """Der Prompt der Foto-Erkennung steht nur in shared/recognize-prompt.txt: App und Server nutzen denselben Text."""
+    shared = (ROOT / 'shared/recognize-prompt.txt').read_text(encoding='utf-8').strip()
+    module = (WWW / 'js/prompt.js').read_text(encoding='utf-8')
+    app = json.loads(re.search(r'export const PROMPT = (".*");', module, re.S).group(1))
+    server = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
+    go = (ROOT / 'server/recognize.go').read_text(encoding='utf-8')
+    head = shared.split('\n')[0]
+    check(len(shared) > 100 and app == shared and server == shared and '//go:embed recognize-prompt.txt' in go
+          and head not in go and head not in (WWW / 'js/recognize.js').read_text(encoding='utf-8'),
+          'App und Server nutzen denselben Prompt, er steht nur in shared/recognize-prompt.txt')
+    check("from './prompt.js'" in (WWW / 'js/recognize.js').read_text(encoding='utf-8')
+          and 'shared/recognize-prompt.txt' in (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
+          and "'app/www/js/prompt.js'" in (ROOT / 'scripts/pack.py').read_text(encoding='utf-8'),
+          'prepare.py erzeugt Modul und Kopie, gepackt wird nur die Datei in shared/')
+
+
 async def test_files(browser, url):
     test_logo_files()
     test_rules_static()
     test_pack()
+    test_prompt()
 
 
 run_tests({'dateien': test_files, 'palette': test_palette, 'logo': test_logo, 'ansichten': test_rules, 'feinschliff': test_polish}, camera=('ansichten',))

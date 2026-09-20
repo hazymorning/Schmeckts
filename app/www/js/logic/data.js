@@ -18,13 +18,14 @@ export function wipe(){
   closeSheet().then(() => { update(); toast(house ? 'Alle Daten im Haushalt gelöscht' : 'Alle Daten gelöscht'); });
 }
 
-/* Ein geteiltes Backup bleibt im Cache, bis die empfangende App es gelesen hat: weg beim nächsten Start und Export */
+/* Eine geteilte Datei (Backup oder Austausch) bleibt im Cache, bis die empfangende App sie gelesen hat:
+   weg beim nächsten Start und vor dem nächsten Export */
 export async function clearExports(){
   if (!Native?.Filesystem) return;
   try {
     const {files} = await Native.Filesystem.readdir({path:'', directory:'CACHE'});
-    await Promise.all(files.filter(f => f.name.startsWith('schmeckts-backup-')).map(f => Native.Filesystem.deleteFile({path:f.name, directory:'CACHE'})));
-  } catch (e) { console.warn('Alte Backups im Cache:', e.message); }
+    await Promise.all(files.filter(f => f.name.startsWith('schmeckts-')).map(f => Native.Filesystem.deleteFile({path:f.name, directory:'CACHE'})));
+  } catch (e) { console.warn('Alte Dateien im Cache:', e.message); }
 }
 export async function exportData(){
   await clearExports();

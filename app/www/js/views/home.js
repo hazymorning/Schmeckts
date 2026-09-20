@@ -316,7 +316,7 @@ function dayHTML(g, multiHouse){
     <ol class="tl">${g.items.map(s => {
       const p = getProduct(s.productId), ids = servingPets(s), fresh = homeView.fresh === s.id;
       const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : ''].filter(Boolean).join(', ');
-      const title = p ? esc(pname(p)) : (s.status === 'recognizing' ? 'Wird erkannt …' : 'Unbekanntes Futter');
+      const title = p ? esc(pname(p)) : (s.status === 'recognizing' ? 'Wird erkannt …' : s.status === 'reading' ? 'Wird gelesen …' : 'Unbekanntes Futter');
       return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh ? 'fresh' : 'item'}"><button class="tl-item" data-action="open-serving" data-id="${s.id}">
         <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p)}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>

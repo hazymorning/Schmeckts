@@ -7,10 +7,10 @@ dieselben Tiere und teilen die Daten über einen eigenen Server im Heimnetz.
 ## Aufbau
 
 `app/www/` ist die App, ES-Module ohne Build-Werkzeuge, verpackt mit Capacitor; `app/native/` enthält
-die eigenen Android-Dateien, `app/android/` erzeugt `scripts/prepare.py`. `server/` ist ein Go-Programm
-nur mit der Standardbibliothek, das seinen Zustand in einer atomar ersetzten Datei hält und als .deb
-aus `packaging/` auf einem Mini-PC läuft. `tests/` prüft beides, `scripts/` baut und `design/` liefert
-die Vorlagen für die Icons.
+die eigenen Android-Dateien, `app/android/` erzeugt `scripts/prepare.py`, und in `shared/` steht, was
+App und Server teilen. `server/` ist ein Go-Programm nur mit der Standardbibliothek, das seinen Zustand
+in einer atomar ersetzten Datei hält und als .deb aus `packaging/` auf einem Mini-PC läuft. `tests/`
+prüft beides, `scripts/` baut und `design/` liefert die Vorlagen für die Icons.
 
 ## Bauen und testen
 
@@ -23,7 +23,9 @@ scripts/build-apk.sh <schmeckts-signatur.txt>   # signierte APK nach dist/, nur 
 ```
 
 Einzelne Tests gehen auch direkt, etwa `python3 tests/ui_test.py modi`. Den Server als .deb baut
-`scripts/build-deb.sh`. Der Signaturschlüssel liegt außerhalb des Repositorys und gehört nicht hinein.
+`scripts/build-deb.sh`. `scripts/prepare.py` erzeugt, was nicht im Repository liegt: die Schriften, das
+Android-Projekt und aus `shared/recognize-prompt.txt` den Prompt für App und Server. Der
+Signaturschlüssel liegt außerhalb des Repositorys und gehört nicht hinein.
 
 ## Mehr
 

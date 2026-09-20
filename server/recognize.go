@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -44,12 +45,14 @@ type recognizeError struct {
 
 func (e *recognizeError) Error() string { return e.msg }
 
+// promptText steht in shared/recognize-prompt.txt; scripts/prepare.py legt die Kopie hier und das Modul der App an,
+// damit Server und App denselben Text nutzen (Test: tests/design_test.py).
+//
+//go:embed recognize-prompt.txt
+var promptText string
+
 func buildPrompt(known []string) string {
-	p := `Auf dem Foto ist eine Tierfutter-Verpackung (Dose, Schale, Beutel, Sack oder Snack).
-Bestimme Marke und Sorte. Antworte AUSSCHLIESSLICH mit JSON ohne Markdown in dieser Form:
-{"brand":"","variety":"","type":"Nassfutter|Trockenfutter|Snack|Sonstiges","animal":"Katze|Hund|Kaninchen|Vogel|Nager|Andere"}
-"variety" ist die Sorte kurz auf Deutsch, z. B. "Huhn in Soße" oder "Lachs Pastete".
-Wenn etwas nicht erkennbar ist, lass den Wert leer.`
+	p := strings.TrimSpace(promptText)
 	if len(known) > 0 {
 		p += "\nBereits bekannte Produkte. Wenn es eines davon ist, übernimm exakt diese Schreibweise:\n" + strings.Join(known, "\n")
 	}
