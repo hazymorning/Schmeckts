@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 7 und 8 kennen nur eine Regel für Cloud-Sicherung und Übertragung: nichts sichern.
+     Ab Android 9 gilt xml-v28/backup_rules.xml. -->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

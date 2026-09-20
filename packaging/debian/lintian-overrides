@@ -1,0 +1,6 @@
+# Bewusste Entscheidungen für ein privates Paket außerhalb des Debian-Archivs
+schmeckts-server: statically-linked-binary [usr/bin/schmeckts-server]
+schmeckts-server: maintainer-script-calls-systemctl *
+schmeckts-server: no-manual-page *
+schmeckts-server: bogus-mail-host *
+schmeckts-server: bogus-mail-host-in-debian-changelog *

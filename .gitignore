@@ -1,0 +1,15 @@
+# Erzeugt von scripts/prepare.py, npm oder dem Build
+app/node_modules/
+app/android/
+dist/
+app/www/fonts/*.woff2
+__pycache__/
+*.apk
+
+# Erzeugt scripts/prepare.py aus shared/recognize-prompt.txt, dort wird gepflegt
+app/www/js/prompt.js
+server/recognize-prompt.txt
+
+# Signaturschlüssel gehören nie ins Repository
+*.jks
+schmeckts-signatur.txt

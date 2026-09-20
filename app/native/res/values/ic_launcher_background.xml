@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hintergrund des adaptiven Icons: Grundfarbe der App (hell) -->
+    <color name="ic_launcher_background">#F4F0EC</color>
+</resources>

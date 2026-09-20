@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Statische App-Kurzbefehle (langes Drücken aufs Icon). Die Deep Links schmeckts://fuettern, schmeckts://scan und
+     schmeckts://foto öffnen die App an derselben Stelle, auch aus Quick Shortcut Maker oder Tasker, bei Kaltstart und bei laufender App. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="fuettern"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_fuettern"
+        android:shortcutShortLabel="@string/shortcut_fuettern"
+        android:shortcutLongLabel="@string/shortcut_fuettern_lang">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="schmeckts://fuettern"
+            android:targetPackage="de.schmeckts.app"
+            android:targetClass="de.schmeckts.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_scan"
+        android:shortcutShortLabel="@string/shortcut_scan"
+        android:shortcutLongLabel="@string/shortcut_scan_lang">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="schmeckts://scan"
+            android:targetPackage="de.schmeckts.app"
+            android:targetClass="de.schmeckts.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="foto"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_foto"
+        android:shortcutShortLabel="@string/shortcut_foto"
+        android:shortcutLongLabel="@string/shortcut_foto_lang">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="schmeckts://foto"
+            android:targetPackage="de.schmeckts.app"
+            android:targetClass="de.schmeckts.app.MainActivity" />
+    </shortcut>
+</shortcuts>

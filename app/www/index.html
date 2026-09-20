@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content=""> <!-- setzt ui/theme.js aus --bg -->
+<title>Schmeckt’s?</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body class="intro">
+<div class="mood" id="mood" aria-hidden="true" hidden><img alt=""><img alt=""></div> <!-- Stimmungsbild, views/mood.js -->
+<div class="app">
+  <header class="top">
+    <h1 class="brand">Schmeckt’s?</h1>
+    <div class="top-end">
+      <button class="sync-chip" id="syncChip" data-action="open-server" hidden></button>
+      <button class="icon-btn" data-action="open-settings" aria-label="Einstellungen" data-icon="sliders"></button>
+    </div>
+  </header>
+  <nav class="pets" id="pets" aria-label="Tier auswählen" hidden></nav>
+  <main id="home"></main>
+</div>
+<button class="fab" id="fab" data-action="feed" hidden></button>
+
+<dialog class="sheet" id="sheet" aria-label="Details">
+  <div class="grip-zone"><div class="grip"></div></div>
+  <div class="sheet-body" id="sheetBody"></div>
+  <input type="file" id="camInputSheet" accept="image/*" capture="environment" hidden>
+  <input type="file" id="petPhotoInput" accept="image/*" hidden>
+  <input type="file" id="albumInput" accept="image/*" multiple hidden>
+  <input type="file" id="importInput" accept="application/json,.json" hidden>
+  <input type="file" id="exchangeInput" accept="application/json,.json" hidden>
+</dialog>
+<dialog class="camera" id="camera" aria-label="Kamera"> <!-- eigene Kamera für Packungsfotos, ui/camera.js -->
+  <video autoplay playsinline muted></video>
+  <p class="cam-hint" role="status"></p>
+  <div class="cam-bar">
+    <button class="cam-cancel" data-cam="cancel">Abbrechen</button>
+    <button class="shutter" data-cam="shoot" aria-label="Auslösen"></button>
+  </div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
