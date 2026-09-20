@@ -98,6 +98,8 @@ scripts/build-apk.sh <schmeckts-signatur.txt>   # signierte APK nach dist/, nur 
 
 Einzelne Tests gehen auch direkt, etwa `python3 tests/ui_test.py modi`. Den Server als .deb baut `scripts/build-deb.sh`. Der Signaturschlüssel liegt außerhalb des Repositorys und gehört nicht hinein.
 
+Ein Release entsteht in drei Schritten: die neue Versionsnummer in `app/package.json` eintragen und den Zweig nach `main` zusammenführen. Dann hier auf GitHub ein Release mit dem Tag `v<version>` veröffentlichen. Der Rest läuft von selbst: Der Workflow prüft, ob Tag und Version zusammenpassen, fährt die Tests, baut die signierte APK und hängt sie als `schmeckts-<version>.apk` an das Release.
+
 Zweck, Datenmodell, Sync-Protokoll, Server-Schnittstelle, Gestaltungsregeln und Arbeitsweise stehen in [PROJEKT.md](PROJEKT.md). Wie der Server auf den Mini-PC kommt, steht in [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 ## Fragen und Rückmeldungen
