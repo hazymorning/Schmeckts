@@ -1,0 +1,94 @@
+name: Release
+
+# Ein veröffentlichtes Release baut die signierte APK und hängt sie an. Von Hand gestartet baut derselbe Weg
+# zum Ausprobieren, das Ergebnis liegt dann als Artefakt bereit. Gebaut wird nur mit grünen Tests:
+# scripts/build-apk.sh fährt zuerst die ganze Testsuite.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # die APK ans Release hängen
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Der Server nutzt nur die Standardbibliothek, es gibt keine go.sum: kein Abhängigkeits-Cache.
+      - name: Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache: false
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Pillow zeichnet die Launcher-Icons für Android 7, Playwright fährt Chromium für die Tests der Oberfläche.
+      - name: Pillow und Playwright mit Chromium
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow playwright
+          python3 -m playwright install --with-deps chromium
+
+      # Das SDK des Läufers steht in ANDROID_HOME, build-apk.sh nimmt es von dort. Nachinstalliert wird, was der
+      # Build braucht: die Plattform 36 und die Build-Tools, aus denen apksigner und aapt2 kommen.
+      - name: Android-SDK ergänzen
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.1.0" > /dev/null
+
+      # Die Version steht nur in app/package.json; der Tag des Releases heißt v<version>.
+      - name: Version prüfen
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="$(node -p "require('./app/package.json').version")"
+          if [ -n "$TAG" ] && [ "${TAG#v}" != "$VERSION" ]; then
+            echo "Der Tag $TAG passt nicht zur Version $VERSION in app/package.json. Erwartet wird v$VERSION." >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      # Der Signaturschlüssel liegt nur für die Dauer des Builds als Datei außerhalb des Arbeitsbaums und wird
+      # in jedem Fall wieder gelöscht. Ausgegeben wird er nirgends.
+      - name: APK bauen und signieren
+        env:
+          SCHMECKTS_SIGNATUR: ${{ secrets.SCHMECKTS_SIGNATUR }}
+        run: |
+          [ -n "$SCHMECKTS_SIGNATUR" ] || { echo "Das Geheimnis SCHMECKTS_SIGNATUR fehlt." >&2; exit 1; }
+          SIGNATUR="$RUNNER_TEMP/schmeckts-signatur.txt"
+          trap 'rm -f "$SIGNATUR"' EXIT INT TERM
+          (umask 077; printf '%s' "$SCHMECKTS_SIGNATUR" > "$SIGNATUR")
+          scripts/build-apk.sh "$SIGNATUR"
+
+      - name: APK ans Release hängen
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" "dist/schmeckts-$VERSION.apk" --clobber
+
+      - name: APK als Artefakt
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: schmeckts-${{ env.VERSION }}
+          path: dist/schmeckts-${{ env.VERSION }}.apk
+          if-no-files-found: error
