@@ -151,6 +151,16 @@ async def until_sync(pg, expr, timeout=10.0):
     return False
 
 
+async def until_dom(pg, expr, timeout=10.0):
+    """Wartet, bis expr im Dokument wahr ist: eine offene Ansicht zeichnet nach einem Abgleich erst neu."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if await pg.evaluate(expr):
+            return True
+        await asyncio.sleep(.1)
+    return False
+
+
 PHONES = {}  # Name → (Seite, Konsolenfehler), für die Diagnose bei Fehlschlägen
 
 
@@ -487,7 +497,8 @@ async def main():
             await expect(pa == pb and sorted(k for k in rec if k.startswith('photos.')) == [f'photos.{k}' for k in keys] and rec[f'photos.{keys[0]}'].startswith('data:image/jpeg;base64,')
                          and 'photos' not in rec, f'auf dem Server liegt jedes Foto als eigenes Feld photos.<id>, beide Handys haben dieselben Bilder ({len(rec["photos." + keys[0]]) // 1024} KB)')
             await idle(b)
-            await expect(await b.locator('#sheet .ph-img').count() == 2, 'im offenen Tier-Sheet von Handy B erscheinen die Fotos')
+            await expect(await until_dom(b, "document.querySelectorAll('#sheet .ph-img').length === 2"),
+                         'im offenen Tier-Sheet von Handy B erscheinen die Fotos')
             await block(ctx_a)
             await block(ctx_b)
             await a.set_input_files('#albumInput', files[2:3])          # A fügt eins hinzu …
