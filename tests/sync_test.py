@@ -190,11 +190,20 @@ async def connect(pg, code, server, edit=True):
         await idle(pg)
     if await pg.locator('#serverBox [data-action=connect-form]').count():  # Modus „lokal“: der Knopf öffnet Adresse und Code
         await pg.click('#serverBox [data-action=connect-form]')
+        await idle(pg)
     if edit:
         if await pg.locator('[data-action=edit-server]').count():
             await pg.click('[data-action=edit-server]')
+            await idle(pg)
         await pg.fill('#f-server', server)
     await pg.fill('#f-code', code)
+    # Zeichnet der Kasten zwischen Tippen und Verbinden neu, stehen die Felder wieder leer und connectServer()
+    # nähme das leere prefs.server. Darum vor dem Klick nachsehen und notfalls noch einmal eintragen.
+    await idle(pg)
+    if edit and await pg.input_value('#f-server') != server:
+        await pg.fill('#f-server', server)
+    if await pg.input_value('#f-code') != code:
+        await pg.fill('#f-code', code)
     await pg.click('[data-action=connect]')
 
 
