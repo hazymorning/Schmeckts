@@ -1,0 +1,51 @@
+/* Gestaltungsgrundlagen: Schrift, Farben, Bewegung. Jede Farbe der App steht genau hier, nirgends sonst. Ausnahmen sind
+   nur die Logo-Dateien (img/) und webview-update.html (für WebViews ohne light-dark()).
+   Festes Farbkonzept ohne Auswahl, die Werte stehen in PROJEKT.md („Gestaltungsregeln“). Tokens außerhalb der Palette
+   sind nur aus ihren Werten abgeleitet, bei Bedarf mit Deckkraft (8-stelliges Hex). tests/app_test.py prüft Werte und Kontraste. */
+
+/* Schriften (liegen in der App, SIL Open Font License)
+   Fraunces für Überschriften und Zahlen, Figtree für alles andere. */
+@font-face{font-family:"Figtree";src:url(../fonts/figtree-latin.woff2) format("woff2");font-weight:400 700;font-style:normal;font-display:swap}
+@font-face{font-family:"Fraunces";src:url(../fonts/fraunces-latin.woff2) format("woff2");font-weight:500 700;font-style:normal;font-display:swap}
+
+:root{
+  color-scheme:light dark;
+  --font-display:"Fraunces","Iowan Old Style",Georgia,serif;
+  --font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --ease-out:cubic-bezier(.22,1,.36,1);
+  --ease-spring:cubic-bezier(.34,1.45,.64,1);
+  --ease-in:cubic-bezier(.5,0,.75,0);
+
+  /* Palette: light-dark(hell, dunkel) */
+  --bg:light-dark(#F4F0EC,#191513);
+  --surface:light-dark(#FCFAF7,#231E1B);
+  --surface-2:light-dark(#E8E2DB,#302A27);
+  --ink:light-dark(#2E2724,#EBE7E2);
+  --muted:light-dark(#6C615A,#B2A9A1);
+  --faint:light-dark(#A0958C,#7C726B);        /* nur Schmuck und Platzhalter, kein Text mit Bedeutung */
+  --line:light-dark(#D8CFC7,#403935);
+  --accent:light-dark(#965E4B,#C78F7A);       /* Akzentfläche, Fokusrahmen, Balken */
+  --accent-ink:light-dark(#7F4C3A,#C78F7A);   /* Akzent als Text */
+  --accent-soft:light-dark(#F9E0D7,#422920);
+  --on-accent:light-dark(#FFFFFF,#191513);    /* Schrift auf kräftigen Flächen: Akzent, auch der rote Knopf zum Bestätigen */
+
+  /* Bewertungen: nur für Icons, Punkte und ihre zarten Flächen */
+  --good:light-dark(#4F725F,#97BBAA);
+  --good-soft:light-dark(#DBE0DA,#363731);
+  --mid:light-dark(#997238,#DBB87E);
+  --mid-soft:light-dark(#E8DED0,#43392D);
+  --sauce:light-dark(#7C5B45,#BD9E86);
+  --sauce-soft:light-dark(#E2D8D1,#3E352E);
+  --bad:light-dark(#823B4E,#D88095);
+  --bad-soft:light-dark(#EADADA,#3D2C2C);
+
+  /* Abgeleitet, nur aus Werten der Palette */
+  --seg-on:light-dark(#FCFAF7,#403935);       /* gewähltes Segment: hell --surface, dunkel --line */
+  --toast-action:light-dark(#C78F7A,#7F4C3A); /* Rückgängig auf dem Toast (Fläche --ink): der Akzent des anderen Modus */
+  --backdrop:light-dark(#2E272466,#191513B3); /* hinter Sheets: --ink hell mit 40 %, --bg dunkel mit 70 % */
+  --seg-shadow:0 1px 4px light-dark(#2E27241A,#1915134D);
+  --card-shadow:0 1px 2px light-dark(#2E27240D,#19151340),0 10px 28px -12px light-dark(#2E272429,#19151380);
+  --float-shadow:0 14px 34px -14px light-dark(#2E27244D,#191513A6),0 2px 6px light-dark(#2E272414,#19151359);
+}
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}

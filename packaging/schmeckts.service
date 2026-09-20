@@ -1,0 +1,39 @@
+[Unit]
+Description=Schmeckt’s? Haushalts-Server
+Documentation=man:schmeckts-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=schmeckts
+Group=schmeckts
+ExecStart=/usr/bin/schmeckts-server
+StateDirectory=schmeckts
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=3
+
+# Der Dienst darf nur seinen Datenordner beschreiben und nur ins Netz
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

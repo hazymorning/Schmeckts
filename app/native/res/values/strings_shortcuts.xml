@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_fuettern">Füttern</string>
+    <string name="shortcut_fuettern_lang">Füttern eintragen</string>
+    <string name="shortcut_scan">Scannen</string>
+    <string name="shortcut_scan_lang">Packung scannen</string>
+    <string name="shortcut_foto">Packung fotografieren</string>
+    <string name="shortcut_foto_lang">Packung fotografieren</string>
+</resources>
