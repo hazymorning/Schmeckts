@@ -1,0 +1,26 @@
+{
+  "appId": "de.schmeckts.app",
+  "appName": "Schmeckt’s?",
+  "webDir": "www",
+  "loggingBehavior": "debug",
+  "server": {
+    "androidScheme": "http",
+    "errorPath": "webview-update.html"
+  },
+  "android": {
+    "minWebViewVersion": 123
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DEFAULT"
+    },
+    "Keyboard": {
+      "resizeOnFullScreen": true
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_schmeckts",
+      "iconColor": "#965E4B"
+    }
+  }
+}

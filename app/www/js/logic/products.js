@@ -1,0 +1,71 @@
+/* Futtersorten anlegen, füllen, zusammenführen und aufräumen. Barcodes kommen nur in linkProduct an eine Sorte, und zwar
+   an jede, die eine gescannte Mahlzeit (scanCode) bekommt: So wächst ein Multipack, und eine falsch erkannte Sorte
+   verschwindet samt Code. */
+import {uid} from '../fields.js';
+import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
+import {db, save} from '../store.js';
+import {shareText} from '../native.js';
+import {findProduct, getProduct, shoppingList} from '../derive.js';
+import {memPhotos} from '../images.js';
+import {toast} from '../ui/toast.js';
+
+/* Eigene Einstellung zum Kaufen, gilt im ganzen Haushalt und geht dem berechneten Urteil vor:
+   'immer', 'nicht' oder etwas anderes für „Automatisch“ (das Feld fällt weg, abgeglichen wird null) */
+export function setKaufen(id, v){
+  const p = getProduct(id); if (!p) return;
+  if (v === 'immer' || v === 'nicht') p.kaufen = v; else delete p.kaufen;
+  save();
+}
+
+/* Einkaufsliste weitergeben, passend zum Tier-Filter: übers Teilen-Menü, ohne eines über die Zwischenablage */
+export async function shareShopping(){
+  const {title, text} = shoppingList();
+  try { if (await shareText(title, text) === 'copied') toast('Liste kopiert'); }
+  catch (e) { toast('Die Liste konnte nicht geteilt werden.'); }
+}
+
+export function cleanupProduct(pid){
+  if (!db.servings.some(s => s.productId === pid)) db.products = db.products.filter(p => p.id !== pid);
+}
+/* Konsistenz oder Snack-Art nach Erkennung, Barcode-Treffer, Benennen und Auswahl. Die Auswahl des Menschen gilt
+   (userType, null = keine). Sonst bleibt ein vorhandener Wert; ein leeres Feld füllt der Wert des Servers, dann die
+   Stichwörter in Marke und Sorte. Was nicht zur Art passt, fällt weg (abgeglichen wird null). */
+export function applyTexture(p, details = {}){
+  const fits = v => textureOf(p, v) ? v : null;
+  const v = details.userType && details.texture !== undefined ? fits(details.texture) : fits(p.texture) || fits(details.texture) || guessTexture(p);
+  if (v) p.texture = v; else delete p.texture;
+}
+export function toggleTexture(id, v){ // Auswahl im Futter-Sheet, ein zweiter Tipp hebt sie auf
+  const p = getProduct(id); if (!p) return;
+  applyTexture(p, {texture:p.texture === v ? null : v, userType:true}); save();
+}
+export function newProduct(details, id = uid()){
+  const p = {id, brand:details.brand || '', variety:details.variety || '', type:typeOf(details),
+    animal:SPECIES.some(x => x.k === details.animal) ? details.animal : null, thumb:details.thumb || null, lastPets:[], codes:{}, createdAt:Date.now()};
+  applyTexture(p, details);
+  db.products.push(p); return p;
+}
+export function applyProduct(s, details){
+  let p = findProduct(details.brand, details.variety);
+  if (!p) p = newProduct({...details, thumb:s.thumb});
+  else { if (details.userType && TYPES.includes(details.type)) p.type = details.type; applyTexture(p, details); }
+  linkProduct(s, p);
+  return p;
+}
+export function linkProduct(s, p){
+  const prev = s.productId;
+  if (!p.thumb && s.thumb) p.thumb = s.thumb;
+  s.productId = p.id;
+  p.lastPets = Object.keys(s.pets);
+  if (s.scanCode) (p.codes ||= {})[s.scanCode] = true;
+  delete s.photo; delete s.thumb; delete s.status; delete s.error; delete s.autoPets;
+  memPhotos.delete(s.id);
+  if (prev && prev !== p.id) cleanupProduct(prev);
+}
+export function mergeProducts(from, into){
+  db.servings.forEach(s => { if (s.productId === from.id) s.productId = into.id; });
+  if (!into.thumb && from.thumb) into.thumb = from.thumb;
+  Object.assign(into.codes ||= {}, from.codes); // die Barcodes gehen mit
+  applyTexture(into, {texture:from.texture});
+  db.products = db.products.filter(p => p.id !== from.id);
+}

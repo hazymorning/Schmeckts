@@ -1,0 +1,11 @@
+# Erzeugt von scripts/prepare.py, npm oder dem Build
+app/node_modules/
+app/android/
+dist/
+app/www/fonts/*.woff2
+__pycache__/
+*.apk
+
+# Signaturschlüssel gehören nie ins Repository
+*.jks
+schmeckts-signatur.txt

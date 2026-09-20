@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: schmeckts-server
+Comment: Privates Projekt für den eigenen Haushalt, nicht zur Weitergabe bestimmt.
+
+Files: *
+Copyright: 2026 Schmeckt’s?
+License: proprietary
+ Alle Rechte vorbehalten. Nur für den privaten Gebrauch im eigenen Haushalt.
