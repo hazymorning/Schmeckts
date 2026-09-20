@@ -28,7 +28,7 @@
 
 Halt beim Füttern einfach die Verpackung vor die Kamera. Die App liest Marke, Sorte und Futterart vom Bild ab und legt den Eintrag selbst an, auch bei Dosen ohne Barcode, bei Multipacks und bei Marken, die sie noch nie gesehen hat. Eine neue Sorte anzulegen dauert damit genau ein Foto.
 
-Dafür verbindest du die App mit einem Haushalt. Was das sonst noch bringt, steht weiter unten.
+Den Text auf der Packung liest das Handy selbst, ohne Netz und ohne Zusatzkosten. Verbunden mit einem Haushalt kommt die genauere Erkennung dazu, die auch verschnörkelte Verpackungen zuverlässig auseinandernimmt. Was das sonst noch bringt, steht weiter unten.
 
 ## Was die App kann
 
@@ -39,6 +39,7 @@ Dafür verbindest du die App mit einem Haushalt. Was das sonst noch bringt, steh
 - **Verlauf.** Kalender und Tagesübersicht aller Mahlzeiten, dazu ein kurzer Rückblick auf die vergangene Woche.
 - **Erinnerungen.** Auf Wunsch erinnert dich die App ans Bewerten oder an die üblichen Fütterungszeiten. Beides ist am Anfang aus.
 - **Mehrere Tiere.** Katzen, Hunde, Kleintiere und Vögel, jedes mit Profilbild und eigener Auswertung.
+- **Austausch von Hand.** Auch ohne Server: „Änderungen teilen“ schickt deine neuen Einträge als Datei an ein anderes Handy, „Austausch empfangen“ führt beide Stände zusammen.
 - **Sicherungskopie.** Du kannst deine Daten jederzeit in eine Datei sichern und auf einem neuen Handy wieder einlesen.
 
 Die App gibt es hell und dunkel und richtet sich dabei nach deinem Handy.
@@ -47,16 +48,17 @@ Die App gibt es hell und dunkel und richtet sich dabei nach deinem Handy.
 
 Beim ersten Start entscheidest du, wie du die App nutzen willst. Wechseln kannst du später jederzeit, deine Einträge bleiben dabei erhalten.
 
-**Nur auf diesem Handy.** Alles bleibt auf dem Gerät, die App geht von sich aus nicht ins Netz. Eine neue Sorte benennst du einmal selbst, danach erkennt die App sie am Barcode wieder. Wer seine Tiere allein füttert, kommt damit gut zurecht.
+**Nur auf diesem Handy.** Alles bleibt auf dem Gerät, die App geht von sich aus nicht ins Netz. Den Text auf der Packung liest sie trotzdem und füllt „Futter benennen“ damit vor; danach erkennt sie die Sorte am Barcode wieder. Wer seine Tiere allein füttert, kommt damit gut zurecht.
 
-**Mit einem Haushalt verbunden.** Mehrere Personen führen dasselbe Tagebuch. Jeder sieht, was die anderen eingetragen haben, auch dann, wenn ein Handy zwischendurch kein Netz hatte. Dazu kommt die Erkennung: die Sorte vom Foto und unbekannte Barcodes, die automatisch nachgeschlagen werden.
+**Mit einem Haushalt verbunden.** Mehrere Personen führen dasselbe Tagebuch. Jeder sieht, was die anderen eingetragen haben, auch dann, wenn ein Handy zwischendurch kein Netz hatte. Dazu kommt die genauere Erkennung: Marke und Sorte vom Foto und unbekannte Barcodes, die automatisch nachgeschlagen werden.
 
 | | Nur auf diesem Handy | Im Haushalt |
 |---|---|---|
 | Füttern, bewerten, auswerten | ja | ja |
-| Sorte vom Foto erkennen | nein | ja |
-| Unbekannte Barcodes nachschlagen | nein | ja |
-| Einträge mit anderen teilen | nein | ja |
+| Packungstext lesen | ja | ja |
+| Marke und Sorte vom Foto erkennen | nur mit eigenem KI-Schlüssel | ja |
+| Unbekannte Barcodes nachschlagen | auf Wunsch | ja |
+| Einträge mit anderen teilen | von Hand, als Datei | automatisch |
 
 Die Haushalt-Funktion steckt in der App, der passende Zugang steht aber noch nicht allgemein bereit.
 
@@ -76,9 +78,27 @@ Neue Versionen installierst du einfach über die alte, deine Einträge bleiben e
 
 - Deine Einträge und Fotos bleiben in der App. Sie landen weder in der Galerie noch in Googles Cloud-Sicherung.
 - Keine Werbung, keine Tracker.
-- Nutzt du die App nur auf deinem Handy, geht von ihr nichts ins Netz. Einzige Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet nach deren Angaben keine Bilder, aber allgemeine Gerätedaten wie das Modell.
+- Nutzt du die App nur auf deinem Handy, geht von ihr nichts ins Netz. Den Packungstext liest sie auf dem Gerät. Einzige Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet nach deren Angaben keine Bilder, aber allgemeine Gerätedaten wie das Modell.
+- Zwei Einstellungen kannst du selbst dazuschalten: das Nachschlagen unbekannter Barcodes in offenen Produktdatenbanken (übertragen wird nur die Nummer) und einen eigenen KI-Schlüssel für die Foto-Erkennung. Beide sind ab Werk aus.
 - Im Haushalt spricht die App nur mit eurem eigenen Zugang. Von dort geht das Foto der Verpackung zur Erkennung weiter, und unbekannte Barcodes werden in offenen Produktdatenbanken nachgeschlagen. Mehr verlässt das Handy nicht, insbesondere nichts über deine Tiere.
+- Eine Austausch-Datei enthält nur Tiere, Sorten und Mahlzeiten, keine Einstellungen, keinen Haushaltscode und keinen Schlüssel.
 - Die Kamera braucht die App für Fotos. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
+
+## Mitentwickeln
+
+`app/www/` ist die App, ES-Module ohne Build-Werkzeuge, verpackt mit Capacitor; `app/native/` enthält die eigenen Android-Dateien, `app/android/` erzeugt `scripts/prepare.py`, und in `shared/` steht, was App und Server teilen. `server/` ist ein Go-Programm nur mit der Standardbibliothek, das als .deb aus `packaging/` auf einem Mini-PC läuft. `tests/` prüft beides, `scripts/` baut und `design/` liefert die Vorlagen für die Icons.
+
+Voraussetzung ist Ubuntu mit Node.js 22+ und Python 3 mit Pillow und Playwright.
+
+```sh
+scripts/setup-build-env.sh              # JDK 21, Android SDK 36, Go und lintian (als root, macht nur was fehlt)
+scripts/test.sh                         # alle Tests: Go, Node, Chromium, Abgleich gegen den echten Server
+scripts/build-apk.sh <schmeckts-signatur.txt>   # signierte APK nach dist/, nur mit grünen Tests
+```
+
+Einzelne Tests gehen auch direkt, etwa `python3 tests/ui_test.py modi`. Den Server als .deb baut `scripts/build-deb.sh`. Der Signaturschlüssel liegt außerhalb des Repositorys und gehört nicht hinein.
+
+Zweck, Datenmodell, Sync-Protokoll, Server-Schnittstelle, Gestaltungsregeln und Arbeitsweise stehen in [PROJEKT.md](PROJEKT.md). Wie der Server auf den Mini-PC kommt, steht in [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 ## Fragen und Rückmeldungen
 

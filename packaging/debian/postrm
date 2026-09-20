@@ -1,0 +1,15 @@
+#!/bin/sh
+# Nach dem Entfernen: Firewall-Regeln wieder schließen. Die Daten bleiben bewusst erhalten.
+set -e
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+  if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw status numbered 2>/dev/null | grep "Schmeckts-Server" | sed -n 's/^\[ *\([0-9]*\)\].*/\1/p' | sort -rn | while read -r N; do
+      ufw --force delete "$N" >/dev/null || true
+    done
+  fi
+  [ -d /run/systemd/system ] && systemctl daemon-reload || true
+fi
+if [ "$1" = purge ] && [ -d /var/lib/schmeckts ]; then
+  echo "Die Daten liegen weiter in /var/lib/schmeckts. Wer sie wirklich löschen will: sudo rm -r /var/lib/schmeckts"
+fi
+exit 0

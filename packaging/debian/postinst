@@ -1,0 +1,37 @@
+#!/bin/sh
+# Nach der Installation: Dienstkonto, Datenordner, freien Port wählen, Firewall öffnen, Dienst starten
+set -e
+DIR=/var/lib/schmeckts
+
+if [ "$1" = configure ]; then
+  getent passwd schmeckts >/dev/null || useradd --system --user-group --home-dir "$DIR" --no-create-home --shell /usr/sbin/nologin schmeckts
+  install -d -m 0700 -o schmeckts -g schmeckts "$DIR"
+
+  # Beim ersten Mal einen freien Port festlegen (8486, sonst den nächsten freien)
+  if [ ! -e "$DIR/config.json" ]; then
+    PORT=8486
+    while [ "$PORT" -lt 8500 ] && command -v ss >/dev/null && [ -n "$(ss -Hltn "sport = :$PORT" 2>/dev/null)" ]; do PORT=$((PORT + 1)); done
+    printf '{\n  "port": %s\n}\n' "$PORT" > "$DIR/config.json"
+    chown schmeckts:schmeckts "$DIR/config.json"; chmod 0600 "$DIR/config.json"
+  fi
+  PORT=$(sed -n 's/.*"port": *\([0-9]*\).*/\1/p' "$DIR/config.json"); PORT=${PORT:-8486}
+
+  # Ist die Firewall aktiv, den Port für private Netze öffnen (der Server prüft das zusätzlich selbst)
+  if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+    for NET in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 100.64.0.0/10; do
+      ufw allow proto tcp from "$NET" to any port "$PORT" comment "Schmeckts-Server" >/dev/null || true
+    done
+  fi
+
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+    systemctl enable schmeckts.service >/dev/null 2>&1
+    systemctl restart schmeckts.service
+  fi
+
+  if [ -z "$2" ]; then
+    echo "Schmeckt’s-Server installiert (Port $PORT)."
+    echo "Weiter geht es im App-Menü mit: Schmeckt’s-Server einrichten"
+  fi
+fi
+exit 0
