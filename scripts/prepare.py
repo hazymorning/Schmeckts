@@ -32,6 +32,12 @@ FONTS = {
 }
 
 
+# Android never installs a package whose versionCode is lower than the installed one. Builds from before the
+# version restart at 0.1.0 reached 10400, so every code we hand out is lifted above that mark. The version name
+# the user sees is unaffected; versionCode is an internal counter and only has to keep rising.
+VERSION_OFFSET = 20000
+
+
 def run(*cmd, cwd=ROOT):
     subprocess.run(cmd, cwd=cwd, check=True)
 
@@ -186,9 +192,10 @@ def android(fresh):
     gradle = ANDROID / 'app/build.gradle'
     edit(gradle, "apply plugin: 'com.android.application'\n",
          "apply plugin: 'com.android.application'\n\n"
-         "// The version number lives only in app/package.json. versionCode: 1.2.3 → 10203\n"
+         "// The version number lives only in app/package.json. versionCode: " + str(VERSION_OFFSET) + " + (1.2.3 → 10203)\n"
          "def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version\n"
-         "def appVersionCode = appVersion.tokenize('.').collect { it as int }.inject(0) { acc, n -> acc * 100 + n }\n")
+         "def appVersionCode = " + str(VERSION_OFFSET) +
+         " + appVersion.tokenize('.').collect { it as int }.inject(0) { acc, n -> acc * 100 + n }\n")
     edit(gradle, '        versionCode 1\n        versionName "1.0"',
          '        versionCode appVersionCode\n        versionName appVersion\n'
          # The app runs on phones, so ARM only. Text recognition ships its library per processor family, and x86 and

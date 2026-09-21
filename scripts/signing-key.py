@@ -23,7 +23,11 @@ def create(jks, pwfile):
 
 def read(txt, jks):
     text = open(txt, encoding='utf-8').read()
-    pw = re.search(r'^Password: (\S+)\s*$', text, re.M).group(1)
+    # "Passwort" is what files written before the move to English say; both are accepted.
+    found = re.search(r'^(?:Password|Passwort): (\S+)\s*$', text, re.M)
+    if not found or BEGIN not in text:
+        sys.exit(f'{txt} is not a signing key file: it needs a "Password:" line and the keystore block.')
+    pw = found.group(1)
     block = text.split(BEGIN, 1)[1].split(END, 1)[0]
     open(jks, 'wb').write(base64.b64decode(''.join(block.split())))
     print(pw)
