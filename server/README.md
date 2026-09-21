@@ -1,10 +1,19 @@
-# Installing the Schmeckt’s server
+# Schmeckt’s? – the household server
+
+Only needed if several people keep the same feeding diary. It is a small program for a computer that stays on at
+home — a mini-PC is plenty. It holds the shared data, passes packaging photos on for recognition and looks up
+barcodes; nothing of it runs on anyone else’s machine. [The app](../README.md) works without it.
+
+Everything the server is sits in this folder: the Go program, `packaging/` for the Debian package and
+`build-deb.sh`, which builds it.
+
+## Installing
 
 About ten minutes, all of it on the mini-PC with mouse and keyboard. Your password is needed once.
 
 The server’s setup window and its messages are German, like the app. This guide is English, like the rest of the repository.
 
-## 1. Pick the right file
+### 1. Pick the right file
 
 There are two builds of the package:
 
@@ -15,7 +24,7 @@ If you are unsure: open the settings, go to “System” right at the bottom, th
 
 Download the file onto the mini-PC, for example by opening this page there in a browser.
 
-## 2. Install
+### 2. Install
 
 1. In the “Downloads” folder, double-click the .deb file. The software centre opens.
 2. Click “Install” and enter your password.
@@ -28,7 +37,7 @@ sudo apt install ~/Downloads/schmeckts-server_1.1.0_amd64.deb
 
 The server runs straight away afterwards and starts automatically with the PC.
 
-## 3. Get an API key
+### 3. Get an API key
 
 The key lets the server have packaging photos recognised by Claude. That costs roughly half a cent per photo.
 
@@ -36,7 +45,7 @@ The key lets the server have packaging photos recognised by Claude. That costs r
 2. Under “API Keys”, create a new key — for example named “Schmeckts” — and copy it. It starts with `sk-ant-`.
 3. Recommended: set a small monthly spending limit under “Limits”, around 5 dollars.
 
-## 4. Set it up
+### 4. Set it up
 
 1. Open the application menu and start „Schmeckt’s-Server einrichten“.
 2. Choose „Einrichten oder API-Schlüssel ändern“, paste the key, confirm and enter your password.
@@ -44,7 +53,7 @@ The key lets the server have packaging photos recognised by Claude. That costs r
 
 The same window shows the connection details again at any time, shows the stored data with „Übersicht“ (animals, food, recent meals, devices), and creates a new household code with „Neuer Code“ should a phone go missing.
 
-## 5. Connect the phones
+### 5. Connect the phones
 
 In the app: on first start „Mit Haushalt verbinden“ (later: settings, „Haushalt“, „Mit Haushalt verbinden“), type in the address and household code, then „Verbinden“. After that all phones sync their data automatically — at home over Wi-Fi, and on the road as soon as WireGuard is up. If something is waiting or the sync is stuck, a small notice appears at the top of the app. After a new code it reads „Code prüfen“; type the new code in there.
 

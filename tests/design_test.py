@@ -358,11 +358,12 @@ def test_pack():
                 unpack.unpack(f'{tmp}/{name}', f'{tmp}/tree')
         names = {name: re.findall(r'^===== FILE: (.+) \(\d+ characters\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
                  for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt')}
-        server = lambda rel: rel.startswith(('server/', 'packaging/')) or rel in ('scripts/build-deb.sh', 'docs/INSTALLATION.md')
+        server = lambda rel: rel.startswith('server/')
         app, srv = names['schmeckts-sources.txt'], names['schmeckts-server-sources.txt']
-        check(app[0] == 'PROJECT.md' and not any(map(server, app)) and all(map(server, srv)) and {'server/main.go', 'packaging/debian/control', 'scripts/build-deb.sh', 'docs/INSTALLATION.md'} <= set(srv)
+        check(app[0] == 'PROJECT.md' and not any(map(server, app)) and all(map(server, srv))
+              and {'server/main.go', 'server/packaging/debian/control', 'server/build-deb.sh', 'server/README.md'} <= set(srv)
               and {'scripts/unpack.py', 'scripts/pack.py', 'tests/ui_test.py', 'app/www/js/main.js'} <= set(app),
-              f'app file with PROJECT.md first, tests and scripts ({len(app)} files), server file with server/, packaging/, build-deb.sh, INSTALLATION.md ({len(srv)})')
+              f'app file with PROJECT.md first, tests and scripts ({len(app)} files), server file with everything under server/ ({len(srv)})')
         want = dict(pack.files())
         got = {p.relative_to(f'{tmp}/tree').as_posix(): p.read_text(encoding='utf-8') for p in pathlib.Path(tmp, 'tree').rglob('*') if p.is_file()}
         check(got == want and len(got) == len(app) + len(srv), f'both files unpacked into the same folder: the same working tree ({len(got)} files)')

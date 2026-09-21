@@ -7,7 +7,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Android-8.0%2B-965E4B?logo=android&logoColor=white&labelColor=2E2724" alt="Android 8.0 or newer">
-  <img src="https://img.shields.io/badge/Language-German-965E4B?labelColor=2E2724" alt="Language: German">
+  <img src="https://img.shields.io/badge/App%20language-German-965E4B?labelColor=2E2724" alt="App language: German">
   <img src="https://img.shields.io/badge/License-AGPL--3.0-965E4B?labelColor=2E2724" alt="License: AGPL-3.0">
 </p>
 
@@ -63,7 +63,7 @@ The first time you start the app you decide how you want to use it. You can swit
 | Look up unknown barcodes | on request | yes |
 | Share entries with others | manually, as a file | automatically |
 
-The household feature is built into the app, but the matching server is not yet generally available.
+A household needs a small server of its own, on a computer that stays on at home. It is not part of the app: its code and its setup guide live in [`server/`](server/).
 
 ## How to install
 
