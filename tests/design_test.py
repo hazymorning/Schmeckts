@@ -372,6 +372,24 @@ def test_pack():
         check(f"version {(ROOT / 'server/VERSION').read_text().strip()}," in first, f'the server file names the server\u2019s version, which does not change with the app ({first})')
 
 
+def test_version_code():
+    """Every build installs over the ones from before the version restart.
+
+    Android refuses a package whose versionCode is lower than the installed one. Builds before 0.1.0 reached
+    10400, so prepare.py lifts every code above that mark."""
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    import importlib
+    prep = importlib.import_module('prepare')
+    version = json.loads((ROOT / 'app/package.json').read_text())['version']
+    code = 0
+    for part in (int(x) for x in version.split('.')):
+        code = code * 100 + part
+    code += prep.VERSION_OFFSET
+    src = (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
+    check(code > 10400 and 'def appVersionCode = " + str(VERSION_OFFSET) +' in src,
+          f'versionCode {code} for version {version} stays above the 10400 of the builds before the restart')
+
+
 def test_signing_key():
     """scripts/signing-key.py: a round trip keeps the keystore and the password, and older files still read.
 
@@ -421,6 +439,7 @@ async def test_files(browser, url):
     test_pack()
     test_prompt()
     test_signing_key()
+    test_version_code()
 
 
 run_tests({'files': test_files, 'palette': test_palette, 'logo': test_logo, 'views': test_rules, 'polish': test_polish}, camera=('views',))
