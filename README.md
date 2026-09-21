@@ -84,27 +84,9 @@ Neue Versionen installierst du einfach über die alte, deine Einträge bleiben e
 - Eine Austausch-Datei enthält nur Tiere, Sorten und Mahlzeiten, keine Einstellungen, keinen Haushaltscode und keinen Schlüssel.
 - Die Kamera braucht die App für Fotos. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
 
-## Mitentwickeln
+## Fragen
 
-`app/www/` ist die App, ES-Module ohne Build-Werkzeuge, verpackt mit Capacitor; `app/native/` enthält die eigenen Android-Dateien, `app/android/` erzeugt `scripts/prepare.py`, und in `shared/` steht, was App und Server teilen. `server/` ist ein Go-Programm nur mit der Standardbibliothek, das als .deb aus `packaging/` auf einem Mini-PC läuft. `tests/` prüft beides, `scripts/` baut und `design/` liefert die Vorlagen für die Icons.
-
-Voraussetzung ist Ubuntu mit Node.js 22+ und Python 3 mit Pillow und Playwright.
-
-```sh
-scripts/setup-build-env.sh              # JDK 21, Android SDK 36, Go und lintian (als root, macht nur was fehlt)
-scripts/test.sh                         # alle Tests: Go, Node, Chromium, Abgleich gegen den echten Server
-scripts/build-apk.sh <schmeckts-signatur.txt>   # signierte APK nach dist/, nur mit grünen Tests
-```
-
-Einzelne Tests gehen auch direkt, etwa `python3 tests/ui_test.py modi`. Den Server als .deb baut `scripts/build-deb.sh`. Der Signaturschlüssel liegt außerhalb des Repositorys und gehört nicht hinein.
-
-Ein Release entsteht in drei Schritten: die neue Versionsnummer in `app/package.json` eintragen und den Zweig nach `main` zusammenführen. Dann hier auf GitHub ein Release mit dem Tag `v<version>` veröffentlichen. Der Rest läuft von selbst: Der Workflow prüft, ob Tag und Version zusammenpassen, fährt die Tests, baut die signierte APK und hängt sie als `schmeckts-<version>.apk` an das Release.
-
-Zweck, Datenmodell, Sync-Protokoll, Server-Schnittstelle, Gestaltungsregeln und Arbeitsweise stehen in [PROJEKT.md](PROJEKT.md). Wie der Server auf den Mini-PC kommt, steht in [docs/INSTALLATION.md](docs/INSTALLATION.md).
-
-## Fragen und Rückmeldungen
-
-Etwas funktioniert nicht oder dir fehlt eine Funktion? Schreib es in ein [Issue](https://github.com/hazymorning/Schmeckts/issues/new/choose). Hilfreich sind dein Handy-Modell, die Android-Version und die Version der App, die steht in den Einstellungen ganz unten.
+Fragen und Ideen gehören in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Hilfreich sind Handy-Modell, Android-Version und die Version der App, die in den Einstellungen ganz unten steht.
 
 ## Lizenz
 
