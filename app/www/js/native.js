@@ -1,22 +1,21 @@
-/* Brücke zu Android. In der App stehen die Capacitor-Plugins bereit, im Browser ist Native null. */
+/* Bridge to Android. In the app the Capacitor plugins are available; in the browser Native is null. */
 
-// In der Android-App stehen die Capacitor-Plugins bereit, im Browser ist Native null
 export const Native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins : null;
 export const appInfo = {version:''};
 const plugin = name => Native ? (Native[name] || window.Capacitor.registerPlugin?.(name)) : null;
 
-/* Vibration in drei Stufen: Auswahl leicht, Erfolg mittel, Löschen und Fehler deutlich */
+/* Haptics in three strengths: selection light, success medium, deletion and errors pronounced */
 const LEVELS = {select:['LIGHT', 8], success:['MEDIUM', 16], strong:['HEAVY', 32]};
 export const haptic = (level = 'select') => {
   const [style, ms] = LEVELS[level] || LEVELS.select;
   try { Native?.Haptics ? Native.Haptics.impact({style}).catch(() => {}) : navigator.vibrate?.(ms); } catch (e) {}
 };
 
-/* Eine Datei aus einer anderen App (content:// oder file://) über Capacitors eigenen Server lesbar machen */
+/* Make a file from another app (content:// or file://) readable through Capacitor's own server */
 export const fileUrl = uri => window.Capacitor?.convertFileSrc?.(uri) || uri;
 
-/* Text weitergeben: in der App über das Teilen-Menü (Share-Plugin), im Browser navigator.share, sonst die Zwischenablage.
-   Liefert 'copied', wenn der Text nur kopiert wurde, sonst 'shared'. Abbrechen ist kein Fehler. */
+/* Pass text on: through the share menu in the app (Share plugin), navigator.share in the browser, the clipboard
+   otherwise. Returns 'copied' when the text was only copied, 'shared' otherwise. Cancelling is not an error. */
 export async function shareText(title, text){
   try {
     if (Native?.Share) await Native.Share.share({title, text, dialogTitle:title});
@@ -26,8 +25,8 @@ export async function shareText(title, text){
   return 'shared';
 }
 
-/* Lokale Benachrichtigungen für die Erinnerung zum Bewerten (Plugin @capacitor/local-notifications). Im Browser simuliert mit
-   den Benachrichtigungen der Seite: gleiche Schnittstelle, geplant wird aber nur, solange die Seite offen ist. */
+/* Local notifications for the rating reminder (plugin @capacitor/local-notifications). Simulated in the browser with
+   the page's own notifications: same interface, but scheduling only lasts while the page is open. */
 function browserNotifications(){
   const N = window.Notification, pending = new Map(), taps = [];
   const state = () => ({display:!N ? 'denied' : N.permission === 'default' ? 'prompt' : N.permission});
@@ -47,35 +46,36 @@ function browserNotifications(){
 }
 export const Notifications = plugin('LocalNotifications') || browserNotifications();
 
-/* Eigenes Plugin (app/native/java): startet die Kamera-App, wenn die eigene Kamera (ui/camera.js) nicht geht.
-   hint erscheint kurz über der Kamera. */
-const Foto = plugin('Foto');
-export const canTakePhoto = () => !!Foto;
-export async function takePhoto(hint){ // Blob des Fotos, null bei Abbruch
-  if (!Foto) return null;
-  const r = await Foto.aufnehmen(hint ? {hinweis:hint} : undefined);
+/* Our own plugin (app/native/java): starts the camera app when the app's own camera (ui/camera.js) will not run.
+   hint appears briefly above the camera. */
+const Photo = plugin('Photo');
+export const canTakePhoto = () => !!Photo;
+export async function takePhoto(hint){ // the photo as a blob, null on cancel
+  if (!Photo) return null;
+  const r = await Photo.capture(hint ? {hint} : undefined);
   if (!r?.base64) return null;
   return fetch('data:image/jpeg;base64,' + r.base64).then(x => x.blob());
 }
 
-/* Text auf einem Foto lesen (Plugin @capacitor-mlkit/text-recognition, nur processImage, lateinische Schrift).
-   Das läuft auf dem Gerät, ohne Netz und ohne Schlüssel; ein Kamerarecht braucht es nicht, das Foto kommt aus dem
-   bestehenden Ablauf. Es liegt dafür kurz im privaten Cache und wird gleich wieder gelöscht. Liefert '', wenn nichts geht. */
+/* Read text off a photo (plugin @capacitor-mlkit/text-recognition, processImage only, Latin script).
+   This runs on the device, without network and without a key; it needs no camera permission, as the photo comes
+   from the existing flow. It sits briefly in the private cache for that and is deleted right after. Returns '' if
+   nothing works. */
 const TextReader = plugin('TextRecognition');
-const TEXT_FILE = 'schmeckts-lesen.jpg';
+const TEXT_FILE = 'schmeckts-ocr.jpg';
 export async function readPhotoText(b64){
   if (!TextReader || !Native?.Filesystem || !b64) return '';
   try {
     const {uri} = await Native.Filesystem.writeFile({path:TEXT_FILE, data:b64, directory:'CACHE'});
     try { return String((await TextReader.processImage({path:uri}))?.text || ''); }
     finally { await Native.Filesystem.deleteFile({path:TEXT_FILE, directory:'CACHE'}).catch(() => {}); }
-  } catch (e) { console.warn('Text auf dem Foto:', e?.message || e); return ''; }
+  } catch (e) { console.warn('text on the photo:', e?.message || e); return ''; }
 }
 
-/* Barcode lesen mit Googles fertiger Scan-Oberfläche (Plugin @capacitor-mlkit/barcode-scanning, nur scan()).
-   Die Kamera steuern dabei die Google-Play-Dienste, ohne das Kamerarecht der App. Fehlt deren Scanner-Modul,
-   wird es zuerst installiert, onInstall zeigt solange einen Hinweis. Liefert den gelesenen Code, null bei Abbruch,
-   und wirft, wenn Scannen auf diesem Handy nicht geht. Im Browser simuliert: der Code wird eingetippt. */
+/* Read a barcode with Google's ready-made scan interface (plugin @capacitor-mlkit/barcode-scanning, scan() only).
+   Google Play services drive the camera for it, without the app's camera permission. If their scanner module is
+   missing, it is installed first and onInstall shows a notice meanwhile. Returns the code read, null on cancel, and
+   throws when scanning does not work on this phone. Simulated in the browser: the code is typed in. */
 const Scanner = plugin('BarcodeScanner');
 const FORMATS = ['EAN_13', 'EAN_8', 'UPC_A'];
 const INSTALL = {completed:4, canceled:3, failed:5}; // GoogleBarcodeScannerModuleInstallState

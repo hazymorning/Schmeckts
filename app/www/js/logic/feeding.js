@@ -1,5 +1,6 @@
-/* Servieren: bekannte Sorte oder Foto. Im Haushalt erkennt der Server das Foto im Hintergrund, im Modus „lokal“ wird die
-   Sorte gleich eingetippt (Status noserver). Das Foto bleibt auf diesem Handy, abgeglichen wird nur die Vorschau. */
+/* Serving: a known variety or a photo. In a household the server recognises the photo in the background; in mode
+   `lokal` the variety is typed in right away (status noserver). The photo stays on this phone and only the preview
+   is synced. */
 import {uid} from '../fields.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {db, prefs, save, savePrefs} from '../store.js';
@@ -20,13 +21,14 @@ export function serveProduct(pid, scanCode = ''){
   const {ids} = defaultPets(p);
   const s = {id:uid(), productId:null, servedAt:Date.now(), pets:petMap(ids), note:'', ...byMe(), ...(scanCode ? {scanCode} : {})};
   db.servings.unshift(s);
-  linkProduct(s, p); prefs.lastPets = ids; // setzt Sorte und zuletzt gefütterte Tiere, hängt einen gescannten Code an
+  linkProduct(s, p); prefs.lastPets = ids; // sets the variety and the pets fed last, and attaches a scanned code
   save(); savePrefs(); served(s.id);
   const msg = `${pname(p)} serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}`;
   update(); scrollTop(); toast(withMilestone(msg), () => undoServe(s.id));
 }
-/* Meilenstein im Toast der Aktion, die ihn erreicht: „… serviert. Die 100. Mahlzeit!“ oder „… 10 Sorten probiert!“. Jede Schwelle
-   nur einmal pro Gerät (prefs.milestones). Was schon überschritten ist, etwa durch ein anderes Handy, gilt still als gesehen. */
+/* A milestone in the toast of the action that reaches it: „… serviert. Die 100. Mahlzeit!“ or „… 10 Sorten
+   probiert!“. Each threshold only once per device (prefs.milestones). Anything already passed, by another phone for
+   instance, counts silently as seen. */
 function withMilestone(msg){
   const m = milestones(db), fresh = m.reached.filter(k => !prefs.milestones.includes(k));
   if (!fresh.length) return msg;
@@ -34,35 +36,36 @@ function withMilestone(msg){
   const notes = [fresh.includes(`meals:${m.meals}`) && `Zum ${m.meals}. Mal gefüttert!`, fresh.includes(`sorts:${m.sorts}`) && `${m.sorts} Sorten probiert!`].filter(Boolean);
   return notes.length ? `${msg}${/[.!?…]$/.test(msg) ? '' : '.'} ${notes.join(' ')}` : msg;
 }
-/* Befriedigende Rückmeldung: Vibration, der Napf im Füttern-Button füllt sich, der Eintrag gleitet in „Heute“;
-   dazu die Erinnerung zum Bewerten, wenn sie eingeschaltet ist */
+/* Satisfying feedback: haptics, the bowl in the feeding button fills up, the entry slides into „Heute“;
+   plus the rating reminder, if it is switched on */
 function served(id){ haptic('success'); homeView.fresh = id; fabFill(); planReminder(getServing(id)); }
 function undoServe(id){
   const s = getServing(id); if (!s) return;
   db.servings = db.servings.filter(x => x.id !== id);
   memPhotos.delete(id); tries.delete(id);
   if (s.productId) cleanupProduct(s.productId);
-  if (sheet?.kind === 'serving' && sheet.id === id) closeSheet(); // wird gerade benannt (Modus „lokal“)
+  if (sheet?.kind === 'serving' && sheet.id === id) closeSheet(); // is being named right now (mode `lokal`)
   save(); update();
 }
 
-/* Packungsfoto aufnehmen und servieren. Ohne Kamera oder Kamerarecht geht es über die Kamera-App (Foto-Plugin), im
-   Browser über das Datei-Eingabefeld. Liefert true, wenn serviert wurde; nach „Abbrechen“ bleibt das Füttern-Sheet offen. */
+/* Take a photo of the packaging and serve. Without a camera or the camera permission it goes through the camera app
+   (photo plugin), and through the file input in the browser. Returns true when something was served; after
+   „Abbrechen“ the feeding sheet stays open. */
 export async function shootPhoto(hint, scanCode = ''){
   let blob = null;
   try { blob = await openCamera(hint || 'Packung fotografieren'); }
   catch (e) {
     console.warn('Eigene Kamera:', e?.name || '', e?.message || e);
-    if (!canTakePhoto()) { if (scanCode) toast(hint); document.getElementById('camInputSheet').click(); return false; } // Browser: der Foto-Knopf übernimmt einen gescannten Code
+    if (!canTakePhoto()) { if (scanCode) toast(hint); document.getElementById('camInputSheet').click(); return false; } // browser: the photo button takes over a scanned code
     try { blob = await takePhoto(hint); }
-    catch (err) { if (!/abgebrochen/.test(String(err?.message))) toast('Die Kamera ließ sich nicht öffnen. Ist sie für Schmeckt’s in den Android-Einstellungen erlaubt?'); }
+    catch (err) { if (!/cancelled/.test(String(err?.message))) toast('Die Kamera ließ sich nicht öffnen. Ist sie für Schmeckt’s in den Android-Einstellungen erlaubt?'); }
   }
   if (blob) await servePhoto(blob, scanCode);
   return !!blob;
 }
 
-/* Foto: sofort als serviert speichern, Erkennung läuft im Hintergrund – kein Warten.
-   scanCode: gescannter, noch unbekannter Barcode, er kommt an die erkannte oder benannte Sorte. */
+/* Photo: save it as served at once, with recognition running in the background — no waiting.
+   scanCode: a scanned barcode still unknown; it goes onto the recognised or named variety. */
 export async function servePhoto(file, scanCode = ''){
   if (!file || !db.pets.length) return;
   let img;
@@ -77,14 +80,14 @@ export async function servePhoto(file, scanCode = ''){
   save(); savePrefs(); served(s.id);
   if (dlg.open) await closeSheet();
   update(); scrollTop();
-  if (local) openSheet({kind:'serving', id:s.id, step:'name', brand:'', variety:'', type:'Nassfutter'}); // Sorte direkt eintippen
+  if (local) openSheet({kind:'serving', id:s.id, step:'name', brand:'', variety:'', type:'Nassfutter'}); // type the variety in directly
   toast(withMilestone(`Serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}${local ? '' : '. Sorte wird erkannt …'}`), () => undoServe(s.id));
-  recognizeServing(s.id); // die Erkennungskette entscheidet, was möglich ist – im Modus „lokal“ liest das Handy den Text
+  recognizeServing(s.id); // the recognition chain decides what is possible — in mode `lokal` the phone reads the text
 }
 
-const running = new Set();                    // laufende Erkennungen
-const tries = new Map();                      // Mahlzeit → {n, next}: Versuche, frühester nächster Versuch
-const PAUSE = [0, 30e3, 2 * 60e3, 10 * 60e3, 30 * 60e3]; // danach kein automatischer Versuch mehr
+const running = new Set();                    // recognitions in flight
+const tries = new Map();                      // meal → {n, next}: attempts, and the earliest next attempt
+const PAUSE = [0, 30e3, 2 * 60e3, 10 * 60e3, 30 * 60e3]; // no automatic attempt after that
 
 export function retryNow(id){ tries.delete(id); recognizeServing(id); }
 
@@ -96,15 +99,15 @@ async function recognizeServing(id){
     return;
   }
   running.add(id);
-  const house = isConnected(); // im Haushalt erkennt der Server, sonst liest das Handy den Text auf dem Foto
+  const house = isConnected(); // in a household the server recognises, otherwise the phone reads the text on the photo
   s.status = house ? 'recognizing' : 'reading'; delete s.error; save(); refreshServing(id);
   let found = {source:'', error:null};
   try { found = await identify({code:s.scanCode || '', photo:b64}); } catch (e) { console.warn('Erkennung:', e?.message || e); }
   running.delete(id);
   const cur = getServing(id); if (!cur) return;
-  if (cur.productId) { settle(cur); save(); refreshServing(id); return; } // inzwischen benannt, hier oder auf einem anderen Handy
+  if (cur.productId) { settle(cur); save(); refreshServing(id); return; } // named meanwhile, here or on another phone
   const err = found.error;
-  if (found.products?.length) {                       // der Barcode gehört inzwischen zu einer bekannten Sorte
+  if (found.products?.length) {                       // the barcode now belongs to a known variety
     tries.delete(id);
     linkProduct(cur, found.products[0]);
   } else if (found.details && found.source !== 'text') {
@@ -112,15 +115,15 @@ async function recognizeServing(id){
     refinePets(cur, findProduct(found.details.brand, found.details.variety), found.details.animal);
     applyProduct(cur, found.details);
     if (sheet?.kind === 'serving' && sheet.id === id && sheet.step === 'name' && !sheet.brand && !sheet.variety) sheet.step = null;
-  } else if (found.details) {                         // vom Handy gelesen: der Mensch bestätigt oder ändert beim Benennen
+  } else if (found.details) {                         // read by the phone: a human confirms or changes it while naming
     tries.delete(id);
     cur.guess = found.details; cur.status = 'noserver'; delete cur.error;
     fillName(id, found.details);
   } else if (!house || err?.kind === 'none') {
-    cur.status = 'noserver'; delete cur.error; // ohne Server und ohne Schlüssel: die Sorte wird eingetippt
+    cur.status = 'noserver'; delete cur.error; // no server and no key: the variety gets typed in
   } else if (err?.retry) {
     const t = tries.get(id) || {n:0, next:0};
-    if (err.kind !== 'offline' || err.timeout) t.n++; // Server nicht erreichbar kostet nichts und zählt nicht
+    if (err.kind !== 'offline' || err.timeout) t.n++; // an unreachable server costs nothing and does not count
     if (t.n < PAUSE.length) {
       t.next = Date.now() + (err.kind === 'busy' ? 90e3 : PAUSE[t.n]);
       tries.set(id, t);
@@ -134,23 +137,23 @@ async function recognizeServing(id){
   save(); refreshServing(id);
 }
 
-/* Gelesene Marke und Sorte in den offenen Benennen-Ablauf schreiben, solange dort nichts eingetippt wurde */
+/* Write the brand and variety that were read into the open naming flow, as long as nothing has been typed there */
 function fillName(id, guess){
   if (sheet?.kind !== 'serving' || sheet.id !== id || sheet.step !== 'name' || sheet.brand || sheet.variety) return;
   Object.assign(sheet, {brand:guess.brand || '', variety:guess.variety || '', type:guess.type || sheet.type, texture:guess.texture});
 }
-/* Was das Handy gelesen hat, füllt das Formular beim Benennen vor (actions.js) */
+/* What the phone read prefills the form while naming (actions.js) */
 export const guessOf = s => ({brand:s?.guess?.brand || '', variety:s?.guess?.variety || '',
   type:s?.guess?.type || 'Nassfutter', texture:s?.guess?.texture});
 
-function settle(s){ // benannt, hier oder auf einem anderen Handy: Foto und Erkennungsstatus werden nicht mehr gebraucht
+function settle(s){ // named, here or on another phone: photo and recognition status are no longer needed
   const p = getProduct(s.productId);
-  if (p) linkProduct(s, p); // räumt auf und hängt einen gescannten Code an
+  if (p) linkProduct(s, p); // tidies up and attaches a scanned code
   else { delete s.photo; delete s.status; delete s.error; delete s.autoPets; delete s.guess; memPhotos.delete(s.id); }
   tries.delete(s.id);
 }
 
-/* Server wieder erreichbar: wartende Fotos nacheinander erkennen */
+/* Server reachable again: recognise the waiting photos one after another */
 let retrying = false;
 export async function retryWaiting(){
   if (retrying || !isConnected()) return;
@@ -159,7 +162,7 @@ export async function retryWaiting(){
     for (const s of [...db.servings]) {
       if (s.productId) { if (s.status || s.photo) { settle(s); save(); refreshServing(s.id); } continue; }
       if (s.status !== 'waiting' && s.status !== 'noserver') continue;
-      if (s.guess) continue; // das Handy hat den Text schon gelesen, der Mensch bestätigt beim Benennen
+      if (s.guess) continue; // the phone has already read the text, a human confirms it while naming
       if ((tries.get(s.id)?.next || 0) > Date.now()) continue;
       await recognizeServing(s.id);
     }
@@ -173,8 +176,8 @@ function refreshServing(id){
   if (sheet.step !== 'name' || !typing) renderSheet();
 }
 
-/* Tiere nachschärfen, solange sie nur geraten waren:
-   wer bekam dieses Futter sonst? Sonst nach Tierart auf der Packung. */
+/* Sharpen up the pets while they were only guessed:
+   who else had this food? Failing that, by the species on the packaging. */
 export function refinePets(s, known, animalHint){
   if (!s.autoPets || db.pets.length < 2 || Object.values(s.pets).some(x => x.r)) return;
   let pref = (known?.lastPets || []).filter(pid => getPet(pid));

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Startbildschirm in der Grundfarbe der App, damit der Übergang nahtlos ist -->
+    <!-- The splash screen in the app's base colour, so the transition is seamless -->
     <color name="splash_background">#F4F0EC</color>
 </resources>

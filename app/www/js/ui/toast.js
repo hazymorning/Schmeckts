@@ -1,4 +1,4 @@
-/* Kurze Meldung unten, optional mit „Rückgängig“. Ersetzt Sicherheitsabfragen. */
+/* A short message at the bottom, optionally with „Rückgängig“. Replaces confirmation prompts. */
 import {$} from '../dom.js';
 import {esc} from '../text.js';
 import {icon} from '../icons.js';

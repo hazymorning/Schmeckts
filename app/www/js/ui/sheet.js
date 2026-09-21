@@ -1,9 +1,9 @@
-/* Bottom Sheet: öffnen, schließen, wischen, Zurück-Geste.
-   Was im Sheet steht, melden die Ansichten über setSheetView() an. */
+/* Bottom sheet: opening, closing, swiping, the back gesture.
+   What the sheet contains is registered by the views through setSheetView(). */
 import {$, reduceMotion} from '../dom.js';
 
 export const dlg = $('#sheet'), sheetBody = $('#sheetBody');
-export let sheet = null; // der Zustand des offenen Sheets, null wenn zu
+export let sheet = null; // the state of the open sheet, null when closed
 let viewKey = '', histPushed = false, closing = null;
 
 export function openSheet(state){
@@ -12,11 +12,11 @@ export function openSheet(state){
   if (!dlg.open) {
     dlg.classList.remove('closing'); dlg.style.transform = ''; dlg.style.transition = '';
     dlg.showModal(); document.body.classList.add('locked');
-    sheetBody.scrollTop = 0; // der Browser merkt sich sonst die Scrollposition des letzten Sheets
+    sheetBody.scrollTop = 0; // the browser would otherwise remember the last sheet's scroll position
     try { history.pushState({sheet:1}, ''); histPushed = true; } catch (e) { histPushed = false; }
   }
 }
-let drawView = () => {}; // setzen die Sheet-Ansichten: zeichnet den Inhalt des offenen Sheets
+let drawView = () => {}; // set by the sheet views: draws the contents of the open sheet
 export function setSheetView(fn){ drawView = fn; }
 export function renderSheet(){
   if (!sheet) return;
@@ -30,8 +30,8 @@ export function renderSheet(){
 export function closeSheet(fromPop = false){
   if (closing) return closing;
   if (!dlg.open) return Promise.resolve();
-  /* Fertig ist das Schließen erst, wenn auch der Verlaufseintrag des Sheets weg ist: Käme popstate nach dem
-     Öffnen des nächsten Sheets, würde es dieses schließen */
+  /* Closing is only done once the sheet's history entry is gone as well: were popstate to arrive after the next
+     sheet has opened, it would close that one */
   const popped = histPushed && !fromPop ? new Promise(resolve => addEventListener('popstate', resolve, {once:true})) : null;
   if (popped) history.back();
   histPushed = false;
@@ -51,7 +51,7 @@ window.addEventListener('popstate', () => { if (histPushed) { histPushed = false
 dlg.addEventListener('cancel', e => { e.preventDefault(); closeSheet(); });
 dlg.addEventListener('click', e => { if (e.target === dlg) closeSheet(); });
 
-/* Nach unten wischen schließt das Sheet */
+/* Swiping down closes the sheet */
 (() => {
   let startY = 0, dy = 0, t0 = 0, dragging = false;
   dlg.addEventListener('pointerdown', e => {

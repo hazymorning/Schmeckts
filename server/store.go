@@ -1,14 +1,14 @@
 package main
 
-// Datenhaltung: alle Datensätze mit einer Uhr pro Feld, dauerhaft in einer JSON-Datei.
+// Storage: every record with one clock per field, persisted in a JSON file.
 //
-// Eine Änderung setzt einzelne Felder eines Datensatzes. Pro Feld gewinnt der größere
-// Zeitstempel (hybride Uhr als sortierbarer Text, siehe clockPattern). "_del" ist ein
-// normales Feld: true = gelöscht, false = wiederhergestellt. Jede übernommene Änderung
-// erhöht die laufende Nummer (seq); Geräte holen „alles seit N“.
+// A change sets individual fields of a record. Per field the larger timestamp wins
+// (a hybrid clock as sortable text, see clockPattern). "_del" is an ordinary field:
+// true = deleted, false = restored. Every accepted change increments the running
+// number (seq); devices fetch "everything since N".
 //
-// Die Datei wird bei jeder Änderung vollständig und atomar ersetzt (schreiben, fsync,
-// umbenennen). Ein Absturz mitten im Schreiben lässt immer die alte oder die neue Fassung zurück.
+// The file is replaced in full and atomically on every change (write, fsync, rename).
+// A crash mid-write always leaves either the old or the new version behind.
 
 import (
 	"crypto/rand"
@@ -32,15 +32,15 @@ const (
 	stateFile     = "state.json"
 	backupDir     = "backups"
 	keepBackups   = 30
-	keepSeen      = 180 * 24 * time.Hour // so lange erkennt der Server doppelt gesendete Änderungen
-	maxFutureSkew = 10 * time.Minute     // Änderungen aus der Zukunft werden abgelehnt
+	keepSeen      = 180 * 24 * time.Hour // how long the server recognises changes sent twice
+	maxFutureSkew = 10 * time.Minute     // changes from the future are rejected
 	maxFieldBytes = 512 << 10
 	maxFields     = 64
 )
 
 var (
 	collections  = map[string]bool{"pets": true, "products": true, "servings": true}
-	localOnly    = map[string]bool{"photo": true, "status": true, "error": true, "autoPets": true, "scanCode": true} // bleiben auf dem Handy
+	localOnly    = map[string]bool{"photo": true, "status": true, "error": true, "autoPets": true, "scanCode": true} // stay on the phone
 	changeIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 	recordIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{4,40}$`)
 	fieldRe      = regexp.MustCompile(`^(_del|[A-Za-z][A-Za-z0-9]{0,31})(\.[A-Za-z0-9_-]{1,40})?$`)
@@ -53,7 +53,7 @@ type Field struct {
 }
 
 type Record struct {
-	S int64            `json:"s"` // Nummer der letzten übernommenen Änderung
+	S int64            `json:"s"` // number of the last accepted change
 	F map[string]Field `json:"f"`
 }
 
@@ -61,10 +61,10 @@ type state struct {
 	Epoch   string                        `json:"epoch"`
 	Seq     int64                         `json:"seq"`
 	Records map[string]map[string]*Record `json:"records"`
-	Seen    map[string]int64              `json:"seen"` // Änderungs-Kennung → Zeitpunkt in ms
+	Seen    map[string]int64              `json:"seen"` // change id → timestamp in ms
 }
 
-// Change ist eine Änderung, wie sie ein Gerät schickt.
+// Change is a change the way a device sends it.
 type Change struct {
 	ID string                     `json:"id"`
 	C  string                     `json:"c"`
@@ -75,11 +75,11 @@ type Change struct {
 
 type Rejected struct {
 	ID     string `json:"id"`
-	Reason string `json:"reason"` // "invalid" oder "clock"
+	Reason string `json:"reason"` // "invalid" or "clock"
 	Detail string `json:"detail"`
 }
 
-// OutRecord ist ein Datensatz, wie ihn die Geräte bekommen.
+// OutRecord is a record the way devices receive it.
 type OutRecord struct {
 	C string           `json:"c"`
 	R string           `json:"r"`
@@ -109,8 +109,8 @@ func emptyState() state {
 	return st
 }
 
-// OpenStore lädt den Datenbestand. Ist die Datei beschädigt, wird sie beiseitegelegt und
-// das neueste Backup geladen, mit neuer Epoche, damit alle Geräte vollständig abgleichen.
+// OpenStore loads the stored data. If the file is corrupted it is set aside and the newest
+// backup is loaded, under a new epoch, so that every device does a full sync.
 func OpenStore(dir string) (*Store, error) {
 	s := &Store{dir: dir}
 	if err := os.MkdirAll(filepath.Join(dir, backupDir), 0o700); err != nil {
@@ -127,7 +127,7 @@ func OpenStore(dir string) (*Store, error) {
 		}
 	default:
 		broken := filepath.Join(dir, fmt.Sprintf("state.defekt-%d.json", time.Now().Unix()))
-		log.Printf("Datenbestand beschädigt (%v), lege ihn als %s beiseite", err, broken)
+		log.Printf("stored data corrupted (%v), setting it aside as %s", err, broken)
 		if rerr := os.Rename(filepath.Join(dir, stateFile), broken); rerr != nil {
 			return nil, rerr
 		}
@@ -156,7 +156,7 @@ func readState(path string) (state, error) {
 		return st, err
 	}
 	if st.Epoch == "" || st.Records == nil {
-		return st, errors.New("unvollständige Datei")
+		return st, errors.New("incomplete file")
 	}
 	for c := range collections {
 		if st.Records[c] == nil {
@@ -169,7 +169,7 @@ func readState(path string) (state, error) {
 	return st, nil
 }
 
-// writeAtomic ersetzt eine Datei so, dass nach einem Absturz immer eine vollständige Fassung da ist.
+// writeAtomic replaces a file so that after a crash there is always a complete version.
 func writeAtomic(path string, data []byte, mode os.FileMode) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
@@ -218,35 +218,35 @@ func validate(c Change, now time.Time) *Rejected {
 	bad := func(detail string) *Rejected { return &Rejected{ID: c.ID, Reason: "invalid", Detail: detail} }
 	switch {
 	case !changeIDRe.MatchString(c.ID):
-		return bad("Kennung der Änderung")
+		return bad("change id")
 	case !collections[c.C]:
-		return bad("Sammlung " + c.C)
+		return bad("collection " + c.C)
 	case !recordIDRe.MatchString(c.R):
-		return bad("Kennung des Datensatzes")
+		return bad("record id")
 	case len(c.F) == 0 || len(c.F) > maxFields:
-		return bad("Anzahl der Felder")
+		return bad("number of fields")
 	}
 	at, ok := parseClock(c.T)
 	if !ok {
-		return bad("Zeitstempel")
+		return bad("timestamp")
 	}
 	if at.After(now.Add(maxFutureSkew)) {
-		return &Rejected{ID: c.ID, Reason: "clock", Detail: "Zeitstempel liegt in der Zukunft"}
+		return &Rejected{ID: c.ID, Reason: "clock", Detail: "timestamp lies in the future"}
 	}
 	for k, v := range c.F {
 		if !fieldRe.MatchString(k) || len(v) > maxFieldBytes || !json.Valid(v) {
-			return bad("Feld " + k)
+			return bad("field " + k)
 		}
 		if k == "_del" && string(v) != "true" && string(v) != "false" {
-			return bad("_del muss true oder false sein")
+			return bad("_del must be true or false")
 		}
 	}
 	return nil
 }
 
-// Apply übernimmt Änderungen und speichert dauerhaft, bevor es zurückkehrt.
-// ok enthält alle Kennungen, die das Gerät aus seiner Warteschlange löschen darf
-// (übernommen oder schon bekannt), rejected die dauerhaft ungültigen.
+// Apply accepts changes and persists them before returning.
+// ok holds every id the device may drop from its queue (accepted or already known),
+// rejected the permanently invalid ones.
 func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []Rejected, seq int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -288,7 +288,7 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 	}
 	if dirty {
 		if err := s.persist(); err != nil {
-			// Zurück auf den gespeicherten Stand, damit Speicher und Platte übereinstimmen
+			// Back to the persisted state, so that memory and disk agree
 			if st, rerr := readState(filepath.Join(s.dir, stateFile)); rerr == nil {
 				s.st = st
 			}
@@ -298,7 +298,7 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 	return ok, rejected, s.st.Seq, nil
 }
 
-// Since liefert alle Datensätze, die sich nach Nummer since geändert haben.
+// Since returns every record that has changed after the number since.
 func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -314,8 +314,8 @@ func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	return s.st.Epoch, s.st.Seq, out
 }
 
-// Checksum ist eine Prüfsumme über alle Felder und ihre Uhren. Die App berechnet sie genauso:
-// SHA-256 über die sortierten Zeilen „sammlung/id/feld@uhr\n“.
+// Checksum is a checksum over every field and its clock. The app computes it the same way:
+// SHA-256 over the sorted lines "collection/id/field@clock\n".
 func (s *Store) Checksum() (epoch string, seq int64, sum string, fields int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -341,7 +341,7 @@ func (s *Store) Seq() (string, int64) {
 	return s.st.Epoch, s.st.Seq
 }
 
-// Products liefert die sichtbaren Futtersorten, neueste zuerst (für den Erkennungs-Prompt).
+// Products returns the visible food varieties, newest first (for the recognition prompt).
 func (s *Store) Products(limit int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -371,8 +371,8 @@ func (s *Store) Products(limit int) []string {
 	return names
 }
 
-// Backup legt einmal pro Tag eine Kopie an und behält die letzten 30.
-// Nebenbei vergisst der Server sehr alte Änderungs-Kennungen.
+// Backup writes a copy once a day and keeps the last 30.
+// Along the way the server forgets very old change ids.
 func (s *Store) Backup(now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -1,7 +1,7 @@
 name: Tests
 
-# Bei jedem Push und jedem Pull Request die ganze Testsuite. Gebaut wird hier nichts:
-# kein Android SDK, keine APK, kein .deb. Nur, was scripts/test.sh wirklich braucht.
+# The whole test suite on every push and every pull request. Nothing is built here:
+# no Android SDK, no APK, no .deb. Only what scripts/test.sh actually needs.
 on: [push, pull_request]
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Der Server nutzt nur die Standardbibliothek, es gibt keine go.sum: kein Abhängigkeits-Cache.
+      # The server uses the standard library only and there is no go.sum: no dependency cache.
       - name: Go
         uses: actions/setup-go@v5
         with:
@@ -34,14 +34,14 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Pillow erzeugt das Testfoto, Playwright fährt Chromium für die Tests der Oberfläche.
-      - name: Playwright mit Chromium
+      # Pillow draws the test photo, Playwright drives Chromium for the interface tests.
+      - name: Playwright with Chromium
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install pillow playwright
           python3 -m playwright install --with-deps chromium
 
-      # Holt zuerst die Schriften (prepare.py --nur-schriften), dann Go-, Node- und Chromium-Tests
-      # samt Abgleich mehrerer Handys gegen den echten Server.
-      - name: Testsuite
+      # Fetches the fonts first (prepare.py --fonts-only), then the Go, Node and Chromium tests,
+      # including several phones syncing against the real server.
+      - name: Test suite
         run: scripts/test.sh
