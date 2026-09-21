@@ -15,8 +15,8 @@ TEXTURES = ['in Soße', 'in Gelee', 'Pastete', 'Mousse', 'Filets']
 
 def household(years):
     rnd, day, now = random.Random(7), 864e5, TUESDAY.timestamp() * 1000
-    pets = [{'id': 'petminka001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1, 'photos': {}},
-            {'id': 'pettiger001', 'name': 'Tiger', 'species': 'Katze', 'photo': None, 'createdAt': 2, 'photos': {}}]
+    pets = [{'id': 'petminka001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1},
+            {'id': 'pettiger001', 'name': 'Tiger', 'species': 'Katze', 'photo': None, 'createdAt': 2}]
     products = [{'id': f'sorte{i:05d}', 'brand': BRANDS[i % 10], 'variety': f'{FLAVORS[i % 15]} {TEXTURES[i % 5]}', 'type': 'Nassfutter', 'animal': 'Katze',
                  'thumb': None, 'lastPets': [], 'createdAt': i, 'codes': {}} for i in range(150)]
     liking = {(p['id'], x['id']): rnd.random() for p in pets for x in products}
@@ -44,7 +44,7 @@ OPEN = """async () => { const s = await import('./js/store.js'), sheet = await i
     await sheet.closeSheet(); s.save();
     await new Promise(done => setTimeout(done, 50));
     const t0 = performance.now(); sheet.openSheet(views.reportState(null)); const t1 = performance.now();
-    out.push([t1 - t0, document.querySelectorAll('#sheetBody h3.label').length]); }
+    out.push([t1 - t0, document.querySelectorAll('#sheetBody .tl-day').length]); }
   await sheet.closeSheet();
   return out; }"""
 
@@ -68,8 +68,8 @@ async def test_rating(browser, url):
         check(draw < LIMIT_MS and all(x[2] for x in runs), f'{years} years ({years * 730} meals): evaluation and redraw {draw:.0f} ms, saving {save:.0f} ms')
         opens = (await pg.evaluate(OPEN))[1:]
         shown = statistics.median(x[0] for x in opens)
-        check(shown < REPORT_MS and all(x[1] >= 4 for x in opens),
-              f'{years} years: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} sections')
+        check(shown < REPORT_MS and all(x[1] >= 10 for x in opens),
+              f'{years} years: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} days to begin with')
         await ctx.close()
 
 

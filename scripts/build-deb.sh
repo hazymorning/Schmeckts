@@ -6,7 +6,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GO="$(command -v go || echo /usr/local/go/bin/go)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/server/VERSION")"
 
-python3 "$ROOT/scripts/prepare.py" --prompt-only   # generate server/recognize-prompt.txt from shared/ (//go:embed)
 cd "$ROOT/server"
 "$GO" vet ./...
 "$GO" test -count=1 ./...

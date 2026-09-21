@@ -1,15 +1,15 @@
 /* Contents of the bottom sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
-   the profile picture and the album), settings and evaluation. */
+   the profile picture), settings and evaluation. */
 import {$} from '../dom.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
 import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
-import {ALBUM_MAX, FEED_START, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, reportModel, sortOf} from '../derive.js';
-import {feedSlots, MIN_RATED, rateCls, scoreCls, SPANS, VERDICTS} from '../smart.js';
+import {feedSlots, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {renderSheet, setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {armBtn, avatar, closeBtn, dayBlocks, dayGroups, nameBlock, rateRow, reasonOf, resultBadges, syncInfo, thumbOf, verdictLabel} from './parts.js';
@@ -97,7 +97,7 @@ function viewFeed(){
     <ul class="plist">${serveRows(pick, sheet.code)}</ul>`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
-    <div class="cta-row">${prefs.feedStart === 'beides' ? CTA.barcode + CTA.foto : CTA[prefs.feedStart]}</div>
+    <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
     ${sheet.busy ? `<p class="note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
     ${prods.length ? `<div id="serveList"><span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul></div>
       ${prods.length > SUGGEST ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>
@@ -160,88 +160,51 @@ function viewProduct(){
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* Evaluation: the same building blocks as the settings. The span at the top, below it a heading per section, the
-   graphic and one sentence summing it up in words; sections without enough data are left out. The computing happens in
-   report() (smart.js), the drawing here: the line as our own SVG, the bars from the app's building blocks. Every
-   graphic carries its text description in aria-label, and no statement rests on colour alone.
-   sheet.span: days of the span, sheet.shown: meals in the history, sheet.at: the section it opens at. */
-const REPORT_STEP = 20;   // the history loads 20 more at a time
-const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const weekdayName = i => new Date(2024, 0, 1 + i).toLocaleDateString('de-DE', {weekday:'long'}); // 1 January 2024 was a Monday
-export const reportState = at => ({kind:'report', span:SPANS[0][0], shown:REPORT_STEP, at});
-export function reportSpan(v){ Object.assign(sheet, {span:+v, shown:REPORT_STEP}); renderSheet(); }
-export function reportMore(){ sheet.shown += REPORT_STEP; renderSheet(); }
+/* Evaluation: the same building blocks as the settings, nothing to set. „Marken“ says what goes down best, below it
+   the whole history. The computing happens in report() (smart.js). The bars carry their text description in
+   aria-label, and no statement rests on colour alone. sheet.at: the id of the day it opens at */
+export const reportState = at => ({kind:'report', at});
 
-const section = (key, title, chart, say) => `<h3 class="label" id="ab-${key}">${title}</h3>${chart}<p class="why">${say}</p>`;
-/* A horizontal bar with name, number and secondary number; cls carries a rating level's colour, otherwise the accent applies */
-const barRow = (name, value, side, w, cls = '') =>
-  `<div class="lv ${cls}"><span class="lv-top"><span class="lv-name">${esc(name)}</span><b class="lv-n">${value}</b><span class="lv-s">${side}</span></span>
+/* A horizontal bar with name, number and secondary number */
+const barRow = (name, value, side, w) =>
+  `<div class="lv"><span class="lv-top"><span class="lv-name">${esc(name)}</span><b class="lv-n">${value}</b><span class="lv-s">${side}</span></span>
     <span class="bar"><i style="--w:${Math.max(2, Math.round(w))}%"></i></span></div>`;
-const bars = (label, rows) => `<div class="bars" role="img" aria-label="${esc(label)}">${rows}</div>`;
-const compare = list => `${esc(list[0].key)} kommt am besten an (${list[0].pct} %), ${esc(list.at(-1).key)} am wenigsten (${list.at(-1).pct} %).`;
-const listOf = list => list.map(g => `${g.key} ${g.pct} Prozent aus ${g.n} Bewertungen`).join('; ');
 
-function trendBlock(m){
-  const lines = m.trend.pets.filter(p => p.points.length > 1);
-  if (!lines.length) return '';
-  const width = Math.max(1, m.trend.to - m.trend.from), per = m.trend.step === 'day' ? 'Tag' : 'Woche';
-  const name = p => esc(getPet(p.id).name), many = lines.length > 1;
-  const points = p => p.points.map(x => `${((x.t - m.trend.from) / width * 100).toFixed(1)},${(100 - x.pct).toFixed(1)}`).join(' ');
-  const label = `Linie der Wertung je ${per}, 0 bis 100 Prozent. `
-    + lines.map(p => `${many ? getPet(p.id).name + ': ' : ''}von ${p.points[0].pct} auf ${p.points.at(-1).pct} Prozent, im Schnitt ${p.pct}`).join('. ') + '.';
-  return section('trend', 'Akzeptanz im Verlauf',
-    `<div class="chart" role="img" aria-label="${esc(label)}">
-      <span class="chart-y"><span>100 %</span><span>50 %</span><span>0 %</span></span>
-      <svg class="plot" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <path class="grid" d="M0 0H100M0 50H100M0 100H100"/>
-        ${lines.map((p, i) => `<polyline class="s${i % 3}" points="${points(p)}"/>`).join('')}</svg></div>
-    ${many ? `<div class="legend">${lines.map((p, i) => `<span class="key s${i % 3}"><svg viewBox="0 0 20 2" aria-hidden="true"><line x1="0" y1="1" x2="20" y2="1"/></svg>${name(p)}</span>`).join('')}</div>` : ''}`,
-    many ? `Im Schnitt ${andList(lines.map(p => `${name(p)} ${p.pct} %`))}.` : `Im Schnitt ${lines[0].pct} %, zuletzt ${lines[0].points.at(-1).pct} %.`);
-}
-function levelBlock(m){
-  if (m.levels.length < 2) return '';
-  const top = m.levels.reduce((a, x) => x.n > a.n ? x : a);
-  return section('levels', 'Verteilung der Bewertungen',
-    bars('Bewertungen je Stufe: ' + m.levels.map(x => `${RATINGS[x.r].label} ${x.n}, ${x.share} Prozent`).join('; ') + '.',
-      m.levels.map(x => barRow(RATINGS[x.r].label, x.n, `${x.share} %`, x.share, rateCls(x.r))).join('')),
-    `Am häufigsten „${esc(RATINGS[top.r].label)}“ mit ${top.n} von ${m.n} Bewertungen (${top.share} %).`);
-}
+/* „Marken“: which brand goes down best. Only from two brands on, otherwise there is nothing to compare. */
 function brandBlock(m){
   if (m.brands.length < 2) return '';
-  return section('brands', 'Marken im Vergleich',
-    bars('Marken nach Wertung: ' + listOf(m.brands) + '.', m.brands.map(b => barRow(b.key, `${b.pct} %`, `${b.n}×`, b.pct)).join('')),
-    compare(m.brands));
+  const label = 'Marken nach Wertung: ' + m.brands.map(b => `${b.key} ${b.pct} Prozent aus ${b.n} Bewertungen`).join('; ') + '.';
+  return `<h3 class="label">Marken</h3>
+    <div class="bars" role="img" aria-label="${esc(label)}">${m.brands.map(b => barRow(b.key, `${b.pct} %`, `${b.n}×`, b.pct)).join('')}</div>
+    <p class="why">${esc(m.brands[0].key)} kommt am besten an, ${esc(m.brands.at(-1).key)} am wenigsten.</p>`;
 }
-const textureBlocks = m => m.textures.map(t => section('tex-' + t.type, t.title,
-  bars(`${t.title} nach Wertung: ` + listOf(t.groups) + '.', t.groups.map(g => barRow(g.key, `${g.pct} %`, `${g.n}×`, g.pct)).join('')),
-  compare(t.groups))).join('');
-function feedingBlock(m){
-  const days = m.feeding.days, most = Math.max(...days);
-  if (!most) return '';
-  const meals = n => `${n} ${n === 1 ? 'Mahlzeit' : 'Mahlzeiten'}`;
-  const often = days.map((n, i) => [n, i]).filter(([n]) => n === most).map(([, i]) => weekdayName(i).toLowerCase() + 's');
-  return section('feeding', 'Fütterungen',
-    `<div class="wd" role="img" aria-label="Mahlzeiten je Wochentag: ${days.map((n, i) => `${weekdayName(i)} ${n}`).join(', ')}.">
-      ${days.map((n, i) => `<span class="wd-col"><span class="wd-bar"><i style="--h:${n ? Math.max(6, Math.round(n / most * 100)) : 0}%"></i></span><b class="lv-n">${n}</b><span>${WEEKDAYS[i]}</span></span>`).join('')}</div>`,
-    often.length > 3 ? `Über die Woche wird gleichmäßig gefüttert, an keinem Tag mehr als ${meals(most)}.`
-      : `Am meisten wird ${andList(often)} gefüttert, ${meals(most)}${often.length > 1 ? ' je Tag' : ''}.`)
-    + (m.feeding.people.length > 1 ? m.feeding.people.map(x => `<p class="who"><span>${esc(x.name)}</span><b class="lv-n">${x.n}×</b></p>`).join('') : '');
+
+/* The history grows as you scroll instead of laying out years of meals in one go: HIST_PAGE days at a time,
+   appended below. How many are already there is what the box says, so a redraw cannot get it out of step. */
+const HIST_PAGE = 10;
+let histDays = [];
+const histHTML = (m, from, to) => dayBlocks(histDays.slice(from, to), {multiHouse:db.pets.length > 1 && !m.pet, anchors:true});
+/* Appends pages as long as less than a screen is left below: while scrolling, and once after drawing, in the frame
+   after it so that the page is on screen first. */
+function growHistory(){
+  const box = $('#histBox');
+  if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
+  const m = reportModel();
+  while (box.children.length < histDays.length && sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800)
+    box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
 }
-function histBlock(m){
-  if (!m.meals.length) return '';
-  const shown = m.meals.slice(0, sheet.shown);
-  return `<h3 class="label" id="ab-hist">Verlauf</h3>
-    ${dayBlocks(dayGroups(shown), {multiHouse:db.pets.length > 1 && !m.pet})}
-    ${m.meals.length > shown.length ? `<button class="card-btn" data-action="report-more">Weitere anzeigen</button>` : ''}`;
-}
+sheetBody.addEventListener('scroll', growHistory, {passive:true});
+
+/* The evaluation: what goes down best, and the whole history. Nothing to set, nothing to unfold. */
 function viewReport(){
-  const m = reportModel(sheet.span);
+  const m = reportModel();
   const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
+  histDays = dayGroups(m.meals);
+  const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
   return `<div class="sh-head"><h2>Auswertung${who}</h2>${closeBtn}</div>
-    <div class="seg">${SPANS.map(([v, l]) => `<button aria-pressed="${sheet.span === v}" data-action="report-span" data-v="${v}">${l}</button>`).join('')}</div>
-    ${m.n < MIN_RATED ? `<p class="hint mt-s">Ab ${MIN_RATED} Bewertungen in diesem Zeitraum zeigt diese Seite, was ankommt.</p>`
-      : trendBlock(m) + levelBlock(m) + brandBlock(m) + textureBlocks(m) + feedingBlock(m)}
-    ${histBlock(m)}`;
+    ${m.n < MIN_RATED ? `<p class="hint">Ab ${MIN_RATED} Bewertungen zeigt diese Seite, was ankommt.</p>` : brandBlock(m)}
+    ${histDays.length ? `<h3 class="label">Verlauf</h3><div id="histBox">${histHTML(m, 0, upto)}</div>`
+      : `<p class="empty">Noch nichts serviert.</p>`}`;
 }
 
 /* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
@@ -251,16 +214,6 @@ const viewCrop = () => `<div class="sh-head"><h2>Foto zuschneiden</h2>${closeBtn
     <label class="label" for="f-zoom">Zoom</label>
     <input id="f-zoom" class="zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1">
     <div class="btn-row"><button class="btn soft" data-action="crop-cancel">Abbrechen</button><button class="btn primary" data-action="crop-apply">${icon('check')}Übernehmen</button></div>`;
-
-/* Album in the pet sheet: up to ALBUM_MAX photos, a cross to remove one, and a tap picks a photo for „Als Profilbild“ */
-function albumHTML(p){
-  const keys = Object.keys(p.photos || {}).sort(), sel = keys.includes(sheet.albumSel) ? sheet.albumSel : null;
-  return `<span class="label">Fotos${keys.length ? ` (${keys.length} von ${ALBUM_MAX})` : ''}</span>
-    <div class="album">${keys.map((k, i) => `<div class="ph"><button class="ph-img" data-action="album-select" data-key="${k}" aria-pressed="${sel === k}" aria-label="Foto ${i + 1} auswählen"><img src="${esc(p.photos[k])}" alt=""></button>
-      <button class="ph-x" data-action="album-remove" data-key="${k}" aria-label="Foto ${i + 1} entfernen"><span>${icon('close')}</span></button></div>`).join('')}
-      ${keys.length < ALBUM_MAX ? `<label class="ph add" for="albumInput" aria-label="Fotos hinzufügen">${icon('plus')}</label>` : ''}</div>
-    ${sel ? `<button class="btn soft mt-s" data-action="album-profile">${icon('crop')}Als Profilbild</button>` : ''}`;
-}
 
 function viewPet(){
   if (sheet.step === 'crop') return viewCrop();
@@ -274,7 +227,6 @@ function viewPet(){
     <input id="f-name" class="field" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done">
     <span class="label">Tierart</span>
     <div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>
-    ${editing ? albumHTML(getPet(s.id)) : ''}
     <div class="mt btn-col"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button>
     ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
 }
@@ -284,13 +236,10 @@ function viewSettings(){
   return `<div class="sh-head"><h2>Einstellungen</h2>${closeBtn}</div>
     ${loadError ? `<p class="banner">Die gespeicherten Daten konnten nicht gelesen werden. Bitte die App neu starten.</p>`
       : storageOK ? '' : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`}
-    <button class="list-row" data-action="open-report"><span class="t-main"><b>Auswertung</b></span>${icon('chevron', 'chev')}</button>
     <span class="label">Darstellung</span>
     <div class="seg">${[['system', 'auto', 'System'], ['light', 'sun', 'Hell'], ['dark', 'moon', 'Dunkel']].map(([v, ic, l]) => `<button aria-pressed="${st.theme === v}" data-action="theme" data-v="${v}">${icon(ic)}${l}</button>`).join('')}</div>
-    <span class="label">Tierfotos im Hintergrund</span>
+    <span class="label">Profilbild im Hintergrund</span>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${st.backdrop === (v === 'on')}" data-action="backdrop" data-v="${v}">${l}</button>`).join('')}</div>
-    <span class="label">Füttern beginnt mit</span>
-    <div class="seg">${FEED_START.map(([v, l]) => `<button aria-pressed="${st.feedStart === v}" data-action="feed-start" data-v="${v}">${l}</button>`).join('')}</div>
     <span class="label">Ans Bewerten erinnern</span>
     <p class="hint" id="remind-hint">${remindHint()}</p>
     <div class="seg">${REMIND.map(m => `<button aria-pressed="${!own && st.remind === m}" data-action="remind" data-v="${m}">${m ? m / 60 + ' Std.' : 'Aus'}</button>`).join('')
@@ -350,7 +299,7 @@ function serverSection(notice = syncInfo()){
     ${deviceSection()}`;
 }
 
-/* This phone's settings and routes: product lookup on the internet, the own AI key and the manual exchange.
+/* This phone's settings and routes: product lookup on the internet and the manual exchange.
    The notes say what goes out in each case. After receiving, the report sits here and, when the other device is
    missing something, „Antwort senden“ (sheet.exchange, see logic/exchange.js). */
 function deviceSection(){
@@ -359,10 +308,6 @@ function deviceSection(){
     <p class="hint">${prefs.lookup ? 'Bei unbekannten Barcodes fragt dieses Handy zwei freie Produktdatenbanken. Übertragen wird nur die Nummer.'
       : 'Unbekannte Barcodes führen gleich zum Foto. Es geht keine Nummer hinaus.'}</p>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${prefs.lookup === (v === 'on')}" data-action="lookup" data-v="${v}">${l}</button>`).join('')}</div>
-    <label class="label" for="f-aikey">Eigener KI-Schlüssel</label>
-    <p class="hint">Mit einem eigenen Schlüssel von Anthropic liest Claude die Packung vom Foto, etwa ein halber Cent je Foto. Der Schlüssel liegt nur auf diesem Handy.</p>
-    <input id="f-aikey" class="field" type="password" data-setting="aiKey" value="${esc(prefs.aiKey)}" placeholder="sk-ant-…"
-      autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
     <span class="label">Austausch von Hand</span>
     <p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält nur Tiere, Futter und Mahlzeiten.</p>
     <div class="btn-col">
@@ -391,16 +336,25 @@ export function paintServerBox(fresh = false){
 /* Datenschutz: explains both modes factually, without promises; opened from the settings, section „Daten“ */
 const PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Haushalt“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
   'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.'];
 const viewPrivacy = () => `<div class="sh-head"><h2>Datenschutz</h2>${closeBtn}</div><div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
 const VIEWS = {serving:viewServing, feed:viewFeed, new:viewName, product:viewProduct, pet:viewPet, settings:viewSettings, report:viewReport, privacy:viewPrivacy};
+/* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
+   away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.
+   The boxes the views fill afterwards are drawn every time, because their contents are not part of this comparison. */
+let drawn = '';
 setSheetView(state => {
-  sheetBody.innerHTML = VIEWS[state.kind]();
-  if (state.kind === 'settings') paintServerBox(true);
-  if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom'));
+  const html = VIEWS[state.kind](), fresh = html !== drawn || !sheetBody.firstChild; // no children: closed in between
+  if (fresh) {
+    drawn = html;
+    sheetBody.innerHTML = html;
+    if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // hangs listeners on: exactly once per drawing
+  }
+  if (state.kind === 'settings') paintServerBox(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
-  if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#ab-' + at)?.scrollIntoView({block:'start'})); } // opened at a given section
+  if (state.kind === 'report') requestAnimationFrame(growHistory);
+  if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#' + at)?.scrollIntoView({block:'start'})); } // opened at a given day
 });

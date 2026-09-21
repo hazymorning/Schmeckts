@@ -1,7 +1,7 @@
 /* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
    derive.js. The rules are in PROJECT.md, section "Evaluation". */
-import {FLAVORS, guessTexture, RATINGS, TEXTURES, textureOf, TYPES, typeOf} from './config.js';
-import {addDays, dayKey, dayStart, weekStart} from './dates.js';
+import {FLAVORS, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
+import {addDays, dayKey, weekStart} from './dates.js';
 
 const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
@@ -175,15 +175,10 @@ function hints(sorts, appetites, pet, prefs){
     .sort((a, b) => HINTS.indexOf(a.kind) - HINTS.indexOf(b.kind) || a.order - b.order);
 }
 
-/* Evaluation page: everything for one span in one go, from the same ratings, weights and thresholds as analyze().
-   span: days, 0 = everything. Computed within the pet filter; pure, caching happens in derive.js.
-     trend     one line of the weighted score per pet, per day at 30 days, per week otherwise
-     levels    count and share of every level that occurs, in the order of RATINGS
-     brands    the TOP_BRANDS most common brands by score
-     textures  consistency and treat type per food type, only groups from MIN_GROUP ratings
-     feeding   meals per weekday (Monday first) and per person */
-export const SPANS = [[30, '30 Tage'], [90, '90 Tage'], [0, 'Alles']];
-const TOP_BRANDS = 6, MIN_GROUP = 3;
+/* Evaluation page (only computed when it opens), for the pet in the filter or for the whole household:
+     meals     every meal within the filter, newest first
+     brands    the TOP_BRANDS most common brands by score */
+const TOP_BRANDS = 6;
 function groupSums(rated, products, keyOf){
   const m = new Map();
   for (const x of rated) {
@@ -194,41 +189,14 @@ function groupSums(rated, products, keyOf){
   }
   return [...m].map(([key, sum]) => ({key, ...statOf(sum)}));
 }
-function trendOf(rated, ids, step){
-  const bucket = step === 'day' ? dayStart : weekStart, per = new Map();
-  for (const x of rated) {
-    if (!per.has(x.pid)) per.set(x.pid, {sum:emptySum(), buckets:new Map()});
-    const mine = per.get(x.pid), b = bucket(x.t);
-    if (!mine.buckets.has(b)) mine.buckets.set(b, emptySum());
-    addRating(mine.buckets.get(b), x); addRating(mine.sum, x);
-  }
-  const pets = ids.filter(id => per.has(id)).map(id => ({id, ...statOf(per.get(id).sum),
-    points:[...per.get(id).buckets].sort((a, b) => a[0] - b[0]).map(([t, sum]) => ({t, ...statOf(sum)}))}));
-  const all = pets.flatMap(p => p.points.map(x => x.t));
-  return {step, from:Math.min(...all, Infinity), to:Math.max(...all, -Infinity), pets};
-}
-export function report(db, prefs, now, span){
+export function report(db, prefs){
   const petIds = db.pets.map(p => p.id);
   const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
   const ids = pet ? [pet] : petIds, mine = new Set(ids), products = new Map(db.products.map(p => [p.id, p]));
-  const from = span ? now - span * DAY : -Infinity;
-  const meals = db.servings.filter(s => s.servedAt > from && s.servedAt <= now && ids.some(id => s.pets?.[id]));
+  const meals = db.servings.filter(s => ids.some(id => s.pets?.[id]));
   const rated = [...ratingsOf(db, meals)].filter(x => mine.has(x.pid));
-  const counts = {}, days = [0, 0, 0, 0, 0, 0, 0], fed = new Map();
-  for (const x of rated) counts[x.r] = (counts[x.r] || 0) + 1;
-  for (const s of meals) {
-    days[(new Date(s.servedAt).getDay() + 6) % 7]++;
-    const name = (s.by || '').trim();
-    if (name) fed.set(name, (fed.get(name) || 0) + 1);
-  }
-  const textureKey = type => p => typeOf(p) === type ? (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1] : '';
-  return {span, pet, n:rated.length, meals, trend:trendOf(rated, ids, span === 30 ? 'day' : 'week'),
-    levels:Object.keys(RATINGS).filter(r => counts[r]).map(r => ({r, n:counts[r], share:Math.round(counts[r] / rated.length * 100)})),
-    brands:groupSums(rated, products, p => p.brand).sort((a, b) => b.n - a.n).slice(0, TOP_BRANDS).sort((a, b) => b.score - a.score),
-    textures:Object.entries(TEXTURES).map(([type, t]) => ({type, title:t.title,
-      groups:groupSums(rated, products, textureKey(type)).filter(g => g.n >= MIN_GROUP).sort((a, b) => b.score - a.score)}))
-      .filter(x => x.groups.length >= 2),
-    feeding:{days, people:[...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de'))}};
+  return {pet, n:rated.length, meals,
+    brands:groupSums(rated, products, p => p.brand).sort((a, b) => b.n - a.n).slice(0, TOP_BRANDS).sort((a, b) => b.score - a.score)};
 }
 
 /* Groups for „Einkaufen“ and the shopping list: „Gemischt“ counts towards buying again, the manual setting decides

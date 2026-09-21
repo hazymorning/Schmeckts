@@ -64,12 +64,6 @@ export const FLAVORS = [['Thunfisch',/thunfisch|tuna/i],['Lachs',/lachs|salmon/i
 export const REMIND = [0, 60, 180, 360];
 export const REMIND_MAX_H = 24;
 export const tidyRemind = m => Number.isFinite(m) && m > 0 ? Math.min(REMIND_MAX_H, Math.max(1, Math.round(m / 60))) * 60 : 0;
-/* What feeding starts with (prefs.feedStart, per device): both buttons in the feeding sheet, or only one. Only the
-   button is hidden; scanning and photographing stay reachable through shortcuts, deep links and the route via the
-   photo after an unknown barcode. tidyFeedStart turns any stored value into a valid one. */
-export const FEED_START = [['beides', 'Barcode & Foto'], ['foto', 'Nur Foto'], ['barcode', 'Nur Barcode']];
-export const tidyFeedStart = v => FEED_START.some(([k]) => k === v) ? v : FEED_START[0][0];
 export const REMIND_MAX_AGE = 10 * 60e3;    // only meals at most 10 minutes old get one scheduled
 export const PENDING_WINDOW = 48 * 3600e3; // open meals drop out of „Wie war’s?“ after 48 h
-export const ALBUM_MAX = 8;                 // photos in a pet's album
 export const DEMO = 'demo'; // sample data identifiers start with this; they are removed on connecting

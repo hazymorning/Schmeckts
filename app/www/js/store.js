@@ -3,14 +3,14 @@
    start replays it; a change from the server lands in db first, and if sync is missing the app fetches it again. */
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
-import {tidyFeedStart, tidyRemind} from './config.js';
+import {tidyRemind} from './config.js';
 import {milestones} from './smart.js';
 import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validId, valueOf} from './fields.js';
 
 export {flush, storageOK};
 export const defaults = () => ({version:3, pets:[], products:[], servings:[]});
 const defaultPrefs = () => ({theme:'system', hiddenHints:[], closedWeek:'', milestones:null, remind:0, feedRemind:false, backdrop:true,
-  feedStart:'beides', mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, aiKey:'', codes:{}, exchange:{}});
+  mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, codes:{}, exchange:{}});
 export const hooks = {changed(){}, saved(){}}; // the interface and the sync hook in here
 
 export function tidy(d){
@@ -19,6 +19,7 @@ export function tidy(d){
     const seen = new Set();
     out[c] = (Array.isArray(d?.[c]) ? d[c] : []).filter(r => r && typeof r === 'object' && r.id && !seen.has(r.id) && seen.add(r.id));
   }
+  for (const p of out.pets) delete p.photos; // the album is gone; whatever a household still holds stays untouched there
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
   for (const s of out.servings) {
     if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed';  // recognition was interrupted
@@ -32,12 +33,12 @@ function tidyPrefs(p){
   out.hiddenHints = Array.isArray(out.hiddenHints) ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))].slice(-300) : [];
   out.remind = tidyRemind(out.remind);
   out.feedRemind = out.feedRemind === true; // reminder to feed at the usual times
-  out.feedStart = tidyFeedStart(out.feedStart);                        // which button the feeding sheet shows
+  delete out.feedStart;                                                // dropped: the feeding sheet always shows both buttons
   out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // pet photos behind the header, on by default ('off': a value from 1.1.0)
   out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: never set, see load()
   out.lookup = out.lookup === true;                                    // product lookup on the internet, off by default
-  out.aiKey = typeof out.aiKey === 'string' ? out.aiKey.trim() : '';   // own AI key, on this phone only
+  delete out.aiKey;                                                    // dropped: the key for photo recognition lives on the server
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};       // remembered barcode answers
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with
   return out;

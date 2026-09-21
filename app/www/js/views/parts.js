@@ -11,12 +11,12 @@ import {sheet} from '../ui/sheet.js';
 
 export function avatar(pet, cls = ''){
   if (!pet) return '';
-  if (pet.photo) return `<span class="av ${cls}"><img src="${esc(pet.photo)}" alt=""></span>`;
+  if (pet.photo) return `<span class="av ${cls}"><img src="${esc(pet.photo)}" alt="" decoding="async"></span>`;
   return `<span class="av ${cls}">${icon(speciesIcon(pet.species))}</span>`;
 }
 export function thumbOf(s, p, cls = ''){
   const src = p?.thumb || s?.thumb;
-  if (src) return `<img class="thumb ${cls}" src="${esc(src)}" alt="">`;
+  if (src) return `<img class="thumb ${cls}" src="${esc(src)}" alt="" decoding="async">`;
   if (!p) return `<span class="thumb unknown ${cls}">${icon('camera')}</span>`;
   const letter = (p.brand || p.variety || '?').trim().charAt(0).toUpperCase();
   return `<span class="thumb ${cls}">${esc(letter)}</span>`;
@@ -110,7 +110,7 @@ export function syncChip(){
   return null;
 }
 
-/* A variety's verdict as text; in a household „Gemischt“ with the pets' names, e.g. „Gemischt: Minka ja, Tiger nein“ */
 /* A short reason for a verdict, e.g. „4× bewertet, zuletzt Gut“ */
 export const reasonOf = x => x.n ? `${x.n}× bewertet, zuletzt ${RATINGS[x.last.r].label}` : 'noch nicht bewertet';
+/* A variety's verdict as text; in a household „Gemischt“ with the pets' names, e.g. „Gemischt: Minka ja, Tiger nein“ */
 export const verdictLabel = x => x.verdict === 'gemischt' ? `Gemischt: ${petNames(x.yes)} ja, ${petNames(x.no)} nein` : VERDICTS[x.verdict];

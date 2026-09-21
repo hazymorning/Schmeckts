@@ -199,29 +199,18 @@ const WEEK = household(['Minka', 'Tiger'], ['lachs', 'huhn', 'rind', 'neu'], [
   [null, {Minka:null}, '2026-05-31T23:59', ' Jonas '],
   ['rind', {Minka:T}, '2026-06-01T00:00', 'Jonas'], ['rind', {Minka:T}, '2026-06-01T09:00', 'Jonas']]);
 
-test('evaluation: the same ratings, scores and groups as the model', () => {
+test('evaluation: the same ratings, scores and brands as the model, and every meal in the filter', () => {
   const products = [{id:'p1', brand:'Sheba'}, {id:'p2', brand:'Felix'}, {id:'p3', brand:'Gourmet'}];
   const db = household(['A', 'B'], products, [...rate('p1', 'A', [T, G, M], 40), ...rate('p2', 'A', [G, X], 20),
     ...rate('p3', 'B', [T, T, S], 5), ...rate('p1', 'B', [M, S], 2)]);
   for (const activePet of ['all', 'A']) {
-    const prefs = {activePet, hiddenHints:[]}, m = model(db, prefs), r = report(db, prefs, NOW, 0);
-    const counts = {};
-    for (const e of m.sorts) for (const [k, n] of Object.entries(e.counts)) counts[k] = (counts[k] || 0) + n;
+    const prefs = {activePet, hiddenHints:[]}, m = model(db, prefs), r = report(db, prefs);
     assert.equal(r.n, m.rated);
-    assert.deepEqual(Object.fromEntries(r.levels.map(x => [x.r, x.n])), counts);
-    assert.equal(r.levels.reduce((a, x) => a + x.share, 0), 100);
     assert.deepEqual(r.brands.map(b => [b.key, b.pct, b.n]).sort(),                  // je Marke genau eine Sorte
       m.sorts.filter(e => e.n).map(e => [e.product.brand, e.pct, e.n]).sort());
+    assert.deepEqual(r.meals, db.servings.filter(s => activePet === 'all' || s.pets[activePet]), 'every meal in the filter, no span');
+    assert.equal(r.pet, activePet === 'all' ? null : activePet);
   }
-});
-
-test('evaluation: the span narrows it down, and the line runs per day or per week', () => {
-  const db = household(['A'], [{id:'p1', brand:'Sheba'}], [...rate('p1', 'A', [T, G], 100), ...rate('p1', 'A', [M, S], 40), ...rate('p1', 'A', [X], 2)]);
-  const prefs = {activePet:'all', hiddenHints:[]};
-  assert.deepEqual([report(db, prefs, NOW, 30).n, report(db, prefs, NOW, 90).n, report(db, prefs, NOW, 0).n], [1, 3, 5]);
-  assert.deepEqual([report(db, prefs, NOW, 30).trend.step, report(db, prefs, NOW, 90).trend.step, report(db, prefs, NOW, 0).trend.step],
-    ['day', 'week', 'week']);
-  assert.equal(report(db, prefs, NOW, 0).trend.pets[0].pct, model(db, prefs).byId.get('p1').pct);
 });
 
 test('week: Monday 00:00 to Sunday 24:00, always for the household', () => {

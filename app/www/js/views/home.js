@@ -27,9 +27,9 @@ export function update(){
 export function scrollTop(){ window.scrollTo({top:0, behavior: reduceMotion.matches ? 'auto' : 'smooth'}); }
 
 // fresh: id of the meal just served, which slides in on the next draw
-// shown: meals in the history, open: unfolded cards; both last until the app restarts
-const HIST = {step:5, max:20};
-export const homeView = {fresh:null, shown:HIST.step, open:{}};
+// open: unfolded cards, lasts until the app restarts
+const HIST = 5;   // meals under the calendar; everything else is in the evaluation
+export const homeView = {fresh:null, open:{}};
 
 /* Pet bar: the filter, only from two pets on. With one pet there is nothing to filter, and pets are managed in the settings. */
 function renderPets(){
@@ -80,7 +80,7 @@ function homeHTML(){
   else {
     const ins = insightCard(m);
     html += hintHTML(m) + weekHTML(lastWeek()) +
-      `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2><div id="sec-hist">${historyHTML()}</div></section>` +
+      `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
       card('shop', 'Einkaufen', shopCard(m)) + (ins ? card('ins', 'Erkenntnisse', ins) : '');
   }
   return html;
@@ -268,7 +268,7 @@ function insightCard(m){
   if (!m.insights.length) return null;
   const list = homeView.open.ins ? m.insights : m.insights.slice(0, 1);
   return {body:`<ul class="ins">${list.map(i => `<li><span class="dot">${icon(INSIGHT[i.kind][0])}</span><span>${insightHTML(i, m)}</span></li>`).join('')}</ul>`,
-    more: m.insights.length > 1, foot:`<button class="card-btn" data-action="open-report">Zur Auswertung</button>`};
+    more: m.insights.length > 1};
 }
 const CARDS = {shop:shopCard, ins:insightCard};
 
@@ -292,7 +292,6 @@ function calendarHTML(list){
 }
 /* Meals within the pet filter, newest first (db.servings is sorted by time descending): the first n for the
    timeline and everything since `since` for the calendar. Both in one pass, which stops as soon as both are done. */
-const visibleServings = () => db.servings.filter(s => servingPets(s).length);
 function someServings(n, since){
   const first = [], recent = [];
   for (const s of db.servings) {
@@ -303,25 +302,12 @@ function someServings(n, since){
   }
   return {first, recent};
 }
-/* Below the calendar the latest meals, grouped by day; „Weitere anzeigen“ shows HIST.step more each time, up to
-   HIST.max, after which „Ganzer Verlauf“ leads to the evaluation. The calendar always shows its two weeks. */
+/* Below the calendar the latest HIST meals, grouped by day, and the button to the evaluation, where the whole
+   history is. The calendar always shows its two weeks. */
 function historyHTML(){
-  const {first, recent} = someServings(homeView.shown + 1, addDays(weekStart(Date.now()), -7)); // one more: are there any left?
+  const {first, recent} = someServings(HIST, addDays(weekStart(Date.now()), -7));
   const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
-  const shown = first.slice(0, homeView.shown);
   return calendarHTML(recent) +
-    (shown.length ? dayBlocks(dayGroups(shown), {multiHouse, fresh:homeView.fresh, anchors:true}) : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
-    (homeView.shown >= HIST.max ? `<button class="card-btn" data-action="open-report" data-v="hist">Ganzer Verlauf</button>`
-      : first.length > shown.length ? `<button class="card-btn" data-action="more-history">Weitere anzeigen</button>` : '');
-}
-/* „Weitere anzeigen“: HIST.step meals more, at most HIST.max; with day, enough of them for that day to be included
-   (a jump from the calendar). Only the history is redrawn. Returns the first newly shown meal. */
-export function showMoreHistory(day){
-  const all = visibleServings(), was = homeView.shown;
-  const upto = day ? all.findLastIndex(s => dayKey(s.servedAt) === day) + 1 : Math.min(was + HIST.step, HIST.max);
-  if (upto <= was) return null;
-  homeView.shown = upto;
-  const box = $('#sec-hist');
-  if (box) box.innerHTML = historyHTML(); else renderHome();
-  return $(`.tl-item[data-id="${all[was].id}"]`);
+    (first.length ? dayBlocks(dayGroups(first), {multiHouse, fresh:homeView.fresh, anchors:true}) : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
+    `<div class="btn-col mt-s"><button class="btn soft" data-action="open-report">${icon('layers')}Auswertung</button></div>`;
 }

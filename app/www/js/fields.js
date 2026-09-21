@@ -2,13 +2,13 @@
    <map>.<key>. null removes, local fields stay on the phone. Pure functions. */
 
 export const COLLECTIONS = ['pets', 'products', 'servings'];
-const MAPS = {servings:['pets'], products:['codes'], pets:['photos']};    // maps, synced entry by entry
+const MAPS = {servings:['pets'], products:['codes']};                    // maps, synced entry by entry
 const LOCAL = new Set(['photo', 'status', 'error', 'autoPets', 'scanCode', 'guess']); // in servings only
 const ID_RE = /^[A-Za-z0-9_-]{4,40}$/;                         // as on the server
 export const validId = id => typeof id === 'string' && ID_RE.test(id); // test(undefined) would otherwise be true
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const FIELD_RE = /^(_del|[A-Za-z][A-Za-z0-9]{0,31})(\.[A-Za-z0-9_-]{1,40})?$/;
-export const MAX_FIELD = 500e3;                                         // the server accepts up to 512 KB per field
+const MAX_FIELD = 500e3;                                                // the server accepts up to 512 KB per field
 
 const isMap = (c, k) => !!MAPS[c]?.includes(k);
 

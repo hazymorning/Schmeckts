@@ -24,7 +24,9 @@ export function renderSheet(){
   const key = `${sheet.kind}:${sheet.step || ''}:${sheet.id || ''}`;
   if (key !== viewKey) {
     viewKey = key; sheetBody.scrollTop = 0;
-    sheetBody.classList.remove('swap-in'); void sheetBody.offsetWidth; sheetBody.classList.add('swap-in');
+    sheetBody.classList.remove('swap-in');
+    // Only for a swap inside an open sheet; while it opens, the sheet's own entrance is animation enough
+    if (dlg.open) { void sheetBody.offsetWidth; sheetBody.classList.add('swap-in'); }
   }
 }
 export function closeSheet(fromPop = false){

@@ -10,14 +10,14 @@ import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
-import {expandCard, showMoreHistory, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderServeHits, renderSuggestions, reportMore, reportSpan, reportState} from './views/sheets.js';
+import {expandCard, toggleOverview, update} from './views/home.js';
+import {paintServerBox, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
 import {setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
-import {addAlbumPhotos, albumToProfile, closeCrop, deletePet, openPet, removeAlbumPhoto, savePet, setPetPhoto} from './logic/pets.js';
+import {closeCrop, deletePet, openPet, savePet, setPetPhoto} from './logic/pets.js';
 import {exportData, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 
@@ -78,9 +78,7 @@ const ACTIONS = {
   'edit-pet'(el){ openPet(el.dataset.id, 'settings'); },
   'open-pet'(el){ openPet(el.dataset.id); }, // from the overview
   'open-settings'(){ openSheet({kind:'settings'}); },
-  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: the section it opens at
-  'report-span'(el){ haptic('select'); reportSpan(el.dataset.v); },                    // the span, applies to the whole page
-  'report-more'(){ haptic('select'); reportMore(); },
+  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: the day it opens at
   'open-privacy'(){ openSheet({kind:'privacy'}); },
   'open-server'(){ openSheet({kind:'settings'}); requestAnimationFrame(() => $('#server')?.scrollIntoView({block:'start'})); },
   connect(){ connectServer(); },
@@ -142,12 +140,8 @@ const ACTIONS = {
   'save-pet'(){ savePet(); },
   'crop-apply'(){ closeCrop(true); },
   'crop-cancel'(){ closeCrop(false); },
-  'album-select'(el){ sheet.albumSel = sheet.albumSel === el.dataset.key ? null : el.dataset.key; haptic('select'); renderSheet(); },
-  'album-remove'(el){ removeAlbumPhoto(el.dataset.key); },
-  'album-profile'(){ albumToProfile(); },
-  backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // pet photos in the background
+  backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // the profile picture behind the header
   lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // product lookup on the internet, off by default
-  'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // which button the feeding sheet shows
   'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // reminder to feed at the usual times
   remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // rating reminder, asks for the permission
   'remind-own'(){ // „Eigene“: a field for whole hours, starting at the current interval, or 2 hours coming from „Aus“
@@ -161,16 +155,11 @@ const ACTIONS = {
   demo(){ loadDemo(); },
   expand(el){ haptic('select'); expandCard(el.dataset.v); },
   'toggle-overview'(){ haptic('select'); toggleOverview(); }, // the overview's full text and back
-  'more-history'(){ // the focus moves to the first newly shown meal
-    haptic('select');
-    showMoreHistory()?.focus({preventScroll:true});
-  },
   'jump-day'(el){
-    const key = el.dataset.day;
-    if (!document.getElementById('d-' + key)) showMoreHistory(key); // the day lies beyond the meals on show
-    const target = document.getElementById('d-' + key); if (!target) return;
-    target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
+    const key = el.dataset.day, target = document.getElementById('d-' + key);
     haptic('select');
+    if (target) target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
+    else openSheet(reportState('d-' + key)); // further back: the whole history is in the evaluation
   },
   undo(){ const u = toastUndo; hideToast(); if (u) { haptic('select'); u(); } }
 };
@@ -239,6 +228,5 @@ document.addEventListener('change', e => {
 const onFile = (id, fn) => $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; fn(f); });
 onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, should the photo button take it over
 onFile('#petPhotoInput', setPetPhoto);
-$('#albumInput').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; addAlbumPhotos(files); });
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);
