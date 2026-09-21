@@ -223,9 +223,9 @@ async def test_cards(browser, url):
     await pg.keyboard.press(' '); await idle(pg)
     check(await pg.inner_text('[data-sec=shop] [data-action=expand]') == 'Alle anzeigen' and await pg.locator('[data-action=share-list]').count() == 0 and await pg.locator('[data-sec=shop] .bar').count() == 0, 'Leertaste klappt wieder zu')
     ins = await pg.eval_on_selector('[data-sec=ins]', 'c => [c.querySelectorAll(".ins li").length, [...c.querySelectorAll(".card-btn")].map(b => b.innerText)]')
-    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen']], f'Erkenntnisse zugeklappt: die wichtigste, dazu „Alle anzeigen“ ({ins}, {m["ins"]} insgesamt)')
+    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen', 'Zur Auswertung']], f'Erkenntnisse zugeklappt: die wichtigste, darunter „Alle anzeigen“ und „Zur Auswertung“ ({ins}, {m["ins"]} insgesamt)')
     await pg.tap('[data-sec=ins] [data-action=expand]'); await idle(pg)
-    check(await pg.locator('[data-sec=ins] .ins li').count() == m['ins'] and await pg.inner_text('[data-sec=ins] .card-btn') == 'Weniger anzeigen', 'Tipp zeigt alle Erkenntnisse')
+    check(await pg.locator('[data-sec=ins] .ins li').count() == m['ins'] and await pg.inner_text('[data-sec=ins] [data-action=expand]') == 'Weniger anzeigen', 'Tipp zeigt alle Erkenntnisse')
     await pg.reload(); await started(pg)
     check(await pg.locator('[data-sec=ins] .ins li').count() == 1 and await pg.locator('[data-sec=shop] .bar').count() == 0,
           'nach dem Neustart ist alles zugeklappt')

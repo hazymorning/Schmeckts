@@ -1,12 +1,12 @@
 /* Wiederkehrende Bausteine der Ansichten: Avatare, Vorschaubilder, Bewertungs-Buttons, Sync-Status. */
 import {esc} from '../text.js';
-import {ago, when} from '../dates.js';
+import {ago, dayKey, dayLabel, timeStr, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {RATINGS, scaleOf, speciesIcon} from '../config.js';
+import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {rateCls, rOf, VERDICTS} from '../smart.js';
+import {rateCls, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {sheet} from '../ui/sheet.js';
 
 export function avatar(pet, cls = ''){
@@ -52,6 +52,41 @@ export const closeBtn = `<button class="icon-btn" data-action="close" aria-label
 export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = {}){
   const on = sheet && sheet.armed === key;
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;
+}
+
+/* Verlauf, auf der Startseite wie in der Auswertung: die Mahlzeiten nach Kalendertagen, neueste zuerst.
+   „2 Mahlzeiten, 1 Snack“: Ein Snack ist keine Mahlzeit; alles andere, auch noch Unbekanntes, zählt als Mahlzeit. */
+export function fedLabel(items){
+  const snacks = items.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length, meals = items.length - snacks;
+  return [meals && (meals === 1 ? '1 Mahlzeit' : meals + ' Mahlzeiten'), snacks && (snacks === 1 ? '1 Snack' : snacks + ' Snacks')].filter(Boolean).join(', ');
+}
+export function servingNode(s){ // Punkt in Bewertungsfarbe, hohl = noch offen
+  const rs = servingPets(s).map(pid => rOf(s.pets[pid])).filter(Boolean);
+  if (!rs.length) return '<i class="open"></i>';
+  const cls = rs.every(r => r === rs[0]) ? rateCls(rs[0]) : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
+  return `<i class="${cls}"></i>`;
+}
+export function dayGroups(list){
+  const groups = [];
+  for (const s of list) {
+    const k = dayKey(s.servedAt), g = groups.at(-1);
+    if (g && g.key === k) g.items.push(s); else groups.push({key:k, t:s.servedAt, items:[s]});
+  }
+  return groups;
+}
+/* anchors: Kennungen der Tage, dorthin springt der Kalender der Startseite; fresh: die gerade servierte Mahlzeit */
+export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}){
+  return groups.map(g => `<div class="tl-day"${anchors ? ` id="d-${g.key}"` : ''}>
+    <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
+    <ol class="tl">${g.items.map(s => {
+      const p = getProduct(s.productId), ids = servingPets(s);
+      const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : ''].filter(Boolean).join(', ');
+      const title = p ? esc(pname(p)) : (s.status === 'recognizing' ? 'Wird erkannt …' : s.status === 'reading' ? 'Wird gelesen …' : 'Unbekanntes Futter');
+      return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="tl-item" data-action="open-serving" data-id="${s.id}">
+        <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p)}
+        <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
+        ${resultBadges(s, true)}</button></li>`;
+    }).join('')}</ol></div>`).join('');
 }
 
 /* Sync-Status in Worten, für Einstellungen und den Hinweis oben */
