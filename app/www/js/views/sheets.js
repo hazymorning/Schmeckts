@@ -181,17 +181,19 @@ function brandBlock(m){
 
 /* The history grows as you scroll instead of laying out years of meals in one go: HIST_PAGE days at a time,
    appended below. How many are already there is what the box says, so a redraw cannot get it out of step. */
-const HIST_PAGE = 20;
+const HIST_PAGE = 10;
 let histDays = [];
 const histHTML = (m, from, to) => dayBlocks(histDays.slice(from, to), {multiHouse:db.pets.length > 1 && !m.pet, anchors:true});
+/* Appends pages as long as less than a screen is left below: while scrolling, and once after drawing, in the frame
+   after it so that the page is on screen first. */
 function growHistory(){
-  const box = $('#histBox'); if (!box || sheet?.kind !== 'report') return;
-  const from = box.children.length;
-  if (from < histDays.length) box.insertAdjacentHTML('beforeend', histHTML(reportModel(), from, from + HIST_PAGE));
+  const box = $('#histBox');
+  if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
+  const m = reportModel();
+  while (box.children.length < histDays.length && sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800)
+    box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
 }
-sheetBody.addEventListener('scroll', () => {
-  if (sheet?.kind === 'report' && sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800) growHistory();
-}, {passive:true});
+sheetBody.addEventListener('scroll', growHistory, {passive:true});
 
 /* The evaluation: what goes down best, and the whole history. Nothing to set, nothing to unfold. */
 function viewReport(){
@@ -353,5 +355,6 @@ setSheetView(state => {
   }
   if (state.kind === 'settings') paintServerBox(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
+  if (state.kind === 'report') requestAnimationFrame(growHistory);
   if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#' + at)?.scrollIntoView({block:'start'})); } // opened at a given day
 });
