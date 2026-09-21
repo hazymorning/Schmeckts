@@ -10,8 +10,8 @@ import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
-import {expandCard, showMoreHistory, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderServeHits, renderSuggestions, reportMore, reportSpan, reportState} from './views/sheets.js';
+import {expandCard, toggleOverview, update} from './views/home.js';
+import {paintServerBox, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
@@ -78,9 +78,7 @@ const ACTIONS = {
   'edit-pet'(el){ openPet(el.dataset.id, 'settings'); },
   'open-pet'(el){ openPet(el.dataset.id); }, // from the overview
   'open-settings'(){ openSheet({kind:'settings'}); },
-  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: the section it opens at
-  'report-span'(el){ haptic('select'); reportSpan(el.dataset.v); },                    // the span, applies to the whole page
-  'report-more'(){ haptic('select'); reportMore(); },
+  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: the day it opens at
   'open-privacy'(){ openSheet({kind:'privacy'}); },
   'open-server'(){ openSheet({kind:'settings'}); requestAnimationFrame(() => $('#server')?.scrollIntoView({block:'start'})); },
   connect(){ connectServer(); },
@@ -158,16 +156,11 @@ const ACTIONS = {
   demo(){ loadDemo(); },
   expand(el){ haptic('select'); expandCard(el.dataset.v); },
   'toggle-overview'(){ haptic('select'); toggleOverview(); }, // the overview's full text and back
-  'more-history'(){ // the focus moves to the first newly shown meal
-    haptic('select');
-    showMoreHistory()?.focus({preventScroll:true});
-  },
   'jump-day'(el){
-    const key = el.dataset.day;
-    if (!document.getElementById('d-' + key)) showMoreHistory(key); // the day lies beyond the meals on show
-    const target = document.getElementById('d-' + key); if (!target) return;
-    target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
+    const key = el.dataset.day, target = document.getElementById('d-' + key);
     haptic('select');
+    if (target) target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
+    else openSheet(reportState('d-' + key)); // further back: the whole history is in the evaluation
   },
   undo(){ const u = toastUndo; hideToast(); if (u) { haptic('select'); u(); } }
 };
