@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/6de937ab-9d55-4474-939f-a8531965ff25">
-    <img src="https://github.com/user-attachments/assets/c185d1f3-68fa-4d2a-89ce-02f7ed7a6293" width="880" alt="Schmeckt’s? – die App, die sich merkt, was deinem Tier wirklich schmeckt.">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/08e5a009-03aa-4a66-9dd5-d75b8bd6c4c9">
+    <img src="https://github.com/user-attachments/assets/1f57300f-45ce-4b4d-bd1f-7100a660ae49" width="880" alt="Schmeckt’s? – die App, die sich merkt, was deinem Tier wirklich schmeckt.">
   </picture>
 </p>
 
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="#installieren"><img src="https://github.com/user-attachments/assets/67f2a3c6-7ccb-484f-82e5-af64c5145dd0" width="292" alt="App installieren"></a>
+  <a href="#installieren"><img src="https://github.com/user-attachments/assets/c6cc3ebb-4e0b-42b5-8fe6-be7890bae7f8" width="292" alt="App installieren"></a>
 </p>
 
 **Schmeckt’s?** ist ein Fütterungstagebuch für Haustiere. Nach jeder Mahlzeit hältst du mit einem Tippen fest, wie der Napf aussah, von „sofort verputzt“ bis „kaum angerührt“. Nach ein paar Tagen zeigt dir die App, welche Sorten deinem Tier wirklich schmecken und welche beim nächsten Einkauf im Regal bleiben können.
@@ -63,6 +63,9 @@ Beim ersten Start entscheidest du, wie du die App nutzen willst. Wechseln kannst
 
 Ein Haushalt braucht einen eigenen kleinen Server auf einem Rechner, der zu Hause läuft. Er gehört nicht zur App: Sein Code und seine Anleitung liegen in [`server/`](server/).
 
+<!-- Sprungziel des QR-Codes (…#how-to-install), bitte nicht entfernen -->
+<a id="how-to-install"></a>
+
 ## Installieren
 
 Schmeckt’s? gibt es nicht im Play Store, du installierst die App also direkt von dieser Seite. Das dauert etwa eine Minute, und die Erlaubnis dazu musst du nur einmal geben.
@@ -70,7 +73,7 @@ Schmeckt’s? gibt es nicht im Play Store, du installierst die App also direkt v
 <!-- Dieser Button lädt die APK des neuesten Releases direkt herunter.
      Er funktioniert nur, wenn jedes Release die APK genau unter diesem Namen enthält: schmeckts.apk -->
 <p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/ffbc6f1f-0da5-4c14-ae23-ab543318029d" width="292" alt="APK herunterladen"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/6184020c-5ebd-43a7-a672-32a7b55a2039" width="292" alt="APK herunterladen"></a>
 </p>
 
 <p align="center">
