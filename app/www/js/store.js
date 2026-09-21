@@ -10,7 +10,7 @@ import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validI
 export {flush, storageOK};
 export const defaults = () => ({version:3, pets:[], products:[], servings:[]});
 const defaultPrefs = () => ({theme:'system', hiddenHints:[], closedWeek:'', milestones:null, remind:0, feedRemind:false, backdrop:true,
-  feedStart:'beides', mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, aiKey:'', codes:{}, exchange:{}});
+  feedStart:'beides', mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, codes:{}, exchange:{}});
 export const hooks = {changed(){}, saved(){}}; // the interface and the sync hook in here
 
 export function tidy(d){
@@ -37,7 +37,7 @@ function tidyPrefs(p){
   out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: never set, see load()
   out.lookup = out.lookup === true;                                    // product lookup on the internet, off by default
-  out.aiKey = typeof out.aiKey === 'string' ? out.aiKey.trim() : '';   // own AI key, on this phone only
+  delete out.aiKey;                                                    // dropped: the key for photo recognition lives on the server
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};       // remembered barcode answers
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with
   return out;
