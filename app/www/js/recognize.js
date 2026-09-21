@@ -79,9 +79,9 @@ export const lookupBarcode = code => request('GET', '/api/barcode/' + encodeURIC
 
 /* Eigener KI-Schlüssel: Die App ruft Anthropic selbst auf, mit der Kopfzeile für den direkten Aufruf aus einer App.
    Modell und Prompt wie auf dem Server (shared/recognize-prompt.txt). Der Schlüssel bleibt auf diesem Handy. */
-export const AI_URL = 'https://api.anthropic.com/v1/messages';
-export const AI_MODEL = 'claude-sonnet-5';
-export async function askKey(b64, key = prefs.aiKey){
+const AI_URL = 'https://api.anthropic.com/v1/messages';
+const AI_MODEL = 'claude-sonnet-5';
+async function askKey(b64, key = prefs.aiKey){
   const res = await fetch(AI_URL, {
     method:'POST', cache:'no-store', signal:AbortSignal.timeout(70e3),
     headers:{'content-type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01',

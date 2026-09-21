@@ -3,7 +3,7 @@
    Marke, Sorte, Art und Tierart entstehen wie auf dem Server. Treffer merkt sich das Handy 90 Tage, Fehlanzeigen 7 Tage. */
 import {prefs, savePrefs} from './store.js';
 
-export const BARCODE_URLS = ['https://world.openpetfoodfacts.org', 'https://world.openfoodfacts.org'];
+const BARCODE_URLS = ['https://world.openpetfoodfacts.org', 'https://world.openfoodfacts.org'];
 const FIELDS = 'product_name,product_name_de,brands,categories_tags';
 const KEEP_FOUND = 90 * 864e5, KEEP_MISS = 7 * 864e5, MAX_KEPT = 200, TIMEOUT = 5e3;
 const QUANTITY = /\b\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b|\b\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b/gi;
@@ -38,14 +38,14 @@ async function fetchProduct(base, code){
 }
 
 /* „Sheba Fresh Choice Huhn in Sauce 4x50g“ → „Fresh Choice Huhn in Sauce“ */
-export function cleanVariety(name, brand){
+function cleanVariety(name, brand){
   let v = String(name).replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim();
   if (brand && v.toLowerCase().startsWith(brand.toLowerCase())) v = v.slice(brand.length);
   return v.replace(/^[\s\-–,·|]+|[\s\-–,·|]+$/g, '');
 }
 
 /* Art und Tierart nur aus eindeutigen Kategorien, wie auf dem Server */
-export function classify(tags){
+function classify(tags){
   const has = (...words) => tags.some(t => words.some(w => String(t).includes(w)));
   const wet = has('wet'), dry = has('dry'), snack = has('treat', 'snack'), cat = has('cat-'), dog = has('dog-');
   const type = wet && !dry && !snack ? 'Nassfutter' : dry && !wet && !snack ? 'Trockenfutter' : snack && !wet && !dry ? 'Snack' : '';
