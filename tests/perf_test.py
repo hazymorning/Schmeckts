@@ -44,7 +44,7 @@ OPEN = """async () => { const s = await import('./js/store.js'), sheet = await i
     await sheet.closeSheet(); s.save();
     await new Promise(done => setTimeout(done, 50));
     const t0 = performance.now(); sheet.openSheet(views.reportState(null)); const t1 = performance.now();
-    out.push([t1 - t0, document.querySelectorAll('#sheetBody h3.label').length]); }
+    out.push([t1 - t0, document.querySelectorAll('#sheetBody .tl-day').length]); }
   await sheet.closeSheet();
   return out; }"""
 
@@ -68,8 +68,8 @@ async def test_rating(browser, url):
         check(draw < LIMIT_MS and all(x[2] for x in runs), f'{years} years ({years * 730} meals): evaluation and redraw {draw:.0f} ms, saving {save:.0f} ms')
         opens = (await pg.evaluate(OPEN))[1:]
         shown = statistics.median(x[0] for x in opens)
-        check(shown < REPORT_MS and all(x[1] >= 4 for x in opens),
-              f'{years} years: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} sections')
+        check(shown < REPORT_MS and all(x[1] == 20 for x in opens),
+              f'{years} years: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} days to begin with')
         await ctx.close()
 
 

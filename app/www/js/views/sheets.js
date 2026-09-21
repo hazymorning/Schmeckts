@@ -5,7 +5,7 @@ import {andList, cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
 import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
-import {FEED_START, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, reportModel, sortOf} from '../derive.js';
@@ -97,7 +97,7 @@ function viewFeed(){
     <ul class="plist">${serveRows(pick, sheet.code)}</ul>`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
-    <div class="cta-row">${prefs.feedStart === 'beides' ? CTA.barcode + CTA.foto : CTA[prefs.feedStart]}</div>
+    <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
     ${sheet.busy ? `<p class="note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
     ${prods.length ? `<div id="serveList"><span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul></div>
       ${prods.length > SUGGEST ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>
@@ -179,13 +179,29 @@ function brandBlock(m){
     <p class="why">${esc(m.brands[0].key)} kommt am besten an, ${esc(m.brands.at(-1).key)} am wenigsten.</p>`;
 }
 
+/* The history grows as you scroll instead of laying out years of meals in one go: HIST_PAGE days at a time,
+   appended below. How many are already there is what the box says, so a redraw cannot get it out of step. */
+const HIST_PAGE = 20;
+let histDays = [];
+const histHTML = (m, from, to) => dayBlocks(histDays.slice(from, to), {multiHouse:db.pets.length > 1 && !m.pet, anchors:true});
+function growHistory(){
+  const box = $('#histBox'); if (!box || sheet?.kind !== 'report') return;
+  const from = box.children.length;
+  if (from < histDays.length) box.insertAdjacentHTML('beforeend', histHTML(reportModel(), from, from + HIST_PAGE));
+}
+sheetBody.addEventListener('scroll', () => {
+  if (sheet?.kind === 'report' && sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800) growHistory();
+}, {passive:true});
+
 /* The evaluation: what goes down best, and the whole history. Nothing to set, nothing to unfold. */
 function viewReport(){
   const m = reportModel();
   const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
+  histDays = dayGroups(m.meals);
+  const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
   return `<div class="sh-head"><h2>Auswertung${who}</h2>${closeBtn}</div>
     ${m.n < MIN_RATED ? `<p class="hint">Ab ${MIN_RATED} Bewertungen zeigt diese Seite, was ankommt.</p>` : brandBlock(m)}
-    ${m.meals.length ? `<h3 class="label">Verlauf</h3>${dayBlocks(dayGroups(m.meals), {multiHouse:db.pets.length > 1 && !m.pet, anchors:true})}`
+    ${histDays.length ? `<h3 class="label">Verlauf</h3><div id="histBox">${histHTML(m, 0, upto)}</div>`
       : `<p class="empty">Noch nichts serviert.</p>`}`;
 }
 
@@ -222,8 +238,6 @@ function viewSettings(){
     <div class="seg">${[['system', 'auto', 'System'], ['light', 'sun', 'Hell'], ['dark', 'moon', 'Dunkel']].map(([v, ic, l]) => `<button aria-pressed="${st.theme === v}" data-action="theme" data-v="${v}">${icon(ic)}${l}</button>`).join('')}</div>
     <span class="label">Profilbild im Hintergrund</span>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${st.backdrop === (v === 'on')}" data-action="backdrop" data-v="${v}">${l}</button>`).join('')}</div>
-    <span class="label">Füttern beginnt mit</span>
-    <div class="seg">${FEED_START.map(([v, l]) => `<button aria-pressed="${st.feedStart === v}" data-action="feed-start" data-v="${v}">${l}</button>`).join('')}</div>
     <span class="label">Ans Bewerten erinnern</span>
     <p class="hint" id="remind-hint">${remindHint()}</p>
     <div class="seg">${REMIND.map(m => `<button aria-pressed="${!own && st.remind === m}" data-action="remind" data-v="${m}">${m ? m / 60 + ' Std.' : 'Aus'}</button>`).join('')
