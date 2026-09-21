@@ -2,7 +2,7 @@
 
 Android app that records which food a pet likes. Several people in a household feed the same animals and share the data through a server on the home network.
 
-The app’s interface is German. Everything in this repository is English: code, comments, tests, documentation. German text in quotes below is user-visible wording; identifiers in backticks such as `lokal` or `kaufen` are stored values and never change.
+The app’s interface is German, and so are the two READMEs, which are written for the people who use it. Everything else in this repository is English: code, comments, tests and this document. German text in quotes below is user-visible wording; identifiers in backticks such as `lokal` or `kaufen` are stored values and never change.
 
 ## Purpose and principles
 
