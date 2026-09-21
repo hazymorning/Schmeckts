@@ -2,7 +2,7 @@
    (model(), gerechnet in smart.js). Nur lesen, nie schreiben. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW} from './config.js';
-import {analyze, review, shopGroups, tally} from './smart.js';
+import {analyze, report, review, shopGroups, tally} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -36,6 +36,7 @@ function refresh(now){
 }
 export const model = () => cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
 export const lastWeek = () => cached('week', [prefs.closedWeek], now => week = review(db, prefs, now, week));
+export const reportModel = span => cached('report', [prefs.activePet, span], now => report(db, prefs, now, span)); // erst beim Öffnen der Auswertung
 export const sortOf = id => model().byId.get(id);
 export function pendingServings(){
   const cut = Date.now() - PENDING_WINDOW;

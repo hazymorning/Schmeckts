@@ -1,12 +1,13 @@
 /* Auswertung: analyze() liefert das Modell, aus dem alles liest, was auswertet. Reine Funktionen, zwischengespeichert
    wird in derive.js. Regeln: PROJEKT.md, Abschnitt „Auswertung“. */
-import {FLAVORS, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
-import {addDays, dayKey, weekStart} from './dates.js';
+import {FLAVORS, guessTexture, RATINGS, TEXTURES, textureOf, TYPES, typeOf} from './config.js';
+import {addDays, dayKey, dayStart, weekStart} from './dates.js';
 
 const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
 const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // Bezugszeit der Gewichte, für die Wertung ohne Belang
 const YES = 70, NO = 40;
+export const MIN_RATED = 3;   // ab so vielen Bewertungen im Filter gibt es Erkenntnisse und eine Auswertung
 const APPETITE = {recent:72 * 36e5, usual:30 * DAY, minRecent:3, minUsual:8, minSorts:2, drop:30, below:50};
 const TASTE_SPAN = 180 * DAY;
 export const VERDICTS = {nachkaufen:'Nachkaufen', gemischt:'Gemischt', beobachten:'Beobachten', nicht:'Nicht mehr kaufen'};
@@ -126,7 +127,7 @@ function tastesOf(db, byId, now){
    Ohne Aussagen zum Kaufen */
 const sauceShare = x => (x.counts.sosse || 0) / x.n;
 function insights(sorts){
-  if (sorts.reduce((a, e) => a + e.n, 0) < 3) return [];
+  if (sorts.reduce((a, e) => a + e.n, 0) < MIN_RATED) return [];
   const out = [];
   for (const type of TYPES) {
     const mine = sorts.filter(e => e.n && typeOf(e.product) === type);
@@ -172,6 +173,62 @@ function hints(sorts, appetites, pet, prefs){
   }
   return out.filter(h => !hidden.has(hintKey(h)))
     .sort((a, b) => HINTS.indexOf(a.kind) - HINTS.indexOf(b.kind) || a.order - b.order);
+}
+
+/* Auswertungs-Seite: alles für einen Zeitraum in einem Rutsch, aus denselben Bewertungen, Gewichten und Schwellen wie
+   analyze(). span: Tage, 0 = alles. Gerechnet wird im Tier-Filter; rein, zwischengespeichert wird in derive.js.
+     trend     je Tier eine Linie der gewichteten Wertung, bei 30 Tagen je Tag, sonst je Woche
+     levels    Anzahl und Anteil je vorkommender Stufe, in der Reihenfolge von RATINGS
+     brands    die TOP_BRANDS häufigsten Marken nach Wertung
+     textures  Konsistenz und Snack-Art je Futterart, nur Gruppen ab MIN_GROUP Bewertungen
+     feeding   Mahlzeiten je Wochentag (Montag zuerst) und je Person */
+export const SPANS = [[30, '30 Tage'], [90, '90 Tage'], [0, 'Alles']];
+const TOP_BRANDS = 6, MIN_GROUP = 3;
+function groupSums(rated, products, keyOf){
+  const m = new Map();
+  for (const x of rated) {
+    const p = products.get(x.id), k = p && keyOf(p);
+    if (!k) continue;
+    if (!m.has(k)) m.set(k, emptySum());
+    addRating(m.get(k), x);
+  }
+  return [...m].map(([key, sum]) => ({key, ...statOf(sum)}));
+}
+function trendOf(rated, ids, step){
+  const bucket = step === 'day' ? dayStart : weekStart, per = new Map();
+  for (const x of rated) {
+    if (!per.has(x.pid)) per.set(x.pid, {sum:emptySum(), buckets:new Map()});
+    const mine = per.get(x.pid), b = bucket(x.t);
+    if (!mine.buckets.has(b)) mine.buckets.set(b, emptySum());
+    addRating(mine.buckets.get(b), x); addRating(mine.sum, x);
+  }
+  const pets = ids.filter(id => per.has(id)).map(id => ({id, ...statOf(per.get(id).sum),
+    points:[...per.get(id).buckets].sort((a, b) => a[0] - b[0]).map(([t, sum]) => ({t, ...statOf(sum)}))}));
+  const all = pets.flatMap(p => p.points.map(x => x.t));
+  return {step, from:Math.min(...all, Infinity), to:Math.max(...all, -Infinity), pets};
+}
+export function report(db, prefs, now, span){
+  const petIds = db.pets.map(p => p.id);
+  const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
+  const ids = pet ? [pet] : petIds, mine = new Set(ids), products = new Map(db.products.map(p => [p.id, p]));
+  const from = span ? now - span * DAY : -Infinity;
+  const meals = db.servings.filter(s => s.servedAt > from && s.servedAt <= now && ids.some(id => s.pets?.[id]));
+  const rated = [...ratingsOf(db, meals)].filter(x => mine.has(x.pid));
+  const counts = {}, days = [0, 0, 0, 0, 0, 0, 0], fed = new Map();
+  for (const x of rated) counts[x.r] = (counts[x.r] || 0) + 1;
+  for (const s of meals) {
+    days[(new Date(s.servedAt).getDay() + 6) % 7]++;
+    const name = (s.by || '').trim();
+    if (name) fed.set(name, (fed.get(name) || 0) + 1);
+  }
+  const textureKey = type => p => typeOf(p) === type ? (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1] : '';
+  return {span, pet, n:rated.length, meals, trend:trendOf(rated, ids, span === 30 ? 'day' : 'week'),
+    levels:Object.keys(RATINGS).filter(r => counts[r]).map(r => ({r, n:counts[r], share:Math.round(counts[r] / rated.length * 100)})),
+    brands:groupSums(rated, products, p => p.brand).sort((a, b) => b.n - a.n).slice(0, TOP_BRANDS).sort((a, b) => b.score - a.score),
+    textures:Object.entries(TEXTURES).map(([type, t]) => ({type, title:t.title,
+      groups:groupSums(rated, products, textureKey(type)).filter(g => g.n >= MIN_GROUP).sort((a, b) => b.score - a.score)}))
+      .filter(x => x.groups.length >= 2),
+    feeding:{days, people:[...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de'))}};
 }
 
 /* Gruppen für „Einkaufen“ und die Einkaufsliste: „Gemischt“ zählt zu Nachkaufen, die eigene Einstellung ordnet ein,
