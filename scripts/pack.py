@@ -5,7 +5,10 @@ dist/schmeckts-server-sources.txt  server/, which is everything the server is
 The server file only changes with the server, which is why its header names the server's version. Left out is
 everything scripts/prepare.py or the build regenerates (node_modules, app/android, fonts, icons).
 scripts/unpack.py reads them back, both into the same folder."""
-import json, pathlib, re, sys
+import json
+import pathlib
+import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKIP_DIRS = {'node_modules', 'android', 'dist', '.gradle', '.git'}

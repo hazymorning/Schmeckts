@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Flows and interface of the app in Chromium, without a server, with simulated Android plugins.
 Usage: python3 tests/ui_test.py [name …] [--shots]   (--shots leaves screenshots in dist/test/)"""
-import asyncio, base64, json, re, time
+import base64
+import json
+import re
+import time
 import xml.etree.ElementTree as ET
 from common import PACK, ROOT, SAVED, SHEBA, UPC, check, contrast, debounced, idle, make_pictures, open_page, phone, real_errors, run_tests, seeded, shot, started, state, until
 
@@ -282,7 +285,8 @@ HOUSE = """([meals]) => import('./js/store.js').then(async s => { const at = t =
 
 def house_meals():
     T, G, M, X = 'top', 'gut', 'mittel', 'schlecht'
-    day = lambda d, h='08:00': f'2026-{d}T{h}'
+    def day(d, h='08:00'):
+        return f'2026-{d}T{h}'
     return ([['lachs', {'M': T}, day(f'05-{10 + i}'), 'Anna'] for i in range(3)]                      # Lachs: Minka buys again
             + [['huhn', {'M': G, 'T': X}, day(f'05-{14 + i}'), 'Jonas'] for i in range(3)]            # Huhn: Minka yes, Tiger no = mixed
             + [['rind', {'T': X}, day(f'05-{18 + i}'), 'Anna'] for i in range(2)]                     # Rind: stop buying
@@ -455,7 +459,8 @@ async def test_texture(browser, url):
     async def product(pid):
         await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}0001'}}))"); await idle(pg)
         return await pg.evaluate(CHIPS)
-    tex = lambda pid: state(pg, f"(p => p.texture ?? null)(db.products.find(p => p.id === '{pid}0001'))")
+    def tex(pid):
+        return state(pg, f"(p => p.texture ?? null)(db.products.find(p => p.id === '{pid}0001'))")
     c = await product('nass')
     check(c == {'title': 'Konsistenz', 'labels': ['In Soße', 'In Gelee', 'Pastete', 'Mousse', 'Fester Block', 'Suppe'], 'on': [], 'fits': True, 'under': 'prod-card', 'note': ''},
           f'food sheet, wet food: „Konsistenz“ with six chips under the type, never mandatory, nothing clipped at 360 px ({c})')
@@ -602,8 +607,11 @@ async def test_milestones(browser, url):
       d.products = Array.from({length: sorts + 1}, (_, i) => ({id: 'sorte' + String(i).padStart(5, '0'), brand: 'Marke', variety: 'Sorte ' + i, type: 'Nassfutter', codes: {}, createdAt: 1}));
       d.servings = Array.from({length: n}, (_, i) => ({id: 'meal' + String(i).padStart(6, '0'), productId: d.products[i % sorts].id, servedAt: now - (i + 1) * 36e5, note: '', pets: {minka00001: {r: 'top', at: now}}}));
       s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
-    serve = lambda i: pg.evaluate(f"import('./js/logic/feeding.js').then(f => f.serveProduct('sorte{i:05d}'))")
-    toast = lambda: pg.eval_on_selector('#toast', 't => [t.querySelector("span").innerText, !!t.querySelector("[data-action=undo]")]')
+    def serve(i):
+        return pg.evaluate(f"import('./js/logic/feeding.js').then(f => f.serveProduct('sorte{i:05d}'))")
+
+    def toast():
+        return pg.eval_on_selector('#toast', 't => [t.querySelector("span").innerText, !!t.querySelector("[data-action=undo]")]')
     await pg.evaluate(FILL, [99, 9]); await idle(pg)
     await serve(0); await idle(pg)
     t1 = await toast()
@@ -643,8 +651,11 @@ async def test_reminders(browser, url):
     await pg.evaluate("localStorage.setItem('__notifyAnswer', 'denied')")
     await pg.click('[data-action=demo]'); await debounced(pg)
     await pg.evaluate("""import('./js/store.js').then(async s => { s.db.pets.push({id: 'tigerpet01', name: 'Tiger', species: 'Katze', createdAt: Date.now()}); s.save(); (await import('./js/views/home.js')).renderHome(); })""")
-    pending = lambda: pg.evaluate("window.Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications)")
-    calls = lambda name: pg.evaluate(f"window.__calls.filter(c => c[0] === '{name}').map(c => c[1])")
+    def pending():
+        return pg.evaluate("window.Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications)")
+
+    def calls(name):
+        return pg.evaluate(f"window.__calls.filter(c => c[0] === '{name}').map(c => c[1])")
     SEG = """() => { const l = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Ans Bewerten erinnern'); let seg = l.nextElementSibling; while (seg && !seg.classList.contains('seg')) seg = seg.nextElementSibling;
       const rows = new Set([...seg.children].map(b => Math.round(b.getBoundingClientRect().top))).size, widths = [...seg.children].map(b => Math.round(b.getBoundingClientRect().width));
       return [...seg.querySelectorAll('button')].map(b => [b.innerText.trim(), b.getAttribute('aria-pressed'), b.dataset.action, rows === 1 && new Set(widths).size === 1 && b.scrollWidth <= b.clientWidth]); }"""
@@ -1077,8 +1088,11 @@ async def test_scan(browser, url):
     print('scanning (plugins simulated, without a server)')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
-    is_open = lambda: pg.evaluate("document.getElementById('sheet').open")
-    impacts = lambda: pg.evaluate("window.__calls.filter(c => c[0] === 'impact').map(c => c[1].style)")
+    def is_open():
+        return pg.evaluate("document.getElementById('sheet').open")
+
+    def impacts():
+        return pg.evaluate("window.__calls.filter(c => c[0] === 'impact').map(c => c[1].style)")
     await pg.click('.welcome [data-action=add-pet]'); await idle(pg)
     await pg.fill('#f-name', 'Minka'); await pg.click('[data-action=save-pet]'); await idle(pg)
     await pg.click('#fab'); await idle(pg)
@@ -1445,7 +1459,8 @@ async def test_crop(browser, url):
     ctx, pg, errors = await one_pet(browser, url)
     await open_pet(pg)
     await pg.set_input_files('#petPhotoInput', str(PACK.parent / 'quadrants.png')); await idle(pg)
-    crop = lambda: pg.evaluate("import('./js/ui/sheet.js').then(async m => { const c = (await import('./js/ui/crop.js')).cropRect(m.sheet.crop); return [Math.round(c.x), Math.round(c.y), Math.round(c.side), +m.sheet.crop.z.toFixed(2)]; })")
+    def crop():
+        return pg.evaluate("import('./js/ui/sheet.js').then(async m => { const c = (await import('./js/ui/crop.js')).cropRect(m.sheet.crop); return [Math.round(c.x), Math.round(c.y), Math.round(c.side), +m.sheet.crop.z.toFixed(2)]; })")
     view = await pg.evaluate("""(() => { const st = document.getElementById('cropStage'), r = st.getBoundingClientRect(), hole = getComputedStyle(st, '::after'), z = document.getElementById('f-zoom');
       return {h2: document.querySelector('#sheet h2').innerText, square: Math.abs(r.width - r.height) < 1, round: hole.borderRadius, shade: hole.boxShadow !== 'none', touch: getComputedStyle(st).touchAction,
         zoom: [z.type, z.min, z.max, z.value], btns: [...document.querySelectorAll('#sheet .btn')].map(b => b.innerText.trim()), img: !!st.querySelector('img')}; })()""")
@@ -1531,7 +1546,8 @@ async def test_mood(browser, url):
             await route.fulfill(path=str(PACK.parent / route.request.url.rsplit('/', 1)[1]), content_type='image/png')
         await ctx.route('**/testfoto/*', pictures)
         pg, errors = await open_page(ctx, url, native=True)
-        pic = lambda n: f'{dist}/testfoto/{n}'
+        def pic(n):
+            return f'{dist}/testfoto/{n}'
 
         async def pick(who):
             await pg.evaluate(f"import('./js/store.js').then(async s => {{ s.prefs.activePet = '{who}'; (await import('./js/views/home.js')).renderHome(); }})"); await idle(pg)

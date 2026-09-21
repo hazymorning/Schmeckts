@@ -12,7 +12,13 @@ Usage: scripts/prepare.py                 normal
        scripts/prepare.py --fresh         delete and regenerate the Android project first
        scripts/prepare.py --fonts-only    the fonts only (enough for tests in the browser)
 """
-import hashlib, os, pathlib, shutil, subprocess, sys, urllib.request
+import hashlib
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / 'app'

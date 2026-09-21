@@ -1,6 +1,14 @@
 """Shared helpers for the tests in Chromium (Playwright): checking, serving the app, opening phones, waiting for
 states, simulated Android plugins with a file system that survives a reload."""
-import asyncio, functools, http.server, json, pathlib, re, sys, threading, time
+import asyncio
+import functools
+import http.server
+import json
+import pathlib
+import re
+import sys
+import threading
+import time
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -205,8 +213,9 @@ def near(rgb, hexv, tol=2):
 def contrast(a, b):
     def lum(c):
         r, g, b_ = [int(x) / 255 for x in re.findall(r'\d+', c)[:3]] if isinstance(c, str) else [v / 255 for v in c]
-        f = lambda v: v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4
-        return .2126 * f(r) + .7152 * f(g) + .0722 * f(b_)
+        def lin(v):
+            return v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4
+        return .2126 * lin(r) + .7152 * lin(g) + .0722 * lin(b_)
     la, lb = lum(a), lum(b)
     return (max(la, lb) + .05) / (min(la, lb) + .05)
 
