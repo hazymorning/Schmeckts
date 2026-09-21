@@ -472,7 +472,7 @@ document.addEventListener('change', e => {
   s.servedAt = Math.min(ts, Date.now());
   db.servings.sort((a, b) => b.servedAt - a.servedAt);
   save();
-  haptic(6);
+  haptic('select');
   renderSheet();
   update();
   toast(`Zeitpunkt: ${when(s.servedAt)}`);

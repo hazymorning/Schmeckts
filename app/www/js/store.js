@@ -3,6 +3,7 @@
    start replays it; a change from the server lands in db first, and if sync is missing the app fetches it again. */
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
+import {report} from './report.js';
 import {tidyRemind} from './config.js';
 import {milestones} from './smart.js';
 import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validId, valueOf} from './fields.js';
@@ -147,7 +148,7 @@ function trimJournal(ids) {
   persist('queue');
 }
 export function log(text) {
-  console.warn('sync:', text);
+  report('sync', text);
   state.log.push({at: Date.now(), text});
   state.log.splice(0, state.log.length - 30);
   persist('sync');
@@ -209,8 +210,9 @@ function ensureClocks() {
 try {
   await load();
 } catch (e) {
+  // loadError makes the app say so and write nothing at all, so the stored state stays as it is
   loadError = e;
-  console.error('stored data unreadable', e);
+  report('stored data unreadable', e);
 }
 
 export function replaceDb(next) {
@@ -329,16 +331,28 @@ export function changesSince(peer) {
   return out;
 }
 
-/* Merges the fields of one record. full: fields holds every field the server knows. */
+/* Merges the fields of one record. full: fields holds every field the server knows.
+   Three steps: which fields win by their clock, then either the record that is here or one that comes back. */
 function applyRecord(c, id, fields, full) {
   if (!state.clocks[c] || !validId(id)) return false;
   const list = db[c],
     idx = list.findIndex(r => r.id === id),
     rec = idx >= 0 ? list[idx] : null;
   const known = !!state.clocks[c][id],
-    clocks = clocksOf(c, id),
-    win = {},
-    before = rec && {...rec};
+    clocks = clocksOf(c, id);
+  const win = winningFields(c, rec, clocks, fields);
+  if (!Object.keys(clocks).length) delete state.clocks[c][id];
+  if (!Object.keys(win).length) return false;
+  const deleted = '_del' in win ? win._del === true : rec ? false : known;
+  if (rec) return updateRecord(c, id, idx, rec, win, deleted);
+  if (deleted) return false; // stays deleted, only the clocks are new
+  return createRecord(c, id, clocks, fields, full);
+}
+
+/* Per field the larger clock wins. The clocks of the winners are taken over right here, because a field whose
+   value this device cannot use still counts as seen. */
+function winningFields(c, rec, clocks, fields) {
+  const win = {};
   for (const [k, x] of Object.entries(fields)) {
     if (!x || typeof x.t !== 'string') continue;
     observe(x.t);
@@ -348,33 +362,36 @@ function applyRecord(c, id, fields, full) {
     clocks[k] = x.t;
     win[k] = x.v ?? null;
   }
-  if (!Object.keys(clocks).length) delete state.clocks[c][id];
-  if (!Object.keys(win).length) return false;
-  const deleted = '_del' in win ? win._del === true : rec ? false : known;
-  if (rec) {
-    if (deleted) {
-      list.splice(idx, 1);
-      snap[c].delete(id);
-      markStale(c, before);
-      if (c === 'pets' && prefs.activePet === id) {
-        prefs.activePet = 'all';
-        persist('prefs');
-      }
-      return true;
+  return win;
+}
+
+/* The record is here: it either goes away or takes the winning values over */
+function updateRecord(c, id, idx, rec, win, deleted) {
+  const before = {...rec};
+  if (deleted) {
+    db[c].splice(idx, 1);
+    snap[c].delete(id);
+    markStale(c, before);
+    if (c === 'pets' && prefs.activePet === id) {
+      prefs.activePet = 'all';
+      persist('prefs');
     }
-    const s = snap[c].get(id) || {};
-    for (const [k, v] of Object.entries(win)) {
-      if (k === '_del') continue;
-      // only what this device actually holds is remembered: otherwise the next save would see a missing field and delete it household-wide
-      if (setField(c, rec, k, v) && v != null) s[k] = JSON.stringify(v);
-      else delete s[k];
-    }
-    snap[c].set(id, s);
-    markStale(c, before, rec);
     return true;
   }
-  if (deleted) return false; // stays deleted, only the clocks are new
-  // visible (again): values from the server, and from the queue wherever our own clock is newer
+  const s = snap[c].get(id) || {};
+  for (const [k, v] of Object.entries(win)) {
+    if (k === '_del') continue;
+    // only what this device actually holds is remembered: otherwise the next save would see a missing field and delete it household-wide
+    if (setField(c, rec, k, v) && v != null) s[k] = JSON.stringify(v);
+    else delete s[k];
+  }
+  snap[c].set(id, s);
+  markStale(c, before, rec);
+  return true;
+}
+
+/* Visible (again): values from the server, and from the queue wherever our own clock is newer */
+function createRecord(c, id, clocks, fields, full) {
   const values = {},
     mine = queuedValues(c, id);
   for (const [k, x] of Object.entries(fields)) if (k !== '_del') values[k] = x.v;
@@ -388,7 +405,7 @@ function applyRecord(c, id, fields, full) {
   }
   const made = fromFields(c, id, values);
   if (!complete(c, made)) return false;
-  list.push(made);
+  db[c].push(made);
   markStale(c, made);
   snap[c].set(id, fieldsOf(c, made));
   return true;

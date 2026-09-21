@@ -16,6 +16,7 @@ import {
   setPosition,
   state,
 } from './store.js';
+import {report} from './report.js';
 
 const MAX_CHANGES = 500,
   MAX_BYTES = 8e6; // the server accepts at most 500 changes and 12 MB per request
@@ -74,7 +75,7 @@ function syncNow() {
         await cycle();
       } while (again && isConnected());
     } catch (e) {
-      console.error('sync:', e);
+      report('sync', e);
     } finally {
       running = null;
     }
@@ -104,7 +105,7 @@ async function cycle() {
 
 function reportFailure(e) {
   if (!(e instanceof ServerError)) {
-    console.error(e);
+    report('sync', e);
     e = new ServerError('bad', 'Beim Abgleich ist ein Fehler aufgetreten.');
   }
   closeLive();
@@ -136,6 +137,8 @@ const abilities = serverInfo => ({
 /* Can the server do this, "barcode" for instance (from server 1.1.0)? Before the first contact the app asks. */
 export async function serverCan(feature) {
   if (!isConnected()) return false;
+  // Offline, or a server older than 1.1.0: the feature then simply counts as missing, which is the answer
+  // this function gives anyway, so there is nothing to report.
   if (!status.features) await checkInfo(5e3).catch(() => {});
   return !!status.features?.includes(feature);
 }
@@ -245,8 +248,8 @@ function openLive() {
     let x;
     try {
       x = JSON.parse(e.data);
-    } catch (err) {
-      return;
+    } catch {
+      return; // a notice we cannot read tells us nothing; the next cycle catches up anyway
     }
     if (!status.live) setStatus({live: true});
     if (x.epoch !== state.epoch || x.seq > state.seq) syncSoon(50);

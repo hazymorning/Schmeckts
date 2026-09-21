@@ -64,7 +64,9 @@ export function mountCrop(stage, img, c, slider) {
   stage.addEventListener('pointerdown', e => {
     try {
       stage.setPointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch {
+      /* the pointer is already gone: panning works without capture, it just stops at the edge of the stage */
+    }
     pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
   });
   stage.addEventListener('pointermove', e => {

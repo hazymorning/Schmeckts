@@ -67,7 +67,7 @@ func main() {
 	case "version":
 		fmt.Println(version)
 	default:
-		err = fmt.Errorf("unbekannter Befehl %q. Möglich: setup, connection, overview, restore, version", cmd)
+		err = sayf("Unbekannter Befehl %q. Möglich: setup, connection, overview, restore, version", cmd)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -78,7 +78,7 @@ func main() {
 func serve(dir string) error {
 	store, err := OpenStore(dir)
 	if err != nil {
-		return fmt.Errorf("Datenbestand nicht lesbar: %w", err)
+		return because("Datenbestand nicht lesbar", err)
 	}
 	cfg := NewConfigHolder(dir)
 	api := NewAPI(store, cfg, OpenBarcodes(dir))
@@ -139,7 +139,7 @@ func ownFiles(paths ...string) {
 
 func requireRoot() error {
 	if os.Geteuid() != 0 {
-		return errors.New("Dafür werden Administratorrechte gebraucht. Bitte über „Schmeckt’s-Server einrichten“ oder mit sudo starten.")
+		return say("Dafür werden Administratorrechte gebraucht. Bitte über „Schmeckt’s-Server einrichten“ oder mit sudo starten.")
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func setup(dir string, args []string) error {
 	ownFiles(dir)
 	cfg, err := readConfig(dir)
 	if err != nil {
-		return fmt.Errorf("Die Konfiguration ist beschädigt: %w", err)
+		return because("Die Konfiguration ist beschädigt", err)
 	}
 	key := ""
 	if info, _ := os.Stdin.Stat(); info.Mode()&os.ModeCharDevice == 0 {
@@ -163,7 +163,7 @@ func setup(dir string, args []string) error {
 	}
 	if key != "" {
 		if !strings.HasPrefix(key, "sk-ant-") {
-			return errors.New("Das sieht nicht wie ein Anthropic-API-Schlüssel aus. Er beginnt mit „sk-ant-“.")
+			return say("Das sieht nicht wie ein Anthropic-API-Schlüssel aus. Er beginnt mit „sk-ant-“.")
 		}
 		test := cfg
 		test.APIKey = key
@@ -197,7 +197,7 @@ func showConnection(dir string) error {
 		return err
 	}
 	if cfg.Code == "" {
-		return errors.New("Der Server ist noch nicht eingerichtet.")
+		return say("Der Server ist noch nicht eingerichtet.")
 	}
 	return printConnection(cfg)
 }
@@ -208,7 +208,7 @@ func showOverview(dir string) error {
 	}
 	st, err := readState(filepath.Join(dir, stateFile))
 	if err != nil {
-		return fmt.Errorf("Der Datenbestand ist nicht lesbar: %w", err)
+		return because("Der Datenbestand ist nicht lesbar", err)
 	}
 	fmt.Printf("Schmeckt’s-Server %s\n\n%s", version, Overview(st, dir, time.Now()))
 	return nil
@@ -284,11 +284,11 @@ func restore(dir string, args []string) error {
 		if len(files) > 0 {
 			msg += "\n\nVorhandene Backups:\n  " + strings.Join(files, "\n  ")
 		}
-		return errors.New(msg)
+		return say(msg)
 	}
 	st, err := readState(args[0])
 	if err != nil {
-		return fmt.Errorf("Das Backup ist nicht lesbar: %w", err)
+		return because("Das Backup ist nicht lesbar", err)
 	}
 	st.Epoch = newEpoch() // this makes every phone do a full resync
 	usesSystemd := systemctl("is-active", "--quiet", "schmeckts") == nil

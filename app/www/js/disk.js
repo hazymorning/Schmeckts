@@ -2,6 +2,7 @@
    those even when short on space), localStorage in the browser. Writing happens in the background, atomically and
    always in the order given by ORDER; why that guards against data loss is explained in store.js. */
 import {Native} from './native.js';
+import {report} from './report.js';
 
 const FS = Native?.Filesystem;
 const DIR = 'DATA';
@@ -15,7 +16,8 @@ export const storageOK = FS
         localStorage.setItem('__t', '1');
         localStorage.removeItem('__t');
         return true;
-      } catch (e) {
+      } catch {
+        // No localStorage at all (a file:// page in some browsers): the app says so and keeps nothing
         return false;
       }
     })();
@@ -42,7 +44,7 @@ export async function read(name) {
       const t = localStorage.getItem(KEYS[name]);
       return t ? JSON.parse(t) : null;
     } catch (e) {
-      console.warn(`${KEYS[name]} is corrupted`, e);
+      report(`${KEYS[name]} is corrupted`, e);
       return null;
     }
   }
@@ -55,11 +57,13 @@ export async function read(name) {
   if (text == null) return null;
   try {
     return JSON.parse(text);
-  } catch (e) {
+  } catch {
     // corrupted: set it aside instead of overwriting
     const aside = `${name}.corrupt-${Date.now()}.json`;
-    await FS.rename({from: path, to: aside, directory: DIR, toDirectory: DIR}).catch(() => {});
-    console.warn(`${path} is corrupted and now sits alongside as ${aside}`);
+    await FS.rename({from: path, to: aside, directory: DIR, toDirectory: DIR}).catch(e =>
+      report('setting the corrupted file aside', e),
+    );
+    report(`${path} is corrupted and now sits alongside as ${aside}`);
     return null;
   }
 }
@@ -75,8 +79,10 @@ async function writeNow(name, text) {
   await FS.writeFile({path: tmp, data: text, directory: DIR, encoding: 'utf8'});
   try {
     await FS.rename({from: tmp, to: path, directory: DIR, toDirectory: DIR});
-  } catch (e) {
-    // if rename will not replace the target, delete first. If the app crashes in between, read() takes the .tmp
+  } catch {
+    // If rename will not replace the target, delete first. The target need not exist, so a failing delete is
+    // deliberately passed over; the rename right after it is the one that has to work, and throws if it does not.
+    // If the app crashes in between, read() takes the .tmp.
     await FS.deleteFile({path, directory: DIR}).catch(() => {});
     await FS.rename({from: tmp, to: path, directory: DIR, toDirectory: DIR});
   }
@@ -85,8 +91,8 @@ async function writeNow(name, text) {
 const pending = new Map(); // name → {produce, done}
 let busy = false,
   fails = 0,
-  retryTimer = null,
-  idle = [];
+  retryTimer = null;
+const idle = []; // resolvers waiting in flush()
 
 /* produce() returns {text, ctx} only at write time, so the newest state always reaches the disk.
    done(ctx) runs once exactly that state has been written. */
@@ -108,7 +114,7 @@ async function loop() {
       if (!pending.has(name)) pending.set(name, job); // retry later; later documents wait
       busy = false;
       if (!fails++) diskHooks.failed(e);
-      console.warn('saving failed:', name, e);
+      report(`saving ${name} failed`, e);
       clearTimeout(retryTimer);
       retryTimer = setTimeout(
         () => {

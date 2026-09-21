@@ -11,6 +11,7 @@ import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
 import {productsByCode} from './derive.js';
+import {report} from './report.js';
 
 const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'locked']);
 const LOOKING = 'Barcode wird nachgeschlagen …',
@@ -55,8 +56,8 @@ export async function identify({code = '', photo = '', note = () => {}} = {}) {
         return {source: step.name, ...hit};
       }
     } catch (e) {
-      error = e;
-      console.warn(`recognition (${step.name}):`, e?.message || e);
+      error = e; // kept for the caller: the last error is what the interface explains
+      report(`recognition (${step.name})`, e);
     }
   }
   note('');
@@ -83,8 +84,8 @@ function asDetails(hit) {
 async function fromServer({code, photo}) {
   if (code && (await serverCan('barcode'))) {
     const hit = await lookupBarcode(code).catch(e => {
-      console.warn('barcode lookup:', e.message);
-      return null;
+      report('barcode lookup', e);
+      return null; // the photo recognition below is the next stage
     });
     const found = hit?.found ? asDetails(hit) : null;
     if (found) return found;

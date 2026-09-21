@@ -9,6 +9,12 @@ import {update} from '../views/home.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, serveProduct} from './feeding.js';
 
+/* The tap on a rating button is felt at once, and only then does the interface follow: the button springs, the
+   card or the sheet closes, and the toast offers the way back. PICKED is the spring in app.css. */
+const PICKED = 220,
+  SHEET_CLOSES = 260,
+  CARD_LEAVES = 440;
+
 export function rate(el) {
   const s = getServing(el.dataset.s),
     pid = el.dataset.p,
@@ -21,46 +27,47 @@ export function rate(el) {
   el.classList.add('picked');
   const pet = getPet(pid);
   const msg = `${RATINGS[r].label} gespeichert${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}`;
-  const undo = () => {
-    const cur = getServing(s.id);
-    if (!cur || !cur.pets[pid]) return;
-    cur.pets[pid] = prev;
-    save();
-    update();
-    if (sheet?.kind === 'serving' && sheet.id === s.id) renderSheet();
-  };
-  if (sheet?.kind === 'serving') {
-    if (Object.values(s.pets).every(x => x.r))
-      setTimeout(
-        () =>
-          closeSheet().then(() => {
-            update();
-            toast(msg, undo);
-          }),
-        260,
-      );
-    else {
-      setTimeout(() => {
-        renderSheet();
-        update();
-      }, 220);
-      toast(msg, undo);
-    }
-  } else {
-    // on the home page: everything rated, and the card closes quietly
-    const li = el.closest('.pend'),
-      gone = li && !Object.values(s.pets).some(x => !x.r);
-    if (gone) li.classList.add('leaving');
-    setTimeout(
-      () => {
-        update();
-        toast(msg, undo);
-      },
-      gone ? 440 : 220,
-    );
-  }
+  showRated(el, s, pid, msg, undoRating(s.id, pid, prev));
 }
 
+/* Puts the rating that was there back, wherever the tap came from */
+const undoRating = (sid, pid, prev) => () => {
+  const cur = getServing(sid);
+  if (!cur || !cur.pets[pid]) return;
+  cur.pets[pid] = prev;
+  save();
+  update();
+  if (sheet?.kind === 'serving' && sheet.id === sid) renderSheet();
+};
+
+function showRated(el, s, pid, msg, undo) {
+  const rated = () => Object.values(s.pets).every(x => x.r);
+  if (sheet?.kind === 'serving') {
+    // In the sheet: with the last open rating it closes, otherwise it simply shows the new state
+    if (rated()) {
+      setTimeout(() => closeSheet().then(() => afterRating(msg, undo)), SHEET_CLOSES);
+      return;
+    }
+    setTimeout(() => {
+      renderSheet();
+      update();
+    }, PICKED);
+    toast(msg, undo);
+    return;
+  }
+  // On the home page: with everything rated the card closes quietly first
+  const li = el.closest('.pend'),
+    gone = li && rated();
+  if (gone) li.classList.add('leaving');
+  setTimeout(() => afterRating(msg, undo), gone ? CARD_LEAVES : PICKED);
+}
+function afterRating(msg, undo) {
+  update();
+  toast(msg, undo);
+}
+
+/* „Speichern“ while naming. The three places it is reached from want three different things: a meal gets its
+   variety, „Neues Futter“ serves it straight away, and the food sheet renames what is already there. */
 export function saveName() {
   const s = sheet;
   const brand = (s.brand || '').trim(),
@@ -71,38 +78,45 @@ export function saveName() {
   }
   const details = {brand, variety, type: s.type, texture: s.texture, userType: true};
   haptic('success');
-  if (s.kind === 'serving') {
-    const sv = getServing(s.id);
-    if (!sv) return;
-    refinePets(sv, findProduct(brand, variety), null);
-    applyProduct(sv, details);
-    save();
-    sheet.step = null;
-    renderSheet();
-    update();
-  } else if (s.kind === 'new') {
-    const p = findProduct(brand, variety) || newProduct(details);
-    p.type = s.type;
+  if (s.kind === 'serving') nameServing(s.id, details);
+  else if (s.kind === 'new') serveNewProduct(details);
+  else if (s.kind === 'product') renameProduct(s.id, details);
+}
+function nameServing(id, details) {
+  const sv = getServing(id);
+  if (!sv) return;
+  refinePets(sv, findProduct(details.brand, details.variety), null);
+  applyProduct(sv, details);
+  save();
+  backFromNaming();
+}
+function serveNewProduct(details) {
+  const p = findProduct(details.brand, details.variety) || newProduct(details);
+  p.type = details.type;
+  applyTexture(p, details);
+  save();
+  closeSheet().then(() => serveProduct(p.id));
+}
+function renameProduct(id, details) {
+  const p = getProduct(id);
+  if (!p) return;
+  const other = findProduct(details.brand, details.variety);
+  if (other && other.id !== p.id) {
+    mergeProducts(p, other);
+    sheet.id = other.id;
+    toast('Mit vorhandenem Futter zusammengeführt');
+  } else {
+    Object.assign(p, {brand: details.brand, variety: details.variety, type: details.type});
     applyTexture(p, details);
-    save();
-    closeSheet().then(() => serveProduct(p.id));
-  } else if (s.kind === 'product') {
-    const p = getProduct(s.id);
-    if (!p) return;
-    const other = findProduct(brand, variety);
-    if (other && other.id !== p.id) {
-      mergeProducts(p, other);
-      sheet.id = other.id;
-      toast('Mit vorhandenem Futter zusammengeführt');
-    } else {
-      Object.assign(p, {brand, variety, type: s.type});
-      applyTexture(p, details);
-    }
-    save();
-    sheet.step = null;
-    renderSheet();
-    update();
   }
+  save();
+  backFromNaming();
+}
+/* Back from „Futter benennen“ to the sheet it was opened from */
+function backFromNaming() {
+  sheet.step = null;
+  renderSheet();
+  update();
 }
 export function useProduct(pid) {
   const p = getProduct(pid);

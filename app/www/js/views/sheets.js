@@ -20,7 +20,7 @@ import {
   sortOf,
 } from '../derive.js';
 import {feedSlots, rateCls, scoreCls, VERDICTS} from '../smart.js';
-import {renderSheet, setSheetView, sheet, sheetBody} from '../ui/sheet.js';
+import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
   armBtn,
@@ -29,13 +29,32 @@ import {
   dayBlocks,
   dayGroups,
   nameBlock,
+  onOff,
   rateRow,
   reasonOf,
   resultBadges,
+  segmented,
   syncInfo,
   thumbOf,
   verdictLabel,
 } from './parts.js';
+
+/* The pieces of „Wie war’s?“: the variety as a card that leads to naming, one rating row per pet, and in a
+   household the chips that say who was served. */
+const servingCard = (s, p) =>
+  `<button class="prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'lg')}
+    <span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span></button>`;
+const petRateRow = (s, pid, multi) =>
+  `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}
+    ${rateRow(s, pid, true)}</div>`;
+const servedForChips = s =>
+  `<span class="label">Serviert für</span><div class="chips">${db.pets
+    .map(
+      pet =>
+        `<button class="chip" aria-pressed="${!!s.pets[pet.id]}" data-action="toggle-serving-pet" data-id="${pet.id}">
+          ${avatar(pet, 'xs')}${esc(pet.name)}</button>`,
+    )
+    .join('')}</div>`;
 
 function viewServing() {
   const s = getServing(sheet.id);
@@ -46,14 +65,9 @@ function viewServing() {
   const ids = Object.keys(s.pets).filter(id => getPet(id));
   const multi = db.pets.length > 1;
   return `<div class="sh-head"><h2>Wie war’s?</h2>${closeBtn}</div>
-    <button class="prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'lg')}<span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span></button>
-    ${ids
-      .map(pid => {
-        const pet = getPet(pid);
-        return `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(pet, 'xs')}${esc(pet.name)}</div>` : ''}${rateRow(s, pid, true)}</div>`;
-      })
-      .join('')}
-    ${multi ? `<span class="label">Serviert für</span><div class="chips">${db.pets.map(pet => `<button class="chip" aria-pressed="${!!s.pets[pet.id]}" data-action="toggle-serving-pet" data-id="${pet.id}">${avatar(pet, 'xs')}${esc(pet.name)}</button>`).join('')}</div>` : ''}
+    ${servingCard(s, p)}
+    ${ids.map(pid => petRateRow(s, pid, multi)).join('')}
+    ${multi ? servedForChips(s) : ''}
     <label class="label" for="f-time">Serviert${s.by ? ' von ' + esc(s.by) : ''}</label>
     <span class="pick"><input id="f-time" class="field" type="datetime-local" data-time="${s.id}" value="${toLocalInput(s.servedAt)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
     <label class="label" for="f-note">Notiz</label>
@@ -145,7 +159,9 @@ function serveRows(prods, code = '') {
     .map(p => {
       const e = sortOf(p.id);
       const meta = [p.variety ? p.brand : '', e?.n ? `${e.pct} %` : 'noch nicht bewertet'].filter(Boolean).join(', ');
-      return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span><span class="serve-pill">Servieren</span></button></li>`;
+      return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
+        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>
+        <span class="serve-pill">Servieren</span></button></li>`;
     })
     .join('');
 }
@@ -219,13 +235,44 @@ const KAUFEN = [
   ['immer', 'Immer kaufen'],
   ['nicht', 'Nicht kaufen'],
 ];
+const verdictPetRow = (pet, x) =>
+  `<div class="verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
+    <small>${esc(reasonOf(x))}</small></span></div>`;
 function kaufenHTML(e) {
   const pets = db.pets.length > 1 ? db.pets.filter(pet => e.pets[pet.id]) : [];
   return `<span class="label">Kaufen</span>
-    <div class="seg">${KAUFEN.map(([v, l]) => `<button aria-pressed="${(e.kaufen || 'auto') === v}" data-action="buy" data-v="${v}">${l}</button>`).join('')}</div>
+    ${segmented('buy', KAUFEN, e.kaufen || 'auto')}
     <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(reasonOf(e.house))}</span>`}</p>
-    ${pets.map(pet => `<div class="verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[e.pets[pet.id].verdict]}</b><small>${esc(reasonOf(e.pets[pet.id]))}</small></span></div>`).join('')}</div>`;
+    ${pets.map(pet => verdictPetRow(pet, e.pets[pet.id])).join('')}</div>`;
 }
+
+/* The pieces of the food sheet, each one a row or a block of its own */
+const productCard = (p, served) =>
+  `<div class="prod-card">${thumbOf(null, p, 'lg')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
+    <small>${esc([p.type, `${served}× serviert`].filter(Boolean).join(', '))}</small></span>
+    <button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>`;
+/* One counter per level of the variety's scale, levels from another scale that still occur after them */
+const countsRow = (levels, counts) =>
+  `<div class="counts">${levels
+    .map(
+      r =>
+        `<div class="cnt ${rateCls(r)}">${icon('r_' + r)}<b>${counts[r] || 0}</b>
+          <span>${RATINGS[r].lines.join('<br>')}</span></div>`,
+    )
+    .join('')}</div>`;
+const petBar = (pet, x) =>
+  `<div class="pp ${scoreCls(x.score)}">${avatar(pet, 'sm')}<span class="pp-name">${esc(pet.name)}</span>
+    <span class="bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b>${x.pct} %</b></div>`;
+const mealRow = s =>
+  `<li><button class="row" data-action="open-serving" data-id="${s.id}"><span class="t-main">
+    <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s)}</button></li>`;
+const mealMeta = s =>
+  [petNames(Object.keys(s.pets).filter(getPet)), s.note ? '„' + s.note + '“' : ''].filter(Boolean).join(', ');
+const barcodeRow = c =>
+  `<li class="list-row"><span class="t-main"><b class="num">${esc(c)}</b></span>
+    <button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">
+    ${icon('close')}</button></li>`;
+const MEALS_SHOWN = 12; // the rest of the history is in „Verlauf“
 
 function viewProduct() {
   const p = getProduct(sheet.id);
@@ -238,31 +285,17 @@ function viewProduct() {
   const scale = scaleOf(p),
     levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // other levels that occur come after them
   const perPet =
-    db.pets.length > 1
-      ? db.pets
-          .map(pet => {
-            const x = e.pets[pet.id];
-            if (!x) return '';
-            return `<div class="pp ${scoreCls(x.score)}">${avatar(pet, 'sm')}<span class="pp-name">${esc(pet.name)}</span><span class="bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b>${x.pct} %</b></div>`;
-          })
-          .join('')
-      : '';
+    db.pets.length > 1 ? db.pets.map(pet => (e.pets[pet.id] ? petBar(pet, e.pets[pet.id]) : '')).join('') : '';
   const codes = Object.keys(p.codes || {}).sort();
-  const hist = ss
-    .slice(0, 12)
-    .map(
-      s =>
-        `<li><button class="row" data-action="open-serving" data-id="${s.id}"><span class="t-main"><b>${esc(cap(when(s.servedAt)))}</b><small>${esc([petNames(Object.keys(s.pets).filter(getPet)), s.note ? '„' + s.note + '“' : ''].filter(Boolean).join(', '))}</small></span>${resultBadges(s)}</button></li>`,
-    )
-    .join('');
+  const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
-    <div class="prod-card">${thumbOf(null, p, 'lg')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b><small>${esc([p.type, `${ss.length}× serviert`].filter(Boolean).join(', '))}</small></span><button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>
+    ${productCard(p, ss.length)}
     ${textureChips(p, p.texture === 'block' ? '<p class="note">Vor dem Servieren zerkleinern</p>' : '')}
-    ${e.house.n ? `<div class="counts">${levels.map(r => `<div class="cnt ${rateCls(r)}">${icon('r_' + r)}<b>${counts[r] || 0}</b><span>${RATINGS[r].lines.join('<br>')}</span></div>`).join('')}</div>` : `<p class="empty">Noch nicht bewertet.</p>`}
+    ${e.house.n ? countsRow(levels, counts) : `<p class="empty">Noch nicht bewertet.</p>`}
     ${kaufenHTML(e)}
     ${perPet ? `<span class="label">Pro Tier</span>${perPet}` : ''}
     ${hist ? `<span class="label">Verlauf</span><ul class="plist">${hist}</ul>` : ''}
-    ${codes.length ? `<span class="label">Barcodes</span><ul class="plist">${codes.map(c => `<li class="list-row"><span class="t-main"><b class="num">${esc(c)}</b></span><button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">${icon('close')}</button></li>`).join('')}</ul>` : ''}
+    ${codes.length ? `<span class="label">Barcodes</span><ul class="plist">${codes.map(barcodeRow).join('')}</ul>` : ''}
     <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Heute servieren</button>
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
@@ -357,6 +390,19 @@ function viewPet() {
     ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
 }
 
+/* The choices in the settings. „Eigene“ under the rating reminder opens a field instead of setting a value,
+   so it carries an action of its own. */
+const THEMES = [
+  ['system', 'System', 'auto'],
+  ['light', 'Hell', 'sun'],
+  ['dark', 'Dunkel', 'moon'],
+];
+const OWN_REMIND = 'own';
+const REMIND_OPTIONS = [
+  ...REMIND.map(m => [String(m), m ? m / 60 + ' Std.' : 'Aus']),
+  [OWN_REMIND, 'Eigene', '', 'remind-own'],
+];
+
 function viewSettings() {
   const st = prefs,
     house = isConnected(),
@@ -370,32 +416,12 @@ function viewSettings() {
           : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`
     }
     <span class="label">Darstellung</span>
-    <div class="seg">${[
-      ['system', 'auto', 'System'],
-      ['light', 'sun', 'Hell'],
-      ['dark', 'moon', 'Dunkel'],
-    ]
-      .map(
-        ([v, ic, l]) =>
-          `<button aria-pressed="${st.theme === v}" data-action="theme" data-v="${v}">${icon(ic)}${l}</button>`,
-      )
-      .join('')}</div>
+    ${segmented('theme', THEMES, st.theme)}
     <span class="label">Profilbild im Hintergrund</span>
-    <div class="seg">${[
-      ['on', 'An'],
-      ['off', 'Aus'],
-    ]
-      .map(
-        ([v, l]) =>
-          `<button aria-pressed="${st.backdrop === (v === 'on')}" data-action="backdrop" data-v="${v}">${l}</button>`,
-      )
-      .join('')}</div>
+    ${onOff('backdrop', st.backdrop)}
     <span class="label">Ans Bewerten erinnern</span>
     <p class="hint" id="remind-hint">${remindHint()}</p>
-    <div class="seg">${REMIND.map(
-      m =>
-        `<button aria-pressed="${!own && st.remind === m}" data-action="remind" data-v="${m}">${m ? m / 60 + ' Std.' : 'Aus'}</button>`,
-    ).join('')}<button aria-pressed="${own}" data-action="remind-own">Eigene</button></div>
+    ${segmented('remind', REMIND_OPTIONS, own ? OWN_REMIND : String(st.remind))}
     ${
       own
         ? `<label class="label" for="f-remind">Stunden nach dem Füttern</label>
@@ -404,15 +430,7 @@ function viewSettings() {
     }
     <span class="label">Ans Füttern erinnern</span>
     <p class="hint">${feedHint()}</p>
-    <div class="seg">${[
-      ['on', 'An'],
-      ['off', 'Aus'],
-    ]
-      .map(
-        ([v, l]) =>
-          `<button aria-pressed="${st.feedRemind === (v === 'on')}" data-action="feed-remind" data-v="${v}">${l}</button>`,
-      )
-      .join('')}</div>
+    ${onOff('feed-remind', st.feedRemind)}
     <span class="label">Tiere</span>
     <div>${db.pets.map(p => `<button class="list-row" data-action="edit-pet" data-id="${p.id}">${avatar(p)}<span class="t-main"><b>${esc(p.name)}</b><small>${esc(p.species)}</small></span>${icon('chevron', 'chev')}</button>`).join('')}
       <button class="list-row" data-action="add-pet"><span class="av add">${icon('plus')}</span><span class="t-main"><b>Tier hinzufügen</b></span></button></div>
@@ -493,15 +511,7 @@ function deviceSection() {
         ? 'Bei unbekannten Barcodes fragt dieses Handy zwei freie Produktdatenbanken. Übertragen wird nur die Nummer.'
         : 'Unbekannte Barcodes führen gleich zum Foto. Es geht keine Nummer hinaus.'
     }</p>
-    <div class="seg">${[
-      ['on', 'An'],
-      ['off', 'Aus'],
-    ]
-      .map(
-        ([v, l]) =>
-          `<button aria-pressed="${prefs.lookup === (v === 'on')}" data-action="lookup" data-v="${v}">${l}</button>`,
-      )
-      .join('')}</div>
+    ${onOff('lookup', prefs.lookup)}
     <span class="label">Austausch von Hand</span>
     <p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält nur Tiere, Futter und Mahlzeiten.</p>
     <div class="btn-col">

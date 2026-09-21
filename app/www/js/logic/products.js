@@ -24,7 +24,8 @@ export async function shareShopping() {
   const {title, text} = shoppingList();
   try {
     if ((await shareText(title, text)) === 'copied') toast('Liste kopiert');
-  } catch (e) {
+  } catch {
+    // shareText() swallows a cancel itself, so anything left here is a real failure of the share menu
     toast('Die Liste konnte nicht geteilt werden.');
   }
 }

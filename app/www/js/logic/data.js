@@ -2,6 +2,7 @@
    With a server, import and delete apply to the whole household. Sample data exists only without a server. */
 import {uid} from '../fields.js';
 import {Native, haptic} from '../native.js';
+import {report} from '../report.js';
 import {DEMO, RATINGS} from '../config.js';
 import {db, defaults, prefs, purge, replaceDb, save, savePrefs, tidy} from '../store.js';
 import {isConnected} from '../sync.js';
@@ -37,7 +38,7 @@ export async function clearExports() {
         .map(f => Native.Filesystem.deleteFile({path: f.name, directory: 'CACHE'})),
     );
   } catch (e) {
-    console.warn('Alte Dateien im Cache:', e.message);
+    report('old files in the cache', e);
   }
 }
 export async function exportData() {
@@ -80,64 +81,82 @@ export async function importData(file) {
         update();
       });
     });
-  } catch (e) {
+  } catch {
+    // Whatever is wrong with the file, a person can only pick another one: the toast says so
     toast('Diese Datei ist kein gültiges Backup.');
   }
 }
 const demoId = () => DEMO + uid();
+/* One sample pet with six varieties and their ratings, two people, and the usual feeding times. Everything is
+   made up but has to look like a phone in use, so the evaluation and the insights have something to say. */
+const DEMO_PLAN = [
+  ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
+  ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],
+  ['Whiskas', 'Thunfisch in Soße', 'Nassfutter', ['sosse', 'sosse', 'mittel']],
+  ['Gourmet', 'Rind Pastete', 'Nassfutter', ['schlecht', 'schlecht', 'mittel']],
+  ['Animonda Carny', 'Pute Pastete', 'Nassfutter', ['mittel', 'gut']],
+  ['Dreamies', 'Käse', 'Snack', ['verputzt', 'verputzt']],
+];
+const DEMO_PEOPLE = ['Anna', 'Jonas'];
+const DEMO_SLOTS = [7.25, 18.1, 12.5, 19.4]; // typical feeding times, as hours of the day
+const DEMO_CALM = 6; // the newest meals without weak ratings, so the sample never reports „frisst schlechter“
+const DEMO_RATED_AFTER = 2 * 3600e3; // rated two hours after the meal
+const DEMO_OPEN_AGO = 2 * 3600e3; // and the one meal still open was served two hours ago
+const DAY = 864e5;
+
 export function loadDemo() {
   if (isConnected()) return;
-  const day = 864e5,
-    now = Date.now();
-  const mau = {id: demoId(), name: 'Mau', species: 'Katze', photo: null, createdAt: now};
-  db.pets.push(mau);
-  const plan = [
-    ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
-    ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],
-    ['Whiskas', 'Thunfisch in Soße', 'Nassfutter', ['sosse', 'sosse', 'mittel']],
-    ['Gourmet', 'Rind Pastete', 'Nassfutter', ['schlecht', 'schlecht', 'mittel']],
-    ['Animonda Carny', 'Pute Pastete', 'Nassfutter', ['mittel', 'gut']],
-    ['Dreamies', 'Käse', 'Snack', ['verputzt', 'verputzt']],
-  ];
-  const made = [],
-    byBrand = {};
-  for (const [brand, variety, type, rs] of plan) {
-    const p = newProduct({brand, variety, type, animal: 'Katze'}, demoId());
-    p.lastPets = [mau.id];
-    byBrand[brand] = p;
-    rs.forEach(r => made.push({id: demoId(), productId: p.id, servedAt: 0, pets: {[mau.id]: {r, at: null}}, note: ''}));
-  }
-  const people = ['Anna', 'Jonas'],
-    slots = [7.25, 18.1, 12.5, 19.4]; // typical feeding times
-  // random order, but the last three days without weak ratings: the sample must not report „frisst schlechter“
-  made.sort(() => Math.random() - 0.5);
-  const calm = made.filter(s => RATINGS[s.pets[mau.id].r].score >= 50).slice(0, 6);
-  made.sort((a, b) => calm.includes(b) - calm.includes(a));
-  made.forEach((s, i) => {
-    const d = new Date(now - (Math.floor(i / 2) + 1) * day);
-    const h = slots[(i * 3) % slots.length] + Math.random() * 0.6;
-    d.setHours(Math.floor(h), Math.floor((h % 1) * 60), 0, 0);
-    s.servedAt = d.getTime();
-    s.by = people[i % 2];
-    Object.values(s.pets).forEach(x => {
-      x.at = s.servedAt + 2 * 3600e3;
-    });
-  });
-  made[3].note = 'Neue Packung';
-  made.push({
-    id: demoId(),
-    productId: byBrand.Felix.id,
-    servedAt: now - 2 * 3600e3,
-    pets: petMap([mau.id]),
-    note: '',
-    by: 'Anna',
-  });
+  const pet = {id: demoId(), name: 'Mau', species: 'Katze', photo: null, createdAt: Date.now()};
+  db.pets.push(pet);
+  const made = demoMeals(pet);
   db.servings.push(...made);
   db.servings.sort((a, b) => b.servedAt - a.servedAt);
   save();
   closeSheet().then(() => {
     update();
     toast('Beispieldaten geladen');
+  });
+}
+
+/* The varieties with their ratings, spread over the days backwards from today */
+function demoMeals(pet) {
+  const made = [],
+    byBrand = {};
+  for (const [brand, variety, type, ratings] of DEMO_PLAN) {
+    const p = newProduct({brand, variety, type, animal: 'Katze'}, demoId());
+    p.lastPets = [pet.id];
+    byBrand[brand] = p;
+    for (const r of ratings)
+      made.push({id: demoId(), productId: p.id, servedAt: 0, pets: {[pet.id]: {r, at: null}}, note: ''});
+  }
+  spreadOverDays(made, pet);
+  made[3].note = 'Neue Packung';
+  // One meal from two hours ago, still without a rating: „Wie war’s?“ has something to show
+  made.push({
+    id: demoId(),
+    productId: byBrand.Felix.id,
+    servedAt: Date.now() - DEMO_OPEN_AGO,
+    pets: petMap([pet.id]),
+    note: '',
+    by: 'Anna',
+  });
+  return made;
+}
+
+/* Two meals a day backwards from yesterday, at the usual times and alternating between the two people.
+   The order is random, except that the newest days carry no weak rating. */
+function spreadOverDays(made, pet) {
+  const now = Date.now();
+  made.sort(() => Math.random() - 0.5);
+  const calm = made.filter(s => RATINGS[s.pets[pet.id].r].score >= 50).slice(0, DEMO_CALM);
+  made.sort((a, b) => calm.includes(b) - calm.includes(a));
+  made.forEach((s, i) => {
+    const d = new Date(now - (Math.floor(i / 2) + 1) * DAY);
+    const h = DEMO_SLOTS[(i * 3) % DEMO_SLOTS.length] + Math.random() * 0.6;
+    d.setHours(Math.floor(h), Math.floor((h % 1) * 60), 0, 0);
+    s.servedAt = d.getTime();
+    s.by = DEMO_PEOPLE[i % 2];
+    for (const x of Object.values(s.pets)) x.at = s.servedAt + DEMO_RATED_AFTER;
   });
 }
 

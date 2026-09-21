@@ -1,0 +1,21 @@
+# Updates for everything the project pulls in from outside. Nothing here touches the app's own dependencies
+# beyond opening a pull request; the tests decide whether it may be merged.
+version: 2
+updates:
+  # The workflows pin every foreign action to a commit; this is what raises the pin.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  # Capacitor and its plugins, plus ESLint and Prettier (devDependencies in app/package.json)
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: monthly
+
+  # Pillow, Playwright and ruff, pinned exactly in tests/requirements.txt
+  - package-ecosystem: pip
+    directory: /tests
+    schedule:
+      interval: monthly

@@ -21,7 +21,7 @@ export function thumbOf(s, p, cls = '') {
   const letter = (p.brand || p.variety || '?').trim().charAt(0).toUpperCase();
   return `<span class="thumb ${cls}">${esc(letter)}</span>`;
 }
-export function nameBlock(s, p, sheet = false) {
+export function nameBlock(s, p, inSheet = false) {
   if (s.status === 'recognizing' || s.status === 'reading')
     // the server is recognising, or the phone is reading the text
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
@@ -33,7 +33,7 @@ export function nameBlock(s, p, sheet = false) {
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (mode `lokal`): without the error tone
   }
   // In the sheet the exact time is in the „Serviert“ field right below, so the food type goes here instead
-  const meta = [p.variety ? p.brand : '', sheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
+  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 /* Rating buttons: equally wide in one row, the variety's scale in its own order; an icon and two lines per button.
@@ -66,6 +66,26 @@ export function resultBadges(s, compact = false) {
     .join('')}</span>`;
 }
 export const closeBtn = `<button class="icon-btn" data-action="close" aria-label="Schließen">${icon('close')}</button>`;
+/* A segmented control: one equally wide button per option, the current one pressed. An option is
+   [value, label] and may carry an icon and an action of its own — „Eigene“ in the rating reminder is one such,
+   because it opens a field instead of setting a value. */
+export const segmented = (action, options, current) =>
+  `<div class="seg">${options
+    .map(
+      ([value, label, ic = '', own = action]) =>
+        `<button aria-pressed="${value === current}" data-action="${own}" data-v="${esc(value)}">${ic ? icon(ic) : ''}${esc(label)}</button>`,
+    )
+    .join('')}</div>`;
+/* Two options, „An“ and „Aus“, for a setting that is simply on or off */
+export const onOff = (action, on) =>
+  segmented(
+    action,
+    [
+      ['on', 'An'],
+      ['off', 'Aus'],
+    ],
+    on ? 'on' : 'off',
+  );
 export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = {}) {
   const on = sheet && sheet.armed === key;
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;
