@@ -8,7 +8,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Android-8.0%2B-965E4B?logo=android&logoColor=white&labelColor=2E2724" alt="Android 8.0 oder neuer">
   <img src="https://img.shields.io/badge/App--Sprache-Deutsch-965E4B?labelColor=2E2724" alt="App-Sprache: Deutsch">
-  <img src="https://img.shields.io/badge/Lizenz-AGPL--3.0-965E4B?labelColor=2E2724" alt="Lizenz: AGPL-3.0">
 </p>
 
 <p align="center">
