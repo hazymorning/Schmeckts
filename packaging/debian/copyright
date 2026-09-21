@@ -1,8 +1,17 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: schmeckts-server
-Comment: Privates Projekt für den eigenen Haushalt, nicht zur Weitergabe bestimmt.
+Source: https://github.com/hazymorning/Schmeckts
 
 Files: *
-Copyright: 2026 Schmeckt’s?
-License: proprietary
- Alle Rechte vorbehalten. Nur für den privaten Gebrauch im eigenen Haushalt.
+Copyright: 2026 hazymorning
+License: AGPL-3.0-only
+ This program is free software: you can redistribute it and/or modify it under
+ the terms of the GNU Affero General Public License as published by the Free
+ Software Foundation, version 3.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY
+ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ .
+ On Debian systems the full text of the GNU Affero General Public License
+ version 3 can be found in /usr/share/common-licenses/AGPL-3.

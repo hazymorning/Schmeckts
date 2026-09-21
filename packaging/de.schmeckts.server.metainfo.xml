@@ -2,14 +2,14 @@
 <component type="desktop-application">
   <id>de.schmeckts.server</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>LicenseRef-proprietary</project_license>
+  <project_license>AGPL-3.0-only</project_license>
   <name>Schmeckt’s-Server</name>
   <summary>Gemeinsame Futterdaten und Foto-Erkennung für die App Schmeckt’s?</summary>
   <description>
     <p>Hält die Fütterungsdaten aller Handys im Haushalt, legt täglich Backups an und erkennt Futter auf Fotos und per Barcode. Der Server ist nur aus dem Heimnetz erreichbar.</p>
     <p>Nach der Installation im App-Menü „Schmeckt’s-Server einrichten“ öffnen.</p>
   </description>
-  <launchable type="desktop-id">schmeckts-einrichten.desktop</launchable>
+  <launchable type="desktop-id">schmeckts-setup.desktop</launchable>
   <developer id="de.schmeckts">
     <name>Schmeckt’s?</name>
   </developer>
