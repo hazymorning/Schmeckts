@@ -1,67 +1,72 @@
-# Schmeckt’s? – the household server
+# Schmeckt’s? – der Haushalts-Server
 
-Only needed if several people keep the same feeding diary. It is a small program for a computer that stays on at
-home — a mini-PC is plenty. It holds the shared data, passes packaging photos on for recognition and looks up
-barcodes; nothing of it runs on anyone else’s machine. [The app](../README.md) works without it.
+Nur nötig, wenn mehrere Menschen dasselbe Fütterungstagebuch führen. Es ist ein kleines Programm für einen Rechner,
+der zu Hause läuft; ein Mini-PC reicht dafür völlig. Er hält die gemeinsamen Daten, gibt Packungsfotos zur Erkennung
+weiter und schlägt Barcodes nach. Nichts davon läuft auf fremden Rechnern. [Die App](../README.md) funktioniert auch
+ohne ihn.
 
-Everything the server is sits in this folder: the Go program, `packaging/` for the Debian package and
-`build-deb.sh`, which builds it.
+Alles, was den Server ausmacht, liegt in diesem Ordner: das Go-Programm, `packaging/` für das Debian-Paket und
+`build-deb.sh`, das es baut.
 
-## Installing
+## Einrichten
 
-About ten minutes, all of it on the mini-PC with mouse and keyboard. Your password is needed once.
+Etwa zehn Minuten, alles davon am Mini-PC mit Maus und Tastatur. Dein Passwort wird einmal gebraucht.
 
-The server’s setup window and its messages are German, like the app. This guide is English, like the rest of the repository.
+### 1. Die richtige Datei wählen
 
-### 1. Pick the right file
+Vom Paket gibt es zwei Ausgaben:
 
-There are two builds of the package:
+- `schmeckts-server_<version>_amd64.deb` für PCs mit Intel- oder AMD-Prozessor (nahezu alle Mini-PCs)
+- `schmeckts-server_<version>_arm64.deb` für PCs mit ARM-Prozessor
 
-- `schmeckts-server_1.1.0_amd64.deb` for PCs with an Intel or AMD processor (nearly all mini-PCs)
-- `schmeckts-server_1.1.0_arm64.deb` for PCs with an ARM processor
+Im Zweifel: Einstellungen öffnen, ganz unten auf „System“, dann „Über“. Steht dort Intel, AMD oder Celeron, nimm amd64.
 
-If you are unsure: open the settings, go to “System” right at the bottom, then “About”. If the processor says Intel, AMD or Celeron, take amd64.
+Lade die Datei auf den Mini-PC herunter, zum Beispiel indem du diese Seite dort im Browser öffnest.
 
-Download the file onto the mini-PC, for example by opening this page there in a browser.
+### 2. Installieren
 
-### 2. Install
+1. Doppelklicke im Ordner „Downloads“ auf die .deb-Datei. Die Softwareverwaltung öffnet sich.
+2. Klicke auf „Installieren“ und gib dein Passwort ein.
 
-1. In the “Downloads” folder, double-click the .deb file. The software centre opens.
-2. Click “Install” and enter your password.
-
-If nothing opens, or an error appears instead: right-click the file, “Open with”, “Software centre”. If that fails too, open a terminal (Ctrl+Alt+T) and enter:
+Öffnet sich nichts oder erscheint stattdessen ein Fehler: Rechtsklick auf die Datei, „Öffnen mit“, „Softwareverwaltung“.
+Klappt auch das nicht, öffne ein Terminal (Strg+Alt+T) und gib ein:
 
 ```
-sudo apt install ~/Downloads/schmeckts-server_1.1.0_amd64.deb
+sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb
 ```
 
-The server runs straight away afterwards and starts automatically with the PC.
+Der Server läuft danach sofort und startet künftig automatisch mit dem PC.
 
-### 3. Get an API key
+### 3. Einen API-Schlüssel besorgen
 
-The key lets the server have packaging photos recognised by Claude. That costs roughly half a cent per photo.
+Mit dem Schlüssel lässt der Server Packungsfotos von Claude erkennen. Das kostet etwa einen halben Cent je Foto.
 
-1. Sign in at [platform.claude.com](https://platform.claude.com) or create an account and add a payment method.
-2. Under “API Keys”, create a new key — for example named “Schmeckts” — and copy it. It starts with `sk-ant-`.
-3. Recommended: set a small monthly spending limit under “Limits”, around 5 dollars.
+1. Melde dich bei [platform.claude.com](https://platform.claude.com) an oder lege ein Konto an und hinterlege eine Zahlungsart.
+2. Erstelle unter „API Keys“ einen neuen Schlüssel, zum Beispiel mit dem Namen „Schmeckts“, und kopiere ihn. Er beginnt mit `sk-ant-`.
+3. Empfehlenswert: Setze unter „Limits“ ein kleines monatliches Ausgabenlimit, etwa 5 Dollar.
 
-### 4. Set it up
+### 4. Einrichten
 
-1. Open the application menu and start „Schmeckt’s-Server einrichten“.
-2. Choose „Einrichten oder API-Schlüssel ändern“, paste the key, confirm and enter your password.
-3. The server checks the key with Anthropic. The window then shows the **address** and the **household code**.
+1. Öffne das Anwendungsmenü und starte „Schmeckt’s-Server einrichten“.
+2. Wähle „Einrichten oder API-Schlüssel ändern“, füge den Schlüssel ein, bestätige und gib dein Passwort ein.
+3. Der Server prüft den Schlüssel bei Anthropic. Danach zeigt das Fenster die **Adresse** und den **Haushalts-Code**.
 
-The same window shows the connection details again at any time, shows the stored data with „Übersicht“ (animals, food, recent meals, devices), and creates a new household code with „Neuer Code“ should a phone go missing.
+Dasselbe Fenster zeigt die Verbindungsdaten jederzeit wieder an, listet mit „Übersicht“ die gespeicherten Daten auf
+(Tiere, Futter, letzte Mahlzeiten, Geräte) und erstellt mit „Neuer Code“ einen neuen Haushalts-Code, falls ein Handy
+abhandenkommt.
 
-### 5. Connect the phones
+### 5. Die Handys verbinden
 
-In the app: on first start „Mit Haushalt verbinden“ (later: settings, „Haushalt“, „Mit Haushalt verbinden“), type in the address and household code, then „Verbinden“. After that all phones sync their data automatically — at home over Wi-Fi, and on the road as soon as WireGuard is up. If something is waiting or the sync is stuck, a small notice appears at the top of the app. After a new code it reads „Code prüfen“; type the new code in there.
+In der App: beim ersten Start „Mit Haushalt verbinden“ (später: Einstellungen, „Haushalt“, „Mit Haushalt verbinden“),
+Adresse und Haushalts-Code eintippen, dann „Verbinden“. Danach gleichen alle Handys ihre Daten automatisch ab: zu
+Hause über das WLAN, unterwegs, sobald WireGuard läuft. Wartet etwas oder hakt der Abgleich, erscheint oben in der App
+ein kleiner Hinweis. Nach einem neuen Code steht dort „Code prüfen“; tippe den neuen Code dann dort ein.
 
-## Good to know
+## Gut zu wissen
 
-- **Backups:** the server writes a backup every day and keeps the last 30, in `/var/lib/schmeckts/backups`.
-- **Updates:** just double-click the new .deb file again, or run `sudo apt install ~/Downloads/schmeckts-server_1.1.0_amd64.deb` in the terminal. Data, code and API key are kept.
-- **Overview in the terminal:** `sudo schmeckts-server overview`.
-- **Is it running?** `systemctl status schmeckts` shows the state, `journalctl -u schmeckts -e` the latest messages.
-- **Restoring a backup:** `sudo schmeckts-server restore` lists the backups. Given a file, the command reads it back in. The phones then automatically do a full resync.
-- **Do not put it on the internet:** do not set up port forwarding for the server in your router. It only accepts requests from the home network and over WireGuard anyway.
+- **Backups:** Der Server schreibt täglich ein Backup und behält die letzten 30, in `/var/lib/schmeckts/backups`.
+- **Updates:** Einfach die neue .deb-Datei wieder doppelklicken, oder im Terminal `sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb`. Daten, Code und API-Schlüssel bleiben erhalten.
+- **Übersicht im Terminal:** `sudo schmeckts-server overview`.
+- **Läuft er?** `systemctl status schmeckts` zeigt den Zustand, `journalctl -u schmeckts -e` die letzten Meldungen.
+- **Backup zurückspielen:** `sudo schmeckts-server restore` listet die Backups auf. Mit einer Datei als Angabe liest der Befehl sie wieder ein. Die Handys gleichen danach automatisch alles neu ab.
+- **Nicht ins Internet stellen:** Richte im Router keine Portweiterleitung für den Server ein. Er nimmt ohnehin nur Anfragen aus dem Heimnetz und über WireGuard an.

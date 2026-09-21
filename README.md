@@ -1,147 +1,143 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/6de937ab-9d55-4474-939f-a8531965ff25">
-    <img src="https://github.com/user-attachments/assets/c185d1f3-68fa-4d2a-89ce-02f7ed7a6293" width="880" alt="Schmeckt’s? – the app that remembers which food your pet actually likes.">
+    <img src="https://github.com/user-attachments/assets/c185d1f3-68fa-4d2a-89ce-02f7ed7a6293" width="880" alt="Schmeckt’s? – die App, die sich merkt, was deinem Tier wirklich schmeckt.">
   </picture>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-8.0%2B-965E4B?logo=android&logoColor=white&labelColor=2E2724" alt="Android 8.0 or newer">
-  <img src="https://img.shields.io/badge/App%20language-German-965E4B?labelColor=2E2724" alt="App language: German">
-  <img src="https://img.shields.io/badge/License-AGPL--3.0-965E4B?labelColor=2E2724" alt="License: AGPL-3.0">
+  <img src="https://img.shields.io/badge/Android-8.0%2B-965E4B?logo=android&logoColor=white&labelColor=2E2724" alt="Android 8.0 oder neuer">
+  <img src="https://img.shields.io/badge/App--Sprache-Deutsch-965E4B?labelColor=2E2724" alt="App-Sprache: Deutsch">
+  <img src="https://img.shields.io/badge/Lizenz-AGPL--3.0-965E4B?labelColor=2E2724" alt="Lizenz: AGPL-3.0">
 </p>
 
 <p align="center">
-  <a href="#how-to-install"><img src="https://github.com/user-attachments/assets/67f2a3c6-7ccb-484f-82e5-af64c5145dd0" width="292" alt="Install app"></a>
+  <a href="#installieren"><img src="https://github.com/user-attachments/assets/67f2a3c6-7ccb-484f-82e5-af64c5145dd0" width="292" alt="App installieren"></a>
 </p>
 
-**Schmeckt’s?** is a feeding diary for pets. After every meal you record with a single tap how the bowl looked, from “finished at once” to “barely touched”. After a few days the app shows which varieties your animal really likes and which ones can stay on the shelf next time you shop.
+**Schmeckt’s?** ist ein Fütterungstagebuch für Haustiere. Nach jeder Mahlzeit hältst du mit einem Tippen fest, wie der Napf aussah, von „sofort verputzt“ bis „kaum angerührt“. Nach ein paar Tagen zeigt dir die App, welche Sorten deinem Tier wirklich schmecken und welche beim nächsten Einkauf im Regal bleiben können.
 
-> The app’s interface is German. This repository — code, comments, documentation — is English.
-
-<!-- Add screenshots and remove these comment markers.
+<!-- Screenshots einfügen und diese Kommentarzeichen entfernen.
 <p align="center">
-  <img src="LIGHT-URL" width="270" alt="Home screen, light theme">
+  <img src="LIGHT-URL" width="270" alt="Startseite, helles Design">
   &nbsp;&nbsp;&nbsp;
-  <img src="DARK-URL" width="270" alt="Home screen, dark theme">
+  <img src="DARK-URL" width="270" alt="Startseite, dunkles Design">
 </p>
 -->
 
-## Photograph instead of typing
+## Eine Mahlzeit eintragen
 
-While feeding, just hold the packaging up to the camera. The app reads brand, variety and food type off the picture and creates the entry by itself — for cans without a barcode, for multipacks and for brands it has never seen. Adding a new variety takes exactly one photo.
+Meistens ist es ein Scan. Barcode vor die Kamera halten, und eine Sorte, die du schon einmal gefüttert hast, ist eingetragen. Mehr ist nicht auszufüllen.
 
-The phone reads the text on the packaging itself, offline and at no extra cost. Connected to a household you also get the more accurate recognition, which reliably makes sense of ornate packaging as well. What else that brings is described further down.
+Für alles ohne brauchbaren Barcode, also Dosen, Multipacks und lose Leckerlis, fotografierst du stattdessen die Packung. Das Handy liest den Text vom Bild, ohne Netz und ohne Zusatzkosten, und füllt Marke und Sorte zum Bestätigen vor. Im Haushalt läuft die Erkennung über euren eigenen Server, der Marke und Sorte selbst herausfindet und auch mit verspielten Packungen zurechtkommt.
 
-## What the app does
+## Was die App kann
 
-- **Record a feeding.** Scan a barcode, photograph the packaging or tap a known variety. The entry is there immediately.
-- **Rate.** One tap is enough. Wet food, dry food and treats each have their own, fitting scales.
-- **Shopping list.** Every variety ends up under “buy again” or “don’t buy again”. You can set that yourself at any time and share the list.
-- **Insights.** Which brand, which texture, which flavour goes down best? The app also speaks up when a variety keeps being left over or an animal is noticeably off its food.
-- **History.** Calendar and daily overview of every meal, plus a short look back at the past week.
-- **Reminders.** On request the app reminds you to rate a meal or about your usual feeding times. Both are off to begin with.
-- **Several animals.** Cats, dogs, small pets and birds, each with a profile picture and its own evaluation.
-- **Manual exchange.** Even without a server: “share changes” sends your new entries to another phone as a file, “receive exchange” merges both states.
-- **Backup.** You can save your data to a file at any time and read it back in on a new phone.
+- **Füttern eintragen.** Barcode scannen, Packung fotografieren oder eine bekannte Sorte antippen. Der Eintrag steht sofort.
+- **Bewerten.** Ein Tippen genügt. Nassfutter, Trockenfutter und Snacks haben jeweils ihre eigene, passende Skala.
+- **Einkaufsliste.** Jede Sorte landet unter „Nachkaufen“ oder „Nicht mehr kaufen“. Du kannst das jederzeit selbst festlegen und die Liste teilen.
+- **Erkenntnisse.** Welche Marke, welche Konsistenz, welcher Geschmack kommt am besten an? Die App meldet sich auch, wenn eine Sorte immer wieder übrig bleibt oder ein Tier auffällig wenig frisst.
+- **Verlauf.** Kalender und Tagesübersicht über jede Mahlzeit, dazu ein kurzer Rückblick auf die vergangene Woche.
+- **Erinnerungen.** Auf Wunsch erinnert dich die App ans Bewerten oder an die üblichen Fütterungszeiten. Beides ist zu Beginn aus.
+- **Mehrere Tiere.** Katzen, Hunde, Kleintiere und Vögel, jedes mit Profilbild und eigener Auswertung.
+- **Austausch von Hand.** Auch ohne Server: „Änderungen teilen“ gibt deine neuen Einträge als Datei an ein anderes Handy, „Austausch empfangen“ führt beide Stände zusammen.
+- **Backup.** Du kannst deine Daten jederzeit in eine Datei sichern und auf einem neuen Handy wieder einlesen.
 
-The app comes in light and dark and follows whatever your phone is set to.
+Die App gibt es hell und dunkel und richtet sich danach, wie dein Handy eingestellt ist.
 
-## On your own or in a household
+## Allein oder im Haushalt
 
-The first time you start the app you decide how you want to use it. You can switch later at any point; your entries are kept either way.
+Beim ersten Start entscheidest du, wie du die App nutzen willst. Wechseln kannst du jederzeit, deine Einträge bleiben in beiden Fällen erhalten.
 
-**This phone only.** Everything stays on the device and the app does not go online by itself. It still reads the text on the packaging and prefills “name this food” with it; after that it recognises the variety by its barcode. Anyone who feeds their animals on their own gets along fine with this.
+**Nur auf diesem Handy.** Alles bleibt auf dem Gerät, und die App geht von sich aus nicht ins Netz. Sie liest weiterhin den Text auf der Packung und füllt „Futter benennen“ damit vor; danach erkennt sie die Sorte am Barcode. Wer seine Tiere allein füttert, kommt damit gut zurecht.
 
-**Connected to a household.** Several people keep the same diary. Everyone sees what the others have entered, even when a phone had no connection for a while. On top of that comes the more accurate recognition: brand and variety from the photo, and unknown barcodes looked up automatically.
+**Mit einem Haushalt verbunden.** Mehrere Menschen führen dasselbe Tagebuch. Alle sehen, was die anderen eingetragen haben, auch wenn ein Handy eine Weile keine Verbindung hatte. Dazu kommt die genauere Erkennung: Marke und Sorte vom Foto, und unbekannte Barcodes werden automatisch nachgeschlagen.
 
-| | This phone only | In a household |
+| | Nur auf diesem Handy | Im Haushalt |
 |---|---|---|
-| Feed, rate, evaluate | yes | yes |
-| Read packaging text | yes | yes |
-| Recognise brand and variety from a photo | no | yes |
-| Look up unknown barcodes | on request | yes |
-| Share entries with others | manually, as a file | automatically |
+| Füttern, bewerten, auswerten | ja | ja |
+| Packungstext lesen | ja | ja |
+| Marke und Sorte vom Foto erkennen | nein | ja |
+| Unbekannte Barcodes nachschlagen | auf Wunsch | ja |
+| Einträge mit anderen teilen | von Hand, als Datei | automatisch |
 
-A household needs a small server of its own, on a computer that stays on at home. It is not part of the app: its code and its setup guide live in [`server/`](server/).
+Ein Haushalt braucht einen eigenen kleinen Server auf einem Rechner, der zu Hause läuft. Er gehört nicht zur App: Sein Code und seine Anleitung liegen in [`server/`](server/).
 
-## How to install
+## Installieren
 
-Schmeckt’s? isn’t on the Play Store, so you install it straight from this page. It takes about a minute, and you only need to give permission once.
+Schmeckt’s? gibt es nicht im Play Store, du installierst die App also direkt von dieser Seite. Das dauert etwa eine Minute, und die Erlaubnis dazu musst du nur einmal geben.
 
-<!-- This button downloads the APK of the latest release directly.
-     It only works if every release has the APK attached under exactly this name: schmeckts.apk -->
+<!-- Dieser Button lädt die APK des neuesten Releases direkt herunter.
+     Er funktioniert nur, wenn jedes Release die APK genau unter diesem Namen enthält: schmeckts.apk -->
 <p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/ffbc6f1f-0da5-4c14-ae23-ab543318029d" width="292" alt="Download APK"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/ffbc6f1f-0da5-4c14-ae23-ab543318029d" width="292" alt="APK herunterladen"></a>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5e312f50-e1ec-493b-9ee2-99c3bb88fbed" width="150" alt="QR code that opens this guide on your phone"><br>
-  <sub>On a computer? Scan this code with your phone’s camera to open this guide there.</sub>
+  <img src="https://github.com/user-attachments/assets/5e312f50-e1ec-493b-9ee2-99c3bb88fbed" width="150" alt="QR-Code, der diese Anleitung auf dem Handy öffnet"><br>
+  <sub>Am Rechner? Scanne diesen Code mit der Kamera deines Handys, dann öffnet sich diese Anleitung dort.</sub>
 </p>
 
-1. **Download.** On your Android phone, tap the button above. If your browser asks whether you want to keep the file, confirm.
-2. **Open.** Once the download has finished, tap *Open*, or open `schmeckts.apk` from your *Downloads*.
-3. **Allow.** The first time, Android asks whether your browser may install apps. Tap *Settings*, switch on *Allow from this source* and go back.
-4. **Install.** Tap *Install*, then *Open*. That’s it.
+1. **Herunterladen.** Tippe auf deinem Android-Handy auf den Button oben. Fragt dein Browser, ob du die Datei behalten willst, bestätige das.
+2. **Öffnen.** Tippe nach dem Download auf *Öffnen*, oder öffne `schmeckts.apk` in deinen *Downloads*.
+3. **Erlauben.** Beim ersten Mal fragt Android, ob dein Browser Apps installieren darf. Tippe auf *Einstellungen*, schalte *Aus dieser Quelle zulassen* ein und geh zurück.
+4. **Installieren.** Tippe auf *Installieren*, dann auf *Öffnen*. Fertig.
 
 <details>
-<summary><b>Android offers to scan the app first</b></summary>
+<summary><b>Android will die App erst prüfen</b></summary>
 <br>
 
-Because the app doesn’t come from the Play Store, Google Play Protect may suggest scanning it before it is installed. Let it scan; it only takes a moment. Afterwards you can install the app as usual.
+Weil die App nicht aus dem Play Store kommt, schlägt Google Play Protect vor, sie vor der Installation zu prüfen. Lass sie prüfen, das dauert nur einen Moment. Danach installierst du die App wie gewohnt.
 
 </details>
 
 <details>
-<summary><b>Installing an update</b></summary>
+<summary><b>Eine neue Version installieren</b></summary>
 <br>
 
-Download the new version with the same button and install it over the old one. Your entries stay where they are. Please don’t uninstall the old version first, as that would delete your data.
+Lade die neue Version mit demselben Button herunter und installiere sie über die alte. Deine Einträge bleiben erhalten. Deinstalliere die alte Version bitte nicht vorher, das würde deine Daten löschen.
 
 </details>
 
 <details>
-<summary><b>“App not installed”</b></summary>
+<summary><b>„App nicht installiert“</b></summary>
 <br>
 
-This usually means an older test version is still on the phone. Save a backup in the app’s settings, uninstall the old version, install the new one and read the backup back in.
+Meist ist noch eine ältere Testversion auf dem Handy. Sichere in den Einstellungen der App ein Backup, deinstalliere die alte Version, installiere die neue und lies das Backup wieder ein.
 
 </details>
 
 <details>
-<summary><b>Requirements</b></summary>
+<summary><b>Voraussetzungen</b></summary>
 <br>
 
-Android 8.0 or newer. The barcode scanner needs Google Play services, which almost every phone has; everything else works without them.
+Android 8.0 oder neuer. Der Barcode-Scanner braucht die Google-Play-Dienste, die fast jedes Handy hat; alles andere funktioniert auch ohne sie.
 
 </details>
 
-<p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">All versions</a></sub></p>
+<p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">Alle Versionen</a></sub></p>
 
-## Privacy
+## Datenschutz
 
-- Your entries and photos stay inside the app. They end up neither in the gallery nor in Google’s cloud backup.
-- No ads, no trackers.
-- If you use the app on your phone alone, nothing leaves it. The packaging text is read on the device. The one exception is the barcode scanner: it comes from Google and, according to Google, reports no images but does report general device data such as the model.
-- One setting you can switch on yourself: looking up unknown barcodes in open product databases. Only the number is transmitted, and it is off by default.
-- In a household the app only talks to your own server. From there the photo of the packaging goes on for recognition, and unknown barcodes are looked up in open product databases. Nothing else leaves the phone, in particular nothing about your animals.
-- An exchange file contains only animals, varieties and meals — no settings and no household code.
-- The app needs the camera for photos. It only asks about notifications once you switch a reminder on.
+- Deine Einträge und Fotos bleiben in der App. Sie landen weder in der Galerie noch in Googles Cloud-Sicherung.
+- Keine Werbung, kein Tracking.
+- Nutzt du die App allein auf deinem Handy, verlässt sie nichts. Den Packungstext liest das Gerät selbst. Die einzige Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet laut Google keine Bilder, aber allgemeine Gerätedaten wie das Modell.
+- Eine Einstellung kannst du selbst einschalten: das Nachschlagen unbekannter Barcodes in freien Produktdatenbanken. Übertragen wird dabei nur die Nummer, und sie ist standardmäßig aus.
+- Im Haushalt spricht die App nur mit eurem eigenen Server. Von dort geht das Foto der Packung zur Erkennung weiter, und unbekannte Barcodes werden in freien Produktdatenbanken nachgeschlagen. Sonst verlässt nichts das Handy, insbesondere nichts über deine Tiere.
+- Eine Austauschdatei enthält nur Tiere, Sorten und Mahlzeiten, keine Einstellungen und keinen Haushalts-Code.
+- Für Fotos braucht die App die Kamera. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
 
-## Questions
+## Fragen
 
-Questions and ideas belong in the [discussions](https://github.com/hazymorning/Schmeckts/discussions). Phone model, Android version and the app version shown at the very bottom of the settings are helpful.
+Fragen und Ideen gehören in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Hilfreich sind Handy-Modell, Android-Version und die App-Version, die ganz unten in den Einstellungen steht.
 
-## Licence
+## Lizenz
 
-Copyright © 2026 hazymorning.
+Freie Software unter der [GNU Affero General Public License, Version 3](LICENSE). Copyright © 2026 hazymorning.
 
-Schmeckt’s? is free software under the **GNU Affero General Public License, version 3**. You may use, study, modify and pass it on, provided that you place derived works under the same licence and make their source code available — including when you offer a modified version as a network service. The full terms are in [LICENSE](LICENSE).
+Der Name „Schmeckt’s?“, das Logo und das App-Icon fallen nicht darunter. Bitte nutze für einen Fork deinen eigenen Namen und deine eigene Gestaltung.
 
-The name “Schmeckt’s?”, the logo and the app icon are not covered by this licence. Please use your own name and your own artwork for a fork.
-
-<!-- Once the repo is public, these badges fit in above. They keep themselves up to date:
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=965E4B&labelColor=2E2724" alt="Latest version"></a>
+<!-- Sobald das Repo öffentlich ist, passen diese Badges oben dazu. Sie halten sich selbst aktuell:
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=965E4B&labelColor=2E2724" alt="Neueste Version"></a>
   <a href="https://github.com/hazymorning/Schmeckts/releases"><img src="https://img.shields.io/github/downloads/hazymorning/Schmeckts/total?label=Downloads&color=965E4B&labelColor=2E2724" alt="Downloads"></a>
 -->
