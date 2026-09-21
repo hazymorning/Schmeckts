@@ -2129,9 +2129,12 @@ button.prod-card:active {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* ::backdrop is not an element and * does not reach it, so the sheet's dimming has to be named: without it
+     the backdrop still faded in for 350 ms while everything else stood still. */
   *,
   *::before,
-  *::after {
+  *::after,
+  ::backdrop {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

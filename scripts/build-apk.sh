@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 # Builds the signed APK to dist/schmeckts-<version>.apk
-# Usage: scripts/build-apk.sh <schmeckts-signing-key.txt>
+# Usage: scripts/build-apk.sh <schmeckts-signing-key.txt> [--tested]
+# --tested: the suite has already run elsewhere and is green. The release workflow passes it, where the tests
+# run as a job of their own beside the build and the APK is only attached once they are through.
 # The version number lives in exactly one place: app/package.json
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNING_KEY="$(realpath "${1:?path to schmeckts-signing-key.txt missing}")"
+TESTED="${2:-}"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 mapfile -t BUILD_TOOL_DIRS < <(printf '%s\n' "$ANDROID_HOME"/build-tools/*/ | sort -V)
 BUILD_TOOLS="${BUILD_TOOL_DIRS[-1]%/}"   # the newest build tools installed
 
-"$ROOT/scripts/test.sh"   # ship tested: no APK without green tests
+if [ "$TESTED" = "--tested" ]; then
+  echo "Tests skipped: they ran elsewhere (--tested)."
+else
+  "$ROOT/scripts/test.sh"   # ship tested: no APK without green tests
+fi
 python3 "$ROOT/scripts/prepare.py"
 cd "$ROOT/app"
 VERSION="$(node -p "require('./package.json').version")"

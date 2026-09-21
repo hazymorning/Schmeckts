@@ -24,7 +24,7 @@ import threading
 import time
 import urllib.request
 from playwright.async_api import async_playwright
-from common import PACK, ROOT, SAVED, check, failures, idle, make_photo, open_page, real_errors, seeded, serve, started, state, until
+from common import PACK, ROOT, SAVED, check, failures, idle, make_photo, open_page, phone, real_errors, seeded, serve, started, state, until
 
 CODE, NEW_CODE = 'K7PM-3QXD', 'W9ZX-4HJT'
 HIT, MISS, C1, C2, OLD = '5901234123457', '4012345000016', '4012345000023', '4012345000030', '4012345000047'  # valid EAN-13
@@ -256,7 +256,7 @@ async def main():
         browser = await p.chromium.launch()
 
         def new_phone():
-            return browser.new_context(viewport={'width': 400, 'height': 860})
+            return phone(browser, motion=True)  # as before: these phones do not run under reduced motion
 
         try:
             # Phone A is already in use (data without clocks) and connects
