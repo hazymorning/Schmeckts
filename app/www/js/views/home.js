@@ -27,8 +27,9 @@ export function update(){
 export function scrollTop(){ window.scrollTo({top:0, behavior: reduceMotion.matches ? 'auto' : 'smooth'}); }
 
 // fresh: Kennung der gerade servierten Mahlzeit, gleitet beim nächsten Zeichnen herein
-// older: „Ältere Tage anzeigen“ wurde getippt, open: aufgeklappte Karten; beides gilt bis zum Neustart der App
-export const homeView = {fresh:null, older:false, open:{}};
+// shown: Mahlzeiten im Verlauf, open: aufgeklappte Karten; beides gilt bis zum Neustart der App
+const HIST = {step:5, max:20};
+export const homeView = {fresh:null, shown:HIST.step, open:{}};
 
 /* Tiere-Leiste: der Filter, erst ab zwei Tieren. Mit einem Tier gibt es nichts zu filtern, verwaltet werden Tiere in den Einstellungen. */
 function renderPets(){
@@ -299,12 +300,11 @@ function calendarHTML(list){
   }
   return `<div class="cal">${cells}</div>`;
 }
-/* Tage des Zeitstrahls ab since, neueste zuerst; db.servings ist nach Zeit absteigend sortiert */
-export function timelineGroups(since = -Infinity){
+/* Mahlzeiten im Tier-Filter, neueste zuerst (db.servings ist nach Zeit absteigend sortiert), und ihre Tage */
+const visibleServings = () => db.servings.filter(s => servingPets(s).length);
+function dayGroups(list){
   const groups = [];
-  for (const s of db.servings) {
-    if (s.servedAt < since) break;
-    if (!servingPets(s).length) continue;
+  for (const s of list) {
     const k = dayKey(s.servedAt), g = groups.at(-1);
     if (g && g.key === k) g.items.push(s); else groups.push({key:k, t:s.servedAt, items:[s]});
   }
@@ -323,25 +323,24 @@ function dayHTML(g, multiHouse){
         ${resultBadges(s, true)}</button></li>`;
     }).join('')}</ol></div>`;
 }
-function recentStart(){ // Beginn von vorgestern: heute, gestern und vorgestern stehen immer im Zeitstrahl
-  const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 2);
-  return d.getTime();
-}
+/* Unter dem Kalender die letzten Mahlzeiten, nach Tagen gruppiert; „Weitere anzeigen“ zeigt jeweils HIST.step mehr,
+   bis HIST.max. Der Kalender zeigt davon unabhängig immer seine zwei Wochen. */
 function historyHTML(){
-  const cut = recentStart(), calendarStart = addDays(weekStart(Date.now()), -7);
-  const groups = timelineGroups(homeView.older ? undefined : calendarStart);
+  const all = visibleServings(), calendarStart = addDays(weekStart(Date.now()), -7);
   const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
-  const shown = homeView.older ? groups : groups.filter(g => g.t >= cut);
-  const more = !homeView.older && db.servings.some(s => s.servedAt < cut && servingPets(s).length);
-  return calendarHTML(groups.flatMap(g => g.items)) +
-    (shown.length ? shown.map(g => dayHTML(g, multiHouse)).join('') : `<p class="empty">${sketch('empty')}<span>In den letzten drei Tagen nichts serviert.</span></p>`) +
-    (more ? `<button class="card-btn" data-action="older-days">Ältere Tage anzeigen</button>` : '');
+  const shown = all.slice(0, homeView.shown);
+  return calendarHTML(all.filter(s => s.servedAt >= calendarStart)) +
+    (shown.length ? dayGroups(shown).map(g => dayHTML(g, multiHouse)).join('') : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
+    (shown.length < Math.min(all.length, HIST.max) ? `<button class="card-btn" data-action="more-history">Weitere anzeigen</button>` : '');
 }
-/* „Ältere Tage anzeigen“: alle Tage im Zeitstrahl, der Knopf verschwindet. Gibt den ersten neu gezeigten Tag zurück. */
-export function showOlderDays(){
-  const cut = recentStart(), first = timelineGroups().find(g => g.t < cut);
-  homeView.older = true;
+/* „Weitere anzeigen“: HIST.step Mahlzeiten mehr, höchstens HIST.max; mit day so viele, dass dieser Tag dabei ist
+   (Sprung aus dem Kalender). Neu gezeichnet wird nur der Verlauf. Gibt die erste neu gezeigte Mahlzeit zurück. */
+export function showMoreHistory(day){
+  const all = visibleServings(), was = homeView.shown;
+  const upto = day ? all.findLastIndex(s => dayKey(s.servedAt) === day) + 1 : Math.min(was + HIST.step, HIST.max);
+  if (upto <= was) return null;
+  homeView.shown = upto;
   const box = $('#sec-hist');
   if (box) box.innerHTML = historyHTML(); else renderHome();
-  return first ? document.getElementById('d-' + first.key) : null;
+  return $(`.tl-item[data-id="${all[was].id}"]`);
 }

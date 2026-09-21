@@ -33,10 +33,9 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('[data-action=expand][data-v=shop]'); await idle(pg)
     check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'Einkaufen aufgeklappt: alle Sorten')
     await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
-    n = await pg.locator('[data-sec=hist] .tl-day').count()
-    await pg.click('[data-action=older-days]'); await idle(pg)
-    check(await pg.locator('[data-sec=hist] .tl-day').count() > n and await pg.locator('[data-action=older-days]').count() == 0,
-          '„Ältere Tage anzeigen“ zeigt die übrigen Tage, der Knopf verschwindet')
+    n = await pg.locator('[data-sec=hist] .tl-item').count()
+    await pg.click('[data-sec=hist] .card-btn'); await idle(pg)
+    check(n == 5 and await pg.locator('[data-sec=hist] .tl-item').count() == 10, '„Weitere anzeigen“ zeigt fünf weitere Mahlzeiten')
     await shot(pg, f'{scheme}-aufgeklappt')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     other = 'dark' if scheme == 'light' else 'light'
@@ -192,12 +191,11 @@ async def test_cards(browser, url):
     ctx = await phone(browser, touch=True, motion=True)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]'); await idle(pg)
-    # Verlauf: ohne Aufklappen Kalender, Zeitstrahl der letzten drei Tage und „Ältere Tage anzeigen“
-    recent = await pg.evaluate("""import('./js/views/home.js').then(m => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 2);
-      return m.timelineGroups().filter(g => g.t >= d.getTime()).map(g => g.key); })""")
-    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-day', 'l => l.map(d => d.id.slice(2))')
+    # Verlauf: Kalender und die letzten fünf Mahlzeiten, nach Tagen gruppiert
+    recent = await pg.evaluate("import('./js/store.js').then(s => s.db.servings.slice(0, 5).map(x => x.id))")
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
     check(await pg.locator('[data-sec=hist] .cal').is_visible() and await pg.locator('[data-sec=hist] .tl-node').first.is_visible()
-          and shown == recent and len(shown) >= 2, f'Verlauf ohne Aufklappen: Kalender und Zeitstrahl der letzten drei Tage ({shown})')
+          and shown == recent and await pg.locator('[data-sec=hist] .tl-day').count() >= 2, f'Verlauf: Kalender und die letzten fünf Mahlzeiten nach Tagen ({len(shown)})')
     # Einkaufen zugeklappt: bis zu 3 zum Nachkaufen, darunter bis zu 2, die nicht mehr gekauft werden
     groups = """import('./js/derive.js').then(d => { const m = d.model(), g = e => e.choice === 'gemischt' ? 'nachkaufen' : e.choice, shown = m.sorts.filter(e => e.n || e.kaufen);
       return {ja: shown.filter(e => g(e) === 'nachkaufen').map(e => e.id), offen: shown.filter(e => g(e) === 'beobachten').map(e => e.id),
@@ -270,8 +268,8 @@ async def test_cards(browser, url):
       const b = [...document.querySelectorAll('.cal .day.has')].find(x => new Date(x.dataset.day + 'T12:00').getTime() < d.getTime()); return b && b.dataset.day; })()""")
     await pg.click(f'.cal .day[data-day="{old}"]'); await idle(pg)
     top = await pg.eval_on_selector(f'#d-{old}', 'd => [d.getBoundingClientRect().top, d.className, getComputedStyle(d).animationName, innerHeight]')
-    check(0 <= top[0] < top[3] - 48 and top[1] == 'tl-day' and top[2] == 'none' and await pg.locator('[data-action=older-days]').count() == 0,
-          f'Tipp im Kalender auf einen älteren Tag: ältere Tage erscheinen, Sprung zum Tag, ohne Aufleuchten ({old}, {top})')
+    check(0 <= top[0] < top[3] - 48 and top[1] == 'tl-day' and top[2] == 'none',
+          f'Tipp im Kalender auf einen älteren Tag: er erscheint im Verlauf, Sprung zum Tag, ohne Aufleuchten ({old}, {top})')
     check(not errors, 'keine Fehler in der Konsole' + (f': {errors}' if errors else ''))
     await ctx.close()
 
