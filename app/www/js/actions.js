@@ -1,7 +1,6 @@
 /* Alle Klicks laufen über data-action und das Objekt ACTIONS. Dazu Eingaben, Tastatur, Dateiauswahl
    und die Deep Links schmeckts://fuettern, schmeckts://scan und schmeckts://foto. Meldet sich beim Laden selbst an. */
 import {$, reduceMotion} from './dom.js';
-import {norm} from './text.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
@@ -10,9 +9,9 @@ import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
-import {closeSheet, openSheet, renderSheet, sheet, sheetBody} from './ui/sheet.js';
+import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
 import {expandCard, showOlderDays, timelineGroups, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderSuggestions} from './views/sheets.js';
+import {paintServerBox, renderServeHits, renderSuggestions} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
@@ -145,6 +144,7 @@ const ACTIONS = {
   'album-profile'(){ albumToProfile(); },
   backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // Tierfotos im Hintergrund
   lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // Produktsuche im Internet, Standard aus
+  'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // welcher Knopf im Füttern-Sheet steht
   'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // Erinnerung ans Füttern zu den üblichen Zeiten
   remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // Erinnerung zum Bewerten, fragt nach der Erlaubnis
   'remind-own'(){ // „Eigene“: Feld für ganze Stunden, beginnt mit dem geltenden Abstand, von „Aus“ mit 2 Stunden
@@ -210,10 +210,7 @@ document.addEventListener('input', e => {
     const h = Number(t.value);
     if (Number.isInteger(h) && h >= 1 && h <= REMIND_MAX_H) setRemind(h * 60, false);
   }
-  if (t.hasAttribute('data-search')) {
-    const q = norm(t.value);
-    sheetBody.querySelectorAll('.plist li').forEach(li => { li.hidden = !!q && !li.dataset.name.includes(q); });
-  }
+  if (t.hasAttribute('data-search')) renderServeHits(t.value);
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !sheet || e.target.tagName !== 'INPUT') return;

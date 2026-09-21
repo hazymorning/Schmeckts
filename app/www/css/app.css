@@ -304,9 +304,10 @@ button.ov-pic:active{transform:scale(.95)}
 .fab.filled{animation:fabPop .5s var(--ease-spring)}
 @keyframes bowlFill{0%{transform:scaleY(0);opacity:.9}30%,75%{transform:scaleY(1);opacity:.9}100%{transform:scaleY(1);opacity:0}}
 @keyframes fabPop{35%{transform:scale(1.06)}}
-/* Füttern: Barcode und Foto in zwei gleich breiten Spalten, gleich hoch und gleich aufgebaut (Icon, fette erste Zeile,
-   kleine zweite Zeile). Barcode ist der Hauptknopf auf der Akzentfläche, Foto steht auf Fläche 2 */
-.cta-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+/* Füttern: Barcode und Foto in gleich breiten Spalten, gleich hoch und gleich aufgebaut (Icon, fette erste Zeile,
+   kleine zweite Zeile). Barcode ist der Hauptknopf auf der Akzentfläche, Foto steht auf Fläche 2. Blendet
+   „Füttern beginnt mit“ einen aus, nimmt der andere die ganze Breite. */
+.cta-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:9px}
 .cta{display:flex;align-items:center;gap:12px;min-width:0;min-height:72px;padding:16px;border-radius:22px;text-align:left;
   cursor:pointer;transition:transform .2s var(--ease-out)}
 .cta:active{transform:scale(.98)}

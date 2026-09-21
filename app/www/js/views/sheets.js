@@ -5,7 +5,7 @@ import {andList, cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
 import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
-import {ALBUM_MAX, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {ALBUM_MAX, FEED_START, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, sortOf} from '../derive.js';
@@ -73,14 +73,21 @@ export function renderSuggestions(){
   box.innerHTML = (hits.length ? `<span class="label">${title}</span>` : '') + hits.map(p => `<button class="sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`).join('');
 }
 
-/* Füttern: Barcode und Foto als zwei gleich breite Knöpfe, darunter die bekannten Sorten.
+/* Füttern: Barcode und Foto als gleich breite Knöpfe; „Füttern beginnt mit“ blendet einen davon aus, der andere nimmt
+   die ganze Breite. Darunter die zuletzt gefütterten Sorten, höchstens SUGGEST; ab mehr bekannten Sorten folgt das
+   Suchfeld, dessen Treffer (höchstens HITS) an die Stelle der Vorschläge treten.
    sheet.busy: Hinweis während des Scannens,
    sheet.code: gescannter Code, um den es gerade geht (Auswahl, oder der Foto-Knopf übernimmt ihn) */
+const SUGGEST = 3, HITS = 8;
+const CTA = {
+  barcode: `<button class="cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
+  foto: `<button class="cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`
+};
 function serveRows(prods, code = ''){
   return prods.map(p => {
     const e = sortOf(p.id);
     const meta = [p.variety ? p.brand : '', e?.n ? `${e.pct} %` : 'noch nicht bewertet'].filter(Boolean).join(', ');
-    return `<li data-name="${esc(norm(p.brand + ' ' + p.variety))}"><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span><span class="serve-pill">Servieren</span></button></li>`;
+    return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span><span class="serve-pill">Servieren</span></button></li>`;
   }).join('');
 }
 function viewFeed(){
@@ -90,15 +97,20 @@ function viewFeed(){
     <ul class="plist">${serveRows(pick, sheet.code)}</ul>`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
-    <div class="cta-row">
-      <button class="cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>
-      <button class="cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>
-    </div>
+    <div class="cta-row">${prefs.feedStart === 'beides' ? CTA.barcode + CTA.foto : CTA[prefs.feedStart]}</div>
     ${sheet.busy ? `<p class="note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
-    ${prods.length ? `<span class="label">Schon mal gehabt</span>
-      ${prods.length > 6 ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>` : ''}
-      <ul class="plist">${serveRows(prods)}</ul>` : ''}
+    ${prods.length ? `<div id="serveList"><span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul></div>
+      ${prods.length > SUGGEST ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>
+        <ul class="plist" id="serveHits"></ul>` : ''}` : ''}
     <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
+}
+/* Suche im Füttern-Sheet: Getipptes zeigt statt der Vorschläge die passenden Sorten, höchstens HITS. */
+export function renderServeHits(text){
+  const list = $('#serveList'), hits = $('#serveHits');
+  if (!list || !hits) return;
+  const words = norm(text).split(' ').filter(Boolean);
+  list.hidden = !!words.length;
+  hits.innerHTML = words.length ? serveRows(quickProducts().filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w))).slice(0, HITS)) : '';
 }
 
 /* Hinweise unter den Erinnerungen: Sie sagen, was mit der gewählten Einstellung gerade gilt.
@@ -192,6 +204,8 @@ function viewSettings(){
     <div class="seg">${[['system', 'auto', 'System'], ['light', 'sun', 'Hell'], ['dark', 'moon', 'Dunkel']].map(([v, ic, l]) => `<button aria-pressed="${st.theme === v}" data-action="theme" data-v="${v}">${icon(ic)}${l}</button>`).join('')}</div>
     <span class="label">Tierfotos im Hintergrund</span>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${st.backdrop === (v === 'on')}" data-action="backdrop" data-v="${v}">${l}</button>`).join('')}</div>
+    <span class="label">Füttern beginnt mit</span>
+    <div class="seg">${FEED_START.map(([v, l]) => `<button aria-pressed="${st.feedStart === v}" data-action="feed-start" data-v="${v}">${l}</button>`).join('')}</div>
     <span class="label">Ans Bewerten erinnern</span>
     <p class="hint" id="remind-hint">${remindHint()}</p>
     <div class="seg">${REMIND.map(m => `<button aria-pressed="${!own && st.remind === m}" data-action="remind" data-v="${m}">${m ? m / 60 + ' Std.' : 'Aus'}</button>`).join('')
