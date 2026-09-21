@@ -5,8 +5,8 @@ package main
 
 import (
 	"bytes"
-	_ "embed"
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
