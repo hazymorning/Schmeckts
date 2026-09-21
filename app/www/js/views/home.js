@@ -2,15 +2,15 @@
    model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {andList, esc} from '../text.js';
-import {addDays, ago, dayKey, dayLabel, timeStr, weekStart} from '../dates.js';
+import {addDays, ago, dayKey, dayLabel, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {RATINGS, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {getPet, getProduct, lastWeek, model, openPets, pendingServings, petNames, pname, servingPets} from '../derive.js';
-import {hintKey, rateCls, rOf, scoreCls, shopGroups} from '../smart.js';
+import {hintKey, rOf, scoreCls, shopGroups} from '../smart.js';
 import {dlg} from '../ui/sheet.js';
-import {avatar, nameBlock, rateRow, reasonOf, resultBadges, syncChip, thumbOf} from './parts.js';
+import {avatar, dayBlocks, dayGroups, fedLabel, nameBlock, rateRow, reasonOf, servingNode, syncChip, thumbOf} from './parts.js';
 import {renderMood} from './mood.js';
 
 /* Startseite neu zeichnen – mit weicher View Transition, wo möglich */
@@ -150,11 +150,11 @@ function pendingHTML(list){
 }
 
 /* Karte mit „Alle anzeigen“: zugeklappt das Wichtigste, aufgeklappt alles */
-function card(key, title, {body, more}){
+function card(key, title, {body, more, foot = ''}){
   const open = !!homeView.open[key];
   return `<section class="card" data-sec="${key}" style="view-transition-name:sec-${key}"><h2>${title}</h2>
     <div class="card-body" id="sec-${key}">${body}</div>${more ? `<button class="card-btn" data-action="expand" data-v="${key}"
-      aria-expanded="${open}" aria-controls="sec-${key}">${open ? 'Weniger anzeigen' : 'Alle anzeigen'}</button>` : ''}</section>`;
+      aria-expanded="${open}" aria-controls="sec-${key}">${open ? 'Weniger anzeigen' : 'Alle anzeigen'}</button>` : ''}${foot}</section>`;
 }
 /* Auf- oder zuklappen: Inhalt tauschen, die Karte wächst oder schrumpft weich (220 ms, ease-out), bei reduzierter Bewegung
    sofort. Ohne Neuzeichnen der Seite, der Knopf bleibt stehen (Fokus bei Bedienung per Tastatur). Nichts wird gespeichert. */
@@ -255,7 +255,8 @@ function shopCard(m){
   return {body, more: g.beobachten.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2};
 }
 
-/* Erkenntnisse: zugeklappt die wichtigste, aufgeklappt alle; ohne Erkenntnis keine Karte */
+/* Erkenntnisse: zugeklappt die wichtigste, aufgeklappt alle; ohne Erkenntnis keine Karte. Unten führt ein Textknopf
+   zur Auswertung. */
 const INSIGHT = {marke:['award', 'Marke'], konsistenz:['layers', 'Konsistenz'], geschmack:['fish', 'Geschmack'], sosse:['drop']};
 function insightHTML(i, m){ // ein Satz, Hervorhebungen in <b>
   if (i.kind === 'sosse') return `Bei <b>${esc(pname(m.byId.get(i.id).product))}</b> wird meist nur die Soße geschleckt.`;
@@ -266,23 +267,11 @@ function insightCard(m){
   if (!m.insights.length) return null;
   const list = homeView.open.ins ? m.insights : m.insights.slice(0, 1);
   return {body:`<ul class="ins">${list.map(i => `<li><span class="dot">${icon(INSIGHT[i.kind][0])}</span><span>${insightHTML(i, m)}</span></li>`).join('')}</ul>`,
-    more: m.insights.length > 1};
+    more: m.insights.length > 1, foot:`<button class="card-btn" data-action="open-report">Zur Auswertung</button>`};
 }
 const CARDS = {shop:shopCard, ins:insightCard};
 
-/* „2 Mahlzeiten, 1 Snack“: Ein Snack ist keine Mahlzeit; alles andere, auch noch Unbekanntes, zählt als Mahlzeit */
-function fedLabel(items){
-  const snacks = items.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length, meals = items.length - snacks;
-  return [meals && (meals === 1 ? '1 Mahlzeit' : meals + ' Mahlzeiten'), snacks && (snacks === 1 ? '1 Snack' : snacks + ' Snacks')].filter(Boolean).join(', ');
-}
-
-/* Verlauf: Zwei-Wochen-Kalender, Zeitstrahl der letzten drei Tage, auf Wunsch die älteren */
-function servingNode(s){ // Punkt in Bewertungsfarbe, hohl = noch offen
-  const rs = servingPets(s).map(pid => rOf(s.pets[pid])).filter(Boolean);
-  if (!rs.length) return '<i class="open"></i>';
-  const cls = rs.every(r => r === rs[0]) ? rateCls(rs[0]) : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
-  return `<i class="${cls}"></i>`;
-}
+/* Verlauf: Zwei-Wochen-Kalender und darunter die letzten Mahlzeiten (Bausteine in parts.js) */
 function calendarHTML(list){
   const byDay = new Map();
   for (const s of list) { const k = dayKey(s.servedAt); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(s); }
@@ -300,38 +289,29 @@ function calendarHTML(list){
   }
   return `<div class="cal">${cells}</div>`;
 }
-/* Mahlzeiten im Tier-Filter, neueste zuerst (db.servings ist nach Zeit absteigend sortiert), und ihre Tage */
+/* Mahlzeiten im Tier-Filter, neueste zuerst (db.servings ist nach Zeit absteigend sortiert): die ersten n für den
+   Zeitstrahl und alle seit since für den Kalender. Beides in einem Durchgang, der abbricht, sobald beides steht. */
 const visibleServings = () => db.servings.filter(s => servingPets(s).length);
-function dayGroups(list){
-  const groups = [];
-  for (const s of list) {
-    const k = dayKey(s.servedAt), g = groups.at(-1);
-    if (g && g.key === k) g.items.push(s); else groups.push({key:k, t:s.servedAt, items:[s]});
+function someServings(n, since){
+  const first = [], recent = [];
+  for (const s of db.servings) {
+    if (first.length >= n && s.servedAt < since) break;
+    if (!servingPets(s).length) continue;
+    if (first.length < n) first.push(s);
+    if (s.servedAt >= since) recent.push(s);
   }
-  return groups;
-}
-function dayHTML(g, multiHouse){
-  return `<div class="tl-day" id="d-${g.key}">
-    <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
-    <ol class="tl">${g.items.map(s => {
-      const p = getProduct(s.productId), ids = servingPets(s), fresh = homeView.fresh === s.id;
-      const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : ''].filter(Boolean).join(', ');
-      const title = p ? esc(pname(p)) : (s.status === 'recognizing' ? 'Wird erkannt …' : s.status === 'reading' ? 'Wird gelesen …' : 'Unbekanntes Futter');
-      return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh ? 'fresh' : 'item'}"><button class="tl-item" data-action="open-serving" data-id="${s.id}">
-        <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p)}
-        <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
-        ${resultBadges(s, true)}</button></li>`;
-    }).join('')}</ol></div>`;
+  return {first, recent};
 }
 /* Unter dem Kalender die letzten Mahlzeiten, nach Tagen gruppiert; „Weitere anzeigen“ zeigt jeweils HIST.step mehr,
-   bis HIST.max. Der Kalender zeigt davon unabhängig immer seine zwei Wochen. */
+   bis HIST.max, danach führt „Ganzer Verlauf“ zur Auswertung. Der Kalender zeigt immer seine zwei Wochen. */
 function historyHTML(){
-  const all = visibleServings(), calendarStart = addDays(weekStart(Date.now()), -7);
+  const {first, recent} = someServings(homeView.shown + 1, addDays(weekStart(Date.now()), -7)); // eine mehr: gibt es noch welche?
   const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
-  const shown = all.slice(0, homeView.shown);
-  return calendarHTML(all.filter(s => s.servedAt >= calendarStart)) +
-    (shown.length ? dayGroups(shown).map(g => dayHTML(g, multiHouse)).join('') : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
-    (shown.length < Math.min(all.length, HIST.max) ? `<button class="card-btn" data-action="more-history">Weitere anzeigen</button>` : '');
+  const shown = first.slice(0, homeView.shown);
+  return calendarHTML(recent) +
+    (shown.length ? dayBlocks(dayGroups(shown), {multiHouse, fresh:homeView.fresh, anchors:true}) : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
+    (homeView.shown >= HIST.max ? `<button class="card-btn" data-action="open-report" data-v="hist">Ganzer Verlauf</button>`
+      : first.length > shown.length ? `<button class="card-btn" data-action="more-history">Weitere anzeigen</button>` : '');
 }
 /* „Weitere anzeigen“: HIST.step Mahlzeiten mehr, höchstens HIST.max; mit day so viele, dass dieser Tag dabei ist
    (Sprung aus dem Kalender). Neu gezeichnet wird nur der Verlauf. Gibt die erste neu gezeigte Mahlzeit zurück. */

@@ -11,7 +11,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
 import {expandCard, showMoreHistory, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderServeHits, renderSuggestions} from './views/sheets.js';
+import {paintServerBox, renderServeHits, renderSuggestions, reportMore, reportSpan, reportState} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
@@ -78,6 +78,9 @@ const ACTIONS = {
   'edit-pet'(el){ openPet(el.dataset.id, 'settings'); },
   'open-pet'(el){ openPet(el.dataset.id); }, // von der Übersicht
   'open-settings'(){ openSheet({kind:'settings'}); },
+  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: Abschnitt, bei dem sie öffnet
+  'report-span'(el){ haptic('select'); reportSpan(el.dataset.v); },                    // Zeitraum, gilt für die ganze Seite
+  'report-more'(){ haptic('select'); reportMore(); },
   'open-privacy'(){ openSheet({kind:'privacy'}); },
   'open-server'(){ openSheet({kind:'settings'}); requestAnimationFrame(() => $('#server')?.scrollIntoView({block:'start'})); },
   connect(){ connectServer(); },
