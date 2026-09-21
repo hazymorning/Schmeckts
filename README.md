@@ -17,8 +17,6 @@
 
 **Schmeckt’s?** is a feeding diary for pets. After every meal you record with a single tap how the bowl looked, from “finished at once” to “barely touched”. After a few days the app shows which varieties your animal really likes and which ones can stay on the shelf next time you shop.
 
-> The app’s interface is German. This repository — code, comments, documentation — is English.
-
 <!-- Add screenshots and remove these comment markers.
 <p align="center">
   <img src="LIGHT-URL" width="270" alt="Home screen, light theme">
@@ -27,11 +25,11 @@
 </p>
 -->
 
-## Photograph instead of typing
+## Recording a meal
 
-While feeding, just hold the packaging up to the camera. The app reads brand, variety and food type off the picture and creates the entry by itself — for cans without a barcode, for multipacks and for brands it has never seen. Adding a new variety takes exactly one photo.
+Most meals are one scan. Hold the barcode in front of the camera and a variety you have fed before is recorded, with nothing left to fill in.
 
-The phone reads the text on the packaging itself, offline and at no extra cost. Connected to a household you also get the more accurate recognition, which reliably makes sense of ornate packaging as well. What else that brings is described further down.
+For everything without a usable barcode, cans, multipacks, loose treats, you photograph the packaging instead. The phone reads the text off the picture, offline and at no extra cost, and fills in brand and variety for you to confirm. In a household the recognition runs through your own server, which works out brand and variety by itself and copes with busy packaging too.
 
 ## What the app does
 
@@ -126,7 +124,7 @@ Android 8.0 or newer. The barcode scanner needs Google Play services, which almo
 - If you use the app on your phone alone, nothing leaves it. The packaging text is read on the device. The one exception is the barcode scanner: it comes from Google and, according to Google, reports no images but does report general device data such as the model.
 - One setting you can switch on yourself: looking up unknown barcodes in open product databases. Only the number is transmitted, and it is off by default.
 - In a household the app only talks to your own server. From there the photo of the packaging goes on for recognition, and unknown barcodes are looked up in open product databases. Nothing else leaves the phone, in particular nothing about your animals.
-- An exchange file contains only animals, varieties and meals — no settings and no household code.
+- An exchange file contains only animals, varieties and meals, no settings and no household code.
 - The app needs the camera for photos. It only asks about notifications once you switch a reminder on.
 
 ## Questions
@@ -135,11 +133,9 @@ Questions and ideas belong in the [discussions](https://github.com/hazymorning/S
 
 ## Licence
 
-Copyright © 2026 hazymorning.
+Free software under the [GNU Affero General Public License, version 3](LICENSE). Copyright © 2026 hazymorning.
 
-Schmeckt’s? is free software under the **GNU Affero General Public License, version 3**. You may use, study, modify and pass it on, provided that you place derived works under the same licence and make their source code available — including when you offer a modified version as a network service. The full terms are in [LICENSE](LICENSE).
-
-The name “Schmeckt’s?”, the logo and the app icon are not covered by this licence. Please use your own name and your own artwork for a fork.
+The name “Schmeckt’s?”, the logo and the app icon are not covered by it. Please use your own name and your own artwork for a fork.
 
 <!-- Once the repo is public, these badges fit in above. They keep themselves up to date:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=965E4B&labelColor=2E2724" alt="Latest version"></a>
