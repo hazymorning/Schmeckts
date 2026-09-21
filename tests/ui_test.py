@@ -1812,11 +1812,23 @@ async def test_report(browser, url):
         wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .why, #sheet h3.label')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
         first = await pg.locator('#sheet .tl-item').count()
-        await pg.eval_on_selector('.sheet-body', 'b => b.scrollTo(0, b.scrollHeight)'); await idle(pg)
-        check([first, await pg.locator('#sheet .tl-item').count()] == [20, 26] and not wide,
-              f'{scheme}, 360 px: twenty days to begin with, the rest follows on scrolling, nothing clipped ({first}, {wide})')
+        for _ in range(10):
+            await pg.eval_on_selector('.sheet-body', 'b => b.scrollTo(0, b.scrollHeight)'); await idle(pg)
+            if await pg.locator('#sheet .tl-item').count() == 26:
+                break
+        check(10 <= first < 26 and await pg.locator('#sheet .tl-item').count() == 26 and not wide,
+              f'{scheme}, 360 px: a page to begin with, the rest follows on scrolling, nothing clipped ({first} of 26, {wide})')
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
+    # A tall screen: one page would not fill it, so the next ones follow at once — without that there is no scrolling
+    ctx = await browser.new_context(viewport={'width': 400, 'height': 1800}, reduced_motion='reduce')
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [26, 1]); await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+    body = await pg.eval_on_selector('.sheet-body', 'b => [b.scrollHeight > b.clientHeight, b.querySelectorAll(".tl-day").length]')
+    check(body[0] and body[1] > 10, f'a tall screen: more than one page is drawn, so the history can be scrolled at all ({body})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
 
 
 run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-routes': test_feed_routes, 'suggestions': test_suggestions, 'milestones': test_milestones,

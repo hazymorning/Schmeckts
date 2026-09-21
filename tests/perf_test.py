@@ -68,7 +68,7 @@ async def test_rating(browser, url):
         check(draw < LIMIT_MS and all(x[2] for x in runs), f'{years} years ({years * 730} meals): evaluation and redraw {draw:.0f} ms, saving {save:.0f} ms')
         opens = (await pg.evaluate(OPEN))[1:]
         shown = statistics.median(x[0] for x in opens)
-        check(shown < REPORT_MS and all(x[1] == 20 for x in opens),
+        check(shown < REPORT_MS and all(x[1] >= 10 for x in opens),
               f'{years} years: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} days to begin with')
         await ctx.close()
 
