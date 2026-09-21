@@ -2,8 +2,10 @@
 states, simulated Android plugins with a file system that survives a reload."""
 
 import asyncio
+import contextvars
 import functools
 import http.server
+import io
 import json
 import pathlib
 import re
@@ -125,6 +127,30 @@ SAVED = {
 }
 
 
+# Tests run at the same time (run_tests), so each one collects its output and its phones for itself.
+# Both live in a context variable, which every task inherits a copy of.
+written = contextvars.ContextVar('written', default=None)  # the running test's output
+phones = contextvars.ContextVar('phones', default=None)  # its open browser contexts
+
+
+class PerTestOutput(io.TextIOBase):
+    """Keeps the output of tests running side by side apart, so the log stays readable: every test's lines are
+    collected and written out in one piece when it is done. Anything printed outside a test goes straight through."""
+
+    def __init__(self, real):
+        self.real = real
+
+    def write(self, s):
+        out = written.get()
+        if out is None:
+            return self.real.write(s)
+        out.append(s)
+        return len(s)
+
+    def flush(self):
+        self.real.flush()
+
+
 def check(cond, text):
     print(('  ok   ' if cond else '  FAIL ') + text)
     if not cond:
@@ -217,14 +243,21 @@ async def shot(pg, name):
         await pg.screenshot(path=str(SHOTS / f'{name}.png'))
 
 
-async def phone(browser, scheme='light', touch=False, motion=False, **kw):
-    """One phone as a browser context. Without motion the app runs under reduced motion, so no flow waits on animations."""
-    return await browser.new_context(
-        viewport={'width': 400, 'height': 860},
+async def phone(browser, scheme='light', touch=False, motion=False, width=400, height=860, **kw):
+    """One phone as a browser context, and the only place the tests make one: that way run_tests can see that
+    every phone belongs to exactly one test and is closed again before the next one starts.
+    Without motion the app runs under reduced motion, so no flow waits on animations."""
+    ctx = await browser.new_context(
+        viewport={'width': width, 'height': height},
         color_scheme=scheme,
         has_touch=touch,
         **{'reduced_motion': 'no-preference' if motion else 'reduce', **kw},
     )
+    mine = phones.get()
+    if mine is not None:
+        mine.append(ctx)
+        ctx.on('close', lambda _: mine.remove(ctx) if ctx in mine else None)
+    return ctx
 
 
 def rgb_of(hexv):
@@ -259,10 +292,16 @@ def make_photo():
     im.save(PACK, quality=70)
 
 
+_pictures = []
+
+
 def make_pictures():
-    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus two plain ones"""
+    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus two plain ones.
+    Written once: several tests ask for them, and running side by side they must not write over each other."""
     from PIL import Image
 
+    if _pictures:
+        return list(_pictures)
     out = PACK.parent
     quad = Image.new('RGB', (800, 400))
     for (x, y), color in {(0, 0): (220, 30, 30), (400, 0): (30, 160, 60), (0, 200): (30, 60, 220), (400, 200): (230, 210, 40)}.items():
@@ -301,17 +340,52 @@ async def set_theme(pg, theme):
 SETTLED = """!document.querySelector('.animating, .closing, :active-view-transition') && document.getAnimations().every(a =>
   a.playState !== 'running' || a.effect.getComputedTiming().iterations === Infinity)"""
 
+# The same condition, waited for inside the page: on the animations themselves (animation.finished) instead of
+# asking from the outside every 20 ms, which cost a round trip each time. Two frames at the end, as before, so
+# that anything the last frame started is counted too. A run of BLIND ms covers what has no animation object yet:
+# an element already marked .animating or .closing, or a view transition about to begin.
+IDLE = (
+    """async ms => { const quiet = () => """
+    + SETTLED
+    + """;
+  const deadline = performance.now() + ms, BLIND = 50;
+  const frame = () => new Promise(done => requestAnimationFrame(() => done()));
+  const moving = () => document.getAnimations().filter(a => a.playState === 'running'
+    && a.effect.getComputedTiming().iterations !== Infinity);
+  for (;;) {
+    while (!quiet()) {
+      if (performance.now() > deadline) return false;
+      const list = moving();
+      if (list.length) await Promise.race([Promise.allSettled(list.map(a => a.finished)), new Promise(d => setTimeout(d, BLIND))]);
+      else await frame();
+    }
+    await frame();
+    await frame();
+    if (quiet()) return true;
+  } }"""
+)
+
+
+async def fixed_clock(ctx, **kw):
+    """ctx.clock.install(), and idle() remembers it: with the clock installed the frames stand still, so waiting
+    for them inside the page would never return."""
+    await ctx.clock.install(**kw)
+    ctx.schmeckts_fixed_clock = True
+
 
 async def idle(pg, timeout=3.0):
-    """Waits until the interface is calm twice in a row. Asks from the outside, so it also works with a fixed clock."""
-    end, calm = asyncio.get_running_loop().time() + timeout, 0
-    while calm < 2 and asyncio.get_running_loop().time() < end:
-        calm = calm + 1 if await pg.evaluate(SETTLED) else 0
-        await asyncio.sleep(0.02)
+    """Waits until the interface is calm: no marked movement and no finite animation running."""
+    if getattr(pg.context, 'schmeckts_fixed_clock', False):
+        end, calm = asyncio.get_running_loop().time() + timeout, 0
+        while calm < 2 and asyncio.get_running_loop().time() < end:
+            calm = calm + 1 if await pg.evaluate(SETTLED) else 0
+            await asyncio.sleep(0.02)
+        return
+    await pg.evaluate(IDLE, int(timeout * 1000))
 
 
 async def debounced(pg):
-    """Lets batched work run at once (the store reports changes, the reminders reconcile). Needs ctx.clock.install()."""
+    """Lets batched work run at once (the store reports changes, the reminders reconcile). Needs fixed_clock()."""
     await pg.clock.run_for(1000)
     await idle(pg)
 
@@ -322,28 +396,49 @@ async def started(pg):
     await idle(pg)
 
 
+PARALLEL = 4  # independent tests at the same time, each on phones of its own; --serial runs them one by one
+
+
 def run_tests(tests, camera=()):
-    """Runs the tests, or only those named on the command line. camera: names of the tests that need a Chromium
-    with a simulated camera device."""
+    """Runs the tests, or only those named on the command line. Tests run at the same time, at most PARALLEL of
+    them; --serial runs them one after another. Nothing is shared but the little web server and the test photo,
+    both read-only, so the order makes no difference — which is what the check per test confirms.
+    camera: names of the tests that need a Chromium with a simulated camera device."""
+
+    async def one(name, browser, url, slots):
+        """Runs one test with its output and its phones to itself."""
+        out, mine = [], []
+        written.set(out)
+        phones.set(mine)
+        async with slots:
+            began = time.monotonic()  # the test's own time, not the wait for a free slot
+            try:
+                await tests[name](browser, url)
+            except Exception as e:
+                check(False, f'{name} aborted: {" ".join(str(e).split())[:160]} … {" ".join(str(e).split())[-260:]}')
+            check(not mine, f'{name}: every phone closed again, so nothing of it reaches the tests beside it')
+        print(f'  {name}: {time.monotonic() - began:.1f} s')
+        return out
 
     async def main():
         only = [a for a in sys.argv[1:] if not a.startswith('--')]
+        slots = asyncio.Semaphore(1 if '--serial' in sys.argv else PARALLEL)
         make_photo()
         url = serve()
-        async with async_playwright() as p:
-            for flags in ([], ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']):
-                names = [n for n in tests if (n in camera) == bool(flags) and (not only or n in only)]
-                if not names:
-                    continue
-                browser = await p.chromium.launch(args=flags)
-                for name in names:
-                    began = time.monotonic()
-                    try:
-                        await tests[name](browser, url)
-                    except Exception as e:
-                        check(False, f'{name} aborted: {" ".join(str(e).split())[:160]} … {" ".join(str(e).split())[-260:]}')
-                    print(f'  {name}: {time.monotonic() - began:.1f} s')
-                await browser.close()
+        sys.stdout = PerTestOutput(sys.stdout)
+        try:
+            async with async_playwright() as p:
+                for flags in ([], ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']):
+                    names = [n for n in tests if (n in camera) == bool(flags) and (not only or n in only)]
+                    if not names:
+                        continue
+                    browser = await p.chromium.launch(args=flags)
+                    running = [asyncio.create_task(one(n, browser, url, slots)) for n in names]
+                    for task in running:  # in the order they are declared, so the log reads the same every time
+                        sys.stdout.real.write(''.join(await task))
+                    await browser.close()
+        finally:
+            sys.stdout = sys.stdout.real
         print(f'\n{"All tests passed" if not failures else f"{len(failures)} tests failed"}')
         sys.exit(1 if failures else 0)
 

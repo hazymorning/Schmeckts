@@ -228,8 +228,18 @@ def android(fresh):
     )
     edit(gradle, ":!CVS:!thumbs.db:!picasa.ini:!*~'", ":!CVS:!thumbs.db:!picasa.ini:!*~:!mlkit_barcode_models'")
 
+    gradle_wrapper_bin()
     run(sys.executable, str(ROOT / 'design/render-icons.py'))
     (ANDROID / 'local.properties').write_text(f'sdk.dir={os.environ.get("ANDROID_HOME", "/opt/android-sdk")}\n')
+
+
+def gradle_wrapper_bin():
+    """The wrapper fetches a Gradle distribution on the first build: -bin instead of -all is about half of it.
+    What -all adds is the sources and the documentation, which nothing here reads."""
+    props = ANDROID / 'gradle/wrapper/gradle-wrapper.properties'
+    text = props.read_text(encoding='utf-8')
+    if '-all.zip' in text:
+        props.write_text(text.replace('-all.zip', '-bin.zip'), encoding='utf-8')
 
 
 if __name__ == '__main__':

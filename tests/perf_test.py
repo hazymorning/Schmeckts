@@ -7,7 +7,7 @@ import datetime
 import json
 import random
 import statistics
-from common import check, phone, run_tests, started
+from common import check, fixed_clock, phone, run_tests, started
 
 LIMIT_MS = 40
 REPORT_MS = 150  # the evaluation is only computed and drawn when it opens
@@ -79,7 +79,7 @@ async def test_rating(browser, url):
     print(f'After a rating, CPU throttled 4x (limit for the evaluation and the redraw: {LIMIT_MS} ms)')
     for years in (2, 5):
         ctx = await phone(browser)
-        await ctx.clock.install(time=TUESDAY)
+        await fixed_clock(ctx, time=TUESDAY)
         seed = await ctx.new_page()
         await seed.goto(url)
         await seed.evaluate(

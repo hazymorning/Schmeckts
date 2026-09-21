@@ -16,6 +16,7 @@ from common import (
     check,
     contrast,
     debounced,
+    fixed_clock,
     idle,
     make_pictures,
     open_page,
@@ -502,9 +503,7 @@ def house_meals():
 
 async def test_week(browser, url):
     print('home page: rating buttons, „Letzte Woche“, „Geschmack bekannt“, sharing the list, appetite')
-    ctx = await browser.new_context(
-        viewport={'width': 360, 'height': 800}, timezone_id='Europe/Berlin', permissions=['clipboard-read', 'clipboard-write']
-    )
+    ctx = await phone(browser, motion=True, width=360, height=800, timezone_id='Europe/Berlin', permissions=['clipboard-read', 'clipboard-write'])
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T10:00:00+02:00')
     await pg.click('[data-action=demo]')
@@ -677,7 +676,7 @@ SCALES_DB = """() => import('./js/store.js').then(async s => { const d = s.defau
 
 async def test_scales(browser, url):
     print('rating per food type: the variety\u2019s scale, four columns at 360 px, a foreign level stays visible, counters in the food sheet')
-    ctx = await browser.new_context(viewport={'width': 360, 'height': 800}, reduced_motion='reduce')
+    ctx = await phone(browser, width=360, height=800)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SCALES_DB)
     await idle(pg)
@@ -767,7 +766,7 @@ TEXTURE_DB = """() => import('./js/store.js').then(async s => { const d = s.defa
 
 async def test_texture(browser, url):
     print('consistency and treat type: the choice per type, the note on „Fester Block“, changing type, keywords, the server\u2019s value')
-    ctx = await browser.new_context(viewport={'width': 360, 'height': 800}, reduced_motion='reduce')
+    ctx = await phone(browser, width=360, height=800)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(TEXTURE_DB)
     await idle(pg)
@@ -907,7 +906,7 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 async def test_overview(browser, url):
     print('overview: a low card with picture, name and the essentials, two lines and unfolding; counting in the history, the gap above the calendar')
-    ctx = await browser.new_context(viewport={'width': 360, 'height': 800}, reduced_motion='reduce', timezone_id='Europe/Berlin')
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
@@ -1017,7 +1016,7 @@ async def test_overview(browser, url):
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
     # With motion: the text eases open and shut, and nothing is left behind afterwards
-    ctx = await browser.new_context(viewport={'width': 360, 'height': 800}, reduced_motion='no-preference')
+    ctx = await phone(browser, motion=True, width=360, height=800)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
@@ -1105,7 +1104,7 @@ async def test_milestones(browser, url):
 async def test_reminders(browser, url):
     print('the rating reminder (plugin simulated)')
     ctx = await phone(browser)
-    await ctx.clock.install()
+    await fixed_clock(ctx)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.evaluate("localStorage.setItem('__notifyAnswer', 'denied')")
     await pg.click('[data-action=demo]')
@@ -1277,7 +1276,7 @@ async def test_reminders(browser, url):
 async def test_remind(browser, url):
     print('reminder: your own interval in hours')
     ctx = await phone(browser)
-    await ctx.clock.install()
+    await fixed_clock(ctx)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('[data-action=demo]')
     await debounced(pg)
@@ -1367,7 +1366,7 @@ FEED_DB = """() => import('./js/store.js').then(async s => { const d = s.default
 
 async def test_feed_remind(browser, url):
     print('the feeding reminder: the usual times from the history, scheduled only while nothing has been served')
-    ctx = await browser.new_context(viewport={'width': 400, 'height': 860}, reduced_motion='reduce', timezone_id='Europe/Berlin')
+    ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url, native=True)
     await pg.clock.set_fixed_time('2026-06-10T12:00:00+02:00')
     PENDING = "Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications.filter(n => n.extra.feed).map(n => [n.extra.feed, new Date(n.schedule.at).toLocaleString('sv').slice(5, 16), n.title, n.body, n.isExactNotification]).sort())"
@@ -2600,7 +2599,7 @@ async def test_mood(browser, url):
     dist = url.rsplit('/', 1)[0]  # the test photos are not under www: served as a data URL through a route
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme, motion=True)
-        await ctx.clock.install()
+        await fixed_clock(ctx)
 
         async def pictures(route):
             await route.fulfill(path=str(PACK.parent / route.request.url.rsplit('/', 1)[1]), content_type='image/png')
@@ -3038,7 +3037,7 @@ REPORT_HEADS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h =>
 
 async def test_report(browser, url):
     print('the history sheet: the facts at a glance, every meal, the pet filter')
-    ctx = await browser.new_context(viewport={'width': 400, 'height': 860}, timezone_id='Europe/Berlin', reduced_motion='reduce')
+    ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-20T10:00:00+02:00')
     await pg.evaluate(HOUSE, [house_meals()])
@@ -3108,7 +3107,7 @@ async def test_report(browser, url):
     await ctx.close()
     # How it looks at 360 px in light and dark
     for scheme in ('light', 'dark'):
-        ctx = await browser.new_context(viewport={'width': 360, 'height': 760}, color_scheme=scheme, reduced_motion='reduce')
+        ctx = await phone(browser, scheme, width=360, height=760)
         pg, errors = await open_page(ctx, url)
         await pg.evaluate(SORTS, [26, 1])
         await idle(pg)
@@ -3129,7 +3128,7 @@ async def test_report(browser, url):
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
     # A tall screen: one page would not fill it, so the next ones follow at once — without that there is no scrolling
-    ctx = await browser.new_context(viewport={'width': 400, 'height': 1800}, reduced_motion='reduce')
+    ctx = await phone(browser, height=1800)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [26, 1])
     await idle(pg)

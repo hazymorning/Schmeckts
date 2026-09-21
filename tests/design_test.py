@@ -493,6 +493,10 @@ async def test_polish(browser, url):
     icons = []
     await pg.click('.pend-head')
     await idle(pg)
+    # ::backdrop is not an element, so the reduced-motion rule has to name it: without that the sheet's dimming
+    # still faded in for 350 ms while everything else stood still.
+    dimming = await pg.evaluate("getComputedStyle(document.getElementById('sheet'), '::backdrop').animationDuration")
+    check(float(dimming.rstrip('s')) < 0.01, f'reduced motion reaches the sheet’s dimming too (::backdrop {dimming})')
     pick = [i for i in await pg.evaluate(ICONS, '.pick .ic')]
     check(
         pick == [{'where': 'pick', 'w': 20, 'h': 20, 'stroke': '1.8px', 'edge': 14, 'mid': True}],
@@ -640,6 +644,22 @@ def test_ratings():
     check(app == server, f'server/overview.go labels exactly those levels, with the same wording ({sorted(set(app.items()) ^ set(server.items()))})')
 
 
+def test_isolated_tests():
+    """Tests run side by side, so every one of them has to work on phones of its own.
+
+    common.phone() is the only place that makes a browser context: run_tests hangs the check on it that each
+    test closes its own again. A context made past it would be outside that check."""
+    made = 'browser.' + 'new_context('  # in two pieces, or this line would report itself
+    stray = []
+    for f in sorted((ROOT / 'tests').glob('*.py')):
+        if f.name == 'common.py':
+            continue
+        stray += [f'{f.name}:{i + 1}' for i, line in enumerate(f.read_text(encoding='utf-8').split('\n')) if made in line]
+    common_py = (ROOT / 'tests/common.py').read_text(encoding='utf-8')
+    check(common_py.count(made) == 1, 'tests/common.py makes a browser context in exactly one place (phone())')
+    check(not stray, f'no test makes one past it, so no phone is shared ({stray})')
+
+
 def test_prompt():
     """Photo recognition belongs to the server: it holds prompt and key, the app has neither."""
     text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
@@ -663,6 +683,7 @@ async def test_files(browser, url):
     test_rules_static()
     test_pack()
     test_ratings()
+    test_isolated_tests()
     test_prompt()
     test_signing_key()
     test_version_code()
