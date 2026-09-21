@@ -23,7 +23,8 @@ async function openCrop(load) {
   let img;
   try {
     img = await load();
-  } catch (e) {
+  } catch {
+    // An unreadable file leaves nothing to crop; the toast asks for another photo
     toast('Das Foto ließ sich nicht lesen.');
     return;
   }

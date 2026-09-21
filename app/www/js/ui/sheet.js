@@ -22,8 +22,8 @@ export function openSheet(state) {
     try {
       history.pushState({sheet: 1}, '');
       histPushed = true;
-    } catch (e) {
-      histPushed = false;
+    } catch {
+      histPushed = false; // without an entry of its own the sheet simply does not answer the back gesture
     }
   }
 }
@@ -113,7 +113,9 @@ dlg.addEventListener('click', e => {
     dlg.style.transition = 'none';
     try {
       dlg.setPointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch {
+      /* the pointer is already gone: the swipe then ends with the next pointerup, which is all it has to do */
+    }
   });
   dlg.addEventListener('pointermove', e => {
     if (!dragging) return;

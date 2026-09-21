@@ -51,7 +51,8 @@ export function normServer(s) {
   let url;
   try {
     url = new URL(v);
-  } catch (e) {
+  } catch {
+    // Whatever URL() did not like, for a person it is one and the same: the address cannot be used
     throw new ServerError('input', 'Das ist keine gültige Adresse.');
   }
   if (url.protocol !== 'https:' && !isHome(url.hostname))
@@ -75,8 +76,7 @@ export async function request(method, path, {body, code = prefs.code, base = pre
   if (code) headers.Authorization = 'Bearer ' + code;
   if (body) headers['Content-Type'] = 'application/json';
   const sent = Date.now();
-  let res,
-    data = null;
+  let res, data;
   try {
     res = await fetch(base + path, {
       method,
@@ -85,8 +85,8 @@ export async function request(method, path, {body, code = prefs.code, base = pre
       signal: ctrl.signal,
       cache: 'no-store',
     });
-    data = await res.json().catch(() => null);
-  } catch (e) {
+    data = await res.json().catch(() => null); // an answer without JSON is judged by its status below
+  } catch {
     throw Object.assign(
       new ServerError(
         'offline',

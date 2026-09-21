@@ -5,6 +5,7 @@
 import {$} from '../dom.js';
 import {timeStr} from '../dates.js';
 import {Notifications} from '../native.js';
+import {report} from '../report.js';
 import {REMIND_MAX_AGE, tidyRemind} from '../config.js';
 import {db, prefs, savePrefs} from '../store.js';
 import {feedReminders} from '../smart.js';
@@ -46,7 +47,9 @@ async function allowed(wanted) {
       !wanted ||
       (await Notifications.checkPermissions()).display === 'granted' ||
       (await Notifications.requestPermissions()).display === 'granted';
-  } catch (e) {}
+  } catch (e) {
+    report('notification permission', e);
+  }
   if (!ok) toast('Benachrichtigungen sind nicht erlaubt.');
   return ok;
 }
@@ -71,7 +74,7 @@ export async function setFeedRemind(on) {
 /* after serving on this phone */
 export function planReminder(s) {
   if (!prefs.remind || !isOpen(s) || Date.now() - s.servedAt > REMIND_MAX_AGE) return;
-  Notifications.schedule({notifications: [notice(s)]}).catch(() => {});
+  Notifications.schedule({notifications: [notice(s)]}).catch(e => report('rating reminder', e));
 }
 
 let timer = null;
@@ -102,7 +105,10 @@ async function reconcile() {
     if (cancel.length) await Notifications.cancel({notifications: cancel.map(({id}) => ({id}))});
     plan.push(...feeds.values());
     if (plan.length) await Notifications.schedule({notifications: plan});
-  } catch (e) {}
+  } catch (e) {
+    // Whatever is already scheduled stays as it is; the next reconcile tries again
+    report('reminders', e);
+  }
 }
 
 /* A tap on the notification, on a cold start too (Capacitor holds the event back until the listener is registered) */

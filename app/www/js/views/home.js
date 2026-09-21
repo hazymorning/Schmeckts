@@ -50,11 +50,14 @@ export function update() {
       if (!done) {
         try {
           t.skipTransition();
-        } catch (e) {}
+        } catch {
+          /* the transition has already finished: run() right below draws in any case */
+        }
         run();
       }
     }, 400); // safety net
-  } catch (e) {
+  } catch {
+    // No view transition to be had here: drawing without one is the same page, only without the movement
     run();
   }
 }

@@ -1,4 +1,5 @@
 /* Bridge to Android. In the app the Capacitor plugins are available; in the browser Native is null. */
+import {report} from './report.js';
 
 export const Native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins : null;
 export const appInfo = {version: ''};
@@ -9,8 +10,12 @@ const LEVELS = {select: ['LIGHT', 8], success: ['MEDIUM', 16], strong: ['HEAVY',
 export const haptic = (level = 'select') => {
   const [style, ms] = LEVELS[level] || LEVELS.select;
   try {
+    // Feedback and nothing else: a phone without a vibration motor, or one that refuses, changes nothing
+    // that a person could act on, so a failure here is deliberately passed over.
     Native?.Haptics ? Native.Haptics.impact({style}).catch(() => {}) : navigator.vibrate?.(ms);
-  } catch (e) {}
+  } catch {
+    /* see above: haptics are a nicety */
+  }
 };
 
 /* Make a file from another app (content:// or file://) readable through Capacitor's own server */
@@ -97,10 +102,12 @@ export async function readPhotoText(b64) {
     try {
       return String((await TextReader.processImage({path: uri}))?.text || '');
     } finally {
-      await Native.Filesystem.deleteFile({path: TEXT_FILE, directory: 'CACHE'}).catch(() => {});
+      await Native.Filesystem.deleteFile({path: TEXT_FILE, directory: 'CACHE'}).catch(e =>
+        report('deleting the photo from the cache', e),
+      );
     }
   } catch (e) {
-    console.warn('text on the photo:', e?.message || e);
+    report('text on the photo', e);
     return '';
   }
 }

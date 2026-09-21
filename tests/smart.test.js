@@ -308,7 +308,7 @@ test('feeding times: from 14 days, treats excluded, from 4 days on; reminder 45 
       ['18:30', '18:30', '19:15'],
     ],
   );
-  const due = (db, now) => feedReminders(db, now).map(x => [x.key, new Date(x.at).toLocaleString('sv')]);
+  const due = (data, when) => feedReminders(data, when).map(x => [x.key, new Date(x.at).toLocaleString('sv')]);
   assert.deepEqual(due(db, now), [
     ['2026-06-11|440', '2026-06-11 08:05:00'],
     ['2026-06-12|440', '2026-06-12 08:05:00'],

@@ -169,12 +169,23 @@ func TestOverview(t *testing.T) {
 	s.Backup(now)
 	out := Overview(s.st, dir, now)
 	for _, want := range []string{"Tiere         2  Minka, Tiger", "Futter        1  davon 1 mit Barcode", "Mahlzeiten    1",
-		"Sheba Lachs", "Minka: Gut, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
+		"Sheba Lachs", "Minka: Später leer, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the overview does not contain %q:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "Weg") {
 		t.Error("deleted pets do not belong in the overview")
+	}
+}
+
+// As for the recognition: a wrongly configured barcodeUrls must be an error, not a crash.
+func TestBrokenBarcodeAddress(t *testing.T) {
+	a := newBarcodeAPI(t, brokenURL)
+	if s, out, _ := call(a, "GET", "/api/barcode/4006381333931", testCode, nil); s != 502 || out["error"] == nil {
+		t.Fatalf("%d %v", s, out)
+	}
+	if _, ok := a.barcodes.cached("4006381333931", now); ok {
+		t.Fatal("without an answer nothing may be remembered")
 	}
 }

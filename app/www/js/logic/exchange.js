@@ -5,6 +5,7 @@
    that back, after which both are level. The file holds data and clocks only: no settings, no household code, no
    key. */
 import {Native, fileUrl, haptic} from '../native.js';
+import {report} from '../report.js';
 import {allClocks, changesSince, merge, prefs, savePrefs, state, topClock} from '../store.js';
 import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
@@ -77,11 +78,11 @@ export const receiveFile = async file => {
   if (file) apply(await file.text().catch(() => ''));
 };
 export async function receiveUri(uri) {
-  let text = '';
+  let text;
   try {
     text = await fetch(fileUrl(uri)).then(r => r.text());
   } catch (e) {
-    console.warn('Austausch-Datei:', e?.message || e);
+    report('exchange file', e);
     toast('Die Datei ließ sich nicht öffnen.');
     return;
   }
@@ -89,11 +90,11 @@ export async function receiveUri(uri) {
 }
 
 function apply(text) {
-  let file = null;
+  let file;
   try {
     file = JSON.parse(text);
-  } catch (e) {
-    file = null;
+  } catch {
+    file = null; // check() below turns that into a sentence a person can act on
   }
   const bad = check(file);
   if (bad) {

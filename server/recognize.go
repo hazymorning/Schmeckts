@@ -101,7 +101,11 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 	})
 	ctx, cancel := context.WithTimeout(ctx, recognizeTimeout)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, cfg.anthropicURL()+"/v1/messages", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.anthropicURL()+"/v1/messages", bytes.NewReader(body))
+	if err != nil {
+		// Only a wrongly configured anthropicUrl gets here; without this the request would be nil and Do would crash.
+		return out, &recognizeError{http.StatusBadGateway, "Die Adresse von Anthropic ist falsch eingestellt."}
+	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("x-api-key", cfg.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersion)
@@ -150,20 +154,23 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 func CheckKey(ctx context.Context, cfg Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, cfg.anthropicURL()+"/v1/models", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.anthropicURL()+"/v1/models", nil)
+	if err != nil {
+		return because("Die Adresse von Anthropic lässt sich nicht verwenden", err)
+	}
 	req.Header.Set("x-api-key", cfg.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersion)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("Anthropic ist nicht erreichbar. Besteht eine Internetverbindung?")
+		return say("Anthropic ist nicht erreichbar. Besteht eine Internetverbindung?")
 	}
 	res.Body.Close()
 	switch res.StatusCode {
 	case 200:
 		return nil
 	case 401, 403:
-		return fmt.Errorf("Anthropic hat den Schlüssel abgelehnt. Bitte auf platform.claude.com prüfen und neu kopieren.")
+		return say("Anthropic hat den Schlüssel abgelehnt. Bitte auf platform.claude.com prüfen und neu kopieren.")
 	default:
-		return fmt.Errorf("Anthropic antwortet mit HTTP %d. Bitte später nochmal versuchen.", res.StatusCode)
+		return sayf("Anthropic antwortet mit HTTP %d. Bitte später nochmal versuchen.", res.StatusCode)
 	}
 }

@@ -282,3 +282,18 @@ func TestCodeFormat(t *testing.T) {
 }
 
 func itoa(n int64) string { b, _ := json.Marshal(n); return string(b) }
+
+// A wrongly configured address must not bring the server down: without the check in
+// http.NewRequestWithContext the request would be nil and Do would panic.
+const brokenURL = "http://192.168.178.9\u007f:8486" // a control character: url.Parse refuses it
+
+func TestBrokenAnthropicAddress(t *testing.T) {
+	a := newTestAPI(t, brokenURL)
+	s, out, _ := call(a, "POST", "/api/recognize", testCode, map[string]any{"image": jpeg})
+	if s != 502 || out["error"] != "Die Adresse von Anthropic ist falsch eingestellt." {
+		t.Fatalf("%d %v", s, out)
+	}
+	if err := CheckKey(t.Context(), Config{APIKey: "sk-ant-test", AnthropicURL: brokenURL}); err == nil {
+		t.Fatal("a broken address has to be an error")
+	}
+}

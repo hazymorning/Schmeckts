@@ -625,6 +625,21 @@ def test_signing_key():
             )
 
 
+def test_ratings():
+    """The server's overview labels every level of RATINGS, with the app's wording.
+
+    The key alone decides points, wording and icon (PROJECT.md, "Evaluation"), so the two lists must not drift
+    apart: the overview would otherwise print "offen" for a level that is perfectly well rated."""
+    config = (WWW / 'js/config.js').read_text(encoding='utf-8')
+    block = re.search(r'export const RATINGS = \{(.*?)\n\};', config, re.S)
+    app = dict(re.findall(r"(\w+):\s*\{label:\s*'([^']+)'", block.group(1) if block else ''))
+    go = (ROOT / 'server/overview.go').read_text(encoding='utf-8')
+    names = re.search(r'var ratingNames = map\[string\]string\{(.*?)\n\}', go, re.S)
+    server = dict(re.findall(r'"(\w+)":\s*"([^"]+)"', names.group(1) if names else ''))
+    check(len(app) == 13, f'RATINGS in config.js holds every level ({sorted(app)})')
+    check(app == server, f'server/overview.go labels exactly those levels, with the same wording ({sorted(set(app.items()) ^ set(server.items()))})')
+
+
 def test_prompt():
     """Photo recognition belongs to the server: it holds prompt and key, the app has neither."""
     text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
@@ -647,6 +662,7 @@ async def test_files(browser, url):
     test_logo_files()
     test_rules_static()
     test_pack()
+    test_ratings()
     test_prompt()
     test_signing_key()
     test_version_code()

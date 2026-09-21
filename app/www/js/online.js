@@ -20,9 +20,9 @@ export async function lookupOnline(code) {
     let hit;
     try {
       hit = await fetchProduct(base, code);
-    } catch (e) {
-      continue;
-    } // this database is not answering: try the next one
+    } catch {
+      continue; // this database is not answering: the next one is tried, and if none answers we throw below
+    }
     reached = true;
     if (hit.found) return remember(code, hit);
   }
@@ -77,7 +77,8 @@ function classify(tags) {
 function remembered(code) {
   const kept = prefs.codes?.[code];
   if (!kept || Date.now() - kept.at > (kept.found ? KEEP_FOUND : KEEP_MISS)) return null;
-  const {at, ...hit} = kept;
+  const hit = {...kept};
+  delete hit.at; // when we remembered it is ours to keep, not part of the answer
   return hit;
 }
 function remember(code, hit) {

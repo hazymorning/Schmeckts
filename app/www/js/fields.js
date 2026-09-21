@@ -1,5 +1,6 @@
 /* Records as fields, the way the server syncs them: every key except id, and maps (MAPS) entry by entry as
    <map>.<key>. null removes, local fields stay on the phone. Pure functions. */
+import {report} from './report.js';
 
 export const COLLECTIONS = ['pets', 'products', 'servings'];
 const MAPS = {servings: ['pets'], products: ['codes']}; // maps, synced entry by entry
@@ -19,7 +20,7 @@ export function fieldsOf(c, rec) {
     if (v == null || !FIELD_RE.test(k) || k === '_del') return;
     const j = JSON.stringify(v);
     if (j.length <= MAX_FIELD) out[k] = j;
-    else console.warn('field too large, stays on the device:', c, rec.id, k);
+    else report('field too large, stays on the device', `${c}/${rec.id}/${k}`);
   };
   for (const [k, v] of Object.entries(rec)) {
     if (k === 'id' || (c === 'servings' && LOCAL.has(k))) continue;

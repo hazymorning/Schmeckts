@@ -3,6 +3,7 @@
    is synced. */
 import {uid} from '../fields.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
+import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
 import {isConnected} from '../sync.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
@@ -83,7 +84,7 @@ export async function shootPhoto(hint, scanCode = '') {
   try {
     blob = await openCamera(hint || 'Packung fotografieren');
   } catch (e) {
-    console.warn('Eigene Kamera:', e?.name || '', e?.message || e);
+    report('our own camera', e);
     if (!canTakePhoto()) {
       if (scanCode) toast(hint);
       document.getElementById('camInputSheet').click();
@@ -107,7 +108,8 @@ export async function servePhoto(file, scanCode = '') {
   let img;
   try {
     img = await fileToImage(file);
-  } catch (e) {
+  } catch {
+    // An unreadable file leaves nothing to serve; the toast asks for another photo
     toast('Das Foto ließ sich nicht lesen.');
     return;
   }
@@ -149,6 +151,7 @@ export async function servePhoto(file, scanCode = '') {
 const running = new Set(); // recognitions in flight
 const tries = new Map(); // meal → {n, next}: attempts, and the earliest next attempt
 const PAUSE = [0, 30e3, 2 * 60e3, 10 * 60e3, 30 * 60e3]; // no automatic attempt after that
+const BUSY_PAUSE = 90e3; // the server's own cost brake lets one photo through every 90 seconds
 
 export function retryNow(id) {
   tries.delete(id);
@@ -178,60 +181,68 @@ async function recognizeServing(id) {
   try {
     found = await identify({code: s.scanCode || '', photo: b64});
   } catch (e) {
-    console.warn('Erkennung:', e?.message || e);
+    report('recognition', e);
   }
   running.delete(id);
   const cur = getServing(id);
   if (!cur) return;
-  if (cur.productId) {
-    settle(cur);
-    save();
-    refreshServing(id);
-    return;
-  } // named meanwhile, here or on another phone
+  if (cur.productId)
+    settle(cur); // named meanwhile, here or on another phone
+  else takeResult(cur, found, house);
+  save();
+  refreshServing(id);
+}
+
+/* What the chain came back with: a known variety, details to apply, something for a human to confirm, or an
+   error — and what the meal then says about itself (status and error are this phone's alone). */
+function takeResult(s, found, house) {
   const err = found.error;
   if (found.products?.length) {
     // the barcode now belongs to a known variety
-    tries.delete(id);
-    linkProduct(cur, found.products[0]);
+    tries.delete(s.id);
+    linkProduct(s, found.products[0]);
   } else if (found.details && found.source !== 'text') {
-    tries.delete(id);
-    refinePets(cur, findProduct(found.details.brand, found.details.variety), found.details.animal);
-    applyProduct(cur, found.details);
-    if (sheet?.kind === 'serving' && sheet.id === id && sheet.step === 'name' && !sheet.brand && !sheet.variety)
+    tries.delete(s.id);
+    refinePets(s, findProduct(found.details.brand, found.details.variety), found.details.animal);
+    applyProduct(s, found.details);
+    if (sheet?.kind === 'serving' && sheet.id === s.id && sheet.step === 'name' && !sheet.brand && !sheet.variety)
       sheet.step = null;
   } else if (found.details) {
     // read by the phone: a human confirms or changes it while naming
-    tries.delete(id);
-    cur.guess = found.details;
-    cur.status = 'noserver';
-    delete cur.error;
-    fillName(id, found.details);
+    tries.delete(s.id);
+    s.guess = found.details;
+    s.status = 'noserver';
+    delete s.error;
+    fillName(s.id, found.details);
   } else if (!house || err?.kind === 'none') {
-    cur.status = 'noserver';
-    delete cur.error; // no server and no key: the variety gets typed in
+    s.status = 'noserver';
+    delete s.error; // no server and no key: the variety gets typed in
   } else if (err?.retry) {
-    const t = tries.get(id) || {n: 0, next: 0};
-    if (err.kind !== 'offline' || err.timeout) t.n++; // an unreachable server costs nothing and does not count
-    if (t.n < PAUSE.length) {
-      t.next = Date.now() + (err.kind === 'busy' ? 90e3 : PAUSE[t.n]);
-      tries.set(id, t);
-      cur.status = 'waiting';
-      cur.error =
-        err.kind === 'offline' && !err.timeout
-          ? 'Der Server ist gerade nicht erreichbar. Die Sorte wird erkannt, sobald er wieder da ist.'
-          : `${err.message} Die App versucht es später automatisch noch einmal.`;
-    } else {
-      tries.delete(id);
-      cur.status = 'failed';
-      cur.error = err.message;
-    }
+    waitForAnotherTry(s, err);
   } else {
-    cur.status = 'failed';
-    cur.error = err ? err.message : 'Packung nicht erkannt.';
+    s.status = 'failed';
+    s.error = err ? err.message : 'Packung nicht erkannt.';
   }
-  save();
-  refreshServing(id);
+}
+
+/* An error worth another attempt: the meal waits, and retryWaiting() comes back to it. After PAUSE has run out
+   it stays failed and a human types the variety in. */
+function waitForAnotherTry(s, err) {
+  const t = tries.get(s.id) || {n: 0, next: 0};
+  if (err.kind !== 'offline' || err.timeout) t.n++; // an unreachable server costs nothing and does not count
+  if (t.n >= PAUSE.length) {
+    tries.delete(s.id);
+    s.status = 'failed';
+    s.error = err.message;
+    return;
+  }
+  t.next = Date.now() + (err.kind === 'busy' ? BUSY_PAUSE : PAUSE[t.n]);
+  tries.set(s.id, t);
+  s.status = 'waiting';
+  s.error =
+    err.kind === 'offline' && !err.timeout
+      ? 'Der Server ist gerade nicht erreichbar. Die Sorte wird erkannt, sobald er wieder da ist.'
+      : `${err.message} Die App versucht es später automatisch noch einmal.`;
 }
 
 /* Write the brand and variety that were read into the open naming flow, as long as nothing has been typed there */

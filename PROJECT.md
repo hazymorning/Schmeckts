@@ -23,7 +23,7 @@ Two halves, kept apart by folder: everything the app is lives in `app/`, everyth
 
 **Modules** in `app/www/js/`, each importing only from layers above it, without cycles:
 
-1. Foundations: `dom`, `text`, `dates`, `native` (Android bridge), `icons`, `config`, `fields`, `clock`, `disk`
+1. Foundations: `dom`, `text`, `dates`, `report` (one way to report an error), `native` (Android bridge), `icons`, `config`, `fields`, `clock`, `disk`
 2. Data: `store`, `api`, `sync`, `smart`, `derive`, `images`, `recognize`, `ocr`, `online`
 3. Interface: `ui/theme`, `ui/toast`, `ui/sheet`, `ui/crop`, `ui/camera`
 4. Views: `views/parts`, `views/mood`, `views/home`, `views/sheets`
@@ -31,6 +31,7 @@ Two halves, kept apart by folder: everything the app is lives in `app/`, everyth
 6. Control: `actions`, `main`
 
 - When a lower layer has to reach an upper one, the upper one hooks itself in (`hooks`, `syncHooks`, `diskHooks`, `setSheetView()`); `main.js` wires them together.
+- Nothing swallows an error in silence. Anything not handled where it happens goes through `report(where, error)` in `js/report.js`, which writes one warning and nothing else; what a person has to know about is said in German at the place it happens, by a toast or a banner. A `catch` that deliberately passes an error over says in a comment why, and takes no variable.
 - Mutate the database and call `save()`; replace it wholesale only through `replaceDb()`. Buttons carry `data-action`, and the entry of the same name in `ACTIONS` runs.
 - Views build HTML and write it in one go. A change from the server redraws every open view, so a sheet whose HTML is the same as the one on screen is left alone (`setSheetView()` in `views/sheets.js`): the photos stay decoded, the scroll position and the focus stay put. Boxes a view fills afterwards (`paintServerBox()`, `renderSuggestions()`) are drawn every time, because their contents are not in that comparison. Photos carry `decoding="async"`, so a view appears without waiting for them.
 - `Native` is the object holding the Capacitor plugins, `null` in the browser, where `localStorage` is the store. That way the same code runs in the app, in the browser and in the tests.
@@ -58,6 +59,37 @@ prefs = { theme, hiddenHints, closedWeek, milestones, remind, feedRemind, backdr
 ```
 
 `kaufen`: `'immer'`, `'nicht'` or absent. `texture`: consistency or treat type, a key from `TEXTURES`, or absent. `hiddenHints`: `'type:variety'`, for appetite `'appetit:pet:YYYY-MM-DD'`. `closedWeek`: the Monday of that week. `milestones`: `'meals:100'`. `remind`: minutes, 0 = off, otherwise whole hours up to 24. `backdrop`: the pet's profile picture behind the header, on by default. `mode`: `'lokal'`, `'haushalt'` or `''`. The phone shrinks images: preview 200 px, profile picture 320 px, as JPEG. The packaging photo stays on the phone. Barcodes: EAN-13, EAN-8, UPC-A with a check digit; UPC-A becomes EAN-13 with a leading 0. Sample data (only in `lokal`) carries identifiers starting with `demo` and disappears on connecting. Unknown values from other devices are left untouched; entries of a record this device does not know (a newer version) are neither kept nor deleted by it (`setField()` reports it, `applyRecord()` does not memorise them).
+
+
+**Glossary of stable data values.** These identifiers are German because they were written that way on the first day, and they sit in stored files, in backups, in exchange files and in every household's server. They are never renamed: a rename would make two phones disagree about the same meal. Everything new is named in English.
+
+| Where | Value | Meaning |
+|---|---|---|
+| `prefs.mode` | `lokal` | „Nur auf diesem Handy“: no server, no recognition, nothing goes out |
+| | `haushalt` | connected to a household server |
+| | `''` | nothing chosen yet; the welcome page asks on the first start |
+| `RATINGS`, scale `portion` (wet food) | `top` `gut` `mittel` `sosse` `schlecht` | 100, 80, 50, 30, 0 points: „Sofort leer“ … „Kaum angerührt“ |
+| `RATINGS`, scale `bowl` (dry food) | `gern` `normal` `wenig` `liegen` | 100, 80, 35, 0 points: „Gern gefressen“ … „Liegen gelassen“ |
+| `RATINGS`, scale `bite` (treats, other) | `verputzt` `spaeter` `angeknabbert` `unberuehrt` | 100, 70, 35, 0 points: „Sofort verputzt“ … „Nicht angerührt“ |
+| `products[].type` | `Nassfutter` `Trockenfutter` `Snack` `Sonstiges` | the food type, which decides the scale |
+| `products[].texture`, wet food | `sosse` `gelee` `pastete` `mousse` `block` `suppe` | „Konsistenz“: In Soße, In Gelee, Pastete, Mousse, Fester Block, Suppe |
+| `products[].texture`, treats | `knusprig` `weich` `creme` `milch` `stick` `kau` | „Snack-Art“: Knusprig, Weich, Creme, Milch, Stick, Kauartikel |
+| `products[].kaufen` | `immer` | buy again, set by hand; beats the computed verdict |
+| | `nicht` | do not buy again, set by hand |
+| | absent | „Automatisch“: the verdict decides |
+| verdict (computed, not stored) | `nachkaufen` `gemischt` `beobachten` `nicht` | „Nachkaufen“, „Gemischt“, „Beobachten“, „Nicht mehr kaufen“ |
+| `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | the species, which picks the icon |
+| `servings[].status` (this phone only) | `reading` | the phone is reading the text off the photo |
+| | `recognizing` | the server is recognising the photo |
+| | `waiting` | recognition failed for now and is tried again |
+| | `failed` | recognition is over; a person types the variety in |
+| | `noserver` | nothing to recognise with: a person types the variety in |
+| `prefs.hiddenHints` | `stop:<variety>` `sosse:<variety>` `liebling:<variety>` | that hint stays hidden on this phone |
+| | `appetit:<pet>:<YYYY-MM-DD>` | the appetite hint for that pet and day |
+| `prefs.milestones` | `meals:100` `sorts:10` | that milestone has been seen on this phone |
+| `rejected[].reason` (server) | `invalid` | the change is dropped and logged |
+| | `clock` | the app restamps and sends again |
+| exchange file, `kind` | `exchange` | the file „Änderungen teilen“ writes |
 
 **Protocol version 1.** Save locally first, then send; the server confirms after writing to disk; sending something twice is harmless; catching up is what counts, live notifications only make it quicker.
 
@@ -185,11 +217,10 @@ Binding for every change; `tests/design_test.py` checks them.
 - **Style and mistakes:** `scripts/lint.sh` runs every check and CI runs it as the job `lint`. JavaScript and CSS: ESLint (flat config in `app/eslint.config.mjs`, recommended plus `no-unused-vars`, `no-empty`, `eqeqeq: smart`, `prefer-const`, `no-shadow`, `--max-warnings 0`) and Prettier (`printWidth` 120); both are `devDependencies` of `app/package.json` with a lockfile, and the app itself still has no build step. Go: `gofmt -l` empty, `go vet`, `staticcheck`. Python: `ruff check` and `ruff format`. Shell: `shellcheck`. The one commit that reformatted everything is listed in `.git-blame-ignore-revs`; `git config blame.ignoreRevsFile .git-blame-ignore-revs` keeps blame useful.
 - **Tests:** `tests/*.test.js` check pure modules in Node, the rest run in Chromium with simulated plugins: `ui_test.py` (flows), `storage_test.py`, `design_test.py` (pack/unpack too), `sync_test.py` (several phones against the real server), `perf_test.py` (redraw after a rating under 40 ms, opening the evaluation under 150 ms, with 5 years of data and the CPU throttled 4×). Individually: `python3 tests/ui_test.py modes`.
 - **Exchange:** git is what counts. The exchange through the two source files is gone; they are no longer part of the project. A session starts with `git clone` or `git pull` and a branch of its own, then `setup-build-env.sh` and `test.sh`, and ends with a commit and a pull request. Descriptions stay short: one line per commit, and in the pull request only what changed. Whatever `scripts/prepare.py` or the build regenerates (`app/node_modules/`, `app/android/`, `dist/`, the fonts) is listed in `.gitignore` and does not belong in the repository. `.github/workflows/tests.yml` runs the suite on every push and pull request on `ubuntu-latest`, and `.claude/hooks/session-start.sh` adds the missing Python packages to a session on the web.
-- **Release:** set the version in `app/package.json`, merge to `main`, publish a release on GitHub with the tag `v<version>`. `.github/workflows/release.yml` checks the tag against the version, runs the tests, builds the signed APK with the secret `SCHMECKTS_SIGNATUR` and attaches it as `schmeckts-<version>.apk`; started by hand it leaves it as an artifact instead.
+- **Release:** set the version in `app/package.json`, merge to `main`, publish a release on GitHub with the tag `v<version>`. `.github/workflows/release.yml` checks the tag against the version, runs the tests, builds the signed APK with the secret `SCHMECKTS_SIGNING_KEY` and attaches it as `schmeckts.apk`, always under that name, because the README's download button links to `releases/latest/download/schmeckts.apk`; started by hand it leaves `schmeckts-<version>.apk` as an artifact instead.
 - **Emergencies:** `scripts/pack.py` and `scripts/unpack.py` stay. `pack.py` still writes the working tree to `dist/schmeckts-sources.txt` (app, tests, scripts, `PROJECT.md`) and `dist/schmeckts-server-sources.txt` (everything under `server/`), `unpack.py` reads both back into the same folder, and `design_test.py` checks the round trip. This is only needed if the source ever has to be passed on without git, and is no longer part of everyday work.
 - **Signing key:** always the same one, otherwise updates over the installed app are impossible; keep a copy somewhere safe. `schmeckts-signing-key.txt` (key with password, `scripts/signing-key.py`) lives outside the repository and is handed to `build-apk.sh` as a path; neither it nor a `.jks` ever belongs in git. Update the phones of a household together.
 
 ## Open points
 
 - Installation on the mini-PC and a field test with two phones, offline as well.
-- The server overview (`server/overview.go`) only knows the levels `gut`, `mittel`, `sosse`, `schlecht` and shows others as “open”; label all levels from `RATINGS` with the next server update.
