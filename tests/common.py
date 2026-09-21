@@ -40,6 +40,10 @@ SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 
 # sessionStorage.__launchNote is set at load time, it arrives right after the listener registers, as on a cold start.
 NATIVE = """
 window.__calls = []; window.__back = null; window.__urlOpen = null;
+// How often the home page has been written: the splash should go after exactly one drawing of it
+window.__draws = 0;
+new MutationObserver(ms => { for (const m of ms) if (m.target.id === 'home') window.__draws++; })
+  .observe(document, {childList: true, subtree: true});   // document: <html> may not exist yet at this point
 const rec = name => arg => { window.__calls.push([name, arg ?? null]);
   return Promise.resolve({getInfo: {version: '9.9.9'}}[name]); };
 const key = p => '__fs:' + p, missing = () => Promise.reject(new Error('File does not exist.'));
@@ -73,6 +77,12 @@ window.Capacitor = {isNativePlatform: () => true,
     return v == null ? uri : 'data:application/json;charset=utf-8,' + encodeURIComponent(v); },
   Plugins: {
   Haptics: {impact: rec('impact')}, SystemBars: {setStyle: rec('setStyle')},
+  // The splash screen the app holds up itself: hide() records what the page looked like at that moment, so a
+  // test can see it went only once the home page was drawn and both typefaces were there.
+  SplashScreen: {hide: o => { window.__calls.push(['hideSplash', {...(o ?? {}),
+      drawn: (document.querySelector('#home')?.childElementCount > 0) || !!document.querySelector('.welcome'), draws: window.__draws,
+      fonts: document.fonts.check('1em "Figtree"') && document.fonts.check('1em "Fraunces"')}]);
+    return Promise.resolve(); }, show: rec('showSplash')},
   App: {addListener: (e, fn) => { if (e === 'backButton') window.__back = fn;
         if (e === 'appUrlOpen') { window.__urlOpen = fn; const u = sessionStorage.getItem('__launchUrl'); if (u) fn({url: u}); } },
         getInfo: rec('getInfo'), minimizeApp: rec('minimize')},
@@ -92,6 +102,14 @@ window.Capacitor = {isNativePlatform: () => true,
     if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
     return new Promise(done => setTimeout(() => done({text: window.__ocrText || '', blocks: []}), window.__ocrDelay || 0)); }},
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
+"""
+
+# Everything the page moves while it is being built: layout-shift entries with no tap or key behind them.
+# Started before the app's own module, so nothing is missed.
+SHIFTS = """
+window.__shifts = [];
+new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push(e.value); })
+  .observe({type: 'layout-shift', buffered: true});
 """
 
 # A colour as sRGB "rgb(r, g, b)", even when set as oklch(): through a canvas, the way the screen shows it

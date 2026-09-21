@@ -183,8 +183,9 @@ const ACTIONS = {
   photo() {
     shootPhoto('', sheet?.kind === 'feed' ? sheet.code : '');
   }, // the code after scanning, should the photo button take it over
-  'new-product'() {
-    openSheet({kind: 'new', brand: '', variety: '', type: 'Nassfutter'});
+  // data-v: what was typed in the feeding sheet's search, when nothing matched it
+  'new-product'(el) {
+    openSheet({kind: 'new', brand: '', variety: el.dataset.v || '', type: 'Nassfutter'});
   },
   rate(el) {
     rate(el);
