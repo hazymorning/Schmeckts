@@ -17,13 +17,11 @@
 
 **Schmeckt’s?** ist ein Fütterungstagebuch für Haustiere. Nach dem Füttern tippst du einmal an, wie der Napf aussah. Nach ein paar Tagen weißt du, welche Sorten ankommen und welche du dir sparen kannst.
 
-<!-- Screenshots einfügen und diese Kommentarzeichen entfernen.
 <p align="center">
-  <img src="LIGHT-URL" width="270" alt="Startseite, helles Design">
+  <img src="https://github.com/user-attachments/assets/3b1986d1-5db4-4a00-975d-ab5d5692178b" width="270" alt="Startseite, helles Design">
   &nbsp;&nbsp;&nbsp;
-  <img src="DARK-URL" width="270" alt="Startseite, dunkles Design">
+  <img src="https://github.com/user-attachments/assets/b36ac28c-4ff1-496f-95cf-24fe68cf46ca" width="270" alt="Startseite, dunkles Design">
 </p>
--->
 
 ## So funktioniert’s
 
