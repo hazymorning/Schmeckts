@@ -10,7 +10,7 @@ import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
-import {expandCard, showOlderDays, timelineGroups, toggleOverview, update} from './views/home.js';
+import {expandCard, showMoreHistory, toggleOverview, update} from './views/home.js';
 import {paintServerBox, renderServeHits, renderSuggestions} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
@@ -158,14 +158,13 @@ const ACTIONS = {
   demo(){ loadDemo(); },
   expand(el){ haptic('select'); expandCard(el.dataset.v); },
   'toggle-overview'(){ haptic('select'); toggleOverview(); }, // der ganze Text der Übersicht und zurück
-  'older-days'(){ // der Knopf verschwindet, der Fokus geht auf den ersten neuen Tag
+  'more-history'(){ // der Fokus geht auf die erste neu gezeigte Mahlzeit
     haptic('select');
-    showOlderDays()?.querySelector('.tl-item')?.focus({preventScroll:true});
+    showMoreHistory()?.focus({preventScroll:true});
   },
   'jump-day'(el){
     const key = el.dataset.day;
-    if (!timelineGroups().some(g => g.key === key)) return;
-    if (!document.getElementById('d-' + key)) showOlderDays(); // Tag liegt vor vorgestern
+    if (!document.getElementById('d-' + key)) showMoreHistory(key); // der Tag liegt hinter den gezeigten Mahlzeiten
     const target = document.getElementById('d-' + key); if (!target) return;
     target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
     haptic('select');

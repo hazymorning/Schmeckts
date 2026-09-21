@@ -78,7 +78,7 @@ input{font:inherit;text-rendering:inherit}
 .card h2{margin:0 0 4px;font:600 21px/1.25 var(--font-display);letter-spacing:-.01em;color:var(--ink)}
 .card ul,.card ol{list-style:none;margin:0;padding:0}
 .card li+li,.card .tl-day+.tl-day{border-top:1px solid var(--line)}
-/* Textknopf in einer Karte, etwa „Ältere Tage anzeigen“ */
+/* Textknopf in einer Karte, etwa „Weitere anzeigen“ */
 .card-btn{display:block;width:100%;min-height:48px;padding:12px 0 10px;border-top:1px solid var(--line);
   font-family:var(--font-ui);font-size:14.5px;font-weight:600;color:var(--accent-ink)}
 
