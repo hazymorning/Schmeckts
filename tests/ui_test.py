@@ -9,6 +9,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from common import (
+    BIG_TEXT,
     NATIVE,
     PACK,
     ROOT,
@@ -477,6 +478,7 @@ HOUSE = """([meals]) => import('./js/store.js').then(async s => { const at = t =
     .map(([id, brand, variety, kaufen]) => ({id: id + '000001', brand, variety, type: 'Nassfutter', codes: {}, createdAt: 1, ...(kaufen ? {kaufen} : {})}));
   d.servings = meals.map(([pid, pets, when, by], i) => ({id: 'meal' + String(i).padStart(6, '0'), productId: pid && pid + '000001', servedAt: at(when), note: '', ...(by ? {by} : {}),
     pets: Object.fromEntries(Object.entries(pets).map(([k, r]) => [k === 'M' ? 'minka00001' : 'tiger00001', {r, at: r ? at(when) : null}]))}));
+  d.servings.sort((a, b) => b.servedAt - a.servedAt);   // newest first, as the app keeps them
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
@@ -3160,14 +3162,23 @@ async def test_home_history(browser, url):
     await ctx.close()
 
 
+# The timeline's geometry: how far the line is from the middle of the dot, whether the time fits its column,
+# and how wide that column is — the last one so a larger system font can be seen to have made it wider.
+TL_GEOMETRY = """t => { const box = t.getBoundingClientRect(), dot = t.querySelector('.tl-node i').getBoundingClientRect();
+  const s = getComputedStyle(t, '::before'), middle = box.left + parseFloat(s.left) + parseFloat(s.width) / 2;
+  const time = t.querySelector('.tl-time');
+  return [Math.round(middle - (dot.left + dot.width / 2)), time.scrollWidth <= time.clientWidth + 1,
+    Math.round(time.getBoundingClientRect().width)]; }"""
+
+
 REPORT_HEADS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h => h.innerText)"
 
 
 async def test_report(browser, url):
-    print('the history sheet: the facts at a glance, every meal, the pet filter')
+    print('the history sheet: the span, the ring, the figures, every meal')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
-    await pg.clock.set_fixed_time('2026-06-20T10:00:00+02:00')
+    await pg.clock.set_fixed_time('2026-06-12T10:00:00+02:00')  # a few days after the last meal, so „7 Tage“ has some
     await pg.evaluate(HOUSE, [house_meals()])
     await idle(pg)
     await pg.click('[data-action=open-settings]')
@@ -3177,63 +3188,139 @@ async def test_report(browser, url):
     await idle(pg)
     await pg.click('[data-sec=hist] [data-action=open-report]')
     await idle(pg)
-    heads, n = await pg.evaluate(REPORT_HEADS), await pg.locator('#sheet .tl-item').count()
     head = await pg.inner_text('#sheet .sh-head h2')
+    spans = await pg.eval_on_selector_all('#sheet [data-action=report-span]', "l => l.map(b => [b.innerText.trim(), b.getAttribute('aria-pressed')])")
     check(
-        heads == ['Jede Mahlzeit']
-        and n == 18
-        and head == 'Verlauf für alle Tiere'
-        and await pg.locator('#sheet .seg, #sheet .card-btn').count() == 0,
-        f'the facts, then every meal, and nothing to set ({heads}, {n} meals, {head})',
+        head == 'Verlauf für alle Tiere'
+        and spans == [['7 Tage', 'false'], ['30 Tage', 'true'], ['Alles', 'false']]
+        and await pg.evaluate(REPORT_HEADS) == [],
+        f'the span at the top, „30 Tage“ to begin with, and no heading over the list any more ({spans}, {head})',
     )
-    facts = await pg.eval_on_selector(
-        '#sheet .facts',
-        """f => [[...f.children].map(d => [d.querySelector('b').innerText, d.querySelector('span').innerText]),
-      (f.getAttribute('aria-label') || '').length]""",
+
+    async def glance():
+        return await pg.eval_on_selector(
+            '#sheet .glance',
+            """g => ({figs: [...g.querySelectorAll('.figs li')].map(li => li.innerText.replace(/\\s+/g, ' ').trim()),
+              ring: g.querySelector('.ring').getAttribute('aria-label'),
+              mid: g.querySelector('.ring-mid').innerText.replace(/\\s+/g, ' ').trim(),
+              colour: (g.querySelector('.ring-fill') || {}).className?.baseVal,
+              size: Math.round(g.querySelector('.ring').getBoundingClientRect().width)})""",
+        )
+
+    month, meals = await glance(), await pg.locator('#sheet .tl-item').count()
+    await pg.click('#sheet [data-action=report-span][data-v="7"]')
+    await idle(pg)
+    week, week_meals = await glance(), await pg.locator('#sheet .tl-item').count()
+    await pg.click('#sheet [data-action=report-span][data-v="0"]')
+    await idle(pg)
+    every, every_meals = await glance(), await pg.locator('#sheet .tl-item').count()
+    check(
+        week_meals < meals < every_meals == 18 and week['figs'][2].endswith('von 7 Tagen') and month['figs'][2].endswith('von 30 Tagen'),
+        f'the span decides what the numbers and the list show ({week_meals} / {meals} / {every_meals}, {week["figs"][2]}, {month["figs"][2]})',
+    )
+    check(
+        every['size'] == 104
+        and (every['colour'] or '').startswith('ring-fill r-')
+        and every['mid'].endswith('kam gut an')
+        and every['ring'].endswith('Prozent der bewerteten Mahlzeiten kamen gut an.')
+        and every['mid'].split('%')[0] == every['ring'].split(' ')[0],
+        f'the ring: 104 px, the share in the rating’s colour, the same number in the middle and in the sentence ({every})',
+    )
+    icons = await pg.eval_on_selector_all(
+        '#sheet .figs .ic', 'l => l.map(i => [Math.round(i.getBoundingClientRect().width), i.innerHTML.length > 20])'
+    )
+    check(
+        every['figs'][0].endswith('Mahlzeiten') and every['figs'][1].endswith('Sorten') and ' von ' in every['figs'][2] and icons == [[20, True]] * 3,
+        f'meals, varieties and days beside it, each with a small icon ({every["figs"]}, {icons})',
     )
     tops = await pg.eval_on_selector_all(
         '#sheet .rank', "l => l.map(t => [t.querySelector('b').innerText, t.querySelector('small').innerText, t.querySelector('.pct').innerText])"
     )
-    high = await pg.evaluate("""() => { const f = document.querySelector('#sheet .facts'), t = document.querySelector('#sheet .tops');
-      return Math.round(t.getBoundingClientRect().bottom - f.getBoundingClientRect().top); }""")
     check(
-        [x[1] for x in facts[0]] == ['Mahlzeiten', 'Sorten', 'Tage gefüttert']
-        and facts[0][0][0] == '18'
-        and all(int(x[0]) > 0 for x in facts[0])
-        and facts[1] > 40
-        and [t[1] for t in tops] == ['kommt am besten an', 'bleibt am ehesten übrig']
+        [t[1] for t in tops] == ['kommt am besten an', 'bleibt am ehesten übrig']
         and tops[0][0] != tops[1][0]
-        and all(t[2].endswith(' %') for t in tops)
-        and high <= 240,
-        f'three numbers, best and worst below them, {high} px tall and with a text description ({facts[0]}, {tops})',
+        and all(t[2].endswith(' %') for t in tops),
+        f'best and worst stay under the overview ({tops})',
     )
     await shot(pg, 'report')
-    await pg.click('#sheet [data-action=close]')
-    await idle(pg)
-    await pg.click('[data-action=filter][data-id=minka00001]')
-    await idle(pg)
-    await pg.click('[data-sec=hist] [data-action=open-report]')
-    await idle(pg)
-    head, mine = await pg.inner_text('#sheet .sh-head h2'), await pg.locator('#sheet .tl-item').count()
-    check(head == 'Verlauf für Minka' and 0 < mine < n, f'the pet filter carries over into the evaluation ({head}, {mine} of {n} meals)')
-    await pg.click('#sheet [data-action=close]')
-    await idle(pg)
-    await pg.click('[data-action=filter][data-id=all]')
-    await idle(pg)
-    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
-      s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
-    await idle(pg)
-    await pg.click('[data-sec=hist] [data-action=open-report]')
-    await idle(pg)
+    calm = await pg.eval_on_selector('#sheet .ring-fill', 'c => getComputedStyle(c).animationDuration')
+    check(float(calm.rstrip('s')) < 0.01, f'under reduced motion the ring does not fill itself ({calm})')
+
+    # The list: the day line sticks to the top, the separators run straight, the name may take two lines
+    day_line = await pg.eval_on_selector(
+        '#sheet .tl-date',
+        """d => [getComputedStyle(d).position, getComputedStyle(d).top,
+          getComputedStyle(d).backgroundColor === getComputedStyle(document.getElementById('sheet')).backgroundColor]""",
+    )
+    radius = await pg.eval_on_selector('#sheet .tl-day', 'd => getComputedStyle(d).borderRadius')
+    lines = await pg.eval_on_selector(
+        '#sheet .tl-item .t-main',
+        "m => [getComputedStyle(m.querySelector('b')).webkitLineClamp, getComputedStyle(m.querySelector('small')).whiteSpace]",
+    )
     check(
-        await pg.evaluate(REPORT_HEADS) == ['Jede Mahlzeit']
-        and await pg.locator('#sheet .tops').count() == 0
-        and await pg.locator('#sheet .facts').count() == 1,
-        'nothing rated: the numbers stay, best and worst are left out',
+        day_line == ['sticky', '0px', True] and radius == '0px' and lines == ['2', 'nowrap'],
+        f'the day line sticks, the separator is straight, two lines for the name and one below it ({day_line}, {radius}, {lines})',
+    )
+    stuck = await pg.evaluate(
+        """async () => { const body = document.getElementById('sheetBody');
+          body.scrollTop = body.scrollHeight;
+          await new Promise(d => setTimeout(d, 250));
+          const on = [...body.querySelectorAll('.tl-date')].filter(d => d.classList.contains('stuck'));
+          return [on.length, on.length ? getComputedStyle(on[0]).borderBottomColor : '']; }"""
+    )
+    check(stuck[0] > 0 and stuck[1] != 'rgba(0, 0, 0, 0)', f'and while it is stuck it carries a fine line ({stuck})')
+
+    # A day from the calendar that lies further back than the span: the span becomes „Alles“
+    await pg.click('#sheet [data-action=report-span][data-v="7"]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    old_day = (await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)'))[0]
+    await pg.click(f'[data-action=jump-day][data-day="{old_day}"]')
+    await idle(pg)
+    jumped = await pg.eval_on_selector(
+        '#sheet',
+        f"s => [s.querySelector('[data-action=report-span][aria-pressed=true]').innerText.trim(), !!s.querySelector('#d-{old_day}')]",
+    )
+    check(jumped == ['Alles', True], f'a day from the calendar outside the span: the span becomes „Alles“ and the day is there ({jumped})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # With movement allowed the ring fills once when the page opens
+    ctx = await phone(browser, motion=True)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [3, 1])
+    await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]')
+    fills = await pg.eval_on_selector(
+        '#sheet .ring-fill', 'c => { const s = getComputedStyle(c); return [s.animationName, s.animationDuration, s.animationIterationCount]; }'
+    )
+    check(fills == ['ringFill', '0.35s', '1'], f'with movement it fills itself once, in 350 ms ({fills})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # The ring without enough ratings: the bare track, „–“ and why
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [2, 1])
+    await pg.evaluate("""import('./js/store.js').then(async s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
+      s.save(); (await import('./js/views/home.js')).renderHome(); })""")
+    await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]')
+    await idle(pg)
+    few = await pg.eval_on_selector(
+        '#sheet .ring',
+        "r => [r.querySelector('.ring-mid').innerText.replace(/\\s+/g, ' ').trim(), !!r.querySelector('.ring-fill'), r.getAttribute('aria-label')]",
+    )
+    empty_days = await pg.eval_on_selector_all('#sheet .figs li', 'l => l.map(x => x.innerText.replace(/\\s+/g, " ").trim())')
+    check(
+        few[0] == '– Noch zu wenig bewertet' and not few[1] and few[2].startswith('Noch zu wenig bewertet'),
+        f'nothing rated: the bare track, „–“ and why ({few}, {empty_days})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
-    # How it looks at 360 px in light and dark
+
+    # 360 px, light and dark, and the timeline at 130 % system font
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme, width=360, height=760)
         pg, errors = await open_page(ctx, url)
@@ -3241,7 +3328,9 @@ async def test_report(browser, url):
         await idle(pg)
         await pg.click('[data-sec=hist] [data-action=open-report]')
         await idle(pg)
-        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .facts b, #sheet .facts span, #sheet .rank b, #sheet h3.label')]
+        await pg.click('#sheet [data-action=report-span][data-v="0"]')
+        await idle(pg)
+        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .figs li, #sheet .rank b, #sheet .ring-mid span, #sheet .seg button')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
         first = await pg.locator('#sheet .tl-item').count()
         for _ in range(10):
@@ -3253,6 +3342,15 @@ async def test_report(browser, url):
             10 <= first < 26 and await pg.locator('#sheet .tl-item').count() == 26 and not wide,
             f'{scheme}, 360 px: a page to begin with, the rest follows on scrolling, nothing clipped ({first} of 26, {wide})',
         )
+        await shot(pg, f'report-{scheme}')
+        small = await pg.eval_on_selector('#sheet .tl', TL_GEOMETRY)
+        await pg.evaluate(BIG_TEXT, 1.3)
+        await idle(pg)
+        geo = await pg.eval_on_selector('#sheet .tl', TL_GEOMETRY)
+        check(
+            abs(small[0]) <= 1 and small[1] and abs(geo[0]) <= 1 and geo[1] and geo[2] > small[2],
+            f'{scheme}: the line runs through the middle of the dot and the time fits, at 100 % and at 130 % ({small}, {geo})',
+        )
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
     # A tall screen: one page would not fill it, so the next ones follow at once — without that there is no scrolling
@@ -3261,6 +3359,8 @@ async def test_report(browser, url):
     await pg.evaluate(SORTS, [26, 1])
     await idle(pg)
     await pg.click('[data-sec=hist] [data-action=open-report]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=report-span][data-v="0"]')
     await idle(pg)
     body = await pg.eval_on_selector('.sheet-body', 'b => [b.scrollHeight > b.clientHeight, b.querySelectorAll(".tl-day").length]')
     check(body[0] and body[1] > 10, f'a tall screen: more than one page is drawn, so the history can be scrolled at all ({body})')

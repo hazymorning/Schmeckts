@@ -64,8 +64,9 @@ MEASURE = """async () => { const s = await import('./js/store.js'), h = await im
   return out; }"""
 
 # The evaluation is only computed when it opens: save beforehand so that nothing comes from the cache
-OPEN = """async () => { const s = await import('./js/store.js'), sheet = await import('./js/ui/sheet.js'), views = await import('./js/views/sheets.js');
+OPEN = """async days => { const s = await import('./js/store.js'), sheet = await import('./js/ui/sheet.js'), views = await import('./js/views/sheets.js');
   const out = [];
+  views.reportView.days = days;
   for (let i = 0; i < 5; i++) {
     await sheet.closeSheet(); s.save();
     await new Promise(done => setTimeout(done, 50));
@@ -98,12 +99,13 @@ async def test_rating(browser, url):
             draw < LIMIT_MS and all(x[2] for x in runs),
             f'{years} years ({years * 730} meals): evaluation and redraw {draw:.0f} ms, saving {save:.0f} ms',
         )
-        opens = (await pg.evaluate(OPEN))[1:]
-        shown = statistics.median(x[0] for x in opens)
-        check(
-            shown < REPORT_MS and all(x[1] >= 10 for x in opens),
-            f'{years} years: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} days to begin with',
-        )
+        for days, what in ((30, '„30 Tage“'), (0, '„Alles“')):
+            opens = (await pg.evaluate(OPEN, days))[1:]
+            shown = statistics.median(x[0] for x in opens)
+            check(
+                shown < REPORT_MS and all(x[1] >= 10 for x in opens),
+                f'{years} years, {what}: the evaluation opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} days to begin with',
+            )
         await ctx.close()
 
 

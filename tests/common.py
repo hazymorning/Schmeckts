@@ -112,6 +112,14 @@ new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadR
   .observe({type: 'layout-shift', buffered: true});
 """
 
+# Android's system font size, simulated: it multiplies every font size the app sets, which is what this does
+# too — every px font size in the style sheets again, scaled, as !important.
+BIG_TEXT = """k => { const s = document.createElement('style');
+  s.textContent = [...document.styleSheets].flatMap(x => [...x.cssRules])
+    .filter(r => r.style && r.style.fontSize && r.style.fontSize.endsWith('px'))
+    .map(r => `${r.selectorText}{font-size:${(parseFloat(r.style.fontSize) * k).toFixed(2)}px !important}`).join('');
+  document.head.append(s); }"""
+
 # A colour as sRGB "rgb(r, g, b)", even when set as oklch(): through a canvas, the way the screen shows it
 RGB = """(c => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d', {willReadFrequently: true});
   x.fillStyle = c; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; })"""

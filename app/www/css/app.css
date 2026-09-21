@@ -943,19 +943,30 @@ button.ov-pic:active {
 }
 
 .tl-day {
-  padding: var(--space-2h) 0 var(--space-1);
+  padding: 0 0 var(--space-1);
   scroll-margin-top: 20px;
-  border-radius: 4px;
 }
 .tl-day + .tl-day {
   border-top: 1px solid var(--line);
 }
+/* The day line stays at the top while its meals scroll past. The fine line under it only while it does, which
+   CSS cannot ask on its own: views/sheets.js sets .stuck. */
 .tl-date {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  padding: var(--space-2h) 0 var(--space-hair);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2h);
   margin-bottom: var(--space-hair);
+}
+.tl-date.stuck {
+  border-bottom-color: var(--line);
 }
 .tl-date b {
   font: 600 15px var(--font-display);
@@ -970,10 +981,17 @@ button.ov-pic:active {
   padding: 0;
   position: relative;
 }
+/* The two columns before the meal, in em of their own text: with a larger system font they grow with it and
+   the line keeps running through the middle of the dot. */
+.tl {
+  --tl-time: 3.3em;
+  --tl-node: 1.8em;
+}
 .tl::before {
   content: "";
   position: absolute;
-  left: 55px;
+  font-size: 13.5px;
+  left: calc(var(--tl-time) + var(--tl-node) / 2);
   top: 30px;
   bottom: 30px;
   width: 2px;
@@ -997,14 +1015,17 @@ button.ov-pic:active {
   transform: scale(0.985);
 }
 .tl-time {
-  width: 44px;
+  width: var(--tl-time);
+  min-width: 0;
   flex: 0 0 auto;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--muted);
 }
 .tl-node {
-  width: 24px;
+  width: var(--tl-node);
+  min-width: 0;
+  font-size: 13.5px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
@@ -1034,11 +1055,15 @@ button.ov-pic:active {
 .tl-item .t-main {
   margin-right: var(--space-2);
 }
-.tl-item .t-main small {
+/* The name of the food matters most, so it may take two lines; what is under it stays on one */
+.tl-item .t-main b {
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tl-item .t-main small {
   line-height: 1.35;
   margin-top: var(--space-hair);
 }
@@ -1748,37 +1773,91 @@ button.prod-card:active {
 .list-row .chev {
   color: var(--faint);
 }
-/* Evaluation, the facts at a glance: three numbers in one row, below them the best and the worst variety. Colours
-   from the tokens only; every row names its name and its number, so no statement rests on colour alone. */
-.facts {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-1);
-  padding: var(--space-4) 0 var(--space-3);
-  border-radius: 22px;
-  background: var(--surface-2);
+/* Evaluation, at a glance: one ring saying how much of what was served went down well, and beside it three
+   quiet figures. The ring carries a sentence in aria-label, so nothing rests on its colour alone. */
+.glance {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-1) 0 var(--space-3);
 }
-.facts div {
+.ring {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+.ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ring circle {
+  fill: none;
+  stroke-width: 10px;
+}
+.ring-track {
+  stroke: var(--surface-2);
+}
+.ring-fill {
+  stroke: var(--c);
+  stroke-linecap: round;
+  transform: rotate(-90deg); /* starts at the top */
+  transform-origin: 50% 50%;
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: calc(var(--len) - var(--part));
+  animation: ringFill 0.35s var(--ease-out) both; /* fills once when the page opens */
+}
+@keyframes ringFill {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+}
+.ring-mid {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-hair);
+  text-align: center;
+  line-height: 1.2;
+}
+.ring-mid .pct {
   min-width: 0;
-  padding: 0 var(--space-1);
+  font-size: 27px;
 }
-.facts b {
-  font: 600 26px/1.1 var(--font-display);
-  font-variant-numeric: tabular-nums;
-}
-.facts span {
-  font-size: 11.5px;
+.ring-mid > span {
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  max-width: 76px;
+}
+.figs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2h);
+}
+.figs li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2h);
+  font-size: 14.5px;
+  color: var(--muted);
+}
+.figs .ic {
+  width: 20px;
+  height: 20px;
+  color: var(--faint);
+  flex: 0 0 auto;
+}
+.figs b {
+  font-weight: 600;
+  color: var(--ink);
 }
 .tops {
   margin-top: var(--space-1h);
