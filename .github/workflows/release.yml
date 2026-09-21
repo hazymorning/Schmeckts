@@ -78,12 +78,15 @@ jobs:
           (umask 077; printf '%s' "$SCHMECKTS_SIGNING_KEY" > "$KEY_FILE")
           scripts/build-apk.sh "$KEY_FILE"
 
+      # Always under the same name: the README's download button links to releases/latest/download/schmeckts.apk.
       - name: Attach the APK to the release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" "dist/schmeckts-$VERSION.apk" --clobber
+        run: |
+          cp "dist/schmeckts-$VERSION.apk" dist/schmeckts.apk
+          gh release upload "$TAG" dist/schmeckts.apk --clobber
 
       - name: Leave the APK as an artifact
         if: github.event_name == 'workflow_dispatch'

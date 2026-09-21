@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/3452ef7d-22bc-457c-add0-9909317ddee5">
-    <img src="https://github.com/user-attachments/assets/33fcbc0a-b332-4e04-8abf-8513f341388a" width="880" alt="Schmeckt’s? – the app that remembers which food your pet actually likes.">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/6de937ab-9d55-4474-939f-a8531965ff25">
+    <img src="https://github.com/user-attachments/assets/c185d1f3-68fa-4d2a-89ce-02f7ed7a6293" width="880" alt="Schmeckt’s? – the app that remembers which food your pet actually likes.">
   </picture>
 </p>
 
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="#install-the-app"><img src="https://img.shields.io/badge/Install%20the%20app-965E4B?style=for-the-badge&logo=android&logoColor=white&labelColor=2E2724" height="42" alt="Install the app"></a>
+  <a href="#how-to-install"><img src="https://github.com/user-attachments/assets/67f2a3c6-7ccb-484f-82e5-af64c5145dd0" width="292" alt="Install app"></a>
 </p>
 
 **Schmeckt’s?** is a feeding diary for pets. After every meal you record with a single tap how the bowl looked, from “finished at once” to “barely touched”. After a few days the app shows which varieties your animal really likes and which ones can stay on the shelf next time you shop.
@@ -31,7 +31,7 @@
 
 While feeding, just hold the packaging up to the camera. The app reads brand, variety and food type off the picture and creates the entry by itself — for cans without a barcode, for multipacks and for brands it has never seen. Adding a new variety takes exactly one photo.
 
-The phone reads the text on the packaging itself, offline and at no extra cost. Connected to a household you also get the more accurate recognition, which reliably makes sense of ornate packaging as well.
+The phone reads the text on the packaging itself, offline and at no extra cost. Connected to a household you also get the more accurate recognition, which reliably makes sense of ornate packaging as well. What else that brings is described further down.
 
 ## What the app does
 
@@ -53,7 +53,7 @@ The first time you start the app you decide how you want to use it. You can swit
 
 **This phone only.** Everything stays on the device and the app does not go online by itself. It still reads the text on the packaging and prefills “name this food” with it; after that it recognises the variety by its barcode. Anyone who feeds their animals on their own gets along fine with this.
 
-**Connected to a household.** Several people keep the same diary. Everyone sees what the others have entered, even when a phone had no connection for a while. On top of that comes the more accurate recognition: brand and variety from the photo, and unknown barcodes looked up automatically. A household needs [its own small server](#the-household-server) on a computer at home.
+**Connected to a household.** Several people keep the same diary. Everyone sees what the others have entered, even when a phone had no connection for a while. On top of that comes the more accurate recognition: brand and variety from the photo, and unknown barcodes looked up automatically.
 
 | | This phone only | In a household |
 |---|---|---|
@@ -63,21 +63,61 @@ The first time you start the app you decide how you want to use it. You can swit
 | Look up unknown barcodes | on request | yes |
 | Share entries with others | manually, as a file | automatically |
 
-## Install the app
+The household feature is built into the app, but the matching server is not yet generally available.
 
-Schmeckt’s? is not on the Play Store. You install it from the file that comes with every release here — two minutes, and the warnings Android shows along the way are normal for apps that do not come from the store.
+## How to install
 
+Schmeckt’s? isn’t on the Play Store, so you install it straight from this page. It takes about a minute, and you only need to give permission once.
+
+<!-- This button downloads the APK of the latest release directly.
+     It only works if every release has the APK attached under exactly this name: schmeckts.apk -->
 <p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/badge/Download%20the%20APK-965E4B?style=for-the-badge&logo=android&logoColor=white&labelColor=2E2724" height="42" alt="Download the APK"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/ffbc6f1f-0da5-4c14-ae23-ab543318029d" width="292" alt="Download APK"></a>
 </p>
 
-1. **Open the release page on your phone.** The button leads there. Below the release notes sits **Assets**; tap it if the list is folded up.
-2. **Tap the file** called `schmeckts-<version>.apk`. The browser warns that files of this kind can harm your device — choose “Download anyway”.
-3. **Open the downloaded file**, from the notification or from your Downloads folder.
-4. **Permit installing once.** Android asks whether your browser may install apps. Switch it on and go back.
-5. **Tap “Install”.** Android may want to check the app first; let it. Then “Open” starts Schmeckt’s?.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5e312f50-e1ec-493b-9ee2-99c3bb88fbed" width="150" alt="QR code that opens this guide on your phone"><br>
+  <sub>On a computer? Scan this code with your phone’s camera to open this guide there.</sub>
+</p>
 
-New versions go straight over the old one — same steps, your entries stay. The app runs on Android 8.0 and up. The barcode scanner needs Google Play services, which the vast majority of phones have; everything else works without them.
+1. **Download.** On your Android phone, tap the button above. If your browser asks whether you want to keep the file, confirm.
+2. **Open.** Once the download has finished, tap *Open*, or open `schmeckts.apk` from your *Downloads*.
+3. **Allow.** The first time, Android asks whether your browser may install apps. Tap *Settings*, switch on *Allow from this source* and go back.
+4. **Install.** Tap *Install*, then *Open*. That’s it.
+
+<details>
+<summary><b>Android offers to scan the app first</b></summary>
+<br>
+
+Because the app doesn’t come from the Play Store, Google Play Protect may suggest scanning it before it is installed. Let it scan; it only takes a moment. Afterwards you can install the app as usual.
+
+</details>
+
+<details>
+<summary><b>Installing an update</b></summary>
+<br>
+
+Download the new version with the same button and install it over the old one. Your entries stay where they are. Please don’t uninstall the old version first, as that would delete your data.
+
+</details>
+
+<details>
+<summary><b>“App not installed”</b></summary>
+<br>
+
+This usually means an older test version is still on the phone. Save a backup in the app’s settings, uninstall the old version, install the new one and read the backup back in.
+
+</details>
+
+<details>
+<summary><b>Requirements</b></summary>
+<br>
+
+Android 8.0 or newer. The barcode scanner needs Google Play services, which almost every phone has; everything else works without them.
+
+</details>
+
+<p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">All versions</a></sub></p>
 
 ## Privacy
 
@@ -88,12 +128,6 @@ New versions go straight over the old one — same steps, your entries stay. The
 - In a household the app only talks to your own server. From there the photo of the packaging goes on for recognition, and unknown barcodes are looked up in open product databases. Nothing else leaves the phone, in particular nothing about your animals.
 - An exchange file contains only animals, varieties and meals — no settings and no household code.
 - The app needs the camera for photos. It only asks about notifications once you switch a reminder on.
-
-## The household server
-
-Only needed if several people are to keep the same diary. It is a small program for a computer that stays on at home — a mini-PC is plenty. It holds the shared data, passes packaging photos on for recognition and looks up barcodes; nothing of it runs on anyone else’s machine.
-
-The server is a project of its own and is moving to its own repository, **Schmeckts-Server**. Until then its code sits in [`server/`](server/) and the setup guide in [docs/INSTALLATION.md](docs/INSTALLATION.md). This repository is about the app.
 
 ## Questions
 
