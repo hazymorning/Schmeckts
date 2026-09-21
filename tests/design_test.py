@@ -587,8 +587,11 @@ def test_version_code():
         code = code * 100 + part
     code += prep.VERSION_OFFSET
     src = (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
+    # The Gradle line is glued together from pieces, so it is read with a pattern: the formatter is free to
+    # change the quotes around the offset and to break the line differently.
+    hands_over_offset = re.search(r'def appVersionCode = [\'"]\s*\+\s*str\(VERSION_OFFSET\)', src)
     check(
-        code > 10400 and 'def appVersionCode = " + str(VERSION_OFFSET) +' in src,
+        code > 10400 and hands_over_offset,
         f'versionCode {code} for version {version} stays above the 10400 of the builds before the restart',
     )
 
