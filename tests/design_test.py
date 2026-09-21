@@ -138,6 +138,18 @@ def css_rules(text):
             for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', text)]
 
 
+def css_value(value):
+    """A declaration's value with the formatting taken out: whitespace collapsed, none around commas"""
+    return re.sub(r'\s*,\s*', ',', ' '.join(value.split()))
+
+
+def css_blocks(text):
+    """[(selector, {property: value})] for every innermost block, at-rules such as @font-face included.
+
+    The rules are read, not searched for as text, so Prettier may lay the CSS out however it likes."""
+    return [(' '.join(sel.split()), {p: css_value(v) for p, v in decls}) for sel, decls in css_rules(text)]
+
+
 def test_rules_static():
     print('design rules in the sources')
     css = {f: (WWW / 'css' / f).read_text() for f in ('tokens.css', 'app.css')}
@@ -160,10 +172,14 @@ def test_rules_static():
     prep = (ROOT / 'scripts/prepare.py').read_text()
     check('8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928' in prep and '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b' in prep,
           'prepare.py downloads both typefaces with a checksum')
+    blocks = css_blocks(css['tokens.css'])
+    faces = {d.get('font-family'): d for sel, d in blocks if sel == '@font-face'}
+    root = next(d for sel, d in blocks if sel == ':root')
+    check(faces.get('"Figtree"', {}).get('font-weight') == '400 700' and faces.get('"Fraunces"', {}).get('font-weight') == '500 700'
+          and root.get('--font-display') == '"Fraunces","Iowan Old Style",Georgia,serif'
+          and root.get('--font-ui') == '"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+          f'@font-face and the type tokens as specified ({sorted(k for k in faces if k)})')
     tok = css['tokens.css']
-    check('font-family:"Figtree"' in tok and 'font-weight:400 700' in tok and 'font-family:"Fraunces"' in tok and 'font-weight:500 700' in tok
-          and '--font-display:"Fraunces","Iowan Old Style",Georgia,serif;' in tok and '--font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;' in tok,
-          '@font-face and the type tokens as specified')
     # Colours only in tokens.css, and there only the palette's values (derived tokens with opacity as 8-digit hex)
     literal = re.compile(r'#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(|\b(?:white|black)\b(?!-)')
     outside = [f'app.css: {m.group(0)}' for m in literal.finditer(re.sub(r'/\*.*?\*/', '', css['app.css'], flags=re.S))]
@@ -193,7 +209,8 @@ def test_rules_static():
     check(frames and not loud,
           f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}')
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
-    check(not focus and ':focus-visible{outline:' in css['app.css'], f'focus rings follow the radius: no radius of their own on focus ({focus})')
+    ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
+    check(not focus and ring, f'focus rings follow the radius: an outline and no radius of their own on focus ({focus})')
     check('data-logo' not in (WWW / 'index.html').read_text() and 'data-logo' not in (WWW / 'js/main.js').read_text()
           and "from './logo.js'" not in (WWW / 'js/main.js').read_text(), 'header without a logo: nothing in index.html and main.js')
 

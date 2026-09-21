@@ -1,10 +1,41 @@
 name: Tests
 
-# The whole test suite on every push and every pull request. Nothing is built here:
-# no Android SDK, no APK, no .deb. Only what scripts/test.sh actually needs.
+# The whole test suite on every push and every pull request, plus the style and mistake checks of
+# scripts/lint.sh. Nothing is built here: no Android SDK, no APK, no .deb. Only what the tests actually need.
 on: [push, pull_request]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache: false
+
+      # ruff comes from the same pinned list as the test packages; shellcheck ships with the runner.
+      - name: ruff
+        run: python3 -m pip install --requirement tests/requirements.txt
+
+      # ESLint, Prettier, gofmt, go vet, staticcheck, ruff and shellcheck. Every check runs, so one job
+      # shows everything that is wrong.
+      - name: Style and mistakes
+        run: scripts/lint.sh
+
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -34,11 +65,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Pillow draws the test photo, Playwright drives Chromium for the interface tests.
+      # Pillow draws the test photo, Playwright drives Chromium for the interface tests. The versions are
+      # pinned in tests/requirements.txt, so a session on the web, the CI and a release build run the same ones.
       - name: Playwright with Chromium
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pillow playwright
+          python3 -m pip install --requirement tests/requirements.txt
           python3 -m playwright install --with-deps chromium
 
       # Fetches the fonts first (prepare.py --fonts-only), then the Go, Node and Chromium tests,
