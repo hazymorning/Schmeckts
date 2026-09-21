@@ -71,5 +71,4 @@ export const FEED_START = [['beides', 'Barcode & Foto'], ['foto', 'Nur Foto'], [
 export const tidyFeedStart = v => FEED_START.some(([k]) => k === v) ? v : FEED_START[0][0];
 export const REMIND_MAX_AGE = 10 * 60e3;    // only meals at most 10 minutes old get one scheduled
 export const PENDING_WINDOW = 48 * 3600e3; // open meals drop out of „Wie war’s?“ after 48 h
-export const ALBUM_MAX = 8;                 // photos in a pet's album
 export const DEMO = 'demo'; // sample data identifiers start with this; they are removed on connecting

@@ -36,10 +36,11 @@ test('fields: maps break down into entries, local fields and null stay out', () 
 });
 
 test('fields: a record from field values, null removes, id and _del are not fields', () => {
-  const pet = fromFields('pets', 'pet00001', {name:'Minka', 'photos.a1':'data:a', 'photos.b2':'data:b', _del:false});
-  assert.deepEqual(pet, {id:'pet00001', photos:{a1:'data:a', b2:'data:b'}, name:'Minka'});
-  setField('pets', pet, 'photos.a1', null); setField('pets', pet, 'name', null); setField('pets', pet, 'id', 'anders'); setField('pets', pet, 'name.x', 1);
-  assert.deepEqual(pet, {id:'pet00001', photos:{b2:'data:b'}});
+  const prod = fromFields('products', 'prod0001', {brand:'Sheba', 'codes.4008429087455':true, 'codes.96385074':true, _del:false});
+  assert.deepEqual(prod, {id:'prod0001', codes:{4008429087455:true, 96385074:true}, brand:'Sheba'});
+  setField('products', prod, 'codes.4008429087455', null); setField('products', prod, 'brand', null); setField('products', prod, 'id', 'anders'); setField('products', prod, 'brand.x', 1);
+  assert.deepEqual(prod, {id:'prod0001', codes:{96385074:true}});
+  assert.equal(setField('pets', {id:'pet00001'}, 'photos.a1', 'data:a'), false); // a map this version does not know stays out
   assert.deepEqual(['abcd', 'abc', 'a b c d', undefined].map(validId), [true, false, false, false]);
 });
 

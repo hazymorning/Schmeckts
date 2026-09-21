@@ -23,14 +23,13 @@ input{font:inherit;text-rendering:inherit}
 .sk{width:64px;height:64px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .num,.tl-time,.pct,.cnt b,.pp b,.day .dn,.field.code,.lv-n,.lv-s,.chart-y{font-variant-numeric:tabular-nums}
 
-/* Mood picture: an album photo behind the header and the upper part of the page, full width, fading out softly
-   downwards. The page sits in front of it unchanged. Changes go through opacity alone (views/mood.js). The mask uses
-   nothing but the opacity of its colour. */
+/* Mood picture: the pet's profile picture behind the header and the upper part of the page, full width, fading
+   out softly downwards. The page sits in front of it unchanged (views/mood.js). The mask uses nothing but the
+   opacity of its colour. */
 .mood{position:absolute;top:0;left:0;right:0;height:calc(260px + var(--safe-area-inset-top,env(safe-area-inset-top,0px)));overflow:hidden;pointer-events:none;
   -webkit-mask-image:linear-gradient(to bottom,var(--ink) 35%,transparent);mask-image:linear-gradient(to bottom,var(--ink) 35%,transparent)}
-.mood img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;filter:saturate(.85);transition:opacity 2s linear}
-.mood img.on{opacity:.16}
-[data-theme="dark"] .mood img.on{opacity:.26}
+.mood img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.16;filter:saturate(.85)}
+[data-theme="dark"] .mood img{opacity:.26}
 .app{position:relative;max-width:600px;margin:0 auto;padding:0 18px calc(112px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))}
 .top{display:flex;align-items:center;justify-content:space-between;padding:calc(12px + var(--safe-area-inset-top,env(safe-area-inset-top,0px))) 0 10px}
 .brand{margin:0;font:650 30px/1.1 var(--font-display);letter-spacing:-.02em;color:var(--ink)} /* the wordmark only, no logo */
@@ -424,17 +423,6 @@ button.prod-card:active{transform:scale(.985)}
 .crop img{position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;pointer-events:none;-webkit-user-drag:none}
 .crop::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 200px var(--backdrop);pointer-events:none}
 .zoom{display:block;width:100%;height:48px;margin:0;color:var(--ink);accent-color:var(--accent)}
-/* Album in the pet sheet */
-.album{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.ph{position:relative;aspect-ratio:1;border-radius:15px;overflow:hidden;background:var(--surface-2)}
-.ph-img{display:block;width:100%;height:100%;padding:0}
-.ph-img img{display:block;width:100%;height:100%;object-fit:cover}
-.ph-img[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:-3px;border-radius:15px}
-.ph-x{position:absolute;top:0;right:0;width:48px;height:48px;display:grid;place-items:center}
-.ph-x span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--ink)}
-.ph-x .ic{width:15px;height:15px;stroke-width:2.2}
-.ph.add{display:grid;place-items:center;background:transparent;border:1.5px dashed var(--faint);color:var(--muted);cursor:pointer}
-.ph.add .ic{width:26px;height:26px}
 /* Toggles in the settings */
 .pet-photo{position:relative;display:block;width:116px;height:116px;margin:4px auto 8px;cursor:pointer;border-radius:50%;transition:transform .2s var(--ease-out)}
 .pet-photo:active{transform:scale(.95)}

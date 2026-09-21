@@ -10,7 +10,7 @@ In the end they must all be level.
 Usage: python3 tests/sync_test.py   (needs Go, builds the server itself)"""
 import asyncio, base64, http.server, json, os, pathlib, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
 from playwright.async_api import async_playwright
-from common import PACK, ROOT, SAVED, check, failures, idle, make_photo, make_pictures, open_page, real_errors, seeded, serve, started, state, until
+from common import PACK, ROOT, SAVED, check, failures, idle, make_photo, open_page, real_errors, seeded, serve, started, state, until
 
 CODE, NEW_CODE = 'K7PM-3QXD', 'W9ZX-4HJT'
 HIT, MISS, C1, C2, OLD = '5901234123457', '4012345000016', '4012345000023', '4012345000030', '4012345000047'  # valid EAN-13
@@ -146,16 +146,6 @@ async def until_sync(pg, expr, timeout=10.0):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         if await pg.evaluate(f"import('./js/sync.js').then(({{status}}) => {expr})"):
-            return True
-        await asyncio.sleep(.1)
-    return False
-
-
-async def until_dom(pg, expr, timeout=10.0):
-    """Waits until expr is true in the document: an open view only redraws after a sync."""
-    end = time.monotonic() + timeout
-    while time.monotonic() < end:
-        if await pg.evaluate(expr):
             return True
         await asyncio.sleep(.1)
     return False
@@ -489,36 +479,6 @@ async def main():
                          'server without barcode lookup: no request, straight to the camera; cancelled, back in the feeding sheet')
             await expect(not real_errors(err_e), 'phone without barcode lookup: no errors in the console' + (f': {real_errors(err_e)}' if real_errors(err_e) else ''))
             await ctx_e.close()
-
-            # The album on the pet, synced per photo
-            print('Album')
-            files = make_pictures()
-            ALBUM = "Object.keys(db.pets.find(p => p.id === 'lxpet00001').photos || {}).sort()"
-            for pg in (a, b):
-                await close_sheet(pg)
-                await pg.evaluate("import('./js/logic/pets.js').then(p => p.openPet('lxpet00001'))")
-                await idle(pg)
-            await a.set_input_files('#albumInput', files[:2])
-            await expect(await until(b, f"{ALBUM}.length === 2"), 'phone A adds two photos and phone B gets them')
-            keys = await state(a, ALBUM)
-            rec = srv.records()['pets']['lxpet00001']
-            pa, pb = [await state(pg, "JSON.stringify(db.pets.find(p => p.id === 'lxpet00001').photos)") for pg in (a, b)]
-            await expect(pa == pb and sorted(k for k in rec if k.startswith('photos.')) == [f'photos.{k}' for k in keys] and rec[f'photos.{keys[0]}'].startswith('data:image/jpeg;base64,')
-                         and 'photos' not in rec, f'on the server every photo is its own field photos.<id>, and both phones have the same images ({len(rec["photos." + keys[0]]) // 1024} KB)')
-            await idle(b)
-            await expect(await until_dom(b, "document.querySelectorAll('#sheet .ph-img').length === 2"),
-                         'the photos appear in phone B\u2019s open pet sheet')
-            await block(ctx_a)
-            await block(ctx_b)
-            await a.set_input_files('#albumInput', files[2:3])          # A adds one …
-            await b.click(f'#sheet .ph-x[data-key="{keys[0]}"]')       # … while B removes one, both without a connection
-            await idle(a)
-            await unblock(ctx_a, a)
-            await unblock(ctx_b, b)
-            await expect(await until(a, f"{ALBUM}.length === 2 && !{ALBUM}.includes('{keys[0]}')") and await until(b, f"{ALBUM}.length === 2 && {ALBUM}.includes('{keys[1]}')")
-                         and await state(a, ALBUM) == await state(b, ALBUM), 'added and removed at the same time: both survive, because syncing happens per photo')
-            for pg in (a, b):
-                await close_sheet(pg)
 
             # Connecting from the welcome page, the server box, disconnecting
             print('modes and the server box')

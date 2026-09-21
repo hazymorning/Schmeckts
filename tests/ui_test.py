@@ -509,7 +509,7 @@ async def test_texture(browser, url):
 
 
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
-  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1, photos: {}}];
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['lachs', 'Lachs', 'Nassfutter'], ['rind', 'Rind', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '00001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
   d.servings = [['snack', 'verputzt', 1], ['lachs', 'top', 2], ['lachs', 'top', 30], ['lachs', 'gut', 54], ['rind', 'schlecht', 60], ['rind', 'schlecht', 80]]
     .map(([pid, r, ago], i) => ({id: 'meal00000' + i, productId: pid + '00001', servedAt: now - ago * H, note: '', pets: {minka00001: {r, at: now}}}));
@@ -551,7 +551,7 @@ async def test_overview(browser, url):
     await pg.click('[data-action=close]'); await idle(pg)
     # Several pets: who last had what, the favourite variety per pet and what does not go down well
     await pg.evaluate("""import('./js/store.js').then(async s => { const now = Date.now(), H = 36e5;
-      s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Hund', photos: {}, createdAt: 2});
+      s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Hund', createdAt: 2});
       s.db.products.push({id: 'pute000001', brand: 'Rinti', variety: 'Pute', type: 'Nassfutter', codes: {}, createdAt: 1});
       [26, 50, 74].forEach((ago, i) => s.db.servings.push({id: 'tigermeal' + i, productId: 'pute000001', servedAt: now - ago * H, note: '', pets: {tiger00001: {r: 'top', at: now}}}));
       s.db.servings.unshift({id: 'beide00001', productId: 'lachs00001', servedAt: now - 5 * 6e4, note: '', pets: {minka00001: {r: null, at: null}, tiger00001: {r: null, at: null}}});
@@ -559,7 +559,7 @@ async def test_overview(browser, url):
     house = await pg.evaluate(CARD)
     await pg.click('[data-action=filter][data-id=tiger00001]'); await idle(pg)
     tiger = await pg.evaluate(CARD)
-    await pg.evaluate("import('./js/store.js').then(async s => { s.db.pets.push({id: 'kiwi000001', name: 'Kiwi', species: 'Vogel', photos: {}, createdAt: 3}); s.prefs.activePet = 'kiwi000001'; s.save(); (await import('./js/views/home.js')).renderHome(); })"); await idle(pg)
+    await pg.evaluate("import('./js/store.js').then(async s => { s.db.pets.push({id: 'kiwi000001', name: 'Kiwi', species: 'Vogel', createdAt: 3}); s.prefs.activePet = 'kiwi000001'; s.save(); (await import('./js/views/home.js')).renderHome(); })"); await idle(pg)
     kiwi = await pg.evaluate(CARD)
     check([house['title'], house['pic'][:2], house['text'], house['bold']] == ['Minka und Tiger', ['SPAN', 2], 'Minka und Tiger bekamen zuletzt vor 5 Min. Lachs. Minka mag am liebsten Lachs, Tiger Pute. Nicht an kommt bei Minka Rind.',
                                                                                  ['vor 5 Min.', 'Lachs', 'Lachs', 'Pute', 'Rind']] and house['height'] == 108 and house['dots'],
@@ -771,7 +771,7 @@ async def test_remind(browser, url):
 
 
 FEED_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), at = (day, time) => new Date(`2026-06-${String(day).padStart(2, '0')}T${time}`).getTime();
-  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1, photos: {}}];
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['nass', 'Lachs', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '000001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
   d.servings = [3, 4, 5, 6, 7, 8, 9].flatMap(day => [[day, '07:15'], [day, '18:30']]).map(([day, time], i) => ({id: 'meal0000' + String(i).padStart(2, '0'), productId: 'nass000001', servedAt: at(day, time), note: '',
     pets: {minka00001: {r: 'gut', at: at(day, time)}}}));
@@ -1474,74 +1474,23 @@ async def test_crop(browser, url):
     await ctx.close()
 
 
-async def test_album(browser, url):
-    print('the album in the pet sheet')
-    files = make_pictures()
-    ctx, pg, errors = await one_pet(browser, url)
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=add-pet]'); await idle(pg)
-    check(await pg.locator('#sheet .album').count() == 0, 'a new pet: the album only exists once it has been created')
-    await pg.click('[data-action=close]'); await idle(pg)
-    await open_pet(pg)
-    head = await pg.evaluate("[...document.querySelectorAll('#sheet .label')].map(l => l.innerText)")
-    check('Fotos' in head and await pg.locator('#sheet label.ph.add[for=albumInput]').count() == 1 and await pg.get_attribute('#albumInput', 'multiple') is not None,
-          f'the pet sheet with a „Fotos“ section, adding through a multiple selection from the gallery ({head})')
-    await pg.evaluate("import('./js/store.js').then(m => { const saved = m.hooks.saved; window.__saves = 0; m.hooks.saved = () => { window.__saves++; saved(); }; })")
-    await pg.set_input_files('#albumInput', files[:5]); await idle(pg)
-    keys = await state(pg, "Object.keys(db.pets[0].photos).sort()")
-    check(await pg.evaluate('window.__saves') == 5, 'every photo is saved at once: if the app is killed while adding, whatever finished stays')
-    t = await pg.inner_text('#toast')
-    dims = await pg.evaluate("""import('./js/store.js').then(s => Promise.all(Object.keys(s.db.pets[0].photos).sort().map(k => new Promise(d => { const i = new Image();
-      i.onload = () => d([i.width, i.height, s.db.pets[0].photos[k].slice(0, 23)]); i.src = s.db.pets[0].photos[k]; }))))""")
-    check(len(keys) == 5 and '5 Fotos hinzugefügt' in t and dims[0] == [960, 480, 'data:image/jpeg;base64,'] and dims[1][:2] == [300, 200],
-          f'five photos added: JPEG as a data URL, longest side at most 960 px ({dims[0][:2]}, {dims[1][:2]})')
-    await pg.set_input_files('#albumInput', files[5:]); await idle(pg)
-    t = await pg.inner_text('#toast')
-    check(await state(pg, "Object.keys(db.pets[0].photos).length") == 8 and 'Höchstens 8 Fotos. 3 hinzugefügt.' in t and await pg.locator('#sheet .ph.add').count() == 0
-          and 'Fotos (8 von 8)' in await pg.inner_text('#sheet'), f'up to 8 photos: three of five more are added, after which there is no adding left („{t.strip()}“)')
-    await shot(pg, 'album')
-    keys = await state(pg, "Object.keys(db.pets[0].photos).sort()")
-    gone = await state(pg, f"db.pets[0].photos['{keys[2]}']")
-    await pg.click(f'#sheet .ph-x[data-key="{keys[2]}"]'); await idle(pg)
-    t = await pg.inner_text('#toast')
-    check(await state(pg, "Object.keys(db.pets[0].photos).length") == 7 and 'Foto entfernt' in t and await pg.locator('#toast [data-action=undo]').count() == 1
-          and await pg.locator('#sheet .ph-img').count() == 7, 'removal through the cross, with undo in the toast')
-    await pg.click('#toast [data-action=undo]'); await idle(pg)
-    check(await state(pg, f"Object.keys(db.pets[0].photos).sort().join() === '{','.join(keys)}' && db.pets[0].photos['{keys[2]}'].length") == len(gone)
-          and await pg.locator('#sheet .ph-img').count() == 8, 'undo: the photo is back, in the same place')
-    await pg.reload(); await started(pg)
-    check(await state(pg, "Object.keys(db.pets[0].photos).length") == 8, 'the album survives a restart')
-    # „Als Profilbild“ (set as the profile picture)
-    await open_pet(pg)
-    check(await pg.locator('[data-action=album-profile]').count() == 0, 'without a chosen photo there is no „Als Profilbild“')
-    await pg.click(f'#sheet .ph-img[data-key="{keys[0]}"]'); await idle(pg)
-    await pg.click('[data-action=album-profile]'); await idle(pg)
-    z = await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet.step, m.sheet.crop.w, m.sheet.crop.h])")
-    check(z == ['crop', 960, 480], f'„Als Profilbild“ on a photo opens the crop with that photo ({z})')
-    await pg.click('[data-action=crop-apply]'); await idle(pg)
-    await pg.click('[data-action=save-pet]'); await idle(pg)
-    check(await state(pg, "db.pets[0].photo.startsWith('data:image/jpeg') && Object.keys(db.pets[0].photos).length === 8"), 'taken over and saved, and the album is left unchanged')
-    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
-    await ctx.close()
-
-
-SET_ALBUMS = """albums => import('./js/store.js').then(async s => { const b64 = async u => { const r = await fetch(u), buf = new Uint8Array(await r.arrayBuffer()); let t = ''; for (const x of buf) t += String.fromCharCode(x);
-    return 'data:image/png;base64,' + btoa(t); };
-  s.db.pets = []; let n = 0;
-  for (const [name, urls] of albums) { const photos = {}; for (const u of urls) photos['foto' + String(n++).padStart(4, '0')] = await b64(u);
-    s.db.pets.push({id: 'pet' + name.toLowerCase() + '001', name, species: 'Katze', photo: null, photos, createdAt: 1}); }
+SET_PETS = """pets => import('./js/store.js').then(async s => { const b64 = async u => { const r = await fetch(u), buf = new Uint8Array(await r.arrayBuffer()); let t = '';
+    for (const x of buf) t += String.fromCharCode(x); return 'data:image/png;base64,' + btoa(t); };
+  s.db.pets = [];
+  for (const [name, url] of pets) s.db.pets.push({id: 'pet' + name.toLowerCase() + '001', name, species: 'Katze', photo: url ? await b64(url) : null, createdAt: 1});
   s.prefs.activePet = 'all'; s.save(); s.savePrefs(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
-MOOD = """() => { const m = document.getElementById('mood'), on = m.querySelector('img.on'), s = getComputedStyle(m), i = on && getComputedStyle(on);
-  return {hidden: m.hidden || s.display === 'none', on: on ? on.src.slice(-40) : null, n: m.querySelectorAll('img.on').length, opacity: i && +(+i.opacity).toFixed(2)}; }"""
+MOOD = """() => { const m = document.getElementById('mood'), img = m.querySelector('img'), s = getComputedStyle(m), i = getComputedStyle(img);
+  return {hidden: m.hidden || s.display === 'none', src: img.getAttribute('src') ? img.src.slice(-40) : null,
+    n: m.querySelectorAll('img').length, opacity: +(+i.opacity).toFixed(2)}; }"""
 
 
 RGB_OF = """(list => list.map(c => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); }))"""
 
 
 async def test_mood(browser, url):
-    print('the mood picture on the home page')
+    print('the mood picture on the home page: the pet\u2019s profile picture')
     make_pictures()
     dist = url.rsplit('/', 1)[0]  # the test photos are not under www: served as a data URL through a route
     for scheme in ('light', 'dark'):
@@ -1552,14 +1501,19 @@ async def test_mood(browser, url):
         await ctx.route('**/testfoto/*', pictures)
         pg, errors = await open_page(ctx, url, native=True)
         pic = lambda n: f'{dist}/testfoto/{n}'
-        await pg.evaluate(SET_ALBUMS, [['Minka', [pic('quadrants.png'), pic('black.png')]], ['Tiger', [pic('white.png')]], ['Kiwi', []]]); await idle(pg)
-        srcs = await state(pg, "db.pets.flatMap(p => Object.keys(p.photos).sort().map(k => p.photos[k].slice(-40)))")
-        css = await pg.evaluate("""() => { const m = document.getElementById('mood'), s = getComputedStyle(m), i = getComputedStyle(m.querySelector('img.on')), r = m.getBoundingClientRect(), b = document.querySelector('.brand').getBoundingClientRect();
+
+        async def pick(who):
+            await pg.evaluate(f"import('./js/store.js').then(async s => {{ s.prefs.activePet = '{who}'; (await import('./js/views/home.js')).renderHome(); }})"); await idle(pg)
+
+        await pg.evaluate(SET_PETS, [['Minka', pic('quadrants.png')], ['Tiger', pic('photo0.jpg')], ['Kiwi', None]]); await idle(pg)
+        srcs = await state(pg, "db.pets.map(p => p.photo && p.photo.slice(-40))")
+        await pick('petminka001')
+        css = await pg.evaluate("""() => { const m = document.getElementById('mood'), s = getComputedStyle(m), i = getComputedStyle(m.querySelector('img')), r = m.getBoundingClientRect(), b = document.querySelector('.brand').getBoundingClientRect();
           return {pos: s.position, box: [r.left, r.top, r.width === document.documentElement.clientWidth, r.height], ptr: s.pointerEvents, mask: (s.maskImage || s.webkitMaskImage).startsWith('linear-gradient') && /rgba\\(0, 0, 0, 0\\)\\)$/.test(s.maskImage || s.webkitMaskImage),
-            fit: i.objectFit, opacity: +(+i.opacity).toFixed(2), filter: i.filter, trans: [i.transitionProperty, i.transitionDuration], front: document.elementFromPoint(b.left + 5, b.top + 10).className,
+            fit: i.objectFit, opacity: +(+i.opacity).toFixed(2), filter: i.filter, trans: i.transitionProperty, front: document.elementFromPoint(b.left + 5, b.top + 10).className,
             card: getComputedStyle(document.querySelector('#home .card')).backgroundColor, first: document.body.firstElementChild.id, aria: m.getAttribute('aria-hidden')}; }""")
         want = {'pos': 'absolute', 'box': [0, 0, True, 260], 'ptr': 'none', 'mask': True, 'fit': 'cover', 'opacity': .16 if scheme == 'light' else .26, 'filter': 'saturate(0.85)',
-                'trans': ['opacity', '2s'], 'front': 'brand', 'first': 'mood', 'aria': 'true'}
+                'trans': 'all', 'front': 'brand', 'first': 'mood', 'aria': 'true'}
         check({k: css[k] for k in want} == want and 'rgba' not in css['card'], f'layer ({scheme}): full width, 260 px, object-fit cover, opacity {want["opacity"]}, saturate(0.85), the mask fades right out at the bottom, and the cards sit in front unchanged ({css["box"]}, {css["opacity"]})')
         await shot(pg, f'{scheme}-mood')
         # Contrast of the wordmark: in the worst case an all-black or all-white photo sits behind it
@@ -1569,39 +1523,17 @@ async def test_mood(browser, url):
         if scheme == 'dark':
             await ctx.close()
             continue
-        # Which photos are picked per filter
-        first = await pg.evaluate(MOOD)
-        lists = {}
+        # Which picture the filter shows
+        shows = {}
         for who in ('all', 'petminka001', 'pettiger001', 'petkiwi001'):
-            await pg.evaluate(f"import('./js/store.js').then(async s => {{ s.prefs.activePet = '{who}'; (await import('./js/views/home.js')).renderHome(); }})"); await idle(pg)
-            lists[who] = [await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhotos().map(p => p.slice(-40)))"), (await pg.evaluate(MOOD))['hidden']]
-        check(first['on'] == srcs[0] and first['n'] == 1 and lists == {'all': [srcs, False], 'petminka001': [srcs[:2], False], 'pettiger001': [srcs[2:], False], 'petkiwi001': [[], True]},
-              '„Alle“ shows every pet\u2019s photos, a chosen pet only its own, and without album photos there is no layer')
+            await pick(who)
+            m = await pg.evaluate(MOOD)
+            shows[who] = [await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhoto().slice(-40))"), m['hidden'], m['n']]
+        check(shows == {'all': ['', True, 1], 'petminka001': [srcs[0], False, 1], 'pettiger001': [srcs[1], False, 1], 'petkiwi001': ['', True, 1]},
+              f'several pets: the chosen pet\u2019s profile picture, none under „Alle“ and none for a pet without a photo ({[v[1] for v in shows.values()]})')
         await pg.evaluate("import('./js/store.js').then(async s => { s.db.pets = s.db.pets.slice(0, 1); s.prefs.activePet = 'all'; s.save(); (await import('./js/views/home.js')).renderHome(); })"); await idle(pg)
-        check(await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhotos().length)") == 2 and await pg.locator('#pets').is_hidden(), 'with only one pet, that pet\u2019s photos')
-        # It changes every 12 seconds, only while the page is visible. The clock is stopped; only run_for moves it
-        await pg.clock.pause_at(await pg.evaluate('Date.now() + 100'))
-        shown = lambda: pg.evaluate("document.querySelector('#mood img.on')?.src.slice(-40)")
-        async def later(ms):
-            before = await shown()
-            await pg.clock.run_for(ms)
-            for _ in range(10):  # the next photo is decoded first, then swapped in
-                if await shown() != before:
-                    break
-                await asyncio.sleep(.03)
-            return await shown()
-        a = await shown()
-        for _ in range(13):  # the beat has run since the app started: up to just after the next change
-            b = await later(1000)
-            if b != a:
-                break
-        c, d = await later(10000), await later(2000)
-        check(a in srcs and b in srcs and [b != a, c, d] == [True, b, a] and (await pg.evaluate(MOOD))['n'] == 1, 'the photo changes every 12 seconds and not in between')
-        await pg.evaluate("Object.defineProperty(document, 'hidden', {get: () => true, configurable: true})")
-        e = await later(12000)
-        await pg.evaluate("delete document.hidden")
-        f = await later(12000)
-        check([e, f] == [d, b], 'no change while the page is not visible; afterwards it carries on')
+        check(await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhoto().slice(-40))") == srcs[0] and await pg.locator('#pets').is_hidden(),
+              'with only one pet, that pet\u2019s picture')
         # The choice in the settings: on or off, in the style of the other choices
         async def choose(v):
             await pg.click('[data-action=open-settings]'); await idle(pg)
@@ -1615,8 +1547,8 @@ async def test_mood(browser, url):
         off.append((await pg.evaluate(MOOD))['hidden'])
         seg2 = await choose('on')
         on = [await state(pg, 'prefs.backdrop'), (await pg.evaluate(MOOD))['hidden']]
-        check(seg == ['Tierfotos im Hintergrund', True, 'An*', 'Aus'] and seg2[2:] == ['An', 'Aus*'] and off == [False, True, True] and on == [True, False],
-              f'settings: „Tierfotos im Hintergrund“ as an An/Aus choice, on by default; off means no layer, across a restart too ({seg}, {off}, {on})')
+        check(seg == ['Profilbild im Hintergrund', True, 'An*', 'Aus'] and seg2[2:] == ['An', 'Aus*'] and off == [False, True, True] and on == [True, False],
+              f'settings: „Profilbild im Hintergrund“ as an An/Aus choice, on by default; off means no layer, across a restart too ({seg}, {off}, {on})')
         check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
         await ctx.close()
     old = []
@@ -1624,17 +1556,6 @@ async def test_mood(browser, url):
         ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'mode': 'lokal', 'backdrop': v}})
         old.append(await state(pg, 'prefs.backdrop')); await ctx.close()
     check(old == [True, False], f'the 1.1.0 setting is carried over: „Übersicht“ becomes on and „Aus“ stays off ({old})')
-    # Reduced motion: no change
-    ctx = await phone(browser, reduced_motion='reduce')
-    await ctx.clock.install()
-    await ctx.route('**/testfoto/*', pictures)
-    pg, errors = await open_page(ctx, url, native=True)
-    await pg.evaluate(SET_ALBUMS, [['Minka', [f'{dist}/testfoto/quadrants.png', f'{dist}/testfoto/black.png']]]); await idle(pg)
-    a = await pg.evaluate(MOOD)
-    await pg.clock.run_for(25000); await idle(pg)
-    b = await pg.evaluate(MOOD)
-    check(a['on'] and a == b and a['opacity'] == .16, 'under reduced motion nothing changes and the first photo stays put')
-    await ctx.close()
 
 
 async def test_camera(browser, url):
@@ -1706,8 +1627,7 @@ async def test_camera(browser, url):
     await pg.wait_for_function("document.querySelector('#toast').innerText.includes('Android-Einstellungen')"); await idle(pg)
     t = await pg.inner_text('#toast')
     check('Android-Einstellungen' in t and await state(pg, 'db.servings.length') == 4, f'when the camera app will not open either (Android blocks it once the permission is denied): a clear notice („{t.strip()}“)')
-    album = await pg.evaluate("[document.getElementById('petPhotoInput').hasAttribute('capture'), document.getElementById('albumInput').hasAttribute('capture')]")
-    check(album == [False, False], 'pet photos come from the gallery')
+    check(not await pg.evaluate("document.getElementById('petPhotoInput').hasAttribute('capture')"), 'the profile picture comes from the gallery')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -1908,5 +1828,5 @@ async def test_report(browser, url):
 
 run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-start': test_feed_start, 'suggestions': test_suggestions, 'milestones': test_milestones,
            'reminder': test_reminders, 'own-interval': test_remind, 'feed-reminder': test_feed_remind, 'pets': test_petbar, 'modes': test_modes, 'network': test_network, 'shortcuts': test_shortcuts,
-           'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'album': test_album, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
+           'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
           camera=('camera',))

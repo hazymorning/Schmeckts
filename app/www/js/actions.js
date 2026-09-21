@@ -17,7 +17,7 @@ import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} fr
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
 import {setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
-import {addAlbumPhotos, albumToProfile, closeCrop, deletePet, openPet, removeAlbumPhoto, savePet, setPetPhoto} from './logic/pets.js';
+import {closeCrop, deletePet, openPet, savePet, setPetPhoto} from './logic/pets.js';
 import {exportData, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 
@@ -142,10 +142,7 @@ const ACTIONS = {
   'save-pet'(){ savePet(); },
   'crop-apply'(){ closeCrop(true); },
   'crop-cancel'(){ closeCrop(false); },
-  'album-select'(el){ sheet.albumSel = sheet.albumSel === el.dataset.key ? null : el.dataset.key; haptic('select'); renderSheet(); },
-  'album-remove'(el){ removeAlbumPhoto(el.dataset.key); },
-  'album-profile'(){ albumToProfile(); },
-  backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // pet photos in the background
+  backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // the profile picture behind the header
   lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // product lookup on the internet, off by default
   'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // which button the feeding sheet shows
   'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // reminder to feed at the usual times
@@ -239,6 +236,5 @@ document.addEventListener('change', e => {
 const onFile = (id, fn) => $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; fn(f); });
 onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, should the photo button take it over
 onFile('#petPhotoInput', setPetPhoto);
-$('#albumInput').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; addAlbumPhotos(files); });
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);

@@ -220,7 +220,7 @@ def make_photo():
 
 
 def make_pictures():
-    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus plain ones for the album, one of them large"""
+    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus two plain ones"""
     from PIL import Image
     out = PACK.parent
     quad = Image.new('RGB', (800, 400))
@@ -228,12 +228,10 @@ def make_pictures():
         quad.paste(Image.new('RGB', (400, 200), color), (x, y))
     quad.save(out / 'quadrants.png')
     files = []
-    for i in range(10):
-        f = out / f'album{i}.jpg'
-        Image.new('RGB', (2400, 1200) if i == 0 else (300, 200), (25 * i, 255 - 25 * i, 120)).save(f, quality=80)
+    for i in range(2):
+        f = out / f'photo{i}.jpg'
+        Image.new('RGB', (300, 200), (25 * i, 255 - 25 * i, 120)).save(f, quality=80)
         files.append(str(f))
-    Image.new('RGB', (64, 64), (0, 0, 0)).save(out / 'black.png')
-    Image.new('RGB', (64, 64), (255, 255, 255)).save(out / 'white.png')
     return files
 
 
