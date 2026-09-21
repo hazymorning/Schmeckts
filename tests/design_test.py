@@ -417,20 +417,15 @@ def test_signing_key():
 
 
 def test_prompt():
-    """The photo recognition prompt lives only in shared/recognize-prompt.txt: app and server use the same text."""
-    shared = (ROOT / 'shared/recognize-prompt.txt').read_text(encoding='utf-8').strip()
-    module = (WWW / 'js/prompt.js').read_text(encoding='utf-8')
-    app = json.loads(re.search(r'export const PROMPT = (".*");', module, re.S).group(1))
-    server = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
+    """Photo recognition belongs to the server: it holds prompt and key, the app has neither."""
+    text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
     go = (ROOT / 'server/recognize.go').read_text(encoding='utf-8')
-    head = shared.split('\n')[0]
-    check(len(shared) > 100 and app == shared and server == shared and '//go:embed recognize-prompt.txt' in go
-          and head not in go and head not in (WWW / 'js/recognize.js').read_text(encoding='utf-8'),
-          'app and server use the same prompt, and it lives only in shared/recognize-prompt.txt')
-    check("from './prompt.js'" in (WWW / 'js/recognize.js').read_text(encoding='utf-8')
-          and 'shared/recognize-prompt.txt' in (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
-          and "'app/www/js/prompt.js'" in (ROOT / 'scripts/pack.py').read_text(encoding='utf-8'),
-          'prepare.py generates the module and the copy, and only the file in shared/ is packed')
+    check(len(text) > 100 and '//go:embed recognize-prompt.txt' in go and text.split('\n')[0] not in go,
+          'the server embeds the prompt from recognize-prompt.txt and keeps it nowhere else')
+    app = '\n'.join(p.read_text(encoding='utf-8') for p in sorted(WWW.rglob('*.js')))
+    check('api.anthropic.com' not in app and 'data-setting="aiKey"' not in app
+          and not (WWW / 'js/prompt.js').exists() and text.split('\n')[0] not in app,
+          'the app has no key of its own for photo recognition, and no prompt')
 
 
 async def test_files(browser, url):

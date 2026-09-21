@@ -44,10 +44,9 @@ async def test_tour(browser, url, scheme='light'):
     meta = await pg.eval_on_selector('meta[name=theme-color]', 'm => m.content')
     check(bg == meta and await pg.get_attribute('html', 'data-theme') == other, f'theme switched: the background and the browser bar follow ({meta})')
     rows = await pg.eval_on_selector_all('#serverBox .label, #serverBox .btn, #serverBox input', "l => l.map(e => e.innerText?.trim() || e.id)")
-    check(rows == ['Produktsuche im Internet', 'Eigener KI-Schlüssel', 'f-aikey', 'Austausch von Hand', 'Änderungen teilen',
-                   'Austausch empfangen', 'Mit Haushalt verbinden']
-          and await pg.locator('#f-code, #f-server').count() == 0 and await pg.locator('#f-aikey[type=password]').count() == 1,
-          f'settings, section „Haushalt“ in mode `lokal`: product lookup, masked key, exchange, connect ({rows})')
+    check(rows == ['Produktsuche im Internet', 'Austausch von Hand', 'Änderungen teilen',
+                   'Austausch empfangen', 'Mit Haushalt verbinden'] and await pg.locator('#f-code, #f-server').count() == 0,
+          f'settings, section „Haushalt“ in mode `lokal`: product lookup, exchange, connect ({rows})')
     await pg.locator('#serverBox').scroll_into_view_if_needed()
     await shot(pg, f'{scheme}-settings')
     await pg.click('[data-action=close]'); await idle(pg)
@@ -864,7 +863,7 @@ SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn
 
 PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
            'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-           'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
+           'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Haushalt“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
            'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
            'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.']
 
@@ -967,8 +966,8 @@ async def test_modes(browser, url):
     check(not found, f'mode `lokal`: no trace of server, sync or recognition anywhere (welcome, „So geht’s“, settings, feeding, photo, scanning) {found}')
     check(await pg.locator('#syncChip').is_hidden(), 'no sync notice in the header')
     foreign = [r for r in requests if not r.startswith((url.rsplit('/', 1)[0], 'data:', 'blob:'))]
-    check(len(requests) > 20 and not foreign and await state(pg, '!prefs.lookup && !prefs.aiKey'),
-          f'mode `lokal`: not a single network request except to the app itself, as long as product lookup and the own key are off ({len(requests)} requests) {foreign[:3]}')
+    check(len(requests) > 20 and not foreign and await state(pg, '!prefs.lookup'),
+          f'mode `lokal`: not a single network request except to the app itself, as long as the product lookup is off ({len(requests)} requests) {foreign[:3]}')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     data = await pg.eval_on_selector_all('#sheet .btn-col:has([data-action=open-privacy]) > *', "l => l.map(b => [b.innerText.trim(), b.classList.contains('btn'), !!b.querySelector('svg')])")
     check([d[0] for d in data] == ['Backup exportieren', 'Backup importieren', 'Beispieldaten laden', 'Datenschutz', 'Alle Daten löschen'] and all(d[1] and d[2] for d in data)
@@ -1185,9 +1184,9 @@ OFF_HIT = {'status': 1, 'product': {'product_name_de': 'Sheba Fresh Choice Huhn 
 
 
 async def test_recognize(browser, url):
-    print('the recognition chain: known code, product lookup, server, own key, text on the device')
-    fail = {'online': False, 'server': False, 'key': False}      # so that each stage can be made to fail on purpose
-    seen = {'online': 0, 'key': 0, 'headers': {}}
+    print('the recognition chain: known code, product lookup, server, text on the device')
+    fail = {'online': False, 'server': False}                     # so that each stage can be made to fail on purpose
+    seen = {'online': 0}
 
     async def off_route(route, request):                          # Open Pet Food Facts and Open Food Facts
         seen['online'] += 1
@@ -1197,21 +1196,6 @@ async def test_recognize(browser, url):
         found = 'openpetfoodfacts' in request.url and '4008429087455' in request.url
         await route.fulfill(status=200, content_type='application/json', headers={'access-control-allow-origin': '*'},
                             body=json.dumps(OFF_HIT if found else {'status': 0}))
-
-    async def ai_route(route, request):                           # api.anthropic.com, the own key
-        cors = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'}
-        if request.method == 'OPTIONS':
-            await route.fulfill(status=204, headers=cors)
-            return
-        seen['key'] += 1
-        seen['headers'] = {k: v for k, v in request.headers.items() if k.startswith(('x-api', 'anthropic'))}
-        seen['body'] = json.loads(request.post_data)
-        if fail['key']:
-            await route.fulfill(status=401, headers=cors, content_type='application/json', body='{"error":"nope"}')
-            return
-        answer = '{"brand":"Cosma","variety":"Thunfisch","type":"Nassfutter","animal":"Katze"}'
-        await route.fulfill(status=200, headers=cors, content_type='application/json',
-                            body=json.dumps({'content': [{'type': 'text', 'text': answer}]}))
 
     async def srv_route(route, request):                          # the household server
         path, now = request.url.split(':8486')[1], int(time.time() * 1000)
@@ -1234,7 +1218,7 @@ async def test_recognize(browser, url):
 
     ctx = await phone(browser)
     for pattern, handler in (('https://world.openpetfoodfacts.org/**', off_route), ('https://world.openfoodfacts.org/**', off_route),
-                             ('https://api.anthropic.com/**', ai_route), (f'{SRV}/**', srv_route)):
+                             (f'{SRV}/**', srv_route)):
         await ctx.route(pattern, handler)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('.welcome [data-action=add-pet]'); await idle(pg)
@@ -1301,34 +1285,23 @@ async def test_recognize(browser, url):
     got = await ident(photo='AAA')
     check(got['source'] == 'server' and got['details']['variety'] == 'Gold Pastete', f'connected: the server recognises the photo ({got.get("details")})')
 
-    # The own key: the right headers, and it steps in when the server cannot
-    fail['server'] = True
-    await setp(aiKey='sk-ant-test')
-    got = await ident(photo='AAA')
-    check(got['source'] == 'key' and got['details']['brand'] == 'Cosma' and seen['headers'].get('x-api-key') == 'sk-ant-test'
-          and seen['headers'].get('anthropic-version') == '2023-06-01' and seen['headers'].get('anthropic-dangerous-direct-browser-access') == 'true'
-          and seen['body']['model'] == 'claude-sonnet-5' and 'pet food packaging' in seen['body']['messages'][0]['content'][1]['text'],
-          f'the own key: a direct call with the server\u2019s headers and model ({seen["headers"]})')
-
     # Every stage falls through cleanly to the next, cheapest first
     await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
     await setp(lookup=True)
     chain = []
-    fail.update(online=False, server=False, key=False)
+    fail.update(online=False, server=False)
     chain.append((await ident(code='4008429087455', photo='AAA'))['source'])   # product lookup before the server
     fail['online'] = True
     chain.append((await ident(code='96385074', photo='AAA'))['source'])        # product lookup broken → server
     fail['server'] = True
-    chain.append((await ident(code='96385074', photo='AAA'))['source'])        # server broken → own key
-    fail['key'] = True
-    chain.append((await ident(code='96385074', photo='AAA'))['source'])        # key broken → text on the device
+    chain.append((await ident(code='96385074', photo='AAA'))['source'])        # server broken → text on the device
     await pg.evaluate("window.__ocrText = ''")
     chain.append((await ident(code='96385074', photo='AAA'))['source'])        # nothing works → an empty form
-    check(chain == ['online', 'server', 'key', 'text', ''], f'the chain: every stage works and every one falls through cleanly ({chain})')
+    check(chain == ['online', 'server', 'text', ''], f'the chain: every stage works and every one falls through cleanly ({chain})')
     await pg.evaluate("p => import('./js/store.js').then(m => { m.db.products[0].codes = {'4008429087455': true}; })")
     first = await ident(code='4008429087455', photo='AAA')
     check(first['source'] == 'codes' and len(first['products']) == 1, f'a barcode already known in the household beats everything ({first["source"]})')
-    await setp(code='', server='', aiKey='', lookup=False)
+    await setp(code='', server='', lookup=False)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)[:2]}')
     await ctx.close()
 
@@ -1360,7 +1333,7 @@ async def test_exchange(browser, url):
     ctx_a, a, err_a = await seeded(browser, url, {'db': SAVED}, native=True)
     ctx_b = await phone(browser)
     b, err_b = await open_page(ctx_b, url, native=True)
-    await a.evaluate("import('./js/store.js').then(m => { m.prefs.aiKey = 'sk-ant-geheim'; m.savePrefs(); })")
+    await a.evaluate("import('./js/store.js').then(m => { m.prefs.name = 'Geheimniskraemer'; m.savePrefs(); })")
 
     # First share: everything, with our own clocks, without any settings
     await settings(a)
@@ -1370,7 +1343,7 @@ async def test_exchange(browser, url):
     shared = ['share' == c[0] for c in await a.evaluate('window.__calls')]
     check(sorted(file) == ['app', 'at', 'clocks', 'device', 'kind', 'protocol', 'records'] and file['app'] == 'schmeckts'
           and file['kind'] == 'exchange' and len(file['records']) == 5 and len(file['clocks']['servings']) == 3
-          and 'sk-ant' not in text and any(shared),
+          and 'Geheimniskraemer' not in text and any(shared),
           f'first share: all {len(file["records"])} records including clocks, nothing from the settings')
     await shot(a, 'exchange-share')
 

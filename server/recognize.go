@@ -45,7 +45,7 @@ type recognizeError struct {
 
 func (e *recognizeError) Error() string { return e.msg }
 
-// promptText lives in shared/recognize-prompt.txt; scripts/prepare.py writes the copy here and the app's module,
+// promptText lives in recognize-prompt.txt, next to this file, because //go:embed cannot reach outside the package,
 // so that server and app use the same text (test: tests/design_test.py).
 //
 //go:embed recognize-prompt.txt

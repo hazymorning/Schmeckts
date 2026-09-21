@@ -59,7 +59,7 @@ The first time you start the app you decide how you want to use it. You can swit
 |---|---|---|
 | Feed, rate, evaluate | yes | yes |
 | Read packaging text | yes | yes |
-| Recognise brand and variety from a photo | only with your own AI key | yes |
+| Recognise brand and variety from a photo | no | yes |
 | Look up unknown barcodes | on request | yes |
 | Share entries with others | manually, as a file | automatically |
 
@@ -84,9 +84,9 @@ New versions go straight over the old one — same steps, your entries stay. The
 - Your entries and photos stay inside the app. They end up neither in the gallery nor in Google’s cloud backup.
 - No ads, no trackers.
 - If you use the app on your phone alone, nothing leaves it. The packaging text is read on the device. The one exception is the barcode scanner: it comes from Google and, according to Google, reports no images but does report general device data such as the model.
-- Two settings you can switch on yourself: looking up unknown barcodes in open product databases (only the number is transmitted) and your own AI key for photo recognition. Both are off by default.
+- One setting you can switch on yourself: looking up unknown barcodes in open product databases. Only the number is transmitted, and it is off by default.
 - In a household the app only talks to your own server. From there the photo of the packaging goes on for recognition, and unknown barcodes are looked up in open product databases. Nothing else leaves the phone, in particular nothing about your animals.
-- An exchange file contains only animals, varieties and meals — no settings, no household code and no key.
+- An exchange file contains only animals, varieties and meals — no settings and no household code.
 - The app needs the camera for photos. It only asks about notifications once you switch a reminder on.
 
 ## The household server

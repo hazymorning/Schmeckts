@@ -350,7 +350,7 @@ function serverSection(notice = syncInfo()){
     ${deviceSection()}`;
 }
 
-/* This phone's settings and routes: product lookup on the internet, the own AI key and the manual exchange.
+/* This phone's settings and routes: product lookup on the internet and the manual exchange.
    The notes say what goes out in each case. After receiving, the report sits here and, when the other device is
    missing something, „Antwort senden“ (sheet.exchange, see logic/exchange.js). */
 function deviceSection(){
@@ -359,10 +359,6 @@ function deviceSection(){
     <p class="hint">${prefs.lookup ? 'Bei unbekannten Barcodes fragt dieses Handy zwei freie Produktdatenbanken. Übertragen wird nur die Nummer.'
       : 'Unbekannte Barcodes führen gleich zum Foto. Es geht keine Nummer hinaus.'}</p>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${prefs.lookup === (v === 'on')}" data-action="lookup" data-v="${v}">${l}</button>`).join('')}</div>
-    <label class="label" for="f-aikey">Eigener KI-Schlüssel</label>
-    <p class="hint">Mit einem eigenen Schlüssel von Anthropic liest Claude die Packung vom Foto, etwa ein halber Cent je Foto. Der Schlüssel liegt nur auf diesem Handy.</p>
-    <input id="f-aikey" class="field" type="password" data-setting="aiKey" value="${esc(prefs.aiKey)}" placeholder="sk-ant-…"
-      autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
     <span class="label">Austausch von Hand</span>
     <p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält nur Tiere, Futter und Mahlzeiten.</p>
     <div class="btn-col">
@@ -391,7 +387,7 @@ export function paintServerBox(fresh = false){
 /* Datenschutz: explains both modes factually, without promises; opened from the settings, section „Daten“ */
 const PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Haushalt“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
   'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.'];
 const viewPrivacy = () => `<div class="sh-head"><h2>Datenschutz</h2>${closeBtn}</div><div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
