@@ -33,9 +33,7 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('[data-action=expand][data-v=shop]'); await idle(pg)
     check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'shopping unfolded: every variety')
     await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
-    n = await pg.locator('[data-sec=hist] .tl-item').count()
-    await pg.click('[data-sec=hist] .card-btn'); await idle(pg)
-    check(n == 5 and await pg.locator('[data-sec=hist] .tl-item').count() == 10, '„Weitere anzeigen“ shows five more meals')
+    check(await pg.locator('[data-sec=hist] .tl-item').count() == 5, 'the history shows five meals')
     await shot(pg, f'{scheme}-unfolded')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     other = 'dark' if scheme == 'light' else 'light'
@@ -222,7 +220,7 @@ async def test_cards(browser, url):
     await pg.keyboard.press(' '); await idle(pg)
     check(await pg.inner_text('[data-sec=shop] [data-action=expand]') == 'Alle anzeigen' and await pg.locator('[data-action=share-list]').count() == 0 and await pg.locator('[data-sec=shop] .bar').count() == 0, 'space folds it shut again')
     ins = await pg.eval_on_selector('[data-sec=ins]', 'c => [c.querySelectorAll(".ins li").length, [...c.querySelectorAll(".card-btn")].map(b => b.innerText)]')
-    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen', 'Zur Auswertung']], f'insights folded up: the most important one, with „Alle anzeigen“ and „Zur Auswertung“ below ({ins}, {m["ins"]} in total)')
+    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen']], f'insights folded up: the most important one, with „Alle anzeigen“ below ({ins}, {m["ins"]} in total)')
     await pg.tap('[data-sec=ins] [data-action=expand]'); await idle(pg)
     check(await pg.locator('[data-sec=ins] .ins li').count() == m['ins'] and await pg.inner_text('[data-sec=ins] [data-action=expand]') == 'Weniger anzeigen', 'a tap shows every insight')
     await pg.reload(); await started(pg)
@@ -1752,96 +1750,78 @@ async def test_suggestions(browser, url):
 
 
 async def test_home_history(browser, url):
-    print('the history on the home page: five meals, loading more up to twenty, then the evaluation')
+    print('the history on the home page: five meals, a calendar, and the button to the evaluation')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [26, 1]); await idle(pg)
-    items = lambda: pg.locator('[data-sec=hist] .tl-item').count()
-    btn = lambda: pg.eval_on_selector_all('[data-sec=hist] .card-btn', 'l => l.map(b => [b.innerText, b.dataset.action, b.dataset.v || ""])')
-    cal = lambda: pg.eval_on_selector('[data-sec=hist] .cal', 'c => c.innerHTML')
-    first, before = await items(), await cal()
-    check(first == 5 and await btn() == [['Weitere anzeigen', 'more-history', '']] and await pg.locator('[data-sec=hist] .tl-day').count() == 5,
-          f'five meals to begin with, grouped by day, with „Weitere anzeigen“ below ({first})')
-    steps = []
-    for _ in range(4):
-        if await pg.locator('[data-action=more-history]').count():
-            await pg.click('[data-action=more-history]'); await idle(pg)
-        steps.append(await items())
-    check(steps == [10, 15, 20, 20] and await btn() == [['Ganzer Verlauf', 'open-report', 'hist']],
-          f'five more at a time up to twenty, then „Ganzer Verlauf“ ({steps})')
-    check(await cal() == before, 'the two-week calendar stays unchanged while that happens')
-    await pg.click('[data-action=open-report]'); await idle(pg)
-    at_hist = await pg.evaluate("""(() => { const b = document.getElementById('ab-hist'), s = document.querySelector('.sheet-body');
-      return [!!b, Math.round(b.getBoundingClientRect().top - s.getBoundingClientRect().top)]; })()""")
-    check(await pg.inner_text('#sheet .sh-head h2') == 'Auswertung' and at_hist[0] and abs(at_hist[1]) < 4,
-          f'„Ganzer Verlauf“ opens the evaluation at the history section ({at_hist})')
+    btn = await pg.eval_on_selector('[data-sec=hist] [data-action=open-report]', 'b => [b.innerText.trim(), b.classList.contains("btn"), !!b.querySelector("svg")]')
+    check(await pg.locator('[data-sec=hist] .tl-item').count() == 5 and await pg.locator('[data-sec=hist] .tl-day').count() == 5
+          and btn == ['Auswertung', True, True] and await pg.locator('[data-sec=hist] .card-btn').count() == 0,
+          f'five meals grouped by day, and below them one proper button to the evaluation ({btn})')
+    # A day in the calendar: near ones scroll on the home page, older ones open the evaluation there
+    days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
+    await pg.click(f'[data-action=jump-day][data-day="{days[-1]}"]'); await idle(pg)
+    near = await pg.evaluate("k => [document.getElementById('sheet').open, !!document.getElementById('d-' + k)]", days[-1])
+    await pg.click(f'[data-action=jump-day][data-day="{days[0]}"]'); await idle(pg)
+    at_day = await pg.evaluate("""k => { const d = document.getElementById('d-' + k), s = document.querySelector('.sheet-body');
+      return [document.getElementById('sheet').open, !!d, Math.round((d?.getBoundingClientRect().top ?? 0) - s.getBoundingClientRect().top)]; }""", days[0])
+    check(near == [False, True] and at_day[:2] == [True, True] and 0 <= at_day[2] < 24,
+          f'a day still on show scrolls, an older one opens the evaluation right at it ({near}, {at_day})')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
-    await pg.reload(); await started(pg)
-    check(await items() == 5, 'after a restart the history starts at five again')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
 
-REPORT_SECTIONS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h => h.id)"
+REPORT_HEADS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h => h.innerText)"
 
 
 async def test_report(browser, url):
-    print('the evaluation: span, pet filter, sections, history, text descriptions')
+    print('the evaluation: brands, the whole history, the pet filter')
     ctx = await browser.new_context(viewport={'width': 400, 'height': 860}, timezone_id='Europe/Berlin', reduced_motion='reduce')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-20T10:00:00+02:00')
     await pg.evaluate(HOUSE, [house_meals()]); await idle(pg)
     await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=open-report]'); await idle(pg)
-    spans = await pg.eval_on_selector_all('#sheet [data-action=report-span]', 'l => l.map(b => [b.innerText, b.getAttribute("aria-pressed")])')
-    short, short_n = await pg.evaluate(REPORT_SECTIONS), await pg.locator('#sheet .tl-item').count()
-    check(spans == [['30 Tage', 'true'], ['90 Tage', 'false'], ['Alles', 'false']] and short[0] == 'ab-trend',
-          f'the span switch at the top, „30 Tage“ by default, and the page starts at the beginning ({spans})')
-    await pg.click('#sheet [data-action=report-span][data-v="0"]'); await idle(pg)
-    full, full_n = await pg.evaluate(REPORT_SECTIONS), await pg.locator('#sheet .tl-item').count()
-    check([short_n, full_n] == [10, 18] and 'ab-hist' in short and set(short) <= set(full),
-          f'the span applies to the whole page, and sections without enough data are left out ({short_n} → {full_n} meals, {short} → {full})')
-    says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
-    labels = await pg.eval_on_selector_all('#sheet [role=img]', 'l => l.map(x => (x.getAttribute("aria-label") || "").length)')
-    check(len(says) == len(full) - 1 and all(s.endswith('.') for s in says) and len(labels) == len(says) and all(n > 20 for n in labels),
-          f'every graphic with a sentence below it and a text description ({len(says)} sentences, {labels})')
+    check(await pg.locator('#sheet [data-action=open-report]').count() == 0, 'the settings no longer lead to the evaluation')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+    heads, n = await pg.evaluate(REPORT_HEADS), await pg.locator('#sheet .tl-item').count()
     head = await pg.inner_text('#sheet .sh-head h2')
-    check(head == 'Auswertung für alle Tiere' and await pg.locator('#sheet .plot polyline').count() == 2
-          and await pg.eval_on_selector_all('#sheet .legend .key', 'l => l.map(k => k.innerText)') == ['Minka', 'Tiger'],
-          f'two pets: two lines with a legend, and the filter in the heading ({head})')
+    check(heads == ['Marken', 'Verlauf'] and n == 18 and head == 'Auswertung für alle Tiere'
+          and await pg.locator('#sheet .seg, #sheet .card-btn').count() == 0,
+          f'two sections, every meal at once, nothing to set ({heads}, {n} meals, {head})')
+    rows = await pg.eval_on_selector_all('#sheet .lv', "l => l.map(e => [e.querySelector('.lv-name').innerText, parseInt(e.querySelector('.lv-n').innerText)])")
+    says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
+    label = await pg.get_attribute('#sheet .bars', 'aria-label')
+    check(len(rows) == 6 and [r[1] for r in rows] == sorted((r[1] for r in rows), reverse=True) and rows[0][0] in says[0]
+          and len(says) == 1 and says[0].endswith('.') and len(label) > 20,
+          f'the brands as bars, best first, with one sentence and a text description ({rows})')
+    await shot(pg, 'report')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.click('[data-action=filter][data-id=minka00001]'); await idle(pg)
-    await pg.click('[data-sec=ins] [data-action=open-report]'); await idle(pg)
-    head = await pg.inner_text('#sheet .sh-head h2')
-    check(head == 'Auswertung für Minka' and await pg.locator('#sheet .plot polyline').count() == 1 and await pg.locator('#sheet .legend').count() == 0,
-          f'the home page\u2019s pet filter: one line without a legend, and the name in the heading ({head})')
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+    head, mine = await pg.inner_text('#sheet .sh-head h2'), await pg.locator('#sheet .tl-item').count()
+    check(head == 'Auswertung für Minka' and 0 < mine < n, f'the pet filter carries over into the evaluation ({head}, {mine} of {n} meals)')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.click('[data-action=filter][data-id=all]'); await idle(pg)
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
       s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=open-report]'); await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
     hint = await pg.eval_on_selector_all('#sheet .hint', 'l => l.map(x => x.innerText)')
-    check(await pg.evaluate(REPORT_SECTIONS) == ['ab-hist'] and hint == ['Ab 3 Bewertungen in diesem Zeitraum zeigt diese Seite, was ankommt.'],
+    check(await pg.evaluate(REPORT_HEADS) == ['Verlauf'] and hint == ['Ab 3 Bewertungen zeigt diese Seite, was ankommt.'],
           f'too little data: one sentence about when it starts; the history stays ({hint})')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
-    # Loading more in the history, and how it looks at 360 px in light and dark
+    # How it looks at 360 px in light and dark
     for scheme in ('light', 'dark'):
         ctx = await browser.new_context(viewport={'width': 360, 'height': 760}, color_scheme=scheme, reduced_motion='reduce')
         pg, errors = await open_page(ctx, url)
         await pg.evaluate(SORTS, [26, 1]); await idle(pg)
-        await pg.click('[data-action=open-settings]'); await idle(pg)
-        await pg.click('#sheet [data-action=open-report]'); await idle(pg)
-        was = await pg.locator('#sheet .tl-item').count()
-        await pg.click('#sheet [data-action=report-more]'); await idle(pg)
-        now = await pg.locator('#sheet .tl-item').count()
-        check([was, now] == [20, 26], f'the evaluation\u2019s history loads 20 more at a time ({was} → {now})')
-        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .wd-col b, #sheet .chart-y span, #sheet .why, #sheet h3.label')]
+        await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .why, #sheet h3.label')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
-        chart = await pg.eval_on_selector('#sheet .chart', 'c => [Math.round(c.getBoundingClientRect().width), Math.round(c.getBoundingClientRect().height)]')
-        check(not wide and chart[0] <= 360 and chart[1] > 80, f'{scheme}, 360 px: nothing clipped and the graphic holds up ({chart}, {wide})')
+        check(await pg.locator('#sheet .tl-item').count() == 26 and not wide, f'{scheme}, 360 px: all 26 meals at once, nothing clipped ({wide})')
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
 
