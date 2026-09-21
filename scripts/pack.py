@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Packs all sources into two text files, for passing the project on:
 dist/schmeckts-sources.txt         app, tests, scripts, PROJECT.md (first, so that it gets read first)
-dist/schmeckts-server-sources.txt  server/, packaging/, scripts/build-deb.sh, docs/INSTALLATION.md
+dist/schmeckts-server-sources.txt  server/, which is everything the server is
 The server file only changes with the server, which is why its header names the server's version. Left out is
 everything scripts/prepare.py or the build regenerates (node_modules, app/android, fonts, icons).
 scripts/unpack.py reads them back, both into the same folder."""
@@ -9,7 +9,7 @@ import json, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKIP_DIRS = {'node_modules', 'android', 'dist', '.gradle', '.git'}
-SERVER = ('server/', 'packaging/', 'scripts/build-deb.sh', 'docs/INSTALLATION.md')
+SERVER = 'server/'   # everything the server is lives in that one folder
 MARK = re.compile(r'^===== FILE: ', re.M)
 
 
