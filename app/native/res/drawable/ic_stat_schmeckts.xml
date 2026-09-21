@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kleines Icon der Benachrichtigung (Erinnerung zum Bewerten): design/schmeckts-zeichen-einfarbig.svg im 24er Raster,
-     einfarbig auf transparentem Grund. Android nutzt nur die Form, die Farbe kommt aus capacitor.config.json (iconColor). -->
+<!-- The notification's small icon (rating reminder): design/schmeckts-mark-mono.svg on a 24 grid, monochrome on a
+     transparent background. Android uses the shape only; the colour comes from capacitor.config.json (iconColor). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
     <group android:scaleX="0.0493" android:scaleY="0.0493" android:translateX="-0.622" android:translateY="-0.545">

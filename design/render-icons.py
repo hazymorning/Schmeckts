@@ -1,7 +1,8 @@
-"""Rendert aus design/schmeckts-app-icon.svg, was Android nicht als Vektor nimmt: die Launcher-Icons für Android 7
-(API 24/25, mipmap-*/ic_launcher.png und ic_launcher_round.png). Die Datei ist das ganze Icon samt Hintergrund.
-Ab Android 8 gilt das adaptive Icon aus app/native/res (Vektoren). Braucht Python mit Playwright/Chromium.
-Aufruf: python3 design/render-icons.py"""
+"""Renders from design/schmeckts-app-icon.svg whatever Android will not take as a vector: the launcher icons for
+Android 7 (API 24/25, mipmap-*/ic_launcher.png and ic_launcher_round.png). That file is the whole icon including its
+background. From Android 8 on the adaptive icon from app/native/res (vectors) applies. Needs Python with
+Playwright/Chromium.
+Usage: python3 design/render-icons.py"""
 import asyncio, pathlib, re
 from playwright.async_api import async_playwright
 
@@ -11,7 +12,7 @@ SVG = (ROOT / 'design/schmeckts-app-icon.svg').read_text()
 DENS = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
 
 
-def page(size, round_):  # quadratisch mit abgerundeten Ecken oder rund
+def page(size, round_):  # square with rounded corners, or round
     radius = '50%' if round_ else f'{size * .22}px'
     svg = re.sub(r'<svg ', f'<svg width="{size}" height="{size}" style="display:block" ', SVG, count=1)
     return (f'<html><body style="margin:0;background:transparent">'
@@ -31,7 +32,7 @@ async def main():
             out = RES / f'mipmap-{d}'
             await shot(48 * k, False, out / 'ic_launcher.png')
             await shot(48 * k, True, out / 'ic_launcher_round.png')
-            (out / 'ic_launcher_foreground.png').unlink(missing_ok=True)  # Vorlage von Capacitor, ersetzt durch den Vektor
+            (out / 'ic_launcher_foreground.png').unlink(missing_ok=True)  # Capacitor's template, replaced by the vector
         await b.close()
 asyncio.run(main())
-print('Icons gerendert')
+print('icons rendered')

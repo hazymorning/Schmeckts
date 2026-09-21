@@ -1,8 +1,8 @@
-/* Erkennung einer Futterpackung. Die Kette steht an einer Stelle (identify) und geht von billig nach teuer:
-   bekannter Barcode im Haushalt → Produktsuche im Internet (wenn erlaubt) → Server (wenn verbunden und er es anbietet)
-   → eigener KI-Schlüssel (wenn gesetzt) → Texterkennung auf dem Gerät → leeres Formular.
-   Jede Stufe darf übersprungen werden, ein Fehler führt zur nächsten; note() sagt der Oberfläche, was gerade läuft.
-   Fehler der Foto-Erkennung über den Server tragen retry: true, wenn sich ein neuer Versuch lohnt. */
+/* Recognising a food packaging. The chain sits in one place (identify) and runs cheapest first:
+   known barcode in the household → product lookup on the internet (if allowed) → server (when connected and it offers
+   it) → own AI key (if set) → on-device text recognition → empty form.
+   Every stage may be skipped, an error moves on to the next; note() tells the interface what is running.
+   Errors from photo recognition through the server carry retry: true when another attempt is worth it. */
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {PROMPT} from './prompt.js';
@@ -16,7 +16,7 @@ import {productsByCode} from './derive.js';
 const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'locked']);
 const LOOKING = 'Barcode wird nachgeschlagen …', READING = 'Sorte wird erkannt …';
 
-/* Eine Stufe: Name, wann sie dran ist, was sie zeigt und was sie tut. Ergebnis {products}, {details} oder null. */
+/* One stage: name, when its turn comes, what it shows and what it does. Result {products}, {details} or null. */
 const STEPS = [
   {name:'codes', when:o => !!o.code, run:o => { const found = productsByCode(o.code); return found.length ? {products:found} : null; }},
   {name:'online', hint:LOOKING, when:o => !!o.code && !!prefs.lookup, run:o => lookupOnline(o.code).then(asDetails)},
@@ -25,8 +25,8 @@ const STEPS = [
   {name:'text', when:o => !!o.photo, run:o => readPhotoText(o.photo).then(text => asDetails(readPack(text, db.products)))}
 ];
 
-/* code: gescannter Barcode, photo: Foto als Base64, note: kurzer Hinweis für die Oberfläche.
-   Liefert {source, products|details} oder {source:'', error} – dann bleibt das Formular leer. */
+/* code: the scanned barcode, photo: the photo as base64, note: a short notice for the interface.
+   Returns {source, products|details} or {source:'', error} — the form then stays empty. */
 export async function identify({code = '', photo = '', note = () => {}} = {}){
   const o = {code, photo};
   let error = null;
@@ -38,14 +38,14 @@ export async function identify({code = '', photo = '', note = () => {}} = {}){
       if (hit) { note(''); return {source:step.name, ...hit}; }
     } catch (e) {
       error = e;
-      console.warn(`Erkennung (${step.name}):`, e?.message || e);
+      console.warn(`recognition (${step.name}):`, e?.message || e);
     }
   }
   note('');
   return {source:'', error};
 }
 
-/* Antwort in die Form des Servers bringen: ohne Marke und Sorte zählt sie nicht */
+/* Bring an answer into the server's shape: without a brand and a variety it does not count */
 function asDetails(hit){
   const brand = String(hit?.brand || '').trim(), variety = String(hit?.variety || '').trim();
   if (!brand && !variety) return null;
@@ -53,17 +53,17 @@ function asDetails(hit){
     animal:SPECIES.some(s => s.k === hit.animal) ? hit.animal : undefined, texture:hit.texture}};
 }
 
-/* Server: für einen Barcode die Suche (ab Server 1.1.0), für ein Foto die KI-Erkennung */
+/* Server: the lookup for a barcode (from server 1.1.0), AI recognition for a photo */
 async function fromServer({code, photo}){
   if (code && await serverCan('barcode')) {
-    const hit = await lookupBarcode(code).catch(e => { console.warn('Barcode-Suche:', e.message); return null; });
+    const hit = await lookupBarcode(code).catch(e => { console.warn('barcode lookup:', e.message); return null; });
     const found = hit?.found ? asDetails(hit) : null;
     if (found) return found;
   }
   return photo ? asDetails(await recognize(photo)) : null;
 }
 
-/* Foto-Erkennung über den Haushalts-Server: Schlüssel, Modell und Prompt liegen dort. */
+/* Photo recognition through the household server: key, model and prompt live there. */
 export async function recognize(b64){
   if (!prefs.code) throw Object.assign(new ServerError('none', 'Kein Server verbunden.'), {retry:false});
   if (status.recognition === false) {
@@ -73,12 +73,12 @@ export async function recognize(b64){
   catch (e) { e.retry = RETRY.has(e.kind); throw e; }
 }
 
-/* Unbekannten Barcode über den Server nachschlagen (Open Pet Food Facts und Open Food Facts).
-   Antwort {found, brand, variety, type, animal}. Der Server fragt je Datenbank höchstens 5 Sekunden. */
+/* Look up an unknown barcode through the server (Open Pet Food Facts and Open Food Facts).
+   Response {found, brand, variety, type, animal}. The server waits at most 5 seconds per database. */
 export const lookupBarcode = code => request('GET', '/api/barcode/' + encodeURIComponent(code), {timeout:15e3});
 
-/* Eigener KI-Schlüssel: Die App ruft Anthropic selbst auf, mit der Kopfzeile für den direkten Aufruf aus einer App.
-   Modell und Prompt wie auf dem Server (shared/recognize-prompt.txt). Der Schlüssel bleibt auf diesem Handy. */
+/* Own AI key: the app calls Anthropic itself, with the header for direct calls from an app.
+   Model and prompt as on the server (shared/recognize-prompt.txt). The key stays on this phone. */
 const AI_URL = 'https://api.anthropic.com/v1/messages';
 const AI_MODEL = 'claude-sonnet-5';
 async function askKey(b64, key = prefs.aiKey){
@@ -97,9 +97,9 @@ async function askKey(b64, key = prefs.aiKey){
   if (!found) return null;
   try { return JSON.parse(found[0]); } catch (e) { return null; }
 }
-/* Die 60 neuesten eigenen Sorten hängen am Prompt, damit die Schreibweise gleich bleibt – wie auf dem Server */
+/* The 60 newest of our own varieties ride along on the prompt so the spelling stays consistent — as on the server */
 function aiPrompt(){
   const known = [...db.products].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 60)
     .map(p => `${(p.brand || '').trim()} | ${(p.variety || '').trim()}`).filter(n => n !== ' | ');
-  return known.length ? `${PROMPT}\nBereits bekannte Produkte. Wenn es eines davon ist, übernimm exakt diese Schreibweise:\n${known.join('\n')}` : PROMPT;
+  return known.length ? `${PROMPT}\nProducts already known. If it is one of these, use exactly this spelling:\n${known.join('\n')}` : PROMPT;
 }

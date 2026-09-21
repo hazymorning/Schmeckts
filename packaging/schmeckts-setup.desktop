@@ -2,7 +2,7 @@
 Type=Application
 Name=Schmeckt’s-Server einrichten
 Comment=API-Schlüssel eintragen und Handys verbinden
-Exec=schmeckts-einrichten
+Exec=schmeckts-setup
 Icon=schmeckts
 Terminal=false
 Categories=Settings;

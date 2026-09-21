@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Richtet eine frische Build-Umgebung ein (Ubuntu 24.04, als root). Macht nur, was fehlt.
-# Am Sitzungsanfang, nach dem Klonen des Repositorys: erst dieses Skript, dann scripts/test.sh
-# Installiert: JDK 21, Android SDK (Plattform 36, Build-Tools) für die App, Go und lintian für Server und .deb.
-# Vorausgesetzt: Node.js 22+, Python 3 mit Pillow und Playwright (Chromium) für Icons und Tests.
+# Sets up a fresh build environment (Ubuntu 24.04, as root). Only does what is missing.
+# At the start of a session, after cloning the repository: this script first, then scripts/test.sh
+# Installs: JDK 21 and the Android SDK (platform 36, build tools) for the app, Go and lintian for server and .deb.
+# Assumed: Node.js 22+, Python 3 with Pillow and Playwright (Chromium) for icons and tests.
 set -euo pipefail
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
@@ -26,6 +26,6 @@ if ! command -v go >/dev/null && [ ! -x /usr/local/go/bin/go ]; then
   curl -sL "https://go.dev/dl/$V.linux-amd64.tar.gz" | tar -C /usr/local -xz
 fi
 
-node -e 'if (+process.versions.node.split(".")[0] < 22) { console.error("Node.js 22 oder neuer nötig"); process.exit(1) }'
-python3 -c 'import PIL, playwright' 2>/dev/null || echo "Hinweis: Python-Pakete Pillow und playwright fehlen (für Icons und Tests)"
-echo "Build-Umgebung bereit: $(javac -version 2>&1), $("${GO:-$(command -v go || echo /usr/local/go/bin/go)}" version | cut -d' ' -f3), Android SDK in $ANDROID_HOME"
+node -e 'if (+process.versions.node.split(".")[0] < 22) { console.error("Node.js 22 or newer required"); process.exit(1) }'
+python3 -c 'import PIL, playwright' 2>/dev/null || echo "Note: the Python packages Pillow and playwright are missing (needed for icons and tests)"
+echo "Build environment ready: $(javac -version 2>&1), $("${GO:-$(command -v go || echo /usr/local/go/bin/go)}" version | cut -d' ' -f3), Android SDK in $ANDROID_HOME"

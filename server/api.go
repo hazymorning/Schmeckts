@@ -1,17 +1,18 @@
 package main
 
-// HTTP-Schnittstelle. Alle Pfade liegen unter /api/, Antworten sind JSON.
+// HTTP interface. Every path sits under /api/ and responses are JSON.
 //
-//   GET  /api/info                  Version, Protokoll, Epoche, Serverzeit; mit Code auch „auth“
-//   GET  /api/changes?since=N       alle Datensätze mit Änderungen nach N
-//   POST /api/changes               Änderungen übernehmen: {"changes":[…]}
-//   GET  /api/checksum              Prüfsumme über alle Felder und Uhren
-//   GET  /api/events?code=…         Live-Hinweis auf neue Nummern (Server-Sent Events)
-//   POST /api/recognize             Packungsfoto erkennen: {"image":"<base64>"}
-//   GET  /api/barcode/<code>        Futter per EAN nachschlagen: {"found", "brand", "variety", "type", "animal"}
+//   GET  /api/info                  version, protocol, epoch, server time; with a code also "auth"
+//   GET  /api/changes?since=N       every record with changes after N
+//   POST /api/changes               accept changes: {"changes":[…]}
+//   GET  /api/checksum              checksum over every field and clock
+//   GET  /api/events?code=…         live notice of new numbers (server-sent events)
+//   POST /api/recognize             recognise a packaging photo: {"image":"<base64>"}
+//   GET  /api/barcode/<code>        look food up by EAN: {"found", "brand", "variety", "type", "animal"}
 //
-// Zugang nur aus privaten Netzen (Heimnetz, WireGuard) und nur mit Haushaltscode,
-// als „Authorization: Bearer <code>“ oder, für /api/events, als ?code=.
+// Reachable from private networks only (home network, WireGuard) and only with the household
+// code, as "Authorization: Bearer <code>" or, for /api/events, as ?code=.
+// Error messages are German, like the app.
 
 import (
 	"encoding/json"
@@ -31,16 +32,16 @@ const (
 	protocolVersion = 1
 	maxBodyBytes    = 12 << 20
 	maxChanges      = 500
-	failLimit       = 20               // falsche Codes pro Adresse …
-	failWindow      = 10 * time.Minute // … innerhalb dieser Zeit, dann Pause
-	recognizeBurst  = 10               // Kostenbremse: so viele Erkennungen am Stück,
-	recognizeEvery  = 90 * time.Second // danach eine je Intervall (40 pro Stunde)
-	barcodeBurst    = 30               // Rücksicht auf die freien Datenbanken
+	failLimit       = 20               // wrong codes per address …
+	failWindow      = 10 * time.Minute // … within this window, then a pause
+	recognizeBurst  = 10               // cost brake: this many recognitions in a row,
+	recognizeEvery  = 90 * time.Second // then one per interval after that (40 an hour)
+	barcodeBurst    = 30               // consideration for the free databases
 	barcodeEvery    = 10 * time.Second
 	pingEvery       = 25 * time.Second
 )
 
-var cgnat = netip.MustParsePrefix("100.64.0.0/10") // von manchen VPNs genutzt
+var cgnat = netip.MustParsePrefix("100.64.0.0/10") // used by some VPNs
 
 type API struct {
 	store    *Store
@@ -55,7 +56,7 @@ type API struct {
 	lookups    bucket
 }
 
-// bucket begrenzt, wie oft etwas passieren darf: burst am Stück, danach eins je every.
+// bucket limits how often something may happen: burst in a row, then one per every.
 type bucket struct {
 	burst  float64
 	every  time.Duration
@@ -127,7 +128,7 @@ func fail(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// guard: nur private Adressen, CORS für die App (läuft unter http://localhost), Größenlimit.
+// guard: private addresses only, CORS for the app (which runs under http://localhost), size limit.
 func (a *API) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !privateAddr(remoteAddr(r)) {
@@ -156,7 +157,7 @@ func givenCode(r *http.Request) string {
 	return r.URL.Query().Get("code")
 }
 
-// checkCode prüft den Haushaltscode und sperrt eine Adresse nach zu vielen Fehlversuchen.
+// checkCode checks the household code and blocks an address after too many failed attempts.
 func (a *API) checkCode(r *http.Request) (status int, msg string) {
 	ip := remoteAddr(r).String()
 	now := a.now()
@@ -215,7 +216,7 @@ func (a *API) getChanges(w http.ResponseWriter, r *http.Request) {
 	since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
 	epoch, _ := a.store.Seq()
 	if e := r.URL.Query().Get("epoch"); e != "" && e != epoch {
-		since = 0 // anderer Datenbestand (z. B. nach Wiederherstellung): alles schicken
+		since = 0 // different data (after a restore, for instance): send everything
 	}
 	epoch, seq, recs := a.store.Since(since)
 	writeJSON(w, http.StatusOK, map[string]any{"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "records": recs})
@@ -246,7 +247,7 @@ func (a *API) postChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, rj := range rejected {
-		log.Printf("Änderung %s abgelehnt: %s (%s)", rj.ID, rj.Reason, rj.Detail)
+		log.Printf("change %s rejected: %s (%s)", rj.ID, rj.Reason, rj.Detail)
 	}
 	if seq != before {
 		a.notify()
@@ -265,7 +266,7 @@ func (a *API) notify() {
 	for ch := range a.subs {
 		select {
 		case ch <- struct{}{}:
-		default: // Hinweis steht schon an
+		default: // a notice is already queued
 		}
 	}
 }

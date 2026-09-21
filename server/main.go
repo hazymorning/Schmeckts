@@ -1,14 +1,15 @@
-// Schmeckt’s-Server: gemeinsame Daten und KI-Erkennung für die App im Heimnetz.
+// Schmeckt's server: shared data and AI recognition for the app on the home network.
 //
-//	schmeckts-server                      Server starten (so läuft er als Systemdienst)
-//	schmeckts-server einrichten           API-Schlüssel von stdin übernehmen, Code erzeugen, Verbindungsdaten zeigen
-//	schmeckts-server einrichten --neuer-code   zusätzlich einen neuen Haushaltscode erzeugen
-//	schmeckts-server verbindung           Verbindungsdaten zeigen
-//	schmeckts-server uebersicht           Datenbestand lesbar zeigen: Tiere, Futter, letzte Mahlzeiten, Geräte
-//	schmeckts-server wiederherstellen <backup.json>   Datenbestand aus einem Backup zurückholen
+//	schmeckts-server                     start the server (this is how it runs as a system service)
+//	schmeckts-server setup               take the API key from stdin, create a code, show the connection details
+//	schmeckts-server setup --new-code    create a new household code as well
+//	schmeckts-server connection          show the connection details
+//	schmeckts-server overview            show the stored data readably: pets, food, recent meals, devices
+//	schmeckts-server restore <backup.json>   bring the stored data back from a backup
 //	schmeckts-server version
 //
-// Der Datenordner ist $STATE_DIRECTORY (setzt systemd) oder /var/lib/schmeckts.
+// The data directory is $STATE_DIRECTORY (set by systemd) or /var/lib/schmeckts.
+// Everything the commands print is German, like the app.
 package main
 
 import (
@@ -32,7 +33,7 @@ import (
 	"time"
 )
 
-var version = "entwicklung" // setzt der Build
+var version = "development" // set by the build
 
 const serviceUser = "schmeckts"
 
@@ -44,7 +45,7 @@ func stateDir() string {
 }
 
 func main() {
-	log.SetFlags(0) // journald setzt die Zeit selbst
+	log.SetFlags(0) // journald adds the time itself
 	dir := stateDir()
 	args := os.Args[1:]
 	cmd := ""
@@ -55,18 +56,18 @@ func main() {
 	switch cmd {
 	case "", "serve":
 		err = serve(dir)
-	case "einrichten":
+	case "setup":
 		err = setup(dir, args)
-	case "verbindung":
+	case "connection":
 		err = showConnection(dir)
-	case "uebersicht", "übersicht":
+	case "overview":
 		err = showOverview(dir)
-	case "wiederherstellen":
+	case "restore":
 		err = restore(dir, args)
 	case "version":
 		fmt.Println(version)
 	default:
-		err = fmt.Errorf("unbekannter Befehl %q. Möglich: einrichten, verbindung, uebersicht, wiederherstellen, version", cmd)
+		err = fmt.Errorf("unbekannter Befehl %q. Möglich: setup, connection, overview, restore, version", cmd)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -84,10 +85,10 @@ func serve(dir string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	go func() { // tägliches Backup, geprüft einmal pro Stunde
+	go func() { // daily backup, checked once an hour
 		for {
 			if err := store.Backup(time.Now()); err != nil {
-				log.Printf("Backup fehlgeschlagen: %v", err)
+				log.Printf("backup failed: %v", err)
 			}
 			select {
 			case <-ctx.Done():
@@ -103,7 +104,7 @@ func serve(dir string) error {
 		Handler:           api.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
-		BaseContext:       func(net.Listener) context.Context { return ctx }, // beendet Live-Verbindungen beim Stoppen
+		BaseContext:       func(net.Listener) context.Context { return ctx }, // ends live connections on shutdown
 	}
 	go func() {
 		<-ctx.Done()
@@ -119,11 +120,11 @@ func serve(dir string) error {
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
-	log.Printf("Server beendet")
+	log.Printf("server stopped")
 	return nil
 }
 
-// ownFiles gibt dem Serverdienst die Dateien, die root beim Einrichten schreibt.
+// ownFiles hands the service the files root writes during setup.
 func ownFiles(paths ...string) {
 	u, err := user.Lookup(serviceUser)
 	if err != nil || os.Geteuid() != 0 {
@@ -171,7 +172,7 @@ func setup(dir string, args []string) error {
 		}
 		cfg.APIKey = key
 	}
-	newCodeWanted := len(args) > 0 && args[0] == "--neuer-code"
+	newCodeWanted := len(args) > 0 && args[0] == "--new-code"
 	if cfg.Code == "" || newCodeWanted {
 		cfg.Code = newCode()
 	}
@@ -240,7 +241,7 @@ func running(port int) bool {
 	return res.StatusCode == http.StatusOK
 }
 
-// lanAddress sucht die Adresse des PCs im Heimnetz, bevorzugt 192.168.x.x.
+// lanAddress looks for the PC's address on the home network, preferring 192.168.x.x.
 func lanAddress() string {
 	ifaces, _ := net.Interfaces()
 	found := []string{}
@@ -279,7 +280,7 @@ func restore(dir string, args []string) error {
 	if len(args) != 1 {
 		files, _ := filepath.Glob(filepath.Join(dir, backupDir, "state-*.json"))
 		sort.Strings(files)
-		msg := "Bitte ein Backup angeben, zum Beispiel:\n  sudo schmeckts-server wiederherstellen " + filepath.Join(dir, backupDir, "state-JJJJ-MM-TT.json")
+		msg := "Bitte ein Backup angeben, zum Beispiel:\n  sudo schmeckts-server restore " + filepath.Join(dir, backupDir, "state-JJJJ-MM-TT.json")
 		if len(files) > 0 {
 			msg += "\n\nVorhandene Backups:\n  " + strings.Join(files, "\n  ")
 		}
@@ -289,7 +290,7 @@ func restore(dir string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("Das Backup ist nicht lesbar: %w", err)
 	}
-	st.Epoch = newEpoch() // alle Handys gleichen dadurch vollständig neu ab
+	st.Epoch = newEpoch() // this makes every phone do a full resync
 	usesSystemd := systemctl("is-active", "--quiet", "schmeckts") == nil
 	if usesSystemd {
 		if err := systemctl("stop", "schmeckts"); err != nil {

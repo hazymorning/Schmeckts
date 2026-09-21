@@ -1,5 +1,5 @@
-/* Stimmungsbild hinter der Kopfzeile: Album-Fotos des gewählten oder einzigen Tiers, bei „Alle“ aller Tiere. Wechselt
-   alle 12 Sekunden, nur sichtbar und ohne reduzierte Bewegung. */
+/* Mood picture behind the header: album photos of the selected or only pet, of every pet under „Alle“. Changes every
+   12 seconds, only while visible and not under reduced motion. */
 import {$, reduceMotion} from '../dom.js';
 import {db, prefs} from '../store.js';
 
@@ -12,7 +12,7 @@ export function moodPhotos(){
   return pets.flatMap(p => Object.keys(p.photos || {}).sort().map(k => p.photos[k]));
 }
 
-/* Zwei Bilder liegen übereinander, das mit der Klasse „on“ ist zu sehen; der Wechsel ändert nur die Deckkraft (2 s, CSS) */
+/* Two images lie on top of each other and the one with the class "on" is visible; the change only touches opacity (2 s, CSS) */
 function show(src){
   const [a, b] = $('#mood').children, to = a.classList.contains('on') ? b : a, from = to === a ? b : a;
   shown = src; to.src = src;
@@ -24,7 +24,7 @@ function next(){
   show(list[(list.indexOf(shown) + 1) % list.length]);
 }
 
-/* Mit der Startseite zeichnen: Ein laufendes Foto bleibt stehen, solange es zur Auswahl gehört */
+/* Drawn with the home page: a photo on show stays put as long as it belongs to the selection */
 export function renderMood(){
   const el = $('#mood');
   list = moodPhotos();

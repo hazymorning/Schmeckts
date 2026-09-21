@@ -1,6 +1,6 @@
-/* Futtersorten anlegen, füllen, zusammenführen und aufräumen. Barcodes kommen nur in linkProduct an eine Sorte, und zwar
-   an jede, die eine gescannte Mahlzeit (scanCode) bekommt: So wächst ein Multipack, und eine falsch erkannte Sorte
-   verschwindet samt Code. */
+/* Creating, filling, merging and tidying up food varieties. Barcodes only reach a variety in linkProduct, and there
+   they reach every variety a scanned meal (scanCode) is given: that is how a multipack grows, and a wrongly
+   recognised variety disappears together with its code. */
 import {uid} from '../fields.js';
 import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
 import {db, save} from '../store.js';
@@ -9,15 +9,15 @@ import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {memPhotos} from '../images.js';
 import {toast} from '../ui/toast.js';
 
-/* Eigene Einstellung zum Kaufen, gilt im ganzen Haushalt und geht dem berechneten Urteil vor:
-   'immer', 'nicht' oder etwas anderes für „Automatisch“ (das Feld fällt weg, abgeglichen wird null) */
+/* The manual buying setting, which holds household-wide and takes precedence over the computed verdict:
+   'immer', 'nicht' or anything else for „Automatisch“ (the field is dropped and null is synced) */
 export function setKaufen(id, v){
   const p = getProduct(id); if (!p) return;
   if (v === 'immer' || v === 'nicht') p.kaufen = v; else delete p.kaufen;
   save();
 }
 
-/* Einkaufsliste weitergeben, passend zum Tier-Filter: übers Teilen-Menü, ohne eines über die Zwischenablage */
+/* Passing on the shopping list, matching the pet filter: through the share menu, or the clipboard without one */
 export async function shareShopping(){
   const {title, text} = shoppingList();
   try { if (await shareText(title, text) === 'copied') toast('Liste kopiert'); }
@@ -27,15 +27,15 @@ export async function shareShopping(){
 export function cleanupProduct(pid){
   if (!db.servings.some(s => s.productId === pid)) db.products = db.products.filter(p => p.id !== pid);
 }
-/* Konsistenz oder Snack-Art nach Erkennung, Barcode-Treffer, Benennen und Auswahl. Die Auswahl des Menschen gilt
-   (userType, null = keine). Sonst bleibt ein vorhandener Wert; ein leeres Feld füllt der Wert des Servers, dann die
-   Stichwörter in Marke und Sorte. Was nicht zur Art passt, fällt weg (abgeglichen wird null). */
+/* Consistency or treat type after recognition, a barcode hit, naming and choosing. The human's choice wins
+   (userType, null = none). Otherwise an existing value stays; an empty field is filled from the server's value, then
+   from the keywords in brand and variety. Anything that does not fit the type is dropped (null is synced). */
 export function applyTexture(p, details = {}){
   const fits = v => textureOf(p, v) ? v : null;
   const v = details.userType && details.texture !== undefined ? fits(details.texture) : fits(p.texture) || fits(details.texture) || guessTexture(p);
   if (v) p.texture = v; else delete p.texture;
 }
-export function toggleTexture(id, v){ // Auswahl im Futter-Sheet, ein zweiter Tipp hebt sie auf
+export function toggleTexture(id, v){ // the choice in the food sheet; a second tap clears it
   const p = getProduct(id); if (!p) return;
   applyTexture(p, {texture:p.texture === v ? null : v, userType:true}); save();
 }
@@ -65,7 +65,7 @@ export function linkProduct(s, p){
 export function mergeProducts(from, into){
   db.servings.forEach(s => { if (s.productId === from.id) s.productId = into.id; });
   if (!into.thumb && from.thumb) into.thumb = from.thumb;
-  Object.assign(into.codes ||= {}, from.codes); // die Barcodes gehen mit
+  Object.assign(into.codes ||= {}, from.codes); // the barcodes come along
   applyTexture(into, {texture:from.texture});
   db.products = db.products.filter(p => p.id !== from.id);
 }

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Baut die Installationspakete dist/schmeckts-server_<version>_<arch>.deb für amd64 (Intel/AMD) und arm64.
-# Die Versionsnummer steht nur in server/VERSION. Ohne grüne Tests kein Paket.
+# Builds the installation packages dist/schmeckts-server_<version>_<arch>.deb for amd64 (Intel/AMD) and arm64.
+# The version number lives only in server/VERSION. No package without green tests.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GO="$(command -v go || echo /usr/local/go/bin/go)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/server/VERSION")"
 
-python3 "$ROOT/scripts/prepare.py" --nur-prompt   # server/recognize-prompt.txt aus shared/ erzeugen (//go:embed)
+python3 "$ROOT/scripts/prepare.py" --prompt-only   # generate server/recognize-prompt.txt from shared/ (//go:embed)
 cd "$ROOT/server"
 "$GO" vet ./...
 "$GO" test -count=1 ./...
@@ -16,9 +16,9 @@ for ARCH in amd64 arm64; do
   PKG="$(mktemp -d)/schmeckts-server"
   CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" "$GO" build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
     -o "$PKG/usr/bin/schmeckts-server" .
-  install -D -m 0755 "$ROOT/packaging/schmeckts-einrichten"          "$PKG/usr/bin/schmeckts-einrichten"
+  install -D -m 0755 "$ROOT/packaging/schmeckts-setup"              "$PKG/usr/bin/schmeckts-setup"
   install -D -m 0644 "$ROOT/packaging/schmeckts.service"             "$PKG/usr/lib/systemd/system/schmeckts.service"
-  install -D -m 0644 "$ROOT/packaging/schmeckts-einrichten.desktop"  "$PKG/usr/share/applications/schmeckts-einrichten.desktop"
+  install -D -m 0644 "$ROOT/packaging/schmeckts-setup.desktop"      "$PKG/usr/share/applications/schmeckts-setup.desktop"
   install -D -m 0644 "$ROOT/packaging/schmeckts.svg"                 "$PKG/usr/share/icons/hicolor/scalable/apps/schmeckts.svg"
   install -D -m 0644 "$ROOT/packaging/de.schmeckts.server.policy"    "$PKG/usr/share/polkit-1/actions/de.schmeckts.server.policy"
   install -D -m 0644 "$ROOT/packaging/de.schmeckts.server.metainfo.xml" "$PKG/usr/share/metainfo/de.schmeckts.server.metainfo.xml"
@@ -32,5 +32,5 @@ for ARCH in amd64 arm64; do
   OUT="$ROOT/dist/schmeckts-server_${VERSION}_${ARCH}.deb"
   dpkg-deb --root-owner-group -Zxz --build "$PKG" "$OUT" >/dev/null
   rm -rf "$(dirname "$PKG")"
-  echo "Fertig: $OUT"
+  echo "Done: $OUT"
 done

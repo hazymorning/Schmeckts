@@ -2,7 +2,7 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
-  <action id="de.schmeckts.server.einrichten">
+  <action id="de.schmeckts.server.setup">
     <description>Schmeckt’s-Server einrichten</description>
     <message>Zum Einrichten des Schmeckt’s-Servers wird dein Passwort gebraucht.</message>
     <defaults>

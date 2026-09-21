@@ -1,5 +1,5 @@
-/* Startseite: Tiere-Leiste und Karten in fester Reihenfolge, ohne Tiere die Willkommensseite. Was auswertet, kommt aus
-   model() in derive.js. */
+/* Home page: pet bar and cards in a fixed order, the welcome page when there are no pets. Everything evaluated comes
+   from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {andList, esc} from '../text.js';
 import {addDays, ago, dayKey, dayLabel, weekStart} from '../dates.js';
@@ -13,25 +13,25 @@ import {dlg} from '../ui/sheet.js';
 import {avatar, dayBlocks, dayGroups, fedLabel, nameBlock, rateRow, reasonOf, servingNode, syncChip, thumbOf} from './parts.js';
 import {renderMood} from './mood.js';
 
-/* Startseite neu zeichnen – mit weicher View Transition, wo möglich */
+/* Redraw the home page — with a smooth view transition where possible */
 export function update(){
   let done = false;
   const run = () => { if (done) return; done = true; renderHome(); };
   if (!document.startViewTransition || reduceMotion.matches || dlg.open) return run();
-  document.body.classList.remove('intro'); // laufende Einblend-Animation beenden, sonst kann die Transition hängen
+  document.body.classList.remove('intro'); // end any running fade-in, or the transition can hang
   try {
     const t = document.startViewTransition(run);
-    setTimeout(() => { if (!done) { try { t.skipTransition(); } catch (e) {} run(); } }, 400); // Sicherheitsnetz
+    setTimeout(() => { if (!done) { try { t.skipTransition(); } catch (e) {} run(); } }, 400); // safety net
   } catch (e) { run(); }
 }
 export function scrollTop(){ window.scrollTo({top:0, behavior: reduceMotion.matches ? 'auto' : 'smooth'}); }
 
-// fresh: Kennung der gerade servierten Mahlzeit, gleitet beim nächsten Zeichnen herein
-// shown: Mahlzeiten im Verlauf, open: aufgeklappte Karten; beides gilt bis zum Neustart der App
+// fresh: id of the meal just served, which slides in on the next draw
+// shown: meals in the history, open: unfolded cards; both last until the app restarts
 const HIST = {step:5, max:20};
 export const homeView = {fresh:null, shown:HIST.step, open:{}};
 
-/* Tiere-Leiste: der Filter, erst ab zwei Tieren. Mit einem Tier gibt es nichts zu filtern, verwaltet werden Tiere in den Einstellungen. */
+/* Pet bar: the filter, only from two pets on. With one pet there is nothing to filter, and pets are managed in the settings. */
 function renderPets(){
   const el = $('#pets');
   if (db.pets.length < 2) { el.innerHTML = ''; el.hidden = true; return; }
@@ -47,14 +47,14 @@ function renderFab(){
   fab.hidden = !db.pets.length;
   if (!fab.innerHTML) fab.innerHTML = icon('bowl') + 'Füttern';
 }
-/* Beim Servieren: der Napf im Button füllt sich kurz */
+/* On serving: the bowl in the button fills up briefly */
 export function fabFill(){
   const fab = $('#fab');
   fab.classList.remove('filled'); void fab.offsetWidth; fab.classList.add('filled');
   setTimeout(() => fab.classList.remove('filled'), 1400);
 }
 
-/* Hinweis oben: nur, wenn Änderungen warten oder der Abgleich hakt */
+/* Notice at the top: only when changes are waiting or the sync is stuck */
 export function renderSyncChip(){
   const el = $('#syncChip'), c = syncChip();
   el.hidden = !c;
@@ -86,18 +86,19 @@ function homeHTML(){
   return html;
 }
 
-/* Übersicht: das Tier im Filter, bei „Alle“ der Haushalt, mit Bild, Namen und dem Wichtigsten aus dem Modell. Ein Tipp auf
-   das Bild öffnet das Tier. Zugeklappt zwei Zeilen mit „…“, ein Tipp auf die Karte zeigt den ganzen Text und zurück
-   (der Zustand gilt wie bei den anderen Karten bis zum Neustart). */
+/* Overview: the pet in the filter, the household under „Alle“, with picture, name and the essentials from the model.
+   A tap on the picture opens the pet. Folded up it is two lines ending in „…“; a tap on the card shows the whole text
+   and back again (the state lasts until restart, as with the other cards). */
 function overviewHTML(m){
   const pets = m.overview.pets.map(x => getPet(x.id)), one = pets.length === 1 ? pets[0] : null;
   const pic = one ? `<button class="ov-pic" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'lg')}</button>`
                   : `<span class="ov-pic">${pets.slice(0, 2).map(p => avatar(p, 'pair')).join('')}</span>`;
-  const tap = m.overview.last ? ` data-action="toggle-overview" aria-expanded="${!!homeView.open.overview}"` : ''; // „Noch nichts serviert.“ ist kurz
+  const tap = m.overview.last ? ` data-action="toggle-overview" aria-expanded="${!!homeView.open.overview}"` : ''; // „Noch nichts serviert.“ is short
   return `<section class="card overview${homeView.open.overview ? ' open' : ''}" data-sec="overview"${tap} style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${overviewText(m.overview)}</p></div></section>`;
 }
-/* Sätze der Übersicht, das Wichtigste fett. Ein Tier: „Bekam zuletzt vor 2 Std. einen Snack: Käse (Sofort verputzt). Am liebsten
-   Lachs, Rind kommt nicht an.“ Mehrere: wer zuletzt was bekam, dann je Tier die liebste Sorte und was nicht ankommt. */
+/* The overview's sentences, the essentials in bold. One pet: „Bekam zuletzt vor 2 Std. einen Snack: Käse (Sofort
+   verputzt). Am liebsten Lachs, Rind kommt nicht an.“ Several: who last had what, then the favourite variety per pet
+   and what does not go down well. */
 function overviewText({last, pets}){
   if (!last) return 'Noch nichts serviert.';
   const many = pets.length > 1, sort = e => `<b>${esc(pname(e.product))}</b>`, pet = x => esc(getPet(x.id).name);
@@ -112,7 +113,7 @@ function overviewText({last, pets}){
        flops.length && 'Nicht an kommt ' + flops.map(x => `bei ${pet(x)} ${sort(x.flop)}`).join(', ') + '.'];
   return [fed, ...taste].filter(Boolean).join(' ');
 }
-/* Auf- oder zuklappen ohne Neuzeichnen: nur die Klasse wechselt, der Text wächst oder schrumpft weich wie bei den anderen Karten */
+/* Folding open or shut without a redraw: only the class changes, and the text eases open or shut as on the other cards */
 export function toggleOverview(){
   const sec = $('#home .overview'), p = sec && $('p', sec); if (!p) return;
   const open = homeView.open.overview = !homeView.open.overview, h0 = p.offsetHeight;
@@ -121,10 +122,10 @@ export function toggleOverview(){
 }
 
 const welcomeHTML = () => `<div class="welcome">
-  <div class="hero"><img class="logo hell" src="img/schmeckts-zeichen.svg" alt=""><img class="logo dunkel" src="img/schmeckts-zeichen-dunkel.svg" alt=""></div>
+  <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
   <h2>Was schmeckt deinem Tier?</h2>
   <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie der Napf aussah. So siehst du bald, was wirklich ankommt.</p>
-  <div class="btn-col">${prefs.mode // beim ersten Start genau zwei Knöpfe: der Modus
+  <div class="btn-col">${prefs.mode // exactly two buttons on the first start: the mode
     ? `<button class="btn primary" data-action="add-pet">${icon('plus')}Erstes Tier anlegen</button>
        ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Mit Beispieldaten ansehen</button>`}`
     : `<button class="btn primary" data-action="mode-local">${icon('phone')}Nur auf diesem Handy</button>
@@ -137,7 +138,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <li><span class="n">2</span><p><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li><span class="n">3</span><p><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und erste Erkenntnisse.</p></li></ol></section>`;
 
-/* „Wie war’s?“: nur, solange Bewertungen offen sind */
+/* „Wie war’s?“: only while ratings are still open */
 function pendingHTML(list){
   const multiHouse = db.pets.length > 1;
   return `<section class="card" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul>` +
@@ -149,15 +150,15 @@ function pendingHTML(list){
     }).join('') + `</ul></section>`;
 }
 
-/* Karte mit „Alle anzeigen“: zugeklappt das Wichtigste, aufgeklappt alles */
+/* A card with „Alle anzeigen“: the essentials folded up, everything unfolded */
 function card(key, title, {body, more, foot = ''}){
   const open = !!homeView.open[key];
   return `<section class="card" data-sec="${key}" style="view-transition-name:sec-${key}"><h2>${title}</h2>
     <div class="card-body" id="sec-${key}">${body}</div>${more ? `<button class="card-btn" data-action="expand" data-v="${key}"
       aria-expanded="${open}" aria-controls="sec-${key}">${open ? 'Weniger anzeigen' : 'Alle anzeigen'}</button>` : ''}${foot}</section>`;
 }
-/* Auf- oder zuklappen: Inhalt tauschen, die Karte wächst oder schrumpft weich (220 ms, ease-out), bei reduzierter Bewegung
-   sofort. Ohne Neuzeichnen der Seite, der Knopf bleibt stehen (Fokus bei Bedienung per Tastatur). Nichts wird gespeichert. */
+/* Folding open or shut: swap the content, and the card eases open or shut (220 ms, ease-out), instantly under reduced
+   motion. Without redrawing the page, so the button stays put (focus when using the keyboard). Nothing is stored. */
 export function expandCard(key){
   if (!CARDS[key]) return;
   homeView.open[key] = !homeView.open[key];
@@ -169,8 +170,8 @@ export function expandCard(key){
   btn.setAttribute('aria-expanded', String(homeView.open[key]));
   slideHeight(body, h0);
 }
-/* el wächst oder schrumpft weich von h0 auf seine neue Höhe (220 ms, ease-out) und trägt dabei „animating“; bei
-   reduzierter Bewegung sofort */
+/* el eases from h0 to its new height (220 ms, ease-out), carrying "animating" while it does; instantly under
+   reduced motion */
 function slideHeight(el, h0){
   const h1 = el.offsetHeight;
   if (reduceMotion.matches || h1 === h0) return;
@@ -186,14 +187,14 @@ function slideHeight(el, h0){
   el.addEventListener('transitionend', end); setTimeout(end, 300);
 }
 
-/* Hinweis: der mit dem höchsten Vorrang, ein Satz, eine Begründung, die Knöpfe */
+/* Hint: the one with the highest precedence — a sentence, a reason, the buttons */
 const HINT_TITLES = {appetit:'Appetit', stop:'Nicht mehr kaufen?', sosse:'Frisst meist nur die Soße', liebling:'Neuer Liebling'};
 const sortName = p => p.variety && p.brand ? `${p.variety} von ${p.brand}` : pname(p);
 function hintHTML(m){
   const h = m.hints[0]; if (!h) return '';
   const e = m.byId.get(h.id), name = e && esc(sortName(e.product)), pet = h.pet && getPet(h.pet);
   const hide = `<button class="btn soft" data-action="hide-hint" data-v="${esc(hintKey(h))}">Ausblenden</button>`;
-  const set = (v, label) => `<button class="btn primary" data-action="hint-kaufen" data-id="${e.id}" data-v="${v}">${label}</button>`;
+  const set = (v, label) => `<button class="btn primary" data-action="hint-buy" data-id="${e.id}" data-v="${v}">${label}</button>`;
   let say, why, btns;
   if (h.kind === 'appetit') {
     [say, why, btns] = [`${esc(pet.name)} frisst seit ein paar Tagen schlechter als sonst.`, `Die letzten ${h.n} Bewertungen im Schnitt ${h.recent} %, sonst ${h.usual} %.`, hide];
@@ -209,8 +210,8 @@ function hintHTML(m){
     <p class="say">${say}</p><p class="why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
-/* Letzte Woche: Rückblick auf die Vorwoche (review() in smart.js), nur Fakten; „Schließen“ merkt sich das Gerät */
-function duelText(feeders){ // die meisten zuerst; führen mehrere gleichauf, heißt es „Gleichstand“
+/* Letzte Woche: a look back at the previous week (review() in smart.js), facts only; the device remembers „Schließen“ */
+function duelText(feeders){ // the most first; when several are level it reads „Gleichstand“
   const times = x => `${esc(x.name)} ${x.n}×`, lead = feeders.filter(x => x.n === feeders[0].n);
   if (lead.length < 2) return `Gefüttert: ${feeders.map(times).join(', ')}`;
   return [`Gleichstand: ${esc(andList(lead.map(x => x.name)))} je ${lead[0].n}×`, ...feeders.slice(lead.length).map(times)].join(', ');
@@ -226,10 +227,10 @@ function weekHTML(w){
     <div class="week">${lines.join('')}</div><button class="card-btn" data-action="close-week" data-v="${dayKey(w.start)}">Schließen</button></section>`;
 }
 
-/* Einkaufen: zugeklappt bis zu 3 Sorten zum Nachkaufen (auch „Gemischt“, mit „für …“) und bis zu 2, die nicht
-   mehr gekauft werden; aufgeklappt alle Sorten in drei Gruppen mit Wertungsbalken. Eine eigene Einstellung ordnet die
-   Sorte ein und zeigt die Stecknadel (Gruppen: shopGroups() in smart.js). Fußzeile „Geschmack bekannt“ ab 3 Sorten,
-   aufgeklappt darunter „Als Liste teilen“. */
+/* Einkaufen: folded up, up to 3 varieties to buy again (including „Gemischt“, with „für …“) and up to 2 no longer
+   bought; unfolded, every variety in three groups with score bars. A manual setting decides the group and shows the
+   pin (groups: shopGroups() in smart.js). Footer „Geschmack bekannt“ from 3 varieties on, with „Als Liste teilen“
+   below it when unfolded. */
 const SHOP = [['nachkaufen', 'Nachkaufen', 3], ['beobachten', 'Beobachten', 0], ['nicht', 'Nicht mehr kaufen', 2]];
 const genitive = name => name + (/[sßxz]$/i.test(name) ? '’' : 's');
 function tasteHTML(m){
@@ -255,12 +256,12 @@ function shopCard(m){
   return {body, more: g.beobachten.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2};
 }
 
-/* Erkenntnisse: zugeklappt die wichtigste, aufgeklappt alle; ohne Erkenntnis keine Karte. Unten führt ein Textknopf
-   zur Auswertung. */
+/* Erkenntnisse: the most important one folded up, all of them unfolded; no card without an insight. A text button at
+   the bottom leads to the evaluation. */
 const INSIGHT = {marke:['award', 'Marke'], konsistenz:['layers', 'Konsistenz'], geschmack:['fish', 'Geschmack'], sosse:['drop']};
-function insightHTML(i, m){ // ein Satz, Hervorhebungen in <b>
+function insightHTML(i, m){ // one sentence, emphasis in <b>
   if (i.kind === 'sosse') return `Bei <b>${esc(pname(m.byId.get(i.id).product))}</b> wird meist nur die Soße geschleckt.`;
-  const label = i.kind === 'konsistenz' ? TEXTURES[i.type].title : INSIGHT[i.kind][1] + (i.type === TYPES[0] ? '' : ` (${i.type})`); // „Snack-Art“ nennt die Art schon
+  const label = i.kind === 'konsistenz' ? TEXTURES[i.type].title : INSIGHT[i.kind][1] + (i.type === TYPES[0] ? '' : ` (${i.type})`); // „Snack-Art“ already names the type
   return `${label}: <b>${esc(i.best.key)}</b> kommt am besten an (${i.best.pct} %), <b>${esc(i.worst.key)}</b> am wenigsten (${i.worst.pct} %).`;
 }
 function insightCard(m){
@@ -271,12 +272,12 @@ function insightCard(m){
 }
 const CARDS = {shop:shopCard, ins:insightCard};
 
-/* Verlauf: Zwei-Wochen-Kalender und darunter die letzten Mahlzeiten (Bausteine in parts.js) */
+/* Verlauf: a two-week calendar and the latest meals below it (building blocks in parts.js) */
 function calendarHTML(list){
   const byDay = new Map();
   for (const s of list) { const k = dayKey(s.servedAt); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(s); }
   const d = new Date(); d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() - (d.getDay() + 6) % 7 - 7);           // Montag der Vorwoche
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7 - 7);           // Monday of the previous week
   const todayKey = dayKey(Date.now());
   let cells = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<span class="wd">${w}</span>`).join(''), future = false;
   for (let i = 0; i < 14; i++) {
@@ -289,8 +290,8 @@ function calendarHTML(list){
   }
   return `<div class="cal">${cells}</div>`;
 }
-/* Mahlzeiten im Tier-Filter, neueste zuerst (db.servings ist nach Zeit absteigend sortiert): die ersten n für den
-   Zeitstrahl und alle seit since für den Kalender. Beides in einem Durchgang, der abbricht, sobald beides steht. */
+/* Meals within the pet filter, newest first (db.servings is sorted by time descending): the first n for the
+   timeline and everything since `since` for the calendar. Both in one pass, which stops as soon as both are done. */
 const visibleServings = () => db.servings.filter(s => servingPets(s).length);
 function someServings(n, since){
   const first = [], recent = [];
@@ -302,10 +303,10 @@ function someServings(n, since){
   }
   return {first, recent};
 }
-/* Unter dem Kalender die letzten Mahlzeiten, nach Tagen gruppiert; „Weitere anzeigen“ zeigt jeweils HIST.step mehr,
-   bis HIST.max, danach führt „Ganzer Verlauf“ zur Auswertung. Der Kalender zeigt immer seine zwei Wochen. */
+/* Below the calendar the latest meals, grouped by day; „Weitere anzeigen“ shows HIST.step more each time, up to
+   HIST.max, after which „Ganzer Verlauf“ leads to the evaluation. The calendar always shows its two weeks. */
 function historyHTML(){
-  const {first, recent} = someServings(homeView.shown + 1, addDays(weekStart(Date.now()), -7)); // eine mehr: gibt es noch welche?
+  const {first, recent} = someServings(homeView.shown + 1, addDays(weekStart(Date.now()), -7)); // one more: are there any left?
   const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
   const shown = first.slice(0, homeView.shown);
   return calendarHTML(recent) +
@@ -313,8 +314,8 @@ function historyHTML(){
     (homeView.shown >= HIST.max ? `<button class="card-btn" data-action="open-report" data-v="hist">Ganzer Verlauf</button>`
       : first.length > shown.length ? `<button class="card-btn" data-action="more-history">Weitere anzeigen</button>` : '');
 }
-/* „Weitere anzeigen“: HIST.step Mahlzeiten mehr, höchstens HIST.max; mit day so viele, dass dieser Tag dabei ist
-   (Sprung aus dem Kalender). Neu gezeichnet wird nur der Verlauf. Gibt die erste neu gezeigte Mahlzeit zurück. */
+/* „Weitere anzeigen“: HIST.step meals more, at most HIST.max; with day, enough of them for that day to be included
+   (a jump from the calendar). Only the history is redrawn. Returns the first newly shown meal. */
 export function showMoreHistory(day){
   const all = visibleServings(), was = homeView.shown;
   const upto = day ? all.findLastIndex(s => dayKey(s.servedAt) === day) + 1 : Math.min(was + HIST.step, HIST.max);

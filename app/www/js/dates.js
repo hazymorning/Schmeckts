@@ -1,4 +1,4 @@
-/* Datum und Uhrzeit in Ortszeit, Kalendertage auch über die Zeitumstellung. */
+/* Date and time in local time; calendar days survive daylight saving changes. */
 
 const rtf = new Intl.RelativeTimeFormat('de', {numeric:'auto', style:'short'});
 const pad = n => String(n).padStart(2, '0');
@@ -6,8 +6,8 @@ export const timeStr = t => { const d = new Date(t); return `${pad(d.getHours())
 export const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 export const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const daysAgo = t => Math.round((dayStart(Date.now()) - dayStart(t)) / 864e5);
-export const addDays = (t, n) => { const d = new Date(t); d.setDate(d.getDate() + n); return d.getTime(); }; // Kalendertage, auch über die Zeitumstellung
-export const weekStart = t => addDays(dayStart(t), -((new Date(t).getDay() + 6) % 7)); // Montag 0:00 Ortszeit
+export const addDays = (t, n) => { const d = new Date(t); d.setDate(d.getDate() + n); return d.getTime(); }; // calendar days, across daylight saving changes too
+export const weekStart = t => addDays(dayStart(t), -((new Date(t).getDay() + 6) % 7)); // Monday 00:00 local time
 export const toLocalInput = t => `${dayKey(t)}T${timeStr(t)}`;
 export function dayLabel(t){
   const n = daysAgo(t);

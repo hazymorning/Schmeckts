@@ -1,12 +1,13 @@
 #!/bin/bash
-# Einrichtungsfenster für den Schmeckt’s-Server. Öffnet sich über das App-Menü.
-# Die eigentliche Arbeit macht „schmeckts-server“ mit Administratorrechten (pkexec fragt nach dem Passwort).
+# Setup window for the Schmeckt's server. Opened from the application menu.
+# The actual work is done by "schmeckts-server" with administrator rights (pkexec asks for the password).
+# The window's own wording is German, like the app.
 TITLE="Schmeckt’s-Server"
 
 esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-# schmeckts-server als Administrator ausführen; Ausgabe landet in OUT.
-# Bricht jemand die Passwortabfrage ab, endet das Fenster still.
+# Run schmeckts-server as administrator; the output ends up in OUT.
+# If someone cancels the password prompt, the window exits quietly.
 admin() {
   OUT=$(pkexec /usr/bin/schmeckts-server "$@" 2>&1)
   local rc=$?
@@ -16,11 +17,11 @@ admin() {
 
 error() { zenity --error --title="$TITLE" --width=440 --text="$(printf '%s' "$OUT" | esc)"; }
 
-# Adresse und Code zuerst und groß, damit man sie gut abtippen kann; danach der Zustand
+# Address and code first and large, so they are easy to copy down; the state after that
 show() {
   local code addr rest
   code=$(printf '%s\n' "$OUT" | sed -n 's/^Code: *//p')
-  addr=$(printf '%s\n' "$OUT" | sed -n 's/^Adresse: *//p')
+  addr=$(printf '%s\n' "$OUT" | sed -n 's/^Adresse: *//p')  # the server's output is German
   rest=$(printf '%s\n' "$OUT" | grep -v '^Code:\|^Adresse:' | sed '/^$/d' | esc)
   zenity --info --title="$TITLE" --width=440 --icon=schmeckts --ok-label="Fertig" --text="Adresse
 <span size='large' weight='bold'>$(printf '%s' "$addr" | esc)</span>
@@ -40,15 +41,15 @@ case "$CHOICE" in
   Einrichten)
     KEY=$(zenity --entry --hide-text --title="$TITLE" --width=480 --ok-label="Speichern" \
       --text="Anthropic-API-Schlüssel einfügen (beginnt mit sk-ant-).\nIst schon einer eingetragen und soll bleiben, das Feld leer lassen.") || exit 0
-    if admin einrichten <<< "$KEY"; then show; else error; fi ;;
+    if admin setup <<< "$KEY"; then show; else error; fi ;;
   Verbindungsdaten)
-    if admin verbindung; then show; else error; fi ;;
+    if admin connection; then show; else error; fi ;;
   Übersicht)
-    if admin uebersicht; then
+    if admin overview; then
       printf '%s\n' "$OUT" | zenity --text-info --title="$TITLE: Übersicht" --width=780 --height=560 --font="Monospace 10" --ok-label="Schließen"
     else error; fi ;;
   "Neuer Code")
     zenity --question --title="$TITLE" --width=440 --ok-label="Neuen Code erzeugen" --cancel-label="Abbrechen" \
       --text="Danach funktioniert der alte Code nicht mehr. Alle Handys im Haushalt müssen den neuen Code einmal eingeben." || exit 0
-    if admin einrichten --neuer-code < /dev/null; then show; else error; fi ;;
+    if admin setup --new-code < /dev/null; then show; else error; fi ;;
 esac

@@ -1,5 +1,5 @@
 [Unit]
-Description=Schmeckt’s? Haushalts-Server
+Description=Schmeckt’s? household server
 Documentation=man:schmeckts-server
 After=network-online.target
 Wants=network-online.target
@@ -13,7 +13,7 @@ StateDirectoryMode=0700
 Restart=on-failure
 RestartSec=3
 
-# Der Dienst darf nur seinen Datenordner beschreiben und nur ins Netz
+# The service may write only to its own data directory, and may only reach the network
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

@@ -1,9 +1,9 @@
 package main
 
-// Barcode-Suche: Futter anhand der EAN in Open Pet Food Facts und Open Food Facts nachschlagen.
-// Die App fragt nur hier; die Ergebnisse merkt sich der Server in barcodes.json
-// (Treffer 90 Tage, kein Treffer 7 Tage). Die eigentliche Zuordnung Code → Sorte speichert
-// die App in der Futtersorte (Feld codes.<EAN>); diese Suche ist nur für unbekannte Codes.
+// Barcode lookup: look food up by its EAN in Open Pet Food Facts and Open Food Facts.
+// The app only ever asks here; the server remembers the results in barcodes.json
+// (hits for 90 days, misses for 7). The actual code → variety mapping is stored by the app
+// on the food variety (field codes.<EAN>); this lookup is only for unknown codes.
 
 import (
 	"context"
@@ -28,23 +28,23 @@ const (
 )
 
 var (
-	barcodeTimeout     = 5 * time.Second // je Datenbank; in Tests kürzer
+	barcodeTimeout     = 5 * time.Second // per database; shorter in tests
 	defaultBarcodeURLs = []string{"https://world.openpetfoodfacts.org", "https://world.openfoodfacts.org"}
 	quantityRe         = regexp.MustCompile(`(?i)\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b|\b\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b`)
 	spacesRe           = regexp.MustCompile(`\s+`)
 )
 
-// Product ist das Ergebnis einer Suche, so wie es die App bekommt.
+// Product is the result of a lookup, the way the app receives it.
 type Product struct {
 	Found   bool   `json:"found"`
 	Brand   string `json:"brand,omitempty"`
 	Variety string `json:"variety,omitempty"`
 	Type    string `json:"type,omitempty"`
 	Animal  string `json:"animal,omitempty"`
-	At      int64  `json:"at,omitempty"` // nur im Zwischenspeicher: wann nachgeschlagen
+	At      int64  `json:"at,omitempty"` // in the cache only: when it was looked up
 }
 
-// NormalizeCode lässt nur gültige EAN-13, EAN-8 und UPC-A zu. UPC-A wird zu EAN-13 mit führender 0.
+// NormalizeCode accepts only valid EAN-13, EAN-8 and UPC-A. UPC-A becomes EAN-13 with a leading 0.
 func NormalizeCode(raw string) (string, bool) {
 	code := strings.TrimSpace(raw)
 	for _, r := range code {
@@ -59,7 +59,7 @@ func NormalizeCode(raw string) (string, bool) {
 		return "", false
 	}
 	sum := 0
-	for i := len(code) - 2; i >= 0; i-- { // von rechts: abwechselnd Gewicht 3 und 1
+	for i := len(code) - 2; i >= 0; i-- { // from the right: alternating weights 3 and 1
 		w := 1
 		if (len(code)-2-i)%2 == 0 {
 			w = 3
@@ -69,7 +69,7 @@ func NormalizeCode(raw string) (string, bool) {
 	return code, (10-sum%10)%10 == int(code[len(code)-1]-'0')
 }
 
-// Barcodes schlägt Codes nach und merkt sich die Ergebnisse.
+// Barcodes looks codes up and remembers the results.
 type Barcodes struct {
 	mu    sync.Mutex
 	dir   string
@@ -79,7 +79,7 @@ type Barcodes struct {
 func OpenBarcodes(dir string) *Barcodes {
 	b := &Barcodes{dir: dir, cache: map[string]Product{}}
 	if raw, err := os.ReadFile(filepath.Join(dir, barcodeFile)); err == nil {
-		json.Unmarshal(raw, &b.cache) // beschädigt: dann eben leer, es ist nur ein Zwischenspeicher
+		json.Unmarshal(raw, &b.cache) // corrupted: then it stays empty, it is only a cache
 	}
 	return b
 }
@@ -107,8 +107,8 @@ func (b *Barcodes) remember(code string, p Product) {
 	}
 }
 
-// Lookup liefert das Ergebnis aus dem Zwischenspeicher oder fragt die Datenbanken der Reihe nach.
-// Ist keine Datenbank erreichbar, gibt es einen Fehler und nichts wird gemerkt.
+// Lookup returns the result from the cache or asks the databases one after another.
+// If no database is reachable it returns an error and nothing is remembered.
 func (b *Barcodes) Lookup(ctx context.Context, cfg Config, code string, now time.Time) (Product, error) {
 	if p, ok := b.cached(code, now); ok {
 		p.At = 0
@@ -139,7 +139,7 @@ func (b *Barcodes) Lookup(ctx context.Context, cfg Config, code string, now time
 	return Product{Found: false}, nil
 }
 
-// fetchProduct fragt eine Datenbank der Open-Food-Facts-Familie (API v2).
+// fetchProduct asks one database of the Open Food Facts family (API v2).
 func fetchProduct(ctx context.Context, base, code string) (Product, error) {
 	ctx, cancel := context.WithTimeout(ctx, barcodeTimeout)
 	defer cancel()
@@ -184,7 +184,7 @@ func fetchProduct(ctx context.Context, base, code string) (Product, error) {
 	return Product{Found: true, Brand: brand, Variety: variety, Type: typ, Animal: animal}, nil
 }
 
-// cleanVariety macht aus „Sheba Fresh Choice Huhn in Sauce 4x50g“ die Sorte „Fresh Choice Huhn in Sauce“.
+// cleanVariety turns "Sheba Fresh Choice Huhn in Sauce 4x50g" into the variety "Fresh Choice Huhn in Sauce".
 func cleanVariety(name, brand string) string {
 	v := quantityRe.ReplaceAllString(name, " ")
 	if brand != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(v)), strings.ToLower(brand)) {
@@ -193,7 +193,7 @@ func cleanVariety(name, brand string) string {
 	return strings.Trim(spacesRe.ReplaceAllString(v, " "), " -–,·|")
 }
 
-// classify leitet Art und Tierart nur ab, wenn die Kategorien eindeutig sind.
+// classify derives type and species only when the categories are unambiguous.
 func classify(tags []string) (typ, animal string) {
 	has := func(words ...string) bool {
 		for _, t := range tags {

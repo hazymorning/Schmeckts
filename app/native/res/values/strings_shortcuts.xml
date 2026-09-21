@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Labels of the static app shortcuts. German, like the rest of the interface. -->
 <resources>
-    <string name="shortcut_fuettern">Füttern</string>
-    <string name="shortcut_fuettern_lang">Füttern eintragen</string>
+    <string name="shortcut_feed">Füttern</string>
+    <string name="shortcut_feed_long">Füttern eintragen</string>
     <string name="shortcut_scan">Scannen</string>
-    <string name="shortcut_scan_lang">Packung scannen</string>
-    <string name="shortcut_foto">Packung fotografieren</string>
-    <string name="shortcut_foto_lang">Packung fotografieren</string>
+    <string name="shortcut_scan_long">Packung scannen</string>
+    <string name="shortcut_photo">Packung fotografieren</string>
+    <string name="shortcut_photo_long">Packung fotografieren</string>
 </resources>

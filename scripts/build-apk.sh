@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# Baut die signierte APK nach dist/schmeckts-<version>.apk
-# Aufruf: scripts/build-apk.sh <schmeckts-signatur.txt>
-# Die Versionsnummer steht nur an einer Stelle: app/package.json
+# Builds the signed APK to dist/schmeckts-<version>.apk
+# Usage: scripts/build-apk.sh <schmeckts-signing-key.txt>
+# The version number lives in exactly one place: app/package.json
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SIGNATUR="$(realpath "${1:?Pfad zu schmeckts-signatur.txt fehlt}")"
+SIGNING_KEY="$(realpath "${1:?path to schmeckts-signing-key.txt missing}")"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
 
-"$ROOT/scripts/test.sh"   # getestet ausliefern: ohne grüne Tests keine APK
+"$ROOT/scripts/test.sh"   # ship tested: no APK without green tests
 python3 "$ROOT/scripts/prepare.py"
 cd "$ROOT/app"
 VERSION="$(node -p "require('./package.json').version")"
 npx cap sync android
 (cd android && ./gradlew assembleRelease --no-daemon --console=plain -q)
 
-# Schlüssel nur für die Dauer des Signierens als Datei, danach wieder gelöscht
+# The key exists as a file only for as long as signing takes, and is deleted afterwards
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-export SCHMECKTS_PW="$(python3 "$ROOT/scripts/signatur.py" lesen "$SIGNATUR" "$TMP/key.jks")"
+export SCHMECKTS_PW="$(python3 "$ROOT/scripts/signing-key.py" read "$SIGNING_KEY" "$TMP/key.jks")"
 mkdir -p "$ROOT/dist"
 OUT="$ROOT/dist/schmeckts-$VERSION.apk"
 "$BUILD_TOOLS/apksigner" sign --ks "$TMP/key.jks" --ks-key-alias schmeckts \
@@ -25,24 +25,24 @@ OUT="$ROOT/dist/schmeckts-$VERSION.apk"
   --out "$OUT" android/app/build/outputs/apk/release/app-release-unsigned.apk
 "$BUILD_TOOLS/apksigner" verify "$OUT"
 
-# Das fertige Manifest prüfen: Kamerarecht vorhanden (eigene Kamera für Packungsfotos) und Googles
-# Scanner-Modul angemeldet (barcode_ui, wird mit der App installiert)
+# Check the finished manifest: the camera permission is there (our own camera for packaging photos) and Google's
+# scanner module is declared (barcode_ui, installed along with the app)
 MANIFEST="$("$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$OUT")"
-grep -q '"android.permission.CAMERA"' <<<"$MANIFEST" || { echo "Fehler: Im Manifest fehlt das Kamerarecht (android.permission.CAMERA), die eigene Kamera ginge nicht." >&2; rm -f "$OUT"; exit 1; }
-# Erinnerung zum Bewerten: Benachrichtigungen ja, exakte Alarme nein (ungefähre Zeit genügt)
+grep -q '"android.permission.CAMERA"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the camera permission (android.permission.CAMERA); our own camera would not work." >&2; rm -f "$OUT"; exit 1; }
+# Rating reminder: notifications yes, exact alarms no (an approximate time is enough)
 if grep -Eq '"android.permission.(SCHEDULE|USE)_EXACT_ALARM"' <<<"$MANIFEST"; then
-  echo "Fehler: Die APK verlangt das Recht für exakte Alarme." >&2; rm -f "$OUT"; exit 1
+  echo "Error: the APK asks for the exact-alarm permission." >&2; rm -f "$OUT"; exit 1
 fi
-grep -q '"android.permission.POST_NOTIFICATIONS"' <<<"$MANIFEST" || { echo "Fehler: Im Manifest fehlt das Recht für Benachrichtigungen." >&2; rm -f "$OUT"; exit 1; }
-grep -q '"barcode_ui"' <<<"$MANIFEST" || { echo "Fehler: Im Manifest fehlt das Scanner-Modul (barcode_ui)." >&2; rm -f "$OUT"; exit 1; }
-# Datenschutz: Regeln gegen die Cloud-Sicherung angemeldet und in der APK
-grep -q 'dataExtractionRules' <<<"$MANIFEST" && grep -q 'fullBackupContent' <<<"$MANIFEST" || { echo "Fehler: Im Manifest fehlen die Regeln gegen die Cloud-Sicherung." >&2; rm -f "$OUT"; exit 1; }
-RULES="$("$BUILD_TOOLS/aapt2" dump resources "$OUT" | grep -A1 'xml/data_extraction_rules$' | grep -o 'res/[^ ]*')"  # der Build kürzt die Pfade
-"$BUILD_TOOLS/aapt2" dump xmltree --file "$RULES" "$OUT" | grep -q 'cloud-backup' || { echo "Fehler: data_extraction_rules.xml fehlt in der APK." >&2; rm -f "$OUT"; exit 1; }
-# Nur Handys: keine x86-Bibliotheken in der APK (die Texterkennung bringt je Prozessorfamilie eine mit)
+grep -q '"android.permission.POST_NOTIFICATIONS"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the notification permission." >&2; rm -f "$OUT"; exit 1; }
+grep -q '"barcode_ui"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the scanner module (barcode_ui)." >&2; rm -f "$OUT"; exit 1; }
+# Privacy: the rules against cloud backup are declared and present in the APK
+grep -q 'dataExtractionRules' <<<"$MANIFEST" && grep -q 'fullBackupContent' <<<"$MANIFEST" || { echo "Error: the manifest is missing the rules against cloud backup." >&2; rm -f "$OUT"; exit 1; }
+RULES="$("$BUILD_TOOLS/aapt2" dump resources "$OUT" | grep -A1 'xml/data_extraction_rules$' | grep -o 'res/[^ ]*')"  # the build shortens the paths
+"$BUILD_TOOLS/aapt2" dump xmltree --file "$RULES" "$OUT" | grep -q 'cloud-backup' || { echo "Error: data_extraction_rules.xml is missing from the APK." >&2; rm -f "$OUT"; exit 1; }
+# Phones only: no x86 libraries in the APK (text recognition ships one per processor family)
 if "$BUILD_TOOLS/aapt2" dump badging "$OUT" | grep -q "native-code:.*x86"; then
-  echo "Fehler: Die APK enthält x86-Bibliotheken, sie ist nur für Handys gedacht." >&2; rm -f "$OUT"; exit 1
+  echo "Error: the APK contains x86 libraries; it is meant for phones only." >&2; rm -f "$OUT"; exit 1
 fi
-"$BUILD_TOOLS/aapt2" dump badging "$OUT" | grep -o 'native-code:.*' | sed 's/^/Prozessoren: /'
-"$BUILD_TOOLS/aapt2" dump permissions "$OUT" | grep '^uses-permission' | sed 's/^/Recht: /'
-echo "Fertig: $OUT"
+"$BUILD_TOOLS/aapt2" dump badging "$OUT" | grep -o 'native-code:.*' | sed 's/^/Processors: /'
+"$BUILD_TOOLS/aapt2" dump permissions "$OUT" | grep '^uses-permission' | sed 's/^/Permission: /'
+echo "Done: $OUT"

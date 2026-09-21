@@ -1,11 +1,11 @@
-/* Feste Werte: Tierarten, Futterarten, Bewertungen und ihre Skalen, Konsistenz und Snack-Art, Erkennungsmuster für den Geschmack. */
+/* Fixed values: species, food types, ratings and their scales, consistency and treat type, patterns for flavour. */
 
 export const SPECIES = [{k:'Katze',i:'cat'},{k:'Hund',i:'dog'},{k:'Kaninchen',i:'rabbit'},{k:'Vogel',i:'bird'},{k:'Nager',i:'rodent'},{k:'Andere',i:'paw'}];
 export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1)).i;
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
-export const typeOf = product => TYPES.includes(product?.type) ? product.type : TYPES[0]; // ohne bekannte Art: Nassfutter
-/* Bewertungsstufen aller Skalen. Gemessen wird Akzeptanz: score, 0 bis 100. Die Schlüssel stehen in den Daten und ändern
-   sich nie; der Schlüssel allein bestimmt Punkte, Text und Icon. lines: die zwei Zeilen im Bewertungsknopf */
+export const typeOf = product => TYPES.includes(product?.type) ? product.type : TYPES[0]; // without a known type: wet food
+/* Rating levels of every scale. What is measured is acceptance: score, 0 to 100. The keys live in the data and never
+   change; the key alone determines points, wording and icon. lines: the two lines on the rating button */
 export const RATINGS = {
   top:          {label:'Sofort leer',     lines:['Sofort', 'leer'],       score:100},
   gut:          {label:'Später leer',     lines:['Später', 'leer'],       score:80},
@@ -21,17 +21,17 @@ export const RATINGS = {
   angeknabbert: {label:'Nur angeknabbert', lines:['Nur', 'angeknabbert'], score:35},
   unberuehrt:   {label:'Nicht angerührt', lines:['Nicht', 'angerührt'],   score:0}
 };
-/* Beobachtungsskalen: Was man beobachtet, hängt von der Futterart ab. Nur scaleOf kennt die Zuordnung. */
+/* Observation scales: what you observe depends on the food type. Only scaleOf knows the mapping. */
 export const SCALES = {
-  portion: ['top', 'gut', 'mittel', 'sosse', 'schlecht'],           // der Napf nach der Mahlzeit
-  bowl:    ['gern', 'normal', 'wenig', 'liegen'],                   // der Napf steht länger
-  bite:    ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']    // ein Happen
+  portion: ['top', 'gut', 'mittel', 'sosse', 'schlecht'],           // the bowl after the meal
+  bowl:    ['gern', 'normal', 'wenig', 'liegen'],                   // the bowl stands for longer
+  bite:    ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']    // a single morsel
 };
 const SCALE_OF = {Nassfutter:'portion', Trockenfutter:'bowl', Snack:'bite', Sonstiges:'bite'};
 export const scaleOf = product => SCALES[SCALE_OF[typeOf(product)]];
-/* Konsistenz (Nassfutter) und Snack-Art: das optionale Feld texture der Sorte, je Art [Schlüssel, Text, Stichwörter].
-   Die Stichwörter in Marke und Sorte füllen ein leeres Feld und dienen der Auswertung, solange es fehlt. Die Schlüssel
-   stehen in den Daten. Trockenfutter und Sonstiges haben keine Auswahl. */
+/* Consistency (wet food) and treat type: the variety's optional texture field, per type [key, label, keywords].
+   The keywords in brand and variety fill an empty field and stand in for it in the evaluation while it is missing.
+   The keys live in the data. Dry food and other have no choice to make. */
 export const TEXTURES = {
   Nassfutter: {title:'Konsistenz', items:[['sosse', 'In Soße', /so(ß|ss)e|sauce|gravy/i], ['gelee', 'In Gelee', /gelee|jelly|aspik/i],
     ['pastete', 'Pastete', /pastete|p[aâ]t[eé]|terrine/i], ['mousse', 'Mousse', /mousse/i], ['block', 'Fester Block', /loaf|block/i],
@@ -40,12 +40,12 @@ export const TEXTURES = {
     ['creme', 'Creme', /creme|crème|cream|paste/i], ['milch', 'Milch', /milch|milk|drink/i], ['stick', 'Stick', /stick|streifen/i],
     ['kau', 'Kauartikel', /kau|chew/i]]}
 };
-/* textureOf: Eintrag zu einem Schlüssel, nur wenn er zur Art der Sorte passt; guessTexture: Schlüssel nach den Stichwörtern */
+/* textureOf: the entry for a key, only when it fits the variety's type; guessTexture: the key from the keywords */
 export const textureOf = (product, key) => TEXTURES[typeOf(product)]?.items.find(([k]) => k === key);
 export const guessTexture = product => TEXTURES[typeOf(product)]?.items.find(([, , re]) => re.test(`${product.brand} ${product.variety}`))?.[0];
-/* Texterkennung auf der Packung (js/ocr.js). BRANDS: gängige Futtermarken für Katze und Hund samt deutschen
-   Handelsmarken; steht eine davon im Text, gilt sie mit dieser Schreibweise. Bei mehreren gewinnt die längste.
-   TYPE_WORDS und ANIMAL_WORDS: Stichwörter für Art und Tierart, die Konsistenz kommt aus TEXTURES. */
+/* Text recognition on the packaging (js/ocr.js). BRANDS: common cat and dog food brands including German retail
+   brands; if one of them appears in the text, it applies with this spelling. Where several match, the longest wins.
+   TYPE_WORDS and ANIMAL_WORDS: keywords for type and species; the consistency comes from TEXTURES. */
 export const BRANDS = ['Whiskas', 'Sheba', 'Felix', 'Kitekat', 'Gourmet', 'Perfect Fit', 'Purina One', 'Pro Plan', 'Friskies', 'Beneful',
   'Cesar', 'Pedigree', 'Frolic', 'Chappi', 'Dreamies', 'Catessy', 'Vitakraft', 'Animonda', 'Miamor', 'Schesir',
   'Catz Finefood', 'MAC’s', 'Wildes Land', 'Terra Canis', 'Herrmann’s', 'Lukullus', 'Rocco', 'Cosma', 'Feringa', 'Smilla',
@@ -59,17 +59,17 @@ export const ANIMAL_WORDS = [['Katze', /katze|kätzchen|kitten|\bcat\b/i], ['Hun
 export const FLAVORS = [['Thunfisch',/thunfisch|tuna/i],['Lachs',/lachs|salmon/i],['Huhn',/huhn|hühn|chicken|geflügel/i],
   ['Pute',/pute|truthahn|turkey/i],['Rind',/rind|beef/i],['Ente',/ente|duck/i],['Lamm',/lamm|lamb/i],
   ['Kaninchen',/kaninchen|rabbit/i],['Wild',/wild|hirsch|reh/i],['Fisch',/fisch|fish|forelle|kabeljau/i],['Käse',/käse|cheese/i]];
-/* Erinnerung zum Bewerten in Minuten nach dem Servieren, 0 = aus: die Stufen REMIND oder eigene ganze Stunden von 1 bis
-   REMIND_MAX_H. tidyRemind macht aus jedem gespeicherten Wert einen gültigen. */
+/* Rating reminder in minutes after serving, 0 = off: the REMIND steps, or whole hours of your own from 1 to
+   REMIND_MAX_H. tidyRemind turns any stored value into a valid one. */
 export const REMIND = [0, 60, 180, 360];
 export const REMIND_MAX_H = 24;
 export const tidyRemind = m => Number.isFinite(m) && m > 0 ? Math.min(REMIND_MAX_H, Math.max(1, Math.round(m / 60))) * 60 : 0;
-/* Womit das Füttern beginnt (prefs.feedStart, pro Gerät): beide Knöpfe im Füttern-Sheet oder nur einer. Ausgeblendet
-   wird allein der Knopf; scannen und fotografieren bleiben über Kurzbefehle, Deep Links und den Weg über das Foto
-   nach einem unbekannten Barcode erreichbar. tidyFeedStart macht aus jedem gespeicherten Wert einen gültigen. */
+/* What feeding starts with (prefs.feedStart, per device): both buttons in the feeding sheet, or only one. Only the
+   button is hidden; scanning and photographing stay reachable through shortcuts, deep links and the route via the
+   photo after an unknown barcode. tidyFeedStart turns any stored value into a valid one. */
 export const FEED_START = [['beides', 'Barcode & Foto'], ['foto', 'Nur Foto'], ['barcode', 'Nur Barcode']];
 export const tidyFeedStart = v => FEED_START.some(([k]) => k === v) ? v : FEED_START[0][0];
-export const REMIND_MAX_AGE = 10 * 60e3;    // geplant wird nur für Mahlzeiten, die höchstens 10 Minuten alt sind
-export const PENDING_WINDOW = 48 * 3600e3; // offene Mahlzeiten verschwinden nach 48 h aus „Wie war’s?“
-export const ALBUM_MAX = 8;                 // Fotos im Album eines Tiers
-export const DEMO = 'demo'; // Kennungen der Beispieldaten beginnen damit, beim Verbinden werden sie entfernt
+export const REMIND_MAX_AGE = 10 * 60e3;    // only meals at most 10 minutes old get one scheduled
+export const PENDING_WINDOW = 48 * 3600e3; // open meals drop out of „Wie war’s?“ after 48 h
+export const ALBUM_MAX = 8;                 // photos in a pet's album
+export const DEMO = 'demo'; // sample data identifiers start with this; they are removed on connecting
