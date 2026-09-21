@@ -79,9 +79,9 @@ function homeHTML(){
   if (!m) html += stepsHTML();
   else {
     const ins = insightCard(m);
-    html += hintHTML(m) + weekHTML(lastWeek()) +
+    html += hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
-      card('shop', 'Einkaufen', shopCard(m)) + (ins ? card('ins', 'Erkenntnisse', ins) : '');
+      weekHTML(lastWeek()) + card('shop', 'Einkaufen', shopCard(m)) + (ins ? card('ins', 'Erkenntnisse', ins) : '');
   }
   return html;
 }
@@ -105,7 +105,8 @@ function overviewText({last, pets}){
   const p = getProduct(last.productId), ids = servingPets(last), since = ago(last.servedAt), r = ids.length === 1 && rOf(last.pets[ids[0]]);
   const who = many ? `${esc(petNames(ids))} ${ids.length > 1 ? 'bekamen' : 'bekam'}` : 'Bekam';
   const what = p ? (typeOf(p) === 'Snack' ? 'einen Snack: ' : '') + sort({product:p}) : 'Futter, das noch keinen Namen hat';
-  const fed = `${who}${since === 'gerade eben' ? '' : ' zuletzt'} <b>${/^\d/.test(since) ? 'am ' : ''}${esc(since)}</b> ${what}${ids.length > 1 ? '' : ` (${r ? RATINGS[r].label : 'noch offen'})`}.`;
+  const by = isConnected() && last.by ? `, serviert von <b>${esc(last.by)}</b>` : ''; // in a household it matters who fed
+  const fed = `${who}${since === 'gerade eben' ? '' : ' zuletzt'} <b>${/^\d/.test(since) ? 'am ' : ''}${esc(since)}</b> ${what}${by}${ids.length > 1 ? '' : ` (${r ? RATINGS[r].label : 'noch offen'})`}.`;
   const favs = pets.filter(x => x.favorite), flops = pets.filter(x => x.flop);
   const taste = !favs.length && !flops.length ? ['Für einen Liebling fehlen noch Bewertungen.']
     : !many ? [favs.length && flops.length ? `Am liebsten ${sort(favs[0].favorite)}, ${sort(flops[0].flop)} kommt nicht an.` : favs.length ? `Am liebsten ${sort(favs[0].favorite)}.` : `${sort(flops[0].flop)} kommt nicht an.`]
@@ -309,5 +310,5 @@ function historyHTML(){
   const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
   return calendarHTML(recent) +
     (first.length ? dayBlocks(dayGroups(first), {multiHouse, fresh:homeView.fresh, anchors:true}) : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
-    `<div class="btn-col mt-s"><button class="btn soft" data-action="open-report">${icon('layers')}Auswertung</button></div>`;
+    `<div class="btn-col mt-s"><button class="btn soft" data-action="open-report">${icon('layers')}Mehr</button></div>`;
 }

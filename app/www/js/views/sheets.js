@@ -9,7 +9,7 @@ import {RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, reportModel, sortOf} from '../derive.js';
-import {feedSlots, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {feedSlots, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {renderSheet, setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {armBtn, avatar, closeBtn, dayBlocks, dayGroups, nameBlock, rateRow, reasonOf, resultBadges, syncInfo, thumbOf, verdictLabel} from './parts.js';
@@ -160,23 +160,34 @@ function viewProduct(){
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* Evaluation: the same building blocks as the settings, nothing to set. „Marken“ says what goes down best, below it
-   the whole history. The computing happens in report() (smart.js). The bars carry their text description in
-   aria-label, and no statement rests on colour alone. sheet.at: the id of the day it opens at */
+/* The evaluation: the facts at a glance, then the whole history. The same building blocks as the settings, nothing
+   to set. The facts card carries its text description in aria-label, and no statement rests on colour alone.
+   sheet.at: the id of the day it opens at */
 export const reportState = at => ({kind:'report', at});
 
-/* A horizontal bar with name, number and secondary number */
-const barRow = (name, value, side, w) =>
-  `<div class="lv"><span class="lv-top"><span class="lv-name">${esc(name)}</span><b class="lv-n">${value}</b><span class="lv-s">${side}</span></span>
-    <span class="bar"><i style="--w:${Math.max(2, Math.round(w))}%"></i></span></div>`;
+/* Three numbers, and below them what goes down best and worst. Stays under 240px: the numbers in one row, at most
+   two lines under them. */
+const FACTS = [['meals', 'Mahlzeiten'], ['sorts', 'Sorten'], ['days', 'Tage gefüttert']];
+const rankRow = (x, r, text) => `<div class="rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="pct">${x.pct} %</b></div>`;
+function factsCard(m){
+  const label = FACTS.map(([k, l]) => `${m.count[k]} ${l}`).join(', ') + '.'
+    + (m.best ? ` Am besten kommt ${pname(m.best.product)} an, ${m.best.pct} Prozent.` : '')
+    + (m.worst ? ` Am wenigsten ${pname(m.worst.product)}, ${m.worst.pct} Prozent.` : '');
+  return `<div class="facts" role="img" aria-label="${esc(label)}">${
+    FACTS.map(([k, l]) => `<div><b>${m.count[k]}</b><span>${l}</span></div>`).join('')}</div>
+    ${m.best ? `<div class="tops">${rankRow(m.best, 'top', 'kommt am besten an')}
+      ${m.worst ? rankRow(m.worst, 'schlecht', 'bleibt am ehesten übrig') : ''}</div>` : ''}`;
+}
 
-/* „Marken“: which brand goes down best. Only from two brands on, otherwise there is nothing to compare. */
-function brandBlock(m){
-  if (m.brands.length < 2) return '';
-  const label = 'Marken nach Wertung: ' + m.brands.map(b => `${b.key} ${b.pct} Prozent aus ${b.n} Bewertungen`).join('; ') + '.';
-  return `<h3 class="label">Marken</h3>
-    <div class="bars" role="img" aria-label="${esc(label)}">${m.brands.map(b => barRow(b.key, `${b.pct} %`, `${b.n}×`, b.pct)).join('')}</div>
-    <p class="why">${esc(m.brands[0].key)} kommt am besten an, ${esc(m.brands.at(-1).key)} am wenigsten.</p>`;
+function viewReport(){
+  const m = reportModel();
+  const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
+  histDays = dayGroups(m.meals);
+  const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
+  return `<div class="sh-head"><h2>Verlauf${who}</h2>${closeBtn}</div>
+    ${m.count.meals ? factsCard(m) : ''}
+    ${histDays.length ? `<h3 class="label">Jede Mahlzeit</h3><div id="histBox">${histHTML(m, 0, upto)}</div>`
+      : `<p class="empty">Noch nichts serviert.</p>`}`;
 }
 
 /* The history grows as you scroll instead of laying out years of meals in one go: HIST_PAGE days at a time,
@@ -194,18 +205,6 @@ function growHistory(){
     box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
 }
 sheetBody.addEventListener('scroll', growHistory, {passive:true});
-
-/* The evaluation: what goes down best, and the whole history. Nothing to set, nothing to unfold. */
-function viewReport(){
-  const m = reportModel();
-  const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
-  histDays = dayGroups(m.meals);
-  const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
-  return `<div class="sh-head"><h2>Auswertung${who}</h2>${closeBtn}</div>
-    ${m.n < MIN_RATED ? `<p class="hint">Ab ${MIN_RATED} Bewertungen zeigt diese Seite, was ankommt.</p>` : brandBlock(m)}
-    ${histDays.length ? `<h3 class="label">Verlauf</h3><div id="histBox">${histHTML(m, 0, upto)}</div>`
-      : `<p class="empty">Noch nichts serviert.</p>`}`;
-}
 
 /* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
    mountCrop() hangs the image in after drawing. */

@@ -27,7 +27,7 @@ async def test_tour(browser, url, scheme='light'):
     heads = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.classList.contains("card") ? s.querySelector("h2").innerText : "-")')
     hint = [h for h in heads if h in ('Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     week = [h for h in heads if h == 'Letzte Woche']  # Monday to Wednesday only
-    check(heads == ['Mau', 'Wie war’s?'] + hint + week + ['Verlauf', 'Einkaufen', 'Erkenntnisse'] and len(hint) == 1, f'cards in a fixed order, the overview first: {heads}')
+    check(heads == ['Mau', 'Wie war’s?'] + hint + ['Verlauf'] + week + ['Einkaufen', 'Erkenntnisse'] and len(hint) == 1, f'cards in a fixed order, the overview first: {heads}')
     check(await pg.locator('.cal').count() == 1 and await pg.locator('[data-sec=hist] .tl-day').count() >= 1 and await pg.locator('[data-sec=shop] .bar').count() == 0,
           'the history visible at once, shopping folded up')
     await pg.click('[data-action=expand][data-v=shop]'); await idle(pg)
@@ -312,11 +312,11 @@ async def test_week(browser, url):
               f'{where}: five equally wide buttons in the scale\u2019s order, nothing clipped or wrapped at 360 px, at least 48 px tall')
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]'); await idle(pg)
-    # A household with a previous week: the „Letzte Woche“ card after the hint and before „Verlauf“
+    # A household with a previous week: the „Letzte Woche“ card after „Verlauf“, looking back once the day is done
     await pg.evaluate(HOUSE, [house_meals()]); await idle(pg)
     heads = await pg.eval_on_selector_all('#home > section.card', 'l => l.map(s => s.querySelector("h2").innerText)')
     hint = [h for h in heads if h in ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
-    check(len(hint) == 1 and heads[:5] == ['Minka und Tiger'] + hint + ['Letzte Woche', 'Verlauf', 'Einkaufen'], f'„Letzte Woche“ sits right after the hint, then „Verlauf“ and „Einkaufen“ ({heads})')
+    check(len(hint) == 1 and heads[:5] == ['Minka und Tiger'] + hint + ['Verlauf', 'Letzte Woche', 'Einkaufen'], f'„Letzte Woche“ sits after „Verlauf“, before „Einkaufen“ ({heads})')
     w = {'lines': await pg.eval_on_selector_all('[data-sec=week] .week p', 'l => l.map(p => p.innerText.trim())')}
     check(w['lines'] == ['8× gefüttert, 7 bewertet', 'Minka mochte am liebsten Pute', 'Tiger mochte am liebsten Lachs in Soße', 'Neuer Liebling: Pute', 'Gefüttert: Anna 4×, Jonas 3×'],
           f'„Letzte Woche“: meals, the favourite variety per pet, a new favourite, the feeding duel with the most first, not counted without a name ({w["lines"]})')
@@ -415,6 +415,9 @@ async def test_scales(browser, url):
     await pg.click('.tl-item[data-id=meal000002]'); await idle(pg)
     old = await pg.evaluate("[document.querySelector('#sheet .pet-rate > .badge')?.innerText.trim(), !!document.querySelector('#sheet .pet-rate > .badge svg'), document.querySelectorAll('#sheet .rb').length, document.querySelectorAll('#sheet .rb[aria-pressed=true]').length]")
     check(old == ['Später leer', True, 4, 0], f'a level outside the scale sits above the four buttons with its own wording and icon ({old})')
+    card = await pg.evaluate("[...document.querySelectorAll('#sheet .prod-card small, #sheet .prod-card b')].map(e => e.innerText)")
+    check(card == ['Josera', 'Trockenfutter'],
+          f'the sheet names the food type, which is what decides the scale, instead of the time that is in the field below ({card})')
     # Counters in the food sheet: the scale's levels, other levels that occur after them
     await pg.click('[data-action=close]'); await idle(pg)
     await pg.click('[data-action=open-product][data-id=trocken0001]'); await idle(pg)
@@ -565,6 +568,16 @@ async def test_overview(browser, url):
     check([tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Bekam zuletzt vor 5 Min. Lachs (noch offen). Am liebsten Pute.']
           and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']] == ['Noch nichts serviert.', False, [None, None], 108],
           f'the overview follows the filter; without a meal there is nothing to unfold ({tiger["text"]} / {kiwi["text"]})')
+    # In a household it matters who fed. prefs.code only in memory: saving it would start a sync
+    by = await pg.evaluate("""import('./js/store.js').then(async s => { const h = await import('./js/views/home.js');
+      s.prefs.activePet = 'all'; s.db.servings[0].by = 'Anna';
+      const text = () => document.querySelector('.overview p').innerText;
+      h.renderHome(); const alone = text();
+      s.prefs.code = 'K7PM-3QXD'; h.renderHome(); const house = text();
+      s.prefs.code = ''; h.renderHome();
+      return [alone, house]; })""")
+    check('Anna' not in by[0] and 'serviert von Anna' in by[1],
+          f'in a household the overview says who fed, on your own it does not ({by[1]})')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
     # With motion: the text eases open and shut, and nothing is left behind afterwards
@@ -834,8 +847,8 @@ async def test_petbar(browser, url):
       .map(e => e.matches('header') ? 'header' : e.id === 'pets' ? 'pets' : e.querySelector('h2')?.innerText ?? e.tagName)""")
     hint = [x for x in order if x in ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     week = [x for x in order if x == 'Letzte Woche']
-    check(order == ['header', 'Mau', 'Wie war’s?'] + hint + week + ['Verlauf', 'Einkaufen', 'Erkenntnisse'] and len(hint) == 1,
-          f'one pet: no pet bar; overview, „Wie war’s?“, hint, „Letzte Woche“, „Verlauf“, „Einkaufen“, „Erkenntnisse“ ({order})')
+    check(order == ['header', 'Mau', 'Wie war’s?'] + hint + ['Verlauf'] + week + ['Einkaufen', 'Erkenntnisse'] and len(hint) == 1,
+          f'one pet: no pet bar; overview, „Wie war’s?“, hint, „Verlauf“, „Letzte Woche“, „Einkaufen“, „Erkenntnisse“ ({order})')
     check(await pg.locator('#pets').is_hidden() and await pg.locator('#pets *').count() == 0, 'with one pet there is no filter')
     await shot(pg, 'home-one-pet')
     await pg.click('[data-action=open-settings]'); await idle(pg)
@@ -1702,6 +1715,15 @@ async def test_feed_routes(browser, url):
     check(['capture', {'hint': 'Vorderseite fotografieren'}] in await pg.evaluate('window.__calls')
           and await state(pg, f"db.servings[0].scanCode === '{SHEBA}'"),
           'schmeckts://scan scans, and the unknown code leads to the photo')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    was = await state(pg, 'db.servings.length')
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://foto'})")
+    await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
+    old_link = await state(pg, 'db.servings.length') == was + 1
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://fuettern'})"); await idle(pg)
+    check(old_link and await pg.evaluate("!!document.querySelector('#sheet .cta-row')"),
+          'the German links from before the move to English still work: they sit in people\u2019s shortcuts')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -1746,8 +1768,8 @@ async def test_home_history(browser, url):
     await pg.evaluate(SORTS, [26, 1]); await idle(pg)
     btn = await pg.eval_on_selector('[data-sec=hist] [data-action=open-report]', 'b => [b.innerText.trim(), b.classList.contains("btn"), !!b.querySelector("svg")]')
     check(await pg.locator('[data-sec=hist] .tl-item').count() == 5 and await pg.locator('[data-sec=hist] .tl-day').count() == 5
-          and btn == ['Auswertung', True, True] and await pg.locator('[data-sec=hist] .card-btn').count() == 0,
-          f'five meals grouped by day, and below them one proper button to the evaluation ({btn})')
+          and btn == ['Mehr', True, True] and await pg.locator('[data-sec=hist] .card-btn').count() == 0,
+          f'five meals grouped by day, and below them one proper button to the whole history ({btn})')
     # A day in the calendar: near ones scroll on the home page, older ones open the evaluation there
     days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
     await pg.click(f'[data-action=jump-day][data-day="{days[-1]}"]'); await idle(pg)
@@ -1766,7 +1788,7 @@ REPORT_HEADS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h =>
 
 
 async def test_report(browser, url):
-    print('the evaluation: brands, the whole history, the pet filter')
+    print('the history sheet: the facts at a glance, every meal, the pet filter')
     ctx = await browser.new_context(viewport={'width': 400, 'height': 860}, timezone_id='Europe/Berlin', reduced_motion='reduce')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-20T10:00:00+02:00')
@@ -1777,30 +1799,34 @@ async def test_report(browser, url):
     await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
     heads, n = await pg.evaluate(REPORT_HEADS), await pg.locator('#sheet .tl-item').count()
     head = await pg.inner_text('#sheet .sh-head h2')
-    check(heads == ['Marken', 'Verlauf'] and n == 18 and head == 'Auswertung für alle Tiere'
+    check(heads == ['Jede Mahlzeit'] and n == 18 and head == 'Verlauf für alle Tiere'
           and await pg.locator('#sheet .seg, #sheet .card-btn').count() == 0,
-          f'two sections, the history right there, nothing to set ({heads}, {n} meals, {head})')
-    rows = await pg.eval_on_selector_all('#sheet .lv', "l => l.map(e => [e.querySelector('.lv-name').innerText, parseInt(e.querySelector('.lv-n').innerText)])")
-    says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
-    label = await pg.get_attribute('#sheet .bars', 'aria-label')
-    check(len(rows) == 6 and [r[1] for r in rows] == sorted((r[1] for r in rows), reverse=True) and rows[0][0] in says[0]
-          and len(says) == 1 and says[0].endswith('.') and len(label) > 20,
-          f'the brands as bars, best first, with one sentence and a text description ({rows})')
+          f'the facts, then every meal, and nothing to set ({heads}, {n} meals, {head})')
+    facts = await pg.eval_on_selector('#sheet .facts', """f => [[...f.children].map(d => [d.querySelector('b').innerText, d.querySelector('span').innerText]),
+      (f.getAttribute('aria-label') || '').length]""")
+    tops = await pg.eval_on_selector_all('#sheet .rank', "l => l.map(t => [t.querySelector('b').innerText, t.querySelector('small').innerText, t.querySelector('.pct').innerText])")
+    high = await pg.evaluate("""() => { const f = document.querySelector('#sheet .facts'), t = document.querySelector('#sheet .tops');
+      return Math.round(t.getBoundingClientRect().bottom - f.getBoundingClientRect().top); }""")
+    check([x[1] for x in facts[0]] == ['Mahlzeiten', 'Sorten', 'Tage gefüttert'] and facts[0][0][0] == '18'
+          and all(int(x[0]) > 0 for x in facts[0]) and facts[1] > 40
+          and [t[1] for t in tops] == ['kommt am besten an', 'bleibt am ehesten übrig'] and tops[0][0] != tops[1][0]
+          and all(t[2].endswith(' %') for t in tops) and high <= 240,
+          f'three numbers, best and worst below them, {high} px tall and with a text description ({facts[0]}, {tops})')
     await shot(pg, 'report')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.click('[data-action=filter][data-id=minka00001]'); await idle(pg)
     await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
     head, mine = await pg.inner_text('#sheet .sh-head h2'), await pg.locator('#sheet .tl-item').count()
-    check(head == 'Auswertung für Minka' and 0 < mine < n, f'the pet filter carries over into the evaluation ({head}, {mine} of {n} meals)')
+    check(head == 'Verlauf für Minka' and 0 < mine < n, f'the pet filter carries over into the evaluation ({head}, {mine} of {n} meals)')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.click('[data-action=filter][data-id=all]'); await idle(pg)
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
       s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
     await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
-    hint = await pg.eval_on_selector_all('#sheet .hint', 'l => l.map(x => x.innerText)')
-    check(await pg.evaluate(REPORT_HEADS) == ['Verlauf'] and hint == ['Ab 3 Bewertungen zeigt diese Seite, was ankommt.'],
-          f'too little data: one sentence about when it starts; the history stays ({hint})')
+    check(await pg.evaluate(REPORT_HEADS) == ['Jede Mahlzeit'] and await pg.locator('#sheet .tops').count() == 0
+          and await pg.locator('#sheet .facts').count() == 1,
+          'nothing rated: the numbers stay, best and worst are left out')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
     # How it looks at 360 px in light and dark
@@ -1809,7 +1835,7 @@ async def test_report(browser, url):
         pg, errors = await open_page(ctx, url)
         await pg.evaluate(SORTS, [26, 1]); await idle(pg)
         await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
-        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .why, #sheet h3.label')]
+        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .facts b, #sheet .facts span, #sheet .rank b, #sheet h3.label')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
         first = await pg.locator('#sheet .tl-item').count()
         for _ in range(10):
