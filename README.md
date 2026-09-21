@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/3452ef7d-22bc-457c-add0-9909317ddee5">
-    <img src="https://github.com/user-attachments/assets/33fcbc0a-b332-4e04-8abf-8513f341388a" width="880" alt="Schmeckt’s? – the app that remembers which food your pet actually likes.">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/6de937ab-9d55-4474-939f-a8531965ff25">
+    <img src="https://github.com/user-attachments/assets/c185d1f3-68fa-4d2a-89ce-02f7ed7a6293" width="880" alt="Schmeckt’s? – the app that remembers which food your pet actually likes.">
   </picture>
 </p>
 
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://github.com/user-attachments/assets/f3f3026c-2e0e-408f-bb06-eb2754afd68f" width="292" alt="Download the APK"></a>
+  <a href="#how-to-install"><img src="https://github.com/user-attachments/assets/67f2a3c6-7ccb-484f-82e5-af64c5145dd0" width="292" alt="Install app"></a>
 </p>
 
 **Schmeckt’s?** is a feeding diary for pets. After every meal you record with a single tap how the bowl looked, from “finished at once” to “barely touched”. After a few days the app shows which varieties your animal really likes and which ones can stay on the shelf next time you shop.
@@ -65,17 +65,59 @@ The first time you start the app you decide how you want to use it. You can swit
 
 The household feature is built into the app, but the matching server is not yet generally available.
 
-## Installing
+## How to install
 
-Schmeckt’s? is not on the Play Store. You download the app directly here.
+Schmeckt’s? isn’t on the Play Store, so you install it straight from this page. It takes about a minute, and you only need to give permission once.
 
-1. On your phone, open the [latest release](https://github.com/hazymorning/Schmeckts/releases/latest) and download the APK file under “Assets”.
-2. Tap the downloaded file. The first time, Android asks whether your browser may install apps. Grant permission and go back.
-3. Tap “Install”.
+<!-- This button downloads the APK of the latest release directly.
+     It only works if every release has the APK attached under exactly this name: schmeckts.apk -->
+<p align="center">
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/ffbc6f1f-0da5-4c14-ae23-ab543318029d" width="292" alt="Download APK"></a>
+</p>
 
-Because the app does not come from the Play Store, Android may offer to scan it first. That is normal.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5e312f50-e1ec-493b-9ee2-99c3bb88fbed" width="150" alt="QR code that opens this guide on your phone"><br>
+  <sub>On a computer? Scan this code with your phone’s camera to open this guide there.</sub>
+</p>
 
-You install new versions straight over the old one; your entries are kept. The app runs on Android 8.0 and up. The barcode scanner needs Google Play services, which are present on the vast majority of phones; everything else works without them.
+1. **Download.** On your Android phone, tap the button above. If your browser asks whether you want to keep the file, confirm.
+2. **Open.** Once the download has finished, tap *Open*, or open `schmeckts.apk` from your *Downloads*.
+3. **Allow.** The first time, Android asks whether your browser may install apps. Tap *Settings*, switch on *Allow from this source* and go back.
+4. **Install.** Tap *Install*, then *Open*. That’s it.
+
+<details>
+<summary><b>Android offers to scan the app first</b></summary>
+<br>
+
+Because the app doesn’t come from the Play Store, Google Play Protect may suggest scanning it before it is installed. Let it scan; it only takes a moment. Afterwards you can install the app as usual.
+
+</details>
+
+<details>
+<summary><b>Installing an update</b></summary>
+<br>
+
+Download the new version with the same button and install it over the old one. Your entries stay where they are. Please don’t uninstall the old version first, as that would delete your data.
+
+</details>
+
+<details>
+<summary><b>“App not installed”</b></summary>
+<br>
+
+This usually means an older test version is still on the phone. Save a backup in the app’s settings, uninstall the old version, install the new one and read the backup back in.
+
+</details>
+
+<details>
+<summary><b>Requirements</b></summary>
+<br>
+
+Android 8.0 or newer. The barcode scanner needs Google Play services, which almost every phone has; everything else works without them.
+
+</details>
+
+<p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">All versions</a></sub></p>
 
 ## Privacy
 
