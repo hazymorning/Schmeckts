@@ -1,7 +1,6 @@
 /* Alle Klicks laufen über data-action und das Objekt ACTIONS. Dazu Eingaben, Tastatur, Dateiauswahl
    und die Deep Links schmeckts://fuettern, schmeckts://scan und schmeckts://foto. Meldet sich beim Laden selbst an. */
 import {$, reduceMotion} from './dom.js';
-import {norm} from './text.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
@@ -10,9 +9,9 @@ import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
-import {closeSheet, openSheet, renderSheet, sheet, sheetBody} from './ui/sheet.js';
-import {expandCard, showOlderDays, timelineGroups, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderSuggestions} from './views/sheets.js';
+import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
+import {expandCard, showMoreHistory, toggleOverview, update} from './views/home.js';
+import {paintServerBox, renderServeHits, renderSuggestions, reportMore, reportSpan, reportState} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
@@ -79,6 +78,9 @@ const ACTIONS = {
   'edit-pet'(el){ openPet(el.dataset.id, 'settings'); },
   'open-pet'(el){ openPet(el.dataset.id); }, // von der Übersicht
   'open-settings'(){ openSheet({kind:'settings'}); },
+  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: Abschnitt, bei dem sie öffnet
+  'report-span'(el){ haptic('select'); reportSpan(el.dataset.v); },                    // Zeitraum, gilt für die ganze Seite
+  'report-more'(){ haptic('select'); reportMore(); },
   'open-privacy'(){ openSheet({kind:'privacy'}); },
   'open-server'(){ openSheet({kind:'settings'}); requestAnimationFrame(() => $('#server')?.scrollIntoView({block:'start'})); },
   connect(){ connectServer(); },
@@ -145,6 +147,7 @@ const ACTIONS = {
   'album-profile'(){ albumToProfile(); },
   backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // Tierfotos im Hintergrund
   lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // Produktsuche im Internet, Standard aus
+  'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // welcher Knopf im Füttern-Sheet steht
   'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // Erinnerung ans Füttern zu den üblichen Zeiten
   remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // Erinnerung zum Bewerten, fragt nach der Erlaubnis
   'remind-own'(){ // „Eigene“: Feld für ganze Stunden, beginnt mit dem geltenden Abstand, von „Aus“ mit 2 Stunden
@@ -158,14 +161,13 @@ const ACTIONS = {
   demo(){ loadDemo(); },
   expand(el){ haptic('select'); expandCard(el.dataset.v); },
   'toggle-overview'(){ haptic('select'); toggleOverview(); }, // der ganze Text der Übersicht und zurück
-  'older-days'(){ // der Knopf verschwindet, der Fokus geht auf den ersten neuen Tag
+  'more-history'(){ // der Fokus geht auf die erste neu gezeigte Mahlzeit
     haptic('select');
-    showOlderDays()?.querySelector('.tl-item')?.focus({preventScroll:true});
+    showMoreHistory()?.focus({preventScroll:true});
   },
   'jump-day'(el){
     const key = el.dataset.day;
-    if (!timelineGroups().some(g => g.key === key)) return;
-    if (!document.getElementById('d-' + key)) showOlderDays(); // Tag liegt vor vorgestern
+    if (!document.getElementById('d-' + key)) showMoreHistory(key); // der Tag liegt hinter den gezeigten Mahlzeiten
     const target = document.getElementById('d-' + key); if (!target) return;
     target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
     haptic('select');
@@ -210,10 +212,7 @@ document.addEventListener('input', e => {
     const h = Number(t.value);
     if (Number.isInteger(h) && h >= 1 && h <= REMIND_MAX_H) setRemind(h * 60, false);
   }
-  if (t.hasAttribute('data-search')) {
-    const q = norm(t.value);
-    sheetBody.querySelectorAll('.plist li').forEach(li => { li.hidden = !!q && !li.dataset.name.includes(q); });
-  }
+  if (t.hasAttribute('data-search')) renderServeHits(t.value);
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !sheet || e.target.tagName !== 'INPUT') return;

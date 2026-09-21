@@ -64,6 +64,11 @@ export const FLAVORS = [['Thunfisch',/thunfisch|tuna/i],['Lachs',/lachs|salmon/i
 export const REMIND = [0, 60, 180, 360];
 export const REMIND_MAX_H = 24;
 export const tidyRemind = m => Number.isFinite(m) && m > 0 ? Math.min(REMIND_MAX_H, Math.max(1, Math.round(m / 60))) * 60 : 0;
+/* Womit das Füttern beginnt (prefs.feedStart, pro Gerät): beide Knöpfe im Füttern-Sheet oder nur einer. Ausgeblendet
+   wird allein der Knopf; scannen und fotografieren bleiben über Kurzbefehle, Deep Links und den Weg über das Foto
+   nach einem unbekannten Barcode erreichbar. tidyFeedStart macht aus jedem gespeicherten Wert einen gültigen. */
+export const FEED_START = [['beides', 'Barcode & Foto'], ['foto', 'Nur Foto'], ['barcode', 'Nur Barcode']];
+export const tidyFeedStart = v => FEED_START.some(([k]) => k === v) ? v : FEED_START[0][0];
 export const REMIND_MAX_AGE = 10 * 60e3;    // geplant wird nur für Mahlzeiten, die höchstens 10 Minuten alt sind
 export const PENDING_WINDOW = 48 * 3600e3; // offene Mahlzeiten verschwinden nach 48 h aus „Wie war’s?“
 export const ALBUM_MAX = 8;                 // Fotos im Album eines Tiers

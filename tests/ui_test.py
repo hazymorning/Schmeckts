@@ -33,10 +33,9 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('[data-action=expand][data-v=shop]'); await idle(pg)
     check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'Einkaufen aufgeklappt: alle Sorten')
     await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
-    n = await pg.locator('[data-sec=hist] .tl-day').count()
-    await pg.click('[data-action=older-days]'); await idle(pg)
-    check(await pg.locator('[data-sec=hist] .tl-day').count() > n and await pg.locator('[data-action=older-days]').count() == 0,
-          '„Ältere Tage anzeigen“ zeigt die übrigen Tage, der Knopf verschwindet')
+    n = await pg.locator('[data-sec=hist] .tl-item').count()
+    await pg.click('[data-sec=hist] .card-btn'); await idle(pg)
+    check(n == 5 and await pg.locator('[data-sec=hist] .tl-item').count() == 10, '„Weitere anzeigen“ zeigt fünf weitere Mahlzeiten')
     await shot(pg, f'{scheme}-aufgeklappt')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     other = 'dark' if scheme == 'light' else 'light'
@@ -192,12 +191,11 @@ async def test_cards(browser, url):
     ctx = await phone(browser, touch=True, motion=True)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]'); await idle(pg)
-    # Verlauf: ohne Aufklappen Kalender, Zeitstrahl der letzten drei Tage und „Ältere Tage anzeigen“
-    recent = await pg.evaluate("""import('./js/views/home.js').then(m => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 2);
-      return m.timelineGroups().filter(g => g.t >= d.getTime()).map(g => g.key); })""")
-    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-day', 'l => l.map(d => d.id.slice(2))')
+    # Verlauf: Kalender und die letzten fünf Mahlzeiten, nach Tagen gruppiert
+    recent = await pg.evaluate("import('./js/store.js').then(s => s.db.servings.slice(0, 5).map(x => x.id))")
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
     check(await pg.locator('[data-sec=hist] .cal').is_visible() and await pg.locator('[data-sec=hist] .tl-node').first.is_visible()
-          and shown == recent and len(shown) >= 2, f'Verlauf ohne Aufklappen: Kalender und Zeitstrahl der letzten drei Tage ({shown})')
+          and shown == recent and await pg.locator('[data-sec=hist] .tl-day').count() >= 2, f'Verlauf: Kalender und die letzten fünf Mahlzeiten nach Tagen ({len(shown)})')
     # Einkaufen zugeklappt: bis zu 3 zum Nachkaufen, darunter bis zu 2, die nicht mehr gekauft werden
     groups = """import('./js/derive.js').then(d => { const m = d.model(), g = e => e.choice === 'gemischt' ? 'nachkaufen' : e.choice, shown = m.sorts.filter(e => e.n || e.kaufen);
       return {ja: shown.filter(e => g(e) === 'nachkaufen').map(e => e.id), offen: shown.filter(e => g(e) === 'beobachten').map(e => e.id),
@@ -225,9 +223,9 @@ async def test_cards(browser, url):
     await pg.keyboard.press(' '); await idle(pg)
     check(await pg.inner_text('[data-sec=shop] [data-action=expand]') == 'Alle anzeigen' and await pg.locator('[data-action=share-list]').count() == 0 and await pg.locator('[data-sec=shop] .bar').count() == 0, 'Leertaste klappt wieder zu')
     ins = await pg.eval_on_selector('[data-sec=ins]', 'c => [c.querySelectorAll(".ins li").length, [...c.querySelectorAll(".card-btn")].map(b => b.innerText)]')
-    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen']], f'Erkenntnisse zugeklappt: die wichtigste, dazu „Alle anzeigen“ ({ins}, {m["ins"]} insgesamt)')
+    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen', 'Zur Auswertung']], f'Erkenntnisse zugeklappt: die wichtigste, darunter „Alle anzeigen“ und „Zur Auswertung“ ({ins}, {m["ins"]} insgesamt)')
     await pg.tap('[data-sec=ins] [data-action=expand]'); await idle(pg)
-    check(await pg.locator('[data-sec=ins] .ins li').count() == m['ins'] and await pg.inner_text('[data-sec=ins] .card-btn') == 'Weniger anzeigen', 'Tipp zeigt alle Erkenntnisse')
+    check(await pg.locator('[data-sec=ins] .ins li').count() == m['ins'] and await pg.inner_text('[data-sec=ins] [data-action=expand]') == 'Weniger anzeigen', 'Tipp zeigt alle Erkenntnisse')
     await pg.reload(); await started(pg)
     check(await pg.locator('[data-sec=ins] .ins li').count() == 1 and await pg.locator('[data-sec=shop] .bar').count() == 0,
           'nach dem Neustart ist alles zugeklappt')
@@ -270,8 +268,8 @@ async def test_cards(browser, url):
       const b = [...document.querySelectorAll('.cal .day.has')].find(x => new Date(x.dataset.day + 'T12:00').getTime() < d.getTime()); return b && b.dataset.day; })()""")
     await pg.click(f'.cal .day[data-day="{old}"]'); await idle(pg)
     top = await pg.eval_on_selector(f'#d-{old}', 'd => [d.getBoundingClientRect().top, d.className, getComputedStyle(d).animationName, innerHeight]')
-    check(0 <= top[0] < top[3] - 48 and top[1] == 'tl-day' and top[2] == 'none' and await pg.locator('[data-action=older-days]').count() == 0,
-          f'Tipp im Kalender auf einen älteren Tag: ältere Tage erscheinen, Sprung zum Tag, ohne Aufleuchten ({old}, {top})')
+    check(0 <= top[0] < top[3] - 48 and top[1] == 'tl-day' and top[2] == 'none',
+          f'Tipp im Kalender auf einen älteren Tag: er erscheint im Verlauf, Sprung zum Tag, ohne Aufleuchten ({old}, {top})')
     check(not errors, 'keine Fehler in der Konsole' + (f': {errors}' if errors else ''))
     await ctx.close()
 
@@ -1754,7 +1752,188 @@ async def test_no_camera(browser, url):
     await ctx.close()
 
 
-run_tests({'rundgang': test_tour, 'ablauf': test_flow, 'kaufen': test_kaufen, 'karten': test_cards, 'woche': test_week, 'uebersicht': test_overview, 'skalen': test_scales, 'konsistenz': test_texture, 'meilensteine': test_milestones,
+# Sorten und Mahlzeiten nach Maß: n Sorten mit eigener Marke, je eine Mahlzeit im Abstand von abstand Tagen (0 = eine Stunde)
+SORTS = """([n, abstand]) => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now();
+  const marken = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Rinti', 'Bozita', 'Schesir'];
+  const stufen = ['top', 'gut', 'mittel', 'sosse', 'schlecht'];
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  d.products = Array.from({length: n}, (_, i) => ({id: 'sorte' + String(i).padStart(5, '0'), brand: marken[i % 10],
+    variety: 'Sorte ' + (i + 1), type: 'Nassfutter', codes: {}, createdAt: i}));
+  d.servings = d.products.map((p, i) => ({id: 'meal' + String(i).padStart(6, '0'), productId: p.id, note: '', by: ['Anna', 'Jonas'][i % 2],
+    servedAt: now - 36e5 - i * (abstand || 1 / 24) * 864e5, pets: {minka00001: {r: stufen[i % 5], at: now}}}));
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+
+async def test_feed_start(browser, url):
+    print('„Füttern beginnt mit“: Barcode, Foto oder beides; beide Wege bleiben')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('[data-action=demo]'); await idle(pg)
+    await pg.click('[data-action=open-settings]'); await idle(pg)
+    seg = await pg.eval_on_selector_all('#sheet [data-action=feed-start]', 'l => l.map(b => [b.innerText, b.getAttribute("aria-pressed")])')
+    check(seg == [['Barcode & Foto', 'true'], ['Nur Foto', 'false'], ['Nur Barcode', 'false']],
+          f'Einstellung mit drei Möglichkeiten, „Barcode & Foto“ ist Standard ({seg})')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    for v, want in (('beides', ['scan', 'photo']), ('foto', ['photo']), ('barcode', ['scan'])):
+        await pg.click('[data-action=open-settings]'); await idle(pg)
+        await pg.click(f'#sheet [data-action=feed-start][data-v={v}]'); await idle(pg)
+        await pg.click('#sheet [data-action=close]'); await idle(pg)
+        await pg.click('#fab'); await idle(pg)
+        cta = await pg.eval_on_selector_all('#sheet .cta', 'l => l.map(b => [b.dataset.action, Math.round(b.getBoundingClientRect().width)])')
+        row = await pg.eval_on_selector('#sheet .cta-row', 'r => Math.round(r.getBoundingClientRect().width)')
+        check([c[0] for c in cta] == want and (len(want) > 1 or cta[0][1] == row),
+              f'„{v}“: nur der gewählte Knopf, ein einzelner nimmt die volle Breite ({cta}, Reihe {row} px)')
+        await pg.click('#sheet [data-action=close]'); await idle(pg)
+    # „Nur Barcode“ gilt: das Foto bleibt über den Kurzbefehl erreichbar
+    await pg.evaluate(f"window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}")
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://foto'})")
+    await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
+    check(await state(pg, "db.servings[0].photo && db.servings[0].status === 'noserver'"),
+          'mit „Nur Barcode“ nimmt schmeckts://foto weiter ein Foto auf')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    # „Nur Foto“ gilt: Scannen bleibt über den Kurzbefehl erreichbar, der unbekannte Code führt zum Foto
+    await pg.click('[data-action=open-settings]'); await idle(pg)
+    await pg.click('#sheet [data-action=feed-start][data-v=foto]'); await idle(pg)
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.evaluate(f"window.__barcode = '{SHEBA}'")
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://scan'})")
+    await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
+    check(['aufnehmen', {'hinweis': 'Vorderseite fotografieren'}] in await pg.evaluate('window.__calls')
+          and await state(pg, f"db.servings[0].scanCode === '{SHEBA}'"),
+          'mit „Nur Foto“ scannt schmeckts://scan weiter, der unbekannte Code führt zum Foto')
+    check(not real_errors(errors), f'keine Fehler in der Konsole {real_errors(errors)}')
+    await ctx.close()
+
+
+async def test_suggestions(browser, url):
+    print('Füttern: höchstens drei Vorschläge, Suchfeld ab vier Sorten, bis acht Treffer')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [3, 0]); await idle(pg)
+    await pg.click('#fab'); await idle(pg)
+    names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
+    check(names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and await pg.locator('#sheet [data-search]').count() == 0,
+          f'drei Sorten: alle als Vorschlag, die zuletzt gefütterte zuerst, kein Suchfeld ({names})')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.evaluate(SORTS, [4, 0]); await idle(pg)
+    await pg.click('#fab'); await idle(pg)
+    names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
+    order = await pg.eval_on_selector('#sheet', "s => [...s.querySelectorAll('#serveList, .search, #serveHits, [data-action=new-product]')].map(e => e.id || e.className.split(' ')[0])")
+    check(names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['serveList', 'search', 'serveHits', 'btn'],
+          f'ab vier Sorten: drei Vorschläge, darunter das Suchfeld, „Ohne Foto eintippen“ bleibt ({names}, {order})')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.evaluate(SORTS, [12, 0]); await idle(pg)
+    await pg.click('#fab'); await idle(pg)
+    await pg.fill('#sheet [data-search]', 'Sorte'); await idle(pg)
+    many = await pg.eval_on_selector_all('#serveHits b', 'l => l.map(x => x.innerText)')
+    check(len(many) == 8 and await pg.locator('#serveList').is_hidden(),
+          f'Suche zeigt höchstens acht Treffer statt der Vorschläge ({len(many)})')
+    await pg.fill('#sheet [data-search]', 'sheba sorte 11'); await idle(pg)
+    hit = await pg.eval_on_selector_all('#serveHits b', 'l => l.map(x => x.innerText)')
+    await pg.fill('#sheet [data-search]', ''); await idle(pg)
+    back = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
+    check(hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and await pg.locator('#serveHits li').count() == 0,
+          f'Marke und Sorte zusammen suchen, leeres Feld zeigt wieder die Vorschläge ({hit})')
+    check(not real_errors(errors), f'keine Fehler in der Konsole {real_errors(errors)}')
+    await ctx.close()
+
+
+async def test_home_history(browser, url):
+    print('Verlauf auf der Startseite: fünf Mahlzeiten, Nachladen bis zwanzig, dann die Auswertung')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [26, 1]); await idle(pg)
+    items = lambda: pg.locator('[data-sec=hist] .tl-item').count()
+    btn = lambda: pg.eval_on_selector_all('[data-sec=hist] .card-btn', 'l => l.map(b => [b.innerText, b.dataset.action, b.dataset.v || ""])')
+    cal = lambda: pg.eval_on_selector('[data-sec=hist] .cal', 'c => c.innerHTML')
+    first, before = await items(), await cal()
+    check(first == 5 and await btn() == [['Weitere anzeigen', 'more-history', '']] and await pg.locator('[data-sec=hist] .tl-day').count() == 5,
+          f'zuerst fünf Mahlzeiten, nach Tagen gruppiert, darunter „Weitere anzeigen“ ({first})')
+    steps = []
+    for _ in range(4):
+        if await pg.locator('[data-action=more-history]').count():
+            await pg.click('[data-action=more-history]'); await idle(pg)
+        steps.append(await items())
+    check(steps == [10, 15, 20, 20] and await btn() == [['Ganzer Verlauf', 'open-report', 'hist']],
+          f'jeweils fünf weitere bis zwanzig, danach „Ganzer Verlauf“ ({steps})')
+    check(await cal() == before, 'der Zwei-Wochen-Kalender bleibt dabei unverändert')
+    await pg.click('[data-action=open-report]'); await idle(pg)
+    at_hist = await pg.evaluate("""(() => { const b = document.getElementById('ab-hist'), s = document.querySelector('.sheet-body');
+      return [!!b, Math.round(b.getBoundingClientRect().top - s.getBoundingClientRect().top)]; })()""")
+    check(await pg.inner_text('#sheet .sh-head h2') == 'Auswertung' and at_hist[0] and abs(at_hist[1]) < 4,
+          f'„Ganzer Verlauf“ öffnet die Auswertung beim Abschnitt Verlauf ({at_hist})')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.reload(); await started(pg)
+    check(await items() == 5, 'nach dem Neustart beginnt der Verlauf wieder bei fünf')
+    check(not real_errors(errors), f'keine Fehler in der Konsole {real_errors(errors)}')
+    await ctx.close()
+
+
+REPORT_SECTIONS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h => h.id)"
+
+
+async def test_report(browser, url):
+    print('Auswertung: Zeitraum, Tier-Filter, Abschnitte, Verlauf, Textbeschreibungen')
+    ctx = await browser.new_context(viewport={'width': 400, 'height': 860}, timezone_id='Europe/Berlin', reduced_motion='reduce')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-20T10:00:00+02:00')
+    await pg.evaluate(HOUSE, [house_meals()]); await idle(pg)
+    await pg.click('[data-action=open-settings]'); await idle(pg)
+    await pg.click('#sheet [data-action=open-report]'); await idle(pg)
+    spans = await pg.eval_on_selector_all('#sheet [data-action=report-span]', 'l => l.map(b => [b.innerText, b.getAttribute("aria-pressed")])')
+    kurz, kurz_n = await pg.evaluate(REPORT_SECTIONS), await pg.locator('#sheet .tl-item').count()
+    check(spans == [['30 Tage', 'true'], ['90 Tage', 'false'], ['Alles', 'false']] and kurz[0] == 'ab-trend',
+          f'Zeitraum-Umschalter oben, „30 Tage“ ist Standard, die Seite beginnt am Anfang ({spans})')
+    await pg.click('#sheet [data-action=report-span][data-v="0"]'); await idle(pg)
+    lang, lang_n = await pg.evaluate(REPORT_SECTIONS), await pg.locator('#sheet .tl-item').count()
+    check([kurz_n, lang_n] == [10, 18] and 'ab-hist' in kurz and set(kurz) <= set(lang),
+          f'der Zeitraum gilt für die ganze Seite, Abschnitte ohne genug Daten fehlen ({kurz_n} → {lang_n} Mahlzeiten, {kurz} → {lang})')
+    says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
+    labels = await pg.eval_on_selector_all('#sheet [role=img]', 'l => l.map(x => (x.getAttribute("aria-label") || "").length)')
+    check(len(says) == len(lang) - 1 and all(s.endswith('.') for s in says) and len(labels) == len(says) and all(n > 20 for n in labels),
+          f'jede Grafik mit einem Satz darunter und einer Textbeschreibung ({len(says)} Sätze, {labels})')
+    head = await pg.inner_text('#sheet .sh-head h2')
+    check(head == 'Auswertung für alle Tiere' and await pg.locator('#sheet .plot polyline').count() == 2
+          and await pg.eval_on_selector_all('#sheet .legend .key', 'l => l.map(k => k.innerText)') == ['Minka', 'Tiger'],
+          f'zwei Tiere: zwei Linien mit Legende, der Filter steht im Kopf ({head})')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.click('[data-action=filter][data-id=minka00001]'); await idle(pg)
+    await pg.click('[data-sec=ins] [data-action=open-report]'); await idle(pg)
+    head = await pg.inner_text('#sheet .sh-head h2')
+    check(head == 'Auswertung für Minka' and await pg.locator('#sheet .plot polyline').count() == 1 and await pg.locator('#sheet .legend').count() == 0,
+          f'Tier-Filter der Startseite: eine Linie ohne Legende, der Name im Kopf ({head})')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.click('[data-action=filter][data-id=all]'); await idle(pg)
+    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
+      s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
+    await idle(pg)
+    await pg.click('[data-action=open-settings]'); await idle(pg)
+    await pg.click('#sheet [data-action=open-report]'); await idle(pg)
+    hint = await pg.eval_on_selector_all('#sheet .hint', 'l => l.map(x => x.innerText)')
+    check(await pg.evaluate(REPORT_SECTIONS) == ['ab-hist'] and hint == ['Ab 3 Bewertungen in diesem Zeitraum zeigt diese Seite, was ankommt.'],
+          f'zu wenig Daten: ein Satz, ab wann es losgeht; der Verlauf bleibt ({hint})')
+    check(not real_errors(errors), f'keine Fehler in der Konsole {real_errors(errors)}')
+    await ctx.close()
+    # Nachladen im Verlauf und die Darstellung bei 360 px in Hell und Dunkel
+    for scheme in ('light', 'dark'):
+        ctx = await browser.new_context(viewport={'width': 360, 'height': 760}, color_scheme=scheme, reduced_motion='reduce')
+        pg, errors = await open_page(ctx, url)
+        await pg.evaluate(SORTS, [26, 1]); await idle(pg)
+        await pg.click('[data-action=open-settings]'); await idle(pg)
+        await pg.click('#sheet [data-action=open-report]'); await idle(pg)
+        was = await pg.locator('#sheet .tl-item').count()
+        await pg.click('#sheet [data-action=report-more]'); await idle(pg)
+        now = await pg.locator('#sheet .tl-item').count()
+        check([was, now] == [20, 26], f'der Verlauf der Auswertung lädt in Schritten von 20 nach ({was} → {now})')
+        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .wd-col b, #sheet .chart-y span, #sheet .why, #sheet h3.label')]
+          .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
+        chart = await pg.eval_on_selector('#sheet .chart', 'c => [Math.round(c.getBoundingClientRect().width), Math.round(c.getBoundingClientRect().height)]')
+        check(not wide and chart[0] <= 360 and chart[1] > 80, f'{scheme}, 360 px: nichts abgeschnitten, die Grafik steht ({chart}, {wide})')
+        check(not real_errors(errors), f'keine Fehler in der Konsole ({scheme}) {real_errors(errors)}')
+        await ctx.close()
+
+
+run_tests({'rundgang': test_tour, 'ablauf': test_flow, 'kaufen': test_kaufen, 'karten': test_cards, 'verlauf': test_home_history, 'auswertung': test_report, 'woche': test_week, 'uebersicht': test_overview, 'skalen': test_scales, 'konsistenz': test_texture, 'fuettern-start': test_feed_start, 'vorschlaege': test_suggestions, 'meilensteine': test_milestones,
            'erinnerung': test_reminders, 'eigene': test_remind, 'fuettern-erinnern': test_feed_remind, 'tiere': test_petbar, 'modi': test_modes, 'netz': test_network, 'kurzbefehle': test_shortcuts,
            'scannen': test_scan, 'erkennung': test_recognize, 'austausch': test_exchange, 'zuschnitt': test_crop, 'album': test_album, 'stimmung': test_mood, 'kamera': test_camera, 'ohne-kamera': test_no_camera},
           camera=('kamera',))

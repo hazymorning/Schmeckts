@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Leistung nach einer Bewertung: Speichern, dann Auswertung und Neuzeichnen der Startseite, mit erfundenen Daten über
-2 und 5 Jahre (2 Tiere, 2 Mahlzeiten am Tag, 150 Sorten), CPU 4-fach gedrosselt. Aufruf: python3 tests/perf_test.py"""
+"""Leistung nach einer Bewertung (Speichern, dann Auswertung und Neuzeichnen der Startseite) und beim Öffnen der
+Auswertungs-Seite, mit erfundenen Daten über 2 und 5 Jahre (2 Tiere, 2 Mahlzeiten am Tag, 150 Sorten),
+CPU 4-fach gedrosselt. Aufruf: python3 tests/perf_test.py"""
 import datetime, json, random, statistics
 from common import check, phone, run_tests, started
 
 LIMIT_MS = 40
+REPORT_MS = 150   # die Auswertung wird erst beim Öffnen gerechnet und gezeichnet
 TUESDAY = datetime.datetime(2026, 6, 9, 10)  # dienstags steht auch „Letzte Woche“ auf der Startseite
 BRANDS = ['Sheba', 'Felix', 'Animonda', 'Miamor', 'Gourmet', 'Whiskas', 'Catz', 'MjAMjAM', 'Bozita', 'Almo']
 FLAVORS = ['Lachs', 'Huhn', 'Rind', 'Pute', 'Ente', 'Thunfisch', 'Lamm', 'Kaninchen', 'Wild', 'Forelle', 'Käse', 'Leber', 'Herz', 'Garnele', 'Kalb']
@@ -35,6 +37,17 @@ MEASURE = """async () => { const s = await import('./js/store.js'), h = await im
     out.push([t1 - t0, t2 - t1, !!document.querySelector('[data-sec=week]')]); await new Promise(done => setTimeout(done, 50)); }
   return out; }"""
 
+# Die Auswertung wird erst beim Öffnen gerechnet: vorher speichern, damit nichts aus dem Zwischenspeicher kommt
+OPEN = """async () => { const s = await import('./js/store.js'), sheet = await import('./js/ui/sheet.js'), views = await import('./js/views/sheets.js');
+  const out = [];
+  for (let i = 0; i < 5; i++) {
+    await sheet.closeSheet(); s.save();
+    await new Promise(done => setTimeout(done, 50));
+    const t0 = performance.now(); sheet.openSheet(views.reportState(null)); const t1 = performance.now();
+    out.push([t1 - t0, document.querySelectorAll('#sheetBody h3.label').length]); }
+  await sheet.closeSheet();
+  return out; }"""
+
 
 async def test_rating(browser, url):
     print(f'Nach einer Bewertung, CPU 4-fach gedrosselt (Grenze für Auswertung und Neuzeichnen: {LIMIT_MS} ms)')
@@ -53,6 +66,10 @@ async def test_rating(browser, url):
         runs = (await pg.evaluate(MEASURE))[2:]
         save, draw = (statistics.median(x[i] for x in runs) for i in (0, 1))
         check(draw < LIMIT_MS and all(x[2] for x in runs), f'{years} Jahre ({years * 730} Mahlzeiten): Auswertung und Neuzeichnen {draw:.0f} ms, Speichern {save:.0f} ms')
+        opens = (await pg.evaluate(OPEN))[1:]
+        shown = statistics.median(x[0] for x in opens)
+        check(shown < REPORT_MS and all(x[1] >= 4 for x in opens),
+              f'{years} Jahre: die Auswertung öffnet in {shown:.0f} ms (Grenze {REPORT_MS} ms), {opens[0][1]} Abschnitte')
         await ctx.close()
 
 

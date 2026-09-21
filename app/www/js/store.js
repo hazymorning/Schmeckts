@@ -3,14 +3,14 @@
    Start spielt sie nach; eine Änderung vom Server steht zuerst in db, fehlt sync, holt die App sie noch einmal. */
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
-import {tidyRemind} from './config.js';
+import {tidyFeedStart, tidyRemind} from './config.js';
 import {milestones} from './smart.js';
 import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validId, valueOf} from './fields.js';
 
 export {flush, storageOK};
 export const defaults = () => ({version:3, pets:[], products:[], servings:[]});
 const defaultPrefs = () => ({theme:'system', hiddenHints:[], closedWeek:'', milestones:null, remind:0, feedRemind:false, backdrop:true,
-  mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, aiKey:'', codes:{}, exchange:{}});
+  feedStart:'beides', mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, aiKey:'', codes:{}, exchange:{}});
 export const hooks = {changed(){}, saved(){}}; // Oberfläche und Abgleich hängen sich hier an
 
 export function tidy(d){
@@ -32,6 +32,7 @@ function tidyPrefs(p){
   out.hiddenHints = Array.isArray(out.hiddenHints) ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))].slice(-300) : [];
   out.remind = tidyRemind(out.remind);
   out.feedRemind = out.feedRemind === true; // Erinnerung ans Füttern zu den üblichen Zeiten
+  out.feedStart = tidyFeedStart(out.feedStart);                        // welcher Knopf im Füttern-Sheet steht
   out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // Tierfotos hinter der Kopfzeile, Standard an ('off': Wert aus 1.1.0)
   out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: noch nie gesetzt, siehe load()

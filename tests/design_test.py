@@ -251,6 +251,8 @@ async def test_rules(browser, url):
         vs = await pg.evaluate("getComputedStyle(document.body).fontVariationSettings")
         check(vs == '"SOFT" 100', f'body: font-variation-settings „SOFT“ 100 ({vs})')
         await pg.click('[data-action=demo]'); await idle(pg)
+        if await pg.query_selector('[data-action=close-week]'):  # „Letzte Woche“ gibt es nur montags bis mittwochs
+            await pg.click('[data-action=close-week]'); await idle(pg)
         await pg.click('[data-action=expand][data-v=shop]'); await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
         await scan()  # Startseite mit allem
         layout = await pg.evaluate("""(() => { const app = getComputedStyle(document.querySelector('.app')), probe = document.createElement('i');

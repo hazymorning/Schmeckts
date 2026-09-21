@@ -10,7 +10,7 @@ import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 
-export const KIND = 'austausch', PROTOKOLL = 1;
+const KIND = 'austausch', PROTOKOLL = 1;
 const fileName = () => `schmeckts-${KIND}-${new Date().toISOString().slice(0, 10)}.json`;
 
 /* Marke für ein Gerät: Was hat es beim letzten Austausch schon gesehen? Ohne bekanntes Gegenüber gilt die älteste

@@ -3,7 +3,7 @@
 const rtf = new Intl.RelativeTimeFormat('de', {numeric:'auto', style:'short'});
 const pad = n => String(n).padStart(2, '0');
 export const timeStr = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+export const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 export const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const daysAgo = t => Math.round((dayStart(Date.now()) - dayStart(t)) / 864e5);
 export const addDays = (t, n) => { const d = new Date(t); d.setDate(d.getDate() + n); return d.getTime(); }; // Kalendertage, auch über die Zeitumstellung
