@@ -33,9 +33,7 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('[data-action=expand][data-v=shop]'); await idle(pg)
     check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'shopping unfolded: every variety')
     await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
-    n = await pg.locator('[data-sec=hist] .tl-item').count()
-    await pg.click('[data-sec=hist] .card-btn'); await idle(pg)
-    check(n == 5 and await pg.locator('[data-sec=hist] .tl-item').count() == 10, '„Weitere anzeigen“ shows five more meals')
+    check(await pg.locator('[data-sec=hist] .tl-item').count() == 5, 'the history shows five meals')
     await shot(pg, f'{scheme}-unfolded')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     other = 'dark' if scheme == 'light' else 'light'
@@ -44,10 +42,9 @@ async def test_tour(browser, url, scheme='light'):
     meta = await pg.eval_on_selector('meta[name=theme-color]', 'm => m.content')
     check(bg == meta and await pg.get_attribute('html', 'data-theme') == other, f'theme switched: the background and the browser bar follow ({meta})')
     rows = await pg.eval_on_selector_all('#serverBox .label, #serverBox .btn, #serverBox input', "l => l.map(e => e.innerText?.trim() || e.id)")
-    check(rows == ['Produktsuche im Internet', 'Eigener KI-Schlüssel', 'f-aikey', 'Austausch von Hand', 'Änderungen teilen',
-                   'Austausch empfangen', 'Mit Haushalt verbinden']
-          and await pg.locator('#f-code, #f-server').count() == 0 and await pg.locator('#f-aikey[type=password]').count() == 1,
-          f'settings, section „Haushalt“ in mode `lokal`: product lookup, masked key, exchange, connect ({rows})')
+    check(rows == ['Produktsuche im Internet', 'Austausch von Hand', 'Änderungen teilen',
+                   'Austausch empfangen', 'Mit Haushalt verbinden'] and await pg.locator('#f-code, #f-server').count() == 0,
+          f'settings, section „Haushalt“ in mode `lokal`: product lookup, exchange, connect ({rows})')
     await pg.locator('#serverBox').scroll_into_view_if_needed()
     await shot(pg, f'{scheme}-settings')
     await pg.click('[data-action=close]'); await idle(pg)
@@ -223,7 +220,7 @@ async def test_cards(browser, url):
     await pg.keyboard.press(' '); await idle(pg)
     check(await pg.inner_text('[data-sec=shop] [data-action=expand]') == 'Alle anzeigen' and await pg.locator('[data-action=share-list]').count() == 0 and await pg.locator('[data-sec=shop] .bar').count() == 0, 'space folds it shut again')
     ins = await pg.eval_on_selector('[data-sec=ins]', 'c => [c.querySelectorAll(".ins li").length, [...c.querySelectorAll(".card-btn")].map(b => b.innerText)]')
-    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen', 'Zur Auswertung']], f'insights folded up: the most important one, with „Alle anzeigen“ and „Zur Auswertung“ below ({ins}, {m["ins"]} in total)')
+    check(m['ins'] > 1 and ins == [1, ['Alle anzeigen']], f'insights folded up: the most important one, with „Alle anzeigen“ below ({ins}, {m["ins"]} in total)')
     await pg.tap('[data-sec=ins] [data-action=expand]'); await idle(pg)
     check(await pg.locator('[data-sec=ins] .ins li').count() == m['ins'] and await pg.inner_text('[data-sec=ins] [data-action=expand]') == 'Weniger anzeigen', 'a tap shows every insight')
     await pg.reload(); await started(pg)
@@ -510,7 +507,7 @@ async def test_texture(browser, url):
 
 
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
-  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1, photos: {}}];
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['lachs', 'Lachs', 'Nassfutter'], ['rind', 'Rind', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '00001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
   d.servings = [['snack', 'verputzt', 1], ['lachs', 'top', 2], ['lachs', 'top', 30], ['lachs', 'gut', 54], ['rind', 'schlecht', 60], ['rind', 'schlecht', 80]]
     .map(([pid, r, ago], i) => ({id: 'meal00000' + i, productId: pid + '00001', servedAt: now - ago * H, note: '', pets: {minka00001: {r, at: now}}}));
@@ -552,7 +549,7 @@ async def test_overview(browser, url):
     await pg.click('[data-action=close]'); await idle(pg)
     # Several pets: who last had what, the favourite variety per pet and what does not go down well
     await pg.evaluate("""import('./js/store.js').then(async s => { const now = Date.now(), H = 36e5;
-      s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Hund', photos: {}, createdAt: 2});
+      s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Hund', createdAt: 2});
       s.db.products.push({id: 'pute000001', brand: 'Rinti', variety: 'Pute', type: 'Nassfutter', codes: {}, createdAt: 1});
       [26, 50, 74].forEach((ago, i) => s.db.servings.push({id: 'tigermeal' + i, productId: 'pute000001', servedAt: now - ago * H, note: '', pets: {tiger00001: {r: 'top', at: now}}}));
       s.db.servings.unshift({id: 'beide00001', productId: 'lachs00001', servedAt: now - 5 * 6e4, note: '', pets: {minka00001: {r: null, at: null}, tiger00001: {r: null, at: null}}});
@@ -560,7 +557,7 @@ async def test_overview(browser, url):
     house = await pg.evaluate(CARD)
     await pg.click('[data-action=filter][data-id=tiger00001]'); await idle(pg)
     tiger = await pg.evaluate(CARD)
-    await pg.evaluate("import('./js/store.js').then(async s => { s.db.pets.push({id: 'kiwi000001', name: 'Kiwi', species: 'Vogel', photos: {}, createdAt: 3}); s.prefs.activePet = 'kiwi000001'; s.save(); (await import('./js/views/home.js')).renderHome(); })"); await idle(pg)
+    await pg.evaluate("import('./js/store.js').then(async s => { s.db.pets.push({id: 'kiwi000001', name: 'Kiwi', species: 'Vogel', createdAt: 3}); s.prefs.activePet = 'kiwi000001'; s.save(); (await import('./js/views/home.js')).renderHome(); })"); await idle(pg)
     kiwi = await pg.evaluate(CARD)
     check([house['title'], house['pic'][:2], house['text'], house['bold']] == ['Minka und Tiger', ['SPAN', 2], 'Minka und Tiger bekamen zuletzt vor 5 Min. Lachs. Minka mag am liebsten Lachs, Tiger Pute. Nicht an kommt bei Minka Rind.',
                                                                                  ['vor 5 Min.', 'Lachs', 'Lachs', 'Pute', 'Rind']] and house['height'] == 108 and house['dots'],
@@ -772,7 +769,7 @@ async def test_remind(browser, url):
 
 
 FEED_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), at = (day, time) => new Date(`2026-06-${String(day).padStart(2, '0')}T${time}`).getTime();
-  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1, photos: {}}];
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['nass', 'Lachs', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '000001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
   d.servings = [3, 4, 5, 6, 7, 8, 9].flatMap(day => [[day, '07:15'], [day, '18:30']]).map(([day, time], i) => ({id: 'meal0000' + String(i).padStart(2, '0'), productId: 'nass000001', servedAt: at(day, time), note: '',
     pets: {minka00001: {r: 'gut', at: at(day, time)}}}));
@@ -864,7 +861,7 @@ SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn
 
 PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
            'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-           'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
+           'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Haushalt“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
            'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
            'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.']
 
@@ -967,8 +964,8 @@ async def test_modes(browser, url):
     check(not found, f'mode `lokal`: no trace of server, sync or recognition anywhere (welcome, „So geht’s“, settings, feeding, photo, scanning) {found}')
     check(await pg.locator('#syncChip').is_hidden(), 'no sync notice in the header')
     foreign = [r for r in requests if not r.startswith((url.rsplit('/', 1)[0], 'data:', 'blob:'))]
-    check(len(requests) > 20 and not foreign and await state(pg, '!prefs.lookup && !prefs.aiKey'),
-          f'mode `lokal`: not a single network request except to the app itself, as long as product lookup and the own key are off ({len(requests)} requests) {foreign[:3]}')
+    check(len(requests) > 20 and not foreign and await state(pg, '!prefs.lookup'),
+          f'mode `lokal`: not a single network request except to the app itself, as long as the product lookup is off ({len(requests)} requests) {foreign[:3]}')
     await pg.click('[data-action=open-settings]'); await idle(pg)
     data = await pg.eval_on_selector_all('#sheet .btn-col:has([data-action=open-privacy]) > *', "l => l.map(b => [b.innerText.trim(), b.classList.contains('btn'), !!b.querySelector('svg')])")
     check([d[0] for d in data] == ['Backup exportieren', 'Backup importieren', 'Beispieldaten laden', 'Datenschutz', 'Alle Daten löschen'] and all(d[1] and d[2] for d in data)
@@ -1185,9 +1182,9 @@ OFF_HIT = {'status': 1, 'product': {'product_name_de': 'Sheba Fresh Choice Huhn 
 
 
 async def test_recognize(browser, url):
-    print('the recognition chain: known code, product lookup, server, own key, text on the device')
-    fail = {'online': False, 'server': False, 'key': False}      # so that each stage can be made to fail on purpose
-    seen = {'online': 0, 'key': 0, 'headers': {}}
+    print('the recognition chain: known code, product lookup, server, text on the device')
+    fail = {'online': False, 'server': False}                     # so that each stage can be made to fail on purpose
+    seen = {'online': 0}
 
     async def off_route(route, request):                          # Open Pet Food Facts and Open Food Facts
         seen['online'] += 1
@@ -1197,21 +1194,6 @@ async def test_recognize(browser, url):
         found = 'openpetfoodfacts' in request.url and '4008429087455' in request.url
         await route.fulfill(status=200, content_type='application/json', headers={'access-control-allow-origin': '*'},
                             body=json.dumps(OFF_HIT if found else {'status': 0}))
-
-    async def ai_route(route, request):                           # api.anthropic.com, the own key
-        cors = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST'}
-        if request.method == 'OPTIONS':
-            await route.fulfill(status=204, headers=cors)
-            return
-        seen['key'] += 1
-        seen['headers'] = {k: v for k, v in request.headers.items() if k.startswith(('x-api', 'anthropic'))}
-        seen['body'] = json.loads(request.post_data)
-        if fail['key']:
-            await route.fulfill(status=401, headers=cors, content_type='application/json', body='{"error":"nope"}')
-            return
-        answer = '{"brand":"Cosma","variety":"Thunfisch","type":"Nassfutter","animal":"Katze"}'
-        await route.fulfill(status=200, headers=cors, content_type='application/json',
-                            body=json.dumps({'content': [{'type': 'text', 'text': answer}]}))
 
     async def srv_route(route, request):                          # the household server
         path, now = request.url.split(':8486')[1], int(time.time() * 1000)
@@ -1234,7 +1216,7 @@ async def test_recognize(browser, url):
 
     ctx = await phone(browser)
     for pattern, handler in (('https://world.openpetfoodfacts.org/**', off_route), ('https://world.openfoodfacts.org/**', off_route),
-                             ('https://api.anthropic.com/**', ai_route), (f'{SRV}/**', srv_route)):
+                             (f'{SRV}/**', srv_route)):
         await ctx.route(pattern, handler)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('.welcome [data-action=add-pet]'); await idle(pg)
@@ -1301,34 +1283,23 @@ async def test_recognize(browser, url):
     got = await ident(photo='AAA')
     check(got['source'] == 'server' and got['details']['variety'] == 'Gold Pastete', f'connected: the server recognises the photo ({got.get("details")})')
 
-    # The own key: the right headers, and it steps in when the server cannot
-    fail['server'] = True
-    await setp(aiKey='sk-ant-test')
-    got = await ident(photo='AAA')
-    check(got['source'] == 'key' and got['details']['brand'] == 'Cosma' and seen['headers'].get('x-api-key') == 'sk-ant-test'
-          and seen['headers'].get('anthropic-version') == '2023-06-01' and seen['headers'].get('anthropic-dangerous-direct-browser-access') == 'true'
-          and seen['body']['model'] == 'claude-sonnet-5' and 'pet food packaging' in seen['body']['messages'][0]['content'][1]['text'],
-          f'the own key: a direct call with the server\u2019s headers and model ({seen["headers"]})')
-
     # Every stage falls through cleanly to the next, cheapest first
     await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
     await setp(lookup=True)
     chain = []
-    fail.update(online=False, server=False, key=False)
+    fail.update(online=False, server=False)
     chain.append((await ident(code='4008429087455', photo='AAA'))['source'])   # product lookup before the server
     fail['online'] = True
     chain.append((await ident(code='96385074', photo='AAA'))['source'])        # product lookup broken → server
     fail['server'] = True
-    chain.append((await ident(code='96385074', photo='AAA'))['source'])        # server broken → own key
-    fail['key'] = True
-    chain.append((await ident(code='96385074', photo='AAA'))['source'])        # key broken → text on the device
+    chain.append((await ident(code='96385074', photo='AAA'))['source'])        # server broken → text on the device
     await pg.evaluate("window.__ocrText = ''")
     chain.append((await ident(code='96385074', photo='AAA'))['source'])        # nothing works → an empty form
-    check(chain == ['online', 'server', 'key', 'text', ''], f'the chain: every stage works and every one falls through cleanly ({chain})')
+    check(chain == ['online', 'server', 'text', ''], f'the chain: every stage works and every one falls through cleanly ({chain})')
     await pg.evaluate("p => import('./js/store.js').then(m => { m.db.products[0].codes = {'4008429087455': true}; })")
     first = await ident(code='4008429087455', photo='AAA')
     check(first['source'] == 'codes' and len(first['products']) == 1, f'a barcode already known in the household beats everything ({first["source"]})')
-    await setp(code='', server='', aiKey='', lookup=False)
+    await setp(code='', server='', lookup=False)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)[:2]}')
     await ctx.close()
 
@@ -1360,7 +1331,7 @@ async def test_exchange(browser, url):
     ctx_a, a, err_a = await seeded(browser, url, {'db': SAVED}, native=True)
     ctx_b = await phone(browser)
     b, err_b = await open_page(ctx_b, url, native=True)
-    await a.evaluate("import('./js/store.js').then(m => { m.prefs.aiKey = 'sk-ant-geheim'; m.savePrefs(); })")
+    await a.evaluate("import('./js/store.js').then(m => { m.prefs.name = 'Geheimniskraemer'; m.savePrefs(); })")
 
     # First share: everything, with our own clocks, without any settings
     await settings(a)
@@ -1370,7 +1341,7 @@ async def test_exchange(browser, url):
     shared = ['share' == c[0] for c in await a.evaluate('window.__calls')]
     check(sorted(file) == ['app', 'at', 'clocks', 'device', 'kind', 'protocol', 'records'] and file['app'] == 'schmeckts'
           and file['kind'] == 'exchange' and len(file['records']) == 5 and len(file['clocks']['servings']) == 3
-          and 'sk-ant' not in text and any(shared),
+          and 'Geheimniskraemer' not in text and any(shared),
           f'first share: all {len(file["records"])} records including clocks, nothing from the settings')
     await shot(a, 'exchange-share')
 
@@ -1501,74 +1472,43 @@ async def test_crop(browser, url):
     await ctx.close()
 
 
-async def test_album(browser, url):
-    print('the album in the pet sheet')
-    files = make_pictures()
-    ctx, pg, errors = await one_pet(browser, url)
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=add-pet]'); await idle(pg)
-    check(await pg.locator('#sheet .album').count() == 0, 'a new pet: the album only exists once it has been created')
-    await pg.click('[data-action=close]'); await idle(pg)
-    await open_pet(pg)
-    head = await pg.evaluate("[...document.querySelectorAll('#sheet .label')].map(l => l.innerText)")
-    check('Fotos' in head and await pg.locator('#sheet label.ph.add[for=albumInput]').count() == 1 and await pg.get_attribute('#albumInput', 'multiple') is not None,
-          f'the pet sheet with a „Fotos“ section, adding through a multiple selection from the gallery ({head})')
-    await pg.evaluate("import('./js/store.js').then(m => { const saved = m.hooks.saved; window.__saves = 0; m.hooks.saved = () => { window.__saves++; saved(); }; })")
-    await pg.set_input_files('#albumInput', files[:5]); await idle(pg)
-    keys = await state(pg, "Object.keys(db.pets[0].photos).sort()")
-    check(await pg.evaluate('window.__saves') == 5, 'every photo is saved at once: if the app is killed while adding, whatever finished stays')
-    t = await pg.inner_text('#toast')
-    dims = await pg.evaluate("""import('./js/store.js').then(s => Promise.all(Object.keys(s.db.pets[0].photos).sort().map(k => new Promise(d => { const i = new Image();
-      i.onload = () => d([i.width, i.height, s.db.pets[0].photos[k].slice(0, 23)]); i.src = s.db.pets[0].photos[k]; }))))""")
-    check(len(keys) == 5 and '5 Fotos hinzugefügt' in t and dims[0] == [960, 480, 'data:image/jpeg;base64,'] and dims[1][:2] == [300, 200],
-          f'five photos added: JPEG as a data URL, longest side at most 960 px ({dims[0][:2]}, {dims[1][:2]})')
-    await pg.set_input_files('#albumInput', files[5:]); await idle(pg)
-    t = await pg.inner_text('#toast')
-    check(await state(pg, "Object.keys(db.pets[0].photos).length") == 8 and 'Höchstens 8 Fotos. 3 hinzugefügt.' in t and await pg.locator('#sheet .ph.add').count() == 0
-          and 'Fotos (8 von 8)' in await pg.inner_text('#sheet'), f'up to 8 photos: three of five more are added, after which there is no adding left („{t.strip()}“)')
-    await shot(pg, 'album')
-    keys = await state(pg, "Object.keys(db.pets[0].photos).sort()")
-    gone = await state(pg, f"db.pets[0].photos['{keys[2]}']")
-    await pg.click(f'#sheet .ph-x[data-key="{keys[2]}"]'); await idle(pg)
-    t = await pg.inner_text('#toast')
-    check(await state(pg, "Object.keys(db.pets[0].photos).length") == 7 and 'Foto entfernt' in t and await pg.locator('#toast [data-action=undo]').count() == 1
-          and await pg.locator('#sheet .ph-img').count() == 7, 'removal through the cross, with undo in the toast')
-    await pg.click('#toast [data-action=undo]'); await idle(pg)
-    check(await state(pg, f"Object.keys(db.pets[0].photos).sort().join() === '{','.join(keys)}' && db.pets[0].photos['{keys[2]}'].length") == len(gone)
-          and await pg.locator('#sheet .ph-img').count() == 8, 'undo: the photo is back, in the same place')
-    await pg.reload(); await started(pg)
-    check(await state(pg, "Object.keys(db.pets[0].photos).length") == 8, 'the album survives a restart')
-    # „Als Profilbild“ (set as the profile picture)
-    await open_pet(pg)
-    check(await pg.locator('[data-action=album-profile]').count() == 0, 'without a chosen photo there is no „Als Profilbild“')
-    await pg.click(f'#sheet .ph-img[data-key="{keys[0]}"]'); await idle(pg)
-    await pg.click('[data-action=album-profile]'); await idle(pg)
-    z = await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet.step, m.sheet.crop.w, m.sheet.crop.h])")
-    check(z == ['crop', 960, 480], f'„Als Profilbild“ on a photo opens the crop with that photo ({z})')
-    await pg.click('[data-action=crop-apply]'); await idle(pg)
-    await pg.click('[data-action=save-pet]'); await idle(pg)
-    check(await state(pg, "db.pets[0].photo.startsWith('data:image/jpeg') && Object.keys(db.pets[0].photos).length === 8"), 'taken over and saved, and the album is left unchanged')
-    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
-    await ctx.close()
-
-
-SET_ALBUMS = """albums => import('./js/store.js').then(async s => { const b64 = async u => { const r = await fetch(u), buf = new Uint8Array(await r.arrayBuffer()); let t = ''; for (const x of buf) t += String.fromCharCode(x);
-    return 'data:image/png;base64,' + btoa(t); };
-  s.db.pets = []; let n = 0;
-  for (const [name, urls] of albums) { const photos = {}; for (const u of urls) photos['foto' + String(n++).padStart(4, '0')] = await b64(u);
-    s.db.pets.push({id: 'pet' + name.toLowerCase() + '001', name, species: 'Katze', photo: null, photos, createdAt: 1}); }
+SET_PETS = """pets => import('./js/store.js').then(async s => { const b64 = async u => { const r = await fetch(u), buf = new Uint8Array(await r.arrayBuffer()); let t = '';
+    for (const x of buf) t += String.fromCharCode(x); return 'data:image/png;base64,' + btoa(t); };
+  s.db.pets = [];
+  for (const [name, url] of pets) s.db.pets.push({id: 'pet' + name.toLowerCase() + '001', name, species: 'Katze', photo: url ? await b64(url) : null, createdAt: 1});
   s.prefs.activePet = 'all'; s.save(); s.savePrefs(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
-MOOD = """() => { const m = document.getElementById('mood'), on = m.querySelector('img.on'), s = getComputedStyle(m), i = on && getComputedStyle(on);
-  return {hidden: m.hidden || s.display === 'none', on: on ? on.src.slice(-40) : null, n: m.querySelectorAll('img.on').length, opacity: i && +(+i.opacity).toFixed(2)}; }"""
+MOOD = """() => { const m = document.getElementById('mood'), img = m.querySelector('img'), s = getComputedStyle(m), i = getComputedStyle(img);
+  return {hidden: m.hidden || s.display === 'none', src: img.getAttribute('src') ? img.src.slice(-40) : null,
+    n: m.querySelectorAll('img').length, opacity: +(+i.opacity).toFixed(2)}; }"""
 
 
 RGB_OF = """(list => list.map(c => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); }))"""
 
 
+async def test_sheet(browser, url):
+    print('the sheet redraws only what has changed')
+    ctx, pg, errors = await one_pet(browser, url)
+    await pg.click('[data-action=open-settings]'); await idle(pg)
+    await pg.evaluate("document.querySelector('#sheetBody .list-row').dataset.mark = 'x'")
+    redraw = "import('./js/ui/sheet.js').then(m => m.renderSheet())"
+    mark = "document.querySelector('#sheetBody .list-row')?.dataset.mark ?? null"
+    await pg.evaluate(redraw); await idle(pg)
+    kept = await pg.evaluate(mark)
+    await pg.evaluate("import('./js/store.js').then(s => { s.db.pets[0].name = 'Mira'; })")
+    await pg.evaluate(redraw); await idle(pg)
+    gone = await pg.evaluate(mark)
+    check([kept, gone] == ['x', None] and 'Mira' in await pg.inner_text('#sheetBody'),
+          f'a change from elsewhere redraws nothing that stayed the same, a changed name does ({kept}, {gone})')
+    await pg.click('#serverBox [data-action=connect-form]'); await idle(pg)
+    check(await pg.locator('#f-code').count() == 1, 'the „Haushalt“ box follows along, even though the view around it is unchanged')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_mood(browser, url):
-    print('the mood picture on the home page')
+    print('the mood picture on the home page: the pet\u2019s profile picture')
     make_pictures()
     dist = url.rsplit('/', 1)[0]  # the test photos are not under www: served as a data URL through a route
     for scheme in ('light', 'dark'):
@@ -1579,14 +1519,19 @@ async def test_mood(browser, url):
         await ctx.route('**/testfoto/*', pictures)
         pg, errors = await open_page(ctx, url, native=True)
         pic = lambda n: f'{dist}/testfoto/{n}'
-        await pg.evaluate(SET_ALBUMS, [['Minka', [pic('quadrants.png'), pic('black.png')]], ['Tiger', [pic('white.png')]], ['Kiwi', []]]); await idle(pg)
-        srcs = await state(pg, "db.pets.flatMap(p => Object.keys(p.photos).sort().map(k => p.photos[k].slice(-40)))")
-        css = await pg.evaluate("""() => { const m = document.getElementById('mood'), s = getComputedStyle(m), i = getComputedStyle(m.querySelector('img.on')), r = m.getBoundingClientRect(), b = document.querySelector('.brand').getBoundingClientRect();
+
+        async def pick(who):
+            await pg.evaluate(f"import('./js/store.js').then(async s => {{ s.prefs.activePet = '{who}'; (await import('./js/views/home.js')).renderHome(); }})"); await idle(pg)
+
+        await pg.evaluate(SET_PETS, [['Minka', pic('quadrants.png')], ['Tiger', pic('photo0.jpg')], ['Kiwi', None]]); await idle(pg)
+        srcs = await state(pg, "db.pets.map(p => p.photo && p.photo.slice(-40))")
+        await pick('petminka001')
+        css = await pg.evaluate("""() => { const m = document.getElementById('mood'), s = getComputedStyle(m), i = getComputedStyle(m.querySelector('img')), r = m.getBoundingClientRect(), b = document.querySelector('.brand').getBoundingClientRect();
           return {pos: s.position, box: [r.left, r.top, r.width === document.documentElement.clientWidth, r.height], ptr: s.pointerEvents, mask: (s.maskImage || s.webkitMaskImage).startsWith('linear-gradient') && /rgba\\(0, 0, 0, 0\\)\\)$/.test(s.maskImage || s.webkitMaskImage),
-            fit: i.objectFit, opacity: +(+i.opacity).toFixed(2), filter: i.filter, trans: [i.transitionProperty, i.transitionDuration], front: document.elementFromPoint(b.left + 5, b.top + 10).className,
+            fit: i.objectFit, opacity: +(+i.opacity).toFixed(2), filter: i.filter, trans: i.transitionProperty, front: document.elementFromPoint(b.left + 5, b.top + 10).className,
             card: getComputedStyle(document.querySelector('#home .card')).backgroundColor, first: document.body.firstElementChild.id, aria: m.getAttribute('aria-hidden')}; }""")
         want = {'pos': 'absolute', 'box': [0, 0, True, 260], 'ptr': 'none', 'mask': True, 'fit': 'cover', 'opacity': .16 if scheme == 'light' else .26, 'filter': 'saturate(0.85)',
-                'trans': ['opacity', '2s'], 'front': 'brand', 'first': 'mood', 'aria': 'true'}
+                'trans': 'all', 'front': 'brand', 'first': 'mood', 'aria': 'true'}
         check({k: css[k] for k in want} == want and 'rgba' not in css['card'], f'layer ({scheme}): full width, 260 px, object-fit cover, opacity {want["opacity"]}, saturate(0.85), the mask fades right out at the bottom, and the cards sit in front unchanged ({css["box"]}, {css["opacity"]})')
         await shot(pg, f'{scheme}-mood')
         # Contrast of the wordmark: in the worst case an all-black or all-white photo sits behind it
@@ -1596,39 +1541,17 @@ async def test_mood(browser, url):
         if scheme == 'dark':
             await ctx.close()
             continue
-        # Which photos are picked per filter
-        first = await pg.evaluate(MOOD)
-        lists = {}
+        # Which picture the filter shows
+        shows = {}
         for who in ('all', 'petminka001', 'pettiger001', 'petkiwi001'):
-            await pg.evaluate(f"import('./js/store.js').then(async s => {{ s.prefs.activePet = '{who}'; (await import('./js/views/home.js')).renderHome(); }})"); await idle(pg)
-            lists[who] = [await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhotos().map(p => p.slice(-40)))"), (await pg.evaluate(MOOD))['hidden']]
-        check(first['on'] == srcs[0] and first['n'] == 1 and lists == {'all': [srcs, False], 'petminka001': [srcs[:2], False], 'pettiger001': [srcs[2:], False], 'petkiwi001': [[], True]},
-              '„Alle“ shows every pet\u2019s photos, a chosen pet only its own, and without album photos there is no layer')
+            await pick(who)
+            m = await pg.evaluate(MOOD)
+            shows[who] = [await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhoto().slice(-40))"), m['hidden'], m['n']]
+        check(shows == {'all': ['', True, 1], 'petminka001': [srcs[0], False, 1], 'pettiger001': [srcs[1], False, 1], 'petkiwi001': ['', True, 1]},
+              f'several pets: the chosen pet\u2019s profile picture, none under „Alle“ and none for a pet without a photo ({[v[1] for v in shows.values()]})')
         await pg.evaluate("import('./js/store.js').then(async s => { s.db.pets = s.db.pets.slice(0, 1); s.prefs.activePet = 'all'; s.save(); (await import('./js/views/home.js')).renderHome(); })"); await idle(pg)
-        check(await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhotos().length)") == 2 and await pg.locator('#pets').is_hidden(), 'with only one pet, that pet\u2019s photos')
-        # It changes every 12 seconds, only while the page is visible. The clock is stopped; only run_for moves it
-        await pg.clock.pause_at(await pg.evaluate('Date.now() + 100'))
-        shown = lambda: pg.evaluate("document.querySelector('#mood img.on')?.src.slice(-40)")
-        async def later(ms):
-            before = await shown()
-            await pg.clock.run_for(ms)
-            for _ in range(10):  # the next photo is decoded first, then swapped in
-                if await shown() != before:
-                    break
-                await asyncio.sleep(.03)
-            return await shown()
-        a = await shown()
-        for _ in range(13):  # the beat has run since the app started: up to just after the next change
-            b = await later(1000)
-            if b != a:
-                break
-        c, d = await later(10000), await later(2000)
-        check(a in srcs and b in srcs and [b != a, c, d] == [True, b, a] and (await pg.evaluate(MOOD))['n'] == 1, 'the photo changes every 12 seconds and not in between')
-        await pg.evaluate("Object.defineProperty(document, 'hidden', {get: () => true, configurable: true})")
-        e = await later(12000)
-        await pg.evaluate("delete document.hidden")
-        f = await later(12000)
-        check([e, f] == [d, b], 'no change while the page is not visible; afterwards it carries on')
+        check(await pg.evaluate("import('./js/views/mood.js').then(m => m.moodPhoto().slice(-40))") == srcs[0] and await pg.locator('#pets').is_hidden(),
+              'with only one pet, that pet\u2019s picture')
         # The choice in the settings: on or off, in the style of the other choices
         async def choose(v):
             await pg.click('[data-action=open-settings]'); await idle(pg)
@@ -1642,8 +1565,8 @@ async def test_mood(browser, url):
         off.append((await pg.evaluate(MOOD))['hidden'])
         seg2 = await choose('on')
         on = [await state(pg, 'prefs.backdrop'), (await pg.evaluate(MOOD))['hidden']]
-        check(seg == ['Tierfotos im Hintergrund', True, 'An*', 'Aus'] and seg2[2:] == ['An', 'Aus*'] and off == [False, True, True] and on == [True, False],
-              f'settings: „Tierfotos im Hintergrund“ as an An/Aus choice, on by default; off means no layer, across a restart too ({seg}, {off}, {on})')
+        check(seg == ['Profilbild im Hintergrund', True, 'An*', 'Aus'] and seg2[2:] == ['An', 'Aus*'] and off == [False, True, True] and on == [True, False],
+              f'settings: „Profilbild im Hintergrund“ as an An/Aus choice, on by default; off means no layer, across a restart too ({seg}, {off}, {on})')
         check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
         await ctx.close()
     old = []
@@ -1651,17 +1574,6 @@ async def test_mood(browser, url):
         ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'mode': 'lokal', 'backdrop': v}})
         old.append(await state(pg, 'prefs.backdrop')); await ctx.close()
     check(old == [True, False], f'the 1.1.0 setting is carried over: „Übersicht“ becomes on and „Aus“ stays off ({old})')
-    # Reduced motion: no change
-    ctx = await phone(browser, reduced_motion='reduce')
-    await ctx.clock.install()
-    await ctx.route('**/testfoto/*', pictures)
-    pg, errors = await open_page(ctx, url, native=True)
-    await pg.evaluate(SET_ALBUMS, [['Minka', [f'{dist}/testfoto/quadrants.png', f'{dist}/testfoto/black.png']]]); await idle(pg)
-    a = await pg.evaluate(MOOD)
-    await pg.clock.run_for(25000); await idle(pg)
-    b = await pg.evaluate(MOOD)
-    check(a['on'] and a == b and a['opacity'] == .16, 'under reduced motion nothing changes and the first photo stays put')
-    await ctx.close()
 
 
 async def test_camera(browser, url):
@@ -1733,8 +1645,7 @@ async def test_camera(browser, url):
     await pg.wait_for_function("document.querySelector('#toast').innerText.includes('Android-Einstellungen')"); await idle(pg)
     t = await pg.inner_text('#toast')
     check('Android-Einstellungen' in t and await state(pg, 'db.servings.length') == 4, f'when the camera app will not open either (Android blocks it once the permission is denied): a clear notice („{t.strip()}“)')
-    album = await pg.evaluate("[document.getElementById('petPhotoInput').hasAttribute('capture'), document.getElementById('albumInput').hasAttribute('capture')]")
-    check(album == [False, False], 'pet photos come from the gallery')
+    check(not await pg.evaluate("document.getElementById('petPhotoInput').hasAttribute('capture')"), 'the profile picture comes from the gallery')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -1764,43 +1675,33 @@ SORTS = """([n, gap]) => import('./js/store.js').then(async s => { const d = s.d
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
-async def test_feed_start(browser, url):
-    print('„Füttern beginnt mit“: barcode, photo or both; both routes stay open')
+async def test_feed_routes(browser, url):
+    print('feeding: both buttons, and both routes also through the shortcuts')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('[data-action=demo]'); await idle(pg)
     await pg.click('[data-action=open-settings]'); await idle(pg)
-    seg = await pg.eval_on_selector_all('#sheet [data-action=feed-start]', 'l => l.map(b => [b.innerText, b.getAttribute("aria-pressed")])')
-    check(seg == [['Barcode & Foto', 'true'], ['Nur Foto', 'false'], ['Nur Barcode', 'false']],
-          f'a setting with three options, with „Barcode & Foto“ as the default ({seg})')
+    labels = await pg.eval_on_selector_all('#sheet .label', 'l => l.map(e => e.innerText)')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
-    for v, want in (('beides', ['scan', 'photo']), ('foto', ['photo']), ('barcode', ['scan'])):
-        await pg.click('[data-action=open-settings]'); await idle(pg)
-        await pg.click(f'#sheet [data-action=feed-start][data-v={v}]'); await idle(pg)
-        await pg.click('#sheet [data-action=close]'); await idle(pg)
-        await pg.click('#fab'); await idle(pg)
-        cta = await pg.eval_on_selector_all('#sheet .cta', 'l => l.map(b => [b.dataset.action, Math.round(b.getBoundingClientRect().width)])')
-        row = await pg.eval_on_selector('#sheet .cta-row', 'r => Math.round(r.getBoundingClientRect().width)')
-        check([c[0] for c in cta] == want and (len(want) > 1 or cta[0][1] == row),
-              f'„{v}“: only the chosen button, and a single one takes the full width ({cta}, row {row} px)')
-        await pg.click('#sheet [data-action=close]'); await idle(pg)
-    # With „Nur Barcode“ the photo stays reachable through the shortcut
+    await pg.click('#fab'); await idle(pg)
+    cta = await pg.eval_on_selector_all('#sheet .cta', 'l => l.map(b => [b.dataset.action, Math.round(b.getBoundingClientRect().width)])')
+    row = await pg.eval_on_selector('#sheet .cta-row', 'r => Math.round(r.getBoundingClientRect().width)')
+    check([c[0] for c in cta] == ['scan', 'photo'] and cta[0][1] == cta[1][1] and cta[0][1] < row
+          and 'Füttern beginnt mit' not in labels,
+          f'always both buttons, equally wide, and nothing to set in the settings ({cta}, row {row} px)')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    # Both routes also come in through the shortcuts
     await pg.evaluate(f"window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}")
     await pg.evaluate("window.__urlOpen({url: 'schmeckts://photo'})")
     await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
-    check(await state(pg, "db.servings[0].photo && db.servings[0].status === 'noserver'"),
-          'with „Nur Barcode“ schmeckts://photo still takes a photo')
-    await pg.click('#sheet [data-action=close]'); await idle(pg)
-    # With „Nur Foto“ scanning stays reachable through the shortcut, and the unknown code leads to the photo
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=feed-start][data-v=foto]'); await idle(pg)
+    check(await state(pg, "db.servings[0].photo && db.servings[0].status === 'noserver'"), 'schmeckts://photo takes a photo')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.evaluate(f"window.__barcode = '{SHEBA}'")
     await pg.evaluate("window.__urlOpen({url: 'schmeckts://scan'})")
     await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
     check(['capture', {'hint': 'Vorderseite fotografieren'}] in await pg.evaluate('window.__calls')
           and await state(pg, f"db.servings[0].scanCode === '{SHEBA}'"),
-          'with „Nur Foto“ schmeckts://scan still scans, and the unknown code leads to the photo')
+          'schmeckts://scan scans, and the unknown code leads to the photo')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -1839,101 +1740,98 @@ async def test_suggestions(browser, url):
 
 
 async def test_home_history(browser, url):
-    print('the history on the home page: five meals, loading more up to twenty, then the evaluation')
+    print('the history on the home page: five meals, a calendar, and the button to the evaluation')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [26, 1]); await idle(pg)
-    items = lambda: pg.locator('[data-sec=hist] .tl-item').count()
-    btn = lambda: pg.eval_on_selector_all('[data-sec=hist] .card-btn', 'l => l.map(b => [b.innerText, b.dataset.action, b.dataset.v || ""])')
-    cal = lambda: pg.eval_on_selector('[data-sec=hist] .cal', 'c => c.innerHTML')
-    first, before = await items(), await cal()
-    check(first == 5 and await btn() == [['Weitere anzeigen', 'more-history', '']] and await pg.locator('[data-sec=hist] .tl-day').count() == 5,
-          f'five meals to begin with, grouped by day, with „Weitere anzeigen“ below ({first})')
-    steps = []
-    for _ in range(4):
-        if await pg.locator('[data-action=more-history]').count():
-            await pg.click('[data-action=more-history]'); await idle(pg)
-        steps.append(await items())
-    check(steps == [10, 15, 20, 20] and await btn() == [['Ganzer Verlauf', 'open-report', 'hist']],
-          f'five more at a time up to twenty, then „Ganzer Verlauf“ ({steps})')
-    check(await cal() == before, 'the two-week calendar stays unchanged while that happens')
-    await pg.click('[data-action=open-report]'); await idle(pg)
-    at_hist = await pg.evaluate("""(() => { const b = document.getElementById('ab-hist'), s = document.querySelector('.sheet-body');
-      return [!!b, Math.round(b.getBoundingClientRect().top - s.getBoundingClientRect().top)]; })()""")
-    check(await pg.inner_text('#sheet .sh-head h2') == 'Auswertung' and at_hist[0] and abs(at_hist[1]) < 4,
-          f'„Ganzer Verlauf“ opens the evaluation at the history section ({at_hist})')
+    btn = await pg.eval_on_selector('[data-sec=hist] [data-action=open-report]', 'b => [b.innerText.trim(), b.classList.contains("btn"), !!b.querySelector("svg")]')
+    check(await pg.locator('[data-sec=hist] .tl-item').count() == 5 and await pg.locator('[data-sec=hist] .tl-day').count() == 5
+          and btn == ['Auswertung', True, True] and await pg.locator('[data-sec=hist] .card-btn').count() == 0,
+          f'five meals grouped by day, and below them one proper button to the evaluation ({btn})')
+    # A day in the calendar: near ones scroll on the home page, older ones open the evaluation there
+    days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
+    await pg.click(f'[data-action=jump-day][data-day="{days[-1]}"]'); await idle(pg)
+    near = await pg.evaluate("k => [document.getElementById('sheet').open, !!document.getElementById('d-' + k)]", days[-1])
+    await pg.click(f'[data-action=jump-day][data-day="{days[0]}"]'); await idle(pg)
+    at_day = await pg.evaluate("""k => { const d = document.getElementById('d-' + k), s = document.querySelector('.sheet-body');
+      return [document.getElementById('sheet').open, !!d, Math.round((d?.getBoundingClientRect().top ?? 0) - s.getBoundingClientRect().top)]; }""", days[0])
+    check(near == [False, True] and at_day[:2] == [True, True] and 0 <= at_day[2] < 24,
+          f'a day still on show scrolls, an older one opens the evaluation right at it ({near}, {at_day})')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
-    await pg.reload(); await started(pg)
-    check(await items() == 5, 'after a restart the history starts at five again')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
 
-REPORT_SECTIONS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h => h.id)"
+REPORT_HEADS = "() => [...document.querySelectorAll('#sheet h3.label')].map(h => h.innerText)"
 
 
 async def test_report(browser, url):
-    print('the evaluation: span, pet filter, sections, history, text descriptions')
+    print('the evaluation: brands, the whole history, the pet filter')
     ctx = await browser.new_context(viewport={'width': 400, 'height': 860}, timezone_id='Europe/Berlin', reduced_motion='reduce')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-20T10:00:00+02:00')
     await pg.evaluate(HOUSE, [house_meals()]); await idle(pg)
     await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=open-report]'); await idle(pg)
-    spans = await pg.eval_on_selector_all('#sheet [data-action=report-span]', 'l => l.map(b => [b.innerText, b.getAttribute("aria-pressed")])')
-    short, short_n = await pg.evaluate(REPORT_SECTIONS), await pg.locator('#sheet .tl-item').count()
-    check(spans == [['30 Tage', 'true'], ['90 Tage', 'false'], ['Alles', 'false']] and short[0] == 'ab-trend',
-          f'the span switch at the top, „30 Tage“ by default, and the page starts at the beginning ({spans})')
-    await pg.click('#sheet [data-action=report-span][data-v="0"]'); await idle(pg)
-    full, full_n = await pg.evaluate(REPORT_SECTIONS), await pg.locator('#sheet .tl-item').count()
-    check([short_n, full_n] == [10, 18] and 'ab-hist' in short and set(short) <= set(full),
-          f'the span applies to the whole page, and sections without enough data are left out ({short_n} → {full_n} meals, {short} → {full})')
-    says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
-    labels = await pg.eval_on_selector_all('#sheet [role=img]', 'l => l.map(x => (x.getAttribute("aria-label") || "").length)')
-    check(len(says) == len(full) - 1 and all(s.endswith('.') for s in says) and len(labels) == len(says) and all(n > 20 for n in labels),
-          f'every graphic with a sentence below it and a text description ({len(says)} sentences, {labels})')
+    check(await pg.locator('#sheet [data-action=open-report]').count() == 0, 'the settings no longer lead to the evaluation')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+    heads, n = await pg.evaluate(REPORT_HEADS), await pg.locator('#sheet .tl-item').count()
     head = await pg.inner_text('#sheet .sh-head h2')
-    check(head == 'Auswertung für alle Tiere' and await pg.locator('#sheet .plot polyline').count() == 2
-          and await pg.eval_on_selector_all('#sheet .legend .key', 'l => l.map(k => k.innerText)') == ['Minka', 'Tiger'],
-          f'two pets: two lines with a legend, and the filter in the heading ({head})')
+    check(heads == ['Marken', 'Verlauf'] and n == 18 and head == 'Auswertung für alle Tiere'
+          and await pg.locator('#sheet .seg, #sheet .card-btn').count() == 0,
+          f'two sections, the history right there, nothing to set ({heads}, {n} meals, {head})')
+    rows = await pg.eval_on_selector_all('#sheet .lv', "l => l.map(e => [e.querySelector('.lv-name').innerText, parseInt(e.querySelector('.lv-n').innerText)])")
+    says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
+    label = await pg.get_attribute('#sheet .bars', 'aria-label')
+    check(len(rows) == 6 and [r[1] for r in rows] == sorted((r[1] for r in rows), reverse=True) and rows[0][0] in says[0]
+          and len(says) == 1 and says[0].endswith('.') and len(label) > 20,
+          f'the brands as bars, best first, with one sentence and a text description ({rows})')
+    await shot(pg, 'report')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.click('[data-action=filter][data-id=minka00001]'); await idle(pg)
-    await pg.click('[data-sec=ins] [data-action=open-report]'); await idle(pg)
-    head = await pg.inner_text('#sheet .sh-head h2')
-    check(head == 'Auswertung für Minka' and await pg.locator('#sheet .plot polyline').count() == 1 and await pg.locator('#sheet .legend').count() == 0,
-          f'the home page\u2019s pet filter: one line without a legend, and the name in the heading ({head})')
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+    head, mine = await pg.inner_text('#sheet .sh-head h2'), await pg.locator('#sheet .tl-item').count()
+    check(head == 'Auswertung für Minka' and 0 < mine < n, f'the pet filter carries over into the evaluation ({head}, {mine} of {n} meals)')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.click('[data-action=filter][data-id=all]'); await idle(pg)
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
       s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=open-report]'); await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
     hint = await pg.eval_on_selector_all('#sheet .hint', 'l => l.map(x => x.innerText)')
-    check(await pg.evaluate(REPORT_SECTIONS) == ['ab-hist'] and hint == ['Ab 3 Bewertungen in diesem Zeitraum zeigt diese Seite, was ankommt.'],
+    check(await pg.evaluate(REPORT_HEADS) == ['Verlauf'] and hint == ['Ab 3 Bewertungen zeigt diese Seite, was ankommt.'],
           f'too little data: one sentence about when it starts; the history stays ({hint})')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
-    # Loading more in the history, and how it looks at 360 px in light and dark
+    # How it looks at 360 px in light and dark
     for scheme in ('light', 'dark'):
         ctx = await browser.new_context(viewport={'width': 360, 'height': 760}, color_scheme=scheme, reduced_motion='reduce')
         pg, errors = await open_page(ctx, url)
         await pg.evaluate(SORTS, [26, 1]); await idle(pg)
-        await pg.click('[data-action=open-settings]'); await idle(pg)
-        await pg.click('#sheet [data-action=open-report]'); await idle(pg)
-        was = await pg.locator('#sheet .tl-item').count()
-        await pg.click('#sheet [data-action=report-more]'); await idle(pg)
-        now = await pg.locator('#sheet .tl-item').count()
-        check([was, now] == [20, 26], f'the evaluation\u2019s history loads 20 more at a time ({was} → {now})')
-        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .wd-col b, #sheet .chart-y span, #sheet .why, #sheet h3.label')]
+        await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .why, #sheet h3.label')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
-        chart = await pg.eval_on_selector('#sheet .chart', 'c => [Math.round(c.getBoundingClientRect().width), Math.round(c.getBoundingClientRect().height)]')
-        check(not wide and chart[0] <= 360 and chart[1] > 80, f'{scheme}, 360 px: nothing clipped and the graphic holds up ({chart}, {wide})')
+        first = await pg.locator('#sheet .tl-item').count()
+        for _ in range(10):
+            await pg.eval_on_selector('.sheet-body', 'b => b.scrollTo(0, b.scrollHeight)'); await idle(pg)
+            if await pg.locator('#sheet .tl-item').count() == 26:
+                break
+        check(10 <= first < 26 and await pg.locator('#sheet .tl-item').count() == 26 and not wide,
+              f'{scheme}, 360 px: a page to begin with, the rest follows on scrolling, nothing clipped ({first} of 26, {wide})')
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
+    # A tall screen: one page would not fill it, so the next ones follow at once — without that there is no scrolling
+    ctx = await browser.new_context(viewport={'width': 400, 'height': 1800}, reduced_motion='reduce')
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [26, 1]); await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
+    body = await pg.eval_on_selector('.sheet-body', 'b => [b.scrollHeight > b.clientHeight, b.querySelectorAll(".tl-day").length]')
+    check(body[0] and body[1] > 10, f'a tall screen: more than one page is drawn, so the history can be scrolled at all ({body})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
 
 
-run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-start': test_feed_start, 'suggestions': test_suggestions, 'milestones': test_milestones,
+run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-routes': test_feed_routes, 'suggestions': test_suggestions, 'milestones': test_milestones,
            'reminder': test_reminders, 'own-interval': test_remind, 'feed-reminder': test_feed_remind, 'pets': test_petbar, 'modes': test_modes, 'network': test_network, 'shortcuts': test_shortcuts,
-           'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'album': test_album, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
+           'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'sheet': test_sheet, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
           camera=('camera',))

@@ -36,7 +36,7 @@ function refresh(now){
 }
 export const model = () => cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
 export const lastWeek = () => cached('week', [prefs.closedWeek], now => week = review(db, prefs, now, week));
-export const reportModel = span => cached('report', [prefs.activePet, span], now => report(db, prefs, now, span)); // only when the evaluation opens
+export const reportModel = () => cached('report', [prefs.activePet], () => report(db, prefs)); // only when the evaluation opens
 export const sortOf = id => model().byId.get(id);
 export function pendingServings(){
   const cut = Date.now() - PENDING_WINDOW;
