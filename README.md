@@ -100,14 +100,6 @@ Android 8.0 oder neuer. Der Barcode-Scanner braucht die Google-Play-Dienste, die
 
 <p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">Alle Versionen</a></sub></p>
 
-## Deine Daten bleiben bei dir
-
-Was du einträgst, liegt auf deinem Handy. Es landet weder in der Galerie noch in Googles Cloud-Sicherung, und die App schickt von sich aus nichts ins Netz. Den Text auf der Packung liest sie selbst, ohne Verbindung. Werbung und Tracking gibt es nicht.
-
-Zwei Ausnahmen, beide klein: Der Barcode-Scanner stammt von Google und meldet laut Google Gerätedaten wie das Modell, aber keine Bilder. Und wenn du es einschaltest, fragt die App bei unbekannten Barcodes zwei freie Produktdatenbanken; übertragen wird dabei nur die Nummer.
-
-Die Kamera braucht die App für Fotos. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
-
 ## Wenn mehrere füttern
 
 Seid ihr zu zweit oder zu dritt, wollt ihr dasselbe Tagebuch führen. Dafür gibt es zwei Wege.
@@ -120,7 +112,15 @@ Den Server richtest du selbst ein, er gehört nicht zur App. [Code und Anleitung
 
 ## Fragen
 
-Fragen und Ideen gehören in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht.
+Fragen und Ideen gehören in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht
+
+## Datenschutz
+
+Was du einträgst, liegt auf deinem Handy. Es landet weder in der Galerie noch in Googles Cloud-Sicherung, und die App schickt von sich aus nichts ins Netz. Den Text auf der Packung liest sie selbst, ohne Verbindung. Werbung und Tracking gibt es nicht.
+
+Zwei Ausnahmen, beide klein: Der Barcode-Scanner stammt von Google und meldet laut Google Gerätedaten wie das Modell, aber keine Bilder. Und wenn du es einschaltest, fragt die App bei unbekannten Barcodes zwei freie Produktdatenbanken; übertragen wird dabei nur die Nummer.
+
+Die Kamera braucht die App für Fotos. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
 
 ## Lizenz
 
