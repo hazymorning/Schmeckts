@@ -21,7 +21,7 @@ input{font:inherit;text-rendering:inherit}
 :focus-visible{outline:2.5px solid var(--accent);outline-offset:3px} /* der Rahmen folgt der Rundung des Elements */
 .ic{width:24px;height:24px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .sk{width:64px;height:64px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.num,.tl-time,.pct,.cnt b,.pp b,.day .dn,.field.code{font-variant-numeric:tabular-nums}
+.num,.tl-time,.pct,.cnt b,.pp b,.day .dn,.field.code,.lv-n,.lv-s,.chart-y{font-variant-numeric:tabular-nums}
 
 /* Stimmungsbild: Album-Foto hinter Kopfzeile und oberem Seitenbereich, volle Breite, läuft nach unten weich aus. Die Seite liegt
    unverändert davor. Gewechselt wird nur über die Deckkraft (views/mood.js). Die Maske nutzt nur die Deckkraft ihrer Farbe. */
@@ -77,8 +77,8 @@ input{font:inherit;text-rendering:inherit}
 .card+.card{margin-top:14px}
 .card h2{margin:0 0 4px;font:600 21px/1.25 var(--font-display);letter-spacing:-.01em;color:var(--ink)}
 .card ul,.card ol{list-style:none;margin:0;padding:0}
-.card li+li,.card .tl-day+.tl-day{border-top:1px solid var(--line)}
-/* Textknopf in einer Karte, etwa „Ältere Tage anzeigen“ */
+.card li+li{border-top:1px solid var(--line)}
+/* Textknopf in einer Karte, etwa „Weitere anzeigen“ */
 .card-btn{display:block;width:100%;min-height:48px;padding:12px 0 10px;border-top:1px solid var(--line);
   font-family:var(--font-ui);font-size:14.5px;font-weight:600;color:var(--accent-ink)}
 
@@ -210,6 +210,7 @@ button.ov-pic:active{transform:scale(.95)}
 .dots b{font-size:10px;line-height:6px;color:var(--faint);font-weight:700}
 
 .tl-day{padding:10px 0 4px;scroll-margin-top:20px;border-radius:4px}
+.tl-day+.tl-day{border-top:1px solid var(--line)}
 .tl-date{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
 .tl-date b{font:600 15px var(--font-display)}
 .tl-date span{font-size:13px;color:var(--muted)}
@@ -304,9 +305,10 @@ button.ov-pic:active{transform:scale(.95)}
 .fab.filled{animation:fabPop .5s var(--ease-spring)}
 @keyframes bowlFill{0%{transform:scaleY(0);opacity:.9}30%,75%{transform:scaleY(1);opacity:.9}100%{transform:scaleY(1);opacity:0}}
 @keyframes fabPop{35%{transform:scale(1.06)}}
-/* Füttern: Barcode und Foto in zwei gleich breiten Spalten, gleich hoch und gleich aufgebaut (Icon, fette erste Zeile,
-   kleine zweite Zeile). Barcode ist der Hauptknopf auf der Akzentfläche, Foto steht auf Fläche 2 */
-.cta-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+/* Füttern: Barcode und Foto in gleich breiten Spalten, gleich hoch und gleich aufgebaut (Icon, fette erste Zeile,
+   kleine zweite Zeile). Barcode ist der Hauptknopf auf der Akzentfläche, Foto steht auf Fläche 2. Blendet
+   „Füttern beginnt mit“ einen aus, nimmt der andere die ganze Breite. */
+.cta-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:9px}
 .cta{display:flex;align-items:center;gap:12px;min-width:0;min-height:72px;padding:16px;border-radius:22px;text-align:left;
   cursor:pointer;transition:transform .2s var(--ease-out)}
 .cta:active{transform:scale(.98)}
@@ -369,6 +371,42 @@ button.prod-card:active{transform:scale(.985)}
 .list-row{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:10px 0;text-align:left}
 .list-row+.list-row{border-top:1px solid var(--line)}
 .list-row .chev{color:var(--faint)}
+/* Auswertung: eine Linie als eigenes SVG, Balken aus den Bausteinen der App. Farben nur aus den Tokens; die Reihen
+   nennen Namen und Zahlen, damit keine Aussage allein in der Farbe steckt. */
+.chart{display:flex;gap:9px;height:124px;margin-top:10px}
+.chart-y{display:flex;flex-direction:column;justify-content:space-between;flex:0 0 auto;text-align:right;font-size:11.5px;color:var(--muted)}
+.plot{flex:1;min-width:0;height:100%;overflow:visible}
+.plot .grid{fill:none;stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+.plot polyline{fill:none;stroke:var(--ser);stroke-dasharray:var(--dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  vector-effect:non-scaling-stroke;animation:fadeIn .5s var(--ease-out) both}
+/* Linien mehrerer Tiere: je eigene Farbe und eigener Strich, dazu die Legende */
+.s0{--ser:var(--accent);--dash:none}
+.s1{--ser:var(--ink);--dash:7 5}
+.s2{--ser:var(--muted);--dash:2 5}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:9px}
+.legend .key{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
+.legend svg{width:20px;height:2px;overflow:visible;flex:0 0 auto}
+.legend line{stroke:var(--ser);stroke-dasharray:var(--dash);stroke-width:2;stroke-linecap:round}
+
+.bars{margin-top:4px}
+.lv{padding:9px 0}
+.lv+.lv{border-top:1px solid var(--line)}
+.lv-top{display:flex;align-items:baseline;gap:10px;font-size:14.5px}
+.lv-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv-n{font-weight:600}
+.lv-s{flex:0 0 auto;font-size:13.5px;color:var(--muted)}
+.lv .bar{margin-top:7px}
+.lv .bar i{background:var(--c,var(--accent));animation:grow .5s var(--ease-out) both}
+
+.wd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:10px}
+.wd-col{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.wd-bar{display:flex;align-items:flex-end;width:100%;height:64px}
+.wd-bar i{width:100%;height:var(--h);border-radius:8px 8px 5px 5px;background:var(--accent);transform-origin:bottom center;
+  animation:rise .5s var(--ease-out) both}
+@keyframes rise{from{transform:scaleY(0)}}
+.who{display:flex;justify-content:space-between;gap:12px;margin:0;padding:9px 0;font-size:14.5px}
+.who+.who{border-top:1px solid var(--line)}
+
 /* Eigene Kamera: Vollbild, immer dunkel (die Tokens lösen sich mit color-scheme dunkel auf), Live-Vorschau füllt die Fläche */
 .camera{color-scheme:dark;position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;overflow:hidden;background:var(--bg);color:var(--ink)}
 .camera::backdrop{background:var(--bg)}

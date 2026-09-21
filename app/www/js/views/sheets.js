@@ -1,18 +1,18 @@
 /* Inhalte der Bottom Sheets: Mahlzeit, Benennen, Füttern (mit Auswahl nach dem Scannen), Futter, Tier (mit Zuschnitt des
-   Profilbilds und Album), Einstellungen. */
+   Profilbilds und Album), Einstellungen und Auswertung. */
 import {$} from '../dom.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
 import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
-import {ALBUM_MAX, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {ALBUM_MAX, FEED_START, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
-import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, sortOf} from '../derive.js';
-import {feedSlots, rateCls, scoreCls, VERDICTS} from '../smart.js';
-import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
+import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, reportModel, sortOf} from '../derive.js';
+import {feedSlots, MIN_RATED, rateCls, scoreCls, SPANS, VERDICTS} from '../smart.js';
+import {renderSheet, setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
-import {armBtn, avatar, closeBtn, nameBlock, rateRow, reasonOf, resultBadges, syncInfo, thumbOf, verdictLabel} from './parts.js';
+import {armBtn, avatar, closeBtn, dayBlocks, dayGroups, nameBlock, rateRow, reasonOf, resultBadges, syncInfo, thumbOf, verdictLabel} from './parts.js';
 
 function viewServing(){
   const s = getServing(sheet.id);
@@ -73,14 +73,21 @@ export function renderSuggestions(){
   box.innerHTML = (hits.length ? `<span class="label">${title}</span>` : '') + hits.map(p => `<button class="sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`).join('');
 }
 
-/* Füttern: Barcode und Foto als zwei gleich breite Knöpfe, darunter die bekannten Sorten.
+/* Füttern: Barcode und Foto als gleich breite Knöpfe; „Füttern beginnt mit“ blendet einen davon aus, der andere nimmt
+   die ganze Breite. Darunter die zuletzt gefütterten Sorten, höchstens SUGGEST; ab mehr bekannten Sorten folgt das
+   Suchfeld, dessen Treffer (höchstens HITS) an die Stelle der Vorschläge treten.
    sheet.busy: Hinweis während des Scannens,
    sheet.code: gescannter Code, um den es gerade geht (Auswahl, oder der Foto-Knopf übernimmt ihn) */
+const SUGGEST = 3, HITS = 8;
+const CTA = {
+  barcode: `<button class="cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
+  foto: `<button class="cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`
+};
 function serveRows(prods, code = ''){
   return prods.map(p => {
     const e = sortOf(p.id);
     const meta = [p.variety ? p.brand : '', e?.n ? `${e.pct} %` : 'noch nicht bewertet'].filter(Boolean).join(', ');
-    return `<li data-name="${esc(norm(p.brand + ' ' + p.variety))}"><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span><span class="serve-pill">Servieren</span></button></li>`;
+    return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span><span class="serve-pill">Servieren</span></button></li>`;
   }).join('');
 }
 function viewFeed(){
@@ -90,15 +97,20 @@ function viewFeed(){
     <ul class="plist">${serveRows(pick, sheet.code)}</ul>`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
-    <div class="cta-row">
-      <button class="cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>
-      <button class="cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>
-    </div>
+    <div class="cta-row">${prefs.feedStart === 'beides' ? CTA.barcode + CTA.foto : CTA[prefs.feedStart]}</div>
     ${sheet.busy ? `<p class="note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
-    ${prods.length ? `<span class="label">Schon mal gehabt</span>
-      ${prods.length > 6 ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>` : ''}
-      <ul class="plist">${serveRows(prods)}</ul>` : ''}
+    ${prods.length ? `<div id="serveList"><span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul></div>
+      ${prods.length > SUGGEST ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>
+        <ul class="plist" id="serveHits"></ul>` : ''}` : ''}
     <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
+}
+/* Suche im Füttern-Sheet: Getipptes zeigt statt der Vorschläge die passenden Sorten, höchstens HITS. */
+export function renderServeHits(text){
+  const list = $('#serveList'), hits = $('#serveHits');
+  if (!list || !hits) return;
+  const words = norm(text).split(' ').filter(Boolean);
+  list.hidden = !!words.length;
+  hits.innerHTML = words.length ? serveRows(quickProducts().filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w))).slice(0, HITS)) : '';
 }
 
 /* Hinweise unter den Erinnerungen: Sie sagen, was mit der gewählten Einstellung gerade gilt.
@@ -148,6 +160,90 @@ function viewProduct(){
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
+/* Auswertung: dieselben Bausteine wie die Einstellungen. Oben der Zeitraum, darunter je Abschnitt eine Überschrift, die
+   Grafik und ein Satz, der sie in Worten zusammenfasst; Abschnitte ohne genug Daten fehlen. Gerechnet wird in report()
+   (smart.js), gezeichnet wird hier: die Linie als eigenes SVG, die Balken aus den Bausteinen der App. Jede Grafik trägt
+   ihre Textbeschreibung im aria-label, und keine Aussage steckt allein in der Farbe.
+   sheet.span: Tage des Zeitraums, sheet.shown: Mahlzeiten im Verlauf, sheet.at: Abschnitt, bei dem geöffnet wird. */
+const REPORT_STEP = 20;   // der Verlauf lädt in Schritten von 20 nach
+const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const weekdayName = i => new Date(2024, 0, 1 + i).toLocaleDateString('de-DE', {weekday:'long'}); // 1.1.2024 war ein Montag
+export const reportState = at => ({kind:'report', span:SPANS[0][0], shown:REPORT_STEP, at});
+export function reportSpan(v){ Object.assign(sheet, {span:+v, shown:REPORT_STEP}); renderSheet(); }
+export function reportMore(){ sheet.shown += REPORT_STEP; renderSheet(); }
+
+const section = (key, title, chart, say) => `<h3 class="label" id="ab-${key}">${title}</h3>${chart}<p class="why">${say}</p>`;
+/* Waagerechter Balken mit Name, Zahl und Nebenzahl; cls trägt die Farbe einer Bewertungsstufe, sonst gilt der Akzent */
+const barRow = (name, value, side, w, cls = '') =>
+  `<div class="lv ${cls}"><span class="lv-top"><span class="lv-name">${esc(name)}</span><b class="lv-n">${value}</b><span class="lv-s">${side}</span></span>
+    <span class="bar"><i style="--w:${Math.max(2, Math.round(w))}%"></i></span></div>`;
+const bars = (label, rows) => `<div class="bars" role="img" aria-label="${esc(label)}">${rows}</div>`;
+const compare = list => `${esc(list[0].key)} kommt am besten an (${list[0].pct} %), ${esc(list.at(-1).key)} am wenigsten (${list.at(-1).pct} %).`;
+const listOf = list => list.map(g => `${g.key} ${g.pct} Prozent aus ${g.n} Bewertungen`).join('; ');
+
+function trendBlock(m){
+  const lines = m.trend.pets.filter(p => p.points.length > 1);
+  if (!lines.length) return '';
+  const width = Math.max(1, m.trend.to - m.trend.from), per = m.trend.step === 'day' ? 'Tag' : 'Woche';
+  const name = p => esc(getPet(p.id).name), many = lines.length > 1;
+  const points = p => p.points.map(x => `${((x.t - m.trend.from) / width * 100).toFixed(1)},${(100 - x.pct).toFixed(1)}`).join(' ');
+  const label = `Linie der Wertung je ${per}, 0 bis 100 Prozent. `
+    + lines.map(p => `${many ? getPet(p.id).name + ': ' : ''}von ${p.points[0].pct} auf ${p.points.at(-1).pct} Prozent, im Schnitt ${p.pct}`).join('. ') + '.';
+  return section('trend', 'Akzeptanz im Verlauf',
+    `<div class="chart" role="img" aria-label="${esc(label)}">
+      <span class="chart-y"><span>100 %</span><span>50 %</span><span>0 %</span></span>
+      <svg class="plot" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path class="grid" d="M0 0H100M0 50H100M0 100H100"/>
+        ${lines.map((p, i) => `<polyline class="s${i % 3}" points="${points(p)}"/>`).join('')}</svg></div>
+    ${many ? `<div class="legend">${lines.map((p, i) => `<span class="key s${i % 3}"><svg viewBox="0 0 20 2" aria-hidden="true"><line x1="0" y1="1" x2="20" y2="1"/></svg>${name(p)}</span>`).join('')}</div>` : ''}`,
+    many ? `Im Schnitt ${andList(lines.map(p => `${name(p)} ${p.pct} %`))}.` : `Im Schnitt ${lines[0].pct} %, zuletzt ${lines[0].points.at(-1).pct} %.`);
+}
+function levelBlock(m){
+  if (m.levels.length < 2) return '';
+  const top = m.levels.reduce((a, x) => x.n > a.n ? x : a);
+  return section('levels', 'Verteilung der Bewertungen',
+    bars('Bewertungen je Stufe: ' + m.levels.map(x => `${RATINGS[x.r].label} ${x.n}, ${x.share} Prozent`).join('; ') + '.',
+      m.levels.map(x => barRow(RATINGS[x.r].label, x.n, `${x.share} %`, x.share, rateCls(x.r))).join('')),
+    `Am häufigsten „${esc(RATINGS[top.r].label)}“ mit ${top.n} von ${m.n} Bewertungen (${top.share} %).`);
+}
+function brandBlock(m){
+  if (m.brands.length < 2) return '';
+  return section('brands', 'Marken im Vergleich',
+    bars('Marken nach Wertung: ' + listOf(m.brands) + '.', m.brands.map(b => barRow(b.key, `${b.pct} %`, `${b.n}×`, b.pct)).join('')),
+    compare(m.brands));
+}
+const textureBlocks = m => m.textures.map(t => section('tex-' + t.type, t.title,
+  bars(`${t.title} nach Wertung: ` + listOf(t.groups) + '.', t.groups.map(g => barRow(g.key, `${g.pct} %`, `${g.n}×`, g.pct)).join('')),
+  compare(t.groups))).join('');
+function feedingBlock(m){
+  const days = m.feeding.days, most = Math.max(...days);
+  if (!most) return '';
+  const meals = n => `${n} ${n === 1 ? 'Mahlzeit' : 'Mahlzeiten'}`;
+  const often = days.map((n, i) => [n, i]).filter(([n]) => n === most).map(([, i]) => weekdayName(i).toLowerCase() + 's');
+  return section('feeding', 'Fütterungen',
+    `<div class="wd" role="img" aria-label="Mahlzeiten je Wochentag: ${days.map((n, i) => `${weekdayName(i)} ${n}`).join(', ')}.">
+      ${days.map((n, i) => `<span class="wd-col"><span class="wd-bar"><i style="--h:${n ? Math.max(6, Math.round(n / most * 100)) : 0}%"></i></span><b class="lv-n">${n}</b><span>${WEEKDAYS[i]}</span></span>`).join('')}</div>`,
+    often.length > 3 ? `Über die Woche wird gleichmäßig gefüttert, an keinem Tag mehr als ${meals(most)}.`
+      : `Am meisten wird ${andList(often)} gefüttert, ${meals(most)}${often.length > 1 ? ' je Tag' : ''}.`)
+    + (m.feeding.people.length > 1 ? m.feeding.people.map(x => `<p class="who"><span>${esc(x.name)}</span><b class="lv-n">${x.n}×</b></p>`).join('') : '');
+}
+function histBlock(m){
+  if (!m.meals.length) return '';
+  const shown = m.meals.slice(0, sheet.shown);
+  return `<h3 class="label" id="ab-hist">Verlauf</h3>
+    ${dayBlocks(dayGroups(shown), {multiHouse:db.pets.length > 1 && !m.pet})}
+    ${m.meals.length > shown.length ? `<button class="card-btn" data-action="report-more">Weitere anzeigen</button>` : ''}`;
+}
+function viewReport(){
+  const m = reportModel(sheet.span);
+  const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
+  return `<div class="sh-head"><h2>Auswertung${who}</h2>${closeBtn}</div>
+    <div class="seg">${SPANS.map(([v, l]) => `<button aria-pressed="${sheet.span === v}" data-action="report-span" data-v="${v}">${l}</button>`).join('')}</div>
+    ${m.n < MIN_RATED ? `<p class="hint mt-s">Ab ${MIN_RATED} Bewertungen in diesem Zeitraum zeigt diese Seite, was ankommt.</p>`
+      : trendBlock(m) + levelBlock(m) + brandBlock(m) + textureBlocks(m) + feedingBlock(m)}
+    ${histBlock(m)}`;
+}
+
 /* Zuschnitt des Profilbilds: quadratische Ansicht mit rundem Ausschnitt wie das Profilbild, Regler zum Zoomen.
    Das Bild hängt mountCrop() nach dem Zeichnen ein. */
 const viewCrop = () => `<div class="sh-head"><h2>Foto zuschneiden</h2>${closeBtn}</div>
@@ -188,10 +284,13 @@ function viewSettings(){
   return `<div class="sh-head"><h2>Einstellungen</h2>${closeBtn}</div>
     ${loadError ? `<p class="banner">Die gespeicherten Daten konnten nicht gelesen werden. Bitte die App neu starten.</p>`
       : storageOK ? '' : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`}
+    <button class="list-row" data-action="open-report"><span class="t-main"><b>Auswertung</b></span>${icon('chevron', 'chev')}</button>
     <span class="label">Darstellung</span>
     <div class="seg">${[['system', 'auto', 'System'], ['light', 'sun', 'Hell'], ['dark', 'moon', 'Dunkel']].map(([v, ic, l]) => `<button aria-pressed="${st.theme === v}" data-action="theme" data-v="${v}">${icon(ic)}${l}</button>`).join('')}</div>
     <span class="label">Tierfotos im Hintergrund</span>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${st.backdrop === (v === 'on')}" data-action="backdrop" data-v="${v}">${l}</button>`).join('')}</div>
+    <span class="label">Füttern beginnt mit</span>
+    <div class="seg">${FEED_START.map(([v, l]) => `<button aria-pressed="${st.feedStart === v}" data-action="feed-start" data-v="${v}">${l}</button>`).join('')}</div>
     <span class="label">Ans Bewerten erinnern</span>
     <p class="hint" id="remind-hint">${remindHint()}</p>
     <div class="seg">${REMIND.map(m => `<button aria-pressed="${!own && st.remind === m}" data-action="remind" data-v="${m}">${m ? m / 60 + ' Std.' : 'Aus'}</button>`).join('')
@@ -296,10 +395,11 @@ const PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Hand
   'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.'];
 const viewPrivacy = () => `<div class="sh-head"><h2>Datenschutz</h2>${closeBtn}</div><div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
-const VIEWS = {serving:viewServing, feed:viewFeed, new:viewName, product:viewProduct, pet:viewPet, settings:viewSettings, privacy:viewPrivacy};
+const VIEWS = {serving:viewServing, feed:viewFeed, new:viewName, product:viewProduct, pet:viewPet, settings:viewSettings, report:viewReport, privacy:viewPrivacy};
 setSheetView(state => {
   sheetBody.innerHTML = VIEWS[state.kind]();
   if (state.kind === 'settings') paintServerBox(true);
   if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom'));
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
+  if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#ab-' + at)?.scrollIntoView({block:'start'})); } // mit einem Abschnitt geöffnet
 });
