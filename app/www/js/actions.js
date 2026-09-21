@@ -165,19 +165,18 @@ const ACTIONS = {
 };
 
 /* Deep links and app shortcuts: schmeckts://feed opens the feeding sheet, schmeckts://scan starts the scanner in it
-   (logic/scan.js), schmeckts://photo our own camera (shootPhoto in logic/feeding.js). After „Abbrechen“ the feeding
-   sheet stays open. */
-const LINKS = ['feed', 'scan', 'photo'];
+   (logic/scan.js), schmeckts://photo our own camera (shootPhoto in logic/feeding.js). The German names from before
+   the move to English keep working: they sit in people's shortcuts. After „Abbrechen“ the feeding sheet stays open. */
+const LINKS = {feed:null, fuettern:null, scan, photo:shootPhoto, foto:shootPhoto};
 export async function openLink(url){
   const raw = String(url || '');
   if (/^(content|file):/i.test(raw)) { await receiveUri(raw); return true; } // an exchange file from another app
   const path = raw.replace(/^schmeckts:\/*/i, '').replace(/[/?#].*$/, '').toLowerCase();
-  if (!LINKS.includes(path)) return false;
+  if (!(path in LINKS)) return false;
   if (!db.pets.length) { openSheet({kind:'pet', name:'', species:'Katze', photo:null, from:null}); toast('Leg zuerst dein Tier an.'); return true; }
   await closeSheet();
   openSheet({kind:'feed'});
-  if (path === 'photo') await shootPhoto();
-  if (path === 'scan') await scan();
+  await LINKS[path]?.();
   return true;
 }
 
