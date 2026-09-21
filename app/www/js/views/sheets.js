@@ -382,10 +382,18 @@ const PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Hand
 const viewPrivacy = () => `<div class="sh-head"><h2>Datenschutz</h2>${closeBtn}</div><div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
 const VIEWS = {serving:viewServing, feed:viewFeed, new:viewName, product:viewProduct, pet:viewPet, settings:viewSettings, report:viewReport, privacy:viewPrivacy};
+/* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
+   away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.
+   The boxes the views fill afterwards are drawn every time, because their contents are not part of this comparison. */
+let drawn = '';
 setSheetView(state => {
-  sheetBody.innerHTML = VIEWS[state.kind]();
-  if (state.kind === 'settings') paintServerBox(true);
-  if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom'));
+  const html = VIEWS[state.kind](), fresh = html !== drawn || !sheetBody.firstChild; // no children: closed in between
+  if (fresh) {
+    drawn = html;
+    sheetBody.innerHTML = html;
+    if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // hangs listeners on: exactly once per drawing
+  }
+  if (state.kind === 'settings') paintServerBox(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
   if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#ab-' + at)?.scrollIntoView({block:'start'})); } // opened at a given section
 });

@@ -15,8 +15,8 @@ TEXTURES = ['in Soße', 'in Gelee', 'Pastete', 'Mousse', 'Filets']
 
 def household(years):
     rnd, day, now = random.Random(7), 864e5, TUESDAY.timestamp() * 1000
-    pets = [{'id': 'petminka001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1, 'photos': {}},
-            {'id': 'pettiger001', 'name': 'Tiger', 'species': 'Katze', 'photo': None, 'createdAt': 2, 'photos': {}}]
+    pets = [{'id': 'petminka001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1},
+            {'id': 'pettiger001', 'name': 'Tiger', 'species': 'Katze', 'photo': None, 'createdAt': 2}]
     products = [{'id': f'sorte{i:05d}', 'brand': BRANDS[i % 10], 'variety': f'{FLAVORS[i % 15]} {TEXTURES[i % 5]}', 'type': 'Nassfutter', 'animal': 'Katze',
                  'thumb': None, 'lastPets': [], 'createdAt': i, 'codes': {}} for i in range(150)]
     liking = {(p['id'], x['id']): rnd.random() for p in pets for x in products}

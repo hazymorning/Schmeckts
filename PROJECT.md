@@ -21,7 +21,7 @@ Interaction: few taps, never ask what can be derived, undo instead of a confirma
 
 **Modules** in `app/www/js/`, each importing only from layers above it, without cycles:
 
-1. Foundations: `dom`, `text`, `dates`, `native` (Android bridge), `icons`, `config`, `fields`, `clock`, `disk`, `prompt` (generated)
+1. Foundations: `dom`, `text`, `dates`, `native` (Android bridge), `icons`, `config`, `fields`, `clock`, `disk`
 2. Data: `store`, `api`, `sync`, `smart`, `derive`, `images`, `recognize`, `ocr`, `online`
 3. Interface: `ui/theme`, `ui/toast`, `ui/sheet`, `ui/crop`, `ui/camera`
 4. Views: `views/parts`, `views/mood`, `views/home`, `views/sheets`
@@ -30,6 +30,7 @@ Interaction: few taps, never ask what can be derived, undo instead of a confirma
 
 - When a lower layer has to reach an upper one, the upper one hooks itself in (`hooks`, `syncHooks`, `diskHooks`, `setSheetView()`); `main.js` wires them together.
 - Mutate the database and call `save()`; replace it wholesale only through `replaceDb()`. Buttons carry `data-action`, and the entry of the same name in `ACTIONS` runs.
+- Views build HTML and write it in one go. A change from the server redraws every open view, so a sheet whose HTML is the same as the one on screen is left alone (`setSheetView()` in `views/sheets.js`): the photos stay decoded, the scroll position and the focus stay put. Boxes a view fills afterwards (`paintServerBox()`, `renderSuggestions()`) are drawn every time, because their contents are not in that comparison. Photos carry `decoding="async"`, so a view appears without waiting for them.
 - `Native` is the object holding the Capacitor plugins, `null` in the browser, where `localStorage` is the store. That way the same code runs in the app, in the browser and in the tests.
 - **Storage:** `db.json`, `prefs.json`, `sync.json`, `queue.json` in private app storage, written atomically (temporary file, rename), in the order queue, data, clocks. After a crash the next start replays the queue. A corrupted file is set aside.
 - **Scanning:** Google’s ready-made scan interface (`scan()` from `@capacitor-mlkit/barcode-scanning`, module `barcode_ui`), without the camera permission. Known code: serve it, and offer a choice when several varieties match. Unknown: ask the recognition chain, otherwise photograph the front. `linkProduct` attaches the meal’s `scanCode` to every variety it is given, which is how a multipack grows.
