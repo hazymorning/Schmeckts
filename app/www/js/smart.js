@@ -176,27 +176,30 @@ function hints(sorts, appetites, pet, prefs){
 }
 
 /* Evaluation page (only computed when it opens), for the pet in the filter or for the whole household:
-     meals     every meal within the filter, newest first
-     brands    the TOP_BRANDS most common brands by score */
-const TOP_BRANDS = 6;
-function groupSums(rated, products, keyOf){
-  const m = new Map();
-  for (const x of rated) {
-    const p = products.get(x.id), k = p && keyOf(p);
-    if (!k) continue;
-    if (!m.has(k)) m.set(k, emptySum());
-    addRating(m.get(k), x);
-  }
-  return [...m].map(([key, sum]) => ({key, ...statOf(sum)}));
-}
+     meals            every meal within the filter, newest first
+     count            meals, varieties tried and days fed on, the three numbers of the facts card
+     best, worst      the variety that goes down best and the one that goes down worst, from MIN_TOP ratings
+   best and worst need two different varieties, otherwise the same one would be both. */
+const MIN_TOP = 2;
 export function report(db, prefs){
   const petIds = db.pets.map(p => p.id);
   const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
   const ids = pet ? [pet] : petIds, mine = new Set(ids), products = new Map(db.products.map(p => [p.id, p]));
   const meals = db.servings.filter(s => ids.some(id => s.pets?.[id]));
   const rated = [...ratingsOf(db, meals)].filter(x => mine.has(x.pid));
+  const sums = new Map();
+  for (const x of rated) {
+    if (!products.has(x.id)) continue;
+    if (!sums.has(x.id)) sums.set(x.id, emptySum());
+    addRating(sums.get(x.id), x);
+  }
+  const ranked = [...sums].map(([id, sum]) => ({product:products.get(id), ...statOf(sum)}))
+    .filter(x => x.n >= MIN_TOP).sort((a, b) => b.score - a.score || b.n - a.n);
   return {pet, n:rated.length, meals,
-    brands:groupSums(rated, products, p => p.brand).sort((a, b) => b.n - a.n).slice(0, TOP_BRANDS).sort((a, b) => b.score - a.score)};
+    count:{meals:meals.length,
+           sorts:new Set(meals.map(s => s.productId).filter(id => products.has(id))).size,
+           days:new Set(meals.map(s => dayKey(s.servedAt))).size},
+    best:ranked[0] || null, worst:ranked.length > 1 ? ranked.at(-1) : null};
 }
 
 /* Groups for „Einkaufen“ and the shopping list: „Gemischt“ counts towards buying again, the manual setting decides

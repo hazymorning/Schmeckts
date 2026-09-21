@@ -1,6 +1,6 @@
 /* Recurring building blocks of the views: avatars, thumbnails, rating buttons, sync status. */
 import {esc} from '../text.js';
-import {ago, dayKey, dayLabel, timeStr, when} from '../dates.js';
+import {ago, dayKey, dayLabel, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {queue} from '../store.js';
@@ -21,14 +21,15 @@ export function thumbOf(s, p, cls = ''){
   const letter = (p.brand || p.variety || '?').trim().charAt(0).toUpperCase();
   return `<span class="thumb ${cls}">${esc(letter)}</span>`;
 }
-export function nameBlock(s, p, exact = false){
+export function nameBlock(s, p, sheet = false){
   if (s.status === 'recognizing' || s.status === 'reading') // the server is recognising, or the phone is reading the text
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
   if (!p) {
     const sub = {waiting:'Wird erkannt, sobald der Server erreichbar ist', failed:'Nicht erkannt, tippen zum Benennen'}[s.status] || 'Tippen zum Benennen';
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (mode `lokal`): without the error tone
   }
-  const meta = [p.variety ? p.brand : '', exact ? when(s.servedAt) : ago(s.servedAt)].filter(Boolean).join(', ');
+  // In the sheet the exact time is in the „Serviert“ field right below, so the food type goes here instead
+  const meta = [p.variety ? p.brand : '', sheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 /* Rating buttons: equally wide in one row, the variety's scale in its own order; an icon and two lines per button.

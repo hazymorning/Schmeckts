@@ -199,18 +199,30 @@ const WEEK = household(['Minka', 'Tiger'], ['lachs', 'huhn', 'rind', 'neu'], [
   [null, {Minka:null}, '2026-05-31T23:59', ' Jonas '],
   ['rind', {Minka:T}, '2026-06-01T00:00', 'Jonas'], ['rind', {Minka:T}, '2026-06-01T09:00', 'Jonas']]);
 
-test('evaluation: the same ratings, scores and brands as the model, and every meal in the filter', () => {
+test('evaluation: the same ratings and scores as the model, every meal in the filter, and the facts', () => {
   const products = [{id:'p1', brand:'Sheba'}, {id:'p2', brand:'Felix'}, {id:'p3', brand:'Gourmet'}];
   const db = household(['A', 'B'], products, [...rate('p1', 'A', [T, G, M], 40), ...rate('p2', 'A', [G, X], 20),
     ...rate('p3', 'B', [T, T, S], 5), ...rate('p1', 'B', [M, S], 2)]);
   for (const activePet of ['all', 'A']) {
     const prefs = {activePet, hiddenHints:[]}, m = model(db, prefs), r = report(db, prefs);
+    const ranked = m.sorts.filter(e => e.n >= 2).sort((a, b) => b.score - a.score);
     assert.equal(r.n, m.rated);
-    assert.deepEqual(r.brands.map(b => [b.key, b.pct, b.n]).sort(),                  // je Marke genau eine Sorte
-      m.sorts.filter(e => e.n).map(e => [e.product.brand, e.pct, e.n]).sort());
-    assert.deepEqual(r.meals, db.servings.filter(s => activePet === 'all' || s.pets[activePet]), 'every meal in the filter, no span');
     assert.equal(r.pet, activePet === 'all' ? null : activePet);
+    assert.deepEqual(r.meals, db.servings.filter(s => activePet === 'all' || s.pets[activePet]), 'every meal in the filter, no span');
+    assert.deepEqual([r.best.product.id, r.best.pct], [ranked[0].product.id, ranked[0].pct], 'best variety as in the model');
+    assert.equal(r.worst.product.id, ranked.at(-1).product.id, 'and the worst one');
+    assert.equal(r.count.meals, r.meals.length);
+    assert.equal(r.count.sorts, new Set(r.meals.map(s => s.productId)).size);
+    assert.ok(r.count.days > 0 && r.count.days <= r.count.meals, 'days fed on, never more than the meals');
   }
+});
+
+test('evaluation: one variety alone is not both best and worst', () => {
+  const db = household(['A'], [{id:'p1', brand:'Sheba'}], rate('p1', 'A', [T, G], 10));
+  const r = report(db, {activePet:'all', hiddenHints:[]});
+  assert.equal(r.best.product.id, 'p1');
+  assert.equal(r.worst, null);
+  assert.equal(report(household(['A'], [], []), {activePet:'all'}).best, null, 'nothing rated: no best either');
 });
 
 test('week: Monday 00:00 to Sunday 24:00, always for the household', () => {
