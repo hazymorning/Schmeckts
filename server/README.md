@@ -1,7 +1,7 @@
 # Schmeckt’s? – the household server
 
 Only needed if several people keep the same feeding diary. It is a small program for a computer that stays on at
-home — a mini-PC is plenty. It holds the shared data, passes packaging photos on for recognition and looks up
+home, and a mini-PC is plenty for it. It holds the shared data, passes packaging photos on for recognition and looks up
 barcodes; nothing of it runs on anyone else’s machine. [The app](../README.md) works without it.
 
 Everything the server is sits in this folder: the Go program, `packaging/` for the Debian package and
@@ -42,7 +42,7 @@ The server runs straight away afterwards and starts automatically with the PC.
 The key lets the server have packaging photos recognised by Claude. That costs roughly half a cent per photo.
 
 1. Sign in at [platform.claude.com](https://platform.claude.com) or create an account and add a payment method.
-2. Under “API Keys”, create a new key — for example named “Schmeckts” — and copy it. It starts with `sk-ant-`.
+2. Under “API Keys”, create a new key, for example named “Schmeckts”, and copy it. It starts with `sk-ant-`.
 3. Recommended: set a small monthly spending limit under “Limits”, around 5 dollars.
 
 ### 4. Set it up
@@ -55,7 +55,7 @@ The same window shows the connection details again at any time, shows the stored
 
 ### 5. Connect the phones
 
-In the app: on first start „Mit Haushalt verbinden“ (later: settings, „Haushalt“, „Mit Haushalt verbinden“), type in the address and household code, then „Verbinden“. After that all phones sync their data automatically — at home over Wi-Fi, and on the road as soon as WireGuard is up. If something is waiting or the sync is stuck, a small notice appears at the top of the app. After a new code it reads „Code prüfen“; type the new code in there.
+In the app: on first start „Mit Haushalt verbinden“ (later: settings, „Haushalt“, „Mit Haushalt verbinden“), type in the address and household code, then „Verbinden“. After that all phones sync their data automatically: at home over Wi-Fi, and on the road as soon as WireGuard is up. If something is waiting or the sync is stuck, a small notice appears at the top of the app. After a new code it reads „Code prüfen“; type the new code in there.
 
 ## Good to know
 
