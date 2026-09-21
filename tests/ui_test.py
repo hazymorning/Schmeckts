@@ -1489,6 +1489,26 @@ MOOD = """() => { const m = document.getElementById('mood'), img = m.querySelect
 RGB_OF = """(list => list.map(c => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); }))"""
 
 
+async def test_sheet(browser, url):
+    print('the sheet redraws only what has changed')
+    ctx, pg, errors = await one_pet(browser, url)
+    await pg.click('[data-action=open-settings]'); await idle(pg)
+    await pg.evaluate("document.querySelector('#sheetBody .list-row').dataset.mark = 'x'")
+    redraw = "import('./js/ui/sheet.js').then(m => m.renderSheet())"
+    mark = "document.querySelector('#sheetBody .list-row')?.dataset.mark ?? null"
+    await pg.evaluate(redraw); await idle(pg)
+    kept = await pg.evaluate(mark)
+    await pg.evaluate("import('./js/store.js').then(s => { s.db.pets[0].name = 'Mira'; })")
+    await pg.evaluate(redraw); await idle(pg)
+    gone = await pg.evaluate(mark)
+    check([kept, gone] == ['x', None] and 'Mira' in await pg.inner_text('#sheetBody'),
+          f'a change from elsewhere redraws nothing that stayed the same, a changed name does ({kept}, {gone})')
+    await pg.click('#serverBox [data-action=connect-form]'); await idle(pg)
+    check(await pg.locator('#f-code').count() == 1, 'the „Haushalt“ box follows along, even though the view around it is unchanged')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_mood(browser, url):
     print('the mood picture on the home page: the pet\u2019s profile picture')
     make_pictures()
@@ -1828,5 +1848,5 @@ async def test_report(browser, url):
 
 run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-start': test_feed_start, 'suggestions': test_suggestions, 'milestones': test_milestones,
            'reminder': test_reminders, 'own-interval': test_remind, 'feed-reminder': test_feed_remind, 'pets': test_petbar, 'modes': test_modes, 'network': test_network, 'shortcuts': test_shortcuts,
-           'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
+           'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'sheet': test_sheet, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
           camera=('camera',))
