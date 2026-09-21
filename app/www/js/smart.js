@@ -1,7 +1,7 @@
 /* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
    derive.js. The rules are in PROJECT.md, section "Evaluation". */
 import {FLAVORS, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
-import {addDays, dayKey, weekStart} from './dates.js';
+import {addDays, dayKey, dayStart, weekStart} from './dates.js';
 
 const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
@@ -271,19 +271,23 @@ function hints(sorts, appetites, pet, prefs) {
     .sort((a, b) => HINTS.indexOf(a.kind) - HINTS.indexOf(b.kind) || a.order - b.order);
 }
 
-/* Evaluation page (only computed when it opens), for the pet in the filter or for the whole household:
-     meals            every meal within the filter, newest first
-     count            meals, varieties tried and days fed on, the three numbers of the facts card
+/* Evaluation page (only computed when it opens), for the pet in the filter or for the whole household and for
+   a span of the last `days` calendar days (0 = everything):
+     meals            every meal within the filter and the span, newest first
+     count            meals, varieties tried, days fed on and how many days the span holds
+     liked            of the ratings in the span, how many went down well (from YES points), as a percentage
      best, worst      the variety that goes down best and the one that goes down worst, from MIN_TOP ratings
-   best and worst need two different varieties, otherwise the same one would be both. */
+   best and worst need two different varieties, otherwise the same one would be both. `liked` counts the very
+   ratings everything else is computed from, so the ring on the page says nothing of its own. */
 const MIN_TOP = 2;
-export function report(db, prefs) {
+export function report(db, prefs, now = Date.now(), days = 0) {
   const petIds = db.pets.map(p => p.id);
   const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
   const ids = pet ? [pet] : petIds,
     mine = new Set(ids),
     products = new Map(db.products.map(p => [p.id, p]));
-  const meals = db.servings.filter(s => ids.some(id => s.pets?.[id]));
+  const from = days ? addDays(dayStart(now), 1 - days) : -Infinity;
+  const meals = db.servings.filter(s => s.servedAt >= from && ids.some(id => s.pets?.[id]));
   const rated = [...ratingsOf(db, meals)].filter(x => mine.has(x.pid));
   const sums = new Map();
   for (const x of rated) {
@@ -295,18 +299,30 @@ export function report(db, prefs) {
     .map(([id, sum]) => ({product: products.get(id), ...statOf(sum)}))
     .filter(x => x.n >= MIN_TOP)
     .sort((a, b) => b.score - a.score || b.n - a.n);
+  const good = rated.filter(x => RATINGS[x.r].score >= YES).length;
   return {
     pet,
+    days,
     n: rated.length,
     meals,
     count: {
       meals: meals.length,
       sorts: new Set(meals.map(s => s.productId).filter(id => products.has(id))).size,
       days: new Set(meals.map(s => dayKey(s.servedAt))).size,
+      span: spanDays(meals, now, days),
     },
+    liked: {rated: rated.length, good, pct: rated.length ? Math.round((good / rated.length) * 100) : 0},
     best: ranked[0] || null,
     worst: ranked.length > 1 ? ranked.at(-1) : null,
   };
+}
+
+/* How many days the span holds: the days asked for, or — for „Alles“ — from the first meal until today. */
+function spanDays(meals, now, days) {
+  if (days) return days;
+  if (!meals.length) return 0;
+  const first = meals.reduce((a, s) => Math.min(a, s.servedAt), Infinity);
+  return Math.round((dayStart(now) - dayStart(first)) / DAY) + 1;
 }
 
 /* Groups for „Einkaufen“ and the shopping list: „Gemischt“ counts towards buying again, the manual setting decides

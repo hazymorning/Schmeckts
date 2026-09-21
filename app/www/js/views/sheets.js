@@ -19,7 +19,7 @@ import {
   reportModel,
   sortOf,
 } from '../derive.js';
-import {feedSlots, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {feedSlots, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
@@ -305,29 +305,54 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* The evaluation: the facts at a glance, then the whole history. The same building blocks as the settings, nothing
-   to set. The facts card carries its text description in aria-label, and no statement rests on colour alone.
-   sheet.at: the id of the day it opens at */
+/* The evaluation. One thing stands out, a ring saying how much of what was served went down well; around it
+   only quiet numbers. The span at the top decides what the ring, the numbers and the list show, and it lasts
+   while the app runs — nothing about it is stored.
+   sheet.at: the id of the day it opens at, coming from the calendar on the home page */
 export const reportState = at => ({kind: 'report', at});
 
-/* Three numbers, and below them what goes down best and worst. Stays under 240px: the numbers in one row, at most
-   two lines under them. */
-const FACTS = [
-  ['meals', 'Mahlzeiten'],
-  ['sorts', 'Sorten'],
-  ['days', 'Tage gefüttert'],
+const SPANS = [
+  ['7', '7 Tage'],
+  ['30', '30 Tage'],
+  ['0', 'Alles'],
 ];
+export const reportView = {days: 30}; // „30 Tage“ to begin with
+
+/* The ring: how many of the ratings in the span were good ones (from 70 points, as everywhere else). 104px
+   across, the arc a dashed circle whose gap shrinks to the share. Under MIN_RATED ratings it shows the bare
+   track and says so instead of a number. */
+const RING = 104,
+  RING_STROKE = 10;
+const RING_R = (RING - RING_STROKE) / 2;
+const RING_LEN = 2 * Math.PI * RING_R;
+function ring(m) {
+  const enough = m.liked.rated >= MIN_RATED;
+  const pct = m.liked.pct;
+  const label = enough
+    ? `${pct} Prozent der bewerteten Mahlzeiten kamen gut an.`
+    : `Noch zu wenig bewertet: ${m.liked.rated} von ${MIN_RATED} Bewertungen.`;
+  const arc = enough
+    ? `<circle class="ring-fill ${scoreCls(pct)}" cx="${RING / 2}" cy="${RING / 2}" r="${RING_R}"
+        style="--len:${RING_LEN.toFixed(1)};--part:${((RING_LEN * pct) / 100).toFixed(1)}"/>`
+    : '';
+  return `<div class="ring" role="img" aria-label="${esc(label)}">
+    <svg viewBox="0 0 ${RING} ${RING}" aria-hidden="true">
+      <circle class="ring-track" cx="${RING / 2}" cy="${RING / 2}" r="${RING_R}"/>${arc}</svg>
+    <span class="ring-mid"><b class="pct">${enough ? `${pct}<small>%</small>` : '–'}</b>
+      <span>${enough ? 'kam gut an' : 'Noch zu wenig bewertet'}</span></span></div>`;
+}
+
+/* Beside the ring: meals, varieties and the days fed on, each with a small quiet icon */
+const figRow = (ic, text) => `<li>${icon(ic)}<span>${text}</span></li>`;
+const figures = m =>
+  `<ul class="figs">${figRow('bowl', `<b>${m.count.meals}</b> ${m.count.meals === 1 ? 'Mahlzeit' : 'Mahlzeiten'}`)}
+    ${figRow('layers', `<b>${m.count.sorts}</b> ${m.count.sorts === 1 ? 'Sorte' : 'Sorten'}`)}
+    ${figRow('calendar', `an <b>${m.count.days}</b> von ${m.count.span} ${m.count.span === 1 ? 'Tag' : 'Tagen'}`)}</ul>`;
+
 const rankRow = (x, r, text) =>
   `<div class="rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="pct">${x.pct} %</b></div>`;
-function factsCard(m) {
-  const label =
-    FACTS.map(([k, l]) => `${m.count[k]} ${l}`).join(', ') +
-    '.' +
-    (m.best ? ` Am besten kommt ${pname(m.best.product)} an, ${m.best.pct} Prozent.` : '') +
-    (m.worst ? ` Am wenigsten ${pname(m.worst.product)}, ${m.worst.pct} Prozent.` : '');
-  return `<div class="facts" role="img" aria-label="${esc(label)}">${FACTS.map(
-    ([k, l]) => `<div><b>${m.count[k]}</b><span>${l}</span></div>`,
-  ).join('')}</div>
+function glance(m) {
+  return `<div class="glance">${ring(m)}${figures(m)}</div>
     ${
       m.best
         ? `<div class="tops">${rankRow(m.best, 'top', 'kommt am besten an')}
@@ -337,16 +362,23 @@ function factsCard(m) {
 }
 
 function viewReport() {
-  const m = reportModel();
+  let m = reportModel(reportView.days);
   const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
   histDays = dayGroups(m.meals);
+  // A day tapped in the calendar that lies further back than the span: then the span is the whole history
+  if (sheet.at && !histDays.some(g => 'd-' + g.key === sheet.at)) {
+    reportView.days = 0;
+    m = reportModel(0);
+    histDays = dayGroups(m.meals);
+  }
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
   return `<div class="sh-head"><h2>Verlauf${who}</h2>${closeBtn}</div>
-    ${m.count.meals ? factsCard(m) : ''}
+    ${segmented('report-span', SPANS, String(reportView.days))}
+    ${glance(m)}
     ${
       histDays.length
-        ? `<h3 class="label">Jede Mahlzeit</h3><div id="histBox">${histHTML(m, 0, upto)}</div>`
-        : `<p class="empty">Noch nichts serviert.</p>`
+        ? `<div id="histBox">${histHTML(m, 0, upto)}</div>`
+        : `<p class="empty"><span>${reportView.days ? 'In diesem Zeitraum gab es nichts.' : 'Noch nichts serviert.'}</span></p>`
     }`;
 }
 
@@ -361,14 +393,28 @@ const histHTML = (m, from, to) =>
 function growHistory() {
   const box = $('#histBox');
   if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
-  const m = reportModel();
+  const m = reportModel(reportView.days);
   while (
     box.children.length < histDays.length &&
     sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800
   )
     box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
+  watchDays();
 }
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
+
+/* The day line sticks to the top of the sheet while its meals scroll past, and the fine line under it appears
+   only while it does. CSS cannot ask whether something is stuck, so this does: a line that no longer sits fully
+   inside the sheet has arrived at the top. Watched again whenever the history grows. */
+let stuck = null;
+function watchDays() {
+  stuck ||= new IntersectionObserver(
+    entries => entries.forEach(e => e.target.classList.toggle('stuck', e.intersectionRatio < 1)),
+    {root: sheetBody, rootMargin: '-1px 0px 0px 0px', threshold: [1]},
+  );
+  stuck.disconnect();
+  for (const line of sheetBody.querySelectorAll('.tl-date')) stuck.observe(line);
+}
 
 /* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
    mountCrop() hangs the image in after drawing. */
@@ -580,7 +626,10 @@ setSheetView(state => {
   }
   if (state.kind === 'settings') paintServerBox(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
-  if (state.kind === 'report') requestAnimationFrame(growHistory);
+  if (state.kind === 'report') {
+    watchDays();
+    requestAnimationFrame(growHistory);
+  }
   if (state.at) {
     const at = state.at;
     state.at = null;

@@ -11,7 +11,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
 import {expandCard, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
+import {paintServerBox, renderServeHits, renderSuggestions, reportState, reportView} from './views/sheets.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
@@ -134,6 +134,12 @@ const ACTIONS = {
   }, // from the overview
   'open-settings'() {
     openSheet({kind: 'settings'});
+  },
+  // The span of the evaluation: „7 Tage“, „30 Tage“ or „Alles“, kept while the app runs and never stored
+  'report-span'(el) {
+    reportView.days = +el.dataset.v;
+    haptic('select');
+    renderSheet();
   },
   'open-report'(el) {
     openSheet(reportState(el.dataset.v || null));

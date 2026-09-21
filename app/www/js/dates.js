@@ -6,7 +6,7 @@ export const timeStr = t => {
   const d = new Date(t);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-const dayStart = t => {
+export const dayStart = t => {
   const d = new Date(t);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
