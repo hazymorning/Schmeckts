@@ -3,7 +3,9 @@ Android 7 (API 24/25, mipmap-*/ic_launcher.png and ic_launcher_round.png). That 
 background. From Android 8 on the adaptive icon from app/native/res (vectors) applies. Needs Python with
 Playwright/Chromium.
 Usage: python3 design/render-icons.py"""
-import asyncio, pathlib, re
+import asyncio
+import pathlib
+import re
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent

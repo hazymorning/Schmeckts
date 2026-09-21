@@ -2,7 +2,10 @@
 """Performance after a rating (saving, then the evaluation and the redraw of the home page) and when opening the
 evaluation page, with made-up data spanning 2 and 5 years (2 pets, 2 meals a day, 150 varieties), the CPU throttled
 4x. Usage: python3 tests/perf_test.py"""
-import datetime, json, random, statistics
+import datetime
+import json
+import random
+import statistics
 from common import check, phone, run_tests, started
 
 LIMIT_MS = 40

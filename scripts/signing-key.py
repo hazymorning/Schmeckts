@@ -4,7 +4,10 @@
   scripts/signing-key.py create <keystore.jks> <passwordfile>       > schmeckts-signing-key.txt
   scripts/signing-key.py read <schmeckts-signing-key.txt> <out.jks>   writes the keystore, prints the password
 """
-import base64, re, sys, textwrap
+import base64
+import re
+import sys
+import textwrap
 
 BEGIN, END = '-----BEGIN KEYSTORE (PKCS12, BASE64)-----', '-----END KEYSTORE-----'
 

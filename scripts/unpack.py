@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Unpacks schmeckts-sources.txt and schmeckts-server-sources.txt back into files, both into the same folder.
 Usage: python3 scripts/unpack.py <schmeckts-sources.txt> <schmeckts-server-sources.txt> <target folder>"""
-import pathlib, re, sys
+import pathlib
+import re
+import sys
 
 HEAD = re.compile(r'\n===== FILE: (.+) \((\d+) characters\) =====\n')
 

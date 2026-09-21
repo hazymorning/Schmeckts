@@ -8,7 +8,20 @@ protocol version, recognition including the automatic retry, and scanning: looku
 via a photo, a known code without a connection, codes from two phones, removal, a server without barcode lookup.
 In the end they must all be level.
 Usage: python3 tests/sync_test.py   (needs Go, builds the server itself)"""
-import asyncio, base64, http.server, json, os, pathlib, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
+import asyncio
+import base64
+import http.server
+import json
+import os
+import pathlib
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import urllib.request
 from playwright.async_api import async_playwright
 from common import PACK, ROOT, SAVED, check, failures, idle, make_photo, open_page, real_errors, seeded, serve, started, state, until
 
@@ -229,7 +242,8 @@ async def main():
 
     async with async_playwright() as p:
         browser = await p.chromium.launch()
-        new_phone = lambda: browser.new_context(viewport={'width': 400, 'height': 860})
+        def new_phone():
+            return browser.new_context(viewport={'width': 400, 'height': 860})
         try:
             # Phone A is already in use (data without clocks) and connects
             print('connecting')
@@ -277,7 +291,8 @@ async def main():
               pets: {lxpet00001: {r: null, at: null}, tigerpet0001: {r: null, at: null}}, note: ''}); save();""")
             await expect(await until(b, "db.servings.some(s => s.id === 'zweipets0001')", 6), 'a meal for two pets arrives')
             # The rating reminder on phone A (plugin simulated): it is only cancelled once the other phone has rated too
-            reminders = lambda: a.evaluate("window.Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications.map(n => n.extra.serving).sort())")
+            def reminders():
+                return a.evaluate("window.Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications.map(n => n.extra.serving).sort())")
 
             async def planned(want, timeout=5.0):
                 end = time.monotonic() + timeout
@@ -418,7 +433,8 @@ async def main():
             gone = f"(p => !p.codes['{C1}'] && p.codes['{C2}'] && p.codes['{HIT}'])(db.products.find(p => p.id === '{pid}'))"
             await expect(await until(b, gone, 6) and 'codes.' + C1 not in srv.records()['products'][pid], 'code removed: gone everywhere, the others are kept')
             # The manual „Kaufen“ setting syncs like any other field, including back to „Automatisch“
-            kauf = lambda v: "(p => p && %s)(db.products.find(p => p.id === '%s'))" % ("!('kaufen' in p)" if v is None else f"p.kaufen === '{v}'", pid)
+            def kauf(v):
+                return "(p => p && %s)(db.products.find(p => p.id === '%s'))" % ("!('kaufen' in p)" if v is None else f"p.kaufen === '{v}'", pid)
             await a.click('#sheet [data-action=buy][data-v=immer]')
             await expect(await until(b, kauf('immer'), 6) and srv.records()['products'][pid].get('kaufen') == 'immer', '„Immer kaufen“ from A arrives at B and on the server')
             await b.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))"); await idle(b)
@@ -429,7 +445,8 @@ async def main():
             await a.click('#sheet [data-action=buy][data-v=auto]')
             await expect(await until(b, kauf(None), 6) and srv.records()['products'][pid].get('kaufen') is None, 'back to „Automatisch“: the field is gone everywhere')
             # Consistency: choosing and clearing arrive everywhere; a value from the server beats the keywords
-            tex = lambda v, name: "(p => !!p && %s)(db.products.find(p => %s))" % ("!('texture' in p)" if v is None else f"p.texture === '{v}'", name)
+            def tex(v, name):
+                return "(p => !!p && %s)(db.products.find(p => %s))" % ("!('texture' in p)" if v is None else f"p.texture === '{v}'", name)
             await a.click('#sheet [data-action=set-texture][data-v=mousse]')
             await expect(await until(b, tex('mousse', f"p.id === '{pid}'"), 6) and srv.records()['products'][pid].get('texture') == 'mousse', 'the consistency from A arrives at B and on the server')
             await a.click('#sheet [data-action=set-texture][data-v=mousse]')

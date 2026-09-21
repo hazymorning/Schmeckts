@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Design rules from PROJECT.md: palette and contrasts, typefaces, logo, animation, every view in light and dark.
 Usage: python3 tests/design_test.py [name …]"""
-import contextlib, io, json, pathlib, re, sys, tempfile
+import contextlib
+import io
+import json
+import pathlib
+import re
+import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from common import RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
 
@@ -202,7 +208,9 @@ def test_rules_static():
     for f, text in css.items():
         for m in re.finditer(r'@keyframes\s+([\w-]+)\s*\{', text):
             depth, i = 1, m.end()
-            while depth: depth += {'{': 1, '}': -1}.get(text[i], 0); i += 1
+            while depth:
+                depth += {'{': 1, '}': -1}.get(text[i], 0)
+                i += 1
             frames[m.group(1)] = text[m.end():i - 1]
     loud = [f'{n}: {p}' for n, body in frames.items() for _, decls in css_rules(body) for p, _ in decls
             if re.match(r'background(?!-position)|box-shadow|outline|border(-[a-z]+)?-color|filter', p)]
@@ -367,7 +375,8 @@ async def test_polish(browser, url):
 def test_pack():
     """The sources in two files: unpacked together they make up the same working tree again"""
     sys.path.insert(0, str(ROOT / 'scripts'))
-    import pack, unpack
+    import pack
+    import unpack
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             pack.main(tmp)
@@ -375,7 +384,8 @@ def test_pack():
                 unpack.unpack(f'{tmp}/{name}', f'{tmp}/tree')
         names = {name: re.findall(r'^===== FILE: (.+) \(\d+ characters\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
                  for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt')}
-        server = lambda rel: rel.startswith('server/')
+        def server(rel):
+            return rel.startswith('server/')
         app, srv = names['schmeckts-sources.txt'], names['schmeckts-server-sources.txt']
         check(app[0] == 'PROJECT.md' and not any(map(server, app)) and all(map(server, srv))
               and {'server/main.go', 'server/packaging/debian/control', 'server/build-deb.sh', 'server/README.md'} <= set(srv)
