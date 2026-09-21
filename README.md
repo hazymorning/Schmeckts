@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://github.com/user-attachments/assets/f3f3026c-2e0e-408f-bb06-eb2754afd68f" width="292" alt="Download the APK"></a>
+  <a href="#install-the-app"><img src="https://img.shields.io/badge/Install%20the%20app-965E4B?style=for-the-badge&logo=android&logoColor=white&labelColor=2E2724" height="42" alt="Install the app"></a>
 </p>
 
 **Schmeckt’s?** is a feeding diary for pets. After every meal you record with a single tap how the bowl looked, from “finished at once” to “barely touched”. After a few days the app shows which varieties your animal really likes and which ones can stay on the shelf next time you shop.
@@ -31,7 +31,7 @@
 
 While feeding, just hold the packaging up to the camera. The app reads brand, variety and food type off the picture and creates the entry by itself — for cans without a barcode, for multipacks and for brands it has never seen. Adding a new variety takes exactly one photo.
 
-The phone reads the text on the packaging itself, offline and at no extra cost. Connected to a household you also get the more accurate recognition, which reliably makes sense of ornate packaging as well. What else that brings is described further down.
+The phone reads the text on the packaging itself, offline and at no extra cost. Connected to a household you also get the more accurate recognition, which reliably makes sense of ornate packaging as well.
 
 ## What the app does
 
@@ -53,7 +53,7 @@ The first time you start the app you decide how you want to use it. You can swit
 
 **This phone only.** Everything stays on the device and the app does not go online by itself. It still reads the text on the packaging and prefills “name this food” with it; after that it recognises the variety by its barcode. Anyone who feeds their animals on their own gets along fine with this.
 
-**Connected to a household.** Several people keep the same diary. Everyone sees what the others have entered, even when a phone had no connection for a while. On top of that comes the more accurate recognition: brand and variety from the photo, and unknown barcodes looked up automatically.
+**Connected to a household.** Several people keep the same diary. Everyone sees what the others have entered, even when a phone had no connection for a while. On top of that comes the more accurate recognition: brand and variety from the photo, and unknown barcodes looked up automatically. A household needs [its own small server](#the-household-server) on a computer at home.
 
 | | This phone only | In a household |
 |---|---|---|
@@ -63,19 +63,21 @@ The first time you start the app you decide how you want to use it. You can swit
 | Look up unknown barcodes | on request | yes |
 | Share entries with others | manually, as a file | automatically |
 
-The household feature is built into the app, but the matching server is not yet generally available.
+## Install the app
 
-## Installing
+Schmeckt’s? is not on the Play Store. You install it from the file that comes with every release here — two minutes, and the warnings Android shows along the way are normal for apps that do not come from the store.
 
-Schmeckt’s? is not on the Play Store. You download the app directly here.
+<p align="center">
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/badge/Download%20the%20APK-965E4B?style=for-the-badge&logo=android&logoColor=white&labelColor=2E2724" height="42" alt="Download the APK"></a>
+</p>
 
-1. On your phone, open the [latest release](https://github.com/hazymorning/Schmeckts/releases/latest) and download the APK file under “Assets”.
-2. Tap the downloaded file. The first time, Android asks whether your browser may install apps. Grant permission and go back.
-3. Tap “Install”.
+1. **Open the release page on your phone.** The button leads there. Below the release notes sits **Assets**; tap it if the list is folded up.
+2. **Tap the file** called `schmeckts-<version>.apk`. The browser warns that files of this kind can harm your device — choose “Download anyway”.
+3. **Open the downloaded file**, from the notification or from your Downloads folder.
+4. **Permit installing once.** Android asks whether your browser may install apps. Switch it on and go back.
+5. **Tap “Install”.** Android may want to check the app first; let it. Then “Open” starts Schmeckt’s?.
 
-Because the app does not come from the Play Store, Android may offer to scan it first. That is normal.
-
-You install new versions straight over the old one; your entries are kept. The app runs on Android 8.0 and up. The barcode scanner needs Google Play services, which are present on the vast majority of phones; everything else works without them.
+New versions go straight over the old one — same steps, your entries stay. The app runs on Android 8.0 and up. The barcode scanner needs Google Play services, which the vast majority of phones have; everything else works without them.
 
 ## Privacy
 
@@ -86,6 +88,12 @@ You install new versions straight over the old one; your entries are kept. The a
 - In a household the app only talks to your own server. From there the photo of the packaging goes on for recognition, and unknown barcodes are looked up in open product databases. Nothing else leaves the phone, in particular nothing about your animals.
 - An exchange file contains only animals, varieties and meals — no settings, no household code and no key.
 - The app needs the camera for photos. It only asks about notifications once you switch a reminder on.
+
+## The household server
+
+Only needed if several people are to keep the same diary. It is a small program for a computer that stays on at home — a mini-PC is plenty. It holds the shared data, passes packaging photos on for recognition and looks up barcodes; nothing of it runs on anyone else’s machine.
+
+The server is a project of its own and is moving to its own repository, **Schmeckts-Server**. Until then its code sits in [`server/`](server/) and the setup guide in [docs/INSTALLATION.md](docs/INSTALLATION.md). This repository is about the app.
 
 ## Questions
 
