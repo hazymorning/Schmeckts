@@ -142,7 +142,6 @@ const ACTIONS = {
   'crop-cancel'(){ closeCrop(false); },
   backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // the profile picture behind the header
   lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // product lookup on the internet, off by default
-  'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // which button the feeding sheet shows
   'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // reminder to feed at the usual times
   remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // rating reminder, asks for the permission
   'remind-own'(){ // „Eigene“: a field for whole hours, starting at the current interval, or 2 hours coming from „Aus“

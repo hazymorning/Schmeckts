@@ -1675,43 +1675,33 @@ SORTS = """([n, gap]) => import('./js/store.js').then(async s => { const d = s.d
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
-async def test_feed_start(browser, url):
-    print('„Füttern beginnt mit“: barcode, photo or both; both routes stay open')
+async def test_feed_routes(browser, url):
+    print('feeding: both buttons, and both routes also through the shortcuts')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('[data-action=demo]'); await idle(pg)
     await pg.click('[data-action=open-settings]'); await idle(pg)
-    seg = await pg.eval_on_selector_all('#sheet [data-action=feed-start]', 'l => l.map(b => [b.innerText, b.getAttribute("aria-pressed")])')
-    check(seg == [['Barcode & Foto', 'true'], ['Nur Foto', 'false'], ['Nur Barcode', 'false']],
-          f'a setting with three options, with „Barcode & Foto“ as the default ({seg})')
+    labels = await pg.eval_on_selector_all('#sheet .label', 'l => l.map(e => e.innerText)')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
-    for v, want in (('beides', ['scan', 'photo']), ('foto', ['photo']), ('barcode', ['scan'])):
-        await pg.click('[data-action=open-settings]'); await idle(pg)
-        await pg.click(f'#sheet [data-action=feed-start][data-v={v}]'); await idle(pg)
-        await pg.click('#sheet [data-action=close]'); await idle(pg)
-        await pg.click('#fab'); await idle(pg)
-        cta = await pg.eval_on_selector_all('#sheet .cta', 'l => l.map(b => [b.dataset.action, Math.round(b.getBoundingClientRect().width)])')
-        row = await pg.eval_on_selector('#sheet .cta-row', 'r => Math.round(r.getBoundingClientRect().width)')
-        check([c[0] for c in cta] == want and (len(want) > 1 or cta[0][1] == row),
-              f'„{v}“: only the chosen button, and a single one takes the full width ({cta}, row {row} px)')
-        await pg.click('#sheet [data-action=close]'); await idle(pg)
-    # With „Nur Barcode“ the photo stays reachable through the shortcut
+    await pg.click('#fab'); await idle(pg)
+    cta = await pg.eval_on_selector_all('#sheet .cta', 'l => l.map(b => [b.dataset.action, Math.round(b.getBoundingClientRect().width)])')
+    row = await pg.eval_on_selector('#sheet .cta-row', 'r => Math.round(r.getBoundingClientRect().width)')
+    check([c[0] for c in cta] == ['scan', 'photo'] and cta[0][1] == cta[1][1] and cta[0][1] < row
+          and 'Füttern beginnt mit' not in labels,
+          f'always both buttons, equally wide, and nothing to set in the settings ({cta}, row {row} px)')
+    await pg.click('#sheet [data-action=close]'); await idle(pg)
+    # Both routes also come in through the shortcuts
     await pg.evaluate(f"window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}")
     await pg.evaluate("window.__urlOpen({url: 'schmeckts://photo'})")
     await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
-    check(await state(pg, "db.servings[0].photo && db.servings[0].status === 'noserver'"),
-          'with „Nur Barcode“ schmeckts://photo still takes a photo')
-    await pg.click('#sheet [data-action=close]'); await idle(pg)
-    # With „Nur Foto“ scanning stays reachable through the shortcut, and the unknown code leads to the photo
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('#sheet [data-action=feed-start][data-v=foto]'); await idle(pg)
+    check(await state(pg, "db.servings[0].photo && db.servings[0].status === 'noserver'"), 'schmeckts://photo takes a photo')
     await pg.click('#sheet [data-action=close]'); await idle(pg)
     await pg.evaluate(f"window.__barcode = '{SHEBA}'")
     await pg.evaluate("window.__urlOpen({url: 'schmeckts://scan'})")
     await pg.wait_for_selector('#sheet #f-brand'); await idle(pg)
     check(['capture', {'hint': 'Vorderseite fotografieren'}] in await pg.evaluate('window.__calls')
           and await state(pg, f"db.servings[0].scanCode === '{SHEBA}'"),
-          'with „Nur Foto“ schmeckts://scan still scans, and the unknown code leads to the photo')
+          'schmeckts://scan scans, and the unknown code leads to the photo')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -1789,7 +1779,7 @@ async def test_report(browser, url):
     head = await pg.inner_text('#sheet .sh-head h2')
     check(heads == ['Marken', 'Verlauf'] and n == 18 and head == 'Auswertung für alle Tiere'
           and await pg.locator('#sheet .seg, #sheet .card-btn').count() == 0,
-          f'two sections, every meal at once, nothing to set ({heads}, {n} meals, {head})')
+          f'two sections, the history right there, nothing to set ({heads}, {n} meals, {head})')
     rows = await pg.eval_on_selector_all('#sheet .lv', "l => l.map(e => [e.querySelector('.lv-name').innerText, parseInt(e.querySelector('.lv-n').innerText)])")
     says = await pg.eval_on_selector_all('#sheet .why', 'l => l.map(p => p.innerText)')
     label = await pg.get_attribute('#sheet .bars', 'aria-label')
@@ -1821,12 +1811,15 @@ async def test_report(browser, url):
         await pg.click('[data-sec=hist] [data-action=open-report]'); await idle(pg)
         wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .lv-name, #sheet .lv-n, #sheet .lv-s, #sheet .why, #sheet h3.label')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
-        check(await pg.locator('#sheet .tl-item').count() == 26 and not wide, f'{scheme}, 360 px: all 26 meals at once, nothing clipped ({wide})')
+        first = await pg.locator('#sheet .tl-item').count()
+        await pg.eval_on_selector('.sheet-body', 'b => b.scrollTo(0, b.scrollHeight)'); await idle(pg)
+        check([first, await pg.locator('#sheet .tl-item').count()] == [20, 26] and not wide,
+              f'{scheme}, 360 px: twenty days to begin with, the rest follows on scrolling, nothing clipped ({first}, {wide})')
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
 
 
-run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-start': test_feed_start, 'suggestions': test_suggestions, 'milestones': test_milestones,
+run_tests({'tour': test_tour, 'flow': test_flow, 'buying': test_buying, 'cards': test_cards, 'history': test_home_history, 'report': test_report, 'week': test_week, 'overview': test_overview, 'scales': test_scales, 'texture': test_texture, 'feed-routes': test_feed_routes, 'suggestions': test_suggestions, 'milestones': test_milestones,
            'reminder': test_reminders, 'own-interval': test_remind, 'feed-reminder': test_feed_remind, 'pets': test_petbar, 'modes': test_modes, 'network': test_network, 'shortcuts': test_shortcuts,
            'scanning': test_scan, 'recognition': test_recognize, 'exchange': test_exchange, 'crop': test_crop, 'sheet': test_sheet, 'mood': test_mood, 'camera': test_camera, 'no-camera': test_no_camera},
           camera=('camera',))
