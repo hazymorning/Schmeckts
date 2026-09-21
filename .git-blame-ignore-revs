@@ -1,0 +1,6 @@
+# Commits that only reformatted code. git blame skips them with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub and GitLab read this file on their own.)
+
+# Format every JavaScript, CSS, Python and Go file with the new tools (Prettier, ruff format, gofmt)
+a4c675167ac70b11c7ffa8f32b8218493b7980ea
