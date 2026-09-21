@@ -19,6 +19,7 @@ export function tidy(d){
     const seen = new Set();
     out[c] = (Array.isArray(d?.[c]) ? d[c] : []).filter(r => r && typeof r === 'object' && r.id && !seen.has(r.id) && seen.add(r.id));
   }
+  for (const p of out.pets) delete p.photos; // the album is gone; whatever a household still holds stays untouched there
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
   for (const s of out.servings) {
     if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed';  // recognition was interrupted

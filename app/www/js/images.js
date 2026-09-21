@@ -1,6 +1,4 @@
 /* Reading, shrinking and cropping photos. Large photos for recognition stay in memory only. */
-import {MAX_FIELD} from './fields.js';
-
 export const memPhotos = new Map(); // large photos in memory only, for recognition
 
 /* Images */
@@ -25,12 +23,4 @@ export function cropSquare(img, size, q, rect){
   c.width = c.height = size;
   c.getContext('2d').drawImage(img, x, y, side, side, 0, 0, size, size);
   return c.toDataURL('image/jpeg', q);
-}
-export const urlToImage = url => new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = url; });
-/* A pet's album photo: JPEG, longest side 960 px, quality 0.72. If it will not fit a sync field that way (very
-   detailed photos), the quality drops until it does. */
-export function albumPhoto(img){
-  let out = '';
-  for (const q of [.72, .6, .45, .3]) { out = resize(img, 960, q); if (out.length < MAX_FIELD - 100) break; }
-  return out;
 }

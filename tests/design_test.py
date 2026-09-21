@@ -289,9 +289,7 @@ async def test_rules(browser, url):
         await pg.click('[data-action=close]'); await idle(pg)
         await pg.click('[data-action=open-settings]'); await idle(pg)
         await pg.click('#sheet [data-action=edit-pet]'); await idle(pg)
-        await pg.set_input_files('#albumInput', pictures[1:3])
-        await pg.click('#sheet .ph-img >> nth=1'); await idle(pg)
-        await scan()  # pet sheet with the album and a chosen photo
+        await scan()  # the pet sheet
         await pg.set_input_files('#petPhotoInput', pictures[1])
         await pg.wait_for_selector('#sheet .crop img'); await idle(pg)
         await scan()

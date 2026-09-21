@@ -1,11 +1,11 @@
 /* Contents of the bottom sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
-   the profile picture and the album), settings and evaluation. */
+   the profile picture), settings and evaluation. */
 import {$} from '../dom.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
 import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
-import {ALBUM_MAX, FEED_START, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {FEED_START, RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {getPet, getProduct, getServing, petNames, pname, productsByCode, quickProducts, reportModel, sortOf} from '../derive.js';
@@ -252,16 +252,6 @@ const viewCrop = () => `<div class="sh-head"><h2>Foto zuschneiden</h2>${closeBtn
     <input id="f-zoom" class="zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1">
     <div class="btn-row"><button class="btn soft" data-action="crop-cancel">Abbrechen</button><button class="btn primary" data-action="crop-apply">${icon('check')}Übernehmen</button></div>`;
 
-/* Album in the pet sheet: up to ALBUM_MAX photos, a cross to remove one, and a tap picks a photo for „Als Profilbild“ */
-function albumHTML(p){
-  const keys = Object.keys(p.photos || {}).sort(), sel = keys.includes(sheet.albumSel) ? sheet.albumSel : null;
-  return `<span class="label">Fotos${keys.length ? ` (${keys.length} von ${ALBUM_MAX})` : ''}</span>
-    <div class="album">${keys.map((k, i) => `<div class="ph"><button class="ph-img" data-action="album-select" data-key="${k}" aria-pressed="${sel === k}" aria-label="Foto ${i + 1} auswählen"><img src="${esc(p.photos[k])}" alt=""></button>
-      <button class="ph-x" data-action="album-remove" data-key="${k}" aria-label="Foto ${i + 1} entfernen"><span>${icon('close')}</span></button></div>`).join('')}
-      ${keys.length < ALBUM_MAX ? `<label class="ph add" for="albumInput" aria-label="Fotos hinzufügen">${icon('plus')}</label>` : ''}</div>
-    ${sel ? `<button class="btn soft mt-s" data-action="album-profile">${icon('crop')}Als Profilbild</button>` : ''}`;
-}
-
 function viewPet(){
   if (sheet.step === 'crop') return viewCrop();
   const s = sheet, editing = !!s.id;
@@ -274,7 +264,6 @@ function viewPet(){
     <input id="f-name" class="field" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done">
     <span class="label">Tierart</span>
     <div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>
-    ${editing ? albumHTML(getPet(s.id)) : ''}
     <div class="mt btn-col"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button>
     ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
 }
@@ -287,7 +276,7 @@ function viewSettings(){
     <button class="list-row" data-action="open-report"><span class="t-main"><b>Auswertung</b></span>${icon('chevron', 'chev')}</button>
     <span class="label">Darstellung</span>
     <div class="seg">${[['system', 'auto', 'System'], ['light', 'sun', 'Hell'], ['dark', 'moon', 'Dunkel']].map(([v, ic, l]) => `<button aria-pressed="${st.theme === v}" data-action="theme" data-v="${v}">${icon(ic)}${l}</button>`).join('')}</div>
-    <span class="label">Tierfotos im Hintergrund</span>
+    <span class="label">Profilbild im Hintergrund</span>
     <div class="seg">${[['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button aria-pressed="${st.backdrop === (v === 'on')}" data-action="backdrop" data-v="${v}">${l}</button>`).join('')}</div>
     <span class="label">Füttern beginnt mit</span>
     <div class="seg">${FEED_START.map(([v, l]) => `<button aria-pressed="${st.feedStart === v}" data-action="feed-start" data-v="${v}">${l}</button>`).join('')}</div>
