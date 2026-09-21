@@ -29,7 +29,7 @@ Beim Füttern hältst du den Barcode vor die Kamera. Kennt die App die Sorte sch
 
 Ist die Sorte neu oder hat die Packung keinen Barcode, fotografierst du sie. Die App liest den Text vom Bild und schlägt Marke und Sorte vor, du bestätigst nur noch.
 
-Später, wenn du siehst, was übrig geblieben ist, tippst du eine von vier Stufen an. Mehr machst du nicht.
+Später, wenn du siehst, was übrig geblieben ist, tippst du eine Bewertung an.
 
 ## Was drin steckt
 
@@ -47,7 +47,7 @@ Hell oder dunkel richtet sich danach, wie dein Handy eingestellt ist.
 
 ## Installieren
 
-Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dauert eine Minute, und die Erlaubnis dazu gibst du nur einmal.
+Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dauert eine Minute, und dein Smartphone wird dich nach deiner Erlaubnis fragen.
 
 <!-- Dieser Button lädt die APK des neuesten Releases direkt herunter.
      Er funktioniert nur, wenn jedes Release die APK genau unter diesem Namen enthält: schmeckts.apk -->
@@ -101,23 +101,23 @@ Android 8.0 oder neuer. Der Barcode-Scanner braucht die Google-Play-Dienste, die
 
 ## Wenn mehrere füttern
 
-Seid ihr zu zweit oder zu dritt, wollt ihr dasselbe Tagebuch führen. Dafür gibt es zwei Wege.
+Seid ihr zu zweit oder zu dritt, wollt ihr vielleicht dasselbe Tagebuch führen. Dafür gibt es zwei Wege.
 
 Ohne alles Weitere: „Änderungen teilen“ packt deine neuen Einträge in eine Datei, das andere Handy liest sie ein. Das geht per Messenger oder Kabel und kommt ohne Konto aus. Die Datei enthält nur Tiere, Sorten und Mahlzeiten.
 
-Bequemer wird es mit einem kleinen Server auf einem Rechner, der zu Hause läuft, etwa einem Mini-PC. Dann gleichen sich die Handys von selbst ab, sobald sie im WLAN sind. Außerdem erkennt die App dann Marke und Sorte direkt vom Foto, statt nur den Text zu lesen, und schlägt unbekannte Barcodes automatisch nach. Die Daten bleiben dabei auf eurem eigenen Rechner.
+Bequemer wird es mit einem kleinen Server auf einem Rechner, der zu Hause läuft, etwa einem Mini-PC. Dann gleichen sich die Handys von selbst ab, sobald sie im WLAN sind. Außerdem erkennt die App dann optional auch Marke und Sorte direkt vom Foto, statt nur den Text zu lesen, und schlägt unbekannte Barcodes automatisch nach. Die Daten bleiben dabei auf eurem eigenen Rechner.
 
-Den Server richtest du selbst ein, er gehört nicht zur App. [Code und Anleitung liegen hier](server/).
+Der Server muss selbst eingerichtet werden und gehört nicht zur App. [Code und Anleitung liegen hier](server/).
 
 ## Fragen
 
-Fragen und Ideen gehören in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht
+Für Fragen und Ideen bitte die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions) nutzen. Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht
 
 ## Datenschutz
 
-Was du einträgst, liegt auf deinem Handy. Es landet weder in der Galerie noch in Googles Cloud-Sicherung, und die App schickt von sich aus nichts ins Netz. Den Text auf der Packung liest sie selbst, ohne Verbindung. Werbung und Tracking gibt es nicht.
+Was du einträgst, liegt auf deinem Handy. Es landet in keiner Cloud-Sicherung, und die App schickt auch von sich aus nichts ins Netz. Den Text auf der Packung liest sie selbst, ohne Verbindung. Werbung und Tracking gibt es nicht.
 
-Zwei Ausnahmen, beide klein: Der Barcode-Scanner stammt von Google und meldet laut Google Gerätedaten wie das Modell, aber keine Bilder. Und wenn du es einschaltest, fragt die App bei unbekannten Barcodes zwei freie Produktdatenbanken; übertragen wird dabei nur die Nummer.
+Zwei kleine Ausnahmen: Der Barcode-Scanner stammt von Google und meldet laut Google Gerätedaten wie das Modell, aber keine Bilder. Und wenn du es einschaltest, fragt die App bei unbekannten Barcodes zwei freie Produktdatenbanken; übertragen wird dabei nur die Nummer.
 
 Die Kamera braucht die App für Fotos. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
 
