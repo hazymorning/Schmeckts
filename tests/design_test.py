@@ -372,6 +372,32 @@ def test_pack():
         check(f"version {(ROOT / 'server/VERSION').read_text().strip()}," in first, f'the server file names the server\u2019s version, which does not change with the app ({first})')
 
 
+def test_signing_key():
+    """scripts/signing-key.py: a round trip keeps the keystore and the password, and older files still read.
+
+    The signing key lives in a GitHub secret as a text file. Files written before the move to English say
+    "Passwort:", so read() has to accept both spellings — otherwise a release build cannot sign."""
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    import importlib
+    key = importlib.import_module('signing-key') if 'signing-key' not in sys.modules else sys.modules['signing-key']
+    with tempfile.TemporaryDirectory() as tmp:
+        jks, pwfile = pathlib.Path(tmp, 'key.jks'), pathlib.Path(tmp, 'pw.txt')
+        jks.write_bytes(bytes(range(256)) * 4)
+        pwfile.write_text('geheim-123\n', encoding='utf-8')
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            key.create(str(jks), str(pwfile))
+        text = out.getvalue()
+        for name, body in (('English', text), ('German', text.replace('Password:', 'Passwort:'))):
+            src, back = pathlib.Path(tmp, f'{name}.txt'), pathlib.Path(tmp, f'{name}.jks')
+            src.write_text(body, encoding='utf-8')
+            got = io.StringIO()
+            with contextlib.redirect_stdout(got):
+                key.read(str(src), str(back))
+            check(got.getvalue().strip() == 'geheim-123' and back.read_bytes() == jks.read_bytes(),
+                  f'signing key, {name} wording: keystore and password come back unchanged')
+
+
 def test_prompt():
     """The photo recognition prompt lives only in shared/recognize-prompt.txt: app and server use the same text."""
     shared = (ROOT / 'shared/recognize-prompt.txt').read_text(encoding='utf-8').strip()
@@ -394,6 +420,7 @@ async def test_files(browser, url):
     test_rules_static()
     test_pack()
     test_prompt()
+    test_signing_key()
 
 
 run_tests({'files': test_files, 'palette': test_palette, 'logo': test_logo, 'views': test_rules, 'polish': test_polish}, camera=('views',))
