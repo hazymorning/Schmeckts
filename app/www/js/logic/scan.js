@@ -14,59 +14,77 @@ const FRONT = 'Vorderseite fotografieren';
 let running = false;
 
 /* Starts in the open feeding sheet: the „Scannen“ button, a shortcut or schmeckts://scan */
-export async function scan(){
+export async function scan() {
   const feed = sheet;
   if (running || feed?.kind !== 'feed') return;
   running = true;
-  Object.assign(feed, {step:null, code:''});
-  try { await run(feed); }
-  finally { running = false; note(feed, ''); }
+  Object.assign(feed, {step: null, code: ''});
+  try {
+    await run(feed);
+  } finally {
+    running = false;
+    note(feed, '');
+  }
 }
 
 const open = feed => sheet === feed; // still the same feeding sheet? Otherwise it has been closed meanwhile
-function note(feed, text){ // a short notice with a spinner in the feeding sheet
+function note(feed, text) {
+  // a short notice with a spinner in the feeding sheet
   if ((feed.busy || '') === text) return;
   feed.busy = text;
   if (open(feed)) renderSheet();
 }
 
-async function run(feed){
+async function run(feed) {
   let raw;
-  try { raw = await scanBarcode(() => note(feed, 'Der Scanner wird eingerichtet …')); }
-  catch (e) {
+  try {
+    raw = await scanBarcode(() => note(feed, 'Der Scanner wird eingerichtet …'));
+  } catch (e) {
     console.warn('Scanner:', e?.message || e);
     return offerPhoto(feed, 'Scannen klappt auf diesem Handy gerade nicht. Mach stattdessen ein Foto.');
   }
   note(feed, '');
   if (!raw || !open(feed)) return; // cancelled: the feeding sheet stays
   const code = normBarcode(raw);
-  if (!code) { haptic('strong'); toast('Das ist kein gültiger Barcode.'); return; }
-  const found = await identify({code, note:text => note(feed, text)});
+  if (!code) {
+    haptic('strong');
+    toast('Das ist kein gültiger Barcode.');
+    return;
+  }
+  const found = await identify({code, note: text => note(feed, text)});
   if (!open(feed)) return;
   const known = found.products || [];
   if (known.length === 1) return serve(known[0], code);
-  if (known.length > 1) { haptic('select'); Object.assign(feed, {step:'pick', code}); renderSheet(); return; }
+  if (known.length > 1) {
+    haptic('select');
+    Object.assign(feed, {step: 'pick', code});
+    renderSheet();
+    return;
+  }
   if (found.details) {
-    const hit = found.details, p = findProduct(hit.brand, hit.variety);
+    const hit = found.details,
+      p = findProduct(hit.brand, hit.variety);
     if (p) applyTexture(p, hit);
     return serve(p || newProduct(hit), code);
   }
   await photo(feed, code);
 }
 
-async function serve(p, code){
+async function serve(p, code) {
   await closeSheet();
   serveProduct(p.id, code);
 }
 
 /* Camera for the front. After „Abbrechen“ the feeding sheet stays and the photo button then takes over the code. */
-async function photo(feed, code){
+async function photo(feed, code) {
   feed.code = code;
   await shootPhoto(FRONT, code);
 }
 
-function offerPhoto(feed, msg){ // scanning did not work
+function offerPhoto(feed, msg) {
+  // scanning did not work
   if (!open(feed)) return;
   haptic('strong');
-  renderSheet(); toast(msg);
+  renderSheet();
+  toast(msg);
 }

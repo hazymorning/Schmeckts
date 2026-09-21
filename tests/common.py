@@ -1,5 +1,6 @@
 """Shared helpers for the tests in Chromium (Playwright): checking, serving the app, opening phones, waiting for
 states, simulated Android plugins with a file system that survives a reload."""
+
 import asyncio
 import functools
 import http.server
@@ -96,12 +97,32 @@ RGB = """(c => { const cv = document.createElement('canvas'); cv.width = cv.heig
   x.fillStyle = c; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; })"""
 
 # A phone already in use: one pet, one variety, three rated meals
-SAVED = {'version': 3,
-          'pets': [{'id': 'lxpet00001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1750000000000}],
-          'products': [{'id': 'lxprod0001', 'brand': 'Sheba', 'variety': 'Lachs', 'type': 'Nassfutter', 'animal': 'Katze',
-                        'thumb': None, 'lastPets': ['lxpet00001'], 'createdAt': 1750000000000}],
-          'servings': [{'id': f'lxserv000{i}', 'productId': 'lxprod0001', 'servedAt': 1750000000000 + i * 864e5,
-                        'pets': {'lxpet00001': {'r': 'gut', 'at': 1750000000000 + i * 864e5 + 3600e3}}, 'note': ''} for i in range(3)]}
+SAVED = {
+    'version': 3,
+    'pets': [{'id': 'lxpet00001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1750000000000}],
+    'products': [
+        {
+            'id': 'lxprod0001',
+            'brand': 'Sheba',
+            'variety': 'Lachs',
+            'type': 'Nassfutter',
+            'animal': 'Katze',
+            'thumb': None,
+            'lastPets': ['lxpet00001'],
+            'createdAt': 1750000000000,
+        }
+    ],
+    'servings': [
+        {
+            'id': f'lxserv000{i}',
+            'productId': 'lxprod0001',
+            'servedAt': 1750000000000 + i * 864e5,
+            'pets': {'lxpet00001': {'r': 'gut', 'at': 1750000000000 + i * 864e5 + 3600e3}},
+            'note': '',
+        }
+        for i in range(3)
+    ],
+}
 
 
 def check(cond, text):
@@ -113,9 +134,11 @@ def check(cond, text):
 
 def serve():
     """Serves app/www and returns the address of index.html."""
+
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *args):
             pass
+
     handler = functools.partial(Quiet, directory=str(WWW))
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -124,8 +147,7 @@ def serve():
 
 def real_errors(errors):
     """Console errors without the expected network messages (server deliberately off, wrong code)."""
-    return [e for e in errors if 'Failed to load resource' not in e and 'net::ERR_' not in e
-            and 'EventSource' not in e]
+    return [e for e in errors if 'Failed to load resource' not in e and 'net::ERR_' not in e and 'EventSource' not in e]
 
 
 # The tests reach the app's modules through import() inside evaluate. Chromium's inspector holds the promise that
@@ -150,6 +172,7 @@ def keep_promises(pg):
         if 'error' in out:
             raise RuntimeError(out['error'])
         return out.get('value')
+
     pg.evaluate = evaluate
 
 
@@ -184,7 +207,7 @@ async def until(pg, expr, timeout=10.0):
     while loop.time() < end:
         if await state(pg, expr):
             return True
-        await asyncio.sleep(.1)
+        await asyncio.sleep(0.1)
     return False
 
 
@@ -196,12 +219,16 @@ async def shot(pg, name):
 
 async def phone(browser, scheme='light', touch=False, motion=False, **kw):
     """One phone as a browser context. Without motion the app runs under reduced motion, so no flow waits on animations."""
-    return await browser.new_context(viewport={'width': 400, 'height': 860}, color_scheme=scheme, has_touch=touch,
-                                     **{'reduced_motion': 'no-preference' if motion else 'reduce', **kw})
+    return await browser.new_context(
+        viewport={'width': 400, 'height': 860},
+        color_scheme=scheme,
+        has_touch=touch,
+        **{'reduced_motion': 'no-preference' if motion else 'reduce', **kw},
+    )
 
 
 def rgb_of(hexv):
-    return tuple(int(hexv[i:i + 2], 16) for i in (1, 3, 5))
+    return tuple(int(hexv[i : i + 2], 16) for i in (1, 3, 5))
 
 
 def near(rgb, hexv, tol=2):
@@ -213,15 +240,19 @@ def near(rgb, hexv, tol=2):
 def contrast(a, b):
     def lum(c):
         r, g, b_ = [int(x) / 255 for x in re.findall(r'\d+', c)[:3]] if isinstance(c, str) else [v / 255 for v in c]
+
         def lin(v):
-            return v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4
-        return .2126 * lin(r) + .7152 * lin(g) + .0722 * lin(b_)
+            return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b_)
+
     la, lb = lum(a), lum(b)
-    return (max(la, lb) + .05) / (min(la, lb) + .05)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
 
 def make_photo():
     from PIL import Image, ImageDraw  # a plain "packaging" as the test photo
+
     PACK.parent.mkdir(parents=True, exist_ok=True)
     im = Image.new('RGB', (480, 360), (214, 120, 60))
     ImageDraw.Draw(im).rectangle((60, 90, 420, 270), fill=(250, 240, 225))
@@ -231,6 +262,7 @@ def make_photo():
 def make_pictures():
     """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus two plain ones"""
     from PIL import Image
+
     out = PACK.parent
     quad = Image.new('RGB', (800, 400))
     for (x, y), color in {(0, 0): (220, 30, 30), (400, 0): (30, 160, 60), (0, 200): (30, 60, 220), (400, 200): (230, 210, 40)}.items():
@@ -259,7 +291,9 @@ async def seeded(browser, url, files, scheme='light', native=False):
 
 
 async def set_theme(pg, theme):
-    await pg.evaluate(f"import('./js/store.js').then(m => {{ m.prefs.theme = '{theme}'; return import('./js/ui/theme.js'); }}).then(t => t.applyTheme())")
+    await pg.evaluate(
+        f"import('./js/store.js').then(m => {{ m.prefs.theme = '{theme}'; return import('./js/ui/theme.js'); }}).then(t => t.applyTheme())"
+    )
     await idle(pg)
 
 
@@ -273,7 +307,7 @@ async def idle(pg, timeout=3.0):
     end, calm = asyncio.get_running_loop().time() + timeout, 0
     while calm < 2 and asyncio.get_running_loop().time() < end:
         calm = calm + 1 if await pg.evaluate(SETTLED) else 0
-        await asyncio.sleep(.02)
+        await asyncio.sleep(0.02)
 
 
 async def debounced(pg):
@@ -291,6 +325,7 @@ async def started(pg):
 def run_tests(tests, camera=()):
     """Runs the tests, or only those named on the command line. camera: names of the tests that need a Chromium
     with a simulated camera device."""
+
     async def main():
         only = [a for a in sys.argv[1:] if not a.startswith('--')]
         make_photo()
@@ -311,4 +346,5 @@ def run_tests(tests, camera=()):
                 await browser.close()
         print(f'\n{"All tests passed" if not failures else f"{len(failures)} tests failed"}')
         sys.exit(1 if failures else 0)
+
     asyncio.run(main())

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Design rules from PROJECT.md: palette and contrasts, typefaces, logo, animation, every view in light and dark.
 Usage: python3 tests/design_test.py [name …]"""
+
 import contextlib
 import io
 import json
@@ -12,13 +13,26 @@ import xml.etree.ElementTree as ET
 from common import RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
 
 PALETTE = {
-    '--bg': ('#F4F0EC', '#191513'), '--surface': ('#FCFAF7', '#231E1B'), '--surface-2': ('#E8E2DB', '#302A27'),
-    '--ink': ('#2E2724', '#EBE7E2'), '--muted': ('#6C615A', '#B2A9A1'), '--faint': ('#A0958C', '#7C726B'),
-    '--line': ('#D8CFC7', '#403935'), '--accent': ('#965E4B', '#C78F7A'), '--accent-ink': ('#7F4C3A', '#C78F7A'),
-    '--accent-soft': ('#F9E0D7', '#422920'), '--on-accent': ('#FFFFFF', '#191513'),
-    '--good': ('#4F725F', '#97BBAA'), '--good-soft': ('#DBE0DA', '#363731'), '--mid': ('#997238', '#DBB87E'),
-    '--mid-soft': ('#E8DED0', '#43392D'), '--sauce': ('#7C5B45', '#BD9E86'), '--sauce-soft': ('#E2D8D1', '#3E352E'),
-    '--bad': ('#823B4E', '#D88095'), '--bad-soft': ('#EADADA', '#3D2C2C')}
+    '--bg': ('#F4F0EC', '#191513'),
+    '--surface': ('#FCFAF7', '#231E1B'),
+    '--surface-2': ('#E8E2DB', '#302A27'),
+    '--ink': ('#2E2724', '#EBE7E2'),
+    '--muted': ('#6C615A', '#B2A9A1'),
+    '--faint': ('#A0958C', '#7C726B'),
+    '--line': ('#D8CFC7', '#403935'),
+    '--accent': ('#965E4B', '#C78F7A'),
+    '--accent-ink': ('#7F4C3A', '#C78F7A'),
+    '--accent-soft': ('#F9E0D7', '#422920'),
+    '--on-accent': ('#FFFFFF', '#191513'),
+    '--good': ('#4F725F', '#97BBAA'),
+    '--good-soft': ('#DBE0DA', '#363731'),
+    '--mid': ('#997238', '#DBB87E'),
+    '--mid-soft': ('#E8DED0', '#43392D'),
+    '--sauce': ('#7C5B45', '#BD9E86'),
+    '--sauce-soft': ('#E2D8D1', '#3E352E'),
+    '--bad': ('#823B4E', '#D88095'),
+    '--bad-soft': ('#EADADA', '#3D2C2C'),
+}
 
 
 PALETTE_HEX = {v for pair in PALETTE.values() for v in pair}
@@ -30,26 +44,44 @@ DERIVED = ('--seg-on', '--toast-action')  # abgeleitet, deckend
 RATING = ('--good', '--mid', '--sauce', '--bad')
 
 
-TEXT_PAIRS = [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')] + [
-    ('--on-accent', '--accent'), ('--on-accent', '--bad'), ('--ink', '--seg-on'), ('--bg', '--ink'), ('--toast-action', '--ink'),
-    ('--accent-ink', '--accent-soft'), ('--bad', '--bad-soft'), ('--bad', '--surface')] + [('--ink', r + '-soft') for r in RATING]
+TEXT_PAIRS = (
+    [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')]
+    + [
+        ('--on-accent', '--accent'),
+        ('--on-accent', '--bad'),
+        ('--ink', '--seg-on'),
+        ('--bg', '--ink'),
+        ('--toast-action', '--ink'),
+        ('--accent-ink', '--accent-soft'),
+        ('--bad', '--bad-soft'),
+        ('--bad', '--surface'),
+    ]
+    + [('--ink', r + '-soft') for r in RATING]
+)
 
 
 ICON_PAIRS = [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')]
 
 
-TOKENS = """(names) => { const rgb = """ + RGB + """, out = {};
+TOKENS = (
+    """(names) => { const rgb = """
+    + RGB
+    + """, out = {};
   for (const n of names) { const i = document.createElement('i'); i.style.color = `var(${n})`; document.body.append(i); out[n] = rgb(getComputedStyle(i).color); i.remove(); }
   return out; }"""
+)
 
 
 async def test_palette(browser, url):
     print('colour scheme: a fixed palette with no choice, derived tokens, contrasts')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
-    await pg.click('[data-action=demo]'); await idle(pg)
-    await pg.click('[data-action=open-settings]'); await idle(pg)
-    await pg.click('[data-action=close]'); await idle(pg)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await pg.click('[data-action=open-settings]')
+    await idle(pg)
+    await pg.click('[data-action=close]')
+    await idle(pg)
     names = list(PALETTE) + list(DERIVED)
     for theme, k in (('light', 0), ('dark', 1)):
         await set_theme(pg, theme)
@@ -63,22 +95,30 @@ async def test_palette(browser, url):
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
         check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
-        got = await pg.evaluate("['top','gut','mittel','sosse','schlecht'].map(r => getComputedStyle(document.querySelector('.rb[data-r=' + r + '] .ic')).color)")
-        check(len(got) == 5 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, RATING[:1] + RATING)),
-              f'the rating buttons show the rating colours, „Sofort leer“ and „Später leer“ both --good ({theme})')
+        got = await pg.evaluate(
+            "['top','gut','mittel','sosse','schlecht'].map(r => getComputedStyle(document.querySelector('.rb[data-r=' + r + '] .ic')).color)"
+        )
+        check(
+            len(got) == 5 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, RATING[:1] + RATING)),
+            f'the rating buttons show the rating colours, „Sofort leer“ and „Später leer“ both --good ({theme})',
+        )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
 
-LOGOS = {'app/www/img/schmeckts-mark.svg': ['#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
-         'app/www/img/schmeckts-mark-dark.svg': ['#E8E2DB', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
-         'design/schmeckts-mark-mono.svg': ['currentColor'],
-         'design/schmeckts-app-icon.svg': ['#F4F0EC', '#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D']}
+LOGOS = {
+    'app/www/img/schmeckts-mark.svg': ['#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+    'app/www/img/schmeckts-mark-dark.svg': ['#E8E2DB', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+    'design/schmeckts-mark-mono.svg': ['currentColor'],
+    'design/schmeckts-app-icon.svg': ['#F4F0EC', '#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+}
 
 
-VECTORS = {'drawable/ic_launcher_foreground.xml': 'app/www/img/schmeckts-mark.svg',
-           'drawable-night/splash_logo.xml': 'app/www/img/schmeckts-mark-dark.svg',
-           'drawable/ic_launcher_monochrome.xml': 'design/schmeckts-mark-mono.svg'}
+VECTORS = {
+    'drawable/ic_launcher_foreground.xml': 'app/www/img/schmeckts-mark.svg',
+    'drawable-night/splash_logo.xml': 'app/www/img/schmeckts-mark-dark.svg',
+    'drawable/ic_launcher_monochrome.xml': 'design/schmeckts-mark-mono.svg',
+}
 
 
 def svg_paths(text):
@@ -96,32 +136,47 @@ def test_logo_files():
     groups = set()
     for vec, src in VECTORS.items():
         root = ET.parse(res / vec).getroot()
-        g = root.find('group'); groups.add(tuple(g.get(A + k) for k in ('scaleX', 'scaleY', 'translateX', 'translateY')))
+        g = root.find('group')
+        groups.add(tuple(g.get(A + k) for k in ('scaleX', 'scaleY', 'translateX', 'translateY')))
         paths = [(x.get(A + 'fillColor'), x.get(A + 'pathData')) for x in root.iter('path')]
         want = svg_paths((ROOT / src).read_text())
-        same = [d for _, d in paths] == [d for _, d in want] and all(c == w or w == 'currentColor' and c == '#FF000000' for (c, _), (w, _) in zip(paths, want))
+        same = [d for _, d in paths] == [d for _, d in want] and all(
+            c == w or w == 'currentColor' and c == '#FF000000' for (c, _), (w, _) in zip(paths, want)
+        )
         check(root.get(A + 'viewportWidth') == '108' and same, f'{vec}: paths and colours from {src}, 108 grid')
     check(len(groups) == 1, f'foreground, themed icon and the dark splash screen sit in the same place ({groups})')
     alias = ET.parse(res / 'values/drawables.xml').getroot().find('drawable')
     prep = (ROOT / 'scripts/prepare.py').read_text()
-    check(alias.get('name') == 'splash_logo' and alias.text == '@drawable/ic_launcher_foreground' and '@drawable/splash_logo' in prep
-          and "drawable-v24/ic_launcher_foreground.xml').unlink" in prep,
-          'splash screen: the app icon\u2019s motif in light, the dark mark in dark; the template\u2019s foreground is dropped')
-    check('#F4F0EC' in (res / 'values/ic_launcher_background.xml').read_text() and '#F4F0EC' in (res / 'values/colors.xml').read_text()
-          and '#191513' in (res / 'values-night/colors.xml').read_text() and 'design/schmeckts-app-icon.svg' in (ROOT / 'design/render-icons.py').read_text()
-          and 'icon-512' not in (ROOT / 'design/render-icons.py').read_text(),
-          'icon background #F4F0EC, splash screen #F4F0EC in light and #191513 in dark, Android 7 from schmeckts-app-icon.svg')
+    check(
+        alias.get('name') == 'splash_logo'
+        and alias.text == '@drawable/ic_launcher_foreground'
+        and '@drawable/splash_logo' in prep
+        and "drawable-v24/ic_launcher_foreground.xml').unlink" in prep,
+        'splash screen: the app icon\u2019s motif in light, the dark mark in dark; the template\u2019s foreground is dropped',
+    )
+    check(
+        '#F4F0EC' in (res / 'values/ic_launcher_background.xml').read_text()
+        and '#F4F0EC' in (res / 'values/colors.xml').read_text()
+        and '#191513' in (res / 'values-night/colors.xml').read_text()
+        and 'design/schmeckts-app-icon.svg' in (ROOT / 'design/render-icons.py').read_text()
+        and 'icon-512' not in (ROOT / 'design/render-icons.py').read_text(),
+        'icon background #F4F0EC, splash screen #F4F0EC in light and #191513 in dark, Android 7 from schmeckts-app-icon.svg',
+    )
 
 
 async def test_logo(browser, url):
     ctx = await phone(browser)
-    pg = await ctx.new_page(); await pg.goto(url)
+    pg = await ctx.new_page()
+    await pg.goto(url)
     A = '{http://schemas.android.com/apk/res/android}'
     g = ET.parse(ROOT / 'app/native/res/drawable/ic_launcher_foreground.xml').getroot().find('group')
     k, tx, ty = float(g.get(A + 'scaleX')), float(g.get(A + 'translateX')), float(g.get(A + 'translateY'))
     await pg.set_content((WWW / 'img/schmeckts-mark.svg').read_text())
-    r = await pg.evaluate("""([k, tx, ty]) => { let m = 0; for (const p of document.querySelectorAll('path')) { const L = p.getTotalLength();
-      for (let i = 0; i <= 600; i++) { const q = p.getPointAtLength(L * i / 600); m = Math.max(m, Math.hypot(tx + k * q.x - 54, ty + k * q.y - 54)); } } return m; }""", [k, tx, ty])
+    r = await pg.evaluate(
+        """([k, tx, ty]) => { let m = 0; for (const p of document.querySelectorAll('path')) { const L = p.getTotalLength();
+      for (let i = 0; i <= 600; i++) { const q = p.getPointAtLength(L * i / 600); m = Math.max(m, Math.hypot(tx + k * q.x - 54, ty + k * q.y - 54)); } } return m; }""",
+        [k, tx, ty],
+    )
     check(r <= 33, f'adaptive icon: the motif sits inside the safe zone (up to {r:.1f} dp from the centre, 33 allowed)')
     await ctx.close()
 
@@ -140,8 +195,10 @@ def colors_in(text):
 def css_rules(text):
     """(selector, [(property, value)]) for every innermost block, comments stripped"""
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
-    return [(sel.strip(), [tuple(x.strip() for x in d.split(':', 1)) for d in body.split(';') if ':' in d])
-            for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', text)]
+    return [
+        (sel.strip(), [tuple(x.strip() for x in d.split(':', 1)) for d in body.split(';') if ':' in d])
+        for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', text)
+    ]
 
 
 def css_value(value):
@@ -172,37 +229,62 @@ def test_rules_static():
     check(not bad and not js, f'no text-transform and no positive letter-spacing outside the code field, not in the JavaScript either ({bad + js})')
     # Typefaces: Figtree and Fraunces ship with the app, Rubik is gone entirely
     fonts = sorted(p.name for p in (WWW / 'fonts').iterdir())
-    check(fonts == ['OFL-Figtree.txt', 'OFL-Fraunces.txt', 'figtree-latin.woff2', 'fraunces-latin.woff2'], f'the typefaces with their licences, nothing else ({fonts})')
-    check(all('SIL Open Font License' in (WWW / 'fonts' / f).read_text() for f in ('OFL-Figtree.txt', 'OFL-Fraunces.txt'))
-          and 'Figtree' in (WWW / 'fonts/OFL-Figtree.txt').read_text() and 'Fraunces' in (WWW / 'fonts/OFL-Fraunces.txt').read_text(), 'licences: SIL OFL')
+    check(
+        fonts == ['OFL-Figtree.txt', 'OFL-Fraunces.txt', 'figtree-latin.woff2', 'fraunces-latin.woff2'],
+        f'the typefaces with their licences, nothing else ({fonts})',
+    )
+    check(
+        all('SIL Open Font License' in (WWW / 'fonts' / f).read_text() for f in ('OFL-Figtree.txt', 'OFL-Fraunces.txt'))
+        and 'Figtree' in (WWW / 'fonts/OFL-Figtree.txt').read_text()
+        and 'Fraunces' in (WWW / 'fonts/OFL-Fraunces.txt').read_text(),
+        'licences: SIL OFL',
+    )
     prep = (ROOT / 'scripts/prepare.py').read_text()
-    check('8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928' in prep and '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b' in prep,
-          'prepare.py downloads both typefaces with a checksum')
+    check(
+        '8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928' in prep
+        and '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b' in prep,
+        'prepare.py downloads both typefaces with a checksum',
+    )
     blocks = css_blocks(css['tokens.css'])
     faces = {d.get('font-family'): d for sel, d in blocks if sel == '@font-face'}
     root = next(d for sel, d in blocks if sel == ':root')
-    check(faces.get('"Figtree"', {}).get('font-weight') == '400 700' and faces.get('"Fraunces"', {}).get('font-weight') == '500 700'
-          and root.get('--font-display') == '"Fraunces","Iowan Old Style",Georgia,serif'
-          and root.get('--font-ui') == '"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
-          f'@font-face and the type tokens as specified ({sorted(k for k in faces if k)})')
+    check(
+        faces.get('"Figtree"', {}).get('font-weight') == '400 700'
+        and faces.get('"Fraunces"', {}).get('font-weight') == '500 700'
+        and root.get('--font-display') == '"Fraunces","Iowan Old Style",Georgia,serif'
+        and root.get('--font-ui') == '"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+        f'@font-face and the type tokens as specified ({sorted(k for k in faces if k)})',
+    )
     tok = css['tokens.css']
     # Colours only in tokens.css, and there only the palette's values (derived tokens with opacity as 8-digit hex)
     literal = re.compile(r'#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(|\b(?:white|black)\b(?!-)')
     outside = [f'app.css: {m.group(0)}' for m in literal.finditer(re.sub(r'/\*.*?\*/', '', css['app.css'], flags=re.S))]
     outside += [f'index.html: {m.group(0)}' for m in literal.finditer(re.sub(r'<!--.*?-->', '', (WWW / 'index.html').read_text(), flags=re.S))]
-    outside += [f'{f.name}: {m.group(0)}' for f in (WWW / 'js').rglob('*.js')
-                for m in re.finditer(r'#[0-9A-Fa-f]{6}\b|\b(?:rgba?|hsla?|oklch)\(', f.read_text())]
+    outside += [
+        f'{f.name}: {m.group(0)}'
+        for f in (WWW / 'js').rglob('*.js')
+        for m in re.finditer(r'#[0-9A-Fa-f]{6}\b|\b(?:rgba?|hsla?|oklch)\(', f.read_text())
+    ]
     tok = re.sub(r'/\*.*?\*/', '', css['tokens.css'], flags=re.S)
     foreign = [c for c in re.findall(r'#[0-9A-Fa-f]{3,8}\b', tok) if c[:7].upper() not in PALETTE_HEX or len(c) not in (7, 9)]
     foreign += re.findall(r'\b(?:rgba?|hsla?|oklch)\(', tok)
     check(not outside and not foreign, f'colours only in tokens.css and only from the palette ({outside + foreign})')
-    check(set(colors_in((WWW / 'webview-update.html').read_text())) == {'#F4F0EC', '#2E2724', '#191513', '#EBE7E2'},
-          'webview-update.html (without light-dark()): background and type from the palette')
+    check(
+        set(colors_in((WWW / 'webview-update.html').read_text())) == {'#F4F0EC', '#2E2724', '#191513', '#EBE7E2'},
+        'webview-update.html (without light-dark()): background and type from the palette',
+    )
     res = ROOT / 'app/native/res'
-    android = [(str(f.relative_to(res)), c) for f in res.rglob('*.xml') if str(f.relative_to(res)) not in VECTORS
-               for c in colors_in(f.read_text()) if c not in PALETTE_HEX]
-    check(not android and colors_in((ROOT / 'design/render-icons.py').read_text()) == [],
-          f'Android resources use the palette\u2019s values only, apart from the logo vectors ({android})')
+    android = [
+        (str(f.relative_to(res)), c)
+        for f in res.rglob('*.xml')
+        if str(f.relative_to(res)) not in VECTORS
+        for c in colors_in(f.read_text())
+        if c not in PALETTE_HEX
+    ]
+    check(
+        not android and colors_in((ROOT / 'design/render-icons.py').read_text()) == [],
+        f'Android resources use the palette\u2019s values only, apart from the logo vectors ({android})',
+    )
     # Animation as movement and opacity within the shape only: no fill, no shadow, no border in @keyframes
     frames = {}
     for f, text in css.items():
@@ -211,16 +293,27 @@ def test_rules_static():
             while depth:
                 depth += {'{': 1, '}': -1}.get(text[i], 0)
                 i += 1
-            frames[m.group(1)] = text[m.end():i - 1]
-    loud = [f'{n}: {p}' for n, body in frames.items() for _, decls in css_rules(body) for p, _ in decls
-            if re.match(r'background(?!-position)|box-shadow|outline|border(-[a-z]+)?-color|filter', p)]
-    check(frames and not loud,
-          f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}')
+            frames[m.group(1)] = text[m.end() : i - 1]
+    loud = [
+        f'{n}: {p}'
+        for n, body in frames.items()
+        for _, decls in css_rules(body)
+        for p, _ in decls
+        if re.match(r'background(?!-position)|box-shadow|outline|border(-[a-z]+)?-color|filter', p)
+    ]
+    check(
+        frames and not loud,
+        f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}',
+    )
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
     ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
     check(not focus and ring, f'focus rings follow the radius: an outline and no radius of their own on focus ({focus})')
-    check('data-logo' not in (WWW / 'index.html').read_text() and 'data-logo' not in (WWW / 'js/main.js').read_text()
-          and "from './logo.js'" not in (WWW / 'js/main.js').read_text(), 'header without a logo: nothing in index.html and main.js')
+    check(
+        'data-logo' not in (WWW / 'index.html').read_text()
+        and 'data-logo' not in (WWW / 'js/main.js').read_text()
+        and "from './logo.js'" not in (WWW / 'js/main.js').read_text(),
+        'header without a logo: nothing in index.html and main.js',
+    )
 
 
 FRAUNCES = '.brand, .card h2, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
@@ -261,24 +354,41 @@ async def test_rules(browser, url):
         pg, errors = await open_page(ctx, url, choose=False)
         await pg.evaluate('document.fonts.ready')
         seen, bad = set(), []
+
         async def scan():
-            r = await pg.evaluate(SCAN, FRAUNCES); bad.extend(r['bad']); seen.update(r['seen'])
+            r = await pg.evaluate(SCAN, FRAUNCES)
+            bad.extend(r['bad'])
+            seen.update(r['seen'])
+
         await scan()  # Willkommen beim ersten Start: Wahl des Modus
-        await pg.click('[data-action=mode-local]'); await idle(pg)
+        await pg.click('[data-action=mode-local]')
+        await idle(pg)
         await scan()  # Willkommen
-        top = await pg.eval_on_selector('.top', """t => { const b = t.querySelector('.brand'), s = getComputedStyle(b);
+        top = await pg.eval_on_selector(
+            '.top',
+            """t => { const b = t.querySelector('.brand'), s = getComputedStyle(b);
           return [t.querySelectorAll('svg, img, [data-logo]').length - t.querySelectorAll('.top-end svg').length, b.innerText, b.children.length,
-            s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.lineHeight, s.letterSpacing]; }""")
-        check(top == [0, 'Schmeckt’s?', 0, 'Fraunces', '650', '30px', '33px', '-0.6px'], f'header ({scheme}): the wordmark only, Fraunces 650, 30px ({top})')
-        logo = await pg.eval_on_selector_all('.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0, i.offsetWidth])")
+            s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.lineHeight, s.letterSpacing]; }""",
+        )
+        check(
+            top == [0, 'Schmeckt’s?', 0, 'Fraunces', '650', '30px', '33px', '-0.6px'],
+            f'header ({scheme}): the wordmark only, Fraunces 650, 30px ({top})',
+        )
+        logo = await pg.eval_on_selector_all(
+            '.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0, i.offsetWidth])"
+        )
         want = 'img/schmeckts-mark.svg' if scheme == 'light' else 'img/schmeckts-mark-dark.svg'
         check(logo == [[want, True, 104]], f'welcome screen ({scheme}): the mark for this scheme ({logo})')
-        vs = await pg.evaluate("getComputedStyle(document.body).fontVariationSettings")
+        vs = await pg.evaluate('getComputedStyle(document.body).fontVariationSettings')
         check(vs == '"SOFT" 100', f'body: font-variation-settings "SOFT" 100 ({vs})')
-        await pg.click('[data-action=demo]'); await idle(pg)
+        await pg.click('[data-action=demo]')
+        await idle(pg)
         if await pg.query_selector('[data-action=close-week]'):  # „Letzte Woche“ only exists Monday to Wednesday
-            await pg.click('[data-action=close-week]'); await idle(pg)
-        await pg.click('[data-action=expand][data-v=shop]'); await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
+            await pg.click('[data-action=close-week]')
+            await idle(pg)
+        await pg.click('[data-action=expand][data-v=shop]')
+        await pg.click('[data-action=expand][data-v=ins]')
+        await idle(pg)
         await scan()  # Startseite mit allem
         layout = await pg.evaluate("""(() => { const app = getComputedStyle(document.querySelector('.app')), probe = document.createElement('i');
           probe.style.cssText = 'background:var(--surface);color:var(--ink)'; document.body.append(probe); const p = getComputedStyle(probe);
@@ -290,42 +400,74 @@ async def test_rules(browser, url):
           probe.remove(); return out; })()""")
         want = 'true|true|none|26px|18px 18px 8px|none|0px|0px|H2|Fraunces|600|21px|26.25px|-0.21px|true'
         first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
-        check(layout['app'] == ['600px', '18px', '18px'] and len(layout['cards']) == 6 and layout['cards'][0] == first and all(c == want for c in layout['cards'][1:]) and layout['gaps'] == [14] * 5,
-              f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 26px, 18/18/8, without border and shadow, heading Fraunces 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})')
-        await pg.click('[data-action=open-settings]'); await idle(pg)
+        check(
+            layout['app'] == ['600px', '18px', '18px']
+            and len(layout['cards']) == 6
+            and layout['cards'][0] == first
+            and all(c == want for c in layout['cards'][1:])
+            and layout['gaps'] == [14] * 5,
+            f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 26px, 18/18/8, without border and shadow, heading Fraunces 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
+        )
+        await pg.click('[data-action=open-settings]')
+        await idle(pg)
         await scan()
-        label = await pg.eval_on_selector('.label', """l => { const s = getComputedStyle(l), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.after(probe);
-          const c = getComputedStyle(probe).color; probe.remove(); return [s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.color === c, s.textTransform, s.letterSpacing, l.innerText]; }""")
-        check(label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Darstellung'], f'field label: Figtree 600, 13.5px, muted, normal casing ({label})')
-        await pg.click('#serverBox [data-action=connect-form]'); await idle(pg)
+        label = await pg.eval_on_selector(
+            '.label',
+            """l => { const s = getComputedStyle(l), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.after(probe);
+          const c = getComputedStyle(probe).color; probe.remove(); return [s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.color === c, s.textTransform, s.letterSpacing, l.innerText]; }""",
+        )
+        check(
+            label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Darstellung'],
+            f'field label: Figtree 600, 13.5px, muted, normal casing ({label})',
+        )
+        await pg.click('#serverBox [data-action=connect-form]')
+        await idle(pg)
         await scan()  # Adresse und Code
         await pg.fill('#f-code', 'abcd1234')
         code = await pg.eval_on_selector('#f-code', 'f => [getComputedStyle(f).textTransform, getComputedStyle(f).letterSpacing]')
         check(code[0] == 'uppercase' and float(code[1][:-2]) > 0, f'the exception: the household code field ({code})')
-        await pg.click('[data-action=close]'); await idle(pg)
-        await pg.click('#fab'); await idle(pg)
+        await pg.click('[data-action=close]')
+        await idle(pg)
+        await pg.click('#fab')
+        await idle(pg)
         await scan()
-        await pg.click('[data-action=close]'); await idle(pg)
-        await pg.click('[data-sec=shop] [data-action=open-product]'); await idle(pg)
+        await pg.click('[data-action=close]')
+        await idle(pg)
+        await pg.click('[data-sec=shop] [data-action=open-product]')
+        await idle(pg)
         await scan()
-        await pg.click('[data-action=close]'); await idle(pg)
-        await pg.click('.tl [data-action=open-serving]'); await idle(pg)
+        await pg.click('[data-action=close]')
+        await idle(pg)
+        await pg.click('.tl [data-action=open-serving]')
+        await idle(pg)
         await scan()
-        await pg.click('[data-action=close]'); await idle(pg)
-        await pg.click('[data-action=open-settings]'); await idle(pg)
-        await pg.click('#sheet [data-action=edit-pet]'); await idle(pg)
+        await pg.click('[data-action=close]')
+        await idle(pg)
+        await pg.click('[data-action=open-settings]')
+        await idle(pg)
+        await pg.click('#sheet [data-action=edit-pet]')
+        await idle(pg)
         await scan()  # the pet sheet
         await pg.set_input_files('#petPhotoInput', pictures[1])
-        await pg.wait_for_selector('#sheet .crop img'); await idle(pg)
+        await pg.wait_for_selector('#sheet .crop img')
+        await idle(pg)
         await scan()
-        await pg.click('[data-action=crop-cancel]'); await idle(pg)
-        await pg.click('[data-action=close]'); await idle(pg)
-        await pg.click('#fab'); await idle(pg)
+        await pg.click('[data-action=crop-cancel]')
+        await idle(pg)
+        await pg.click('[data-action=close]')
+        await idle(pg)
+        await pg.click('#fab')
+        await idle(pg)
         await pg.click('#sheet [data-action=photo]')
-        await pg.wait_for_selector('#camera[open]'); await idle(pg)
+        await pg.wait_for_selector('#camera[open]')
+        await idle(pg)
         await scan()
-        await pg.click('[data-cam=cancel]'); await idle(pg)
-        check(not bad, f'Figtree everywhere and Fraunces only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}')
+        await pg.click('[data-cam=cancel]')
+        await idle(pg)
+        check(
+            not bad,
+            f'Figtree everywhere and Fraunces only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
+        )
         check(seen == set(FRAUNCES.split(', ')), f'Fraunces on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
@@ -342,32 +484,52 @@ async def test_polish(browser, url):
     print('polish: small icons consistent, the „Serviert von“ select field, the gap under the wordmark')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
-    await pg.click('[data-action=demo]'); await idle(pg)
-    gap = await pg.evaluate("[getComputedStyle(document.querySelector('.top')).paddingBottom, document.querySelector('#home > section').getBoundingClientRect().top - document.querySelector('.top').getBoundingClientRect().bottom]")
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    gap = await pg.evaluate(
+        "[getComputedStyle(document.querySelector('.top')).paddingBottom, document.querySelector('#home > section').getBoundingClientRect().top - document.querySelector('.top').getBoundingClientRect().bottom]"
+    )
     check(gap == ['10px', 0], f'home page: 10px from the wordmark to the first card, 8px more than before ({gap})')
     icons = []
-    await pg.click('.pend-head'); await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
     pick = [i for i in await pg.evaluate(ICONS, '.pick .ic')]
-    check(pick == [{'where': 'pick', 'w': 20, 'h': 20, 'stroke': '1.8px', 'edge': 14, 'mid': True}], f'select icon on „Serviert von“: 20px, the icon set\u2019s stroke width, 14px from the right edge, vertically centred ({pick})')
-    check(await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance') == 'none', 'the field does not draw the system\u2019s own arrow beside it (Android)')
+    check(
+        pick == [{'where': 'pick', 'w': 20, 'h': 20, 'stroke': '1.8px', 'edge': 14, 'mid': True}],
+        f'select icon on „Serviert von“: 20px, the icon set\u2019s stroke width, 14px from the right edge, vertically centred ({pick})',
+    )
+    check(
+        await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance') == 'none',
+        'the field does not draw the system\u2019s own arrow beside it (Android)',
+    )
     await shot(pg, 'select-field')
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('[data-action=edit-name]'); await idle(pg)
-    await pg.fill('#f-variety', ''); await pg.fill('#f-brand', 'She'); await idle(pg)
+    await pg.click('[data-action=edit-name]')
+    await idle(pg)
+    await pg.fill('#f-variety', '')
+    await pg.fill('#f-brand', 'She')
+    await idle(pg)
     await pg.wait_for_selector('#sheet .sugg')
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('[data-action=close]'); await idle(pg)
-    await pg.click('[data-action=open-settings]'); await idle(pg)
+    await pg.click('[data-action=close]')
+    await idle(pg)
+    await pg.click('[data-action=open-settings]')
+    await idle(pg)
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('#sheet [data-action=edit-pet]'); await idle(pg)
+    await pg.click('#sheet [data-action=edit-pet]')
+    await idle(pg)
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('[data-action=close]'); await idle(pg)
-    await pg.click('#fab'); await idle(pg)
+    await pg.click('[data-action=close]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
     kinds = {i['where'].split()[0] for i in icons}
     odd = [i for i in icons if (i['w'], i['h'], i['stroke']) != (20, 20, '1.8px') or i['edge'] not in (None, 14) or i['mid'] is False]
-    check({'pick', 'sugg', 'edit', 'list-row', 'btn', 'chip'} <= kinds and not odd,
-          f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}')
+    check(
+        {'pick', 'sugg', 'edit', 'list-row', 'btn', 'chip'} <= kinds and not odd,
+        f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}',
+    )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
@@ -377,25 +539,37 @@ def test_pack():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import pack
     import unpack
+
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             pack.main(tmp)
             for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt'):
                 unpack.unpack(f'{tmp}/{name}', f'{tmp}/tree')
-        names = {name: re.findall(r'^===== FILE: (.+) \(\d+ characters\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
-                 for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt')}
+        names = {
+            name: re.findall(r'^===== FILE: (.+) \(\d+ characters\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
+            for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt')
+        }
+
         def server(rel):
             return rel.startswith('server/')
+
         app, srv = names['schmeckts-sources.txt'], names['schmeckts-server-sources.txt']
-        check(app[0] == 'PROJECT.md' and not any(map(server, app)) and all(map(server, srv))
-              and {'server/main.go', 'server/packaging/debian/control', 'server/build-deb.sh', 'server/README.md'} <= set(srv)
-              and {'scripts/unpack.py', 'scripts/pack.py', 'tests/ui_test.py', 'app/www/js/main.js'} <= set(app),
-              f'app file with PROJECT.md first, tests and scripts ({len(app)} files), server file with everything under server/ ({len(srv)})')
+        check(
+            app[0] == 'PROJECT.md'
+            and not any(map(server, app))
+            and all(map(server, srv))
+            and {'server/main.go', 'server/packaging/debian/control', 'server/build-deb.sh', 'server/README.md'} <= set(srv)
+            and {'scripts/unpack.py', 'scripts/pack.py', 'tests/ui_test.py', 'app/www/js/main.js'} <= set(app),
+            f'app file with PROJECT.md first, tests and scripts ({len(app)} files), server file with everything under server/ ({len(srv)})',
+        )
         want = dict(pack.files())
         got = {p.relative_to(f'{tmp}/tree').as_posix(): p.read_text(encoding='utf-8') for p in pathlib.Path(tmp, 'tree').rglob('*') if p.is_file()}
         check(got == want and len(got) == len(app) + len(srv), f'both files unpacked into the same folder: the same working tree ({len(got)} files)')
         first = pathlib.Path(tmp, 'schmeckts-server-sources.txt').read_text(encoding='utf-8').split('\n', 1)[0]
-        check(f"version {(ROOT / 'server/VERSION').read_text().strip()}," in first, f'the server file names the server\u2019s version, which does not change with the app ({first})')
+        check(
+            f'version {(ROOT / "server/VERSION").read_text().strip()},' in first,
+            f'the server file names the server\u2019s version, which does not change with the app ({first})',
+        )
 
 
 def test_version_code():
@@ -405,6 +579,7 @@ def test_version_code():
     10400, so prepare.py lifts every code above that mark."""
     sys.path.insert(0, str(ROOT / 'scripts'))
     import importlib
+
     prep = importlib.import_module('prepare')
     version = json.loads((ROOT / 'app/package.json').read_text())['version']
     code = 0
@@ -412,8 +587,10 @@ def test_version_code():
         code = code * 100 + part
     code += prep.VERSION_OFFSET
     src = (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
-    check(code > 10400 and 'def appVersionCode = " + str(VERSION_OFFSET) +' in src,
-          f'versionCode {code} for version {version} stays above the 10400 of the builds before the restart')
+    check(
+        code > 10400 and 'def appVersionCode = " + str(VERSION_OFFSET) +' in src,
+        f'versionCode {code} for version {version} stays above the 10400 of the builds before the restart',
+    )
 
 
 def test_signing_key():
@@ -423,6 +600,7 @@ def test_signing_key():
     "Passwort:", so read() has to accept both spellings — otherwise a release build cannot sign."""
     sys.path.insert(0, str(ROOT / 'scripts'))
     import importlib
+
     key = importlib.import_module('signing-key') if 'signing-key' not in sys.modules else sys.modules['signing-key']
     with tempfile.TemporaryDirectory() as tmp:
         jks, pwfile = pathlib.Path(tmp, 'key.jks'), pathlib.Path(tmp, 'pw.txt')
@@ -438,20 +616,28 @@ def test_signing_key():
             got = io.StringIO()
             with contextlib.redirect_stdout(got):
                 key.read(str(src), str(back))
-            check(got.getvalue().strip() == 'geheim-123' and back.read_bytes() == jks.read_bytes(),
-                  f'signing key, {name} wording: keystore and password come back unchanged')
+            check(
+                got.getvalue().strip() == 'geheim-123' and back.read_bytes() == jks.read_bytes(),
+                f'signing key, {name} wording: keystore and password come back unchanged',
+            )
 
 
 def test_prompt():
     """Photo recognition belongs to the server: it holds prompt and key, the app has neither."""
     text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
     go = (ROOT / 'server/recognize.go').read_text(encoding='utf-8')
-    check(len(text) > 100 and '//go:embed recognize-prompt.txt' in go and text.split('\n')[0] not in go,
-          'the server embeds the prompt from recognize-prompt.txt and keeps it nowhere else')
+    check(
+        len(text) > 100 and '//go:embed recognize-prompt.txt' in go and text.split('\n')[0] not in go,
+        'the server embeds the prompt from recognize-prompt.txt and keeps it nowhere else',
+    )
     app = '\n'.join(p.read_text(encoding='utf-8') for p in sorted(WWW.rglob('*.js')))
-    check('api.anthropic.com' not in app and 'data-setting="aiKey"' not in app
-          and not (WWW / 'js/prompt.js').exists() and text.split('\n')[0] not in app,
-          'the app has no key of its own for photo recognition, and no prompt')
+    check(
+        'api.anthropic.com' not in app
+        and 'data-setting="aiKey"' not in app
+        and not (WWW / 'js/prompt.js').exists()
+        and text.split('\n')[0] not in app,
+        'the app has no key of its own for photo recognition, and no prompt',
+    )
 
 
 async def test_files(browser, url):

@@ -5,31 +5,49 @@ import assert from 'node:assert/strict';
 import {BRANDS} from '../app/www/js/config.js';
 import {MAX_VARIETY, readPack} from '../app/www/js/ocr.js';
 
-const VARIETIES = [{brand:'Sheba', variety:'Lachs in Soße', type:'Nassfutter', animal:'Katze', texture:'sosse'},
-  {brand:'Dreamies', variety:'Käse', type:'Snack', animal:'Katze'}];
+const VARIETIES = [
+  {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
+  {brand: 'Dreamies', variety: 'Käse', type: 'Snack', animal: 'Katze'},
+];
 
 test('packaging text: our own varieties win, insensitive to case, hyphens and spaces', () => {
   const samples = ['SHEBA\nLACHS IN SOSSE\n85 g', 'sheba lachs-in-soße', 'Sheba\nLachsinSosse\nNEU'];
   for (const text of samples) {
-    assert.deepEqual(readPack(text, VARIETIES), {brand:'Sheba', variety:'Lachs in Soße', type:'Nassfutter', animal:'Katze', texture:'sosse'}, text);
+    assert.deepEqual(
+      readPack(text, VARIETIES),
+      {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
+      text,
+    );
   }
   assert.equal(readPack('Dreamies\nmit Käse', VARIETIES).variety, 'Käse');
 });
 
 test('packaging text: a brand from the list, nothing invented otherwise', () => {
-  assert.ok(BRANDS.length > 50 && BRANDS.includes('Whiskas') && BRANDS.includes('Coshida'), 'common brands including retail brands');
+  assert.ok(
+    BRANDS.length > 50 && BRANDS.includes('Whiskas') && BRANDS.includes('Coshida'),
+    'common brands including retail brands',
+  );
   assert.equal(readPack('ANIMONDA\nCarny Adult\nRind & Huhn\n400 g').brand, 'Animonda');
   assert.equal(readPack('K-CLASSIC\nHuhn in Gelee').brand, 'K-Classic');
-  assert.equal(readPack('Hofmeister\nHuhn in Gelee').brand, '', 'an unknown brand stays empty, the variety is there all the same');
+  assert.equal(
+    readPack('Hofmeister\nHuhn in Gelee').brand,
+    '',
+    'an unknown brand stays empty, the variety is there all the same',
+  );
   assert.equal(readPack('Hofmeister\nHuhn in Gelee').variety, 'Huhn in Gelee');
 });
 
 test('packaging text: the variety without quantities, advertising, ingredients and bare numbers, at most 40 characters', () => {
-  const text = 'Sheba\nNEU\n100 % natürlich\nSelection in Sauce\nmit Lachs\n4 x 85 g\n4008429087455\nZutaten: Fleisch und tierische Nebenerzeugnisse 40 %';
+  const text =
+    'Sheba\nNEU\n100 % natürlich\nSelection in Sauce\nmit Lachs\n4 x 85 g\n4008429087455\nZutaten: Fleisch und tierische Nebenerzeugnisse 40 %';
   const got = readPack(text);
   assert.equal(got.variety, 'Selection in Sauce mit Lachs');
   assert.ok(got.variety.length <= MAX_VARIETY);
-  assert.equal(readPack('Whiskas\n1+ Adult Thunfisch in Gelee für ausgewachsene Katzen jeden Alters').variety.length <= MAX_VARIETY, true);
+  assert.equal(
+    readPack('Whiskas\n1+ Adult Thunfisch in Gelee für ausgewachsene Katzen jeden Alters').variety.length <=
+      MAX_VARIETY,
+    true,
+  );
 });
 
 test('packaging text: type, consistency and species from the keywords', () => {
@@ -43,6 +61,6 @@ test('packaging text: type, consistency and species from the keywords', () => {
 
 test('packaging text: with nothing usable everything stays empty', () => {
   for (const text of ['', '   ', '12345\n4008429087455\n850 g', 'NEU\n100 % natürlich']) {
-    assert.deepEqual(readPack(text, VARIETIES), {brand:'', variety:'', type:'', animal:''}, JSON.stringify(text));
+    assert.deepEqual(readPack(text, VARIETIES), {brand: '', variety: '', type: '', animal: ''}, JSON.stringify(text));
   }
 });

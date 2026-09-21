@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """The signing key as a text file, so that it fits alongside the project files.
 
-  scripts/signing-key.py create <keystore.jks> <passwordfile>       > schmeckts-signing-key.txt
-  scripts/signing-key.py read <schmeckts-signing-key.txt> <out.jks>   writes the keystore, prints the password
+scripts/signing-key.py create <keystore.jks> <passwordfile>       > schmeckts-signing-key.txt
+scripts/signing-key.py read <schmeckts-signing-key.txt> <out.jks>   writes the keystore, prints the password
 """
+
 import base64
 import re
 import sys

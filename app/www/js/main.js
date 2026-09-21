@@ -15,17 +15,26 @@ import {paintServerBox} from './views/sheets.js'; // also registers the sheet co
 import {retryWaiting} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
-import {openLink} from './actions.js';         // also registers clicks and input
+import {openLink} from './actions.js'; // also registers clicks and input
 
-document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); });
+document.querySelectorAll('[data-icon]').forEach(el => {
+  el.innerHTML = icon(el.dataset.icon);
+});
 const typingIn = box => document.activeElement?.tagName === 'INPUT' && box?.contains(document.activeElement);
-hooks.changed = () => { // changes from other devices
+hooks.changed = () => {
+  // changes from other devices
   update();
   if (sheet && !typingIn(sheetBody)) renderSheet();
   syncReminders(); // rated or deleted elsewhere: cancel the reminder
 };
-hooks.saved = () => { syncSoon(400); syncReminders(); }; // sync shortly after our own save, keep the reminders current
-syncHooks.status = () => { renderSyncChip(); paintServerBox(); }; // the box in the settings only changes on new content
+hooks.saved = () => {
+  syncSoon(400);
+  syncReminders();
+}; // sync shortly after our own save, keep the reminders current
+syncHooks.status = () => {
+  renderSyncChip();
+  paintServerBox();
+}; // the box in the settings only changes on new content
 syncHooks.reachable = () => retryWaiting(); // recognise waiting photos as soon as the server is reachable
 diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportieren.');
 startSync();
@@ -41,10 +50,20 @@ if (Native?.App) {
     else if (canGoBack) history.back();
     else Native.App.minimizeApp();
   });
-  Native.App.getInfo().then(i => { appInfo.version = i.version; }).catch(() => {});
+  Native.App.getInfo()
+    .then(i => {
+      appInfo.version = i.version;
+    })
+    .catch(() => {});
   // Shortcuts and deep links, on a cold start (Capacitor holds the event back) and while the app is running
-  Native.App.addListener('appUrlOpen', ({url}) => { openLink(url); });
+  Native.App.addListener('appUrlOpen', ({url}) => {
+    openLink(url);
+  });
 }
 setTimeout(() => document.body.classList.remove('intro'), 1800);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open) renderHome(); });
-setInterval(() => { if (!dlg.open && !document.hidden) renderHome(); }, 60000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !dlg.open) renderHome();
+});
+setInterval(() => {
+  if (!dlg.open && !document.hidden) renderHome();
+}, 60000);
