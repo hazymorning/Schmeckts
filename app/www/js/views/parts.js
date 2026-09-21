@@ -1,4 +1,4 @@
-/* Wiederkehrende Bausteine der Ansichten: Avatare, Vorschaubilder, Bewertungs-Buttons, Sync-Status. */
+/* Recurring building blocks of the views: avatars, thumbnails, rating buttons, sync status. */
 import {esc} from '../text.js';
 import {ago, dayKey, dayLabel, timeStr, when} from '../dates.js';
 import {icon} from '../icons.js';
@@ -22,17 +22,17 @@ export function thumbOf(s, p, cls = ''){
   return `<span class="thumb ${cls}">${esc(letter)}</span>`;
 }
 export function nameBlock(s, p, exact = false){
-  if (s.status === 'recognizing' || s.status === 'reading') // der Server erkennt, oder das Handy liest den Text
+  if (s.status === 'recognizing' || s.status === 'reading') // the server is recognising, or the phone is reading the text
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
   if (!p) {
     const sub = {waiting:'Wird erkannt, sobald der Server erreichbar ist', failed:'Nicht erkannt, tippen zum Benennen'}[s.status] || 'Tippen zum Benennen';
-    return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (Modus „lokal“): ohne Fehlerton
+    return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (mode `lokal`): without the error tone
   }
   const meta = [p.variety ? p.brand : '', exact ? when(s.servedAt) : ago(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
-/* Bewertungsknöpfe: gleich breite in einer Reihe, die Skala der Sorte in ihrer Reihenfolge; je Knopf Icon und zwei Zeilen.
-   Eine gespeicherte Stufe einer anderen Skala (die Art der Sorte hat gewechselt) steht als Badge darüber. */
+/* Rating buttons: equally wide in one row, the variety's scale in its own order; an icon and two lines per button.
+   A stored level from another scale (the variety's type has changed) sits above them as a badge. */
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
 export function rateRow(s, pid, big = false){
   const scale = scaleOf(getProduct(s.productId)), cur = rOf(s.pets[pid]);
@@ -54,13 +54,13 @@ export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = 
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;
 }
 
-/* Verlauf, auf der Startseite wie in der Auswertung: die Mahlzeiten nach Kalendertagen, neueste zuerst.
-   „2 Mahlzeiten, 1 Snack“: Ein Snack ist keine Mahlzeit; alles andere, auch noch Unbekanntes, zählt als Mahlzeit. */
+/* History, on the home page as in the evaluation: the meals by calendar day, newest first.
+   „2 Mahlzeiten, 1 Snack“: a treat is not a meal; everything else, including what is still unknown, counts as one. */
 export function fedLabel(items){
   const snacks = items.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length, meals = items.length - snacks;
   return [meals && (meals === 1 ? '1 Mahlzeit' : meals + ' Mahlzeiten'), snacks && (snacks === 1 ? '1 Snack' : snacks + ' Snacks')].filter(Boolean).join(', ');
 }
-export function servingNode(s){ // Punkt in Bewertungsfarbe, hohl = noch offen
+export function servingNode(s){ // a dot in the rating's colour, hollow = still open
   const rs = servingPets(s).map(pid => rOf(s.pets[pid])).filter(Boolean);
   if (!rs.length) return '<i class="open"></i>';
   const cls = rs.every(r => r === rs[0]) ? rateCls(rs[0]) : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
@@ -74,7 +74,7 @@ export function dayGroups(list){
   }
   return groups;
 }
-/* anchors: Kennungen der Tage, dorthin springt der Kalender der Startseite; fresh: die gerade servierte Mahlzeit */
+/* anchors: ids for the days, where the home page's calendar jumps to; fresh: the meal just served */
 export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}){
   return groups.map(g => `<div class="tl-day"${anchors ? ` id="d-${g.key}"` : ''}>
     <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
@@ -89,7 +89,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
     }).join('')}</ol></div>`).join('');
 }
 
-/* Sync-Status in Worten, für Einstellungen und den Hinweis oben */
+/* Sync status in words, for the settings and the notice at the top */
 const waitingText = n => n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '';
 const ERROR_TITLE = {auth:'Code stimmt nicht mehr', protocol:'Update nötig', locked:'Kurz gesperrt'};
 const CHIP_ERROR = {auth:'Code prüfen', protocol:'Update nötig', locked:'Kurz gesperrt'};
@@ -102,7 +102,7 @@ export function syncInfo(){
   if (st.state === 'wait') return {tone:'ok', title:'Verbinde …', detail:wait || 'Der Abgleich läuft.'};
   return {tone:'ok', title:'Verbunden', detail:wait ? wait + ', wird gesendet …' : 'Alles abgeglichen'};
 }
-/* Oben neben den Einstellungen, nur wenn etwas wartet oder hakt */
+/* At the top next to the settings, only when something is waiting or stuck */
 export function syncChip(){
   const st = status, n = queue.length;
   if (st.state === 'error') return {label:CHIP_ERROR[st.kind] || 'Abgleich gestört', ic:'alert', bad:true};
@@ -110,7 +110,7 @@ export function syncChip(){
   return null;
 }
 
-/* Urteil einer Sorte als Text, im Haushalt „Gemischt“ mit Tiernamen, etwa „Gemischt: Minka ja, Tiger nein“ */
-/* Kurze Begründung eines Urteils, etwa „4× bewertet, zuletzt Gut“ */
+/* A variety's verdict as text; in a household „Gemischt“ with the pets' names, e.g. „Gemischt: Minka ja, Tiger nein“ */
+/* A short reason for a verdict, e.g. „4× bewertet, zuletzt Gut“ */
 export const reasonOf = x => x.n ? `${x.n}× bewertet, zuletzt ${RATINGS[x.last.r].label}` : 'noch nicht bewertet';
 export const verdictLabel = x => x.verdict === 'gemischt' ? `Gemischt: ${petNames(x.yes)} ja, ${petNames(x.no)} nein` : VERDICTS[x.verdict];

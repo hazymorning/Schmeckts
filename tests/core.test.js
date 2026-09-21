@@ -1,4 +1,4 @@
-// Grundlagen ohne DOM: Barcodes, Datensätze als Felder, hybride Uhr, Aufbau der Module. Aufruf: node --test tests/*.test.js
+// Foundations without a DOM: barcodes, records as fields, the hybrid clock, module layering. Usage: node --test tests/*.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
@@ -8,12 +8,12 @@ import {guessTexture, TEXTURES, textureOf} from '../app/www/js/config.js';
 import {fieldsOf, fromFields, setField, validId, valueOf} from '../app/www/js/fields.js';
 import {clockState, measure, observe, rebase, stamp} from '../app/www/js/clock.js';
 
-test('Barcodes: EAN-13, EAN-8 und UPC-A mit gültiger Prüfziffer', () => {
+test('barcodes: EAN-13, EAN-8 and UPC-A with a valid check digit', () => {
   const codes = ['4008429087455', '4008429087456', '036000291452', '96385074', '96385075', ' 4008429087455 ', '40084290874', 'abc', null];
   assert.deepEqual(codes.map(normBarcode), ['4008429087455', '', '0036000291452', '96385074', '', '4008429087455', '', '', '']);
 });
 
-test('Konsistenz und Snack-Art: Auswahl je Art, Stichwörter in Marke und Sorte', () => {
+test('consistency and treat type: the choice per type, keywords in brand and variety', () => {
   assert.deepEqual(Object.fromEntries(Object.entries(TEXTURES).map(([type, t]) => [type, [t.title, ...t.items.map(([k, label]) => `${k} ${label}`)]])), {
     Nassfutter: ['Konsistenz', 'sosse In Soße', 'gelee In Gelee', 'pastete Pastete', 'mousse Mousse', 'block Fester Block', 'suppe Suppe'],
     Snack: ['Snack-Art', 'knusprig Knusprig', 'weich Weich', 'creme Creme', 'milch Milch', 'stick Stick', 'kau Kauartikel']});
@@ -27,7 +27,7 @@ test('Konsistenz und Snack-Art: Auswahl je Art, Stichwörter in Marke und Sorte'
   assert.deepEqual([textureOf({type:'Snack'}, 'sosse'), textureOf({type:'Nassfutter'}, 'sosse')?.[1], textureOf({type:'Sonstiges'}, 'kau')], [undefined, 'In Soße', undefined]);
 });
 
-test('Felder: Karten zerfallen in Einträge, lokale Felder und null bleiben draußen', () => {
+test('fields: maps break down into entries, local fields and null stay out', () => {
   const meal = {id:'meal0001', productId:'prod0001', servedAt:5, note:null, pets:{minka:{r:'gut'}, tiger:null}, photo:'data:…', status:'waiting', scanCode:'4008429087455'};
   assert.deepEqual(fieldsOf('servings', meal), {productId:'"prod0001"', servedAt:'5', 'pets.minka':'{"r":"gut"}'});
   assert.deepEqual(fieldsOf('products', {id:'prod0001', codes:{'4008429087455':true}}), {'codes.4008429087455':'true'});
@@ -35,7 +35,7 @@ test('Felder: Karten zerfallen in Einträge, lokale Felder und null bleiben drau
   assert.equal(valueOf('servings', meal, 'pets.kiwi'), null);
 });
 
-test('Felder: Datensatz aus Feldwerten, null entfernt, id und _del sind keine Felder', () => {
+test('fields: a record from field values, null removes, id and _del are not fields', () => {
   const pet = fromFields('pets', 'pet00001', {name:'Minka', 'photos.a1':'data:a', 'photos.b2':'data:b', _del:false});
   assert.deepEqual(pet, {id:'pet00001', photos:{a1:'data:a', b2:'data:b'}, name:'Minka'});
   setField('pets', pet, 'photos.a1', null); setField('pets', pet, 'name', null); setField('pets', pet, 'id', 'anders'); setField('pets', pet, 'name.x', 1);
@@ -43,28 +43,28 @@ test('Felder: Datensatz aus Feldwerten, null entfernt, id und _del sind keine Fe
   assert.deepEqual(['abcd', 'abc', 'a b c d', undefined].map(validId), [true, false, false, false]);
 });
 
-test('Uhr: sortierbar, steigt immer, folgt fremden Uhren und der Serverzeit', () => {
+test('clock: sortable, always rising, follows foreign clocks and server time', () => {
   Object.assign(clockState, {device:'handy001', offset:0, ms:0, n:0});
   const a = stamp(), b = stamp();
   assert.match(a, /^\d{13}-\d{4}-handy001$/);
   assert.ok(b > a);
   const ahead = `${String(Date.now() + 60e3).padStart(13, '0')}-0007-anderes1`;
   observe(ahead);
-  assert.ok(stamp() > ahead, 'nach einer fremden Uhr geht es darüber weiter');
+  assert.ok(stamp() > ahead, 'after a foreign clock it carries on above it');
   observe(`${String(Date.now() + 3600e3).padStart(13, '0')}-0000-anderes1`);
-  assert.ok(clockState.ms < Date.now() + 61e3, 'Uhren weit in der Zukunft zählen nicht');
+  assert.ok(clockState.ms < Date.now() + 61e3, 'clocks far in the future do not count');
   measure(Date.now() - 3600e3, Date.now() - 100, Date.now());
-  assert.ok(Math.abs(clockState.offset + 3600e3) < 1000, 'Abweichung zur Serverzeit gemessen');
+  assert.ok(Math.abs(clockState.offset + 3600e3) < 1000, 'offset to server time measured');
   rebase();
-  assert.ok(clockState.ms <= Date.now() + clockState.offset, 'nach „clock“ nicht in der Zukunft weiterzählen');
+  assert.ok(clockState.ms <= Date.now() + clockState.offset, 'after a "clock" rejection do not keep counting in the future');
 });
 
-test('Module: keine Kreisabhängigkeiten', () => {
+test('modules: no circular dependencies', () => {
   const root = new URL('../app/www/js/', import.meta.url).pathname, deps = new Map();
   for (const file of readdirSync(root, {recursive:true}).filter(f => f.endsWith('.js')))
     deps.set(join(root, file), [...readFileSync(join(root, file), 'utf8').matchAll(/^import\s[^;]*?'(\.[^']+)'/gm)].map(m => join(root, dirname(file), m[1])));
   const visit = (file, path) => {
-    assert.ok(!path.includes(file), `Kreis: ${[...path, file].join(' → ')}`);
+    assert.ok(!path.includes(file), `cycle: ${[...path, file].join(' → ')}`);
     for (const dep of deps.get(file)) visit(dep, [...path, file]);
   };
   for (const file of deps.keys()) visit(file, []);

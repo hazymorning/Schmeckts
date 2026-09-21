@@ -1,4 +1,4 @@
-/* Bewerten, Benennen und Löschen von Mahlzeiten und Futtersorten, Barcodes einer Sorte entfernen. */
+/* Rating, naming and deleting meals and food varieties, and removing a variety's barcodes. */
 import {haptic} from '../native.js';
 import {RATINGS} from '../config.js';
 import {db, save} from '../store.js';
@@ -27,7 +27,7 @@ export function rate(el){
     if (Object.values(s.pets).every(x => x.r)) setTimeout(() => closeSheet().then(() => { update(); toast(msg, undo); }), 260);
     else { setTimeout(() => { renderSheet(); update(); }, 220); toast(msg, undo); }
   } else {
-    // auf der Startseite: alles bewertet, die Karte schließt ruhig
+    // on the home page: everything rated, and the card closes quietly
     const li = el.closest('.pend'), gone = li && !Object.values(s.pets).some(x => !x.r);
     if (gone) li.classList.add('leaving');
     setTimeout(() => { update(); toast(msg, undo); }, gone ? 440 : 220);
@@ -83,7 +83,7 @@ export function deleteServing(id){
     save(); update();
   }); });
 }
-/* Barcode aus dem Futter-Sheet entfernen, etwa wenn er an der falschen Sorte hängt. Rückgängig stellt ihn wieder her. */
+/* Remove a barcode from the food sheet, for instance when it is stuck on the wrong variety. Undo puts it back. */
 export function removeCode(code){
   const p = getProduct(sheet?.id); if (!p?.codes?.[code]) return;
   delete p.codes[code];

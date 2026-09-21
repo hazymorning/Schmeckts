@@ -1,8 +1,8 @@
 package main
 
-// Konfiguration des Servers in config.json im Datenordner. Nur der Serverdienst und root
-// dürfen sie lesen, denn sie enthält den API-Schlüssel. Der Server liest sie neu, sobald
-// sie sich ändert, ein Neustart ist nach dem Einrichten nicht nötig.
+// The server's configuration in config.json inside the data directory. Only the service and root
+// may read it, because it holds the API key. The server rereads it as soon as it changes, so no
+// restart is needed after setup.
 
 import (
 	"crypto/rand"
@@ -20,7 +20,7 @@ const (
 	configFile   = "config.json"
 	defaultModel = "claude-sonnet-5"
 	defaultPort  = 8486
-	codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // ohne 0/O und 1/I, gut abzutippen
+	codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // without 0/O and 1/I, easy to copy down
 )
 
 type Config struct {
@@ -28,8 +28,8 @@ type Config struct {
 	Code         string   `json:"code,omitempty"`
 	Model        string   `json:"model,omitempty"`
 	Port         int      `json:"port,omitempty"`
-	AnthropicURL string   `json:"anthropicUrl,omitempty"` // nur für Tests, sonst leer
-	BarcodeURLs  []string `json:"barcodeUrls,omitempty"`  // nur für Tests, sonst Open Pet Food Facts und Open Food Facts
+	AnthropicURL string   `json:"anthropicUrl,omitempty"` // for tests only, empty otherwise
+	BarcodeURLs  []string `json:"barcodeUrls,omitempty"`  // for tests only, Open Pet Food Facts and Open Food Facts otherwise
 }
 
 func (c Config) model() string {
@@ -53,7 +53,7 @@ func (c Config) anthropicURL() string {
 	return "https://api.anthropic.com"
 }
 
-// normCode macht Eingaben wie „k7pm 3qxd“ oder „K7PM-3QXD“ vergleichbar.
+// normCode makes input such as "k7pm 3qxd" or "K7PM-3QXD" comparable.
 func normCode(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '-' || r == ' ' {
@@ -103,7 +103,7 @@ func writeConfig(dir string, c Config) error {
 	return writeAtomic(filepath.Join(dir, configFile), append(data, '\n'), 0o600)
 }
 
-// ConfigHolder liefert die aktuelle Konfiguration und liest die Datei neu, wenn sie sich geändert hat.
+// ConfigHolder returns the current configuration and rereads the file whenever it has changed.
 type ConfigHolder struct {
 	mu    sync.Mutex
 	dir   string

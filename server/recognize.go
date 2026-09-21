@@ -1,7 +1,7 @@
 package main
 
-// KI-Erkennung einer Futterpackung über die Anthropic-API. Schlüssel, Modell und Prompt
-// liegen nur hier auf dem Server; die App schickt nur das Foto.
+// AI recognition of a food packaging through the Anthropic API. Key, model and prompt live
+// here on the server alone; the app only sends the photo.
 
 import (
 	"bytes"
@@ -37,7 +37,7 @@ type Recognition struct {
 	Animal  string `json:"animal"`
 }
 
-// recognizeError trägt eine Meldung für die App und den passenden HTTP-Status.
+// recognizeError carries a message for the app and the matching HTTP status.
 type recognizeError struct {
 	status int
 	msg    string
@@ -45,8 +45,8 @@ type recognizeError struct {
 
 func (e *recognizeError) Error() string { return e.msg }
 
-// promptText steht in shared/recognize-prompt.txt; scripts/prepare.py legt die Kopie hier und das Modul der App an,
-// damit Server und App denselben Text nutzen (Test: tests/design_test.py).
+// promptText lives in shared/recognize-prompt.txt; scripts/prepare.py writes the copy here and the app's module,
+// so that server and app use the same text (test: tests/design_test.py).
 //
 //go:embed recognize-prompt.txt
 var promptText string
@@ -54,7 +54,7 @@ var promptText string
 func buildPrompt(known []string) string {
 	p := strings.TrimSpace(promptText)
 	if len(known) > 0 {
-		p += "\nBereits bekannte Produkte. Wenn es eines davon ist, übernimm exakt diese Schreibweise:\n" + strings.Join(known, "\n")
+		p += "\nProducts already known. If it is one of these, use exactly this spelling:\n" + strings.Join(known, "\n")
 	}
 	return p
 }
@@ -80,7 +80,7 @@ func oneOf(v string, allowed []string) string {
 	return ""
 }
 
-// Recognize schickt das Foto an Claude und liefert Marke, Sorte, Art und Tierart.
+// Recognize sends the photo to Claude and returns brand, variety, type and species.
 func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Recognition, error) {
 	var out Recognition
 	img, err := base64.StdEncoding.DecodeString(b64)
@@ -139,14 +139,14 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 	}
 	m := jsonObject.FindString(strings.NewReplacer("```json", "", "```", "").Replace(text.String()))
 	if m == "" || json.Unmarshal([]byte(m), &out) != nil {
-		return Recognition{}, nil // nichts erkannt: die App fragt dann nach dem Namen
+		return Recognition{}, nil // nothing recognised: the app then asks for the name
 	}
 	out.Brand, out.Variety = strings.TrimSpace(out.Brand), strings.TrimSpace(out.Variety)
 	out.Type, out.Animal = oneOf(strings.TrimSpace(out.Type), foodTypes), oneOf(strings.TrimSpace(out.Animal), animalKinds)
 	return out, nil
 }
 
-// CheckKey prüft einen API-Schlüssel mit der kostenlosen Modell-Liste.
+// CheckKey validates an API key using the free model list.
 func CheckKey(ctx context.Context, cfg Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()

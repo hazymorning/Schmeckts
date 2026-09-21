@@ -1,15 +1,15 @@
-/* Layout und Komponenten. Farben und Schriften kommen ausschließlich aus tokens.css, feste Werte aus PROJEKT.md
-   („Gestaltungsregeln“). Fraunces (--font-display) für Überschriften und Zahlen, sonst Figtree (--font-ui).
-   Keine Großbuchstaben per text-transform und keine gesperrte Schrift, einzige Ausnahme ist das Feld für den Haushaltscode.
-   Uhrzeiten und Zahlen mit tabellarischen Ziffern.
-   Tippflächen mindestens 48 px. Größen in px, die System-Schriftgröße skaliert sie in der WebView mit;
-   deshalb hat kein Textcontainer eine feste Höhe. */
+/* Layout and components. Colours and typefaces come from tokens.css alone, fixed values from PROJECT.md
+   ("Design rules"). Fraunces (--font-display) for headings and numbers, Figtree (--font-ui) for everything else.
+   No capitals through text-transform and no letter-spacing, the one exception being the household code field.
+   Times and numbers use tabular figures.
+   Tap targets at least 48 px. Sizes in px, which the system font size scales along with inside the WebView;
+   that is why no text container has a fixed height. */
 
-/* Grundlagen */
+/* Foundations */
 *{box-sizing:border-box}
 html{background:var(--bg)}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--font-ui);font-variation-settings:"SOFT" 100;-webkit-font-smoothing:antialiased;
-  text-rendering:geometricPrecision; /* Laufweite ohne Rundung durch Hinting, sonst klaffen Figtree-Buchstaben wie f und t */
+  text-rendering:geometricPrecision; /* advance widths without hinting's rounding, or Figtree letters such as f and t gape */
   -webkit-tap-highlight-color:transparent;overscroll-behavior-y:none;transition:background-color .45s ease,color .45s ease}
 body.locked{overflow:hidden}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -18,13 +18,14 @@ img{-webkit-user-drag:none;display:block}
 [hidden]{display:none!important}
 button{font:inherit;text-rendering:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
 input{font:inherit;text-rendering:inherit}
-:focus-visible{outline:2.5px solid var(--accent);outline-offset:3px} /* der Rahmen folgt der Rundung des Elements */
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:3px} /* the ring follows the element's radius */
 .ic{width:24px;height:24px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .sk{width:64px;height:64px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .num,.tl-time,.pct,.cnt b,.pp b,.day .dn,.field.code,.lv-n,.lv-s,.chart-y{font-variant-numeric:tabular-nums}
 
-/* Stimmungsbild: Album-Foto hinter Kopfzeile und oberem Seitenbereich, volle Breite, läuft nach unten weich aus. Die Seite liegt
-   unverändert davor. Gewechselt wird nur über die Deckkraft (views/mood.js). Die Maske nutzt nur die Deckkraft ihrer Farbe. */
+/* Mood picture: an album photo behind the header and the upper part of the page, full width, fading out softly
+   downwards. The page sits in front of it unchanged. Changes go through opacity alone (views/mood.js). The mask uses
+   nothing but the opacity of its colour. */
 .mood{position:absolute;top:0;left:0;right:0;height:calc(260px + var(--safe-area-inset-top,env(safe-area-inset-top,0px)));overflow:hidden;pointer-events:none;
   -webkit-mask-image:linear-gradient(to bottom,var(--ink) 35%,transparent);mask-image:linear-gradient(to bottom,var(--ink) 35%,transparent)}
 .mood img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;filter:saturate(.85);transition:opacity 2s linear}
@@ -32,20 +33,20 @@ input{font:inherit;text-rendering:inherit}
 [data-theme="dark"] .mood img.on{opacity:.26}
 .app{position:relative;max-width:600px;margin:0 auto;padding:0 18px calc(112px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))}
 .top{display:flex;align-items:center;justify-content:space-between;padding:calc(12px + var(--safe-area-inset-top,env(safe-area-inset-top,0px))) 0 10px}
-.brand{margin:0;font:650 30px/1.1 var(--font-display);letter-spacing:-.02em;color:var(--ink)} /* nur die Wortmarke, kein Logo */
+.brand{margin:0;font:650 30px/1.1 var(--font-display);letter-spacing:-.02em;color:var(--ink)} /* the wordmark only, no logo */
 .icon-btn{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;color:var(--muted);flex:0 0 auto;
   transition:background-color .2s,transform .2s var(--ease-out)}
 .icon-btn:active{background:var(--surface-2);transform:scale(.9)}
 .top-end{display:flex;align-items:center;gap:2px;min-width:0;margin-right:-8px}
 
-/* Hinweis oben: Änderungen warten oder der Abgleich hakt. Tippfläche 48 px, sichtbar nur die Pille */
+/* Notice at the top: changes waiting or the sync stuck. Tap target 48 px, with only the pill visible */
 .sync-chip{min-height:48px;padding:0 4px;min-width:0;transition:transform .2s var(--ease-out)}
 .sync-chip:active{transform:scale(.95)}
 .sync-chip .pill{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px 5px 9px;border-radius:999px;
   background:var(--surface-2);color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap}
 .sync-chip.bad .pill{background:var(--bad-soft);color:var(--bad)}
 
-/* Tiere oben */
+/* Pets at the top */
 .pets{display:flex;gap:10px;overflow-x:auto;padding:10px 4px 14px;margin:0 -4px;scrollbar-width:none}
 .pets::-webkit-scrollbar{display:none}
 .pet{display:flex;flex-direction:column;align-items:center;gap:6px;width:62px;min-height:48px;padding:2px 0;flex:0 0 auto;transition:transform .2s var(--ease-out)}
@@ -70,20 +71,20 @@ input{font:inherit;text-rendering:inherit}
 .av.add{background:transparent;border:1.5px dashed var(--faint);color:var(--muted)}
 .av.add .ic{width:42%;height:42%}
 
-/* Karten der Startseite
-   Jeder Abschnitt ist eine Karte: Fläche, Radius 26px, Innenabstand 18px oben und seitlich, 8px unten, 14px Abstand,
-   kein Rahmen, kein Schatten, kein farbiger Hintergrund. Die Überschrift steht oben in der Karte. */
+/* Cards of the home page
+   Every section is a card: surface, radius 26px, padding 18px at the top and sides, 8px at the bottom, 14px apart,
+   no border, no shadow, no coloured background. The heading sits at the top of the card. */
 .card{background:var(--surface);border-radius:26px;padding:18px 18px 8px;margin:0;transition:background-color .45s ease}
 .card+.card{margin-top:14px}
 .card h2{margin:0 0 4px;font:600 21px/1.25 var(--font-display);letter-spacing:-.01em;color:var(--ink)}
 .card ul,.card ol{list-style:none;margin:0;padding:0}
 .card li+li{border-top:1px solid var(--line)}
-/* Textknopf in einer Karte, etwa „Weitere anzeigen“ */
+/* A text button inside a card, e.g. „Weitere anzeigen“ */
 .card-btn{display:block;width:100%;min-height:48px;padding:12px 0 10px;border-top:1px solid var(--line);
   font-family:var(--font-ui);font-size:14.5px;font-weight:600;color:var(--accent-ink)}
 
-/* Karten mit „Alle anzeigen“ (Einkaufen, Erkenntnisse): Der Inhalt wächst weich, der Knopf ist .card-btn */
-.card-body{display:flow-root} /* Ränder der Kinder zählen zur Höhe, so springt die Animation nicht */
+/* Cards with „Alle anzeigen“ (Einkaufen, Erkenntnisse): the content eases open and the button is .card-btn */
+.card-body{display:flow-root} /* the children's margins count towards the height, so the animation does not jump */
 .animating{overflow:hidden}
 .card-line{margin:0;padding-bottom:10px;font-size:14.5px;line-height:1.45;color:var(--muted)}
 .empty{display:flex;align-items:center;gap:14px;color:var(--muted);margin:2px 0 8px;font-size:15px;line-height:1.45}
@@ -103,17 +104,17 @@ input{font:inherit;text-rendering:inherit}
 .thumb .ic{width:46%;height:46%}
 .thumb.lg{width:64px;height:64px;border-radius:18px;font-size:26px}
 
-/* Bewertungsfarben */
+/* Rating colours */
 .r-good{--c:var(--good);--cs:var(--good-soft)}
 .r-mid{--c:var(--mid);--cs:var(--mid-soft)}
 .r-sauce{--c:var(--sauce);--cs:var(--sauce-soft)}
 .r-bad{--c:var(--bad);--cs:var(--bad-soft)}
 
-/* Übersicht: niedrige Karte (108px), links das Bild, rechts der Name und das Wichtigste in zwei Zeilen mit „…“;
-   aufgeklappt (.open) und während des Klappens (.animating) steht der ganze Text da. */
+/* Overview: a low card (108px), the picture on the left, the name and the essentials on the right in two lines
+   ending in „…“; unfolded (.open) and while folding (.animating) the whole text is there. */
 .overview{display:flex;align-items:center;gap:14px}
 .overview[data-action]{cursor:pointer}
-.ov-pic,.ov-text{margin-bottom:10px} /* mit den 8px der Karte unten wie oben 18px */
+.ov-pic,.ov-text{margin-bottom:10px} /* with the card's 8px at the bottom that makes 18px, as at the top */
 .ov-pic{position:relative;flex:0 0 auto;width:72px;height:72px;border-radius:50%;transition:transform .2s var(--ease-out)}
 button.ov-pic:active{transform:scale(.95)}
 .ov-pic .av.pair{position:absolute;top:0;left:0;width:46px;height:46px}
@@ -123,22 +124,22 @@ button.ov-pic:active{transform:scale(.95)}
 .overview p{margin:0;font-size:14.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .overview.open p,.overview p.animating{display:block}
 
-/* Offene Bewertungen */
+/* Open ratings */
 .pend{padding:12px 0 14px;max-height:900px}
 .pend.leaving{animation:leave .42s var(--ease-in) both;overflow:hidden}
 @keyframes leave{to{opacity:0;transform:translateY(-6px) scale(.98);max-height:0;padding-top:0;padding-bottom:0;border-top-width:0}}
 .pend-head{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;text-align:left;margin-bottom:10px}
 .pet-rate+.pet-rate{margin-top:12px}
 .pet-label{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--muted);margin-bottom:7px}
-/* gleich breite Knöpfe in einer Reihe, so viele wie die Skala Stufen hat: Icon, darunter zwei Zeilen. Bei 360px und fünf
-   Stufen bleiben je Knopf gut 54px, „angerührt“ braucht 50 */
+/* Equally wide buttons in one row, as many as the scale has levels: an icon with two lines below it. At 360px and
+   five levels each button keeps a good 54px, and „angerührt“ needs 50 */
 .rate-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px}
 .pet-rate>.badge{margin-bottom:8px}
 .rb{display:flex;flex-direction:column;align-items:center;min-height:64px;padding:10px 0 9px;border-radius:16px;background:var(--surface-2);
   font-size:12.5px;font-weight:600;line-height:1.25;color:var(--ink);white-space:nowrap;transition:transform .22s var(--ease-out),box-shadow .25s}
 .rb .ic{width:30px;height:30px;margin-bottom:3px;color:var(--c);stroke-width:1.7}
 .rb small{font-size:11.5px;font-weight:400;line-height:1.25;color:var(--muted)}
-.rb[aria-pressed="true"] small{color:var(--ink)} /* auf der zarten Fläche reicht --muted nicht für 4,5:1 */
+.rb[aria-pressed="true"] small{color:var(--ink)} /* on the soft fill --muted does not reach 4.5:1 */
 .rb:active{transform:scale(.92)}
 .rb[aria-pressed="true"]{background:var(--cs);box-shadow:inset 0 0 0 2px var(--c)}
 .rb.picked{animation:picked .48s var(--ease-spring);background:var(--cs);box-shadow:inset 0 0 0 2px var(--c)}
@@ -155,17 +156,17 @@ button.ov-pic:active{transform:scale(.95)}
 .spin{width:16px;height:16px;border-radius:50%;border:2.5px solid var(--line);border-top-color:var(--accent);animation:rot .8s linear infinite;flex:0 0 auto}
 @keyframes rot{to{transform:rotate(360deg)}}
 
-/* Hinweis, Einkaufen, Erkenntnisse */
+/* Hint, Einkaufen, Erkenntnisse */
 .say{margin:2px 0 0;font-size:16px;line-height:1.45;color:var(--ink)}
 .why{margin:2px 0 0;font-size:14.5px;line-height:1.45;color:var(--muted)}
 .btn-row{display:flex;flex-wrap:wrap;gap:9px;margin:14px 0 10px}
-.btn-row .btn{flex:1 1 auto;width:auto;white-space:nowrap} /* passt der Text nicht nebeneinander, steht jeder Knopf in eigener Zeile */
-/* Letzte Woche: Zeilen wie der Satz im Hinweis, vor dem Futter-Duell ein kleiner Pokal */
+.btn-row .btn{flex:1 1 auto;width:auto;white-space:nowrap} /* when the text will not fit side by side, each button takes its own row */
+/* Letzte Woche: rows like the sentence in the hint, with a small trophy before the food duel */
 .week{padding-bottom:12px}
 .week .say+.say{margin-top:6px}
 .duel{display:flex;align-items:flex-start;gap:7px}
 .duel .ic{flex:0 0 auto;width:18px;height:18px;margin-top:2.5px;color:var(--muted)}
-/* Einkaufen, Fußzeile „Geschmack bekannt“: Text, darunter ein 4px hoher Balken */
+/* Einkaufen, footer „Geschmack bekannt“: text with a 4px bar below it */
 .taste{margin:0;padding:10px 0 12px;font-size:13.5px;line-height:1.4;color:var(--muted)}
 .meter{display:block;height:4px;margin-top:7px;border-radius:999px;background:var(--surface-2);overflow:hidden}
 .meter i{display:block;width:var(--w);height:100%;border-radius:999px;background:var(--accent)}
@@ -193,8 +194,8 @@ button.ov-pic:active{transform:scale(.95)}
 .minis{display:flex;gap:8px;padding:0 4px;flex:0 0 auto}
 .mini{border-radius:50%;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--c,var(--line))}
 
-/* Verlauf: Zwei-Wochen-Kalender, Zeitstrahl der letzten drei Tage, auf Wunsch ältere Tage */
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin:14px 0 10px;text-align:center} /* oben 14px: Der Abstand verschmilzt mit den 4px der Überschrift, vorher blieben nur 6px; die kleinen Wochentage haben keine eigene Luft wie die Zeilen anderer Karten */
+/* Verlauf: a two-week calendar, a timeline of the last three days, and older days on request */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin:14px 0 10px;text-align:center} /* 14px at the top: the margin collapses with the heading's 4px, which left only 6px before; the small weekday labels have no breathing room of their own the way other cards' rows do */
 .cal .wd{font-size:11.5px;font-weight:600;color:var(--faint);padding-bottom:4px}
 .day{display:flex;flex-direction:column;align-items:center;gap:5px;min-height:52px;padding:5px 0 8px;border-radius:14px;
   transition:background-color .2s,transform .2s var(--ease-out)}
@@ -227,13 +228,13 @@ button.ov-pic:active{transform:scale(.95)}
 .tl-item .t-main{margin-right:8px}
 .tl-item .t-main small{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35;margin-top:1px}
 .tl-note{font-style:italic}
-/* Der neue Eintrag: gleitet herein (View Transition) und leuchtet danach kurz */
+/* The new entry: slides in (view transition) and then glows briefly */
 
-/* Willkommen & erste Schritte */
+/* Welcome and first steps */
 .welcome{text-align:center;padding:26px 6px 20px}
 .hero{width:148px;height:148px;margin:0 auto 22px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);box-shadow:var(--card-shadow)}
 .hero .logo{width:104px;height:104px}
-:root[data-theme="dark"] .logo.hell,:root:not([data-theme="dark"]) .logo.dunkel{display:none} /* data-theme: Schema, das gerade gilt */
+:root[data-theme="dark"] .logo.light,:root:not([data-theme="dark"]) .logo.dark{display:none} /* data-theme: the scheme currently in force */
 .intro .hero{animation:heroIn .9s var(--ease-spring) both}
 @keyframes heroIn{from{opacity:0;transform:scale(.7) rotate(-8deg)}}
 .welcome h2{margin:0 0 10px;font:700 27px/1.15 var(--font-display);letter-spacing:-.02em}
@@ -246,7 +247,7 @@ button.ov-pic:active{transform:scale(.95)}
 .steps-hero{display:flex;justify-content:center;padding:8px 0 4px;color:var(--faint)}
 .steps-hero .sk{width:72px;height:72px}
 
-/* Buttons & Eingaben */
+/* Buttons and input */
 .btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:52px;padding:14px 18px;border-radius:18px;font-size:16px;font-weight:600;
   cursor:pointer;transition:transform .2s var(--ease-out),background-color .25s,color .25s}
 .btn:active{transform:scale(.97)}
@@ -265,8 +266,8 @@ button.ov-pic:active{transform:scale(.95)}
   transition:background-color .25s,color .25s,transform .2s var(--ease-out)}
 .chip:active{transform:scale(.95)}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
-/* kleine Icons in Knöpfen, Zeilen und Auswahlfeldern: überall 20px mit der Strichstärke des Icon-Sets, senkrecht mittig;
-   in Feldern und Kästen 14px vom Rand */
+/* Small icons in buttons, rows and select fields: 20px throughout at the icon set's stroke width, vertically
+   centred; 14px from the edge in fields and boxes */
 .btn .ic,.chip .ic,.seg button .ic,.toast button .ic,.sync-chip .ic,.sugg>.ic,.list-row .chev,.prod-card .edit .ic,.search .ic,.pick .ic{width:20px;height:20px}
 .chip .av{margin-left:-7px}
 .tex{margin-bottom:18px}
@@ -283,9 +284,9 @@ button.ov-pic:active{transform:scale(.95)}
 .field:focus{outline:none;border-color:var(--accent);background:var(--surface)}
 .search{position:relative;margin-bottom:6px}
 .search .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
-/* Auswahlfeld: der eigene Pfeil statt des Zeichens vom System; das liegt unsichtbar darüber und öffnet die Auswahl */
+/* Select field: our own arrow instead of the system's control, which sits invisibly on top and opens the picker */
 .pick{position:relative;display:block}
-.pick .field{padding-right:44px;appearance:none;-webkit-appearance:none} /* Android zeichnet sonst seinen eigenen Pfeil daneben */
+.pick .field{padding-right:44px;appearance:none;-webkit-appearance:none} /* Android would otherwise draw its own arrow beside it */
 .pick .field::-webkit-calendar-picker-indicator{position:absolute;right:0;top:0;width:48px;height:100%;margin:0;padding:0;opacity:0;cursor:pointer}
 .pick .ic{position:absolute;right:14px;top:50%;transform:translateY(-50%) rotate(90deg);color:var(--muted);pointer-events:none}
 .search .field{padding-left:44px}
@@ -294,7 +295,7 @@ button.ov-pic:active{transform:scale(.95)}
 .note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:12px 0 0}
 .note.warn{color:var(--bad)}
 
-/* Füttern-Button: der Napf füllt sich beim Servieren kurz */
+/* Feeding button: the bowl fills up briefly on serving */
 .fab{position:fixed;right:max(18px,calc(50% - 282px));bottom:calc(20px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));z-index:5;view-transition-name:fab;
   display:flex;align-items:center;gap:9px;min-height:56px;padding:14px 24px 14px 19px;border-radius:999px;background:var(--accent);color:var(--on-accent);
   font-size:17px;font-weight:600;box-shadow:var(--float-shadow);transition:transform .2s var(--ease-out)}
@@ -305,9 +306,9 @@ button.ov-pic:active{transform:scale(.95)}
 .fab.filled{animation:fabPop .5s var(--ease-spring)}
 @keyframes bowlFill{0%{transform:scaleY(0);opacity:.9}30%,75%{transform:scaleY(1);opacity:.9}100%{transform:scaleY(1);opacity:0}}
 @keyframes fabPop{35%{transform:scale(1.06)}}
-/* Füttern: Barcode und Foto in gleich breiten Spalten, gleich hoch und gleich aufgebaut (Icon, fette erste Zeile,
-   kleine zweite Zeile). Barcode ist der Hauptknopf auf der Akzentfläche, Foto steht auf Fläche 2. Blendet
-   „Füttern beginnt mit“ einen aus, nimmt der andere die ganze Breite. */
+/* Feeding: barcode and photo in equally wide columns, the same height and built the same way (icon, bold first
+   line, small second line). Barcode is the primary button on the accent fill, photo sits on surface 2. When
+   „Füttern beginnt mit“ hides one of them, the other takes the full width. */
 .cta-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:9px}
 .cta{display:flex;align-items:center;gap:12px;min-width:0;min-height:72px;padding:16px;border-radius:22px;text-align:left;
   cursor:pointer;transition:transform .2s var(--ease-out)}
@@ -318,7 +319,7 @@ button.ov-pic:active{transform:scale(.95)}
 .cta b{display:block;font-size:17px;font-weight:600}
 .cta small{display:block;font-size:13.5px}
 
-/* Bottom Sheet */
+/* Bottom sheet */
 dialog.sheet{position:fixed;inset:auto 0 0 0;margin:0 auto;width:100%;max-width:600px;max-height:92vh;max-height:92dvh;padding:0;border:0;
   border-radius:28px 28px 0 0;background:var(--surface);color:var(--ink);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--float-shadow)}
 dialog.sheet:not([open]){display:none}
@@ -360,7 +361,7 @@ button.prod-card:active{transform:scale(.985)}
 .pp .pp-name{min-width:64px;font-weight:600;font-size:14.5px}
 .pp .bar{flex:1;margin:0}
 .pp b{min-width:50px;text-align:right;font:600 16px var(--font-ui);color:var(--ink)}
-/* Futter-Sheet, „Kaufen“: berechnetes Urteil mit kurzer Begründung, bei mehreren Tieren je Tier eine Zeile */
+/* Food sheet, „Kaufen“: the computed verdict with a short reason, one row per pet where there are several */
 .verdict{margin-top:10px}
 .verdict p{margin:0;display:flex;flex-wrap:wrap;column-gap:8px;font-size:14.5px}
 .verdict p b{font-weight:600}
@@ -371,15 +372,15 @@ button.prod-card:active{transform:scale(.985)}
 .list-row{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:10px 0;text-align:left}
 .list-row+.list-row{border-top:1px solid var(--line)}
 .list-row .chev{color:var(--faint)}
-/* Auswertung: eine Linie als eigenes SVG, Balken aus den Bausteinen der App. Farben nur aus den Tokens; die Reihen
-   nennen Namen und Zahlen, damit keine Aussage allein in der Farbe steckt. */
+/* Evaluation: a line as our own SVG, bars from the app's building blocks. Colours from the tokens only; the rows
+   name names and numbers so that no statement rests on colour alone. */
 .chart{display:flex;gap:9px;height:124px;margin-top:10px}
 .chart-y{display:flex;flex-direction:column;justify-content:space-between;flex:0 0 auto;text-align:right;font-size:11.5px;color:var(--muted)}
 .plot{flex:1;min-width:0;height:100%;overflow:visible}
 .plot .grid{fill:none;stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
 .plot polyline{fill:none;stroke:var(--ser);stroke-dasharray:var(--dash);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
   vector-effect:non-scaling-stroke;animation:fadeIn .5s var(--ease-out) both}
-/* Linien mehrerer Tiere: je eigene Farbe und eigener Strich, dazu die Legende */
+/* Lines for several pets: each with its own colour and dash, plus the legend */
 .s0{--ser:var(--accent);--dash:none}
 .s1{--ser:var(--ink);--dash:7 5}
 .s2{--ser:var(--muted);--dash:2 5}
@@ -407,7 +408,7 @@ button.prod-card:active{transform:scale(.985)}
 .who{display:flex;justify-content:space-between;gap:12px;margin:0;padding:9px 0;font-size:14.5px}
 .who+.who{border-top:1px solid var(--line)}
 
-/* Eigene Kamera: Vollbild, immer dunkel (die Tokens lösen sich mit color-scheme dunkel auf), Live-Vorschau füllt die Fläche */
+/* Our own camera: full screen, always dark (the tokens resolve dark through color-scheme), the live preview fills the area */
 .camera{color-scheme:dark;position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;overflow:hidden;background:var(--bg);color:var(--ink)}
 .camera::backdrop{background:var(--bg)}
 .camera video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -417,13 +418,13 @@ button.prod-card:active{transform:scale(.985)}
 .cam-cancel{justify-self:start;min-height:48px;padding:12px 18px;border-radius:18px;background:var(--surface);color:var(--ink);font-size:16px;font-weight:600}
 .shutter{width:78px;height:78px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 4px var(--bg),0 0 0 8px var(--ink);transition:transform .15s var(--ease-out)}
 .shutter:active{transform:scale(.92)}
-/* Zuschnitt: quadratische Ansicht, der runde Ausschnitt entspricht dem Profilbild, außen abgedunkelt */
+/* Cropping: a square stage, the round cut-out matching the profile picture, dimmed outside it */
 .crop{position:relative;width:100%;max-width:340px;aspect-ratio:1;margin:4px auto 0;border-radius:26px;overflow:hidden;background:var(--surface-2);touch-action:none;cursor:grab}
 .crop:active{cursor:grabbing}
 .crop img{position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;pointer-events:none;-webkit-user-drag:none}
 .crop::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 200px var(--backdrop);pointer-events:none}
 .zoom{display:block;width:100%;height:48px;margin:0;color:var(--ink);accent-color:var(--accent)}
-/* Album im Tier-Sheet */
+/* Album in the pet sheet */
 .album{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .ph{position:relative;aspect-ratio:1;border-radius:15px;overflow:hidden;background:var(--surface-2)}
 .ph-img{display:block;width:100%;height:100%;padding:0}
@@ -434,7 +435,7 @@ button.prod-card:active{transform:scale(.985)}
 .ph-x .ic{width:15px;height:15px;stroke-width:2.2}
 .ph.add{display:grid;place-items:center;background:transparent;border:1.5px dashed var(--faint);color:var(--muted);cursor:pointer}
 .ph.add .ic{width:26px;height:26px}
-/* Schalter in den Einstellungen */
+/* Toggles in the settings */
 .pet-photo{position:relative;display:block;width:116px;height:116px;margin:4px auto 8px;cursor:pointer;border-radius:50%;transition:transform .2s var(--ease-out)}
 .pet-photo:active{transform:scale(.95)}
 .cam-badge{position:absolute;right:0;bottom:2px;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
@@ -443,18 +444,18 @@ button.prod-card:active{transform:scale(.985)}
 .photo-hint{display:block;text-align:center;margin:0 0 4px;padding:12px 0;font-size:13.5px;font-weight:600;color:var(--accent-ink);cursor:pointer}
 .foot{margin:24px 0 0;text-align:center;font-size:13px;color:var(--muted)}
 
-/* Haushalts-Server in den Einstellungen */
+/* The household server in the settings */
 .srv{display:flex;align-items:center;gap:13px;padding:12px 14px 12px 12px;border-radius:20px;background:var(--surface-2)}
 .srv-ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:0 0 auto;background:var(--surface);color:var(--muted);
   transition:background-color .3s,color .3s}
 .srv-ic .ic{width:23px;height:23px}
-.srv.ok .srv-ic{color:var(--accent-ink)} /* die zarten Flächen heben sich von --surface-2 kaum ab: Nur das Icon trägt die Farbe */
+.srv.ok .srv-ic{color:var(--accent-ink)} /* the soft fills barely stand out against --surface-2: only the icon carries the colour */
 .srv.bad .srv-ic{color:var(--bad)}
 .srv .t-main small{white-space:normal;line-height:1.35;margin-top:1px}
 .connect{display:flex;gap:9px}
 .connect .field{flex:1;min-width:0}
 .connect .btn{width:auto;flex:0 0 auto;padding:14px 20px}
-.field.code{text-transform:uppercase;letter-spacing:.14em;font-weight:600} /* einzige Ausnahme: Haushaltscode */
+.field.code{text-transform:uppercase;letter-spacing:.14em;font-weight:600} /* the one exception: the household code */
 .field.code::placeholder{text-transform:none;letter-spacing:0;font-weight:400}
 .addr{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin:10px 0 0;font-size:13.5px;color:var(--muted);overflow-wrap:anywhere}
 .addr .link{font-size:13.5px}
@@ -462,7 +463,7 @@ button.prod-card:active{transform:scale(.985)}
 .btn .spin{border-color:currentColor;border-top-color:transparent;opacity:.8}
 .mt-s{margin-top:10px}
 
-/* Toast mit Rückgängig */
+/* Toast with undo */
 .toast{position:fixed;left:50%;bottom:calc(90px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));z-index:30;view-transition-name:toast;
   display:flex;align-items:center;gap:6px;width:max-content;max-width:min(92vw,520px);min-height:52px;padding:8px 8px 8px 18px;border-radius:18px;
   background:var(--ink);color:var(--bg);font-size:14.5px;font-weight:500;box-shadow:var(--float-shadow);
@@ -474,17 +475,17 @@ button.prod-card:active{transform:scale(.985)}
 .toast>span{padding:6px 8px 6px 0}
 .toast button{display:flex;align-items:center;gap:6px;flex:0 0 auto;min-height:44px;padding:9px 12px;border-radius:12px;color:var(--toast-action);font-weight:600}
 
-/* View Transitions (Umsortieren, Ein- und Ausblenden) */
+/* View transitions (reordering, fading in and out) */
 ::view-transition-group(*){animation-duration:.4s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
 ::view-transition-old(root),::view-transition-new(root){animation:none}
 ::view-transition-new(*):only-child{animation:vtIn .36s cubic-bezier(.22,1,.36,1) both}
 ::view-transition-old(*):only-child{animation:vtOut .22s ease both}
-::view-transition-new(.fresh):only-child{animation:slideIn .5s cubic-bezier(.22,1,.36,1) both} /* neuer Eintrag gleitet in „Heute“ (view-transition-class) */
+::view-transition-new(.fresh):only-child{animation:slideIn .5s cubic-bezier(.22,1,.36,1) both} /* a new entry slides into „Heute“ (view-transition-class) */
 @keyframes vtIn{from{opacity:0;transform:scale(.94)}}
 @keyframes vtOut{to{opacity:0;transform:scale(.94)}}
 @keyframes slideIn{from{opacity:0;transform:translateY(-22px)}}
 
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-  html{transition:none!important} /* sonst liest applyTheme() noch den alten Grund */
+  html{transition:none!important} /* otherwise applyTheme() still reads the old background */
 }

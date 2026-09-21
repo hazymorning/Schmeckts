@@ -9,26 +9,26 @@ import (
 	"time"
 )
 
-func TestBarcodeNormalisieren(t *testing.T) {
+func TestNormalisingBarcodes(t *testing.T) {
 	cases := map[string]string{"4006381333931": "4006381333931", "96385074": "96385074", "036000291452": "0036000291452", " 4006381333931 ": "4006381333931"}
 	for in, want := range cases {
 		if got, ok := NormalizeCode(in); !ok || got != want {
-			t.Errorf("%q: %q %v, erwartet %q", in, got, ok, want)
+			t.Errorf("%q: %q %v, expected %q", in, got, ok, want)
 		}
 	}
 	for _, bad := range []string{"4006381333932", "40063813339", "abc", "", "4006-381333931"} {
 		if _, ok := NormalizeCode(bad); ok {
-			t.Errorf("%q müsste ungültig sein", bad)
+			t.Errorf("%q should be invalid", bad)
 		}
 	}
 }
 
-// fakeDB spielt eine Datenbank der Open-Food-Facts-Familie; products: Code → Antwort-JSON
+// fakeDB plays a database of the Open Food Facts family; products: code → response JSON
 func fakeDB(t *testing.T, products map[string]string, calls *atomic.Int32) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		if r.Header.Get("User-Agent") != barcodeUserAgent {
-			t.Errorf("User-Agent fehlt: %q", r.Header.Get("User-Agent"))
+			t.Errorf("User-Agent missing: %q", r.Header.Get("User-Agent"))
 		}
 		code := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v2/product/"), ".json")
 		if body, ok := products[code]; ok {
@@ -50,7 +50,7 @@ func newBarcodeAPI(t *testing.T, urls ...string) *API {
 
 const sheba = `{"product_name":"Sheba Fresh Choice Huhn in Sauce 4x50g","brands":"Sheba,Mars","categories_tags":["en:pet-food","en:cat-food","en:wet-cat-food"]}`
 
-func TestBarcodeTrefferMitAufbereitung(t *testing.T) {
+func TestBarcodeHitWithCleanup(t *testing.T) {
 	var calls atomic.Int32
 	db := fakeDB(t, map[string]string{"4006381333931": sheba}, &calls)
 	defer db.Close()
@@ -62,7 +62,7 @@ func TestBarcodeTrefferMitAufbereitung(t *testing.T) {
 	}
 }
 
-func TestBarcodeZweiteDatenbankUndDeutscherName(t *testing.T) {
+func TestSecondDatabaseAndGermanName(t *testing.T) {
 	var calls atomic.Int32
 	pet := fakeDB(t, nil, &calls)
 	defer pet.Close()
@@ -75,7 +75,7 @@ func TestBarcodeZweiteDatenbankUndDeutscherName(t *testing.T) {
 	}
 }
 
-func TestBarcodeZwischenspeicher(t *testing.T) {
+func TestBarcodeCache(t *testing.T) {
 	var calls atomic.Int32
 	db := fakeDB(t, map[string]string{"4006381333931": sheba}, &calls)
 	defer db.Close()
@@ -83,28 +83,28 @@ func TestBarcodeZwischenspeicher(t *testing.T) {
 	call(a, "GET", "/api/barcode/4006381333931", testCode, nil) // Treffer
 	call(a, "GET", "/api/barcode/96385074", testCode, nil)      // kein Treffer
 	if calls.Load() != 2 {
-		t.Fatalf("%d Anfragen", calls.Load())
+		t.Fatalf("%d requests", calls.Load())
 	}
 	a.now = func() time.Time { return now.Add(6 * 24 * time.Hour) }
 	call(a, "GET", "/api/barcode/4006381333931", testCode, nil)
 	call(a, "GET", "/api/barcode/96385074", testCode, nil)
 	if calls.Load() != 2 {
-		t.Fatalf("nach 6 Tagen: %d Anfragen, beide Ergebnisse müssen noch gemerkt sein", calls.Load())
+		t.Fatalf("after 6 days: %d requests, both results must still be remembered", calls.Load())
 	}
 	a.now = func() time.Time { return now.Add(8 * 24 * time.Hour) }
 	call(a, "GET", "/api/barcode/96385074", testCode, nil)
 	call(a, "GET", "/api/barcode/4006381333931", testCode, nil)
 	if calls.Load() != 3 {
-		t.Fatalf("nach 8 Tagen: %d Anfragen, nur „kein Treffer“ darf abgelaufen sein", calls.Load())
+		t.Fatalf("after 8 days: %d requests, only the miss may have expired", calls.Load())
 	}
-	// Der Zwischenspeicher überlebt einen Neustart
+	// The cache survives a restart
 	b := OpenBarcodes(a.cfg.dir)
 	if p, ok := b.cached("4006381333931", now); !ok || p.Brand != "Sheba" {
-		t.Fatal("Zwischenspeicher nach Neustart leer")
+		t.Fatal("cache empty after the restart")
 	}
 }
 
-func TestBarcodeDatenbankNichtErreichbar(t *testing.T) {
+func TestBarcodeDatabaseUnreachable(t *testing.T) {
 	old := barcodeTimeout
 	barcodeTimeout = 100 * time.Millisecond
 	defer func() { barcodeTimeout = old }()
@@ -117,30 +117,30 @@ func TestBarcodeDatenbankNichtErreichbar(t *testing.T) {
 		t.Fatalf("%d %v", s, out)
 	}
 	if _, ok := a.barcodes.cached("4006381333931", now); ok {
-		t.Fatal("ohne Antwort darf nichts gemerkt werden")
+		t.Fatal("without an answer nothing may be remembered")
 	}
 }
 
-func TestBarcodeUngueltigUndBremse(t *testing.T) {
+func TestBarcodeInvalidAndRateLimit(t *testing.T) {
 	var calls atomic.Int32
 	db := fakeDB(t, nil, &calls)
 	defer db.Close()
 	a := newBarcodeAPI(t, db.URL)
 	if s, _, _ := call(a, "GET", "/api/barcode/4006381333932", testCode, nil); s != 400 {
-		t.Fatalf("falsche Prüfziffer: %d", s)
+		t.Fatalf("wrong check digit: %d", s)
 	}
 	if s, _, _ := call(a, "GET", "/api/barcode/4006381333931", "", nil); s != 401 {
-		t.Fatalf("ohne Code: %d", s)
+		t.Fatalf("without a code: %d", s)
 	}
 	for i := 0; i < barcodeBurst; i++ {
 		call(a, "GET", "/api/barcode/4006381333931", testCode, nil)
 	}
 	if s, _, _ := call(a, "GET", "/api/barcode/4006381333931", testCode, nil); s != 429 {
-		t.Fatalf("nach %d Abfragen: %d", barcodeBurst, s)
+		t.Fatalf("after %d queries: %d", barcodeBurst, s)
 	}
 }
 
-func TestInfoMeldetBarcode(t *testing.T) {
+func TestInfoAnnouncesBarcode(t *testing.T) {
 	_, out, _ := call(newTestAPI(t, ""), "GET", "/api/info", "", nil)
 	f, _ := out["features"].([]any)
 	if len(f) != 1 || f[0] != "barcode" {
@@ -148,15 +148,15 @@ func TestInfoMeldetBarcode(t *testing.T) {
 	}
 }
 
-func TestScanCodeBleibtAufDemHandy(t *testing.T) {
+func TestScanCodeStaysOnThePhone(t *testing.T) {
 	s, _ := openTemp(t)
 	mustApply(t, s, chg("scan0001", "servings", "srv1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"scanCode": "4006381333931", "note": "x"}))
 	if field(s, "servings", "srv1", "scanCode") != "<fehlt>" {
-		t.Fatal("scanCode darf nicht auf dem Server landen")
+		t.Fatal("scanCode must not reach the server")
 	}
 }
 
-func TestUebersicht(t *testing.T) {
+func TestOverview(t *testing.T) {
 	s, dir := openTemp(t)
 	ms := now.UnixMilli()
 	mustApply(t, s,
@@ -171,10 +171,10 @@ func TestUebersicht(t *testing.T) {
 	for _, want := range []string{"Tiere         2  Minka, Tiger", "Futter        1  davon 1 mit Barcode", "Mahlzeiten    1",
 		"Sheba Lachs", "Minka: Gut, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
 		if !strings.Contains(out, want) {
-			t.Errorf("Übersicht enthält %q nicht:\n%s", want, out)
+			t.Errorf("the overview does not contain %q:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "Weg") {
-		t.Error("gelöschte Tiere gehören nicht in die Übersicht")
+		t.Error("deleted pets do not belong in the overview")
 	}
 }

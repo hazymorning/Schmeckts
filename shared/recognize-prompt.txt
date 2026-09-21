@@ -1,5 +1,5 @@
-Auf dem Foto ist eine Tierfutter-Verpackung (Dose, Schale, Beutel, Sack oder Snack).
-Bestimme Marke und Sorte. Antworte AUSSCHLIESSLICH mit JSON ohne Markdown in dieser Form:
+The photo shows pet food packaging (a can, tray, pouch, sack or treat).
+Identify the brand and the variety. Answer with JSON ONLY, no markdown, in this form:
 {"brand":"","variety":"","type":"Nassfutter|Trockenfutter|Snack|Sonstiges","animal":"Katze|Hund|Kaninchen|Vogel|Nager|Andere"}
-"variety" ist die Sorte kurz auf Deutsch, z. B. "Huhn in Soße" oder "Lachs Pastete".
-Wenn etwas nicht erkennbar ist, lass den Wert leer.
+"variety" is the variety, short and in German, e.g. "Huhn in Soße" or "Lachs Pastete".
+Leave a value empty when it cannot be made out.

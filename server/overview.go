@@ -1,6 +1,7 @@
 package main
 
-// Übersicht für „sudo schmeckts-server uebersicht“: der Datenbestand lesbar statt als JSON.
+// The overview for "sudo schmeckts-server overview": the stored data readably instead of as JSON.
+// The output is German, like the app.
 
 import (
 	"encoding/json"
@@ -48,7 +49,7 @@ func when(t, now time.Time) string {
 	}
 }
 
-// Overview fasst den Datenbestand zusammen. dir dient nur für das Datum des letzten Backups.
+// Overview summarises the stored data. dir is only used for the date of the last backup.
 func Overview(st state, dir string, now time.Time) string {
 	var b strings.Builder
 	pets, products, servings := st.Records["pets"], st.Records["products"], st.Records["servings"]
@@ -130,7 +131,7 @@ func Overview(st state, dir string, now time.Time) string {
 		b.WriteString("\nFutter mit Barcode\n" + strings.Join(withCode, "\n") + "\n")
 	}
 
-	// Geräte: letzte Änderung je Geräte-Kennung aus den Feld-Uhren, Name aus „by“, falls bekannt
+	// Devices: the latest change per device id from the field clocks, with the name from "by" where known
 	type device struct {
 		last  int64
 		name  string

@@ -54,49 +54,49 @@ func mustApply(t *testing.T, s *Store, changes ...Change) ([]string, []Rejected)
 	return ok, rej
 }
 
-func TestSpaetereAenderungGewinntProFeld(t *testing.T) {
+func TestLaterChangeWinsPerField(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	mustApply(t, s, chg("aaaaaaaa1", "servings", "srv1", clock(ms, 0, "anna"), map[string]any{"note": "alt", "servedAt": 1}))
 	mustApply(t, s, chg("aaaaaaaa2", "servings", "srv1", clock(ms+10, 0, "jonas"), map[string]any{"note": "neu"}))
 	mustApply(t, s, chg("aaaaaaaa3", "servings", "srv1", clock(ms+5, 0, "anna"), map[string]any{"note": "zwischendurch"}))
 	if got := field(s, "servings", "srv1", "note"); got != `"neu"` {
-		t.Fatalf("note = %s, erwartet die spätere Änderung", got)
+		t.Fatalf("note = %s, expected the later change", got)
 	}
 	if got := field(s, "servings", "srv1", "servedAt"); got != `1` {
-		t.Fatalf("servedAt = %s, andere Felder dürfen nicht leiden", got)
+		t.Fatalf("servedAt = %s, other fields must not suffer", got)
 	}
 }
 
-func TestZweiGeraeteBewertenVerschiedeneTiere(t *testing.T) {
+func TestTwoDevicesRateDifferentPets(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	mustApply(t, s,
 		chg("bbbbbbbb1", "servings", "srv1", clock(ms, 0, "anna"), map[string]any{"pets.minka": map[string]any{"r": "gut"}}),
 		chg("bbbbbbbb2", "servings", "srv1", clock(ms, 0, "jonas"), map[string]any{"pets.tiger": map[string]any{"r": "sosse"}}))
 	if field(s, "servings", "srv1", "pets.minka") == "<fehlt>" || field(s, "servings", "srv1", "pets.tiger") == "<fehlt>" {
-		t.Fatal("beide Bewertungen müssen erhalten bleiben")
+		t.Fatal("both ratings must be kept")
 	}
 }
 
-func TestLoeschenUndRueckgaengig(t *testing.T) {
+func TestDeleteAndUndo(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	mustApply(t, s, chg("cccccccc1", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"name": "Minka", "_del": false}))
 	mustApply(t, s, chg("cccccccc2", "pets", "pet1", clock(ms+1000, 0, "anna"), map[string]any{"_del": true}))
-	// Ein Handy war offline und ändert danach nur den Namen: das holt den Eintrag nicht zurück
+	// A phone was offline and then only changes the name: that does not bring the record back
 	mustApply(t, s, chg("cccccccc3", "pets", "pet1", clock(ms+2000, 0, "jonas"), map[string]any{"name": "Minka II"}))
 	if got := field(s, "pets", "pet1", "_del"); got != "true" {
-		t.Fatalf("_del = %s, eine Namensänderung darf nichts wiederherstellen", got)
+		t.Fatalf("_del = %s, a name change must not restore anything", got)
 	}
-	// Rückgängig setzt _del ausdrücklich auf false
+	// Undo sets _del to false explicitly
 	mustApply(t, s, chg("cccccccc4", "pets", "pet1", clock(ms+3000, 0, "anna"), map[string]any{"_del": false}))
 	if got := field(s, "pets", "pet1", "_del"); got != "false" {
-		t.Fatalf("_del = %s, Rückgängig muss wiederherstellen", got)
+		t.Fatalf("_del = %s, undo must restore", got)
 	}
 }
 
-func TestDoppeltGesendetWirdNurEinmalGezaehlt(t *testing.T) {
+func TestSentTwiceCountsOnce(t *testing.T) {
 	s, _ := openTemp(t)
 	c := chg("dddddddd1", "products", "prd1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"brand": "Sheba"})
 	ok1, _ := mustApply(t, s, c)
@@ -104,11 +104,11 @@ func TestDoppeltGesendetWirdNurEinmalGezaehlt(t *testing.T) {
 	ok2, _ := mustApply(t, s, c)
 	_, seq2 := s.Seq()
 	if len(ok1) != 1 || len(ok2) != 1 || seq1 != seq2 {
-		t.Fatalf("ok=%v/%v seq=%d/%d: doppelte Änderung muss bestätigt, aber nicht erneut gezählt werden", ok1, ok2, seq1, seq2)
+		t.Fatalf("ok=%v/%v seq=%d/%d: a duplicate change must be confirmed but not counted again", ok1, ok2, seq1, seq2)
 	}
 }
 
-func TestUngueltigeAenderungenWerdenAbgelehnt(t *testing.T) {
+func TestInvalidChangesAreRejected(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	cases := map[string]Change{
@@ -127,23 +127,23 @@ func TestUngueltigeAenderungenWerdenAbgelehnt(t *testing.T) {
 	}
 	future := chg("eeeeeeee7", "pets", "pet1", clock(ms+int64(time.Hour/time.Millisecond), 0, "anna"), map[string]any{"name": "x"})
 	if _, rej := mustApply(t, s, future); len(rej) != 1 || rej[0].Reason != "clock" {
-		t.Fatalf("Zeitstempel aus der Zukunft: %v", rej)
+		t.Fatalf("timestamp from the future: %v", rej)
 	}
 }
 
-func TestLokaleFelderBleibenAufDemHandy(t *testing.T) {
+func TestLocalFieldsStayOnThePhone(t *testing.T) {
 	s, _ := openTemp(t)
 	mustApply(t, s, chg("ffffffff1", "servings", "srv1", clock(now.UnixMilli(), 0, "anna"),
 		map[string]any{"photo": "data:image/jpeg;base64,xyz", "status": "recognizing", "note": "hallo"}))
 	if field(s, "servings", "srv1", "photo") != "<fehlt>" || field(s, "servings", "srv1", "status") != "<fehlt>" {
-		t.Fatal("photo und status dürfen nicht auf dem Server landen")
+		t.Fatal("photo and status must not reach the server")
 	}
 	if field(s, "servings", "srv1", "note") != `"hallo"` {
-		t.Fatal("note fehlt")
+		t.Fatal("note missing")
 	}
 }
 
-func TestNachNeustartIdentisch(t *testing.T) {
+func TestIdenticalAfterRestart(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("gggggggg1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
 	e1, q1, sum1, _ := s.Checksum()
@@ -153,27 +153,27 @@ func TestNachNeustartIdentisch(t *testing.T) {
 	}
 	e2, q2, sum2, _ := s2.Checksum()
 	if e1 != e2 || q1 != q2 || sum1 != sum2 {
-		t.Fatal("nach dem Neustart muss der Datenbestand identisch sein")
+		t.Fatal("after the restart the stored data must be identical")
 	}
 }
 
-func TestSpeicherfehlerRolltZurueck(t *testing.T) {
+func TestWriteFailureRollsBack(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("hhhhhhhh1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
-	os.Mkdir(filepath.Join(dir, stateFile+".tmp"), 0o700) // Schreiben schlägt damit fehl
+	os.Mkdir(filepath.Join(dir, stateFile+".tmp"), 0o700) // this makes writing fail
 	_, _, _, err := s.Apply([]Change{chg("hhhhhhhh2", "pets", "pet1", clock(now.UnixMilli()+1, 0, "anna"), map[string]any{"name": "Kater"})}, now)
 	if err == nil {
-		t.Fatal("Schreibfehler muss gemeldet werden, sonst würde das Handy die Änderung verwerfen")
+		t.Fatal("a write failure must be reported, or the phone would drop the change")
 	}
 	if field(s, "pets", "pet1", "name") != `"Minka"` {
-		t.Fatal("nach einem Schreibfehler muss der Speicher dem gespeicherten Stand entsprechen")
+		t.Fatal("after a write failure memory must match the persisted state")
 	}
 	if _, seen := s.st.Seen["hhhhhhhh2"]; seen {
-		t.Fatal("die fehlgeschlagene Änderung darf nicht als bekannt gelten")
+		t.Fatal("the failed change must not count as known")
 	}
 }
 
-func TestBeschaedigteDateiNutztBackup(t *testing.T) {
+func TestCorruptedFileUsesBackup(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("iiiiiiii1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
 	if err := s.Backup(now); err != nil {
@@ -186,31 +186,31 @@ func TestBeschaedigteDateiNutztBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 	if field(s2, "pets", "pet1", "name") != `"Minka"` {
-		t.Fatal("das Backup muss geladen werden")
+		t.Fatal("the backup must be loaded")
 	}
 	if e, _ := s2.Seq(); e == oldEpoch {
-		t.Fatal("nach dem Laden eines Backups braucht es eine neue Epoche")
+		t.Fatal("after loading a backup a new epoch is needed")
 	}
 	if m, _ := filepath.Glob(filepath.Join(dir, "state.defekt-*.json")); len(m) != 1 {
-		t.Fatal("die beschädigte Datei muss beiseitegelegt werden")
+		t.Fatal("the corrupted file must be set aside")
 	}
 }
 
-func TestBackupsWerdenRotiert(t *testing.T) {
+func TestBackupsAreRotated(t *testing.T) {
 	s, dir := openTemp(t)
 	for d := 0; d < 35; d++ {
 		if err := s.Backup(now.AddDate(0, 0, d)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	s.Backup(now.AddDate(0, 0, 34)) // derselbe Tag noch einmal
+	s.Backup(now.AddDate(0, 0, 34)) // the same day again
 	files, _ := filepath.Glob(filepath.Join(dir, backupDir, "state-*.json"))
 	if len(files) != keepBackups {
 		t.Fatalf("%d Backups, erwartet %d", len(files), keepBackups)
 	}
 }
 
-func TestSinceLiefertNurNeueres(t *testing.T) {
+func TestSinceReturnsOnlyNewer(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	mustApply(t, s, chg("jjjjjjjj1", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"name": "Minka"}))
@@ -222,7 +222,7 @@ func TestSinceLiefertNurNeueres(t *testing.T) {
 	}
 }
 
-func TestProdukteFuerDenPrompt(t *testing.T) {
+func TestProductsForThePrompt(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	mustApply(t, s,

@@ -1,5 +1,5 @@
-/* Alle Klicks laufen über data-action und das Objekt ACTIONS. Dazu Eingaben, Tastatur, Dateiauswahl
-   und die Deep Links schmeckts://fuettern, schmeckts://scan und schmeckts://foto. Meldet sich beim Laden selbst an. */
+/* Every click runs through data-action and the ACTIONS object. Plus input, the keyboard, the file picker
+   and the deep links schmeckts://feed, schmeckts://scan and schmeckts://photo. Registers itself as it loads. */
 import {$, reduceMotion} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
@@ -21,7 +21,7 @@ import {addAlbumPhotos, albumToProfile, closeCrop, deletePet, openPet, removeAlb
 import {exportData, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 
-/* Mit dem Haushalt verbinden: erst Adresse, Protokoll und Code prüfen, dann Beispieldaten entfernen und abgleichen */
+/* Connecting to the household: check address, protocol and code first, then remove the sample data and sync */
 async function connectServer(){
   if (sheet?.kind !== 'settings' || sheet.connecting) return;
   Object.assign(sheet, {connecting:true, connectError:''}); renderSheet();
@@ -39,15 +39,15 @@ async function connectServer(){
     if (sheet?.kind === 'settings') { Object.assign(sheet, {connecting:false, connectError:e.message}); renderSheet(); $('#f-code')?.focus(); }
   }
 }
-function disconnectServer(){ // wechselt zum Modus „lokal“
+function disconnectServer(){ // switches to mode `lokal`
   disconnect(); renderSheet(); update();
   toast('Verbindung getrennt. Die Daten bleiben auf diesem Handy.');
 }
-function openConnect(){ // Felder für Adresse und Code, aus den Einstellungen oder von der Willkommensseite
+function openConnect(){ // fields for address and code, from the settings or the welcome page
   if (sheet?.kind === 'settings') { sheet.connectForm = true; renderSheet(); } else openSheet({kind:'settings', connectForm:true});
   requestAnimationFrame(() => { $('#server')?.scrollIntoView({block:'start'}); $(prefs.server ? '#f-code' : '#f-server')?.focus({preventScroll:true}); });
 }
-/* „Jetzt abgleichen“: Nur dieser von Hand gestartete Abgleich zeigt einen Fortschritt, und erst nach 600 ms */
+/* „Jetzt abgleichen“: only this hand-started sync shows progress, and only after 600 ms */
 async function syncByHand(){
   const s = sheet; if (s?.kind !== 'settings' || s.syncing) return;
   s.syncing = 'quiet';
@@ -56,7 +56,7 @@ async function syncByHand(){
   finally { clearTimeout(timer); s.syncing = ''; if (sheet === s) paintServerBox(); }
 }
 
-/* Zweimal tippen statt Sicherheitsdialog */
+/* Tap twice instead of a confirmation dialog */
 const ARMED = {'delete-product':deleteProduct, 'delete-pet':deletePet, wipe, disconnect:disconnectServer};
 let armTimer = null;
 function arm(el){
@@ -70,35 +70,35 @@ function arm(el){
 const ACTIONS = {
   filter(el){
     const id = el.dataset.id;
-    if (id !== 'all' && (db.pets.length === 1 || prefs.activePet === id)) return openPet(id); // erneut tippen = bearbeiten
+    if (id !== 'all' && (db.pets.length === 1 || prefs.activePet === id)) return openPet(id); // tapping again = edit
     prefs.activePet = id;
     savePrefs(); haptic('select'); update();
   },
   'add-pet'(){ openSheet({kind:'pet', name:'', species:'Katze', photo:null, from:sheet?.kind === 'settings' ? 'settings' : null}); },
   'edit-pet'(el){ openPet(el.dataset.id, 'settings'); },
-  'open-pet'(el){ openPet(el.dataset.id); }, // von der Übersicht
+  'open-pet'(el){ openPet(el.dataset.id); }, // from the overview
   'open-settings'(){ openSheet({kind:'settings'}); },
-  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: Abschnitt, bei dem sie öffnet
-  'report-span'(el){ haptic('select'); reportSpan(el.dataset.v); },                    // Zeitraum, gilt für die ganze Seite
+  'open-report'(el){ openSheet(reportState(el.dataset.v || null)); },                  // data-v: the section it opens at
+  'report-span'(el){ haptic('select'); reportSpan(el.dataset.v); },                    // the span, applies to the whole page
   'report-more'(){ haptic('select'); reportMore(); },
   'open-privacy'(){ openSheet({kind:'privacy'}); },
   'open-server'(){ openSheet({kind:'settings'}); requestAnimationFrame(() => $('#server')?.scrollIntoView({block:'start'})); },
   connect(){ connectServer(); },
   'connect-form'(){ haptic('select'); openConnect(); },
-  'mode-local'(){ prefs.mode = 'lokal'; savePrefs(); haptic('select'); update(); }, // Willkommensseite: „Nur auf diesem Handy“
+  'mode-local'(){ prefs.mode = 'lokal'; savePrefs(); haptic('select'); update(); }, // welcome page: „Nur auf diesem Handy“
   'edit-server'(){ sheet.editServer = true; renderSheet(); $('#f-server')?.focus(); },
   'sync-now'(){ haptic('select'); syncByHand(); },
   close(){ closeSheet(); },
   feed(){ openSheet({kind:'feed'}); },
-  serve(el){ const {id, code} = el.dataset; closeSheet().then(() => serveProduct(id, code)); }, // code: aus der Auswahl nach dem Scannen
+  serve(el){ const {id, code} = el.dataset; closeSheet().then(() => serveProduct(id, code)); }, // code: from the choice after scanning
   scan(){ scan(); },
-  photo(){ shootPhoto('', sheet?.kind === 'feed' ? sheet.code : ''); }, // Code nach dem Scannen, falls der Foto-Knopf ihn übernimmt
+  photo(){ shootPhoto('', sheet?.kind === 'feed' ? sheet.code : ''); }, // the code after scanning, should the photo button take it over
   'new-product'(){ openSheet({kind:'new', brand:'', variety:'', type:'Nassfutter'}); },
   rate(el){ rate(el); },
   'open-serving'(el){
     const s = getServing(el.dataset.id); if (!s) return;
     const unknown = !s.productId && s.status !== 'recognizing';
-    openSheet({kind:'serving', id:s.id, step:unknown ? 'name' : null, ...guessOf(s)}); // gelesene Marke und Sorte stehen schon da
+    openSheet({kind:'serving', id:s.id, step:unknown ? 'name' : null, ...guessOf(s)}); // the brand and variety that were read are already there
   },
   'edit-name'(){
     const s = getServing(sheet.id), p = getProduct(s?.productId);
@@ -106,8 +106,8 @@ const ACTIONS = {
   },
   'save-name'(){ saveName(); },
   'use-product'(el){ useProduct(el.dataset.id); },
-  'set-type'(el){ sheet.type = el.dataset.v; if (!textureOf(sheet, sheet.texture)) delete sheet.texture; renderSheet(); }, // passt nicht mehr: wieder offen
-  'set-texture'(el){ // ein zweiter Tipp hebt auf (null = keine): im Futter-Sheet sofort, beim Benennen bis „Speichern“
+  'set-type'(el){ sheet.type = el.dataset.v; if (!textureOf(sheet, sheet.texture)) delete sheet.texture; renderSheet(); }, // no longer fits: open again
+  'set-texture'(el){ // a second tap clears it (null = none): at once in the food sheet, until „Speichern“ while naming
     const v = el.dataset.v;
     if (sheet.kind === 'product' && sheet.step !== 'name') { toggleTexture(sheet.id, v); update(); } else sheet.texture = sheet.texture === v ? null : v;
     haptic('select'); renderSheet();
@@ -128,10 +128,10 @@ const ACTIONS = {
   'delete-serving'(){ deleteServing(sheet.id); },
   'open-product'(el){ openSheet({kind:'product', id:el.dataset.id}); },
   'remove-code'(el){ removeCode(el.dataset.code); },
-  kaufen(el){ setKaufen(sheet.id, el.dataset.v); haptic('select'); renderSheet(); update(); }, // Futter-Sheet, Abschnitt „Kaufen“
-  'hint-kaufen'(el){ setKaufen(el.dataset.id, el.dataset.v); haptic('success'); update(); },  // Hinweis erledigt, auf allen Geräten
+  buy(el){ setKaufen(sheet.id, el.dataset.v); haptic('select'); renderSheet(); update(); },  // food sheet, section „Kaufen“
+  'hint-buy'(el){ setKaufen(el.dataset.id, el.dataset.v); haptic('success'); update(); },    // hint settled, on every device
   'hide-hint'(el){ if (!prefs.hiddenHints.includes(el.dataset.v)) prefs.hiddenHints.push(el.dataset.v); savePrefs(); haptic('select'); update(); },
-  'close-week'(el){ prefs.closedWeek = el.dataset.v; savePrefs(); haptic('select'); update(); },    // Wochenrückblick, pro Woche und Gerät
+  'close-week'(el){ prefs.closedWeek = el.dataset.v; savePrefs(); haptic('select'); update(); },    // weekly review, per week and device
   'share-list'(){ shareShopping(); },
   'rename-product'(){
     const p = getProduct(sheet.id); if (!p) return;
@@ -145,29 +145,29 @@ const ACTIONS = {
   'album-select'(el){ sheet.albumSel = sheet.albumSel === el.dataset.key ? null : el.dataset.key; haptic('select'); renderSheet(); },
   'album-remove'(el){ removeAlbumPhoto(el.dataset.key); },
   'album-profile'(){ albumToProfile(); },
-  backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // Tierfotos im Hintergrund
-  lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // Produktsuche im Internet, Standard aus
-  'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // welcher Knopf im Füttern-Sheet steht
-  'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // Erinnerung ans Füttern zu den üblichen Zeiten
-  remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // Erinnerung zum Bewerten, fragt nach der Erlaubnis
-  'remind-own'(){ // „Eigene“: Feld für ganze Stunden, beginnt mit dem geltenden Abstand, von „Aus“ mit 2 Stunden
+  backdrop(el){ prefs.backdrop = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); update(); }, // pet photos in the background
+  lookup(el){ prefs.lookup = el.dataset.v === 'on'; savePrefs(); haptic('select'); renderSheet(); },                // product lookup on the internet, off by default
+  'feed-start'(el){ prefs.feedStart = el.dataset.v; savePrefs(); haptic('select'); renderSheet(); },                // which button the feeding sheet shows
+  'feed-remind'(el){ haptic('select'); setFeedRemind(el.dataset.v === 'on'); },                         // reminder to feed at the usual times
+  remind(el){ haptic('select'); sheet.ownRemind = false; setRemind(+el.dataset.v); },                 // rating reminder, asks for the permission
+  'remind-own'(){ // „Eigene“: a field for whole hours, starting at the current interval, or 2 hours coming from „Aus“
     haptic('select'); sheet.ownRemind = true;
     setRemind(prefs.remind || 120).then(() => $('#f-remind')?.select());
   },
   theme(el){ prefs.theme = el.dataset.v; savePrefs(); applyTheme(); renderSheet(); haptic('select'); },
   'export'(){ exportData(); },
-  'share-changes'(){ haptic('select'); shareChanges(); },                      // Austausch von Hand, Abschnitt „Haushalt“
-  'send-answer'(){ haptic('select'); shareChanges(sheet?.exchange?.peer); },   // genau das, was dem anderen Gerät fehlt
+  'share-changes'(){ haptic('select'); shareChanges(); },                      // manual exchange, section „Haushalt“
+  'send-answer'(){ haptic('select'); shareChanges(sheet?.exchange?.peer); },   // exactly what the other device is missing
   demo(){ loadDemo(); },
   expand(el){ haptic('select'); expandCard(el.dataset.v); },
-  'toggle-overview'(){ haptic('select'); toggleOverview(); }, // der ganze Text der Übersicht und zurück
-  'more-history'(){ // der Fokus geht auf die erste neu gezeigte Mahlzeit
+  'toggle-overview'(){ haptic('select'); toggleOverview(); }, // the overview's full text and back
+  'more-history'(){ // the focus moves to the first newly shown meal
     haptic('select');
     showMoreHistory()?.focus({preventScroll:true});
   },
   'jump-day'(el){
     const key = el.dataset.day;
-    if (!document.getElementById('d-' + key)) showMoreHistory(key); // der Tag liegt hinter den gezeigten Mahlzeiten
+    if (!document.getElementById('d-' + key)) showMoreHistory(key); // the day lies beyond the meals on show
     const target = document.getElementById('d-' + key); if (!target) return;
     target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block:'start'});
     haptic('select');
@@ -175,19 +175,19 @@ const ACTIONS = {
   undo(){ const u = toastUndo; hideToast(); if (u) { haptic('select'); u(); } }
 };
 
-/* Deep Links und App-Kurzbefehle: schmeckts://fuettern öffnet das Füttern-Sheet, schmeckts://scan startet darin
-   den Scanner (logic/scan.js), schmeckts://foto die eigene Kamera (shootPhoto in logic/feeding.js). Nach „Abbrechen“
-   bleibt das Füttern-Sheet offen. */
-const LINKS = ['fuettern', 'scan', 'foto'];
+/* Deep links and app shortcuts: schmeckts://feed opens the feeding sheet, schmeckts://scan starts the scanner in it
+   (logic/scan.js), schmeckts://photo our own camera (shootPhoto in logic/feeding.js). After „Abbrechen“ the feeding
+   sheet stays open. */
+const LINKS = ['feed', 'scan', 'photo'];
 export async function openLink(url){
   const raw = String(url || '');
-  if (/^(content|file):/i.test(raw)) { await receiveUri(raw); return true; } // Austausch-Datei aus einer anderen App
+  if (/^(content|file):/i.test(raw)) { await receiveUri(raw); return true; } // an exchange file from another app
   const path = raw.replace(/^schmeckts:\/*/i, '').replace(/[/?#].*$/, '').toLowerCase();
   if (!LINKS.includes(path)) return false;
   if (!db.pets.length) { openSheet({kind:'pet', name:'', species:'Katze', photo:null, from:null}); toast('Leg zuerst dein Tier an.'); return true; }
   await closeSheet();
   openSheet({kind:'feed'});
-  if (path === 'foto') await shootPhoto();
+  if (path === 'photo') await shootPhoto();
   if (path === 'scan') await scan();
   return true;
 }
@@ -208,7 +208,7 @@ document.addEventListener('input', e => {
     if (s) { s.note = t.value; clearTimeout(noteTimer); noteTimer = setTimeout(save, 400); }
   }
   if (t.dataset.setting) { prefs[t.dataset.setting] = t.value.trim(); savePrefs(); }
-  if (t.hasAttribute('data-remind')) { // eigene Stunden: gültige Werte gelten sofort, das Feld bleibt beim Tippen stehen
+  if (t.hasAttribute('data-remind')) { // own hours: valid values take effect at once, the field stays put while typing
     const h = Number(t.value);
     if (Number.isInteger(h) && h >= 1 && h <= REMIND_MAX_H) setRemind(h * 60, false);
   }
@@ -227,7 +227,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.hasAttribute('data-remind')) return renderSheet(); // Feld verlassen: zeigt wieder den geltenden Wert
+  if (t.hasAttribute('data-remind')) return renderSheet(); // leaving the field: shows the current value again
   if (!t.dataset.time || !t.value) return;
   const s = getServing(t.dataset.time), ts = new Date(t.value).getTime();
   if (!s || isNaN(ts)) return;
@@ -237,7 +237,7 @@ document.addEventListener('change', e => {
   toast(`Zeitpunkt: ${when(s.servedAt)}`);
 });
 const onFile = (id, fn) => $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; fn(f); });
-onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // Code nach dem Scannen, falls der Foto-Knopf ihn übernimmt
+onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, should the photo button take it over
 onFile('#petPhotoInput', setPetPhoto);
 $('#albumInput').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; addAlbumPhotos(files); });
 onFile('#importInput', importData);

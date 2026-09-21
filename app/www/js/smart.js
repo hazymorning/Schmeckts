@@ -1,28 +1,28 @@
-/* Auswertung: analyze() liefert das Modell, aus dem alles liest, was auswertet. Reine Funktionen, zwischengespeichert
-   wird in derive.js. Regeln: PROJEKT.md, Abschnitt „Auswertung“. */
+/* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
+   derive.js. The rules are in PROJECT.md, section "Evaluation". */
 import {FLAVORS, guessTexture, RATINGS, TEXTURES, textureOf, TYPES, typeOf} from './config.js';
 import {addDays, dayKey, dayStart, weekStart} from './dates.js';
 
 const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
-const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // Bezugszeit der Gewichte, für die Wertung ohne Belang
+const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // reference time of the weights, irrelevant to the score
 const YES = 70, NO = 40;
-export const MIN_RATED = 3;   // ab so vielen Bewertungen im Filter gibt es Erkenntnisse und eine Auswertung
+export const MIN_RATED = 3;   // from this many ratings within the filter there are insights and an evaluation
 const APPETITE = {recent:72 * 36e5, usual:30 * DAY, minRecent:3, minUsual:8, minSorts:2, drop:30, below:50};
 const TASTE_SPAN = 180 * DAY;
 export const VERDICTS = {nachkaufen:'Nachkaufen', gemischt:'Gemischt', beobachten:'Beobachten', nicht:'Nicht mehr kaufen'};
-const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // nach Vorrang
+const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
 const MILESTONES = {meals:[50, 100, 250, 500, 1000], sorts:[10, 25, 50]};
-export const rOf = x => RATINGS[x?.r] ? x.r : null; // unbekannte Werte anderer Geräte zählen nicht
-/* Farbklasse einer Wertung und einer Stufe. Die Stufe folgt ihren Punkten: ab 70 --good, ab 40 --mid, darunter --sauce, bei 0 --bad */
+export const rOf = x => RATINGS[x?.r] ? x.r : null; // unknown values from other devices do not count
+/* Colour class of a score and of a level. The level follows its points: from 70 --good, from 40 --mid, below that --sauce, at 0 --bad */
 export const scoreCls = v => v >= YES ? 'r-good' : v >= NO ? 'r-mid' : 'r-bad';
 export const rateCls = r => { const v = RATINGS[r].score; return v > 0 && v < NO ? 'r-sauce' : scoreCls(v); };
 export const hintKey = h => h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`;
 const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) || [])[0];
 
-/* Summe aus Bewertungen. Alle Gewichte schrumpfen gleich schnell, points / weights hängt deshalb nicht vom
-   Zeitpunkt ab: Eine Summe gilt, bis sich eine ihrer Mahlzeiten ändert. */
-const emptySum = () => ({n:0, points:0, weights:0, counts:{}, last:null}); // counts: nur Stufen, die vorkommen
+/* Sum over ratings. All weights shrink at the same rate, so points / weights does not depend on when it is
+   computed: a sum holds until one of its meals changes. */
+const emptySum = () => ({n:0, points:0, weights:0, counts:{}, last:null}); // counts: only levels that actually occur
 function addRating(sum, x){
   const w = Math.pow(2, (x.t - WEIGHT_ZERO) / HALF_LIFE);
   sum.n++; sum.points += w * RATINGS[x.r].score; sum.weights += w; sum.counts[x.r] = (sum.counts[x.r] || 0) + 1;
@@ -35,20 +35,20 @@ function addSum(sum, other){
   return sum;
 }
 function statOf(sum){
-  const score = sum.n ? +(sum.points / sum.weights).toFixed(6) : 0, pct = Math.round(score); // gerundet gegen das Rauschen der Gewichte
+  const score = sum.n ? +(sum.points / sum.weights).toFixed(6) : 0, pct = Math.round(score); // rounded against the noise of the weights
   return {n:sum.n, score, pct, counts:sum.counts, last:sum.last,
     verdict: sum.n >= 3 && pct >= YES ? 'nachkaufen' : sum.n >= 2 && pct < NO ? 'nicht' : 'beobachten'};
 }
 
-/* Bewertungen bekannter Tiere: {pid, r, t, id} mit id = Sorte oder null */
+/* Ratings by known pets: {pid, r, t, id} where id is the variety or null */
 function* ratingsOf(db, servings){
   const known = new Set(db.pets.map(p => p.id));
   for (const s of servings)
     for (const [pid, x] of Object.entries(s.pets || {})) { const r = rOf(x); if (r && known.has(pid)) yield {pid, r, t:s.servedAt, id:s.productId || null}; }
 }
 
-/* Summen je Sorte und Tier aus den Mahlzeiten bis now: {bySort: Map Sorte → {[petId]: Summe}, next}. Mit only werden nur
-   diese Sorten neu gerechnet. next ist die nächste Mahlzeit nach now: Ab dann fehlt sie in den Summen. */
+/* Sums per variety and pet from the meals up to now: {bySort: Map variety → {[petId]: sum}, next}. With only, just
+   those varieties are recomputed. next is the first meal after now: from then on it is missing from the sums. */
 export function tally(db, now, only, sums = {bySort:new Map()}){
   if (only) for (const id of only) sums.bySort.delete(id); else sums.bySort.clear();
   sums.next = Infinity;
@@ -70,10 +70,10 @@ function houseVerdict(pets){
   return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : 'beobachten'};
 }
 
-/* Modell = {pet, sorts, byId, rated, overview, insights, hints, tastes, taste}
-   Sorte  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat mit yes/no, sum, choice, dazu die Werte im Filter:
-             n, score, pct, verdict, counts, last, yes, no}
-   Stat   = {n, score, pct, verdict, counts, last: {pid, r, t, id}} */
+/* Model  = {pet, sorts, byId, rated, overview, insights, hints, tastes, taste}
+   Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
+            the filter: n, score, pct, verdict, counts, last, yes, no}
+   Stat  = {n, score, pct, verdict, counts, last: {pid, r, t, id}} */
 export function analyze(db, prefs, now, sums = tally(db, now)){
   const petIds = db.pets.map(p => p.id);
   const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
@@ -96,8 +96,8 @@ export function analyze(db, prefs, now, sums = tally(db, now)){
     tastes, taste:pet ? tastes[pet] : {known:total('known'), total:total('total')}};
 }
 
-/* Kurzübersicht im Filter: die letzte Fütterung bis now und je Tier die liebste Sorte (Urteil „Nachkaufen“, beste Wertung)
-   und die schwächste (Urteil „Nicht mehr kaufen“, schlechteste Wertung): {last, pets: [{id, favorite, flop}]} */
+/* Short overview within the filter: the last feeding up to now and, per pet, the favourite variety (verdict
+   „Nachkaufen“, best score) and the weakest (verdict „Nicht mehr kaufen“, worst score): {last, pets: [{id, favorite, flop}]} */
 function overviewOf(db, pet, sorts, now){
   const ids = pet ? [pet] : db.pets.map(p => p.id);
   const pick = (id, verdict, sign) => sorts.filter(e => e.pets[id]?.verdict === verdict).sort((a, b) => sign * (b.pets[id].score - a.pets[id].score))[0] || null;
@@ -105,8 +105,8 @@ function overviewOf(db, pet, sorts, now){
     pets:ids.map(id => ({id, favorite:pick(id, 'nachkaufen', 1), flop:pick(id, 'nicht', -1)}))};
 }
 
-/* „Geschmack bekannt“ je Tier: von den Sorten der letzten 180 Tage sind die bekannt, die es mindestens 3× bewertet hat,
-   oder mindestens 2× bei einer Wertung unter 40 */
+/* „Geschmack bekannt“ per pet: of the varieties from the last 180 days, those count as known that it has rated at
+   least 3 times, or at least twice at a score below 40 */
 function tastesOf(db, byId, now){
   const out = Object.fromEntries(db.pets.map(p => [p.id, {known:0, total:0}])), seen = new Set();
   for (const s of db.servings) {
@@ -123,8 +123,8 @@ function tastesOf(db, byId, now){
   return out;
 }
 
-/* Vergleiche nach Marke, Konsistenz und Geschmack, jeweils nur innerhalb einer Futterart, dazu „meist nur die Soße“.
-   Ohne Aussagen zum Kaufen */
+/* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“.
+   No statements about buying */
 const sauceShare = x => (x.counts.sosse || 0) / x.n;
 function insights(sorts){
   if (sorts.reduce((a, e) => a + e.n, 0) < MIN_RATED) return [];
@@ -138,14 +138,14 @@ function insights(sorts){
       if (ranked.length >= 2) out.push({kind, type, best:ranked[0], worst:ranked.at(-1)});
     };
     compare('marke', p => p.brand);
-    compare('konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]); // das Feld, nur ohne Feld die Stichwörter
+    compare('konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]); // the field, falling back to the keywords only when it is missing
     compare('geschmack', p => keywordOf(FLAVORS, p.variety));
   }
   sorts.filter(e => e.n >= 2 && sauceShare(e) >= .5).slice(0, 2).forEach(e => out.push({kind:'sosse', id:e.id}));
   return out;
 }
 
-/* Frisst ein Tier seit ein paar Tagen deutlich schlechter als sonst? Liest nur die 72 Stunden und die 30 Tage davor */
+/* Has a pet been eating noticeably worse for a few days? Reads only the 72 hours and the 30 days before them */
 function appetite(db, petIds, now){
   const A = APPETITE, cut = now - A.recent, out = [];
   const span = [...ratingsOf(db, db.servings.filter(s => s.servedAt <= now && s.servedAt > cut - A.usual))];
@@ -160,7 +160,7 @@ function appetite(db, petIds, now){
   return out;
 }
 
-/* Hinweise nach Vorrang, die deutlichsten zuerst. Außer „Appetit“ nur für Sorten ohne eigene Einstellung */
+/* Hints by precedence, the most pronounced first. Except for „Appetit“, only for varieties without a manual setting */
 function hints(sorts, appetites, pet, prefs){
   const hidden = new Set(prefs.hiddenHints || []), out = [...appetites];
   for (const e of sorts) {
@@ -175,13 +175,13 @@ function hints(sorts, appetites, pet, prefs){
     .sort((a, b) => HINTS.indexOf(a.kind) - HINTS.indexOf(b.kind) || a.order - b.order);
 }
 
-/* Auswertungs-Seite: alles für einen Zeitraum in einem Rutsch, aus denselben Bewertungen, Gewichten und Schwellen wie
-   analyze(). span: Tage, 0 = alles. Gerechnet wird im Tier-Filter; rein, zwischengespeichert wird in derive.js.
-     trend     je Tier eine Linie der gewichteten Wertung, bei 30 Tagen je Tag, sonst je Woche
-     levels    Anzahl und Anteil je vorkommender Stufe, in der Reihenfolge von RATINGS
-     brands    die TOP_BRANDS häufigsten Marken nach Wertung
-     textures  Konsistenz und Snack-Art je Futterart, nur Gruppen ab MIN_GROUP Bewertungen
-     feeding   Mahlzeiten je Wochentag (Montag zuerst) und je Person */
+/* Evaluation page: everything for one span in one go, from the same ratings, weights and thresholds as analyze().
+   span: days, 0 = everything. Computed within the pet filter; pure, caching happens in derive.js.
+     trend     one line of the weighted score per pet, per day at 30 days, per week otherwise
+     levels    count and share of every level that occurs, in the order of RATINGS
+     brands    the TOP_BRANDS most common brands by score
+     textures  consistency and treat type per food type, only groups from MIN_GROUP ratings
+     feeding   meals per weekday (Monday first) and per person */
 export const SPANS = [[30, '30 Tage'], [90, '90 Tage'], [0, 'Alles']];
 const TOP_BRANDS = 6, MIN_GROUP = 3;
 function groupSums(rated, products, keyOf){
@@ -231,18 +231,18 @@ export function report(db, prefs, now, span){
     feeding:{days, people:[...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de'))}};
 }
 
-/* Gruppen für „Einkaufen“ und die Einkaufsliste: „Gemischt“ zählt zu Nachkaufen, die eigene Einstellung ordnet ein,
-   Sorten ohne Bewertung im Filter erscheinen nur mit eigener Einstellung */
+/* Groups for „Einkaufen“ and the shopping list: „Gemischt“ counts towards buying again, the manual setting decides
+   the group, and varieties without a rating in the filter only show up with a manual setting */
 export function shopGroups(m){
   const g = {nachkaufen:[], beobachten:[], nicht:[]};
   for (const e of m.sorts) if (e.n || e.kaufen) g[e.choice === 'gemischt' ? 'nachkaufen' : e.choice].push(e);
   return g;
 }
 
-/* Kalenderwoche ab start (Montag 0:00 Ortszeit), immer für den ganzen Haushalt:
-   best       je Tier die Sorte mit der besten Wertung dieser Woche, ab 2 Bewertungen: {pet, id, n, pct}
-   favorites  Sorten, deren Urteil am Wochenende „Nachkaufen“ ist und am Anfang nicht war
-   feeders    Fütterungen je Person (Feld by), die meisten zuerst: {name, n} */
+/* Calendar week from start (Monday 00:00 local time), always for the whole household:
+   best       per pet the variety with the best score that week, from 2 ratings: {pet, id, n, pct}
+   favorites  varieties whose verdict is „Nachkaufen“ at the weekend and was not at the start
+   feeders    feedings per person (field by), the most first: {name, n} */
 export function week(db, prefs, start){
   const end = addDays(start, 7), house = {...prefs, activePet:'all'};
   const before = analyze(db, house, start - 1), after = analyze(db, house, end - 1);
@@ -260,8 +260,8 @@ export function week(db, prefs, start){
     feeders:[...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de'))};
 }
 
-/* Wochenrückblick: die Vorwoche, sichtbar von Montag 0:00 bis Mittwoch 23:59, ab 5 Mahlzeiten und bis zum Schließen.
-   known: eine schon berechnete Woche, sie gilt, solange sich keine Mahlzeit bis zu ihrem Ende ändert */
+/* Weekly review: the previous week, visible from Monday 00:00 to Wednesday 23:59, from 5 meals and until it is
+   closed. known: a week already computed, which holds as long as no meal up to its end changes */
 export function review(db, prefs, now, known){
   const monday = weekStart(now), start = addDays(monday, -7);
   if (now >= addDays(monday, 3) || prefs.closedWeek === dayKey(start)) return null;
@@ -269,9 +269,9 @@ export function review(db, prefs, now, known){
   return w.meals >= 5 ? w : null;
 }
 
-/* Übliche Fütterungszeiten des Haushalts aus den Mahlzeiten (ohne Snacks) der letzten 14 Tage: Uhrzeiten, die höchstens
-   90 Minuten auseinanderliegen, bilden eine Zeit; sie gilt ab 4 verschiedenen Tagen. Minuten seit Mitternacht, Ortszeit:
-   from früheste, at mittlere Uhrzeit, remind = at + 45 Minuten. */
+/* The household's usual feeding times from the meals (excluding treats) of the last 14 days: times at most 90
+   minutes apart form one slot, which counts from 4 different days onwards. Minutes since midnight, local time:
+   from the earliest, at the mean time, remind = at + 45 minutes. */
 const FEED = {span:14 * DAY, gap:90, minDays:4, delay:45, lead:60, ahead:3};
 function mealsIn(db, from, to){
   const snack = new Set(db.products.filter(p => typeOf(p) === 'Snack').map(p => p.id));
@@ -283,8 +283,8 @@ export function feedSlots(db, now){
   for (const x of times) { const g = groups.at(-1); if (g && x.min - g.at(-1).min <= FEED.gap) g.push(x); else groups.push([x]); }
   return groups.filter(g => new Set(g.map(x => x.day)).size >= FEED.minDays).map(g => ({from:g[0].min, at:g[g.length >> 1].min, remind:g[g.length >> 1].min + FEED.delay}));
 }
-/* Erinnerungen ans Füttern für heute und die zwei Tage danach: je übliche Zeit eine, außer es gab an dem Tag ab einer
-   Stunde vor der frühesten üblichen Uhrzeit schon eine Mahlzeit. {key: 'Tag|Zeit', at} */
+/* Feeding reminders for today and the two days after: one per usual time, unless a meal was already served that day
+   from an hour before the earliest usual time. {key: 'day|time', at} */
 export function feedReminders(db, now){
   const out = [], atMinute = (i, min) => { const d = new Date(now); d.setHours(0, min, 0, 0); d.setDate(d.getDate() + i); return d.getTime(); };
   for (const slot of feedSlots(db, now)) for (let i = 0; i < FEED.ahead; i++) {

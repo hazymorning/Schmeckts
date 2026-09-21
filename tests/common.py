@@ -1,31 +1,32 @@
-"""Gemeinsame Helfer für die Tests in Chromium (Playwright): Prüfen, App ausliefern, Handys öffnen, auf Zustände warten,
-simulierte Android-Plugins mit einem Dateisystem, das Neuladen übersteht."""
+"""Shared helpers for the tests in Chromium (Playwright): checking, serving the app, opening phones, waiting for
+states, simulated Android plugins with a file system that survives a reload."""
 import asyncio, functools, http.server, json, pathlib, re, sys, threading, time
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WWW = ROOT / 'app/www'
 failures = []
-SHOTS = ROOT / 'dist/test' if '--bilder' in sys.argv else None
+SHOTS = ROOT / 'dist/test' if '--shots' in sys.argv else None
 
 
-PACK = ROOT / 'dist/test/packung.jpg'  # wird beim Start erzeugt
+PACK = ROOT / 'dist/test/package.jpg'  # created at start-up
 
 
-SHEBA, UPC = '4008429087455', '036000291452'  # gültige Testcodes, UPC-A wird zu 0036000291452
+SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 0036000291452
 
-# Simulierte Android-Plugins. Das Dateisystem liegt in localStorage unter „__fs:“, damit es ein Neuladen
-# (= App-Neustart) übersteht; auch geteilte Dateien im CACHE stehen dort, damit Tests ihren Inhalt lesen können. rename ersetzt das Ziel wie unter Linux. Aufrufe landen in window.__calls.
-# Eine Datei aus einer anderen App (content://…) liefert convertFileSrc aus dem simulierten Dateisystem.
-# Deep Links: window.__urlOpen({url}) löst appUrlOpen aus; steht beim Laden sessionStorage.__launchUrl, kommt das
-# Ereignis wie beim Kaltstart sofort nach dem Anmelden (Capacitor hält es zurück). Das eigene Foto-Plugin
-# liefert window.__photo (Base64) oder lehnt ab, wenn es fehlt. Der Barcode-Scanner (nur scan(), wie in der App)
-# liefert window.__barcode oder bricht ab, window.__scanError lässt ihn scheitern. Mit window.__scanModule = false
-# fehlt Googles Scanner-Modul, die Installation meldet sich dann nach kurzer Zeit als fertig.
-# Benachrichtigungen (@capacitor/local-notifications): Geplantes liegt in localStorage.__notes und übersteht so ein Neuladen.
-# Die Erlaubnis steht in localStorage.__notifyPermission (sonst „prompt“), die Antwort auf die Nachfrage in
-# localStorage.__notifyAnswer (sonst „granted“). Ein Tipp: window.__tapNote({actionId: 'tap', notification}); steht beim
-# Laden sessionStorage.__launchNote, kommt er wie beim Kaltstart sofort nach dem Anmelden.
+# Simulated Android plugins. The file system sits in localStorage under "__fs:" so that it survives a reload
+# (= an app restart); shared files in the CACHE live there too, so tests can read their contents. rename replaces
+# the target as it does on Linux. Calls end up in window.__calls.
+# A file from another app (content://…) is served by convertFileSrc out of the simulated file system.
+# Deep links: window.__urlOpen({url}) fires appUrlOpen; if sessionStorage.__launchUrl is set at load time, the
+# event arrives right after the listener registers, as on a cold start (Capacitor holds it back). Our own photo
+# plugin returns window.__photo (base64) or rejects when it is missing. The barcode scanner (scan() only, as in the
+# app) returns window.__barcode or cancels; window.__scanError makes it fail. With window.__scanModule = false
+# Google's scanner module is missing and the installation reports itself finished after a moment.
+# Notifications (@capacitor/local-notifications): what is scheduled lives in localStorage.__notes and so survives a
+# reload. The permission is in localStorage.__notifyPermission (otherwise "prompt"), the answer to the request in
+# localStorage.__notifyAnswer (otherwise "granted"). A tap: window.__tapNote({actionId: 'tap', notification}); if
+# sessionStorage.__launchNote is set at load time, it arrives right after the listener registers, as on a cold start.
 NATIVE = """
 window.__calls = []; window.__back = null; window.__urlOpen = null;
 const rec = name => arg => { window.__calls.push([name, arg ?? null]);
@@ -37,7 +38,7 @@ const LocalNotifications = {
   checkPermissions: () => Promise.resolve({display: localStorage.getItem('__notifyPermission') || 'prompt'}),
   requestPermissions: () => { window.__calls.push(['requestPermissions', null]); const display = localStorage.getItem('__notifyAnswer') || 'granted';
     localStorage.setItem('__notifyPermission', display); return Promise.resolve({display}); },
-  schedule: ({notifications}) => { const list = JSON.parse(JSON.stringify(notifications)); window.__calls.push(['schedule', list]);  // Datum als Text, wie über die Brücke
+  schedule: ({notifications}) => { const list = JSON.parse(JSON.stringify(notifications)); window.__calls.push(['schedule', list]);  // the date as text, as it comes over the bridge
     setNotes([...others(list), ...list]); return Promise.resolve({notifications: list.map(n => ({id: n.id}))}); },
   cancel: ({notifications}) => { window.__calls.push(['cancelNotes', notifications]); setNotes(others(notifications)); return Promise.resolve(); },
   getPending: () => Promise.resolve({notifications: notes()}),
@@ -57,15 +58,15 @@ const Filesystem = {
   stat: ({path}) => localStorage.getItem(key(path)) == null ? missing() : Promise.resolve({type: 'file'})
 };
 window.Capacitor = {isNativePlatform: () => true,
-  convertFileSrc: uri => { const v = localStorage.getItem(key(String(uri).split('/').pop()));   // Datei aus einer anderen App
+  convertFileSrc: uri => { const v = localStorage.getItem(key(String(uri).split('/').pop()));   // a file from another app
     return v == null ? uri : 'data:application/json;charset=utf-8,' + encodeURIComponent(v); },
   Plugins: {
   Haptics: {impact: rec('impact')}, SystemBars: {setStyle: rec('setStyle')},
   App: {addListener: (e, fn) => { if (e === 'backButton') window.__back = fn;
         if (e === 'appUrlOpen') { window.__urlOpen = fn; const u = sessionStorage.getItem('__launchUrl'); if (u) fn({url: u}); } },
         getInfo: rec('getInfo'), minimizeApp: rec('minimize')},
-  Foto: {aufnehmen: o => { window.__calls.push(['aufnehmen', o ?? null]);
-    return window.__photo ? Promise.resolve({base64: window.__photo}) : Promise.reject(new Error('abgebrochen')); }},
+  Photo: {capture: o => { window.__calls.push(['capture', o ?? null]);
+    return window.__photo ? Promise.resolve({base64: window.__photo}) : Promise.reject(new Error('cancelled')); }},
   BarcodeScanner: {
     isGoogleBarcodeScannerModuleAvailable: () => Promise.resolve({available: window.__scanModule !== false}),
     installGoogleBarcodeScannerModule: () => { window.__calls.push(['installModule', null]);
@@ -82,11 +83,11 @@ window.Capacitor = {isNativePlatform: () => true,
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
-# Farbe als sRGB „rgb(r, g, b)“, auch wenn sie als oklch() gesetzt ist: über ein Canvas, so wie der Bildschirm sie zeigt
+# A colour as sRGB "rgb(r, g, b)", even when set as oklch(): through a canvas, the way the screen shows it
 RGB = """(c => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d', {willReadFrequently: true});
   x.fillStyle = c; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; })"""
 
-# Ein Handy, das schon benutzt wird: ein Tier, eine Sorte, drei bewertete Mahlzeiten
+# A phone already in use: one pet, one variety, three rated meals
 SAVED = {'version': 3,
           'pets': [{'id': 'lxpet00001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1750000000000}],
           'products': [{'id': 'lxprod0001', 'brand': 'Sheba', 'variety': 'Lachs', 'type': 'Nassfutter', 'animal': 'Katze',
@@ -96,14 +97,14 @@ SAVED = {'version': 3,
 
 
 def check(cond, text):
-    print(('  ok   ' if cond else '  FEHLER ') + text)
+    print(('  ok   ' if cond else '  FAIL ') + text)
     if not cond:
         failures.append(text)
     return cond
 
 
 def serve():
-    """Liefert app/www aus, gibt die Adresse von index.html zurück."""
+    """Serves app/www and returns the address of index.html."""
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -114,15 +115,16 @@ def serve():
 
 
 def real_errors(errors):
-    """Konsolenfehler ohne die erwartbaren Netzwerkmeldungen (Server absichtlich aus, falscher Code)."""
+    """Console errors without the expected network messages (server deliberately off, wrong code)."""
     return [e for e in errors if 'Failed to load resource' not in e and 'net::ERR_' not in e
             and 'EventSource' not in e]
 
 
-# Die Tests rufen die Module der App über import() in evaluate auf. Chromiums Inspektor hält das Versprechen, auf das
-# evaluate wartet, nur schwach: Läuft gerade die Speicherbereinigung (viele Daten, eben neu geladen), sammelt sie es
-# gelegentlich ein (CDP „Promise was collected“, bei Playwright „Execution context was destroyed“). Deshalb wartet hier
-# nicht der Inspektor: Die Seite legt das Ergebnis ab (window.__out), der Test fragt es ab. Ausdruck oder Funktion, wie bei Playwright.
+# The tests reach the app's modules through import() inside evaluate. Chromium's inspector holds the promise that
+# evaluate waits on only weakly: while garbage collection runs (lots of data, just reloaded) it occasionally collects
+# it (CDP "Promise was collected", "Execution context was destroyed" in Playwright). So it is not the inspector that
+# waits here: the page stores the result (window.__out) and the test asks for it. Expression or function, as in
+# Playwright.
 CALL = """a => { const v = (EXPR), id = Math.random().toString(36).slice(2), out = (window.__out ||= {})[id] = {};
   Promise.resolve(typeof v === 'function' ? v(a) : v).then(value => { out.value = value; out.done = true; }, e => { out.error = String(e?.stack || e); out.done = true; });
   return id; }"""
@@ -144,8 +146,8 @@ def keep_promises(pg):
 
 
 async def open_page(ctx, url, scheme='light', native=False, choose=True):
-    """Neue Seite in einem Browser-Kontext (= ein Handy). Gibt Seite und Fehlerliste zurück.
-    choose: beim ersten Start gleich „Nur auf diesem Handy“ wählen, so beginnen die meisten Tests."""
+    """A new page in a browser context (= one phone). Returns the page and the list of errors.
+    choose: pick „Nur auf diesem Handy“ right at the first start, which is how most tests begin."""
     pg = await ctx.new_page()
     keep_promises(pg)
     pg.set_default_timeout(8000)
@@ -163,12 +165,12 @@ async def open_page(ctx, url, scheme='light', native=False, choose=True):
 
 
 async def state(pg, expr):
-    """Wertet expr mit db, prefs, queue und state aus store.js aus."""
+    """Evaluates expr with db, prefs, queue and state from store.js."""
     return await pg.evaluate(f"import('./js/store.js').then(({{db, prefs, queue, state}}) => {expr})")
 
 
 async def until(pg, expr, timeout=10.0):
-    """Wartet, bis expr (mit db, prefs, queue, state) wahr ist. Gibt zurück, ob das geklappt hat."""
+    """Waits until expr (with db, prefs, queue, state) is true. Returns whether that worked."""
     loop = asyncio.get_running_loop()
     end = loop.time() + timeout
     while loop.time() < end:
@@ -185,7 +187,7 @@ async def shot(pg, name):
 
 
 async def phone(browser, scheme='light', touch=False, motion=False, **kw):
-    """Ein Handy als Browser-Kontext. Ohne motion läuft die App mit reduzierter Bewegung, so wartet kein Ablauf auf Animationen."""
+    """One phone as a browser context. Without motion the app runs under reduced motion, so no flow waits on animations."""
     return await browser.new_context(viewport={'width': 400, 'height': 860}, color_scheme=scheme, has_touch=touch,
                                      **{'reduced_motion': 'no-preference' if motion else 'reduce', **kw})
 
@@ -195,7 +197,7 @@ def rgb_of(hexv):
 
 
 def near(rgb, hexv, tol=2):
-    """rgb(…) aus dem Browser entspricht #RRGGBB bis auf Rundung"""
+    """rgb(…) from the browser matches #RRGGBB up to rounding"""
     got = [int(x) for x in re.findall(r'\d+', rgb)[:3]]
     return all(abs(a - b) <= tol for a, b in zip(got, rgb_of(hexv)))
 
@@ -210,7 +212,7 @@ def contrast(a, b):
 
 
 def make_photo():
-    from PIL import Image, ImageDraw  # eine schlichte „Packung“ als Testfoto
+    from PIL import Image, ImageDraw  # a plain "packaging" as the test photo
     PACK.parent.mkdir(parents=True, exist_ok=True)
     im = Image.new('RGB', (480, 360), (214, 120, 60))
     ImageDraw.Draw(im).rectangle((60, 90, 420, 270), fill=(250, 240, 225))
@@ -218,25 +220,25 @@ def make_photo():
 
 
 def make_pictures():
-    """Testfotos: vier Felder (rot, grün, blau, gelb) für den Zuschnitt, dazu einfarbige fürs Album, eins davon groß"""
+    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus plain ones for the album, one of them large"""
     from PIL import Image
     out = PACK.parent
     quad = Image.new('RGB', (800, 400))
     for (x, y), color in {(0, 0): (220, 30, 30), (400, 0): (30, 160, 60), (0, 200): (30, 60, 220), (400, 200): (230, 210, 40)}.items():
         quad.paste(Image.new('RGB', (400, 200), color), (x, y))
-    quad.save(out / 'felder.png')
+    quad.save(out / 'quadrants.png')
     files = []
     for i in range(10):
         f = out / f'album{i}.jpg'
         Image.new('RGB', (2400, 1200) if i == 0 else (300, 200), (25 * i, 255 - 25 * i, 120)).save(f, quality=80)
         files.append(str(f))
-    Image.new('RGB', (64, 64), (0, 0, 0)).save(out / 'schwarz.png')
-    Image.new('RGB', (64, 64), (255, 255, 255)).save(out / 'weiss.png')
+    Image.new('RGB', (64, 64), (0, 0, 0)).save(out / 'black.png')
+    Image.new('RGB', (64, 64), (255, 255, 255)).save(out / 'white.png')
     return files
 
 
 async def seeded(browser, url, files, scheme='light', native=False):
-    """Handy mit vorhandenen Daten: files = {name: inhalt} für db, prefs … (im Browser localStorage, in der App Dateien)"""
+    """A phone with existing data: files = {name: content} for db, prefs … (localStorage in the browser, files in the app)"""
     ctx = await phone(browser, scheme)
     seed = await ctx.new_page()
     await seed.goto(url)
@@ -254,13 +256,13 @@ async def set_theme(pg, theme):
     await idle(pg)
 
 
-# Ruhe: keine laufenden Übergänge (Sheet, Karten, Toast); endlose Animationen wie der Spinner zählen nicht
+# Calm: no transitions running (sheet, cards, toast); endless animations such as the spinner do not count
 SETTLED = """!document.querySelector('.animating, .closing, :active-view-transition') && document.getAnimations().every(a =>
   a.playState !== 'running' || a.effect.getComputedTiming().iterations === Infinity)"""
 
 
 async def idle(pg, timeout=3.0):
-    """Wartet, bis die Oberfläche zweimal hintereinander ruhig ist. Fragt von außen, läuft also auch mit gestellter Uhr."""
+    """Waits until the interface is calm twice in a row. Asks from the outside, so it also works with a fixed clock."""
     end, calm = asyncio.get_running_loop().time() + timeout, 0
     while calm < 2 and asyncio.get_running_loop().time() < end:
         calm = calm + 1 if await pg.evaluate(SETTLED) else 0
@@ -268,20 +270,20 @@ async def idle(pg, timeout=3.0):
 
 
 async def debounced(pg):
-    """Lässt gebündelte Arbeit sofort ablaufen (Speicher meldet Änderungen, Erinnerungen gleichen ab). Braucht ctx.clock.install()."""
+    """Lets batched work run at once (the store reports changes, the reminders reconcile). Needs ctx.clock.install()."""
     await pg.clock.run_for(1000)
     await idle(pg)
 
 
 async def started(pg):
-    """Wartet, bis die App geladen und die Startseite gezeichnet ist."""
+    """Waits until the app has loaded and the home page is drawn."""
     await pg.wait_for_function("document.querySelector('#home')?.childElementCount > 0 || !!document.querySelector('.welcome')")
     await idle(pg)
 
 
 def run_tests(tests, camera=()):
-    """Führt die Tests aus, auf Wunsch nur die auf der Kommandozeile genannten. camera: Namen der Tests, die einen
-    Chromium mit simuliertem Kameragerät brauchen."""
+    """Runs the tests, or only those named on the command line. camera: names of the tests that need a Chromium
+    with a simulated camera device."""
     async def main():
         only = [a for a in sys.argv[1:] if not a.startswith('--')]
         make_photo()
@@ -297,9 +299,9 @@ def run_tests(tests, camera=()):
                     try:
                         await tests[name](browser, url)
                     except Exception as e:
-                        check(False, f'{name} abgebrochen: {" ".join(str(e).split())[:160]} … {" ".join(str(e).split())[-260:]}')
+                        check(False, f'{name} aborted: {" ".join(str(e).split())[:160]} … {" ".join(str(e).split())[-260:]}')
                     print(f'  {name}: {time.monotonic() - began:.1f} s')
                 await browser.close()
-        print(f'\n{"Alle Tests bestanden" if not failures else f"{len(failures)} Tests fehlgeschlagen"}')
+        print(f'\n{"All tests passed" if not failures else f"{len(failures)} tests failed"}')
         sys.exit(1 if failures else 0)
     asyncio.run(main())

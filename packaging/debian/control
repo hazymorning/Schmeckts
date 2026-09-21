@@ -1,7 +1,7 @@
 Package: schmeckts-server
 Version: @VERSION@
 Architecture: @ARCH@
-Maintainer: Schmeckts <schmeckts@localhost>
+Maintainer: hazymorning <schmeckts@localhost>
 Installed-Size: @SIZE@
 Depends: zenity, pkexec | policykit-1
 Section: net

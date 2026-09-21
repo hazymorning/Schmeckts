@@ -1,5 +1,5 @@
-/* Tiere anlegen, bearbeiten und löschen. Das Profilbild wird zugeschnitten (Schritt „crop“ im Tier-Sheet) und mit
-   „Speichern“ übernommen; das Album speichert Hinzufügen und Entfernen sofort. */
+/* Creating, editing and deleting pets. The profile picture is cropped (step „crop“ in the pet sheet) and taken over
+   with „Speichern“; the album saves additions and removals at once. */
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
 import {ALBUM_MAX} from '../config.js';
@@ -16,7 +16,7 @@ export function openPet(id, from = null){
   const p = getPet(id); if (!p) return;
   openSheet({kind:'pet', id:p.id, name:p.name, species:p.species, photo:p.photo || null, from});
 }
-/* Zuschnitt öffnen: mit einer gewählten Datei oder einem Foto aus dem Album („Als Profilbild“) */
+/* Open the crop: with a chosen file or a photo from the album („Als Profilbild“) */
 async function openCrop(load){
   const s = sheet; if (s?.kind !== 'pet') return;
   let img;
@@ -32,13 +32,13 @@ export function closeCrop(apply){
   Object.assign(s, {step:null, cropImg:null, crop:null}); renderSheet();
 }
 
-const albumKeys = p => Object.keys(p?.photos || {}).sort(); // Schlüssel beginnen mit der Zeit: älteste zuerst
+const albumKeys = p => Object.keys(p?.photos || {}).sort(); // keys start with the time: oldest first
 export async function addAlbumPhotos(files){
   const s = sheet, p = getPet(s?.id); if (!p || !files.length) return;
   const free = ALBUM_MAX - albumKeys(p).length;
   let n = 0;
   for (const f of files.slice(0, free)) {
-    try { const photo = albumPhoto(await fileToImage(f)); (p.photos ||= {})[uid()] = photo; n++; save(); } catch (e) {} // jedes Foto sofort: Wird die App dabei beendet, bleibt, was fertig war
+    try { const photo = albumPhoto(await fileToImage(f)); (p.photos ||= {})[uid()] = photo; n++; save(); } catch (e) {} // every photo at once: if the app is killed meanwhile, whatever finished stays
   }
   if (n) { haptic('success'); update(); }
   if (sheet === s) renderSheet();

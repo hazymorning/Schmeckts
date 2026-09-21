@@ -1,16 +1,16 @@
 schmeckts-server (1.1.0) unstable; urgency=medium
 
-  * Barcode-Suche über Open Pet Food Facts und Open Food Facts,
-    mit Zwischenspeicher.
-  * Neuer Befehl „uebersicht“ und Button „Übersicht“ im Einrichtungsfenster.
-  * Einrichtungsfenster mit klaren Buttons, Adresse und Code zuerst.
-  * Paketbeschreibung ohne Umlaute, dazu AppStream-Metadaten.
+  * Barcode lookup through Open Pet Food Facts and Open Food Facts,
+    with a cache.
+  * New "overview" command and an „Übersicht“ button in the setup window.
+  * Setup window with clear buttons, address and code first.
+  * Package description without umlauts, plus AppStream metadata.
 
  -- Schmeckts <schmeckts@localhost>  Sat, 19 Sep 2026 16:00:00 +0200
 
 schmeckts-server (1.0.0) unstable; urgency=medium
 
-  * Erste Version: gemeinsame Daten mit Feld-Uhren, Live-Meldungen,
-    KI-Erkennung über die Anthropic-API, tägliche Backups, Einrichtungsfenster.
+  * First version: shared data with field clocks, live notifications,
+    AI recognition through the Anthropic API, daily backups, setup window.
 
  -- Schmeckts <schmeckts@localhost>  Sat, 19 Sep 2026 00:00:00 +0200

@@ -1,11 +1,11 @@
-/* Eigenes SVG-Icon-Set im 24er Raster. Die Bewertungen (r_<Schlüssel>) zeigen, was man sieht, wenn man zurückkommt:
-   den Napf oder, bei Snacks, den Happen. Dazu Linienzeichnungen in der Formsprache des Logos (Napf als Sprechblase) für leere Zustände. */
+/* Our own SVG icon set on a 24 grid. The ratings (r_<key>) show what you see when you come back: the bowl, or the
+   morsel for treats. Plus line drawings in the logo's shape language (bowl as a speech bubble) for empty states. */
 
 const BOWL = '<path d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>';
 const DOT = (x, y) => `<circle cx="${x}" cy="${y}" r="1.15" fill="currentColor" stroke="none"/>`;
 const CRUMBS = DOT(7.7, 13.1) + DOT(11.3, 16) + DOT(7.6, 17);
 const TREAT = '<circle cx="9.6" cy="14.4" r="6"/>' + CRUMBS;
-const ABOVE = mark => `<g transform="translate(6.6 .2)">${mark}</g>`; // Herz und Uhr stehen beim Happen oben rechts
+const ABOVE = mark => `<g transform="translate(6.6 .2)">${mark}</g>`; // heart and clock sit top right on the morsel
 const HEART = '<path d="M12 8.7c-1.4-.9-2.8-2-2.8-3.4a1.45 1.45 0 0 1 2.8-.6 1.45 1.45 0 0 1 2.8.6c0 1.4-1.4 2.5-2.8 3.4z"/>';
 const LATER = '<circle cx="12" cy="5.6" r="3.3"/><path d="M12 3.9v1.9l1.2.8"/>';
 const FULL = '<path d="M5.4 11c.8-2.7 3.5-4.4 6.6-4.4s5.8 1.7 6.6 4.4z" fill="currentColor" fill-opacity=".3"/>' + BOWL + '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
@@ -62,7 +62,7 @@ const I = {
   bird: '<path d="M4.8 13.2c0-4.2 2.9-7.2 6.7-7.2 2.4 0 4.2 1.4 5 3.4l3.8.9-3.5 1.7c.1 4.6-3.2 8.2-7.7 8.2H6l1.9-2.5c-1.9-.9-3.1-2.5-3.1-4.5z"/><path d="M13.9 9.4v.4"/><path d="M8.5 13.5c1.3 1.3 3.2 1.6 4.9.7"/>',
   rodent: '<path d="M6.2 9a2 2 0 1 1 3-2.3M17.8 9a2 2 0 1 0-3-2.3"/><path d="M4.4 14.2c0-4 3.4-6.9 7.6-6.9s7.6 2.9 7.6 6.9c0 3.6-3.4 5.9-7.6 5.9s-7.6-2.3-7.6-5.9z"/><path d="M9.8 13.2v.4M14.2 13.2v.4M11.2 15.8h1.6"/>'
 };
-/* Linienzeichnungen im 64er Raster: die Sprechblase des Logos mit Napf, je nach Anlass mit Herz, Krümeln oder Kamera */
+/* Line drawings on a 64 grid: the logo's speech bubble with a bowl, and a heart, crumbs or camera as the case may be */
 const BUBBLE = '<path d="M34 8A22 22 0 1 1 20.5 47.2L12 57l3.4-15.4A22 22 0 0 1 34 8z"/>';
 const S = {
   empty: BUBBLE + '<circle cx="34" cy="30" r="12"/><path d="M26.5 33.5a8 8 0 0 0 15 0" stroke-dasharray="1.5 3.2"/>',

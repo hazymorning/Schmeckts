@@ -1,5 +1,5 @@
-/* Inhalte der Bottom Sheets: Mahlzeit, Benennen, Füttern (mit Auswahl nach dem Scannen), Futter, Tier (mit Zuschnitt des
-   Profilbilds und Album), Einstellungen und Auswertung. */
+/* Contents of the bottom sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
+   the profile picture and the album), settings and evaluation. */
 import {$} from '../dom.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
@@ -55,7 +55,7 @@ function viewName(){
     ${textureChips(s)}
     <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button></div>`;
 }
-/* Konsistenz oder Snack-Art der Sorte x (beim Benennen das Sheet selbst): Einfachauswahl, nur bei Arten mit Auswahl */
+/* Consistency or treat type of variety x (the sheet itself while naming): single choice, only for types that have one */
 function textureChips(x, note = ''){
   const t = TEXTURES[typeOf(x)];
   return t ? `<div class="tex"><span class="label">${t.title}</span><div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}</div>` : '';
@@ -69,15 +69,15 @@ export function renderSuggestions(){
   if (q.length >= 2) {
     const words = q.split(' ');
     hits = db.products.filter(p => p.id !== skip && words.every(w => norm(p.brand + ' ' + p.variety).includes(w))).slice(0, 4);
-  } else if (serving && !serving.productId) { hits = quickProducts(4); title = 'Schon mal gehabt?'; } // 1-Tipp-Vorschlag
+  } else if (serving && !serving.productId) { hits = quickProducts(4); title = 'Schon mal gehabt?'; } // one-tap suggestion
   box.innerHTML = (hits.length ? `<span class="label">${title}</span>` : '') + hits.map(p => `<button class="sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`).join('');
 }
 
-/* Füttern: Barcode und Foto als gleich breite Knöpfe; „Füttern beginnt mit“ blendet einen davon aus, der andere nimmt
-   die ganze Breite. Darunter die zuletzt gefütterten Sorten, höchstens SUGGEST; ab mehr bekannten Sorten folgt das
-   Suchfeld, dessen Treffer (höchstens HITS) an die Stelle der Vorschläge treten.
-   sheet.busy: Hinweis während des Scannens,
-   sheet.code: gescannter Code, um den es gerade geht (Auswahl, oder der Foto-Knopf übernimmt ihn) */
+/* Feeding: barcode and photo as equally wide buttons; „Füttern beginnt mit“ hides one of them and the other takes
+   the full width. Below them the most recently fed varieties, at most SUGGEST; with more known varieties the search
+   field follows, whose hits (at most HITS) take the place of the suggestions.
+   sheet.busy: the notice while scanning,
+   sheet.code: the scanned code currently in play (the choice, or the photo button takes it over) */
 const SUGGEST = 3, HITS = 8;
 const CTA = {
   barcode: `<button class="cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
@@ -104,7 +104,7 @@ function viewFeed(){
         <ul class="plist" id="serveHits"></ul>` : ''}` : ''}
     <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
 }
-/* Suche im Füttern-Sheet: Getipptes zeigt statt der Vorschläge die passenden Sorten, höchstens HITS. */
+/* Search in the feeding sheet: what is typed shows the matching varieties in place of the suggestions, at most HITS. */
 export function renderServeHits(text){
   const list = $('#serveList'), hits = $('#serveHits');
   if (!list || !hits) return;
@@ -113,8 +113,8 @@ export function renderServeHits(text){
   hits.innerHTML = words.length ? serveRows(quickProducts().filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w))).slice(0, HITS)) : '';
 }
 
-/* Hinweise unter den Erinnerungen: Sie sagen, was mit der gewählten Einstellung gerade gilt.
-   Ans Füttern: die üblichen Zeiten aus dem Verlauf, gefragt wird nichts */
+/* The notes under the reminders: they say what the chosen setting currently means.
+   For feeding: the usual times from the history, nothing is asked */
 export const remindHint = () => !prefs.remind ? 'Dieses Handy erinnert nicht ans Bewerten.'
   : `Dieses Handy erinnert ${prefs.remind === 60 ? '1 Stunde' : prefs.remind / 60 + ' Stunden'} nach dem Füttern ans Bewerten.`;
 function feedHint(){
@@ -125,13 +125,13 @@ function feedHint(){
       + (isConnected() ? ' Was andere inzwischen serviert haben, erfährt es erst, wenn die App offen war.' : ''));
 }
 
-/* Futter-Sheet, Abschnitt „Kaufen“: eigene Einstellung (Automatisch, Immer kaufen, Nicht kaufen), darunter das
-   berechnete Urteil mit kurzer Begründung, bei mehreren Tieren je Tier eine Zeile */
+/* Food sheet, section „Kaufen“: the manual setting (Automatisch, Immer kaufen, Nicht kaufen), below it the computed
+   verdict with a short reason, and one line per pet where there are several */
 const KAUFEN = [['auto', 'Automatisch'], ['immer', 'Immer kaufen'], ['nicht', 'Nicht kaufen']];
 function kaufenHTML(e){
   const pets = db.pets.length > 1 ? db.pets.filter(pet => e.pets[pet.id]) : [];
   return `<span class="label">Kaufen</span>
-    <div class="seg">${KAUFEN.map(([v, l]) => `<button aria-pressed="${(e.kaufen || 'auto') === v}" data-action="kaufen" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="seg">${KAUFEN.map(([v, l]) => `<button aria-pressed="${(e.kaufen || 'auto') === v}" data-action="buy" data-v="${v}">${l}</button>`).join('')}</div>
     <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(reasonOf(e.house))}</span>`}</p>
     ${pets.map(pet => `<div class="verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[e.pets[pet.id].verdict]}</b><small>${esc(reasonOf(e.pets[pet.id]))}</small></span></div>`).join('')}</div>`;
 }
@@ -141,7 +141,7 @@ function viewProduct(){
   if (!p) return `<div class="sh-head"><h2>Futter</h2>${closeBtn}</div><p class="empty">Dieses Futter gibt es nicht mehr.</p>`;
   if (sheet.step === 'name') return viewName();
   const ss = db.servings.filter(s => s.productId === p.id), e = sortOf(p.id), counts = e.house.counts;
-  const scale = scaleOf(p), levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // andere vorkommende Stufen dahinter
+  const scale = scaleOf(p), levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // other levels that occur come after them
   const perPet = db.pets.length > 1 ? db.pets.map(pet => {
     const x = e.pets[pet.id]; if (!x) return '';
     return `<div class="pp ${scoreCls(x.score)}">${avatar(pet, 'sm')}<span class="pp-name">${esc(pet.name)}</span><span class="bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b>${x.pct} %</b></div>`;
@@ -160,20 +160,20 @@ function viewProduct(){
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* Auswertung: dieselben Bausteine wie die Einstellungen. Oben der Zeitraum, darunter je Abschnitt eine Überschrift, die
-   Grafik und ein Satz, der sie in Worten zusammenfasst; Abschnitte ohne genug Daten fehlen. Gerechnet wird in report()
-   (smart.js), gezeichnet wird hier: die Linie als eigenes SVG, die Balken aus den Bausteinen der App. Jede Grafik trägt
-   ihre Textbeschreibung im aria-label, und keine Aussage steckt allein in der Farbe.
-   sheet.span: Tage des Zeitraums, sheet.shown: Mahlzeiten im Verlauf, sheet.at: Abschnitt, bei dem geöffnet wird. */
-const REPORT_STEP = 20;   // der Verlauf lädt in Schritten von 20 nach
+/* Evaluation: the same building blocks as the settings. The span at the top, below it a heading per section, the
+   graphic and one sentence summing it up in words; sections without enough data are left out. The computing happens in
+   report() (smart.js), the drawing here: the line as our own SVG, the bars from the app's building blocks. Every
+   graphic carries its text description in aria-label, and no statement rests on colour alone.
+   sheet.span: days of the span, sheet.shown: meals in the history, sheet.at: the section it opens at. */
+const REPORT_STEP = 20;   // the history loads 20 more at a time
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const weekdayName = i => new Date(2024, 0, 1 + i).toLocaleDateString('de-DE', {weekday:'long'}); // 1.1.2024 war ein Montag
+const weekdayName = i => new Date(2024, 0, 1 + i).toLocaleDateString('de-DE', {weekday:'long'}); // 1 January 2024 was a Monday
 export const reportState = at => ({kind:'report', span:SPANS[0][0], shown:REPORT_STEP, at});
 export function reportSpan(v){ Object.assign(sheet, {span:+v, shown:REPORT_STEP}); renderSheet(); }
 export function reportMore(){ sheet.shown += REPORT_STEP; renderSheet(); }
 
 const section = (key, title, chart, say) => `<h3 class="label" id="ab-${key}">${title}</h3>${chart}<p class="why">${say}</p>`;
-/* Waagerechter Balken mit Name, Zahl und Nebenzahl; cls trägt die Farbe einer Bewertungsstufe, sonst gilt der Akzent */
+/* A horizontal bar with name, number and secondary number; cls carries a rating level's colour, otherwise the accent applies */
 const barRow = (name, value, side, w, cls = '') =>
   `<div class="lv ${cls}"><span class="lv-top"><span class="lv-name">${esc(name)}</span><b class="lv-n">${value}</b><span class="lv-s">${side}</span></span>
     <span class="bar"><i style="--w:${Math.max(2, Math.round(w))}%"></i></span></div>`;
@@ -244,15 +244,15 @@ function viewReport(){
     ${histBlock(m)}`;
 }
 
-/* Zuschnitt des Profilbilds: quadratische Ansicht mit rundem Ausschnitt wie das Profilbild, Regler zum Zoomen.
-   Das Bild hängt mountCrop() nach dem Zeichnen ein. */
+/* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
+   mountCrop() hangs the image in after drawing. */
 const viewCrop = () => `<div class="sh-head"><h2>Foto zuschneiden</h2>${closeBtn}</div>
     <div class="crop" id="cropStage" aria-label="Ausschnitt verschieben"></div>
     <label class="label" for="f-zoom">Zoom</label>
     <input id="f-zoom" class="zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1">
     <div class="btn-row"><button class="btn soft" data-action="crop-cancel">Abbrechen</button><button class="btn primary" data-action="crop-apply">${icon('check')}Übernehmen</button></div>`;
 
-/* Album im Tier-Sheet: bis zu ALBUM_MAX Fotos, Kreuz zum Entfernen, ein Tipp wählt ein Foto für „Als Profilbild“ */
+/* Album in the pet sheet: up to ALBUM_MAX photos, a cross to remove one, and a tap picks a photo for „Als Profilbild“ */
 function albumHTML(p){
   const keys = Object.keys(p.photos || {}).sort(), sel = keys.includes(sheet.albumSel) ? sheet.albumSel : null;
   return `<span class="label">Fotos${keys.length ? ` (${keys.length} von ${ALBUM_MAX})` : ''}</span>
@@ -280,7 +280,7 @@ function viewPet(){
 }
 
 function viewSettings(){
-  const st = prefs, house = isConnected(), own = st.remind > 0 && (!!sheet.ownRemind || !REMIND.includes(st.remind)); // „Eigene“: gewählt oder ein Wert außerhalb der Stufen
+  const st = prefs, house = isConnected(), own = st.remind > 0 && (!!sheet.ownRemind || !REMIND.includes(st.remind)); // „Eigene“: chosen, or a value outside the steps
   return `<div class="sh-head"><h2>Einstellungen</h2>${closeBtn}</div>
     ${loadError ? `<p class="banner">Die gespeicherten Daten konnten nicht gelesen werden. Bitte die App neu starten.</p>`
       : storageOK ? '' : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`}
@@ -320,10 +320,10 @@ function viewSettings(){
     <p class="foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
 }
 
-/* Abschnitt „Haushalt“. Modus „lokal“: die Einstellungen dieses Handys und der Knopf „Mit Haushalt verbinden“, der die
-   Felder für Adresse und Code öffnet. Verbunden: Zustand des Abgleichs, „Jetzt abgleichen“ und „Verbindung trennen“,
-   darunter dieselben Einstellungen. Einen Fortschritt zeigt nur der von Hand gestartete Abgleich (sheet.syncing,
-   siehe actions.js), Abgleiche im Hintergrund bleiben unsichtbar. */
+/* Section „Haushalt“. Mode `lokal`: this phone's settings and the „Mit Haushalt verbinden“ button, which opens the
+   fields for address and code. Connected: the state of the sync, „Jetzt abgleichen“ and „Verbindung trennen“, with the
+   same settings below. Only the hand-started sync shows progress (sheet.syncing, see actions.js); syncs in the
+   background stay invisible. */
 function serverSection(notice = syncInfo()){
   const s = sheet || {};
   const codeRow = `<div class="connect mt-s">
@@ -344,15 +344,15 @@ function serverSection(notice = syncInfo()){
       : codeRow + (s.editServer ? addrField : `<p class="addr"><span>Server ${esc(prefs.server)}</span><button class="link" data-action="edit-server">Ändern</button></p>`)}
     <div class="btn-col mt-s">
       ${needCode ? '' : s.syncing === 'shown' ? `<button class="btn soft" disabled><span class="spin"></span>Abgleich läuft …</button>`
-        : status.state === 'ok' && !queue.length ? '' // alles abgeglichen: nichts zu tun
+        : status.state === 'ok' && !queue.length ? '' // all synced: nothing to do
         : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Jetzt abgleichen</button>`}
       ${armBtn('disconnect', 'Verbindung trennen', 'Nochmal tippen: trennen, die Daten bleiben hier', {ic:'unplug', cls:'plain'})}</div>
     ${deviceSection()}`;
 }
 
-/* Einstellungen und Wege dieses Handys: Produktsuche im Internet, eigener KI-Schlüssel und der Austausch von Hand.
-   Die Hinweise sagen, was dabei hinausgeht. Nach einem Empfang steht hier die Meldung und, wenn dem anderen Gerät
-   etwas fehlt, „Antwort senden“ (sheet.exchange, siehe logic/exchange.js). */
+/* This phone's settings and routes: product lookup on the internet, the own AI key and the manual exchange.
+   The notes say what goes out in each case. After receiving, the report sits here and, when the other device is
+   missing something, „Antwort senden“ (sheet.exchange, see logic/exchange.js). */
 function deviceSection(){
   const ex = sheet?.exchange;
   return `<span class="label">Produktsuche im Internet</span>
@@ -371,15 +371,16 @@ function deviceSection(){
     </div>
     ${ex ? `<p class="note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
 }
-/* Server-Kasten zeichnen. Neu geschrieben wird er nur, wenn sich sein sichtbarer Inhalt ändert: Statuswechsel ohne sichtbare
-   Folge (busy bei jedem kurzen Abgleich) tun nichts, und ändert sich nur die Zeile unter dem Titel, etwa die Zeitangabe
-   „zuletzt abgeglichen“, wechselt nur ihr Text. fresh: nach dem Zeichnen des Sheets, der Kasten ist dann leer. */
-let boxFrame = ''; // der zuletzt geschriebene Kasten ohne die Zeile unter dem Titel
+/* Drawing the server box. It is only rewritten when its visible content changes: status changes with no visible
+   consequence (busy on every short sync) do nothing, and when only the line under the title changes, such as the
+   „zuletzt abgeglichen“ timestamp, only its text is swapped. fresh: right after the sheet was drawn, when the box is
+   still empty. */
+let boxFrame = ''; // the box as last written, without the line under the title
 export function paintServerBox(fresh = false){
   const box = $('#serverBox'); if (!box) return;
   const notice = syncInfo(), frame = serverSection({...notice, detail:''});
   if (fresh || frame !== boxFrame) {
-    if (!fresh && document.activeElement?.tagName === 'INPUT' && box.contains(document.activeElement)) return; // beim Tippen nicht stören
+    if (!fresh && document.activeElement?.tagName === 'INPUT' && box.contains(document.activeElement)) return; // do not interrupt while typing
     boxFrame = frame; box.innerHTML = serverSection(notice);
     return;
   }
@@ -387,7 +388,7 @@ export function paintServerBox(fresh = false){
   if (line && line.textContent !== notice.detail) line.textContent = notice.detail;
 }
 
-/* Datenschutz: erklärt beide Modi sachlich, ohne Versprechen; geöffnet aus den Einstellungen, Abschnitt „Daten“ */
+/* Datenschutz: explains both modes factually, without promises; opened from the settings, section „Daten“ */
 const PRIVACY = ['Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
   'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Zwei Einstellungen unter „Haushalt“ können mehr, beide sind aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer. Mit einem eigenen KI-Schlüssel geht das Packungsfoto an Anthropic; der Schlüssel liegt nur auf diesem Handy.',
@@ -401,5 +402,5 @@ setSheetView(state => {
   if (state.kind === 'settings') paintServerBox(true);
   if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom'));
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
-  if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#ab-' + at)?.scrollIntoView({block:'start'})); } // mit einem Abschnitt geöffnet
+  if (state.at) { const at = state.at; state.at = null; requestAnimationFrame(() => $('#ab-' + at)?.scrollIntoView({block:'start'})); } // opened at a given section
 });

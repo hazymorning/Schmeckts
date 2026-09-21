@@ -1,5 +1,5 @@
-/* Backup exportieren und importieren, Beispieldaten, alle Daten löschen.
-   Mit Server gelten Import und Löschen für den ganzen Haushalt. Beispieldaten gibt es nur ohne Server. */
+/* Exporting and importing a backup, sample data, deleting everything.
+   With a server, import and delete apply to the whole household. Sample data exists only without a server. */
 import {uid} from '../fields.js';
 import {Native, haptic} from '../native.js';
 import {DEMO, RATINGS} from '../config.js';
@@ -18,8 +18,8 @@ export function wipe(){
   closeSheet().then(() => { update(); toast(house ? 'Alle Daten im Haushalt gelöscht' : 'Alle Daten gelöscht'); });
 }
 
-/* Eine geteilte Datei (Backup oder Austausch) bleibt im Cache, bis die empfangende App sie gelesen hat:
-   weg beim nächsten Start und vor dem nächsten Export */
+/* A shared file (backup or exchange) stays in the cache until the receiving app has read it:
+   gone on the next start and before the next export */
 export async function clearExports(){
   if (!Native?.Filesystem) return;
   try {
@@ -29,7 +29,7 @@ export async function clearExports(){
 }
 export async function exportData(){
   await clearExports();
-  const json = JSON.stringify({...db, exportedAt:new Date().toISOString()}); // nur Haushaltsdaten, keine Geräte-Einstellungen
+  const json = JSON.stringify({...db, exportedAt:new Date().toISOString()}); // household data only, no device settings
   const name = `schmeckts-backup-${new Date().toISOString().slice(0, 10)}.json`;
   if (Native?.Filesystem && Native?.Share) {
     try {
@@ -77,8 +77,8 @@ export function loadDemo(){
     p.lastPets = [mau.id]; byBrand[brand] = p;
     rs.forEach(r => made.push({id:demoId(), productId:p.id, servedAt:0, pets:{[mau.id]:{r, at:null}}, note:''}));
   }
-  const people = ['Anna', 'Jonas'], slots = [7.25, 18.1, 12.5, 19.4];   // typische Fütterungszeiten
-  // zufällige Reihenfolge, aber die letzten drei Tage ohne schwache Bewertungen: Das Beispiel soll nicht „frisst schlechter“ melden
+  const people = ['Anna', 'Jonas'], slots = [7.25, 18.1, 12.5, 19.4];   // typical feeding times
+  // random order, but the last three days without weak ratings: the sample must not report „frisst schlechter“
   made.sort(() => Math.random() - .5);
   const calm = made.filter(s => RATINGS[s.pets[mau.id].r].score >= 50).slice(0, 6);
   made.sort((a, b) => calm.includes(b) - calm.includes(a));
@@ -97,8 +97,8 @@ export function loadDemo(){
   closeSheet().then(() => { update(); toast('Beispieldaten geladen'); });
 }
 
-/* Vor dem Verbinden: Beispieldaten spurlos entfernen, sie sollen nicht in den Haushalt.
-   Dazu gehört, was nur für das Beispieltier serviert wurde, und Futter, das nur daran hing. */
+/* Before connecting: remove the sample data without a trace, it has no business in the household.
+   That includes whatever was served only for the sample pet, and food that hung only on it. */
 export function purgeDemo(){
   const demo = id => id.startsWith(DEMO);
   const pets = new Set(db.pets.filter(p => demo(p.id)).map(p => p.id));
@@ -109,7 +109,7 @@ export function purgeDemo(){
   const products = new Set(db.products.filter(p => !used.has(p.id) && (demo(p.id) || fromDemo.has(p.id))).map(p => p.id));
   if (!pets.size && !servings.size && !products.size) return;
   purge({pets, products, servings});
-  let touched = false; // gemischte Mahlzeiten behalten, nur das Beispieltier austragen
+  let touched = false; // keep mixed meals, only take the sample pet out of them
   for (const s of db.servings) for (const id of Object.keys(s.pets)) if (pets.has(id)) { delete s.pets[id]; touched = true; }
   prefs.lastPets = (prefs.lastPets || []).filter(id => !pets.has(id));
   savePrefs();
