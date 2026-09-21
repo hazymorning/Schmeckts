@@ -5,26 +5,48 @@
    contrasts. */
 
 /* Typefaces (bundled with the app, SIL Open Font License)
-   Fraunces for headings and numbers, Figtree for everything else. */
+   Fraunces for headings and numbers, Figtree for everything else.
+   font-display: block, not swap: the files lie in the app, so they are there in a moment, and the splash screen
+   stays up until they are (ui/splash.js). Nothing is drawn in a stand-in first and then jumps. */
 @font-face {
   font-family: "Figtree";
   src: url(../fonts/figtree-latin.woff2) format("woff2");
   font-weight: 400 700;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 @font-face {
   font-family: "Fraunces";
   src: url(../fonts/fraunces-latin.woff2) format("woff2");
   font-weight: 500 700;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 :root {
   color-scheme: light dark;
   --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
   --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Distances: one scale, so a margin is chosen and not invented. The whole steps are the backbone, the halves
+     between them are the ones this layout was drawn on — among them the card's 18px padding and the 14px
+     between two cards, both laid down in PROJECT.md ("Design rules"). Under 4px nothing is a distance any
+     more but an optical nudge, which is why 2px has a name of its own. Every margin, padding and gap in
+     app.css uses these; tests/design_test.py holds them to it. */
+  --space-hair: 2px;
+  --space-1: 4px;
+  --space-1h: 6px;
+  --space-2: 8px;
+  --space-2h: 10px;
+  --space-3: 12px;
+  --space-3h: 14px;
+  --space-4: 16px;
+  --space-4h: 18px;
+  --space-5: 20px;
+  --space-5h: 22px;
+  --space-6: 24px;
+  --space-6h: 26px;
+  --space-7: 32px;
+
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.75, 0);

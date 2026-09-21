@@ -7,7 +7,9 @@ import json
 import re
 import time
 import xml.etree.ElementTree as ET
+
 from common import (
+    NATIVE,
     PACK,
     ROOT,
     SAVED,
@@ -24,6 +26,7 @@ from common import (
     real_errors,
     run_tests,
     seeded,
+    SHIFTS,
     shot,
     started,
     state,
@@ -2939,8 +2942,102 @@ async def test_feed_routes(browser, url):
     await ctx.close()
 
 
+async def top_pixel(pg):
+    """The colour of the topmost strip of the screen, where the status bar sits"""
+    from PIL import Image
+
+    shot = PACK.parent / 'top.png'
+    await pg.screenshot(path=str(shot), clip={'x': 150, 'y': 2, 'width': 4, 'height': 4})
+    return Image.open(shot).convert('RGB').getpixel((2, 2))
+
+
+async def test_start(browser, url):
+    print('start: the splash stays until the app is there, nothing moves, and it never hangs')
+    ctx = await phone(browser)
+    pg = await ctx.new_page()
+    await pg.add_init_script(NATIVE)
+    await pg.add_init_script(SHIFTS)
+    errors = []
+    pg.on('pageerror', lambda e: errors.append(str(e)))
+    await pg.goto(url)
+    await started(pg)
+    hid = await pg.evaluate("window.__calls.filter(c => c[0] === 'hideSplash').map(c => c[1])")
+    check(
+        hid == [{'fadeOutDuration': 200, 'drawn': True, 'draws': 1, 'fonts': True}],
+        f'the splash goes exactly once, after the home page was drawn exactly once and both typefaces are there ({hid})',
+    )
+    shifts = await pg.evaluate('window.__shifts')
+    check(not shifts, f'and nothing moved on the way there: no layout shift ({shifts})')
+    used = await pg.evaluate(
+        """[...document.styleSheets].flatMap(s => [...s.cssRules]).filter(r => r.constructor.name === 'CSSFontFaceRule')
+             .map(r => [r.style.getPropertyValue('font-family'), r.style.getPropertyValue('font-display')])"""
+    )
+    check(
+        sorted(used) == [['Figtree', 'block'], ['Fraunces', 'block']],
+        f'the typefaces are drawn only once they are there, never in a stand-in first ({used})',
+    )
+    preload = await pg.eval_on_selector_all(
+        'link[rel=preload]', "l => l.map(x => [x.getAttribute('as'), x.getAttribute('type'), x.crossOrigin, x.getAttribute('href')])"
+    )
+    check(
+        preload
+        == [['font', 'font/woff2', 'anonymous', 'fonts/figtree-latin.woff2'], ['font', 'font/woff2', 'anonymous', 'fonts/fraunces-latin.woff2']],
+        f'both files are asked for right away ({preload})',
+    )
+    check(
+        not await pg.evaluate("document.body.className.includes('intro')")
+        and not await pg.evaluate("document.getAnimations().some(a => a.playState === 'running')"),
+        'and nothing fades in by itself: after the splash the page is simply there',
+    )
+    await ctx.close()
+
+    # A strip of the background behind the status bar, as tall as the inset — and the sheet's dimming over it.
+    # The inset comes in before the page is built: Chromium does not redo an env() fallback afterwards.
+    ctx = await phone(browser)
+    pg = await ctx.new_page()
+    await pg.add_init_script(
+        "addEventListener('DOMContentLoaded', () => { const s = document.createElement('style');"
+        "  s.textContent = ':root{--safe-area-inset-top:24px}'; document.head.append(s); })"
+    )
+    await pg.goto(url)
+    await started(pg)
+    await pg.click('.welcome [data-action=mode-local]')
+    await idle(pg)
+    bar = await pg.evaluate(
+        """(() => { const s = getComputedStyle(document.body, '::before');
+          return [s.height, s.position, s.backgroundColor === getComputedStyle(document.body).backgroundColor, s.zIndex,
+            getComputedStyle(document.querySelector('.top')).paddingTop]; })()"""
+    )
+    check(
+        bar == ['24px', 'fixed', True, '10', '36px'],
+        f'behind the status bar a strip of the background, as tall as the inset, and the header below it ({bar})',
+    )
+    plain = await top_pixel(pg)
+    await pg.click('[data-action=open-settings]')
+    await idle(pg)
+    dimmed = await top_pixel(pg)
+    check(
+        sum(dimmed) < sum(plain) - 60,
+        f'with a sheet open its dimming lies over the strip, not the other way round ({plain} → {dimmed})',
+    )
+    await ctx.close()
+
+    # The safety net: with the typefaces never arriving the splash still goes, within 2.5 s
+    ctx = await phone(browser)
+    pg = await ctx.new_page()
+    await pg.add_init_script(NATIVE)
+    await pg.add_init_script('document.fonts.load = () => new Promise(() => {});')
+    began = time.monotonic()
+    await pg.goto(url)
+    await pg.wait_for_function("window.__calls.some(c => c[0] === 'hideSplash')", timeout=5000)
+    took = time.monotonic() - began
+    check(2 < took < 4, f'a start that never finishes: the splash goes anyway, after {took:.1f} s')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_suggestions(browser, url):
-    print('feeding: at most three suggestions, a search field from four varieties, up to eight hits')
+    print('feeding: buttons, search field, one list, at most three suggestions and eight hits')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [3, 0])
@@ -2954,41 +3051,70 @@ async def test_suggestions(browser, url):
     )
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
-    await pg.evaluate(SORTS, [4, 0])
-    await idle(pg)
-    await pg.click('#fab')
-    await idle(pg)
-    names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
-    order = await pg.eval_on_selector(
-        '#sheet',
-        "s => [...s.querySelectorAll('#serveList, .search, #serveHits, [data-action=new-product]')].map(e => e.id || e.className.split(' ')[0])",
-    )
-    check(
-        names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['serveList', 'search', 'serveHits', 'btn'],
-        f'from four varieties on: three suggestions, the search field below them, and „Ohne Foto eintippen“ stays ({names}, {order})',
-    )
-    await pg.click('#sheet [data-action=close]')
-    await idle(pg)
     await pg.evaluate(SORTS, [12, 0])
     await idle(pg)
     await pg.click('#fab')
     await idle(pg)
+    order = await pg.eval_on_selector(
+        '#sheet',
+        "s => [...s.querySelectorAll('.cta-row, .search, #serveList, [data-action=new-product]')].map(e => e.id || e.className.split(' ')[0])",
+    )
+    names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
+    check(
+        names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['cta-row', 'search', 'serveList', 'btn'],
+        f'buttons, then the search field, then the list, and „Ohne Foto eintippen“ at the end ({names}, {order})',
+    )
+
+    # The search field must not move while typing: nothing above it may change, so its place inside the sheet
+    # and its distance to the two buttons stay the same. (The sheet itself grows and shrinks with its list, as
+    # a sheet at the bottom of the screen does.)
+    async def field():
+        return await pg.eval_on_selector(
+            '#sheet .search',
+            """s => { const cta = document.querySelector('#sheet .cta-row').getBoundingClientRect(), r = s.getBoundingClientRect();
+              const body = document.getElementById('sheetBody').getBoundingClientRect();
+              return [Math.round(r.top - body.top), Math.round(r.top - cta.bottom)]; }""",
+        )
+
+    empty = await field()
     await pg.fill('#sheet [data-search]', 'Sorte')
     await idle(pg)
-    many = await pg.eval_on_selector_all('#serveHits b', 'l => l.map(x => x.innerText)')
+    many = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
+    hits = await field()
+    await pg.fill('#sheet [data-search]', 'gibtsnicht')
+    await idle(pg)
+    none = await field()
+    empty_text = await pg.eval_on_selector('#serveList .empty', 'e => e.innerText')
+    offer = await pg.eval_on_selector('#serveList [data-action=new-product]', 'b => [b.innerText, b.dataset.v]')
     check(
-        len(many) == 8 and await pg.locator('#serveList').is_hidden(),
+        len(many) == 8,
         f'the search shows at most eight hits in place of the suggestions ({len(many)})',
     )
+    check(
+        empty == hits == none,
+        f'the field keeps its place in the sheet and its distance to the buttons: empty, with hits, without ({empty}, {hits}, {none})',
+    )
+    check(
+        empty_text == 'Keine Sorte passt zu „gibtsnicht“.' and offer == ['„gibtsnicht“ als neues Futter eintippen', 'gibtsnicht'],
+        f'without a hit it says so and offers what was typed as a new variety ({empty_text}, {offer})',
+    )
+    await pg.click('#serveList [data-action=new-product]')
+    await idle(pg)
+    typed = await pg.eval_on_selector('#f-variety', 'i => i.value')
+    check(typed == 'gibtsnicht', f'and takes it into „Neues Futter“ ({typed})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
     await pg.fill('#sheet [data-search]', 'sheba sorte 11')
     await idle(pg)
-    hit = await pg.eval_on_selector_all('#serveHits b', 'l => l.map(x => x.innerText)')
+    hit = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     await pg.fill('#sheet [data-search]', '')
     await idle(pg)
     back = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and await pg.locator('#serveHits li').count() == 0,
-        f'searching brand and variety together, and an empty field shows the suggestions again ({hit})',
+        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'],
+        f'searching brand and variety together, and an empty field shows the suggestions again ({hit}, {back})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
@@ -3001,14 +3127,16 @@ async def test_home_history(browser, url):
     await pg.evaluate(SORTS, [26, 1])
     await idle(pg)
     btn = await pg.eval_on_selector(
-        '[data-sec=hist] [data-action=open-report]', 'b => [b.innerText.trim(), b.classList.contains("btn"), !!b.querySelector("svg")]'
+        '[data-sec=hist] [data-action=open-report]',
+        """b => { const ic = b.querySelector('svg'); const r = ic.getBoundingClientRect();
+          return [b.innerText.trim(), b.className, ic.getBBox().width > 0, r.left > b.getBoundingClientRect().left + r.width,
+            getComputedStyle(ic).width]; }""",
     )
     check(
         await pg.locator('[data-sec=hist] .tl-item').count() == 5
         and await pg.locator('[data-sec=hist] .tl-day').count() == 5
-        and btn == ['Mehr', True, True]
-        and await pg.locator('[data-sec=hist] .card-btn').count() == 0,
-        f'five meals grouped by day, and below them one proper button to the whole history ({btn})',
+        and btn == ['Ganzer Verlauf', 'card-btn', True, True, '20px'],
+        f'five meals grouped by day, below them „Ganzer Verlauf“ as a card button with the chevron at its end ({btn})',
     )
     # A day in the calendar: near ones scroll on the home page, older ones open the evaluation there
     days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
@@ -3142,6 +3270,7 @@ async def test_report(browser, url):
 
 run_tests(
     {
+        'start': test_start,
         'tour': test_tour,
         'flow': test_flow,
         'buying': test_buying,

@@ -629,6 +629,36 @@ def test_signing_key():
             )
 
 
+# Not distances, so they keep their own value: the room an icon needs inside a field, and the room the
+# feeding button needs under the page. env()'s own fallback is not a distance either and is taken out first.
+SPACING_ALLOWED = {
+    '44px': 'room for the icon in a field: 14 from the edge, 20 wide, 10 to the text',
+    '112px': 'room for the feeding button under the page',
+}
+SPACING_PROPS = ('margin', 'padding', 'gap', 'row-gap', 'column-gap')
+
+
+def test_spacing_scale():
+    """Every margin, padding and gap comes from the scale in tokens.css, so no distance is invented on the spot."""
+    scale = {
+        p: v
+        for sel, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8'))
+        if sel == ':root'
+        for p, v in d.items()
+        if p.startswith('--space-')
+    }
+    want = ['--space-hair'] + [f'--space-{n}{h}' for n in range(1, 8) for h in ('', 'h') if not (n == 7 and h)]
+    check(sorted(scale) == sorted(want), f'the scale in tokens.css: {len(scale)} steps ({sorted(scale)})')
+    loose = []
+    for sel, decls in css_rules((WWW / 'css/app.css').read_text(encoding='utf-8')):
+        for prop, value in decls:
+            if prop.split('-top')[0].split('-right')[0].split('-bottom')[0].split('-left')[0] not in SPACING_PROPS:
+                continue
+            bare = re.sub(r'env\([^)]*\)', '', value)
+            loose += [f'{sel} {prop}:{value}' for px in re.findall(r'\d+(?:\.\d+)?px', bare) if px not in SPACING_ALLOWED]
+    check(not loose, f'every distance in app.css comes from the scale ({len(loose)} do not: {loose[:4]})')
+
+
 def test_ratings():
     """The server's overview labels every level of RATINGS, with the app's wording.
 
@@ -682,6 +712,7 @@ async def test_files(browser, url):
     test_logo_files()
     test_rules_static()
     test_pack()
+    test_spacing_scale()
     test_ratings()
     test_isolated_tests()
     test_prompt()

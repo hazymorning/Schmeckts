@@ -175,33 +175,38 @@ function viewFeed() {
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
     <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
     ${sheet.busy ? `<p class="note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
-    ${
-      prods.length
-        ? `<div id="serveList"><span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul></div>
+    <div class="serve">
       ${
         prods.length > SUGGEST
-          ? `<div class="search">${icon('search')}<input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>
-        <ul class="plist" id="serveHits"></ul>`
+          ? `<div class="search">${icon('search')}
+            <input class="field" type="search" data-search placeholder="Marke oder Sorte suchen" autocomplete="off"></div>`
           : ''
-      }`
-        : ''
-    }
+      }
+      <div class="serve-list" id="serveList">${quickList(prods)}</div>
+    </div>
     <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
 }
-/* Search in the feeding sheet: what is typed shows the matching varieties in place of the suggestions, at most HITS. */
-export function renderServeHits(text) {
-  const list = $('#serveList'),
-    hits = $('#serveHits');
-  if (!list || !hits) return;
-  const words = norm(text).split(' ').filter(Boolean);
-  list.hidden = !!words.length;
-  hits.innerHTML = words.length
-    ? serveRows(
-        quickProducts()
-          .filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
-          .slice(0, HITS),
-      )
+/* The varieties most recently served, at most SUGGEST of them */
+const quickList = prods =>
+  prods.length
+    ? `<span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul>`
     : '';
+/* Search in the feeding sheet: the hits take the place of the suggestions, at most HITS. Only this one box is
+   rewritten, so the search field neither moves nor loses the focus; the distances above it hang on .serve. */
+export function renderServeHits(text) {
+  const box = $('#serveList');
+  if (!box) return;
+  const words = norm(text).split(' ').filter(Boolean);
+  box.innerHTML = words.length ? hitList(text.trim(), words) : quickList(quickProducts());
+}
+function hitList(text, words) {
+  const hits = quickProducts()
+    .filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
+    .slice(0, HITS);
+  if (hits.length) return `<ul class="plist">${serveRows(hits)}</ul>`;
+  const q = esc(text);
+  return `<p class="empty"><span>Keine Sorte passt zu „${q}“.</span></p>
+    <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neues Futter eintippen</button>`;
 }
 
 /* The notes under the reminders: they say what the chosen setting currently means.

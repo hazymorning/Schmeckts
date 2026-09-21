@@ -1,6 +1,9 @@
 /* Starting the app: build the interface, wire up the storage and sync hooks, start syncing, handle Android's back
    button. Imports the sheet views and actions, which register themselves as they load.
-   store.js loads the stored data before this module runs (top-level await). */
+   store.js loads the stored data before this module runs (top-level await), and the native splash screen stays
+   up until the home page is drawn and the typefaces are there (ui/splash.js), so nobody sees the page build up.
+   ui/splash.js comes first, because its safety net is armed as it loads. */
+import {hideSplash, hideSplashWhenReady} from './ui/splash.js';
 import {appInfo, Native} from './native.js';
 import {icon} from './icons.js';
 import {diskHooks} from './disk.js';
@@ -16,6 +19,7 @@ import {retryWaiting} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
 import {openLink} from './actions.js'; // also registers clicks and input
+import {report} from './report.js';
 
 document.querySelectorAll('[data-icon]').forEach(el => {
   el.innerHTML = icon(el.dataset.icon);
@@ -37,11 +41,17 @@ syncHooks.status = () => {
 }; // the box in the settings only changes on new content
 syncHooks.reachable = () => retryWaiting(); // recognise waiting photos as soon as the server is reachable
 diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportieren.');
-startSync();
-applyTheme();
-renderHome();
-startReminders();
-clearExports();
+try {
+  startSync();
+  applyTheme();
+  renderHome(); // drawn exactly once before the splash goes
+  startReminders();
+  clearExports();
+} catch (e) {
+  report('start', e);
+  hideSplash(); // whatever happened, the app is on screen and not behind the splash
+}
+hideSplashWhenReady();
 if (Native?.App) {
   // Back: close an open camera or an open sheet, otherwise send the app to the background (as native apps do)
   Native.App.addListener('backButton', ({canGoBack}) => {
@@ -54,13 +64,12 @@ if (Native?.App) {
     .then(i => {
       appInfo.version = i.version;
     })
-    .catch(() => {});
+    .catch(e => report('app version', e));
   // Shortcuts and deep links, on a cold start (Capacitor holds the event back) and while the app is running
   Native.App.addListener('appUrlOpen', ({url}) => {
     openLink(url);
   });
 }
-setTimeout(() => document.body.classList.remove('intro'), 1800);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && !dlg.open) renderHome();
 });

@@ -43,7 +43,6 @@ export function update() {
     renderHome();
   };
   if (!document.startViewTransition || reduceMotion.matches || dlg.open) return run();
-  document.body.classList.remove('intro'); // end any running fade-in, or the transition can hang
   try {
     const t = document.startViewTransition(run);
     setTimeout(() => {
@@ -494,6 +493,7 @@ function historyHTML() {
     (first.length
       ? dayBlocks(dayGroups(first), {multiHouse, fresh: homeView.fresh, anchors: true})
       : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
-    `<div class="btn-col mt-s"><button class="btn soft" data-action="open-report">${icon('layers')}Mehr</button></div>`
+    // The only way to the evaluation, so it reads like the other cards' buttons and says where it leads
+    `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
   );
 }
