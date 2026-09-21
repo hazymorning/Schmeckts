@@ -1,6 +1,6 @@
-/* Datenbank (db), Einstellungen (prefs), Sync-Stand mit Feld-Uhren (state) und unbestätigte Änderungen (queue).
-   Absturzsicher durch die Schreibfolge queue → db → sync: Eine eigene Änderung steht zuerst in der Warteschlange, der
-   Start spielt sie nach; eine Änderung vom Server steht zuerst in db, fehlt sync, holt die App sie noch einmal. */
+/* Database (db), settings (prefs), sync state with field clocks (state) and unconfirmed changes (queue).
+   Crash-safe through the write order queue → db → sync: one of our own changes lands in the queue first and the next
+   start replays it; a change from the server lands in db first, and if sync is missing the app fetches it again. */
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
 import {tidyFeedStart, tidyRemind} from './config.js';
@@ -11,7 +11,7 @@ export {flush, storageOK};
 export const defaults = () => ({version:3, pets:[], products:[], servings:[]});
 const defaultPrefs = () => ({theme:'system', hiddenHints:[], closedWeek:'', milestones:null, remind:0, feedRemind:false, backdrop:true,
   feedStart:'beides', mode:'', server:'', code:'', name:'', activePet:'all', lastPets:[], lookup:false, aiKey:'', codes:{}, exchange:{}});
-export const hooks = {changed(){}, saved(){}}; // Oberfläche und Abgleich hängen sich hier an
+export const hooks = {changed(){}, saved(){}}; // the interface and the sync hook in here
 
 export function tidy(d){
   const out = defaults();
@@ -21,8 +21,8 @@ export function tidy(d){
   }
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
   for (const s of out.servings) {
-    if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed';  // Erkennung wurde unterbrochen
-    if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed';     // Lesen wurde unterbrochen: eintippen
+    if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed';  // recognition was interrupted
+    if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed';     // reading was interrupted: type it in
   }
   out.servings.sort((a, b) => b.servedAt - a.servedAt);
   return out;
@@ -31,15 +31,15 @@ function tidyPrefs(p){
   const out = {...defaultPrefs(), ...(p && typeof p === 'object' ? p : {})};
   out.hiddenHints = Array.isArray(out.hiddenHints) ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))].slice(-300) : [];
   out.remind = tidyRemind(out.remind);
-  out.feedRemind = out.feedRemind === true; // Erinnerung ans Füttern zu den üblichen Zeiten
-  out.feedStart = tidyFeedStart(out.feedStart);                        // welcher Knopf im Füttern-Sheet steht
-  out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // Tierfotos hinter der Kopfzeile, Standard an ('off': Wert aus 1.1.0)
+  out.feedRemind = out.feedRemind === true; // reminder to feed at the usual times
+  out.feedStart = tidyFeedStart(out.feedStart);                        // which button the feeding sheet shows
+  out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // pet photos behind the header, on by default ('off': a value from 1.1.0)
   out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
-  out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: noch nie gesetzt, siehe load()
-  out.lookup = out.lookup === true;                                    // Produktsuche im Internet, Standard aus
-  out.aiKey = typeof out.aiKey === 'string' ? out.aiKey.trim() : '';   // eigener KI-Schlüssel, nur auf diesem Handy
-  out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};       // gemerkte Barcode-Antworten
-  out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // Stand je Gerät, mit dem getauscht wurde
+  out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: never set, see load()
+  out.lookup = out.lookup === true;                                    // product lookup on the internet, off by default
+  out.aiKey = typeof out.aiKey === 'string' ? out.aiKey.trim() : '';   // own AI key, on this phone only
+  out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};       // remembered barcode answers
+  out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with
   return out;
 }
 function tidyState(s){
@@ -57,12 +57,12 @@ const validChange = x => x && typeof x.id === 'string' && COLLECTIONS.includes(x
 
 export let db = defaults(), prefs = defaultPrefs(), queue = [];
 export const state = tidyState(null);
-export let revision = 0; // zählt jede Änderung der Daten, derive.js rechnet die Auswertung dann neu
-export let loadError = null; // gespeicherte Daten vorhanden, aber nicht lesbar: dann wird nichts geschrieben
+export let revision = 0; // counts every change to the data; derive.js then recomputes the evaluation
+export let loadError = null; // stored data present but unreadable: nothing is written then
 let snap = Object.fromEntries(COLLECTIONS.map(c => [c, new Map()]));
 
-/* Für die Auswertung (derive.js): Sorten, deren Mahlzeiten sich geändert haben (null: alle), und die früheste betroffene
-   Servierzeit. meals: die Mahlzeit vor und nach der Änderung */
+/* For the evaluation (derive.js): varieties whose meals have changed (null: all), and the earliest serving time
+   affected. meals: the meal before and after the change */
 const allStale = () => ({sorts:null, since:-Infinity});
 let stale = allStale();
 export function takeStale(){ const taken = stale; stale = {sorts:new Set(), since:Infinity}; return taken; }
@@ -73,7 +73,7 @@ function markStale(c, ...meals){
   for (const m of meals) if (m) { stale.sorts.add(m.productId); stale.since = Math.min(stale.since, m.servedAt); }
 }
 
-/* Speichern auf der Platte */
+/* Saving to disk */
 const stateForDisk = () => ({...state, device:clockState.device, offset:clockState.offset, ms:clockState.ms, n:clockState.n});
 const connected = () => !!prefs.code;
 function persist(...names){
@@ -93,14 +93,14 @@ function trimJournal(ids){
   persist('queue');
 }
 export function log(text){
-  console.warn('Abgleich:', text);
+  console.warn('sync:', text);
   state.log.push({at:Date.now(), text});
   state.log.splice(0, state.log.length - 30);
   persist('sync');
 }
 
-/* Laden und Nachspielen der Warteschlange */
-const ZERO = () => `0000000000000-0000-${clockState.device}`; // unbekannte Herkunft: verliert gegen jede echte Änderung
+/* Loading and replaying the queue */
+const ZERO = () => `0000000000000-0000-${clockState.device}`; // unknown origin: loses against every real change
 const clocksOf = (c, id) => state.clocks[c][id] ||= {};
 const snapshot = () => Object.fromEntries(COLLECTIONS.map(c => [c, new Map(db[c].filter(r => validId(r.id)).map(r => [r.id, fieldsOf(c, r)]))]));
 const sortServings = () => db.servings.sort((a, b) => b.servedAt - a.servedAt);
@@ -110,22 +110,22 @@ async function load(){
   db = tidy(d);
   prefs = tidyPrefs(p);
   Object.assign(state, tidyState(s));
-  if (d == null) Object.assign(state, {epoch:'', seq:0, clocks:tidyState(null).clocks}); // Uhren ohne Werte gelten nicht
+  if (d == null) Object.assign(state, {epoch:'', seq:0, clocks:tidyState(null).clocks}); // clocks without values do not count
   queue = Array.isArray(q) ? q.filter(validChange) : [];
   Object.assign(clockState, {device:state.device, offset:state.offset, ms:state.ms, n:state.n});
   for (const x of queue) observe(x.t);
-  let fixed = false; // Warteschlange nachspielen: was dort steht, aber in db oder sync fehlt (Absturz beim Schreiben)
+  let fixed = false; // replay the queue: whatever is in it but missing from db or sync (a crash while writing)
   for (const x of queue) if (applyRecord(x.c, x.r, Object.fromEntries(Object.entries(x.f).map(([k, v]) => [k, {v, t:x.t}])), false)) fixed = true;
   sortServings();
   if (ensureClocks()) fixed = true;
   snap = snapshot();
   if (fixed) persist('db', 'sync');
   if (prefs.activePet !== 'all' && !db.pets.some(x => x.id === prefs.activePet)) prefs.activePet = 'all';
-  prefs.milestones ||= milestones(db).reached; // noch nie gemerkt: Erreichtes gilt als gesehen
-  // verbunden heißt „haushalt“, ein benutztes Handy ist sonst „lokal“; beim allerersten Start fragt die Willkommensseite
+  prefs.milestones ||= milestones(db).reached; // never recorded: what is reached counts as seen
+  // connected means `haushalt`; a phone already in use is otherwise `lokal`; on the very first start the welcome page asks
   prefs.mode = connected() ? 'haushalt' : prefs.mode === 'lokal' || p != null || d != null ? 'lokal' : '';
 }
-function ensureClocks(){ // Datensätze ohne Uhren, z. B. übernommen aus älteren Versionen
+function ensureClocks(){ // records without clocks, e.g. carried over from older versions
   let n = 0;
   for (const c of COLLECTIONS) for (const rec of db[c]) {
     if (!validId(rec.id)) continue;
@@ -136,15 +136,15 @@ function ensureClocks(){ // Datensätze ohne Uhren, z. B. übernommen aus älter
   return n > 0;
 }
 
-try { await load(); } catch (e) { loadError = e; console.error('Gespeicherte Daten nicht lesbar', e); }
+try { await load(); } catch (e) { loadError = e; console.error('stored data unreadable', e); }
 
-export function replaceDb(next){ db = next; revision++; stale = allStale(); } // Import, Löschen und Rückgängig tauschen die ganze Datenbank
+export function replaceDb(next){ db = next; revision++; stale = allStale(); } // import, delete and undo swap the whole database
 
-/* Eigene Änderungen */
+/* Our own changes */
 export function save(){
   const changes = diff();
   if (changes.length) { queue.push(...changes); persist('queue', 'db', 'sync'); hooks.saved(); }
-  else persist('db'); // lokale Felder wie Foto und Erkennungsstatus
+  else persist('db'); // local fields such as the photo and the recognition status
 }
 export function savePrefs(){ persist('prefs'); }
 
@@ -154,10 +154,10 @@ function diff(){
   for (const c of COLLECTIONS) {
     const prev = snap[c], cur = new Map();
     for (const rec of db[c]) {
-      if (!validId(rec.id)) continue; // wird nicht abgeglichen, der Server würde ihn ablehnen
+      if (!validId(rec.id)) continue; // not synced, the server would reject it
       const f = fieldsOf(c, rec), p = prev.get(rec.id), ch = {};
       cur.set(rec.id, f);
-      if (!p) Object.assign(ch, f, {_del:'false'}); // neu oder wiederhergestellt: alle Felder
+      if (!p) Object.assign(ch, f, {_del:'false'}); // new or restored: every field
       else {
         for (const k in f) if (p[k] !== f[k]) ch[k] = f[k];
         for (const k in p) if (!(k in f)) ch[k] = 'null';
@@ -175,14 +175,14 @@ function change(c, r, json){
   return {id:randomId(16), c, r, t, f};
 }
 
-/* Änderungen anderer Geräte */
+/* Changes from other devices */
 let changedTimer = null;
-function notify(){ clearTimeout(changedTimer); changedTimer = setTimeout(() => hooks.changed(), 120); } // gebündelt
+function notify(){ clearTimeout(changedTimer); changedTimer = setTimeout(() => hooks.changed(), 120); } // batched
 
-/* records: [{c, r, f: {feld: {v, t}}}], jeweils komplett, so wie der Server sie liefert. Liefert die Zahl der
-   geänderten Datensätze (0 = nichts Neues). */
+/* records: [{c, r, f: {field: {v, t}}}], each one complete, the way the server delivers them. Returns the number of
+   records changed (0 = nothing new). */
 export function merge(records){
-  save(); // eigene, noch nicht erfasste Änderungen zuerst festhalten
+  save(); // record our own uncaptured changes first
   let changed = 0;
   for (const x of records) if (applyRecord(x.c, x.r, x.f || {}, true)) changed++;
   if (changed) { sortServings(); notify(); }
@@ -190,8 +190,8 @@ export function merge(records){
   return changed;
 }
 
-/* Austausch von Hand (logic/exchange.js): alle eigenen Feld-Uhren, und die Datensätze, die dieses Gerät neuer hat als
-   die Gegenseite. peer: deren Uhren (aus ihrer Datei), sonst eine Marke (höchste Uhr beim letzten Austausch), null: alles. */
+/* Manual exchange (logic/exchange.js): all of our own field clocks, plus the records this device holds newer than the
+   other side. peer: their clocks (from their file), otherwise a mark (the highest clock at the last exchange), null: everything. */
 export const allClocks = () => Object.fromEntries(COLLECTIONS.map(c => [c, state.clocks[c]]));
 export const topClock = () => {
   let top = '';
@@ -208,7 +208,7 @@ export function changesSince(peer){
       if (!Object.entries(clocks).some(newer)) continue;
       const rec = visible.get(id), f = {};
       if (rec) for (const [k, t] of Object.entries(clocks)) f[k] = k === '_del' ? {v:false, t} : {v:valueOf(c, rec, k), t};
-      else if (clocks._del) f._del = {v:true, t:clocks._del};  // gelöscht: die übrigen Werte kennt dieses Gerät nicht mehr
+      else if (clocks._del) f._del = {v:true, t:clocks._del};  // deleted: this device no longer knows the other values
       else continue;
       out.push({c, r:id, f});
     }
@@ -216,7 +216,7 @@ export function changesSince(peer){
   return out;
 }
 
-/* Führt Felder eines Datensatzes zusammen. full: fields enthält alle Felder, die der Server kennt. */
+/* Merges the fields of one record. full: fields holds every field the server knows. */
 function applyRecord(c, id, fields, full){
   if (!state.clocks[c] || !validId(id)) return false;
   const list = db[c], idx = list.findIndex(r => r.id === id), rec = idx >= 0 ? list[idx] : null;
@@ -242,20 +242,20 @@ function applyRecord(c, id, fields, full){
     const s = snap[c].get(id) || {};
     for (const [k, v] of Object.entries(win)) {
       if (k === '_del') continue;
-      // gemerkt wird nur, was dieses Gerät auch hält: Sonst sähe das nächste Speichern ein fehlendes Feld und löschte es im ganzen Haushalt
+      // only what this device actually holds is remembered: otherwise the next save would see a missing field and delete it household-wide
       if (setField(c, rec, k, v) && v != null) s[k] = JSON.stringify(v); else delete s[k];
     }
     snap[c].set(id, s); markStale(c, before, rec);
     return true;
   }
-  if (deleted) return false; // bleibt gelöscht, nur die Uhren sind neu
-  // (wieder) sichtbar: Werte vom Server, wo die eigene Uhr neuer ist, aus der Warteschlange
+  if (deleted) return false; // stays deleted, only the clocks are new
+  // visible (again): values from the server, and from the queue wherever our own clock is newer
   const values = {}, mine = queuedValues(c, id);
   for (const [k, x] of Object.entries(fields)) if (k !== '_del') values[k] = x.v;
   for (const k of Object.keys(clocks)) {
     if (k === '_del') continue;
     if (mine[k] && mine[k].t === clocks[k]) values[k] = mine[k].v;
-    else if (full) { if (fields[k]) clocks[k] = fields[k].t; else delete clocks[k]; } // Wert unbekannt
+    else if (full) { if (fields[k]) clocks[k] = fields[k].t; else delete clocks[k]; } // value unknown
   }
   const made = fromFields(c, id, values);
   if (!complete(c, made)) return false;
@@ -269,8 +269,8 @@ function queuedValues(c, r){
   return out;
 }
 
-/* Vollständiger Abgleich (neue Epoche, erstes Verbinden, abweichende Prüfsumme): alles vom Server
-   zusammenführen, dann jedes Feld erneut senden, bei dem die eigene Uhr neuer ist. */
+/* Full sync (new epoch, first connection, differing checksum): merge everything from the server, then resend every
+   field whose own clock is newer. */
 export function reconcile(records){
   merge(records);
   const server = {};
@@ -287,7 +287,7 @@ export function reconcile(records){
         if ((rt && rt >= t) || queued.has(`${c}/${id}/${k}@${t}`)) continue;
         if (rec) add(t, k, k === '_del' ? false : valueOf(c, rec, k));
         else if (k === '_del') add(t, k, true);
-        else if (rt) clocks[k] = rt; else delete clocks[k]; // Wert eines gelöschten Datensatzes: nicht mehr bekannt
+        else if (rt) clocks[k] = rt; else delete clocks[k]; // value of a deleted record: no longer known
       }
       for (const [t, f] of groups) out.push({id:randomId(16), c, r:id, t, f});
     }
@@ -297,13 +297,13 @@ export function reconcile(records){
   return out.length;
 }
 
-/* Für den Abgleich */
-export function ack(ids){ // vom Server bestätigt oder dauerhaft abgelehnt
+/* For the sync */
+export function ack(ids){ // confirmed by the server, or rejected for good
   const done = new Set(ids), before = queue.length;
   queue = queue.filter(x => !done.has(x.id));
   if (queue.length !== before) persist('queue');
 }
-export function restamp(id){ // Server lehnt die Uhrzeit ab: mit korrigierter Zeit neu stempeln
+export function restamp(id){ // the server rejects the clock: restamp with the corrected time
   const x = queue.find(q => q.id === id); if (!x) return;
   rebase();
   const t = stamp(), clocks = state.clocks[x.c]?.[x.r] || {};
@@ -314,7 +314,7 @@ export function restamp(id){ // Server lehnt die Uhrzeit ab: mit korrigierter Ze
 export function setPosition(epoch, seq){ state.epoch = epoch; state.seq = seq; persist('sync'); }
 export function resetSync(){ queue = []; state.epoch = ''; state.seq = 0; persist('queue', 'sync'); }
 
-/* Datensätze spurlos entfernen, ohne Löschung im Haushalt (Beispieldaten vor dem Verbinden). ids: {sammlung: Set} */
+/* Remove records without a trace, without deleting them household-wide (sample data before connecting). ids: {collection: Set} */
 export function purge(ids){
   for (const c of COLLECTIONS) {
     const gone = ids[c]; if (!gone?.size) continue;
@@ -326,7 +326,7 @@ export function purge(ids){
   persist('queue', 'db', 'sync', 'prefs');
 }
 
-/* Prüfsumme wie auf dem Server: SHA-256 über die sortierten Zeilen „sammlung/id/feld@uhr\n“ */
+/* Checksum as on the server: SHA-256 over the sorted lines "collection/id/field@clock\n" */
 export async function checksum(){
   const lines = [];
   for (const c of COLLECTIONS) for (const [id, clocks] of Object.entries(state.clocks[c]))

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12 und neuer: nichts in Googles Cloud-Sicherung. Die direkte Übertragung auf ein neues Gerät
-     (device-transfer) bleibt ohne Regeln vollständig erlaubt. -->
+<!-- Android 12 and newer: nothing goes into Google's cloud backup. The direct transfer to a new device
+     (device-transfer) stays fully allowed, with no rules of its own. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" path="." />

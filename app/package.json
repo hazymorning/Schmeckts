@@ -2,7 +2,7 @@
   "name": "schmeckts",
   "version": "0.1.0",
   "private": true,
-  "description": "Schmeckt’s? – welches Futter kommt an",
+  "description": "Schmeckt’s? – a feeding diary for pets",
   "scripts": {
     "sync": "cap sync android"
   },

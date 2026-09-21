@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Unverschlüsseltes http ist nur im Heimnetz erlaubt (WLAN oder WireGuard), jede andere Adresse braucht https.
-         Android kann hier keine Adressbereiche ausdrücken, nur einzelne Namen. Deshalb prüft die App die Regel selbst,
-         an genau einer Stelle und für jede Anfrage: normServer() in www/js/api.js. Die App lädt nichts aus dem Internet
-         und spricht nur mit dem eingetragenen Server. -->
+    <!-- Unencrypted http is allowed on the home network only (Wi-Fi or WireGuard); every other address needs https.
+         Android cannot express address ranges here, only individual names. That is why the app checks the rule
+         itself, in exactly one place and for every request: normServer() in www/js/api.js. The app loads nothing
+         from the internet and talks only to the server that was entered. -->
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

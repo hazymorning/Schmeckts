@@ -1,20 +1,20 @@
-/* Austausch von Hand, ohne Server. „Änderungen teilen“ schreibt eine Datei mit allen Änderungen seit dem letzten
-   Austausch mit dem anderen Gerät, samt den eigenen Feld-Uhren, und gibt sie ans Teilen-Menü. „Austausch empfangen“
-   führt eine solche Datei zusammen, genau nach dem Protokoll: pro Feld gewinnt die größere Uhr, Löschen bleibt Löschen.
-   Danach steht in der Meldung, was übernommen wurde und was dem anderen Gerät fehlt; „Antwort senden“ schickt genau das
-   zurück, dann sind beide gleich. Die Datei enthält nur Daten und Uhren: keine Einstellungen, keinen Haushaltscode,
-   keinen Schlüssel. */
+/* Manual exchange, without a server. „Änderungen teilen“ writes a file holding every change since the last exchange
+   with the other device, together with our own field clocks, and hands it to the share menu. „Austausch empfangen“
+   merges such a file strictly by the protocol: per field the larger clock wins, and a deletion stays a deletion.
+   The report afterwards says what was taken over and what the other device is missing; „Antwort senden“ sends exactly
+   that back, after which both are level. The file holds data and clocks only: no settings, no household code, no
+   key. */
 import {Native, fileUrl, haptic} from '../native.js';
 import {allClocks, changesSince, merge, prefs, savePrefs, state, topClock} from '../store.js';
 import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 
-const KIND = 'austausch', PROTOKOLL = 1;
+const KIND = 'exchange', PROTOCOL = 1;
 const fileName = () => `schmeckts-${KIND}-${new Date().toISOString().slice(0, 10)}.json`;
 
-/* Marke für ein Gerät: Was hat es beim letzten Austausch schon gesehen? Ohne bekanntes Gegenüber gilt die älteste
-   Marke aller Geräte, damit niemand etwas verpasst; ohne jeden Austausch enthält die Datei alles. */
+/* The mark for a device: what had it already seen at the last exchange? Without a known counterpart the oldest mark
+   across all devices applies, so nobody misses anything; with no exchange at all the file holds everything. */
 function markFor(device){
   const marks = Object.entries(prefs.exchange || {});
   if (device) return prefs.exchange?.[device]?.mark || null;
@@ -26,10 +26,10 @@ function remember(device){
   savePrefs();
 }
 
-/* Datei bauen und weitergeben. peer: {device, clocks} nach einem Empfang („Antwort senden“), sonst der gemerkte Stand. */
+/* Build the file and pass it on. peer: {device, clocks} after receiving („Antwort senden“), otherwise the stored state. */
 export async function shareChanges(peer = null){
   const records = changesSince(peer ? peer.clocks : markFor(null));
-  const data = JSON.stringify({app:'schmeckts', kind:KIND, protokoll:PROTOKOLL, device:state.device, at:Date.now(),
+  const data = JSON.stringify({app:'schmeckts', kind:KIND, protocol:PROTOCOL, device:state.device, at:Date.now(),
     clocks:allClocks(), records});
   const name = fileName();
   const many = `${records.length} ${records.length === 1 ? 'Änderung' : 'Änderungen'}`;
@@ -50,11 +50,11 @@ export async function shareChanges(peer = null){
   }
   haptic('success');
   remember(peer?.device);
-  if (peer && sheet?.kind === 'settings') { delete sheet.exchange; renderSheet(); } // die Lücke ist geschlossen
+  if (peer && sheet?.kind === 'settings') { delete sheet.exchange; renderSheet(); } // the gap is closed
   toast(`${many} weitergegeben`);
 }
 
-/* Datei entgegennehmen: aus der Dateiauswahl oder von einer anderen App (Intent, siehe actions.js) */
+/* Take a file in: from the file picker or from another app (intent, see actions.js) */
 export const receiveFile = async file => { if (file) apply(await file.text().catch(() => '')); };
 export async function receiveUri(uri){
   let text = '';
@@ -71,7 +71,7 @@ function apply(text){
   const took = merge(file.records);
   const back = changesSince(file.clocks);
   remember(file.device);
-  // Die Meldung steht im Abschnitt „Haushalt“, mit dem Knopf „Antwort senden“, wenn dem anderen Gerät etwas fehlt
+  // The report sits in the „Haushalt“ section, with the „Antwort senden“ button when the other device is missing something
   const info = {text:message(took, back.length), peer:back.length ? {device:file.device, clocks:file.clocks} : null};
   haptic(took ? 'success' : 'select');
   update();
@@ -83,14 +83,14 @@ function apply(text){
 const message = (took, back) => `${took ? `${took} ${took === 1 ? 'Änderung' : 'Änderungen'} übernommen.` : 'Nichts Neues dabei.'}`
   + (back ? ` ${back} ${back === 1 ? 'Änderung fehlt' : 'Änderungen fehlen'} auf dem anderen Gerät.` : ' Beide Geräte sind gleich.');
 
-/* Fremde oder beschädigte Dateien abweisen, mit verständlicher Meldung */
+/* Reject foreign or corrupted files, with a message people can understand */
 function check(file){
   if (!file || typeof file !== 'object') return 'Diese Datei ist kein Schmeckt’s-Austausch.';
   if (file.app !== 'schmeckts' || file.kind !== KIND) {
     return Array.isArray(file.servings) ? 'Das ist ein Backup. Es gehört unter „Daten“ zu „Backup importieren“.'
       : 'Diese Datei ist kein Schmeckt’s-Austausch.';
   }
-  if (file.protokoll > PROTOKOLL) return 'Die Datei kommt von einer neueren App. Bitte diese App aktualisieren.';
+  if (file.protocol > PROTOCOL) return 'Die Datei kommt von einer neueren App. Bitte diese App aktualisieren.';
   if (!Array.isArray(file.records) || !file.clocks || typeof file.clocks !== 'object') return 'Diese Austausch-Datei ist beschädigt.';
   if (file.device === state.device) return 'Diese Datei kommt von diesem Handy.';
   return '';

@@ -1,18 +1,18 @@
-/* Abgleich mit dem Server. Ein Durchlauf: Warteschlange senden, Neues nachholen, bei anderer Epoche vollständig
-   abgleichen, bei leerer Warteschlange die Prüfsumme vergleichen. Live-Meldungen beschleunigen nur. */
+/* Syncing with the server. One cycle: send the queue, catch up on what is new, do a full sync on a different epoch,
+   and compare the checksum whenever the queue is empty. Live notifications only make it quicker. */
 import {PROTOCOL, ServerError, eventsUrl, normCode, normServer, request} from './api.js';
 import {ack, checksum, flush, log, merge, prefs, queue, reconcile, resetSync, restamp, savePrefs, setPosition, state} from './store.js';
 
-const MAX_CHANGES = 500, MAX_BYTES = 8e6; // der Server nimmt höchstens 500 Änderungen und 12 MB pro Anfrage
+const MAX_CHANGES = 500, MAX_BYTES = 8e6; // the server accepts at most 500 changes and 12 MB per request
 const CHECK_EVERY = 5 * 60e3, INFO_EVERY = 10 * 60e3;
 
 export const isConnected = () => !!prefs.code;
 
-/* Zustand für die Oberfläche. state: off (kein Server), wait (noch kein Kontakt), ok, offline, error.
-   recognition und features (etwa „barcode“) meldet der Server in /api/info, null solange unbekannt. */
+/* State for the interface. state: off (no server), wait (no contact yet), ok, offline, error.
+   The server reports recognition and features (such as "barcode") in /api/info; null while unknown. */
 export const status = {state:isConnected() ? 'wait' : 'off', kind:'', message:'', busy:false, lastOk:0, live:false,
   recognition:null, features:null};
-export const syncHooks = {status(){}, reachable(){}}; // Oberfläche: Status zeichnen, wartende Fotos erkennen
+export const syncHooks = {status(){}, reachable(){}}; // interface: draw the status, recognise waiting photos
 
 let timer = null, running = null, again = false, failures = 0, pauseUntil = 0;
 let checkedAt = 0, infoAt = 0, mismatches = 0, es = null;
@@ -29,9 +29,9 @@ function syncNow(){
   clearTimeout(timer);
   if (!isConnected()) return Promise.resolve();
   if (running) { again = true; return running; }
-  running = (async () => { // ein unerwarteter Fehler darf den Abgleich nie dauerhaft blockieren
+  running = (async () => { // an unexpected error must never block the sync for good
     try { do { again = false; await cycle(); } while (again && isConnected()); }
-    catch (e) { console.error('Abgleich:', e); }
+    catch (e) { console.error('sync:', e); }
     finally { running = null; }
   })();
   return running;
@@ -68,7 +68,7 @@ function reportFailure(e){
   setStatus({state:'error', kind:e.kind, message:e.message});
 }
 
-async function checkInfo(timeout){ // ohne Code, zählt also nicht als Fehlversuch
+async function checkInfo(timeout){ // without a code, so it does not count as a failed attempt
   const serverInfo = await request('GET', '/api/info', {code:'', timeout});
   const problem = protocolProblem(serverInfo);
   if (problem) throw new ServerError('protocol', problem);
@@ -77,7 +77,7 @@ async function checkInfo(timeout){ // ohne Code, zählt also nicht als Fehlversu
 }
 const abilities = serverInfo => ({recognition:!!serverInfo.recognition, features:Array.isArray(serverInfo.features) ? serverInfo.features : []});
 
-/* Kann der Server das, etwa „barcode“ (ab Server 1.1.0)? Vor dem ersten Kontakt fragt die App kurz nach. */
+/* Can the server do this, "barcode" for instance (from server 1.1.0)? Before the first contact the app asks. */
 export async function serverCan(feature){
   if (!isConnected()) return false;
   if (!status.features) await checkInfo(5e3).catch(() => {});
@@ -90,7 +90,7 @@ function protocolProblem(serverInfo){
   return '';
 }
 
-/* Senden */
+/* Sending */
 function batch(limit){
   const out = [];
   let bytes = 20;
@@ -110,13 +110,13 @@ async function push(){
     catch (e) {
       if (e.status !== 413) throw e;
       if (changes.length > 1) { limit = Math.ceil(changes.length / 2); continue; }
-      ack([changes[0].id]); log('Änderung zu groß für den Server, verworfen'); continue;
+      ack([changes[0].id]); log('change too large for the server, dropped'); continue;
     }
     const done = [...(res.ok || [])];
     let clock = 0;
     for (const r of res.rejected || []) {
-      if (r.reason === 'clock') { restamp(r.id); clock++; } // mit korrigierter Zeit neu stempeln, nochmal senden
-      else { done.push(r.id); log(`Änderung verworfen: ${r.detail || r.reason}`); }
+      if (r.reason === 'clock') { restamp(r.id); clock++; } // restamp with the corrected time and send again
+      else { done.push(r.id); log(`change dropped: ${r.detail || r.reason}`); }
     }
     ack(done);
     if (clock && ++clockRounds > 3) throw new ServerError('bad', 'Die Uhrzeit dieses Handys weicht zu stark ab.');
@@ -124,34 +124,34 @@ async function push(){
   }
 }
 
-/* Nachholen */
+/* Catching up */
 async function pull(){
   const known = state.epoch;
   const query = known ? `since=${state.seq}&epoch=${encodeURIComponent(known)}` : 'since=0';
   const res = await request('GET', '/api/changes?' + query, {timeout:60e3});
   const records = Array.isArray(res.records) ? res.records : [];
-  if (res.epoch !== known) { // erstes Verbinden oder Server aus Backup wiederhergestellt
-    if (known) log('Der Server wurde wiederhergestellt, gleiche vollständig ab');
+  if (res.epoch !== known) { // first connection, or the server restored from a backup
+    if (known) log('the server was restored, doing a full sync');
     reconcile(records);
     checkedAt = 0;
   } else if (records.length) merge(records);
   setPosition(res.epoch, res.seq);
 }
 
-/* Selbstprüfung */
+/* Self-check */
 async function verify(){
   if (queue.length || Date.now() - checkedAt < CHECK_EVERY) return;
   const res = await request('GET', '/api/checksum');
   checkedAt = Date.now();
-  if (res.epoch !== state.epoch || res.seq !== state.seq) { again = true; return; } // inzwischen Neues: erst nachholen
+  if (res.epoch !== state.epoch || res.seq !== state.seq) { again = true; return; } // something new meanwhile: catch up first
   const mine = await checksum();
   if (queue.length) return;
   if (mine.sum === res.sum) { mismatches = 0; return; }
   if (mismatches++) {
-    if (mismatches === 2) log(`Prüfsumme weicht auch nach vollständigem Abgleich ab (${mine.fields} zu ${res.fields} Feldern)`);
+    if (mismatches === 2) log(`checksum still differs after a full sync (${mine.fields} against ${res.fields} fields)`);
     return;
   }
-  log(`Prüfsumme weicht ab (${mine.fields} zu ${res.fields} Feldern), gleiche vollständig ab`);
+  log(`checksum differs (${mine.fields} against ${res.fields} fields), doing a full sync`);
   const all = await request('GET', '/api/changes?since=0', {timeout:60e3});
   reconcile(Array.isArray(all.records) ? all.records : []);
   setPosition(all.epoch, all.seq);
@@ -160,7 +160,7 @@ async function verify(){
   await verify();
 }
 
-/* Live-Meldungen */
+/* Live notifications */
 function openLive(){
   if (es || !isConnected() || document.hidden || typeof EventSource !== 'function') return;
   es = new EventSource(eventsUrl());
@@ -170,15 +170,15 @@ function openLive(){
     if (!status.live) setStatus({live:true});
     if (x.epoch !== state.epoch || x.seq > state.seq) syncSoon(50);
   });
-  es.onerror = () => { closeLive(); syncSoon(5e3); }; // kein Dauerversuch, der nächste Durchlauf verbindet neu
+  es.onerror = () => { closeLive(); syncSoon(5e3); }; // no endless retry, the next cycle reconnects
 }
 function closeLive(){
   if (es) { es.close(); es = null; }
   if (status.live) setStatus({live:false});
 }
 
-/* Verbinden und Trennen */
-/* Prüft Adresse, Protokoll und Code, bevor irgendetwas übernommen wird. Wirft ServerError mit Meldung. */
+/* Connecting and disconnecting */
+/* Checks address, protocol and code before anything is taken over. Throws ServerError with a message. */
 export async function checkServer(codeInput, serverInput){
   const code = normCode(codeInput), base = normServer(serverInput);
   if (!base) throw new ServerError('input', 'Bitte die Adresse des Servers eintragen.');
@@ -196,7 +196,7 @@ export async function checkServer(codeInput, serverInput){
 }
 
 export function startSession({code, base, serverInfo}){
-  if (prefs.server && prefs.server !== base) resetSync(); // anderer Server: vollständig abgleichen
+  if (prefs.server && prefs.server !== base) resetSync(); // a different server: do a full sync
   prefs.server = base; prefs.code = code; prefs.mode = 'haushalt';
   savePrefs();
   failures = 0; pauseUntil = 0; mismatches = 0; checkedAt = 0; infoAt = Date.now();
@@ -204,7 +204,7 @@ export function startSession({code, base, serverInfo}){
   return syncNow();
 }
 
-/* „Jetzt abgleichen“: prüft auch Protokoll und Prüfsumme sofort */
+/* „Jetzt abgleichen“: checks the protocol and the checksum right away too */
 export function retrySync(){
   if (status.kind === 'protocol' || status.kind === 'locked') { status.kind = ''; pauseUntil = 0; }
   infoAt = 0; checkedAt = 0;
@@ -214,7 +214,7 @@ export function retrySync(){
 export function disconnect(){
   closeLive(); clearTimeout(timer);
   prefs.code = ''; prefs.mode = 'lokal';
-  savePrefs(); resetSync(); // die Daten bleiben auf dem Gerät, beim nächsten Verbinden wird vollständig abgeglichen
+  savePrefs(); resetSync(); // the data stays on the device; the next connection does a full sync
   setStatus({state:'off', kind:'', message:'', lastOk:0, recognition:null, features:null});
 }
 

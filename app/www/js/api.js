@@ -1,19 +1,19 @@
-/* Anfragen an den Haushalts-Server: Haushaltscode als Bearer, Zeitlimit, Serverzeit für die Uhr,
-   Fehler als ServerError mit Art und deutscher Meldung. */
+/* Requests to the household server: household code as bearer, a timeout, server time for the clock,
+   errors as a ServerError carrying a kind and a German message. */
 import {measure} from './clock.js';
 import {prefs} from './store.js';
 
 export const PROTOCOL = 1;
 
-/* kind: offline (nicht erreichbar), auth (Code falsch), locked (zu viele Fehlversuche), busy (Kostenbremse),
-   unavailable (503), server (5xx), bad (sonstige Ablehnung), input (Adresse oder Code so nicht möglich) */
+/* kind: offline (unreachable), auth (wrong code), locked (too many failed attempts), busy (cost brake),
+   unavailable (503), server (5xx), bad (any other rejection), input (address or code impossible as given) */
 export class ServerError extends Error {
   constructor(kind, message, status = 0){ super(message); this.kind = kind; this.status = status; }
 }
 
-/* Heimnetz: nur dorthin darf unverschlüsseltes http gehen. IPv4 10/8, 172.16/12, 192.168/16, 100.64/10 (VPN) und 127/8,
-   IPv6 fc00::/7 und fe80::/10, dazu die Namen localhost, *.local und *.home.arpa. host: URL.hostname, also schon in
-   Normalform (klein, IPv4 als vier Dezimalzahlen, IPv6 in eckigen Klammern). */
+/* Home network: the only place unencrypted http may go. IPv4 10/8, 172.16/12, 192.168/16, 100.64/10 (VPN) and 127/8,
+   IPv6 fc00::/7 and fe80::/10, plus the names localhost, *.local and *.home.arpa. host: URL.hostname, so already in
+   normal form (lower case, IPv4 as four decimal numbers, IPv6 in square brackets). */
 function isHome(host){
   const name = host.replace(/\.$/, '');
   if (name === 'localhost' || /\.(local|home\.arpa)$/.test(name)) return true;
@@ -26,9 +26,10 @@ function isHome(host){
   return (h & 0xfe00) === 0xfc00 || (h & 0xffc0) === 0xfe80;
 }
 
-/* Adresse, wie sie eingetippt wurde → „http://192.168.1.20:8486“, ohne Angabe http. Leer bleibt leer: Es gibt keine Vorgabe.
-   Hier sitzt die einzige Prüfung der Netzwerkregel, und weil jede Anfrage (request) und die Live-Meldungen (eventsUrl) ihre
-   Adresse hierüber bekommen, gilt sie für alle: http nur im Heimnetz, jede andere Adresse braucht https. Wirft ServerError „input“. */
+/* The address as typed → "http://192.168.1.20:8486", http when none is given. Empty stays empty: there is no default.
+   This is the one place the network rule is checked, and because every request (request) and the live notifications
+   (eventsUrl) get their address through it, it holds for all of them: http only on the home network, every other
+   address needs https. Throws ServerError 'input'. */
 export function normServer(s){
   let v = String(s || '').trim().replace(/\/+$/, '');
   if (!v) return '';
@@ -39,14 +40,14 @@ export function normServer(s){
   return v;
 }
 
-/* „k7pm 3qxd“ → „K7PM-3QXD“. Der Server vergleicht ohnehin ohne Leerzeichen, Bindestrich und Groß/klein. */
+/* "k7pm 3qxd" → "K7PM-3QXD". The server compares without spaces, hyphens and case anyway. */
 export function normCode(s){
   const v = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   return v.length === 8 ? v.slice(0, 4) + '-' + v.slice(4) : v;
 }
 
 export async function request(method, path, {body, code = prefs.code, base = prefs.server, timeout = 20e3} = {}){
-  base = normServer(base); // jede Anfrage: http nur im Heimnetz
+  base = normServer(base); // every request: http only on the home network
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), timeout);
   const headers = {};
   if (code) headers.Authorization = 'Bearer ' + code;

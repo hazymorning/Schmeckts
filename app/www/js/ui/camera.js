@@ -1,17 +1,18 @@
-/* Eigene Kamera für Packungsfotos. openCamera(hint) liefert das Foto als Blob, null bei „Abbrechen“, und wirft ohne
-   Kamera oder Recht: Dann nimmt der Aufrufer die Kamera-App. Nach dem Recht fragt die WebView beim ersten Gebrauch. */
+/* Our own camera for packaging photos. openCamera(hint) returns the photo as a blob, null on „Abbrechen“, and throws
+   without a camera or the permission: the caller then falls back to the camera app. The WebView asks for the
+   permission on first use. */
 import {$} from '../dom.js';
 import {esc} from '../text.js';
 
 const WANT = {audio:false, video:{facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}}};
-let close = null; // schließt die offene Kamera, null wenn zu
+let close = null; // closes the open camera, null when closed
 
-export const closeCamera = () => { if (!close) return false; close(null); return true; }; // für die Zurück-Taste
+export const closeCamera = () => { if (!close) return false; close(null); return true; }; // for the back button
 
 export async function openCamera(hint){
   if (close) return null;
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Keine Kamera in dieser Umgebung.');
-  const stream = await navigator.mediaDevices.getUserMedia(WANT); // fragt beim ersten Mal nach dem Recht
+  const stream = await navigator.mediaDevices.getUserMedia(WANT); // asks for the permission the first time
   const dlg = $('#camera'), video = $('video', dlg);
   $('.cam-hint', dlg).innerHTML = esc(hint);
   video.srcObject = stream;
@@ -20,13 +21,13 @@ export async function openCamera(hint){
     const hidden = () => { if (document.hidden) close(null); };
     close = blob => {
       close = null;
-      stream.getTracks().forEach(t => t.stop()); video.srcObject = null; // sofort freigeben
+      stream.getTracks().forEach(t => t.stop()); video.srcObject = null; // release it at once
       dlg.removeEventListener('click', tap); dlg.removeEventListener('cancel', cancel); document.removeEventListener('visibilitychange', hidden);
       dlg.close();
       resolve(blob);
     };
     const shoot = () => {
-      if (!video.videoWidth) return; // noch kein Bild
+      if (!video.videoWidth) return; // no frame yet
       const c = document.createElement('canvas');
       c.width = video.videoWidth; c.height = video.videoHeight;
       c.getContext('2d').drawImage(video, 0, 0);

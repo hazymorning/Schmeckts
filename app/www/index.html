@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content=""> <!-- setzt ui/theme.js aus --bg -->
+<meta name="theme-color" content=""> <!-- set by ui/theme.js from --bg -->
 <title>Schmeckt’s?</title>
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/app.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body class="intro">
-<div class="mood" id="mood" aria-hidden="true" hidden><img alt=""><img alt=""></div> <!-- Stimmungsbild, views/mood.js -->
+<div class="mood" id="mood" aria-hidden="true" hidden><img alt=""><img alt=""></div> <!-- mood picture, views/mood.js -->
 <div class="app">
   <header class="top">
     <h1 class="brand">Schmeckt’s?</h1>
@@ -33,7 +33,7 @@
   <input type="file" id="importInput" accept="application/json,.json" hidden>
   <input type="file" id="exchangeInput" accept="application/json,.json" hidden>
 </dialog>
-<dialog class="camera" id="camera" aria-label="Kamera"> <!-- eigene Kamera für Packungsfotos, ui/camera.js -->
+<dialog class="camera" id="camera" aria-label="Kamera"> <!-- our own camera for packaging photos, ui/camera.js -->
   <video autoplay playsinline muted></video>
   <p class="cam-hint" role="status"></p>
   <div class="cam-bar">

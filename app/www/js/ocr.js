@@ -1,6 +1,6 @@
-/* Packungstext auswerten: Aus dem Text, den das Handy auf dem Foto liest (native.js), wird dieselbe Antwort wie vom
-   Server – brand, variety, type, animal, texture. Reine Funktionen, damit sie sich einzeln prüfen lassen.
-   Reihenfolge: eigene Sorten, dann Marke aus der Liste, dann die auffälligste Zeile als Sorte. */
+/* Making sense of the packaging text: out of the text the phone reads off the photo (native.js) comes the same answer
+   the server gives — brand, variety, type, animal, texture. Pure functions, so they can be tested on their own.
+   Order: our own varieties, then a brand from the list, then the most prominent line as the variety. */
 import {norm} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 
@@ -9,10 +9,10 @@ const EMPTY = {brand:'', variety:'', type:'', animal:''};
 const QUANTITY = /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
 const JUNK = /zutaten|zusammensetzung|analytische|bestandteile|inhaltsstoff|rohprotein|rohfett|rohasche|feuchtigkeit|vitamin|zusatzstoff|alleinfutter|ergänzungsfutter|haltbar|füllmenge|gmbh|www\.|@|\bean\b/i;
 const ADS = /^(?:neu|new|jetzt|jetzt neu|gratis|aktion|vorteilspack|sparpack|premium|qualität|natürlich|frisch|lecker|100\s*%\s*natürlich|ohne zucker)$|^\d+\s*%/i;
-const squeeze = s => norm(s).replace(/ /g, '');        // unempfindlich gegen Groß/klein, Bindestriche und Leerzeichen
+const squeeze = s => norm(s).replace(/ /g, '');        // insensitive to case, hyphens and spaces
 const has = (text, re) => re.test(text);
 
-/* text: der gelesene Text, products: die eigenen Sorten. Ohne Brauchbares bleibt alles leer. */
+/* text: the text that was read, products: our own varieties. With nothing usable everything stays empty. */
 export function readPack(text, products = []){
   const raw = String(text || '');
   if (!raw.trim()) return {...EMPTY};
@@ -31,15 +31,15 @@ export function readPack(text, products = []){
   return {brand, variety, type, animal:ANIMAL_WORDS.find(([, re]) => re.test(raw))?.[0] || '', ...(texture ? {texture} : {})};
 }
 
-/* Art: erst die eindeutigen Stichwörter, sonst die Stichwörter der Konsistenz (Soße, Pastete → Nassfutter; Stick, Kau → Snack) */
+/* Type: the unambiguous keywords first, otherwise the consistency keywords (Soße, Pastete → Nassfutter; Stick, Kau → Snack) */
 function foodType(raw){
   const direct = TYPE_WORDS.find(([, re]) => re.test(raw));
   if (direct) return direct[0];
   return Object.entries(TEXTURES).find(([, t]) => t.items.some(([, , re]) => re.test(raw)))?.[0] || '';
 }
 
-/* Sorte: die auffälligste Zeile ohne Mengen, Werbung, Zutaten und reine Zahlen. Passen mehrere, werden sie in der
-   Reihenfolge der Packung zusammengeführt, höchstens MAX_VARIETY Zeichen. */
+/* Variety: the most prominent line, without quantities, advertising, ingredients and bare numbers. Where several
+   fit, they are joined in the order they appear on the packaging, at most MAX_VARIETY characters. */
 function pickVariety(raw, brand){
   const bare = norm(brand);
   const lines = raw.split(/\r?\n/)
@@ -56,7 +56,7 @@ function pickVariety(raw, brand){
   }
   return take.sort((a, b) => a.i - b.i).map(x => x.v).join(' ').slice(0, MAX_VARIETY).trim();
 }
-function withoutBrand(v, bare){ // „Sheba Lachs in Soße“ → „Lachs in Soße“
+function withoutBrand(v, bare){ // "Sheba Lachs in Soße" → "Lachs in Soße"
   if (!bare) return v;
   const words = v.split(' ');
   for (let n = 1; n <= words.length; n++) {

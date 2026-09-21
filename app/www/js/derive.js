@@ -1,5 +1,5 @@
-/* Abgeleitetes aus den Daten: Nachschlagen, offene Mahlzeiten, Vorschläge beim Füttern und das Modell der Auswertung
-   (model(), gerechnet in smart.js). Nur lesen, nie schreiben. */
+/* Everything derived from the data: lookups, open meals, suggestions while feeding and the evaluation model
+   (model(), computed in smart.js). Read only, never writes. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW} from './config.js';
 import {analyze, report, review, shopGroups, tally} from './smart.js';
@@ -12,15 +12,15 @@ export const pname = p => p ? (p.variety || p.brand || 'Unbekannt') : 'Unbekannt
 const inFilter = pid => prefs.activePet === 'all' || prefs.activePet === pid;
 export const petMap = ids => Object.fromEntries(ids.map(id => [id, {r:null, at:null}]));
 export const findProduct = (brand, variety) => db.products.find(p => norm(p.brand) === norm(brand) && norm(p.variety) === norm(variety));
-export const productsByCode = code => db.products.filter(p => p.codes?.[code]); // mehrere bei Multipacks
+export const productsByCode = code => db.products.filter(p => p.codes?.[code]); // several for multipacks
 export const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r && inFilter(pid) && getPet(pid));
 export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) && getPet(pid));
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
 
-/* Modell der Auswertung und Wochenrückblick, neu berechnet erst, wenn sich Daten, Tier-Filter, ausgeblendete Hinweise,
-   geschlossene Woche oder die Stunde ändern (Fenster wie die 72 Stunden beim Appetit). Die Summen je Sorte bleiben
-   dabei stehen, neu gerechnet werden nur Sorten mit geänderten Mahlzeiten; die Woche bleibt, bis sich eine Mahlzeit
-   bis zu ihrem Ende ändert. */
+/* The evaluation model and the weekly review, recomputed only when the data, the pet filter, the hidden hints, the
+   closed week or the hour change (windows such as the 72 hours for appetite). The sums per variety stay put while
+   that happens and only varieties with changed meals are recomputed; the week stands until a meal up to its end
+   changes. */
 const cache = {};
 let sums = null, week = null;
 function cached(name, parts, fn){
@@ -36,15 +36,15 @@ function refresh(now){
 }
 export const model = () => cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
 export const lastWeek = () => cached('week', [prefs.closedWeek], now => week = review(db, prefs, now, week));
-export const reportModel = span => cached('report', [prefs.activePet, span], now => report(db, prefs, now, span)); // erst beim Öffnen der Auswertung
+export const reportModel = span => cached('report', [prefs.activePet, span], now => report(db, prefs, now, span)); // only when the evaluation opens
 export const sortOf = id => model().byId.get(id);
 export function pendingServings(){
   const cut = Date.now() - PENDING_WINDOW;
   return db.servings.filter(s => s.servedAt > cut && openPets(s).length);
 }
 
-/* Für wen wird serviert? Ohne Nachfrage, aber möglichst richtig:
-   aktives Tier > einziges Tier > wer das Futter zuletzt bekam > passende Tierart > zuletzt benutzt > alle */
+/* Who is being served? Without asking, but as right as possible:
+   active pet > only pet > whoever had this food last > matching species > last used > everyone */
 export function defaultPets(p){
   const valid = ids => (ids || []).filter(id => getPet(id));
   if (prefs.activePet !== 'all' && getPet(prefs.activePet)) return {ids:[prefs.activePet], auto:false};
@@ -57,7 +57,7 @@ export function defaultPets(p){
   return {ids:db.pets.map(x => x.id), auto:true};
 }
 
-/* Schnellauswahl beim Füttern: zuletzt servierte Sorten zuerst, ohne Sorten, die nicht mehr gekauft werden (Modell) */
+/* Quick picker while feeding: most recently served varieties first, leaving out the ones no longer bought (model) */
 export function quickProducts(limit = Infinity){
   const last = new Map();
   for (const s of db.servings) {
@@ -73,8 +73,9 @@ export function quickProducts(limit = Infinity){
     .sort((a, b) => ((last.get(b.id) || 0) - (last.get(a.id) || 0)) || ((b.createdAt || 0) - (a.createdAt || 0)))
     .slice(0, limit);
 }
-/* Einkaufsliste als Text zum Teilen, passend zum Tier-Filter: Nachkaufen (auch „Gemischt“ mit „für …“ und eigene Einstellung
-   „immer“), Nicht kaufen („Nicht mehr kaufen“ und eigene Einstellung „nicht“). „Beobachten“ und leere Gruppen fehlen. */
+/* The shopping list as shareable text, matching the pet filter: „Nachkaufen“ (including „Gemischt“ with „für …“ and
+   the manual `immer`), „Nicht kaufen“ („Nicht mehr kaufen“ and the manual `nicht`). „Beobachten“ and empty groups are
+   left out. */
 export function shoppingList(){
   const m = model(), g = shopGroups(m), full = p => [p.brand, p.variety].filter(Boolean).join(' ') || pname(p);
   const line = e => `- ${full(e.product)}${!e.kaufen && e.choice === 'gemischt' ? ` (für ${petNames(e.yes)})` : ''}`;

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Logo im Startbildschirm: hell das Motiv des App-Icons, dunkel drawable-night/splash_logo.xml -->
+    <!-- Logo on the splash screen: the app icon's motif in light, drawable-night/splash_logo.xml in dark -->
     <drawable name="splash_logo">@drawable/ic_launcher_foreground</drawable>
 </resources>

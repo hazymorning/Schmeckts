@@ -1,5 +1,6 @@
-/* Scannen beim Füttern. Die Erkennungskette (recognize.js) sagt, was der Code ist: bekannte Sorte servieren, bei
-   mehreren Sorten Auswahl, sonst Produktsuche im Internet oder über den Server. Ohne Treffer folgt das Foto der Vorderseite. */
+/* Scanning while feeding. The recognition chain (recognize.js) says what the code is: serve a known variety, offer a
+   choice where several match, otherwise look the product up on the internet or through the server. Without a hit the
+   photo of the front follows. */
 import {normBarcode} from '../text.js';
 import {haptic, scanBarcode} from '../native.js';
 import {findProduct} from '../derive.js';
@@ -12,7 +13,7 @@ import {applyTexture, newProduct} from './products.js';
 const FRONT = 'Vorderseite fotografieren';
 let running = false;
 
-/* Startet im offenen Füttern-Sheet: Knopf „Scannen“, Kurzbefehl oder schmeckts://scan */
+/* Starts in the open feeding sheet: the „Scannen“ button, a shortcut or schmeckts://scan */
 export async function scan(){
   const feed = sheet;
   if (running || feed?.kind !== 'feed') return;
@@ -22,8 +23,8 @@ export async function scan(){
   finally { running = false; note(feed, ''); }
 }
 
-const open = feed => sheet === feed; // noch dasselbe Füttern-Sheet? Sonst wurde es inzwischen geschlossen
-function note(feed, text){ // kurzer Hinweis mit Spinner im Füttern-Sheet
+const open = feed => sheet === feed; // still the same feeding sheet? Otherwise it has been closed meanwhile
+function note(feed, text){ // a short notice with a spinner in the feeding sheet
   if ((feed.busy || '') === text) return;
   feed.busy = text;
   if (open(feed)) renderSheet();
@@ -37,7 +38,7 @@ async function run(feed){
     return offerPhoto(feed, 'Scannen klappt auf diesem Handy gerade nicht. Mach stattdessen ein Foto.');
   }
   note(feed, '');
-  if (!raw || !open(feed)) return; // abgebrochen: das Füttern-Sheet bleibt
+  if (!raw || !open(feed)) return; // cancelled: the feeding sheet stays
   const code = normBarcode(raw);
   if (!code) { haptic('strong'); toast('Das ist kein gültiger Barcode.'); return; }
   const found = await identify({code, note:text => note(feed, text)});
@@ -58,13 +59,13 @@ async function serve(p, code){
   serveProduct(p.id, code);
 }
 
-/* Kamera für die Vorderseite. Nach „Abbrechen“ bleibt das Füttern-Sheet, der Foto-Knopf übernimmt dann den Code. */
+/* Camera for the front. After „Abbrechen“ the feeding sheet stays and the photo button then takes over the code. */
 async function photo(feed, code){
   feed.code = code;
   await shootPhoto(FRONT, code);
 }
 
-function offerPhoto(feed, msg){ // Scannen ging nicht
+function offerPhoto(feed, msg){ // scanning did not work
   if (!open(feed)) return;
   haptic('strong');
   renderSheet(); toast(msg);

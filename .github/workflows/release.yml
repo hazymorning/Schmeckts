@@ -1,15 +1,15 @@
 name: Release
 
-# Ein veröffentlichtes Release baut die signierte APK und hängt sie an. Von Hand gestartet baut derselbe Weg
-# zum Ausprobieren, das Ergebnis liegt dann als Artefakt bereit. Gebaut wird nur mit grünen Tests:
-# scripts/build-apk.sh fährt zuerst die ganze Testsuite.
+# A published release builds the signed APK and attaches it. Started by hand the same path builds for
+# trying things out, and the result is left as an artifact. Nothing is built without green tests:
+# scripts/build-apk.sh runs the whole suite first.
 on:
   release:
     types: [published]
   workflow_dispatch:
 
 permissions:
-  contents: write   # die APK ans Release hängen
+  contents: write   # to attach the APK to the release
 
 jobs:
   apk:
@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Der Server nutzt nur die Standardbibliothek, es gibt keine go.sum: kein Abhängigkeits-Cache.
+      # The server uses the standard library only and there is no go.sum: no dependency cache.
       - name: Go
         uses: actions/setup-go@v5
         with:
@@ -41,51 +41,51 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Pillow zeichnet die Launcher-Icons für Android 7, Playwright fährt Chromium für die Tests der Oberfläche.
-      - name: Pillow und Playwright mit Chromium
+      # Pillow draws the launcher icons for Android 7, Playwright drives Chromium for the interface tests.
+      - name: Pillow and Playwright with Chromium
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install pillow playwright
           python3 -m playwright install --with-deps chromium
 
-      # Das SDK des Läufers steht in ANDROID_HOME, build-apk.sh nimmt es von dort. Nachinstalliert wird, was der
-      # Build braucht: die Plattform 36 und die Build-Tools, aus denen apksigner und aapt2 kommen.
-      - name: Android-SDK ergänzen
+      # The runner's SDK lives in ANDROID_HOME and build-apk.sh takes it from there. What the build needs is
+      # installed on top: platform 36 and the build tools, which is where apksigner and aapt2 come from.
+      - name: Add to the Android SDK
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.1.0" > /dev/null
 
-      # Die Version steht nur in app/package.json; der Tag des Releases heißt v<version>.
-      - name: Version prüfen
+      # The version lives only in app/package.json; the release tag is v<version>.
+      - name: Check the version
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION="$(node -p "require('./app/package.json').version")"
           if [ -n "$TAG" ] && [ "${TAG#v}" != "$VERSION" ]; then
-            echo "Der Tag $TAG passt nicht zur Version $VERSION in app/package.json. Erwartet wird v$VERSION." >&2
+            echo "Tag $TAG does not match version $VERSION in app/package.json. Expected v$VERSION." >&2
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      # Der Signaturschlüssel liegt nur für die Dauer des Builds als Datei außerhalb des Arbeitsbaums und wird
-      # in jedem Fall wieder gelöscht. Ausgegeben wird er nirgends.
-      - name: APK bauen und signieren
+      # The signing key sits outside the working tree as a file for the duration of the build only, and is
+      # removed in every case. It is never printed anywhere.
+      - name: Build and sign the APK
         env:
-          SCHMECKTS_SIGNATUR: ${{ secrets.SCHMECKTS_SIGNATUR }}
+          SCHMECKTS_SIGNING_KEY: ${{ secrets.SCHMECKTS_SIGNING_KEY }}
         run: |
-          [ -n "$SCHMECKTS_SIGNATUR" ] || { echo "Das Geheimnis SCHMECKTS_SIGNATUR fehlt." >&2; exit 1; }
-          SIGNATUR="$RUNNER_TEMP/schmeckts-signatur.txt"
-          trap 'rm -f "$SIGNATUR"' EXIT INT TERM
-          (umask 077; printf '%s' "$SCHMECKTS_SIGNATUR" > "$SIGNATUR")
-          scripts/build-apk.sh "$SIGNATUR"
+          [ -n "$SCHMECKTS_SIGNING_KEY" ] || { echo "The secret SCHMECKTS_SIGNING_KEY is missing." >&2; exit 1; }
+          KEY_FILE="$RUNNER_TEMP/schmeckts-signing-key.txt"
+          trap 'rm -f "$KEY_FILE"' EXIT INT TERM
+          (umask 077; printf '%s' "$SCHMECKTS_SIGNING_KEY" > "$KEY_FILE")
+          scripts/build-apk.sh "$KEY_FILE"
 
-      - name: APK ans Release hängen
+      - name: Attach the APK to the release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" "dist/schmeckts-$VERSION.apk" --clobber
 
-      - name: APK als Artefakt
+      - name: Leave the APK as an artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Gestaltungsregeln aus PROJEKT.md: Palette und Kontraste, Schriften, Logo, Animationen, jede Ansicht in Hell und Dunkel.
-Aufruf: python3 tests/design_test.py [name …]"""
+"""Design rules from PROJECT.md: palette and contrasts, typefaces, logo, animation, every view in light and dark.
+Usage: python3 tests/design_test.py [name …]"""
 import contextlib, io, json, pathlib, re, sys, tempfile
 import xml.etree.ElementTree as ET
 from common import RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
@@ -38,7 +38,7 @@ TOKENS = """(names) => { const rgb = """ + RGB + """, out = {};
 
 
 async def test_palette(browser, url):
-    print('Farbkonzept: feste Palette ohne Auswahl, abgeleitete Tokens, Kontraste')
+    print('colour scheme: a fixed palette with no choice, derived tokens, contrasts')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]'); await idle(pg)
@@ -49,30 +49,30 @@ async def test_palette(browser, url):
         await set_theme(pg, theme)
         c = await pg.evaluate(TOKENS, names)
         wrong = [f'{n} {c[n]}' for n in PALETTE if not near(c[n], PALETTE[n][k], 1)]
-        check(not wrong, f'alle Tokens wie vorgegeben ({theme}){": " + ", ".join(wrong) if wrong else ""}')
+        check(not wrong, f'every token as specified ({theme}){": " + ", ".join(wrong) if wrong else ""}')
         derived = [f'{n} {c[n]}' for n in DERIVED if not any(near(c[n], h, 1) for h in PALETTE_HEX)]
-        check(not derived, f'abgeleitete Tokens nur aus Werten der Palette ({theme}){": " + ", ".join(derived) if derived else ""}')
+        check(not derived, f'derived tokens from the palette\u2019s values only ({theme}){": " + ", ".join(derived) if derived else ""}')
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in TEXT_PAIRS if contrast(c[fg], c[bg]) < 4.5]
-        check(not low, f'Schrift mindestens 4,5:1 auf ihren Flächen ({theme}, {len(TEXT_PAIRS)} Paare){": " + ", ".join(low) if low else ""}')
+        check(not low, f'type at least 4.5:1 on its own surfaces ({theme}, {len(TEXT_PAIRS)} pairs){": " + ", ".join(low) if low else ""}')
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
-        check(not low, f'Bewertungsfarben als Icons mindestens 3:1 ({theme}, schlechtestes Paar {worst:.2f}){": " + ", ".join(low) if low else ""}')
+        check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
         got = await pg.evaluate("['top','gut','mittel','sosse','schlecht'].map(r => getComputedStyle(document.querySelector('.rb[data-r=' + r + '] .ic')).color)")
         check(len(got) == 5 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, RATING[:1] + RATING)),
-              f'Bewertungsknöpfe zeigen die Bewertungsfarben, „Sofort leer“ und „Später leer“ beide --good ({theme})')
-    check(not errors, 'keine Fehler in der Konsole' + (f': {errors}' if errors else ''))
+              f'the rating buttons show the rating colours, „Sofort leer“ and „Später leer“ both --good ({theme})')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
 
-LOGOS = {'app/www/img/schmeckts-zeichen.svg': ['#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
-         'app/www/img/schmeckts-zeichen-dunkel.svg': ['#E8E2DB', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
-         'design/schmeckts-zeichen-einfarbig.svg': ['currentColor'],
+LOGOS = {'app/www/img/schmeckts-mark.svg': ['#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+         'app/www/img/schmeckts-mark-dark.svg': ['#E8E2DB', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+         'design/schmeckts-mark-mono.svg': ['currentColor'],
          'design/schmeckts-app-icon.svg': ['#F4F0EC', '#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D']}
 
 
-VECTORS = {'drawable/ic_launcher_foreground.xml': 'app/www/img/schmeckts-zeichen.svg',
-           'drawable-night/splash_logo.xml': 'app/www/img/schmeckts-zeichen-dunkel.svg',
-           'drawable/ic_launcher_monochrome.xml': 'design/schmeckts-zeichen-einfarbig.svg'}
+VECTORS = {'drawable/ic_launcher_foreground.xml': 'app/www/img/schmeckts-mark.svg',
+           'drawable-night/splash_logo.xml': 'app/www/img/schmeckts-mark-dark.svg',
+           'drawable/ic_launcher_monochrome.xml': 'design/schmeckts-mark-mono.svg'}
 
 
 def svg_paths(text):
@@ -80,12 +80,12 @@ def svg_paths(text):
 
 
 def test_logo_files():
-    print('Logo: Dateien, Android-Icon und Startbildschirm')
+    print('logo: files, Android icon and splash screen')
     A = '{http://schemas.android.com/apk/res/android}'
     for f, colors in LOGOS.items():
         text = (ROOT / f).read_text()
         got = re.findall(r'fill="([^"]*)"', text)
-        check('c2pa' not in text and '<metadata' not in text and got == colors, f'{f}: ohne Metadaten, Farben unverändert ({len(got)} Flächen)')
+        check('c2pa' not in text and '<metadata' not in text and got == colors, f'{f}: without metadata, colours unchanged ({len(got)} fills)')
     res = ROOT / 'app/native/res'
     groups = set()
     for vec, src in VECTORS.items():
@@ -94,17 +94,17 @@ def test_logo_files():
         paths = [(x.get(A + 'fillColor'), x.get(A + 'pathData')) for x in root.iter('path')]
         want = svg_paths((ROOT / src).read_text())
         same = [d for _, d in paths] == [d for _, d in want] and all(c == w or w == 'currentColor' and c == '#FF000000' for (c, _), (w, _) in zip(paths, want))
-        check(root.get(A + 'viewportWidth') == '108' and same, f'{vec}: Pfade und Farben aus {src}, 108er Raster')
-    check(len(groups) == 1, f'Vordergrund, Themen-Icon und dunkler Startbildschirm liegen gleich ({groups})')
+        check(root.get(A + 'viewportWidth') == '108' and same, f'{vec}: paths and colours from {src}, 108 grid')
+    check(len(groups) == 1, f'foreground, themed icon and the dark splash screen sit in the same place ({groups})')
     alias = ET.parse(res / 'values/drawables.xml').getroot().find('drawable')
     prep = (ROOT / 'scripts/prepare.py').read_text()
     check(alias.get('name') == 'splash_logo' and alias.text == '@drawable/ic_launcher_foreground' and '@drawable/splash_logo' in prep
           and "drawable-v24/ic_launcher_foreground.xml').unlink" in prep,
-          'Startbildschirm: hell das Motiv des App-Icons, dunkel das dunkle Zeichen; der Vordergrund der Vorlage fliegt raus')
+          'splash screen: the app icon\u2019s motif in light, the dark mark in dark; the template\u2019s foreground is dropped')
     check('#F4F0EC' in (res / 'values/ic_launcher_background.xml').read_text() and '#F4F0EC' in (res / 'values/colors.xml').read_text()
           and '#191513' in (res / 'values-night/colors.xml').read_text() and 'design/schmeckts-app-icon.svg' in (ROOT / 'design/render-icons.py').read_text()
           and 'icon-512' not in (ROOT / 'design/render-icons.py').read_text(),
-          'Icon-Hintergrund #F4F0EC, Startbildschirm hell #F4F0EC und dunkel #191513, Android 7 aus schmeckts-app-icon.svg')
+          'icon background #F4F0EC, splash screen #F4F0EC in light and #191513 in dark, Android 7 from schmeckts-app-icon.svg')
 
 
 async def test_logo(browser, url):
@@ -113,10 +113,10 @@ async def test_logo(browser, url):
     A = '{http://schemas.android.com/apk/res/android}'
     g = ET.parse(ROOT / 'app/native/res/drawable/ic_launcher_foreground.xml').getroot().find('group')
     k, tx, ty = float(g.get(A + 'scaleX')), float(g.get(A + 'translateX')), float(g.get(A + 'translateY'))
-    await pg.set_content((WWW / 'img/schmeckts-zeichen.svg').read_text())
+    await pg.set_content((WWW / 'img/schmeckts-mark.svg').read_text())
     r = await pg.evaluate("""([k, tx, ty]) => { let m = 0; for (const p of document.querySelectorAll('path')) { const L = p.getTotalLength();
       for (let i = 0; i <= 600; i++) { const q = p.getPointAtLength(L * i / 600); m = Math.max(m, Math.hypot(tx + k * q.x - 54, ty + k * q.y - 54)); } } return m; }""", [k, tx, ty])
-    check(r <= 33, f'adaptives Icon: das Motiv liegt in der sicheren Zone (bis {r:.1f} dp vom Mittelpunkt, erlaubt 33)')
+    check(r <= 33, f'adaptive icon: the motif sits inside the safe zone (up to {r:.1f} dp from the centre, 33 allowed)')
     await ctx.close()
 
 
@@ -132,14 +132,14 @@ def colors_in(text):
 
 
 def css_rules(text):
-    """(Selektor, [(Eigenschaft, Wert)]) für jeden innersten Block, ohne Kommentare"""
+    """(selector, [(property, value)]) for every innermost block, comments stripped"""
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
     return [(sel.strip(), [tuple(x.strip() for x in d.split(':', 1)) for d in body.split(';') if ':' in d])
             for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', text)]
 
 
 def test_rules_static():
-    print('Gestaltungsregeln in den Quelltexten')
+    print('design rules in the sources')
     css = {f: (WWW / 'css' / f).read_text() for f in ('tokens.css', 'app.css')}
     bad = []
     for f, text in css.items():
@@ -151,20 +151,20 @@ def test_rules_static():
                     bad.append(f'{sel} {prop}:{val}')
     js = [f.name for f in (WWW / 'js').rglob('*.js') if re.search(r'text-?transform|letter-?spacing', f.read_text(), re.I)]
     js += [f for f in ('index.html',) if re.search(r'text-transform|letter-spacing', (WWW / f).read_text())]
-    check(not bad and not js, f'kein text-transform und kein positives letter-spacing außer im Code-Feld, auch nicht im JavaScript ({bad + js})')
-    # Schriften: Figtree und Fraunces liegen in der App, Rubik ist ganz weg
+    check(not bad and not js, f'no text-transform and no positive letter-spacing outside the code field, not in the JavaScript either ({bad + js})')
+    # Typefaces: Figtree and Fraunces ship with the app, Rubik is gone entirely
     fonts = sorted(p.name for p in (WWW / 'fonts').iterdir())
-    check(fonts == ['OFL-Figtree.txt', 'OFL-Fraunces.txt', 'figtree-latin.woff2', 'fraunces-latin.woff2'], f'Schriften mit Lizenz, sonst nichts ({fonts})')
+    check(fonts == ['OFL-Figtree.txt', 'OFL-Fraunces.txt', 'figtree-latin.woff2', 'fraunces-latin.woff2'], f'the typefaces with their licences, nothing else ({fonts})')
     check(all('SIL Open Font License' in (WWW / 'fonts' / f).read_text() for f in ('OFL-Figtree.txt', 'OFL-Fraunces.txt'))
-          and 'Figtree' in (WWW / 'fonts/OFL-Figtree.txt').read_text() and 'Fraunces' in (WWW / 'fonts/OFL-Fraunces.txt').read_text(), 'Lizenzen: SIL OFL')
+          and 'Figtree' in (WWW / 'fonts/OFL-Figtree.txt').read_text() and 'Fraunces' in (WWW / 'fonts/OFL-Fraunces.txt').read_text(), 'licences: SIL OFL')
     prep = (ROOT / 'scripts/prepare.py').read_text()
     check('8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928' in prep and '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b' in prep,
-          'prepare.py lädt beide Schriften mit Prüfsumme')
+          'prepare.py downloads both typefaces with a checksum')
     tok = css['tokens.css']
     check('font-family:"Figtree"' in tok and 'font-weight:400 700' in tok and 'font-family:"Fraunces"' in tok and 'font-weight:500 700' in tok
           and '--font-display:"Fraunces","Iowan Old Style",Georgia,serif;' in tok and '--font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;' in tok,
-          '@font-face und Schrift-Tokens wie vorgegeben')
-    # Farben nur in tokens.css, dort nur Werte der Palette (abgeleitete Tokens mit Deckkraft als 8-stelliges Hex)
+          '@font-face and the type tokens as specified')
+    # Colours only in tokens.css, and there only the palette's values (derived tokens with opacity as 8-digit hex)
     literal = re.compile(r'#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(|\b(?:white|black)\b(?!-)')
     outside = [f'app.css: {m.group(0)}' for m in literal.finditer(re.sub(r'/\*.*?\*/', '', css['app.css'], flags=re.S))]
     outside += [f'index.html: {m.group(0)}' for m in literal.finditer(re.sub(r'<!--.*?-->', '', (WWW / 'index.html').read_text(), flags=re.S))]
@@ -173,15 +173,15 @@ def test_rules_static():
     tok = re.sub(r'/\*.*?\*/', '', css['tokens.css'], flags=re.S)
     foreign = [c for c in re.findall(r'#[0-9A-Fa-f]{3,8}\b', tok) if c[:7].upper() not in PALETTE_HEX or len(c) not in (7, 9)]
     foreign += re.findall(r'\b(?:rgba?|hsla?|oklch)\(', tok)
-    check(not outside and not foreign, f'Farben nur in tokens.css und nur aus der Palette ({outside + foreign})')
+    check(not outside and not foreign, f'colours only in tokens.css and only from the palette ({outside + foreign})')
     check(set(colors_in((WWW / 'webview-update.html').read_text())) == {'#F4F0EC', '#2E2724', '#191513', '#EBE7E2'},
-          'webview-update.html (ohne light-dark()): Grund und Schrift der Palette')
+          'webview-update.html (without light-dark()): background and type from the palette')
     res = ROOT / 'app/native/res'
     android = [(str(f.relative_to(res)), c) for f in res.rglob('*.xml') if str(f.relative_to(res)) not in VECTORS
                for c in colors_in(f.read_text()) if c not in PALETTE_HEX]
     check(not android and colors_in((ROOT / 'design/render-icons.py').read_text()) == [],
-          f'Android-Ressourcen nur mit Werten der Palette, außer den Logo-Vektoren ({android})')
-    # Animationen nur als Bewegung und Deckkraft innerhalb der Form: keine Fläche, kein Schatten, kein Rahmen in @keyframes
+          f'Android resources use the palette\u2019s values only, apart from the logo vectors ({android})')
+    # Animation as movement and opacity within the shape only: no fill, no shadow, no border in @keyframes
     frames = {}
     for f, text in css.items():
         for m in re.finditer(r'@keyframes\s+([\w-]+)\s*\{', text):
@@ -191,11 +191,11 @@ def test_rules_static():
     loud = [f'{n}: {p}' for n, body in frames.items() for _, decls in css_rules(body) for p, _ in decls
             if re.match(r'background(?!-position)|box-shadow|outline|border(-[a-z]+)?-color|filter', p)]
     check(frames and not loud,
-          f'@keyframes nur mit Bewegung und Deckkraft, ohne Hintergrund und Schatten ({len(frames)} Animationen){": " + ", ".join(loud) if loud else ""}')
+          f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}')
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
-    check(not focus and ':focus-visible{outline:' in css['app.css'], f'Fokusrahmen folgen der Rundung: kein eigener Radius im Fokus ({focus})')
+    check(not focus and ':focus-visible{outline:' in css['app.css'], f'focus rings follow the radius: no radius of their own on focus ({focus})')
     check('data-logo' not in (WWW / 'index.html').read_text() and 'data-logo' not in (WWW / 'js/main.js').read_text()
-          and "from './logo.js'" not in (WWW / 'js/main.js').read_text(), 'Kopfzeile ohne Logo: nichts in index.html und main.js')
+          and "from './logo.js'" not in (WWW / 'js/main.js').read_text(), 'header without a logo: nothing in index.html and main.js')
 
 
 FRAUNCES = '.brand, .card h2, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
@@ -206,7 +206,7 @@ SCAN = """(allowed) => { const bad = [], seen = new Set();
   const lum = c => { const f = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
   const probe = document.createElement('i'); probe.style.color = 'var(--faint)'; document.body.append(probe);
   const faint = getComputedStyle(probe).color; probe.remove();
-  const ratio = el => { // Schrift mit ihrer Deckkraft auf den Flächen darunter
+  const ratio = el => { // type with its opacity against the surfaces beneath
     let op = 1, layers = [];
     for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e), c = rgba(s.backgroundColor);
       if (c[3] > 0) { layers.unshift(c); if (c[3] >= 1) break; } op *= +s.opacity; }
@@ -217,19 +217,19 @@ SCAN = """(allowed) => { const bad = [], seen = new Set();
     if (el.closest('svg') || !el.getClientRects().length) continue;
     const s = getComputedStyle(el), own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     const tag = el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).join('.') : '');
-    if (el.id !== 'f-code' && s.textTransform !== 'none') bad.push('Großbuchstaben ' + tag);
-    if (el.id !== 'f-code' && s.letterSpacing !== 'normal' && parseFloat(s.letterSpacing) > 0) bad.push('gesperrt ' + tag);
+    if (el.id !== 'f-code' && s.textTransform !== 'none') bad.push('uppercase ' + tag);
+    if (el.id !== 'f-code' && s.letterSpacing !== 'normal' && parseFloat(s.letterSpacing) > 0) bad.push('letter-spaced ' + tag);
     if (!own && el.tagName !== 'INPUT') continue;
-    if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`Kontrast ${r.toFixed(2)} ${tag}`); }
+    if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
-    if (fam === 'Fraunces') { if (!el.closest(allowed)) bad.push('Fraunces an ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
-    else if (fam !== 'Figtree') bad.push(fam + ' an ' + tag);
+    if (fam === 'Fraunces') { if (!el.closest(allowed)) bad.push('Fraunces on ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
+    else if (fam !== 'Figtree') bad.push(fam + ' on ' + tag);
   }
   return {bad: [...new Set(bad)], seen: [...seen]}; }"""
 
 
 async def test_rules(browser, url):
-    print('Gestaltungsregeln in jeder Ansicht')
+    print('design rules in every view')
     pictures = make_pictures()
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme)
@@ -244,14 +244,14 @@ async def test_rules(browser, url):
         top = await pg.eval_on_selector('.top', """t => { const b = t.querySelector('.brand'), s = getComputedStyle(b);
           return [t.querySelectorAll('svg, img, [data-logo]').length - t.querySelectorAll('.top-end svg').length, b.innerText, b.children.length,
             s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.lineHeight, s.letterSpacing]; }""")
-        check(top == [0, 'Schmeckt’s?', 0, 'Fraunces', '650', '30px', '33px', '-0.6px'], f'Kopfzeile ({scheme}): nur die Wortmarke, Fraunces 650, 30px ({top})')
+        check(top == [0, 'Schmeckt’s?', 0, 'Fraunces', '650', '30px', '33px', '-0.6px'], f'header ({scheme}): the wordmark only, Fraunces 650, 30px ({top})')
         logo = await pg.eval_on_selector_all('.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0, i.offsetWidth])")
-        want = 'img/schmeckts-zeichen.svg' if scheme == 'light' else 'img/schmeckts-zeichen-dunkel.svg'
-        check(logo == [[want, True, 104]], f'Willkommensbildschirm ({scheme}): das Zeichen für dieses Schema ({logo})')
+        want = 'img/schmeckts-mark.svg' if scheme == 'light' else 'img/schmeckts-mark-dark.svg'
+        check(logo == [[want, True, 104]], f'welcome screen ({scheme}): the mark for this scheme ({logo})')
         vs = await pg.evaluate("getComputedStyle(document.body).fontVariationSettings")
-        check(vs == '"SOFT" 100', f'body: font-variation-settings „SOFT“ 100 ({vs})')
+        check(vs == '"SOFT" 100', f'body: font-variation-settings "SOFT" 100 ({vs})')
         await pg.click('[data-action=demo]'); await idle(pg)
-        if await pg.query_selector('[data-action=close-week]'):  # „Letzte Woche“ gibt es nur montags bis mittwochs
+        if await pg.query_selector('[data-action=close-week]'):  # „Letzte Woche“ only exists Monday to Wednesday
             await pg.click('[data-action=close-week]'); await idle(pg)
         await pg.click('[data-action=expand][data-v=shop]'); await pg.click('[data-action=expand][data-v=ins]'); await idle(pg)
         await scan()  # Startseite mit allem
@@ -264,19 +264,19 @@ async def test_rules(browser, url):
             gaps: cards.slice(1).map((c, i) => Math.round(c.getBoundingClientRect().top - cards[i].getBoundingClientRect().bottom))};
           probe.remove(); return out; })()""")
         want = 'true|true|none|26px|18px 18px 8px|none|0px|0px|H2|Fraunces|600|21px|26.25px|-0.21px|true'
-        first = want.replace('|H2|', '|BUTTON|')  # Übersicht: links das Bild, die Überschrift daneben
+        first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
         check(layout['app'] == ['600px', '18px', '18px'] and len(layout['cards']) == 6 and layout['cards'][0] == first and all(c == want for c in layout['cards'][1:]) and layout['gaps'] == [14] * 5,
-              f'Startseite ({scheme}): 600px, 18px Rand; jede Karte Fläche, Radius 26px, 18/18/8, ohne Rahmen und Schatten, Überschrift Fraunces 600 21px oben (Übersicht: neben dem Bild), 14px Abstand ({layout["gaps"]})')
+              f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 26px, 18/18/8, without border and shadow, heading Fraunces 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})')
         await pg.click('[data-action=open-settings]'); await idle(pg)
         await scan()
         label = await pg.eval_on_selector('.label', """l => { const s = getComputedStyle(l), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.after(probe);
           const c = getComputedStyle(probe).color; probe.remove(); return [s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.color === c, s.textTransform, s.letterSpacing, l.innerText]; }""")
-        check(label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Darstellung'], f'Feldbeschriftung: Figtree 600, 13,5px, gedämpft, normale Schreibweise ({label})')
+        check(label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Darstellung'], f'field label: Figtree 600, 13.5px, muted, normal casing ({label})')
         await pg.click('#serverBox [data-action=connect-form]'); await idle(pg)
         await scan()  # Adresse und Code
         await pg.fill('#f-code', 'abcd1234')
         code = await pg.eval_on_selector('#f-code', 'f => [getComputedStyle(f).textTransform, getComputedStyle(f).letterSpacing]')
-        check(code[0] == 'uppercase' and float(code[1][:-2]) > 0, f'Ausnahme: das Feld für den Haushaltscode ({code})')
+        check(code[0] == 'uppercase' and float(code[1][:-2]) > 0, f'the exception: the household code field ({code})')
         await pg.click('[data-action=close]'); await idle(pg)
         await pg.click('#fab'); await idle(pg)
         await scan()
@@ -291,7 +291,7 @@ async def test_rules(browser, url):
         await pg.click('#sheet [data-action=edit-pet]'); await idle(pg)
         await pg.set_input_files('#albumInput', pictures[1:3])
         await pg.click('#sheet .ph-img >> nth=1'); await idle(pg)
-        await scan()  # Tier-Sheet mit Album und gewähltem Foto
+        await scan()  # pet sheet with the album and a chosen photo
         await pg.set_input_files('#petPhotoInput', pictures[1])
         await pg.wait_for_selector('#sheet .crop img'); await idle(pg)
         await scan()
@@ -302,9 +302,9 @@ async def test_rules(browser, url):
         await pg.wait_for_selector('#camera[open]'); await idle(pg)
         await scan()
         await pg.click('[data-cam=cancel]'); await idle(pg)
-        check(not bad, f'überall nur Figtree und Fraunces an den festgelegten Stellen, keine Großbuchstaben, nichts gesperrt, jede Schrift mit 4,5:1 ({scheme}): {bad}')
-        check(seen == set(FRAUNCES.split(', ')), f'Fraunces an Wortmarke, Überschriften, Tageszeilen, Prozent, Zählern, Anfangsbuchstaben ({sorted(seen)})')
-        check(not errors, 'keine Fehler in der Konsole' + (f': {errors}' if errors else ''))
+        check(not bad, f'Figtree everywhere and Fraunces only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}')
+        check(seen == set(FRAUNCES.split(', ')), f'Fraunces on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
+        check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
 
 
@@ -316,18 +316,18 @@ ICONS = """sel => [...document.querySelectorAll(sel)].filter(i => i.getClientRec
 
 
 async def test_polish(browser, url):
-    print('Feinschliff: kleine Icons einheitlich, Auswahlfeld „Serviert von“, Abstand unter der Wortmarke')
+    print('polish: small icons consistent, the „Serviert von“ select field, the gap under the wordmark')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]'); await idle(pg)
     gap = await pg.evaluate("[getComputedStyle(document.querySelector('.top')).paddingBottom, document.querySelector('#home > section').getBoundingClientRect().top - document.querySelector('.top').getBoundingClientRect().bottom]")
-    check(gap == ['10px', 0], f'Startseite: unter der Wortmarke 10px bis zur ersten Karte, 8px mehr als zuvor ({gap})')
+    check(gap == ['10px', 0], f'home page: 10px from the wordmark to the first card, 8px more than before ({gap})')
     icons = []
     await pg.click('.pend-head'); await idle(pg)
     pick = [i for i in await pg.evaluate(ICONS, '.pick .ic')]
-    check(pick == [{'where': 'pick', 'w': 20, 'h': 20, 'stroke': '1.8px', 'edge': 14, 'mid': True}], f'Auswahl-Icon bei „Serviert von“: 20px, Strichstärke des Icon-Sets, 14px vom rechten Rand, senkrecht mittig ({pick})')
-    check(await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance') == 'none', 'das Feld zeichnet keinen eigenen Pfeil des Systems daneben (Android)')
-    await shot(pg, 'auswahlfeld')
+    check(pick == [{'where': 'pick', 'w': 20, 'h': 20, 'stroke': '1.8px', 'edge': 14, 'mid': True}], f'select icon on „Serviert von“: 20px, the icon set\u2019s stroke width, 14px from the right edge, vertically centred ({pick})')
+    check(await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance') == 'none', 'the field does not draw the system\u2019s own arrow beside it (Android)')
+    await shot(pg, 'select-field')
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
     await pg.click('[data-action=edit-name]'); await idle(pg)
     await pg.fill('#f-variety', ''); await pg.fill('#f-brand', 'She'); await idle(pg)
@@ -344,36 +344,36 @@ async def test_polish(browser, url):
     kinds = {i['where'].split()[0] for i in icons}
     odd = [i for i in icons if (i['w'], i['h'], i['stroke']) != (20, 20, '1.8px') or i['edge'] not in (None, 14) or i['mid'] is False]
     check({'pick', 'sugg', 'edit', 'list-row', 'btn', 'chip'} <= kinds and not odd,
-          f'Auswahlfelder, Pfeile in Zeilen und kleine Icons in Knöpfen: 20px, Strichstärke 1.8, in Kästen 14px vom Rand und senkrecht mittig ({len(icons)} Icons, {sorted(kinds)}) {odd[:3]}')
-    check(not errors, 'keine Fehler in der Konsole' + (f': {errors}' if errors else ''))
+          f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
 
 def test_pack():
-    """Quellen in zwei Dateien: zusammen entpackt ergeben sie wieder denselben Arbeitsbaum"""
+    """The sources in two files: unpacked together they make up the same working tree again"""
     sys.path.insert(0, str(ROOT / 'scripts'))
     import pack, unpack
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             pack.main(tmp)
-            for name in ('schmeckts-quellen.txt', 'schmeckts-server-quellen.txt'):
-                unpack.unpack(f'{tmp}/{name}', f'{tmp}/baum')
-        names = {name: re.findall(r'^===== DATEI: (.+) \(\d+ Zeichen\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
-                 for name in ('schmeckts-quellen.txt', 'schmeckts-server-quellen.txt')}
+            for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt'):
+                unpack.unpack(f'{tmp}/{name}', f'{tmp}/tree')
+        names = {name: re.findall(r'^===== FILE: (.+) \(\d+ characters\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
+                 for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt')}
         server = lambda rel: rel.startswith(('server/', 'packaging/')) or rel in ('scripts/build-deb.sh', 'docs/INSTALLATION.md')
-        app, srv = names['schmeckts-quellen.txt'], names['schmeckts-server-quellen.txt']
-        check(app[0] == 'PROJEKT.md' and not any(map(server, app)) and all(map(server, srv)) and {'server/main.go', 'packaging/debian/control', 'scripts/build-deb.sh', 'docs/INSTALLATION.md'} <= set(srv)
+        app, srv = names['schmeckts-sources.txt'], names['schmeckts-server-sources.txt']
+        check(app[0] == 'PROJECT.md' and not any(map(server, app)) and all(map(server, srv)) and {'server/main.go', 'packaging/debian/control', 'scripts/build-deb.sh', 'docs/INSTALLATION.md'} <= set(srv)
               and {'scripts/unpack.py', 'scripts/pack.py', 'tests/ui_test.py', 'app/www/js/main.js'} <= set(app),
-              f'App-Datei mit PROJEKT.md vorn, Tests und Skripten ({len(app)} Dateien), Server-Datei mit server/, packaging/, build-deb.sh, INSTALLATION.md ({len(srv)})')
+              f'app file with PROJECT.md first, tests and scripts ({len(app)} files), server file with server/, packaging/, build-deb.sh, INSTALLATION.md ({len(srv)})')
         want = dict(pack.files())
-        got = {p.relative_to(f'{tmp}/baum').as_posix(): p.read_text(encoding='utf-8') for p in pathlib.Path(tmp, 'baum').rglob('*') if p.is_file()}
-        check(got == want and len(got) == len(app) + len(srv), f'beide Dateien in denselben Ordner entpackt: derselbe Arbeitsbaum ({len(got)} Dateien)')
-        first = pathlib.Path(tmp, 'schmeckts-server-quellen.txt').read_text(encoding='utf-8').split('\n', 1)[0]
-        check(f"Version {(ROOT / 'server/VERSION').read_text().strip()}," in first, f'die Server-Datei nennt die Version des Servers, sie ändert sich nicht mit der App ({first})')
+        got = {p.relative_to(f'{tmp}/tree').as_posix(): p.read_text(encoding='utf-8') for p in pathlib.Path(tmp, 'tree').rglob('*') if p.is_file()}
+        check(got == want and len(got) == len(app) + len(srv), f'both files unpacked into the same folder: the same working tree ({len(got)} files)')
+        first = pathlib.Path(tmp, 'schmeckts-server-sources.txt').read_text(encoding='utf-8').split('\n', 1)[0]
+        check(f"version {(ROOT / 'server/VERSION').read_text().strip()}," in first, f'the server file names the server\u2019s version, which does not change with the app ({first})')
 
 
 def test_prompt():
-    """Der Prompt der Foto-Erkennung steht nur in shared/recognize-prompt.txt: App und Server nutzen denselben Text."""
+    """The photo recognition prompt lives only in shared/recognize-prompt.txt: app and server use the same text."""
     shared = (ROOT / 'shared/recognize-prompt.txt').read_text(encoding='utf-8').strip()
     module = (WWW / 'js/prompt.js').read_text(encoding='utf-8')
     app = json.loads(re.search(r'export const PROMPT = (".*");', module, re.S).group(1))
@@ -382,11 +382,11 @@ def test_prompt():
     head = shared.split('\n')[0]
     check(len(shared) > 100 and app == shared and server == shared and '//go:embed recognize-prompt.txt' in go
           and head not in go and head not in (WWW / 'js/recognize.js').read_text(encoding='utf-8'),
-          'App und Server nutzen denselben Prompt, er steht nur in shared/recognize-prompt.txt')
+          'app and server use the same prompt, and it lives only in shared/recognize-prompt.txt')
     check("from './prompt.js'" in (WWW / 'js/recognize.js').read_text(encoding='utf-8')
           and 'shared/recognize-prompt.txt' in (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
           and "'app/www/js/prompt.js'" in (ROOT / 'scripts/pack.py').read_text(encoding='utf-8'),
-          'prepare.py erzeugt Modul und Kopie, gepackt wird nur die Datei in shared/')
+          'prepare.py generates the module and the copy, and only the file in shared/ is packed')
 
 
 async def test_files(browser, url):
@@ -396,4 +396,4 @@ async def test_files(browser, url):
     test_prompt()
 
 
-run_tests({'dateien': test_files, 'palette': test_palette, 'logo': test_logo, 'ansichten': test_rules, 'feinschliff': test_polish}, camera=('ansichten',))
+run_tests({'files': test_files, 'palette': test_palette, 'logo': test_logo, 'views': test_rules, 'polish': test_polish}, camera=('views',))
