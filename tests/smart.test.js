@@ -2,7 +2,7 @@
 process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyze, feedReminders, feedSlots, hintKey, milestones, rateCls, review, week} from '../app/www/js/smart.js';
+import {analyze, feedReminders, feedSlots, hintKey, milestones, rateCls, report, review, week} from '../app/www/js/smart.js';
 import {RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
 
 const DAY = 864e5, NOW = Date.UTC(2026, 5, 3, 10);
@@ -198,6 +198,31 @@ const WEEK = household(['Minka', 'Tiger'], ['lachs', 'huhn', 'rind', 'neu'], [
   ['rind', {Minka:T}, '2026-05-29T08:00', ''], ['lachs', {Tiger:S}, '2026-05-29T18:00', 'Anna'], ['lachs', {Tiger:S}, '2026-05-30T18:00', null],
   [null, {Minka:null}, '2026-05-31T23:59', ' Jonas '],
   ['rind', {Minka:T}, '2026-06-01T00:00', 'Jonas'], ['rind', {Minka:T}, '2026-06-01T09:00', 'Jonas']]);
+
+test('Auswertung: dieselben Bewertungen, Wertungen und Gruppen wie das Modell', () => {
+  const products = [{id:'p1', brand:'Sheba'}, {id:'p2', brand:'Felix'}, {id:'p3', brand:'Gourmet'}];
+  const db = household(['A', 'B'], products, [...rate('p1', 'A', [T, G, M], 40), ...rate('p2', 'A', [G, X], 20),
+    ...rate('p3', 'B', [T, T, S], 5), ...rate('p1', 'B', [M, S], 2)]);
+  for (const activePet of ['all', 'A']) {
+    const prefs = {activePet, hiddenHints:[]}, m = model(db, prefs), r = report(db, prefs, NOW, 0);
+    const counts = {};
+    for (const e of m.sorts) for (const [k, n] of Object.entries(e.counts)) counts[k] = (counts[k] || 0) + n;
+    assert.equal(r.n, m.rated);
+    assert.deepEqual(Object.fromEntries(r.levels.map(x => [x.r, x.n])), counts);
+    assert.equal(r.levels.reduce((a, x) => a + x.share, 0), 100);
+    assert.deepEqual(r.brands.map(b => [b.key, b.pct, b.n]).sort(),                  // je Marke genau eine Sorte
+      m.sorts.filter(e => e.n).map(e => [e.product.brand, e.pct, e.n]).sort());
+  }
+});
+
+test('Auswertung: der Zeitraum grenzt ein, die Linie läuft je Tag oder je Woche', () => {
+  const db = household(['A'], [{id:'p1', brand:'Sheba'}], [...rate('p1', 'A', [T, G], 100), ...rate('p1', 'A', [M, S], 40), ...rate('p1', 'A', [X], 2)]);
+  const prefs = {activePet:'all', hiddenHints:[]};
+  assert.deepEqual([report(db, prefs, NOW, 30).n, report(db, prefs, NOW, 90).n, report(db, prefs, NOW, 0).n], [1, 3, 5]);
+  assert.deepEqual([report(db, prefs, NOW, 30).trend.step, report(db, prefs, NOW, 90).trend.step, report(db, prefs, NOW, 0).trend.step],
+    ['day', 'week', 'week']);
+  assert.equal(report(db, prefs, NOW, 0).trend.pets[0].pct, model(db, prefs).byId.get('p1').pct);
+});
 
 test('Woche: Montag 0:00 bis Sonntag 24:00, immer für den Haushalt', () => {
   const w = week(WEEK, {activePet:'Tiger'}, at('2026-05-25T00:00'));
