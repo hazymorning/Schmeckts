@@ -5,6 +5,7 @@ dist/
 app/www/fonts/*.woff2
 __pycache__/
 *.apk
+server/schmeckts
 
 # Signing keys never belong in the repository
 *.jks

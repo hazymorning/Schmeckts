@@ -12,7 +12,14 @@ Usage: scripts/prepare.py                 normal
        scripts/prepare.py --fresh         delete and regenerate the Android project first
        scripts/prepare.py --fonts-only    the fonts only (enough for tests in the browser)
 """
-import hashlib, os, pathlib, shutil, subprocess, sys, urllib.request
+
+import hashlib
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / 'app'
@@ -22,10 +29,14 @@ MAIN = ANDROID / 'app/src/main'
 # The latin subset only (which covers ä, ö, ü, ß and the typographic characters). Licence: www/fonts/OFL-*.txt
 # Figtree for everything, Fraunces for headings and numbers (design rules in PROJECT.md)
 FONTS = {
-    'figtree-latin.woff2': ('https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DaRvzig.woff2',
-                            '8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928'),
-    'fraunces-latin.woff2': ('https://fonts.gstatic.com/s/fraunces/v38/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92usiIk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2',
-                             '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b'),
+    'figtree-latin.woff2': (
+        'https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DaRvzig.woff2',
+        '8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928',
+    ),
+    'fraunces-latin.woff2': (
+        'https://fonts.gstatic.com/s/fraunces/v38/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92usiIk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2',
+        '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b',
+    ),
 }
 
 
@@ -50,7 +61,6 @@ def fonts():
             sys.exit(f'checksum does not match: {name}')
         path.write_bytes(data)
         print('font downloaded:', name)
-
 
 
 def edit(path, old, new):
@@ -85,119 +95,151 @@ def android(fresh):
         if not any(folder.iterdir()):
             folder.rmdir()
 
-    edit(MAIN / 'AndroidManifest.xml',
-         'android:supportsRtl="true"',
-         'android:supportsRtl="true"\n        android:networkSecurityConfig="@xml/network_security_config"\n'
-         # Privacy: no cloud backup, only the direct transfer to a new device; build-apk.sh checks this
-         '        android:dataExtractionRules="@xml/data_extraction_rules"\n        android:fullBackupContent="@xml/backup_rules"')
+    edit(
+        MAIN / 'AndroidManifest.xml',
+        'android:supportsRtl="true"',
+        'android:supportsRtl="true"\n        android:networkSecurityConfig="@xml/network_security_config"\n'
+        # Privacy: no cloud backup, only the direct transfer to a new device; build-apk.sh checks this
+        '        android:dataExtractionRules="@xml/data_extraction_rules"\n        android:fullBackupContent="@xml/backup_rules"',
+    )
 
     # Deep links schmeckts://… (for Quick Shortcut Maker and Tasker too) and the static shortcuts
-    edit(MAIN / 'AndroidManifest.xml',
-         '                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n',
-         '                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n'
-         '            <intent-filter>\n'
-         '                <action android:name="android.intent.action.VIEW" />\n'
-         '                <category android:name="android.intent.category.DEFAULT" />\n'
-         '                <category android:name="android.intent.category.BROWSABLE" />\n'
-         '                <data android:scheme="schmeckts" />\n'
-         '            </intent-filter>\n'
-         '            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />\n'
-         # Exchange files from another app: opened (VIEW) or shared (SEND); MainActivity turns SEND into VIEW
-         '            <intent-filter>\n'
-         '                <action android:name="android.intent.action.VIEW" />\n'
-         '                <category android:name="android.intent.category.DEFAULT" />\n'
-         '                <category android:name="android.intent.category.BROWSABLE" />\n'
-         '                <data android:mimeType="application/json" />\n'
-         '            </intent-filter>\n'
-         '            <intent-filter>\n'
-         '                <action android:name="android.intent.action.SEND" />\n'
-         '                <category android:name="android.intent.category.DEFAULT" />\n'
-         '                <data android:mimeType="application/json" />\n'
-         '            </intent-filter>\n')
+    edit(
+        MAIN / 'AndroidManifest.xml',
+        '                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n',
+        '                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n'
+        '            <intent-filter>\n'
+        '                <action android:name="android.intent.action.VIEW" />\n'
+        '                <category android:name="android.intent.category.DEFAULT" />\n'
+        '                <category android:name="android.intent.category.BROWSABLE" />\n'
+        '                <data android:scheme="schmeckts" />\n'
+        '            </intent-filter>\n'
+        '            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />\n'
+        # Exchange files from another app: opened (VIEW) or shared (SEND); MainActivity turns SEND into VIEW
+        '            <intent-filter>\n'
+        '                <action android:name="android.intent.action.VIEW" />\n'
+        '                <category android:name="android.intent.category.DEFAULT" />\n'
+        '                <category android:name="android.intent.category.BROWSABLE" />\n'
+        '                <data android:mimeType="application/json" />\n'
+        '            </intent-filter>\n'
+        '            <intent-filter>\n'
+        '                <action android:name="android.intent.action.SEND" />\n'
+        '                <category android:name="android.intent.category.DEFAULT" />\n'
+        '                <data android:mimeType="application/json" />\n'
+        '            </intent-filter>\n',
+    )
 
     # Fetch Google's scanner module (scan() from @capacitor-mlkit/barcode-scanning) at install time already.
-    edit(MAIN / 'AndroidManifest.xml',
-         '        </provider>\n    </application>',
-         '        </provider>\n'
-         '        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />\n'
-         '    </application>')
+    edit(
+        MAIN / 'AndroidManifest.xml',
+        '        </provider>\n    </application>',
+        '        </provider>\n'
+        '        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />\n'
+        '    </application>',
+    )
 
     # Rating reminder (@capacitor/local-notifications): an approximate time is enough. The exact-alarm permission the
     # plugin brings along is stripped from the finished manifest; build-apk.sh checks this.
-    edit(MAIN / 'AndroidManifest.xml',
-         '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
-         '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">')
-    edit(MAIN / 'AndroidManifest.xml',
-         '    <uses-permission android:name="android.permission.INTERNET" />\n',
-         '    <uses-permission android:name="android.permission.INTERNET" />\n'
-         '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />\n'
-         # Our own camera for packaging photos (getUserMedia in the WebView): Capacitor forwards the WebView's camera
-         # request to Android (BridgeWebChromeClient.onPermissionRequest), which only works with the permission in the
-         # manifest. It is asked for on first use. No camera is required: without one the app takes the route through
-         # the camera app. build-apk.sh checks this.
-         '    <uses-permission android:name="android.permission.CAMERA" />\n'
-         '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n')
+    edit(
+        MAIN / 'AndroidManifest.xml',
+        '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+        '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">',
+    )
+    edit(
+        MAIN / 'AndroidManifest.xml',
+        '    <uses-permission android:name="android.permission.INTERNET" />\n',
+        '    <uses-permission android:name="android.permission.INTERNET" />\n'
+        '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />\n'
+        # Our own camera for packaging photos (getUserMedia in the WebView): Capacitor forwards the WebView's camera
+        # request to Android (BridgeWebChromeClient.onPermissionRequest), which only works with the permission in the
+        # manifest. It is asked for on first use. No camera is required: without one the app takes the route through
+        # the camera app. build-apk.sh checks this.
+        '    <uses-permission android:name="android.permission.CAMERA" />\n'
+        '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n',
+    )
 
     # Register our own photo plugin
-    edit(MAIN / 'java/de/schmeckts/app/MainActivity.java',
-         'public class MainActivity extends BridgeActivity {}',
-         'public class MainActivity extends BridgeActivity {\n'
-         '    @Override\n'
-         '    public void onCreate(android.os.Bundle savedInstanceState) {\n'
-         '        registerPlugin(PhotoPlugin.class); // app/native/java, for the „Packung fotografieren“ shortcut\n'
-         '        shared(getIntent());\n'
-         '        super.onCreate(savedInstanceState);\n'
-         '    }\n'
-         '\n'
-         '    @Override\n'
-         '    public void onNewIntent(android.content.Intent intent) {\n'
-         '        shared(intent);\n'
-         '        super.onNewIntent(intent);\n'
-         '    }\n'
-         '\n'
-         '    // A file shared from another app (ACTION_SEND) carries its address in the extra. As ACTION_VIEW\n'
-         '    // Capacitor forwards it as appUrlOpen, and the app opens the receive flow with it.\n'
-         '    private void shared(android.content.Intent intent) {\n'
-         '        if (intent == null || !android.content.Intent.ACTION_SEND.equals(intent.getAction())) return;\n'
-         '        android.os.Parcelable file = intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM);\n'
-         '        if (file instanceof android.net.Uri) {\n'
-         '            intent.setAction(android.content.Intent.ACTION_VIEW);\n'
-         '            intent.setData((android.net.Uri) file);\n'
-         '        }\n'
-         '    }\n'
-         '}')
+    edit(
+        MAIN / 'java/de/schmeckts/app/MainActivity.java',
+        'public class MainActivity extends BridgeActivity {}',
+        'public class MainActivity extends BridgeActivity {\n'
+        '    @Override\n'
+        '    public void onCreate(android.os.Bundle savedInstanceState) {\n'
+        '        registerPlugin(PhotoPlugin.class); // app/native/java, for the „Packung fotografieren“ shortcut\n'
+        '        shared(getIntent());\n'
+        '        super.onCreate(savedInstanceState);\n'
+        '    }\n'
+        '\n'
+        '    @Override\n'
+        '    public void onNewIntent(android.content.Intent intent) {\n'
+        '        shared(intent);\n'
+        '        super.onNewIntent(intent);\n'
+        '    }\n'
+        '\n'
+        '    // A file shared from another app (ACTION_SEND) carries its address in the extra. As ACTION_VIEW\n'
+        '    // Capacitor forwards it as appUrlOpen, and the app opens the receive flow with it.\n'
+        '    private void shared(android.content.Intent intent) {\n'
+        '        if (intent == null || !android.content.Intent.ACTION_SEND.equals(intent.getAction())) return;\n'
+        '        android.os.Parcelable file = intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM);\n'
+        '        if (file instanceof android.net.Uri) {\n'
+        '            intent.setAction(android.content.Intent.ACTION_VIEW);\n'
+        '            intent.setData((android.net.Uri) file);\n'
+        '        }\n'
+        '    }\n'
+        '}',
+    )
 
-    edit(MAIN / 'res/values/styles.xml',
-         '        <item name="android:background">@drawable/splash</item>\n    </style>',
-         '        <item name="android:background">@drawable/splash</item>\n'
-         '        <item name="windowSplashScreenBackground">@color/splash_background</item>\n'
-         '        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>\n'  # light and dark, app/native/res
-         '        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>\n    </style>')
+    edit(
+        MAIN / 'res/values/styles.xml',
+        '        <item name="android:background">@drawable/splash</item>\n    </style>',
+        '        <item name="android:background">@drawable/splash</item>\n'
+        '        <item name="windowSplashScreenBackground">@color/splash_background</item>\n'
+        '        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>\n'  # light and dark, app/native/res
+        '        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>\n    </style>',
+    )
 
     gradle = ANDROID / 'app/build.gradle'
-    edit(gradle, "apply plugin: 'com.android.application'\n",
-         "apply plugin: 'com.android.application'\n\n"
-         "// The version number lives only in app/package.json. versionCode: " + str(VERSION_OFFSET) + " + (1.2.3 → 10203)\n"
-         "def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version\n"
-         "def appVersionCode = " + str(VERSION_OFFSET) +
-         " + appVersion.tokenize('.').collect { it as int }.inject(0) { acc, n -> acc * 100 + n }\n")
-    edit(gradle, '        versionCode 1\n        versionName "1.0"',
-         '        versionCode appVersionCode\n        versionName appVersion\n'
-         # The app runs on phones, so ARM only. Text recognition ships its library per processor family, and x86 and
-         # x86_64 (emulators and Chromebooks only) would roughly double the APK. build-apk.sh checks this.
-         '        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }')
+    edit(
+        gradle,
+        "apply plugin: 'com.android.application'\n",
+        "apply plugin: 'com.android.application'\n\n"
+        '// The version number lives only in app/package.json. versionCode: ' + str(VERSION_OFFSET) + ' + (1.2.3 → 10203)\n'
+        "def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version\n"
+        'def appVersionCode = ' + str(VERSION_OFFSET) + " + appVersion.tokenize('.').collect { it as int }.inject(0) { acc, n -> acc * 100 + n }\n",
+    )
+    edit(
+        gradle,
+        '        versionCode 1\n        versionName "1.0"',
+        '        versionCode appVersionCode\n        versionName appVersion\n'
+        # The app runs on phones, so ARM only. Text recognition ships its library per processor family, and x86 and
+        # x86_64 (emulators and Chromebooks only) would roughly double the APK. build-apk.sh checks this.
+        '        ndk { abiFilters "armeabi-v7a", "arm64-v8a" }',
+    )
 
     # scan() only: Google's scanner in Play services reads the barcodes. The app does not need the bundled ML Kit
     # model for the plugin's own camera preview (startScan), and without it the APK is around 20 MB smaller.
-    edit(gradle, '    buildTypes {\n',
-         '    packaging {\n'
-         '        jniLibs { excludes += [\'**/libbarhopper_v3.so\'] } // only for startScan and readBarcodesFromImage\n'
-         '    }\n'
-         '    buildTypes {\n')
+    edit(
+        gradle,
+        '    buildTypes {\n',
+        '    packaging {\n'
+        "        jniLibs { excludes += ['**/libbarhopper_v3.so'] } // only for startScan and readBarcodesFromImage\n"
+        '    }\n'
+        '    buildTypes {\n',
+    )
     edit(gradle, ":!CVS:!thumbs.db:!picasa.ini:!*~'", ":!CVS:!thumbs.db:!picasa.ini:!*~:!mlkit_barcode_models'")
 
+    gradle_wrapper_bin()
     run(sys.executable, str(ROOT / 'design/render-icons.py'))
-    (ANDROID / 'local.properties').write_text(f"sdk.dir={os.environ.get('ANDROID_HOME', '/opt/android-sdk')}\n")
+    (ANDROID / 'local.properties').write_text(f'sdk.dir={os.environ.get("ANDROID_HOME", "/opt/android-sdk")}\n')
+
+
+def gradle_wrapper_bin():
+    """The wrapper fetches a Gradle distribution on the first build: -bin instead of -all is about half of it.
+    What -all adds is the sources and the documentation, which nothing here reads."""
+    props = ANDROID / 'gradle/wrapper/gradle-wrapper.properties'
+    text = props.read_text(encoding='utf-8')
+    if '-all.zip' in text:
+        props.write_text(text.replace('-all.zip', '-bin.zip'), encoding='utf-8')
 
 
 if __name__ == '__main__':

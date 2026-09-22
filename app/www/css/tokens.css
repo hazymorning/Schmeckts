@@ -5,48 +5,86 @@
    contrasts. */
 
 /* Typefaces (bundled with the app, SIL Open Font License)
-   Fraunces for headings and numbers, Figtree for everything else. */
-@font-face{font-family:"Figtree";src:url(../fonts/figtree-latin.woff2) format("woff2");font-weight:400 700;font-style:normal;font-display:swap}
-@font-face{font-family:"Fraunces";src:url(../fonts/fraunces-latin.woff2) format("woff2");font-weight:500 700;font-style:normal;font-display:swap}
+   Fraunces for headings and numbers, Figtree for everything else.
+   font-display: block, not swap: the files lie in the app, so they are there in a moment, and the splash screen
+   stays up until they are (ui/splash.js). Nothing is drawn in a stand-in first and then jumps. */
+@font-face {
+  font-family: "Figtree";
+  src: url(../fonts/figtree-latin.woff2) format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url(../fonts/fraunces-latin.woff2) format("woff2");
+  font-weight: 500 700;
+  font-style: normal;
+  font-display: block;
+}
 
-:root{
-  color-scheme:light dark;
-  --font-display:"Fraunces","Iowan Old Style",Georgia,serif;
-  --font-ui:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  --ease-out:cubic-bezier(.22,1,.36,1);
-  --ease-spring:cubic-bezier(.34,1.45,.64,1);
-  --ease-in:cubic-bezier(.5,0,.75,0);
+:root {
+  color-scheme: light dark;
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Distances: one scale, so a margin is chosen and not invented. The whole steps are the backbone, the halves
+     between them are the ones this layout was drawn on — among them the card's 18px padding and the 14px
+     between two cards, both laid down in PROJECT.md ("Design rules"). Under 4px nothing is a distance any
+     more but an optical nudge, which is why 2px has a name of its own. Every margin, padding and gap in
+     app.css uses these; tests/design_test.py holds them to it. */
+  --space-hair: 2px;
+  --space-1: 4px;
+  --space-1h: 6px;
+  --space-2: 8px;
+  --space-2h: 10px;
+  --space-3: 12px;
+  --space-3h: 14px;
+  --space-4: 16px;
+  --space-4h: 18px;
+  --space-5: 20px;
+  --space-5h: 22px;
+  --space-6: 24px;
+  --space-6h: 26px;
+  --space-7: 32px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
 
   /* Palette: light-dark(light, dark) */
-  --bg:light-dark(#F4F0EC,#191513);
-  --surface:light-dark(#FCFAF7,#231E1B);
-  --surface-2:light-dark(#E8E2DB,#302A27);
-  --ink:light-dark(#2E2724,#EBE7E2);
-  --muted:light-dark(#6C615A,#B2A9A1);
-  --faint:light-dark(#A0958C,#7C726B);        /* decoration and placeholders only, never meaningful text */
-  --line:light-dark(#D8CFC7,#403935);
-  --accent:light-dark(#965E4B,#C78F7A);       /* accent fill, focus ring, bars */
-  --accent-ink:light-dark(#7F4C3A,#C78F7A);   /* accent as text */
-  --accent-soft:light-dark(#F9E0D7,#422920);
-  --on-accent:light-dark(#FFFFFF,#191513);    /* type on strong fills: accent, and the red confirm button too */
+  --bg: light-dark(#f4f0ec, #191513);
+  --surface: light-dark(#fcfaf7, #231e1b);
+  --surface-2: light-dark(#e8e2db, #302a27);
+  --ink: light-dark(#2e2724, #ebe7e2);
+  --muted: light-dark(#6c615a, #b2a9a1);
+  --faint: light-dark(#a0958c, #7c726b); /* decoration and placeholders only, never meaningful text */
+  --line: light-dark(#d8cfc7, #403935);
+  --accent: light-dark(#965e4b, #c78f7a); /* accent fill, focus ring, bars */
+  --accent-ink: light-dark(#7f4c3a, #c78f7a); /* accent as text */
+  --accent-soft: light-dark(#f9e0d7, #422920);
+  --on-accent: light-dark(#ffffff, #191513); /* type on strong fills: accent, and the red confirm button too */
 
   /* Ratings: for icons, dots and their soft fills only */
-  --good:light-dark(#4F725F,#97BBAA);
-  --good-soft:light-dark(#DBE0DA,#363731);
-  --mid:light-dark(#997238,#DBB87E);
-  --mid-soft:light-dark(#E8DED0,#43392D);
-  --sauce:light-dark(#7C5B45,#BD9E86);
-  --sauce-soft:light-dark(#E2D8D1,#3E352E);
-  --bad:light-dark(#823B4E,#D88095);
-  --bad-soft:light-dark(#EADADA,#3D2C2C);
+  --good: light-dark(#4f725f, #97bbaa);
+  --good-soft: light-dark(#dbe0da, #363731);
+  --mid: light-dark(#997238, #dbb87e);
+  --mid-soft: light-dark(#e8ded0, #43392d);
+  --sauce: light-dark(#7c5b45, #bd9e86);
+  --sauce-soft: light-dark(#e2d8d1, #3e352e);
+  --bad: light-dark(#823b4e, #d88095);
+  --bad-soft: light-dark(#eadada, #3d2c2c);
 
   /* Derived, from the palette's values alone */
-  --seg-on:light-dark(#FCFAF7,#403935);       /* the chosen segment: light --surface, dark --line */
-  --toast-action:light-dark(#C78F7A,#7F4C3A); /* undo on the toast (fill --ink): the other mode's accent */
-  --backdrop:light-dark(#2E272466,#191513B3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
-  --seg-shadow:0 1px 4px light-dark(#2E27241A,#1915134D);
-  --card-shadow:0 1px 2px light-dark(#2E27240D,#19151340),0 10px 28px -12px light-dark(#2E272429,#19151380);
-  --float-shadow:0 14px 34px -14px light-dark(#2E27244D,#191513A6),0 2px 6px light-dark(#2E272414,#19151359);
+  --seg-on: light-dark(#fcfaf7, #403935); /* the chosen segment: light --surface, dark --line */
+  --toast-action: light-dark(#c78f7a, #7f4c3a); /* undo on the toast (fill --ink): the other mode's accent */
+  --backdrop: light-dark(#2e272466, #191513b3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
+  --seg-shadow: 0 1px 4px light-dark(#2e27241a, #1915134d);
+  --card-shadow: 0 1px 2px light-dark(#2e27240d, #19151340), 0 10px 28px -12px light-dark(#2e272429, #19151380);
+  --float-shadow: 0 14px 34px -14px light-dark(#2e27244d, #191513a6), 0 2px 6px light-dark(#2e272414, #19151359);
 }
-:root[data-theme="light"]{color-scheme:light}
-:root[data-theme="dark"]{color-scheme:dark}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}

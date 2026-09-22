@@ -144,7 +144,10 @@ func fetchProduct(ctx context.Context, base, code string) (Product, error) {
 	ctx, cancel := context.WithTimeout(ctx, barcodeTimeout)
 	defer cancel()
 	url := fmt.Sprintf("%s/api/v2/product/%s.json?fields=product_name,product_name_de,brands,categories_tags", base, code)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return Product{}, err // a wrongly configured barcodeUrls; without this the request would be nil
+	}
 	req.Header.Set("User-Agent", barcodeUserAgent)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

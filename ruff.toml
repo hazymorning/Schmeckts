@@ -1,0 +1,7 @@
+# Python in tests/, scripts/ and design/. The lines are long on purpose: the tests read as prose, and a check and
+# its wording belong together on one line.
+line-length = 150
+target-version = "py311"
+
+[format]
+quote-style = "single"
