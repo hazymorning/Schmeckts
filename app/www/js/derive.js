@@ -1,5 +1,5 @@
 /* Everything derived from the data: lookups, open meals, suggestions while feeding and the evaluation model
-   (model(), computed in smart.js). Read only, never writes. */
+   (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW} from './config.js';
 import {analyze, report, review, shopGroups, tally} from './smart.js';
@@ -51,7 +51,7 @@ export function pendingServings() {
   return db.servings.filter(s => s.servedAt > cut && openPets(s).length);
 }
 
-/* Who is being served? Without asking, but as right as possible:
+/* Which pets a serving is for, picked without asking, in this order:
    active pet > only pet > whoever had this food last > matching species > last used > everyone */
 export function defaultPets(p) {
   const valid = ids => (ids || []).filter(id => getPet(id));

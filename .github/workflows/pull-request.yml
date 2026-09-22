@@ -1,8 +1,8 @@
 name: Pull request
 
-# The title and the body of a pull request are read by people and are not in the repository, so lint.sh never
-# sees them. This holds them to the same rules, and keeps more than one of our own pull requests from being
-# open at a time: a month of them at once is work for whoever has to read them.
+# The title and the body of a pull request are not in the repository, so lint.sh never sees them. This holds
+# them to the same rules, and fails when more than one of our own pull requests is open at a time, so they do
+# not pile up for whoever reads them.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
@@ -33,6 +33,6 @@ jobs:
           ours=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json author \
             --jq '[.[] | select(.author.is_bot | not)] | length')
           [ "$ours" -le 1 ] || {
-            echo "$ours pull requests of ours are open. Finish one before the next is opened." >&2
+            echo "$ours pull requests of ours are open. Finish one before opening the next." >&2
             exit 1
           }

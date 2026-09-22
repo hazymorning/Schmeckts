@@ -7,6 +7,6 @@ __pycache__/
 *.apk
 server/schmeckts
 
-# Signing keys never belong in the repository
+# Signing keys, never committed
 *.jks
 schmeckts-signing-key.txt

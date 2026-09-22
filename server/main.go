@@ -124,7 +124,7 @@ func serve(dir string) error {
 	return nil
 }
 
-// ownFiles hands the service the files root writes during setup.
+// ownFiles gives files that root created during setup to the service user.
 func ownFiles(paths ...string) {
 	u, err := user.Lookup(serviceUser)
 	if err != nil || os.Geteuid() != 0 {

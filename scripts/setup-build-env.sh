@@ -27,7 +27,7 @@ if ! command -v go >/dev/null && [ ! -x /usr/local/go/bin/go ]; then
   curl -sL "https://go.dev/dl/$V.linux-amd64.tar.gz" | tar -C /usr/local -xz
 fi
 
-# ruff checks and formats the Python in tests/, scripts/ and design/ (scripts/lint.sh), pinned like every tool
+# ruff checks and formats the Python in tests/, scripts/ and design/ (scripts/lint.sh), pinned in tests/requirements.txt
 command -v ruff >/dev/null || python3 -m pip install --quiet --break-system-packages --requirement "$(dirname "$0")/../tests/requirements.txt"
 
 node -e 'if (+process.versions.node.split(".")[0] < 22) { console.error("Node.js 22 or newer required"); process.exit(1) }'

@@ -14,7 +14,7 @@ import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet} from '../ui/sheet.js';
 import {remindHint} from '../views/settings.js';
 
-const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1; // the plugin demands a whole number
+const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1; // the plugin needs a whole number
 const isOpen = s => Object.keys(s.pets).some(pid => getPet(pid) && !s.pets[pid].r);
 function notice(s) {
   const p = getProduct(s.productId),
@@ -62,7 +62,7 @@ export async function setRemind(minutes, redraw = true) {
   else {
     const hint = $('#remind-hint');
     if (hint) hint.textContent = remindHint();
-  } // the field stays put while typing, the note follows
+  } // a full redraw would interrupt the typing, so only the note is updated
 }
 export async function setFeedRemind(on) {
   prefs.feedRemind = on && (await allowed(true));

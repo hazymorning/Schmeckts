@@ -1,9 +1,9 @@
 name: Release
 
-# A published release builds the signed APK and attaches it. Started by hand the same path builds for trying
-# things out, and the result is left as an artifact. Nothing is released without green tests: the whole suite
-# runs as its own job (the Tests workflow, split across several) next to the build, and the APK is only
-# attached once both are through.
+# A published release builds the signed APK and attaches it to the release. Started by hand, the same path
+# builds an APK for trying things out and leaves it as an artifact. The whole suite runs next to the build as
+# its own job (the Tests workflow, itself split across several), and the APK is attached only once both are
+# through.
 on:
   release:
     types: [published]
@@ -63,8 +63,8 @@ jobs:
           python3 -m pip install --requirement tests/requirements.txt
           python3 -m playwright install --with-deps chromium
 
-      # The runner's SDK lives in ANDROID_HOME and build-apk.sh takes it from there. What the build needs is
-      # installed on top: platform 36 and the build tools, which is where apksigner and aapt2 come from.
+      # The runner's SDK lives in ANDROID_HOME and build-apk.sh takes it from there. Platform 36 and the build
+      # tools are installed on top; apksigner and aapt2 come with the build tools.
       - name: Add to the Android SDK
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.1.0" > /dev/null
@@ -82,8 +82,8 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # The signing key sits outside the working tree as a file for the duration of the build only, and is
-      # removed in every case. It is never printed anywhere. --tested: the tests run in the job beside this one.
+      # The signing key is written to a file outside the working tree for the build, removed again in every
+      # case and never printed. --tested: the tests run in the job beside this one.
       - name: Build and sign the APK
         env:
           SCHMECKTS_SIGNING_KEY: ${{ secrets.SCHMECKTS_SIGNING_KEY }}
@@ -94,7 +94,7 @@ jobs:
           (umask 077; printf '%s' "$SCHMECKTS_SIGNING_KEY" > "$KEY_FILE")
           scripts/build-apk.sh "$KEY_FILE" --tested
 
-      # Started by hand this is the result; for a release the job below picks it up again.
+      # When started by hand, this is the result; for a release the job below picks it up again.
       - name: Leave the APK as an artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -1,12 +1,12 @@
-/* Making sense of the packaging text: out of the text the phone reads off the photo (native.js) comes the same answer
-   the server gives: brand, variety, type, animal, texture. Pure functions, so they can be tested on their own.
+/* The packaging text (read off the photo in native.js) into the same answer the server gives: brand, variety,
+   type, animal, texture. Pure functions, so they can be tested on their own.
    Order: our own varieties, then a brand (from the list or from one of our own varieties), then the most
    prominent line as the variety. */
 import {norm} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 
 export const MAX_VARIETY = 40;
-export const PACK_LINES = 8; // as chips while naming, more than this is no longer a glance
+export const PACK_LINES = 8; // shown as chips while naming; beyond this there are too many to scan
 const MIN_BRAND = 4; // our own brands count as brands too, and a shorter word is too general to match on
 const EMPTY = {brand: '', variety: '', type: '', animal: ''};
 const QUANTITY =
@@ -59,7 +59,7 @@ export function readPack(text, products = []) {
 }
 
 /* Every brand that may be read off a packaging: the list, plus the brands of our own varieties; once each and
-   only from MIN_BRAND characters on. The match is on whole words and the longest hit wins, as before. */
+   only from MIN_BRAND characters on. The match is on whole words and the longest hit wins. */
 function brandsOf(products) {
   const out = [...BRANDS],
     seen = new Set(BRANDS.map(norm));

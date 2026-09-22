@@ -1,7 +1,7 @@
 package main
 
-// AI recognition of a food packaging through the Anthropic API. Key, model and prompt live
-// here on the server alone; the app only sends the photo.
+// Recognition of a packaging photo through the Anthropic API. Key, model and prompt live
+// on the server alone; the app only sends the photo.
 
 import (
 	"bytes"
@@ -45,8 +45,8 @@ type recognizeError struct {
 
 func (e *recognizeError) Error() string { return e.msg }
 
-// promptText lives in recognize-prompt.txt, next to this file, because //go:embed cannot reach outside the package,
-// so that server and app use the same text (test: tests/design_test.py).
+// promptText lives in recognize-prompt.txt next to this file, because //go:embed cannot reach outside
+// the package. It is kept nowhere else, neither in this file nor in the app (tests/design_test.py).
 //
 //go:embed recognize-prompt.txt
 var promptText string
@@ -80,7 +80,7 @@ func oneOf(v string, allowed []string) string {
 	return ""
 }
 
-// Recognize sends the photo to Claude and returns brand, variety, type and species.
+// Recognize sends the photo to the Anthropic API and returns brand, variety, type and species.
 func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Recognition, error) {
 	var out Recognition
 	img, err := base64.StdEncoding.DecodeString(b64)

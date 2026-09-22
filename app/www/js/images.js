@@ -1,7 +1,6 @@
-/* Reading, shrinking and cropping photos. Large photos for recognition stay in memory only. */
+/* Reading, shrinking and cropping photos. */
 export const memPhotos = new Map(); // large photos in memory only, for recognition
 
-/* Images */
 export function fileToImage(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file),

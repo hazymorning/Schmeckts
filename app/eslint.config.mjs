@@ -1,6 +1,6 @@
-/* Style and the usual mistakes, for the app's modules and the pure-module tests. Run from the repository root
-   (scripts/lint.sh), which is why the patterns start there; the packages live in app/ next to this file.
-   The app ships without a build step: nothing here rewrites code, it only reports. */
+/* Lint rules for the app's modules and the pure-module tests. Run from the repository root (scripts/lint.sh),
+   which is why the patterns start there; the packages live in app/ next to this file. The app ships without
+   a build step, so this config reports problems and does not rewrite files. */
 import js from '@eslint/js';
 import globals from 'globals';
 

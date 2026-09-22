@@ -1,13 +1,12 @@
-/* Design foundations: type, colour, motion. Every colour in the app lives exactly here and nowhere else. The only
-   exceptions are the logo files (img/) and webview-update.html (for WebViews without light-dark()).
-   A fixed colour scheme with no choice; the values are in PROJECT.md ("Design rules"). Tokens outside the palette are
-   derived from its values alone, with opacity where needed (8-digit hex). tests/design_test.py checks values and
-   contrasts. */
+/* Design foundations: type, colour, motion. Every colour in the app is defined here; the only exceptions are the
+   logo files (img/) and webview-update.html (for WebViews without light-dark()).
+   One fixed palette, the values are in PROJECT.md ("Design rules"). Tokens outside the palette are derived from
+   its values alone, with opacity where needed (8-digit hex). tests/design_test.py checks values and contrasts. */
 
 /* Typefaces (bundled with the app, SIL Open Font License)
    Fraunces for headings and numbers, Figtree for everything else.
-   font-display: block, not swap: the files lie in the app, so they are there in a moment, and the splash screen
-   stays up until they are (ui/splash.js). Nothing is drawn in a stand-in first and then jumps. */
+   font-display: block because the files ship inside the app and load at once; the splash screen stays up until
+   they are ready (ui/splash.js). With swap, text would first render in a fallback and then reflow. */
 @font-face {
   font-family: "Figtree";
   src: url(../fonts/figtree-latin.woff2) format("woff2");
@@ -27,11 +26,10 @@
   color-scheme: light dark;
   --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
   --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* Distances: one scale, so a margin is chosen and not invented. The whole steps are the backbone, the halves
-     between them are the ones this layout was drawn on, among them the card's 18px padding and the 14px
-     between two cards, both laid down in PROJECT.md ("Design rules"). Under 4px nothing is a distance any
-     more but an optical nudge, which is why 2px has a name of its own. Every margin, padding and gap in
-     app.css uses these; tests/design_test.py holds them to it. */
+  /* One spacing scale for the whole app, so margins come from a fixed set. Whole steps and the halves between
+     them; this layout uses both, among them the card's 18px padding and the 14px between two cards, which
+     PROJECT.md ("Design rules") fixes. 2px has a name of its own for optical nudges below the 4px step.
+     Every margin, padding and gap in app.css uses these; tests/design_test.py checks that. */
   --space-hair: 2px;
   --space-1: 4px;
   --space-1h: 6px;

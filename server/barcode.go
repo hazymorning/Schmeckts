@@ -1,6 +1,6 @@
 package main
 
-// Barcode lookup: look food up by its EAN in Open Pet Food Facts and Open Food Facts.
+// Looks food up by its EAN in Open Pet Food Facts and Open Food Facts.
 // The app only ever asks here; the server remembers the results in barcodes.json
 // (hits for 90 days, misses for 7). The actual code → variety mapping is stored by the app
 // on the food variety (field codes.<EAN>); this lookup is only for unknown codes.
@@ -79,7 +79,7 @@ type Barcodes struct {
 func OpenBarcodes(dir string) *Barcodes {
 	b := &Barcodes{dir: dir, cache: map[string]Product{}}
 	if raw, err := os.ReadFile(filepath.Join(dir, barcodeFile)); err == nil {
-		json.Unmarshal(raw, &b.cache) // corrupted: then it stays empty, it is only a cache
+		json.Unmarshal(raw, &b.cache) // corrupted: stays empty, it is only a cache
 	}
 	return b
 }

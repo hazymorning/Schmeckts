@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Builds the signed APK to dist/schmeckts-<version>.apk
 # Usage: scripts/build-apk.sh <schmeckts-signing-key.txt> [--tested]
-# --tested: the suite has already run elsewhere and is green. The release workflow passes it, where the tests
-# run as a job of their own beside the build and the APK is only attached once they are through.
-# The version number lives in exactly one place: app/package.json
+# --tested: the suite has already run elsewhere and is green. The release workflow passes it: the tests run
+# there as a job of their own beside the build, and the APK is attached only once they are through.
+# The version number comes only from app/package.json
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNING_KEY="$(realpath "${1:?path to schmeckts-signing-key.txt missing}")"
@@ -15,7 +15,7 @@ BUILD_TOOLS="${BUILD_TOOL_DIRS[-1]%/}"   # the newest build tools installed
 if [ "$TESTED" = "--tested" ]; then
   echo "Tests skipped: they ran elsewhere (--tested)."
 else
-  "$ROOT/scripts/test.sh"   # ship tested: no APK without green tests
+  "$ROOT/scripts/test.sh"   # no APK without green tests
 fi
 python3 "$ROOT/scripts/prepare.py"
 cd "$ROOT/app"
@@ -23,7 +23,7 @@ VERSION="$(node -p "require('./package.json').version")"
 npx cap sync android
 (cd android && ./gradlew assembleRelease --no-daemon --console=plain -q)
 
-# The key exists as a file only for as long as signing takes, and is deleted afterwards
+# The key is written to disk only for the signing step
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 SCHMECKTS_PW="$(python3 "$ROOT/scripts/signing-key.py" read "$SIGNING_KEY" "$TMP/key.jks")"
 export SCHMECKTS_PW

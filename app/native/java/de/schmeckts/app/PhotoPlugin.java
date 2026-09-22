@@ -19,14 +19,14 @@ import java.io.File;
 import java.io.InputStream;
 
 /**
- * A small plugin of our own: starts the system camera app and returns the photo as base64.
- * It is the fallback for when the app's own camera (www/js/ui/camera.js) will not run: no camera for the
- * WebView, or the camera permission denied. The "hint" option appears briefly above the camera, for example
+ * Starts the system camera app and returns the photo as base64.
+ * Fallback for when the app's own camera (www/js/ui/camera.js) will not run: no camera for the WebView, or
+ * the camera permission denied. The "hint" option appears briefly above the camera, for example
  * "Vorderseite fotografieren". The camera app takes the photo and writes it to the cache via the FileProvider.
- * An Android limitation: because the app declares the camera permission in its manifest, Android only starts the
- * camera app on its behalf while that permission is not denied (SecurityException otherwise). The plugin then
- * reports "camera unavailable" and the app points at the Android settings.
- * The plugin is registered in MainActivity (scripts/prepare.py); in the app it is Capacitor.Plugins.Photo.
+ * Because the app declares the camera permission in its manifest, Android only starts the camera app on its
+ * behalf while that permission is not denied (SecurityException otherwise). The plugin then reports
+ * "camera unavailable" and the app points at the Android settings.
+ * Registered in MainActivity (scripts/prepare.py); in the app it is Capacitor.Plugins.Photo.
  */
 @CapacitorPlugin(name = "Photo")
 public class PhotoPlugin extends Plugin {

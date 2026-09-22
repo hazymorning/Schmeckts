@@ -76,7 +76,7 @@ export const segmented = (action, options, current) =>
         `<button aria-pressed="${value === current}" data-action="${own}" data-v="${esc(value)}">${ic ? icon(ic) : ''}${esc(label)}</button>`,
     )
     .join('')}</div>`;
-/* Two options, „An“ and „Aus“, for a setting that is simply on or off */
+/* Two options, „An“ and „Aus“, for a setting that is on or off */
 export const onOff = (action, on) =>
   segmented(
     action,
@@ -92,7 +92,8 @@ export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = 
 }
 
 /* History, on the home page as in the evaluation: the meals by calendar day, newest first.
-   „2 Mahlzeiten, 1 Snack“: a treat is not a meal; everything else, including what is still unknown, counts as one. */
+   „2 Mahlzeiten, 1 Snack“: a treat is not a meal; everything else, including what is still unknown, counts
+   as one. */
 export function fedLabel(items) {
   const snacks = items.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length,
     meals = items.length - snacks;
@@ -186,6 +187,7 @@ export function syncChip() {
 
 /* A short reason for a verdict, e.g. „4× bewertet, zuletzt Gut“ */
 export const reasonOf = x => (x.n ? `${x.n}× bewertet, zuletzt ${RATINGS[x.last.r].label}` : 'noch nicht bewertet');
-/* A variety's verdict as text; in a household „Gemischt“ with the pets' names, e.g. „Gemischt: Minka ja, Tiger nein“ */
+/* A variety's verdict as text; in a household „Gemischt“ with the pets' names,
+   e.g. „Gemischt: Minka ja, Tiger nein“ */
 export const verdictLabel = x =>
   x.verdict === 'gemischt' ? `Gemischt: ${petNames(x.yes)} ja, ${petNames(x.no)} nein` : VERDICTS[x.verdict];

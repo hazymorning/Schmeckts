@@ -1,5 +1,5 @@
 /* Our own SVG icon set on a 24 grid. The ratings (r_<key>) show what you see when you come back: the bowl, or the
-   morsel for treats. Plus line drawings in the logo's shape language (bowl as a speech bubble) for empty states. */
+   morsel for treats. Plus line drawings for empty states, drawn from the logo: a bowl in a speech bubble. */
 
 const BOWL = '<path d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>';
 const DOT = (x, y) => `<circle cx="${x}" cy="${y}" r="1.15" fill="currentColor" stroke="none"/>`;
@@ -92,7 +92,7 @@ const I = {
   rodent:
     '<path d="M6.2 9a2 2 0 1 1 3-2.3M17.8 9a2 2 0 1 0-3-2.3"/><path d="M4.4 14.2c0-4 3.4-6.9 7.6-6.9s7.6 2.9 7.6 6.9c0 3.6-3.4 5.9-7.6 5.9s-7.6-2.3-7.6-5.9z"/><path d="M9.8 13.2v.4M14.2 13.2v.4M11.2 15.8h1.6"/>',
 };
-/* Line drawings on a 64 grid: the logo's speech bubble with a bowl, and a heart, crumbs or camera as the case may be */
+/* Line drawings on a 64 grid: the logo's speech bubble with a bowl or a camera inside */
 const BUBBLE = '<path d="M34 8A22 22 0 1 1 20.5 47.2L12 57l3.4-15.4A22 22 0 0 1 34 8z"/>';
 const S = {
   empty: BUBBLE + '<circle cx="34" cy="30" r="12"/><path d="M26.5 33.5a8 8 0 0 0 15 0" stroke-dasharray="1.5 3.2"/>',

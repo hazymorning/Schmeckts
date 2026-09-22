@@ -1,11 +1,10 @@
-# Python in tests/, scripts/ and design/. The lines are long on purpose: the tests read as prose, and a check and
-# its wording belong together on one line.
+# Python in tests/, scripts/ and design/. The lines are long on purpose: a check and its message stay on one line.
 line-length = 150
 target-version = "py311"
 
-# The rule set is ours to choose, not the release's to decide: ruff 0.16 widened its default selection from
-# E4/E7/E9/F to dozens of rule families, and the gate would then change with every upgrade. These are the four
-# the project has been held to since the gate was introduced; adding a family is a change of its own.
+# The families are listed here instead of left to the default: ruff 0.16 widened its default selection from
+# E4/E7/E9/F to dozens of rule families, and the gate would then change with every upgrade. These four have
+# applied since the gate was introduced; adding another one is a separate change.
 [lint]
 select = ["E4", "E7", "E9", "F"]
 

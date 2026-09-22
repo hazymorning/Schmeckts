@@ -1,11 +1,11 @@
 # Schmeckt’s? – der Haushalts-Server
 
 Nur nötig, wenn mehrere Menschen dasselbe Fütterungstagebuch führen. Es ist ein kleines Programm für einen Rechner,
-der zu Hause läuft; ein Mini-PC reicht dafür völlig. Er hält die gemeinsamen Daten, gibt Packungsfotos zur Erkennung
-weiter und schlägt Barcodes nach. Nichts davon läuft auf fremden Rechnern. [Die App](../README.md) funktioniert auch
-ohne ihn.
+der zu Hause läuft; ein Mini-PC genügt. Er hält die gemeinsamen Daten, gibt Packungsfotos zur Erkennung weiter und
+schlägt Barcodes nach. Die gespeicherten Daten verlassen ihn nicht; nach draußen gehen nur die Packungsfotos und die
+Barcode-Anfragen. [Die App](../README.md) funktioniert auch ohne ihn.
 
-Alles, was den Server ausmacht, liegt in diesem Ordner: das Go-Programm, `packaging/` für das Debian-Paket und
+Der Server liegt vollständig in diesem Ordner: das Go-Programm, `packaging/` für das Debian-Paket und
 `build-deb.sh`, das es baut.
 
 ## Einrichten
@@ -68,5 +68,5 @@ ein kleiner Hinweis. Nach einem neuen Code steht dort „Code prüfen“; tippe 
 - **Updates:** Einfach die neue .deb-Datei wieder doppelklicken, oder im Terminal `sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb`. Daten, Code und API-Schlüssel bleiben erhalten.
 - **Übersicht im Terminal:** `sudo schmeckts-server overview`.
 - **Läuft er?** `systemctl status schmeckts` zeigt den Zustand, `journalctl -u schmeckts -e` die letzten Meldungen.
-- **Backup zurückspielen:** `sudo schmeckts-server restore` listet die Backups auf. Mit einer Datei als Angabe liest der Befehl sie wieder ein. Die Handys gleichen danach automatisch alles neu ab.
+- **Backup zurückspielen:** `sudo schmeckts-server restore` listet die Backups auf. Gibst du ein Backup an, spielt der Befehl es zurück. Die Handys gleichen danach automatisch alles neu ab.
 - **Nicht ins Internet stellen:** Richte im Router keine Portweiterleitung für den Server ein. Er nimmt ohnehin nur Anfragen aus dem Heimnetz und über WireGuard an.

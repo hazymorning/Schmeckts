@@ -432,7 +432,8 @@ async def test_cards(browser, url):
         and await pg.eval_on_selector('[data-sec=shop] .card-body', 'b => !b.classList.contains("animating") && b.style.height === ""'),
         'reduced motion: at once, without animation',
     )
-    # Hint: at most one, a sentence, a reason, the buttons; „Nicht mehr kaufen“ and „Immer kaufen“ set kaufen, and „Ausblenden“ is remembered by the device
+    # Hint: at most one, with a sentence, a reason and its buttons. „Nicht mehr kaufen“ and „Immer kaufen“ set kaufen,
+    # „Ausblenden“ is remembered per device.
     HINT = """c => ({title: c.querySelector('h2').innerText, btns: [...c.querySelectorAll('.btn-row button')].map(b => b.innerText),
       id: (c.querySelector('[data-action=hint-buy]') || {}).dataset?.id || c.querySelector('[data-action=hide-hint]').dataset.v.split(':')[1]})"""
     TITLES = {'stop': 'Nicht mehr kaufen?', 'sosse': 'Frisst meist nur die Soße', 'liebling': 'Neuer Liebling'}
@@ -558,7 +559,7 @@ async def test_week(browser, url):
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
     await idle(pg)
-    # A household with a previous week: the „Letzte Woche“ card after „Verlauf“, looking back once the day is done
+    # A household with a previous week: the „Letzte Woche“ card sits after „Verlauf“ once that week is over
     await pg.evaluate(HOUSE, [house_meals()])
     await idle(pg)
     heads = await pg.eval_on_selector_all('#home > section.card', 'l => l.map(s => s.querySelector("h2").innerText)')
@@ -2367,7 +2368,7 @@ async def test_pack_lines(browser, url):
         f'one tap fills „Marke“, the next two „Sorte“, and tapping again takes a line out ({brand}, {both})',
     )
 
-    # The lines are in memory only: neither the data nor the queue knows them, and a restart loses them
+    # The lines are in memory only: they are in neither the data nor the queue, and a restart loses them
     kept = await state(pg, 'JSON.stringify([db, queue])')
     check(
         'Zarte Häppchen' not in kept and 'Katzenglück' not in kept,
@@ -3264,7 +3265,7 @@ async def test_settings(browser, url):
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
-    # With movement a page slides in, under reduced motion it is simply there
+    # With movement a page slides in from the side; without it the page is there at once
     ctx = await phone(browser, motion=True)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('[data-action=demo]')
@@ -3313,9 +3314,8 @@ async def test_suggestions(browser, url):
         f'buttons, then the search field, then the list, and „Ohne Foto eintippen“ at the end ({names}, {order})',
     )
 
-    # The search field must not move while typing: nothing above it may change, so its place inside the sheet
-    # and its distance to the two buttons stay the same. (The sheet itself grows and shrinks with its list, as
-    # a sheet at the bottom of the screen does.)
+    # The search field must not move while typing: its place inside the sheet and its distance to the two
+    # buttons stay the same. The sheet grows and shrinks with its list, so both are measured against it.
     async def field():
         return await pg.eval_on_selector(
             '#sheet .search',
@@ -3409,7 +3409,7 @@ async def test_home_history(browser, url):
 
 
 # The timeline's geometry: how far the line is from the middle of the dot, whether the time fits its column,
-# and how wide that column is (the last one so a larger system font can be seen to have made it wider).
+# and how wide that column is, so the caller can compare 100 % with 130 % system font.
 TL_GEOMETRY = """t => { const box = t.getBoundingClientRect(), dot = t.querySelector('.tl-node i').getBoundingClientRect();
   const s = getComputedStyle(t, '::before'), middle = box.left + parseFloat(s.left) + parseFloat(s.width) / 2;
   const time = t.querySelector('.tl-time');

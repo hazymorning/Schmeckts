@@ -15,8 +15,8 @@ const KIND = 'exchange',
   PROTOCOL = 1;
 const fileName = () => `schmeckts-${KIND}-${new Date().toISOString().slice(0, 10)}.json`;
 
-/* The mark for a device: what had it already seen at the last exchange? Without a known counterpart the oldest mark
-   across all devices applies, so nobody misses anything; with no exchange at all the file holds everything. */
+/* The mark for a device: what it had already seen at the last exchange. Without a known counterpart the oldest
+   mark across all devices applies, so nothing is left out; with no exchange at all the file holds everything. */
 function markFor(device) {
   const marks = Object.entries(prefs.exchange || {});
   if (device) return prefs.exchange?.[device]?.mark || null;
@@ -28,7 +28,8 @@ function remember(device) {
   savePrefs();
 }
 
-/* Build the file and pass it on. peer: {device, clocks} after receiving („Antwort senden“), otherwise the stored state. */
+/* Build the file and pass it on. peer: {device, clocks} after receiving („Antwort senden“), otherwise the
+   stored state. */
 export async function shareChanges(peer = null) {
   const records = changesSince(peer ? peer.clocks : markFor(null));
   const data = JSON.stringify({
@@ -69,7 +70,7 @@ export async function shareChanges(peer = null) {
   if (peer && sheet?.kind === 'settings') {
     delete sheet.exchange;
     renderSheet();
-  } // the gap is closed
+  } // the other device is level now, so the report drops „Antwort senden“
   toast(`${many} weitergegeben`);
 }
 
@@ -94,7 +95,7 @@ function apply(text) {
   try {
     file = JSON.parse(text);
   } catch {
-    file = null; // check() below turns that into a sentence a person can act on
+    file = null; // check() below turns this into a message
   }
   const bad = check(file);
   if (bad) {
@@ -126,7 +127,7 @@ const message = (took, back) =>
     ? ` ${back} ${back === 1 ? 'Änderung fehlt' : 'Änderungen fehlen'} auf dem anderen Gerät.`
     : ' Beide Geräte sind gleich.');
 
-/* Reject foreign or corrupted files, with a message people can understand */
+/* Reject foreign or damaged files, each with its own message */
 function check(file) {
   if (!file || typeof file !== 'object') return 'Diese Datei ist kein Schmeckt’s-Austausch.';
   if (file.app !== 'schmeckts' || file.kind !== KIND) {

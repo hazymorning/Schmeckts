@@ -1,4 +1,4 @@
-/* Scanning while feeding. The recognition chain (recognize.js) says what the code is: serve a known variety, offer a
+/* Scanning while feeding. The recognition chain (recognize.js) resolves the code: serve a known variety, offer a
    choice where several match, otherwise look the product up on the internet or through the server. Without a hit the
    photo of the front follows. */
 import {normBarcode} from '../text.js';
@@ -27,7 +27,7 @@ export async function scan() {
   }
 }
 
-const open = feed => sheet === feed; // still the same feeding sheet? Otherwise it has been closed meanwhile
+const open = feed => sheet === feed; // false once the feeding sheet has been closed or replaced
 function note(feed, text) {
   // a short notice with a spinner in the feeding sheet
   if ((feed.busy || '') === text) return;
@@ -82,7 +82,6 @@ async function photo(feed, code) {
 }
 
 function offerPhoto(feed, msg) {
-  // scanning did not work
   if (!open(feed)) return;
   haptic('strong');
   renderSheet();

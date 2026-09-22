@@ -1,9 +1,9 @@
 /* Layout and components. Colours and typefaces come from tokens.css alone, fixed values from PROJECT.md
    ("Design rules"). Fraunces (--font-display) for headings and numbers, Figtree (--font-ui) for everything else.
-   No capitals through text-transform and no letter-spacing, the one exception being the household code field.
+   No capitals through text-transform and no letter-spacing; the household code field is the one exception.
    Times and numbers use tabular figures.
-   Tap targets at least 48 px. Sizes in px, which the system font size scales along with inside the WebView;
-   that is why no text container has a fixed height. */
+   Tap targets at least 48 px. Sizes in px; the WebView scales them with the system font size, which is why no
+   text container has a fixed height. */
 
 /* Foundations */
 * {
@@ -19,7 +19,7 @@ body {
   font: 400 16px/1.5 var(--font-ui);
   font-variation-settings: "SOFT" 100;
   -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision; /* advance widths without hinting's rounding, or Figtree letters such as f and t gape */
+  text-rendering: geometricPrecision; /* advance widths without hinting's rounding, or gaps open around f and t */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
   transition:
@@ -97,8 +97,8 @@ input {
 }
 
 /* Mood picture: the pet's profile picture behind the header and the upper part of the page, full width, fading
-   out softly downwards. The page sits in front of it unchanged (views/mood.js). The mask uses nothing but the
-   opacity of its colour. */
+   out downwards. The page renders over it unchanged (views/mood.js). Only the alpha in the mask gradient
+   matters, the colour in it is arbitrary. */
 .mood {
   position: absolute;
   top: 0;
@@ -871,7 +871,8 @@ button.ov-pic:active {
   gap: var(--space-hair);
   margin: var(--space-3h) 0 var(--space-2h);
   text-align: center;
-} /* 14px at the top: the margin collapses with the heading's 4px, which left only 6px before; the small weekday labels have no breathing room of their own the way other cards' rows do */
+} /* 14px at the top: the margin collapses with the heading's 4px, which left 6px; the weekday labels have no
+     padding of their own, unlike the rows in other cards */
 .cal .wd {
   font-size: 11.5px;
   font-weight: 600;
@@ -949,8 +950,8 @@ button.ov-pic:active {
 .tl-day + .tl-day {
   border-top: 1px solid var(--line);
 }
-/* The day line stays at the top while its meals scroll past. The fine line under it only while it does, which
-   CSS cannot ask on its own: views/sheets.js sets .stuck. */
+/* The day line stays at the top while its meals scroll past, and the border under it shows only while it does.
+   CSS cannot match that state, so views/sheets.js sets .stuck. */
 .tl-date {
   position: sticky;
   top: 0;
@@ -1070,7 +1071,6 @@ button.ov-pic:active {
 .tl-note {
   font-style: italic;
 }
-/* The new entry: slides in (view transition) and then glows briefly */
 
 /* Welcome and first steps */
 .welcome {
@@ -1452,9 +1452,9 @@ button.ov-pic:active {
   grid-auto-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
-/* Under the two big buttons: the search field, then one box that shows either the varieties served lately or
-   the hits. Both distances hang on these two containers, which are always there, never on something that is
-   hidden while typing, or the field would jump on the first letter. */
+/* Under the two big buttons: the search field, then one box showing either the varieties served lately or the
+   hits. Both margins sit on these two containers, which are always present; on an element that is hidden while
+   typing, the field would jump on the first letter. */
 .serve {
   margin: var(--space-5) 0 var(--space-2h);
 }
@@ -1891,8 +1891,8 @@ button.prod-card:active {
   transform: translateX(18px);
   background: var(--on-accent);
 }
-/* Evaluation, at a glance: one ring saying how much of what was served went down well, and beside it three
-   quiet figures. The ring carries a sentence in aria-label, so nothing rests on its colour alone. */
+/* Evaluation, at a glance: one ring for the share of servings that went down well, and three figures beside it.
+   The ring carries a sentence in aria-label, so nothing rests on its colour alone. */
 .glance {
   display: flex;
   align-items: center;
@@ -2002,7 +2002,7 @@ button.prod-card:active {
   color: var(--c);
 }
 
-/* Our own camera: full screen, always dark (the tokens resolve dark through color-scheme), the live preview fills the area */
+/* Our own camera: full screen, always dark (color-scheme resolves the tokens dark), the preview fills the area */
 .camera {
   color-scheme: dark;
   position: fixed;

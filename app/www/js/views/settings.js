@@ -57,8 +57,8 @@ const remindValue = () => {
   return `${rate}, Füttern ${prefs.feedRemind ? 'an' : 'aus'}`;
 };
 
-/* A row of the overview. `pageRow` leads to a sub-page and shows the current value, `doRow` simply does something
-   and therefore carries neither value nor chevron. `id` on a value lets it be rewritten without a redraw. */
+/* A row of the overview. `pageRow` leads to a sub-page and shows the current value, `doRow` runs an action and
+   has neither value nor chevron. `id` on a value lets it be rewritten without a redraw. */
 const rowIc = ic => `<span class="row-ic">${icon(ic)}</span>`;
 const pageRow = (page, ic, title, value = '', tone = '', id = '') =>
   `<button class="list-row" data-action="settings-page" data-v="${page}">${rowIc(ic)}
@@ -163,7 +163,7 @@ function exchangePage() {
     ${ex ? `<p class="note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col mt-s"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
 }
 
-/* Datenschutz: explains both modes factually, without promises */
+/* Datenschutz: what happens to the data in each of the two modes */
 const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
@@ -173,9 +173,9 @@ const PRIVACY = [
 ];
 const privacyPage = () => `<div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
-/* Sub-page „Haushalt“. Mode `lokal`: the „Mit Haushalt verbinden“ button, which opens the fields for address and
-   code. Connected: the state of the sync, „Jetzt abgleichen“ and „Verbindung trennen“. Only the hand-started sync
-   shows progress (sheet.syncing, see actions.js); syncs in the background stay invisible. */
+/* Sub-page „Haushalt“. Mode `lokal`: the „Mit Haushalt verbinden“ button, which opens the fields for address
+   and code. Connected: the state of the sync, „Jetzt abgleichen“ and „Verbindung trennen“. Only the hand-started
+   sync shows progress (sheet.syncing, see actions.js); syncs in the background stay invisible. */
 function serverSection(notice = syncInfo()) {
   const s = sheet || {};
   const codeRow = `<div class="connect mt-s">

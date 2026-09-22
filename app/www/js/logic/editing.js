@@ -10,8 +10,8 @@ import {update} from '../views/home.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, serveProduct} from './feeding.js';
 
-/* The tap on a rating button is felt at once, and only then does the interface follow: the button springs, the
-   card or the sheet closes, and the toast offers the way back. PICKED is the spring in app.css. */
+/* The rating is stored and felt on the tap; the interface follows after these delays, so the button animation is
+   not cut off. PICKED is the length of that animation in app.css. */
 const PICKED = 220,
   SHEET_CLOSES = 260,
   CARD_LEAVES = 440;
@@ -44,7 +44,7 @@ const undoRating = (sid, pid, prev) => () => {
 function showRated(el, s, pid, msg, undo) {
   const rated = () => Object.values(s.pets).every(x => x.r);
   if (sheet?.kind === 'serving') {
-    // In the sheet: with the last open rating it closes, otherwise it simply shows the new state
+    // In the sheet: with the last open rating it closes, otherwise it shows the new state
     if (rated()) {
       setTimeout(() => closeSheet().then(() => afterRating(msg, undo)), SHEET_CLOSES);
       return;
@@ -56,7 +56,7 @@ function showRated(el, s, pid, msg, undo) {
     toast(msg, undo);
     return;
   }
-  // On the home page: with everything rated the card closes quietly first
+  // On the home page: with everything rated the card animates out first
   const li = el.closest('.pend'),
     gone = li && rated();
   if (gone) li.classList.add('leaving');
@@ -67,8 +67,8 @@ function afterRating(msg, undo) {
   toast(msg, undo);
 }
 
-/* „Speichern“ while naming. The three places it is reached from want three different things: a meal gets its
-   variety, „Neues Futter“ serves it straight away, and the food sheet renames what is already there. */
+/* „Speichern“ while naming, from three places: a meal gets its variety, „Neues Futter“ serves it straight
+   away, and the food sheet renames an existing variety. */
 export function saveName() {
   const s = sheet;
   const brand = (s.brand || '').trim(),

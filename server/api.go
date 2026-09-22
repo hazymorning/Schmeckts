@@ -32,8 +32,8 @@ const (
 	protocolVersion = 1
 	maxBodyBytes    = 12 << 20
 	maxChanges      = 500
-	failLimit       = 20               // wrong codes per address …
-	failWindow      = 10 * time.Minute // … within this window, then a pause
+	failLimit       = 20               // wrong codes per address before it is blocked
+	failWindow      = 10 * time.Minute // the window the wrong codes are counted in
 	recognizeBurst  = 10               // cost brake: this many recognitions in a row,
 	recognizeEvery  = 90 * time.Second // then one per interval after that (40 an hour)
 	barcodeBurst    = 30               // consideration for the free databases

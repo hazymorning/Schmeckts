@@ -192,7 +192,7 @@ const ACTIONS = {
   },
   photo() {
     shootPhoto('', sheet?.kind === 'feed' ? sheet.code : '');
-  }, // the code after scanning, should the photo button take it over
+  }, // the code after scanning, if the photo button takes it over
   // data-v: what was typed in the feeding sheet's search, when nothing matched it
   'new-product'(el) {
     openSheet({kind: 'new', brand: '', variety: el.dataset.v || '', type: 'Nassfutter'});
@@ -228,7 +228,7 @@ const ACTIONS = {
     sheet.type = el.dataset.v;
     if (!textureOf(sheet, sheet.texture)) delete sheet.texture;
     renderSheet();
-  }, // no longer fits: open again
+  }, // the texture no longer fits the new type: cleared, so it is asked again
   'set-texture'(el) {
     // a second tap clears it (null = none): at once in the food sheet, until „Speichern“ while naming
     const v = el.dataset.v;
@@ -501,7 +501,7 @@ const onFile = (id, fn) =>
     e.target.value = '';
     fn(f);
   });
-onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, should the photo button take it over
+onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, if the photo button takes it over
 onFile('#petPhotoInput', setPetPhoto);
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);

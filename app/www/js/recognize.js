@@ -17,7 +17,7 @@ const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'lock
 const LOOKING = 'Barcode wird nachgeschlagen …',
   READING = 'Sorte wird erkannt …';
 
-/* One stage: name, when its turn comes, what it shows and what it does. Result {products}, {details} or null. */
+/* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null. */
 const STEPS = [
   {
     name: 'codes',
@@ -101,7 +101,7 @@ async function fromServer({code, photo}) {
   return photo ? asDetails(await recognize(photo)) : null;
 }
 
-/* Photo recognition through the household server: key, model and prompt live there. */
+/* Photo recognition through the household server: key, model and prompt are configured there. */
 export async function recognize(b64) {
   if (!prefs.code) throw Object.assign(new ServerError('none', 'Kein Server verbunden.'), {retry: false});
   if (status.recognition === false) {

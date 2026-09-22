@@ -43,7 +43,7 @@ export function serveProduct(pid, scanCode = '') {
 }
 /* A milestone in the toast of the action that reaches it: „… serviert. Die 100. Mahlzeit!“ or „… 10 Sorten
    probiert!“. Each threshold only once per device (prefs.milestones). Anything already passed, by another phone for
-   instance, counts silently as seen. */
+   instance, counts as seen. */
 function withMilestone(msg) {
   const m = milestones(db),
     fresh = m.reached.filter(k => !prefs.milestones.includes(k));
@@ -56,8 +56,8 @@ function withMilestone(msg) {
   ].filter(Boolean);
   return notes.length ? `${msg}${/[.!?…]$/.test(msg) ? '' : '.'} ${notes.join(' ')}` : msg;
 }
-/* Satisfying feedback: haptics, the bowl in the feeding button fills up, the entry slides into „Heute“;
-   plus the rating reminder, if it is switched on */
+/* Feedback after serving: haptics, the bowl in the feeding button fills up, the entry appears under „Heute“,
+   and the rating reminder if it is switched on */
 function served(id) {
   haptic('success');
   homeView.fresh = id;
@@ -102,7 +102,7 @@ export async function shootPhoto(hint, scanCode = '') {
   return !!blob;
 }
 
-/* Photo: save it as served at once, with recognition running in the background. No waiting.
+/* Photo: the meal is saved as served at once, recognition then runs in the background.
    scanCode: a scanned barcode still unknown; it goes onto the recognised or named variety. */
 export async function servePhoto(file, scanCode = '') {
   if (!file || !db.pets.length) return;
@@ -146,7 +146,7 @@ export async function servePhoto(file, scanCode = '') {
     ),
     () => undoServe(s.id),
   );
-  recognizeServing(s.id); // the recognition chain decides what is possible; in mode `lokal` the phone reads the text
+  recognizeServing(s.id); // recognize.js picks the source; in mode `lokal` the phone reads the text itself
 }
 
 const running = new Set(); // recognitions in flight
@@ -195,7 +195,7 @@ async function recognizeServing(id) {
 }
 
 /* What the chain came back with: a known variety, details to apply, something for a human to confirm, or an
-   error, and what the meal then says about itself (status and error are this phone's alone). */
+   error. Sets status and error on the meal, which stay on this phone. */
 function takeResult(s, found, house) {
   const err = found.error;
   if (found.products?.length) {
@@ -227,8 +227,8 @@ function takeResult(s, found, house) {
   }
 }
 
-/* An error worth another attempt: the meal waits, and retryWaiting() comes back to it. After PAUSE has run out
-   it stays failed and a human types the variety in. */
+/* An error worth another attempt: the meal gets status 'waiting' and retryWaiting() picks it up again. Once
+   PAUSE has run out it stays failed and a human types the variety in. */
 function waitForAnotherTry(s, err) {
   const t = tries.get(s.id) || {n: 0, next: 0};
   if (err.kind !== 'offline' || err.timeout) t.n++; // an unreachable server costs nothing and does not count
@@ -315,8 +315,8 @@ function refreshServing(id) {
   if (sheet.step !== 'name' || !typing) renderSheet();
 }
 
-/* Sharpen up the pets while they were only guessed:
-   who else had this food? Failing that, by the species on the packaging. */
+/* Narrow down the pets while they are still only guessed: the pets that last had this food, and failing that
+   the pets whose species matches the packaging. */
 export function refinePets(s, known, animalHint) {
   if (!s.autoPets || db.pets.length < 2 || Object.values(s.pets).some(x => x.r)) return;
   let pref = (known?.lastPets || []).filter(pid => getPet(pid));

@@ -1,6 +1,6 @@
 package main
 
-// The overview for "sudo schmeckts-server overview": the stored data readably instead of as JSON.
+// The overview for "sudo schmeckts-server overview": the stored data as readable text.
 // The output is German, like the app.
 
 import (
