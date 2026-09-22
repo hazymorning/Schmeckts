@@ -884,6 +884,9 @@ button.ov-pic:active {
   text-align: center;
 } /* 14px at the top: the margin collapses with the heading's 4px, which left 6px; the weekday labels have no
      padding of their own, unlike the rows in other cards */
+.card.days .cal {
+  margin-top: 0;
+} /* that card has no heading, so the calendar starts at the card's own padding */
 .cal .wd {
   font-size: 11.5px;
   font-weight: 600;
@@ -956,7 +959,7 @@ button.ov-pic:active {
 
 .tl-day {
   padding: 0 0 var(--space-1);
-  scroll-margin-top: 20px;
+  scroll-margin-top: calc(var(--stick, 0px) + 20px);
 }
 .tl-day + .tl-day {
   border-top: 1px solid var(--line);
@@ -965,7 +968,7 @@ button.ov-pic:active {
    CSS cannot match that state, so views/sheets.js sets .stuck. */
 .tl-date {
   position: sticky;
-  top: 0;
+  top: var(--stick, 0px);
   z-index: 2;
   background: var(--surface);
   padding: var(--space-2h) 0 var(--space-hair);
@@ -1010,9 +1013,10 @@ button.ov-pic:active {
   border-radius: var(--radius-full);
   background: var(--line);
 }
-.card .tl li + li {
+.card .tl li + li,
+.card .figs li + li {
   border-top: 0;
-}
+} /* the timeline draws its own line, and the figures beside the ring stand without one */
 .tl-item {
   display: flex;
   align-items: center;
@@ -1610,6 +1614,15 @@ dialog.sheet.page .sheet-body {
   background: var(--bg);
   padding: 0 var(--space-4) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   view-transition-name: page;
+  --stick: calc(48px + 2 * var(--space-2)); /* the bar with the arrow: what stays at the top parks under it */
+}
+/* „Verlauf“: cards on the page ground, as wide as and as far apart as the ones on the home page */
+dialog.sheet.page[data-kind="report"] .sheet-body {
+  padding-left: var(--space-4h);
+  padding-right: var(--space-4h);
+}
+dialog.sheet.page[data-kind="report"] .page-title {
+  margin-bottom: var(--space-3h);
 }
 /* A level deeper and back: the page you go to comes in from the side while the one you leave goes out the other
    way. The browser takes both pictures itself, so nothing has to be copied first (ui/sheet.js sets the direction
@@ -1666,7 +1679,7 @@ html.step-back::view-transition-new(page) {
 .page-bar {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 3; /* above the day lines of the history, which park under it */
   display: flex;
   align-items: center;
   padding: var(--space-2) 0;
@@ -2131,28 +2144,35 @@ button.prod-card:active {
   color: var(--ink);
 }
 .tops {
-  margin-top: var(--space-1h);
+  margin-top: var(--space-4);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--line);
 }
 .rank {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-hair);
-}
-.rank + .rank {
-  border-top: 1px solid var(--line);
+  gap: var(--space-3h);
+  padding: var(--space-2) 0;
 }
 .rank > .ic {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   flex: 0 0 auto;
   color: var(--c);
 }
-.rank .pct {
-  min-width: 0;
+.rank .t-main b {
+  font-size: 16px;
+  line-height: 1.25;
+  white-space: normal;
+}
+.rank .t-main small {
+  font-size: 14px;
+}
+.rank .share {
   flex: 0 0 auto;
   font-size: 16px;
-  color: var(--c);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Our own camera: full screen, always dark (color-scheme resolves the tokens dark), the preview fills the area */

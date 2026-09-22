@@ -8,8 +8,8 @@ import {$, reduceMotion} from '../dom.js';
 export const dlg = $('#sheet'),
   sheetBody = $('#sheetBody');
 export let sheet = null; // the state of what is open, null when closed
-/* The settings and everything below them are a page; everything else is a sheet. */
-export const isPage = state => state?.kind === 'settings';
+/* The settings with everything below them, and the history, are a page; everything else is a sheet. */
+export const isPage = state => state?.kind === 'settings' || state?.kind === 'report';
 const PAGE_OUT = 300,
   SHEET_OUT = 240;
 let viewKey = '',
@@ -25,6 +25,7 @@ sheetBody.addEventListener('scroll', markSheetScrolled, {passive: true});
 export function openSheet(state) {
   sheet = state;
   pageKeys = [];
+  dlg.dataset.kind = state.kind; // a page says which one it is, for what only it needs
   dlg.classList.toggle('page', isPage(state));
   renderSheet();
   if (!dlg.open) {
