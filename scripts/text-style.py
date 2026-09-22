@@ -5,6 +5,7 @@ Runs over the tracked text files and over the commit messages this branch adds o
 and exits non-zero, so scripts/lint.sh and with it the CI job go red before any of it reaches a reader.
 """
 
+import argparse
 import re
 import subprocess
 import sys
@@ -67,7 +68,17 @@ def new_commits():
     return subprocess.run(['git', 'rev-list', '-1', 'HEAD'], capture_output=True, text=True, check=True).stdout.split()
 
 
-def main():
+def from_stdin(what, limit):
+    """One text that is not in the repository, such as the title or the body of a pull request."""
+    text = sys.stdin.read().strip()
+    hits = []
+    scan(what, text, hits)
+    if limit and len(text) > limit:
+        hits.append(f'{what}: {len(text)} characters, at most {limit} are allowed')
+    return hits
+
+
+def from_repository():
     hits = []
     for path in tracked_files():
         text = read(path)
@@ -81,11 +92,20 @@ def main():
         # without history has no parents to count, which is why the subject decides as well.
         merge = len(parents) > 1 or message.startswith('Merge ')
         scan(f'commit {commit[:9]}', message, hits, subject_limit=None if merge else SUBJECT_LIMIT)
+    return hits
 
+
+def main(argv):
+    parser = argparse.ArgumentParser(description='Check the texts for the marks a writing tool leaves behind.')
+    parser.add_argument('--stdin', metavar='WHAT', help='check one text read from stdin, named WHAT, instead of the repository')
+    parser.add_argument('--limit', type=int, default=0, metavar='N', help='the most characters that text may have')
+    options = parser.parse_args(argv)
+
+    hits = from_stdin(options.stdin, options.limit) if options.stdin else from_repository()
     for hit in hits:
         print(hit, file=sys.stderr)
     return 1 if hits else 0
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
