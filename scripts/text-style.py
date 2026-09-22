@@ -77,8 +77,10 @@ def main():
     for commit in new_commits():
         message = subprocess.run(['git', 'log', '-1', '--format=%B', commit], capture_output=True, text=True, check=True).stdout
         parents = subprocess.run(['git', 'log', '-1', '--format=%P', commit], capture_output=True, text=True, check=True).stdout.split()
-        # A merge subject is written by the forge, not by us, so only its body is held to the rules.
-        scan(f'commit {commit[:9]}', message, hits, subject_limit=None if len(parents) > 1 else SUBJECT_LIMIT)
+        # A merge subject is written by the forge, not by us, so only its body is held to the rules. A checkout
+        # without history has no parents to count, which is why the subject decides as well.
+        merge = len(parents) > 1 or message.startswith('Merge ')
+        scan(f'commit {commit[:9]}', message, hits, subject_limit=None if merge else SUBJECT_LIMIT)
 
     for hit in hits:
         print(hit, file=sys.stderr)
