@@ -27,7 +27,7 @@
 
 Beim Füttern hältst du den Barcode vor die Kamera. Kennt die App die Sorte schon, steht die Mahlzeit damit im Verlauf.
 
-Ist die Sorte neu oder hat die Packung keinen Barcode, fotografierst du sie. Die App liest den Text vom Bild und schlägt Marke und Sorte vor, du bestätigst nur noch.
+Ist die Sorte neu oder hat die Packung keinen Barcode, fotografierst du sie. Die App liest den Text vom Bild und schlägt Marke und Sorte vor, du bestätigst nur noch. Passt der Vorschlag nicht, tippst du dir aus den gelesenen Zeilen zusammen, was auf der Packung steht.
 
 Später, wenn du siehst, was übrig geblieben ist, tippst du eine Bewertung an.
 
@@ -35,7 +35,7 @@ Später, wenn du siehst, was übrig geblieben ist, tippst du eine Bewertung an.
 
 - **Einkaufsliste.** Jede Sorte landet bei „Nachkaufen“ oder „Nicht mehr kaufen“. Du kannst das selbst umstellen und die Liste weitergeben.
 - **Erkenntnisse.** Welche Marke ankommt, welche Konsistenz, welcher Geschmack. Die App meldet sich auch, wenn eine Sorte ständig übrig bleibt oder ein Tier auffällig wenig frisst.
-- **Verlauf.** Ein Kalender über zwei Wochen und die letzten Mahlzeiten. Dahinter jede einzelne, mit den wichtigsten Zahlen darüber.
+- **Verlauf.** Ein Kalender über zwei Wochen und die letzten Mahlzeiten. Dahinter jede einzelne, und darüber ein Ring, der für 7 Tage, 30 Tage oder alles sagt, wie viel davon gut angekommen ist.
 - **Erinnerungen.** Wenn du magst, meldet sich die App zum Bewerten oder zu den Zeiten, zu denen du sonst fütterst. Beides ist zunächst aus.
 - **Mehrere Tiere.** Katzen, Hunde, Kleintiere und Vögel, jedes mit eigenem Profilbild und eigener Auswertung.
 - **Backup.** Alles lässt sich in eine Datei sichern und auf einem neuen Handy wieder einlesen.
