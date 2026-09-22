@@ -20,6 +20,16 @@ BANNED_CHARS = {
 }
 PICTURES = re.compile('[\U0001f000-\U0001faff☀-➿⬀-⯿️]')
 
+# Words that sell instead of saying. None of them has ever been the right word here, in either language.
+SALES = re.compile(
+    r'(?i)\b('
+    r'seamless(ly)?|effortless(ly)?|delightful|cutting[- ]edge|state[- ]of[- ]the[- ]art|best[- ]in[- ]class|'
+    r'game[- ]chang\w*|supercharge\w*|delve[sd]?|a testament to|worth noting|elevate your|unlock the|'
+    r'nahtlos\w*|mühelos\w*|revolutionär\w*|kinderleicht|im Handumdrehen|leistungsstark\w*|'
+    r'maßgeschneidert\w*|ganzheitlich\w*|zukunftssicher\w*'
+    r')\b'
+)
+
 # Lines a tool signs its work with.
 SIGNATURES = [
     (re.compile(r'(?i)^\s*co-authored-by:'), 'a co-author trailer'),
@@ -49,6 +59,9 @@ def scan(where, text, hits, subject_limit=None):
                 hits.append(f'{where}:{number}: {why}')
         if PICTURES.search(line):
             hits.append(f'{where}:{number}: an emoji')
+        selling = SALES.search(line)
+        if selling:
+            hits.append(f'{where}:{number}: "{selling.group(0)}" sells instead of saying what is the case')
         for pattern, why in SIGNATURES:
             if pattern.search(line):
                 hits.append(f'{where}:{number}: {why}')
