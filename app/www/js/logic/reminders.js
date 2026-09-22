@@ -1,4 +1,4 @@
-/* This phone's reminders, without an exact alarm — the app does not hold that permission.
+/* This phone's reminders, without an exact alarm: the app does not hold that permission.
    To rate: the serving phone schedules it after serving.
    To feed: at the usual times from the history (feedReminders() in smart.js), if nothing has been served by then.
    syncReminders() reconciles what is scheduled with the data, after changes from other phones too. */

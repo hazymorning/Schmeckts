@@ -2,7 +2,7 @@ name: Tests
 
 # The whole suite on every push and every pull request, split across jobs that run at the same time, plus the
 # style and mistake checks of scripts/lint.sh. Nothing is built here: no Android SDK, no APK, no .deb.
-# Only what the tests actually need — no JDK either: ui_test.py only reads PhotoPlugin.java as text.
+# Only what the tests actually need, and no JDK either: ui_test.py only reads PhotoPlugin.java as text.
 on:
   push:
   pull_request:
@@ -22,7 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # The whole history: scripts/text-style.py reads the commit messages this branch puts on top of main, and
+      # a shallow checkout has neither main nor the parents of its own tip.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -48,8 +52,8 @@ jobs:
       - name: ruff
         run: python3 -m pip install --requirement tests/requirements.txt
 
-      # ESLint, Prettier, gofmt, go vet, staticcheck, ruff and shellcheck. Every check runs, so one job
-      # shows everything that is wrong.
+      # ESLint, Prettier, gofmt, go vet, staticcheck, ruff, shellcheck and the texts themselves. Every check
+      # runs, so one job shows everything that is wrong.
       - name: Style and mistakes
         run: scripts/lint.sh
 

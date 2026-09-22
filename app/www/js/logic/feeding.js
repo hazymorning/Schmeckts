@@ -102,7 +102,7 @@ export async function shootPhoto(hint, scanCode = '') {
   return !!blob;
 }
 
-/* Photo: save it as served at once, with recognition running in the background — no waiting.
+/* Photo: save it as served at once, with recognition running in the background. No waiting.
    scanCode: a scanned barcode still unknown; it goes onto the recognised or named variety. */
 export async function servePhoto(file, scanCode = '') {
   if (!file || !db.pets.length) return;
@@ -146,7 +146,7 @@ export async function servePhoto(file, scanCode = '') {
     ),
     () => undoServe(s.id),
   );
-  recognizeServing(s.id); // the recognition chain decides what is possible — in mode `lokal` the phone reads the text
+  recognizeServing(s.id); // the recognition chain decides what is possible; in mode `lokal` the phone reads the text
 }
 
 const running = new Set(); // recognitions in flight
@@ -195,7 +195,7 @@ async function recognizeServing(id) {
 }
 
 /* What the chain came back with: a known variety, details to apply, something for a human to confirm, or an
-   error — and what the meal then says about itself (status and error are this phone's alone). */
+   error, and what the meal then says about itself (status and error are this phone's alone). */
 function takeResult(s, found, house) {
   const err = found.error;
   if (found.products?.length) {

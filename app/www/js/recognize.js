@@ -50,7 +50,7 @@ const STEPS = [
 export const memLines = new Map();
 
 /* code: the scanned barcode, photo: the photo as base64, note: a short notice for the interface.
-   Returns {source, products|details} or {source:'', error} — the form then stays empty. */
+   Returns {source, products|details} or {source:'', error}; the form then stays empty. */
 export async function identify({code = '', photo = '', note = () => {}} = {}) {
   const o = {code, photo};
   let error = null;

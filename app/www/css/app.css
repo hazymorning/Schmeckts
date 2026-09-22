@@ -1453,7 +1453,7 @@ button.ov-pic:active {
   gap: var(--space-2);
 }
 /* Under the two big buttons: the search field, then one box that shows either the varieties served lately or
-   the hits. Both distances hang on these two containers, which are always there — never on something that is
+   the hits. Both distances hang on these two containers, which are always there, never on something that is
    hidden while typing, or the field would jump on the first letter. */
 .serve {
   margin: var(--space-5) 0 var(--space-2h);
@@ -1798,8 +1798,8 @@ button.prod-card:active {
 .list-row .chev {
   color: var(--faint);
 }
-/* The settings: one group of rows per subject, each row leading to a page of its own — icon, title, the current
-   value and the chevron. Only „Produktsuche im Internet“ carries a switch instead, because it has no page. */
+/* The settings: one group of rows per subject, each row leading to a page of its own (icon, title, the current
+   value and the chevron). Only „Produktsuche im Internet“ carries a switch instead, because it has no page. */
 .set-group {
   padding: 0 var(--space-4);
   border-radius: 20px;

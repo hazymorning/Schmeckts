@@ -113,7 +113,7 @@ new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadR
 """
 
 # Android's system font size, simulated: it multiplies every font size the app sets, which is what this does
-# too — every px font size in the style sheets again, scaled, as !important.
+# too: every px font size in the style sheets again, scaled, as !important.
 BIG_TEXT = """k => { const s = document.createElement('style');
   s.textContent = [...document.styleSheets].flatMap(x => [...x.cssRules])
     .filter(r => r.style && r.style.fontSize && r.style.fontSize.endsWith('px'))
@@ -428,7 +428,7 @@ PARALLEL = 4  # independent tests at the same time, each on phones of its own; -
 def run_tests(tests, camera=()):
     """Runs the tests, or only those named on the command line. Tests run at the same time, at most PARALLEL of
     them; --serial runs them one after another. Nothing is shared but the little web server and the test photo,
-    both read-only, so the order makes no difference — which is what the check per test confirms.
+    both read-only, so the order makes no difference, which is what the check per test confirms.
     camera: names of the tests that need a Chromium with a simulated camera device."""
 
     async def one(name, browser, url, slots):

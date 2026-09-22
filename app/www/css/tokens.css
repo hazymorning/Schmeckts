@@ -28,7 +28,7 @@
   --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
   --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Distances: one scale, so a margin is chosen and not invented. The whole steps are the backbone, the halves
-     between them are the ones this layout was drawn on — among them the card's 18px padding and the 14px
+     between them are the ones this layout was drawn on, among them the card's 18px padding and the 14px
      between two cards, both laid down in PROJECT.md ("Design rules"). Under 4px nothing is a distance any
      more but an optical nudge, which is why 2px has a name of its own. Every margin, padding and gap in
      app.css uses these; tests/design_test.py holds them to it. */

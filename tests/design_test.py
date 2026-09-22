@@ -607,7 +607,7 @@ def test_signing_key():
     """scripts/signing-key.py: a round trip keeps the keystore and the password, and older files still read.
 
     The signing key lives in a GitHub secret as a text file. Files written before the move to English say
-    "Passwort:", so read() has to accept both spellings — otherwise a release build cannot sign."""
+    "Passwort:", so read() has to accept both spellings; otherwise a release build cannot sign."""
     sys.path.insert(0, str(ROOT / 'scripts'))
     import importlib
 

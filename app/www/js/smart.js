@@ -317,7 +317,7 @@ export function report(db, prefs, now = Date.now(), days = 0) {
   };
 }
 
-/* How many days the span holds: the days asked for, or — for „Alles“ — from the first meal until today. */
+/* How many days the span holds: the days asked for, or (for „Alles“) from the first meal until today. */
 function spanDays(meals, now, days) {
   if (days) return days;
   if (!meals.length) return 0;
