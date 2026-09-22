@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-8.0%2B-965E4B?logo=android&logoColor=white&labelColor=2E2724" alt="Android 8.0 oder neuer">
-  <img src="https://img.shields.io/badge/App--Sprache-Deutsch-965E4B?labelColor=2E2724" alt="App-Sprache: Deutsch">
+  <img src="https://img.shields.io/badge/Android-8.0%2B-58603F?logo=android&logoColor=white&labelColor=25261F" alt="Android 8.0 oder neuer">
+  <img src="https://img.shields.io/badge/App--Sprache-Deutsch-58603F?labelColor=25261F" alt="App-Sprache: Deutsch">
 </p>
 
 <p align="center">
@@ -129,6 +129,6 @@ Freie Software unter der [GNU Affero General Public License, Version 3](LICENSE)
 Der Name „Schmeckt’s?“, das Logo und das App-Icon gehören nicht dazu. Wenn du die App forkst, nimm dafür bitte einen eigenen Namen und eine eigene Gestaltung.
 
 <!-- Sobald das Repo öffentlich ist, passen diese Badges oben dazu. Sie halten sich selbst aktuell:
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=965E4B&labelColor=2E2724" alt="Neueste Version"></a>
-  <a href="https://github.com/hazymorning/Schmeckts/releases"><img src="https://img.shields.io/github/downloads/hazymorning/Schmeckts/total?label=Downloads&color=965E4B&labelColor=2E2724" alt="Downloads"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=58603F&labelColor=25261F" alt="Neueste Version"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases"><img src="https://img.shields.io/github/downloads/hazymorning/Schmeckts/total?label=Downloads&color=58603F&labelColor=25261F" alt="Downloads"></a>
 -->

@@ -1,10 +1,10 @@
-/* Design foundations: type, colour, motion. Every colour in the app is defined here; the only exceptions are the
-   logo files (img/) and webview-update.html (for WebViews without light-dark()).
+/* Design foundations: type, colour, radius, motion. Every colour in the app is defined here; the only exceptions
+   are the logo files (img/) and webview-update.html (for WebViews without light-dark()).
    One fixed palette, the values are in PROJECT.md ("Design rules"). Tokens outside the palette are derived from
    its values alone, with opacity where needed (8-digit hex). tests/design_test.py checks values and contrasts. */
 
 /* Typefaces (bundled with the app, SIL Open Font License)
-   Fraunces for headings and numbers, Figtree for everything else.
+   Faustina for headings and numbers, Figtree for everything else.
    font-display: block because the files ship inside the app and load at once; the splash screen stays up until
    they are ready (ui/splash.js). With swap, text would first render in a fallback and then reflow. */
 @font-face {
@@ -15,8 +15,8 @@
   font-display: block;
 }
 @font-face {
-  font-family: "Fraunces";
-  src: url(../fonts/fraunces-latin.woff2) format("woff2");
+  font-family: "Faustina";
+  src: url(../fonts/faustina-latin.woff2) format("woff2");
   font-weight: 500 700;
   font-style: normal;
   font-display: block;
@@ -24,7 +24,7 @@
 
 :root {
   color-scheme: light dark;
-  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-display: "Faustina", "Iowan Old Style", Georgia, serif;
   --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* One spacing scale for the whole app, so margins come from a fixed set. Whole steps and the halves between
      them; this layout uses both, among them the card's 18px padding and the 14px between two cards, which
@@ -45,40 +45,47 @@
   --space-6h: 26px;
   --space-7: 32px;
 
+  /* One radius per role (PROJECT.md, "Principles"): s for small and nested shapes, m for controls, l for
+     containers, full for pills. Circles stay 50 %. Every border-radius in app.css uses these. */
+  --radius-s: 12px;
+  --radius-m: 16px;
+  --radius-l: 24px;
+  --radius-full: 999px;
+
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
 
   /* Palette: light-dark(light, dark) */
-  --bg: light-dark(#f4f0ec, #191513);
-  --surface: light-dark(#fcfaf7, #231e1b);
-  --surface-2: light-dark(#e8e2db, #302a27);
-  --ink: light-dark(#2e2724, #ebe7e2);
-  --muted: light-dark(#6c615a, #b2a9a1);
-  --faint: light-dark(#a0958c, #7c726b); /* decoration and placeholders only, never meaningful text */
-  --line: light-dark(#d8cfc7, #403935);
-  --accent: light-dark(#965e4b, #c78f7a); /* accent fill, focus ring, bars */
-  --accent-ink: light-dark(#7f4c3a, #c78f7a); /* accent as text */
-  --accent-soft: light-dark(#f9e0d7, #422920);
-  --on-accent: light-dark(#ffffff, #191513); /* type on strong fills: accent, and the red confirm button too */
+  --bg: light-dark(#eeede7, #1b1c17);
+  --surface: light-dark(#fafaf6, #25261f);
+  --surface-2: light-dark(#e4e3da, #30312a);
+  --ink: light-dark(#25261f, #ecece3);
+  --muted: light-dark(#62625a, #a6a699);
+  --faint: light-dark(#9d9d92, #77776c); /* decoration and placeholders only, never meaningful text */
+  --line: light-dark(#d8d7cd, #3b3c34);
+  --accent: light-dark(#58603f, #a9b283); /* accent fill, focus ring, bars */
+  --accent-ink: light-dark(#4a5134, #a9b283); /* accent as text */
+  --accent-soft: light-dark(#dee0d7, #393b2e);
+  --on-accent: light-dark(#ffffff, #1b1c17); /* type on strong fills: accent, and the red confirm button too */
 
   /* Ratings: for icons, dots and their soft fills only */
-  --good: light-dark(#4f725f, #97bbaa);
-  --good-soft: light-dark(#dbe0da, #363731);
-  --mid: light-dark(#997238, #dbb87e);
-  --mid-soft: light-dark(#e8ded0, #43392d);
-  --sauce: light-dark(#7c5b45, #bd9e86);
-  --sauce-soft: light-dark(#e2d8d1, #3e352e);
-  --bad: light-dark(#823b4e, #d88095);
-  --bad-soft: light-dark(#eadada, #3d2c2c);
+  --good: light-dark(#4d6c57, #93bba0);
+  --good-soft: light-dark(#d9dfd8, #373e34);
+  --mid: light-dark(#8a6822, #d2ae62);
+  --mid-soft: light-dark(#e5dece, #413c2a);
+  --sauce: light-dark(#7a5a43, #c49c7e);
+  --sauce-soft: light-dark(#e2dcd4, #3e392e);
+  --bad: light-dark(#8f3f43, #d98c8e);
+  --bad-soft: light-dark(#e9dcd9, #3e342f);
 
   /* Derived, from the palette's values alone */
-  --seg-on: light-dark(#fcfaf7, #403935); /* the chosen segment: light --surface, dark --line */
-  --toast-action: light-dark(#c78f7a, #7f4c3a); /* undo on the toast (fill --ink): the other mode's accent */
-  --backdrop: light-dark(#2e272466, #191513b3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
-  --seg-shadow: 0 1px 4px light-dark(#2e27241a, #1915134d);
-  --card-shadow: 0 1px 2px light-dark(#2e27240d, #19151340), 0 10px 28px -12px light-dark(#2e272429, #19151380);
-  --float-shadow: 0 14px 34px -14px light-dark(#2e27244d, #191513a6), 0 2px 6px light-dark(#2e272414, #19151359);
+  --seg-on: light-dark(#fafaf6, #3b3c34); /* the chosen segment: light --surface, dark --line */
+  --toast-action: light-dark(#a9b283, #4a5134); /* undo on the toast (fill --ink): the other mode's accent */
+  --backdrop: light-dark(#25261f66, #1b1c17b3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
+  --seg-shadow: 0 1px 4px light-dark(#25261f1a, #1b1c174d);
+  --card-shadow: 0 1px 2px light-dark(#25261f0d, #1b1c1740), 0 10px 28px -12px light-dark(#25261f29, #1b1c1780);
+  --float-shadow: 0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759);
 }
 :root[data-theme="light"] {
   color-scheme: light;

@@ -7,7 +7,7 @@ import {report} from '../report.js';
 
 const FADE = 200; // how long it fades out
 const LATEST = 2500; // the safety net
-const FACES = ['1em "Figtree"', '1em "Fraunces"'];
+const FACES = ['1em "Figtree"', '1em "Faustina"'];
 
 let gone = false;
 const frame = () => new Promise(done => requestAnimationFrame(() => done()));

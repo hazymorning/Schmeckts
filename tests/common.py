@@ -81,7 +81,7 @@ window.Capacitor = {isNativePlatform: () => true,
   // test can see it went only once the home page was drawn and both typefaces were there.
   SplashScreen: {hide: o => { window.__calls.push(['hideSplash', {...(o ?? {}),
       drawn: (document.querySelector('#home')?.childElementCount > 0) || !!document.querySelector('.welcome'), draws: window.__draws,
-      fonts: document.fonts.check('1em "Figtree"') && document.fonts.check('1em "Fraunces"')}]);
+      fonts: document.fonts.check('1em "Figtree"') && document.fonts.check('1em "Faustina"')}]);
     return Promise.resolve(); }, show: rec('showSplash')},
   App: {addListener: (e, fn) => { if (e === 'backButton') window.__back = fn;
         if (e === 'appUrlOpen') { window.__urlOpen = fn; const u = sessionStorage.getItem('__launchUrl'); if (u) fn({url: u}); } },

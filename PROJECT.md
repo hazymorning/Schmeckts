@@ -146,7 +146,7 @@ Everything reads from one model: `analyze(db, prefs, now)` in `js/smart.js`, pur
 - **The manual `kaufen` setting** takes precedence over the verdict; „Automatisch“ removes the field (`null`).
 - **Evaluation page:** `report(db, prefs, now, days)` delivers everything for the page from the same ratings, weights and thresholds; `reportModel(days)` in `derive.js` caches the result like the rest of the model and computes it only when the page opens. Called „Verlauf“ in the app, within the pet filter and over everything.
   - **Span:** „7 Tage“, „30 Tage“ or „Alles“ at the top, „30 Tage“ to begin with. It decides what the ring, the numbers and the list show, holds while the app runs and is never stored (`reportView` in `views/sheets.js`). A day tapped in the calendar of the home page that lies further back than the span switches it to „Alles“.
-  - **Ring:** one SVG, 104px, saying how many of the ratings in the span were good ones (from 70 points, as everywhere else, and from the very ratings the rest is computed from: there is no second sum). Its colour comes from `scoreCls`, in the middle the percentage in Fraunces and under it „kam gut an“. Under `MIN_RATED` ratings it shows the bare track, „–“ and „Noch zu wenig bewertet“. It carries the whole statement as a sentence in `aria-label` and `role="img"`, so nothing rests on its colour. It fills itself once on opening (350 ms, ease-out) and not at all under reduced motion; numbers never count up.
+  - **Ring:** one SVG, 104px, saying how many of the ratings in the span were good ones (from 70 points, as everywhere else, and from the very ratings the rest is computed from: there is no second sum). Its colour comes from `scoreCls`, in the middle the percentage in Faustina and under it „kam gut an“. Under `MIN_RATED` ratings it shows the bare track, „–“ and „Noch zu wenig bewertet“. It carries the whole statement as a sentence in `aria-label` and `role="img"`, so nothing rests on its colour. It fills itself once on opening (350 ms, ease-out) and not at all under reduced motion; numbers never count up.
   - **Beside it:** meals, varieties tried and „an 12 von 30 Tagen“, each with a small icon (`bowl`, `layers`, `calendar`), no tiles and no dots between them. Under the two, the variety that goes down best and the one that goes down worst, from 2 ratings each and never the same one twice.
   - **List:** every meal grouped by day, without a heading of its own. The day line sticks to the top of the sheet while its meals scroll past and carries a fine line only while it does (`views/sheets.js` sets `.stuck`, which CSS cannot ask). The separators run straight across, the name of the food may take two lines and what is under it one. The timeline's two columns are `em` of their own text (`--tl-time`, `--tl-node`), so at a larger system font they grow with it and the line keeps running through the middle of the dot. The history grows as you scroll, 10 days at a time appended to `#histBox`, and right after drawing until less than a screen is left below: laying out years of meals in one go takes seconds. How many days are drawn is what the box says, so a redraw cannot get it out of step.
 - **Insights:** from 3 ratings within the filter. Comparisons by brand, consistency and flavour run only within one food type, need two groups with 2 ratings each and name the best and the weakest, plus the type except for wet food. Consistency reads the `texture` field and only falls back to the keywords when the field is missing, kept separate for wet food („Konsistenz“) and treats („Snack-Art“). „Meist nur die Soße“: varieties with at least 2 ratings, at least half of them „Soße geleckt“, at most two. No statements about buying.
@@ -167,40 +167,49 @@ Everything reads from one model: `analyze(db, prefs, now)` in `js/smart.js`, pur
 
 Binding for every change; `tests/design_test.py` checks them.
 
-**Typefaces:** Figtree (`400 700`), Fraunces (`500 700`) only for the wordmark, headings, day lines, percentages, counters and initials in thumbnails; `prepare.py` downloads them with a checksum, and the licences ship alongside. `body`: `font-variation-settings: "SOFT" 100`, `text-rendering: geometricPrecision`. Header 650, 30px, line height 1.1, `-.02em`; section heading 600, 21px, 1.25, `-.01em`; field label Figtree 600, 13.5px, `--muted`. No `text-transform`, no positive `letter-spacing`, except in the field for the household code.
+### Principles
+
+They come before every rule below. Where a rule and a principle disagree, the rule is changed.
+
+1. Colour carries meaning. `--accent` belongs to the app: actions, selection, focus and its own marks. Rating colours stand for ratings and nothing else. Everything else is neutral, and no hue exists outside the palette.
+2. One radius per role. `--radius-s` (12px) for small and nested shapes: thumbnails, the chosen segment, buttons inside other controls. `--radius-m` (16px) for controls: buttons, rating buttons, fields, segmented controls, toasts, the feeding button. `--radius-l` (24px) for containers: cards, groups, the top of a sheet, large photo frames. `--radius-full` for pills, 50% for circles. No other values.
+
+**Typefaces:** Figtree (`400 700`), Faustina (`500 700`) only for the wordmark, headings, day lines, percentages, counters and initials in thumbnails; `prepare.py` downloads them with a checksum, and the licences ship alongside. `body`: `text-rendering: geometricPrecision`. Header 650, 30px, line height 1.1, `-.015em`; section heading 600, 21px, 1.25, `-.005em`; field label Figtree 600, 13.5px, `--muted`. Faustina runs narrower than a grotesque, which is why the display sizes are tracked that little bit tighter and nothing else changes. No `text-transform`, no positive `letter-spacing`, except in the field for the household code.
 
 **Distances:** one scale in `css/tokens.css`, `--space-hair` (2px) and `--space-1` … `--space-7` with the halves between them (4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 32). Every `margin`, `padding` and `gap` in `app.css` comes from it; the two exceptions are not distances and are named in `design_test.py`: the room an icon needs inside a field (44px) and the room the feeding button needs under the page (112px).
+
+**Radii:** four tokens in `css/tokens.css`, `--radius-s` (12px), `--radius-m` (16px), `--radius-l` (24px) and `--radius-full` (999px); a circle is 50%. Every `border-radius` in `app.css` comes from them, by role as in principle 2, and `design_test.py` checks that. Anchors: `.card`, `dialog.sheet` (its top), `.crop`, `.prod-card`, `.cta`, `.srv`, `.thumb.lg` and `.name-photo` are containers; `.btn`, `.rb`, `.seg`, `.field`, `.banner`, `.toast`, `.cnt`, `.sugg`, `.fab`, `.tl-item`, `.cam-hint` and `.cam-cancel` are controls; `.thumb`, `.seg button`, `.toast button`, `.srv-ic`, `.day`, `.skel` and `.ins .dot` are small or nested; lines, bars, the grip, `.chip`, `.badge` and the pills are `--radius-full`.
 
 **Colours:** a fixed scheme with no choice, `light-dark(light, dark)`, only in `css/tokens.css`.
 
 | Token | Light | Dark |
 |---|---|---|
-| `--bg` | #F4F0EC | #191513 |
-| `--surface` | #FCFAF7 | #231E1B |
-| `--surface-2` | #E8E2DB | #302A27 |
-| `--ink` | #2E2724 | #EBE7E2 |
-| `--muted` | #6C615A | #B2A9A1 |
-| `--faint` | #A0958C | #7C726B |
-| `--line` | #D8CFC7 | #403935 |
-| `--accent` | #965E4B | #C78F7A |
-| `--accent-ink` | #7F4C3A | #C78F7A |
-| `--accent-soft` | #F9E0D7 | #422920 |
-| `--on-accent` | #FFFFFF | #191513 |
-| `--good` / `--good-soft` | #4F725F / #DBE0DA | #97BBAA / #363731 |
-| `--mid` / `--mid-soft` | #997238 / #E8DED0 | #DBB87E / #43392D |
-| `--sauce` / `--sauce-soft` | #7C5B45 / #E2D8D1 | #BD9E86 / #3E352E |
-| `--bad` / `--bad-soft` | #823B4E / #EADADA | #D88095 / #3D2C2C |
+| `--bg` | #EEEDE7 | #1B1C17 |
+| `--surface` | #FAFAF6 | #25261F |
+| `--surface-2` | #E4E3DA | #30312A |
+| `--ink` | #25261F | #ECECE3 |
+| `--muted` | #62625A | #A6A699 |
+| `--faint` | #9D9D92 | #77776C |
+| `--line` | #D8D7CD | #3B3C34 |
+| `--accent` | #58603F | #A9B283 |
+| `--accent-ink` | #4A5134 | #A9B283 |
+| `--accent-soft` | #DEE0D7 | #393B2E |
+| `--on-accent` | #FFFFFF | #1B1C17 |
+| `--good` / `--good-soft` | #4D6C57 / #D9DFD8 | #93BBA0 / #373E34 |
+| `--mid` / `--mid-soft` | #8A6822 / #E5DECE | #D2AE62 / #413C2A |
+| `--sauce` / `--sauce-soft` | #7A5A43 / #E2DCD4 | #C49C7E / #3E392E |
+| `--bad` / `--bad-soft` | #8F3F43 / #E9DCD9 | #D98C8E / #3E342F |
 
-- Colour values appear nowhere else but the logo files, `webview-update.html`, `app/capacitor.config.json` (`iconColor`, the notification icon's colour) and `app/native` (values from the palette, shortcut icons white on #965E4B).
-- Derived tokens with no hues of their own: `--seg-on` (light `--surface`, dark `--line`), `--toast-action` (#C78F7A / #7F4C3A), `--backdrop` (light #2E2724 at 40 %, dark #191513 at 70 %) and the three shadows.
+- Colour values appear nowhere else but the logo files, `webview-update.html`, `app/capacitor.config.json` (`iconColor`, the notification icon's colour) and `app/native` (values from the palette, shortcut icons white on #58603F).
+- Derived tokens with no hues of their own: `--seg-on` (light `--surface`, dark `--line`), `--toast-action` (#A9B283 / #4A5134), `--backdrop` (light #25261F at 40 %, dark #1B1C17 at 70 %) and the three shadows.
 - `--on-accent` is the type on accent and on `.btn.armed`. Rating colours are only for icons, points, bars and their soft fills. A level’s colour follows its points (`rateCls`): from 70 `--good`, from 40 `--mid`, below that `--sauce`, at 0 `--bad`.
 - Contrast: text at least 4.5:1, light and dark; rating colours as icons 3:1. `--faint` for decoration only.
 
-**Logo** (files without metadata): `schmeckts-mark.svg` (light, the icon motif on #F4F0EC) and `-dark.svg` in `app/www/img/`, `schmeckts-mark-mono.svg` and `schmeckts-app-icon.svg` in `design/`. The Android vectors take over paths and colours unchanged, and the motif stays inside the safe zone (33 dp around the centre). The header is pure wordmark.
+**Logo** (files without metadata): `schmeckts-mark.svg` (light, the icon motif on #EEEDE7) and `-dark.svg` in `app/www/img/`, `schmeckts-mark-mono.svg` and `schmeckts-app-icon.svg` in `design/`. The Android vectors take over paths and colours unchanged, and the motif stays inside the safe zone (33 dp around the centre). The header is pure wordmark.
 
 **Animation:** movement and opacity only; `@keyframes` without background, `box-shadow`, borders and filters. `:focus-visible` sets nothing but `outline` and `outline-offset`. Under `prefers-reduced-motion` nothing moves, the sheet's dimming included: `::backdrop` is not an element, so the rule names it beside `*`. Haptics: selection light, success medium, deletion and errors pronounced.
 
-**Cards:** page at most 600px, 18px margin. Card: `--surface`, radius 26px, 18px padding at the top and sides, 8px at the bottom, 14px apart, no border and no shadow. Order: pet bar (from two pets), overview, „Wie war’s?“, hint, „Verlauf“ (always fully visible), „Letzte Woche“, „Einkaufen“, „Erkenntnisse“. Text button `.card-btn` („Alle anzeigen“, only when there is more, state kept until restart): full width, Figtree 600, 14.5px, accent text, a line above.
+**Cards:** page at most 600px, 18px margin. Card: `--surface`, `--radius-l`, 18px padding at the top and sides, 8px at the bottom, 14px apart, no border and no shadow. Order: pet bar (from two pets), overview, „Wie war’s?“, hint, „Verlauf“ (always fully visible), „Letzte Woche“, „Einkaufen“, „Erkenntnisse“. Text button `.card-btn` („Alle anzeigen“, only when there is more, state kept until restart): full width, Figtree 600, 14.5px, accent text, a line above.
 
 - **Overview:** 108px tall as soon as something has been served. On the left the picture at 72px (a tap opens the pet), and with „Alle“ and several pets two offset pictures; beside it the name as a heading and a short text from the model, the important part in bold. One pet: „Bekam zuletzt **vor 2 Std.** einen Snack: **Käse** (Sofort verputzt). Am liebsten **Lachs**, **Rind** kommt nicht an.“ In a household „, serviert von **Anna**“ comes after the food, since there it matters who fed. Several: „Minka und Tiger bekamen zuletzt …. Minka mag am liebsten **Lachs**, Tiger **Pute**. Nicht an kommt bei Minka **Rind**.“ Never more than two lines; longer text ends in „…“. A tap on the card shows all of it, a second folds it away: without a redraw, only the class changes, and the height eases like the other cards (`slideHeight()`, 220 ms; state kept until restart). The only card whose heading sits beside the picture rather than on top.
 - **History:** a two-week calendar, below it the last 5 meals grouped by day and the button „Ganzer Verlauf“, the only way to the evaluation: a `.card-btn` like the other cards', with `chevron` at its end because it leads to a view of its own. A day in the calendar scrolls to it while it is on show, otherwise it opens the evaluation right at that day. The day line counts „2 Mahlzeiten, 1 Snack“ (the type treat is not a meal, everything else is); elsewhere the neutral „gefüttert“ is used (review, milestone). 14px above the calendar.
@@ -208,7 +217,7 @@ Binding for every change; `tests/design_test.py` checks them.
 
 **Settings** (`views/settings.js`): an overview of grouped rows, and behind most of them a page of its own in the same sheet.
 
-- **Row:** the icon on `--surface`, the title, the current value on the right and `chevron`. The title keeps its full width and the value gives way instead, over as many lines as it needs, because German settings are long and a large system font makes them longer; nothing about a value is ever cut off, and a pair that belongs together („Füttern an“) is held by a no-break space. The box carries 4px of its own above and below its rows, so the first and the last are not pressed into its 20px radius, and a pet's photo inside a group is the size of an icon tile, so every title in the box starts at the same place. A row that only does something (a pet, „Tier hinzufügen“, „Beispieldaten laden“) carries neither value nor chevron.
+- **Row:** the icon on `--surface`, the title, the current value on the right and `chevron`. The title keeps its full width and the value gives way instead, over as many lines as it needs, because German settings are long and a large system font makes them longer; nothing about a value is ever cut off, and a pair that belongs together („Füttern an“) is held by a no-break space. The box carries 4px of its own above and below its rows, so the first and the last are not pressed into its `--radius-l` corners, and a pet's photo inside a group is the size of an icon tile, so every title in the box starts at the same place. A row that only does something (a pet, „Tier hinzufügen“, „Beispieldaten laden“) carries neither value nor chevron.
 - **Groups:** „Tiere“ (the pets and „Tier hinzufügen“), „App“ (Darstellung, Erinnerungen), „Teilen“ (Dein Name, Haushalt, Austausch von Hand, Produktsuche im Internet), „Daten“ (Backup, Beispieldaten laden only while unconnected, Datenschutz). „Alle Daten löschen“ sits below all of them, set off, with the two taps it always had. The footer says where the data lies, and the version.
 - **Values:** they say what is currently set: „System“, „Bewerten 1 Std., Füttern an“, the name, and for the household the state of the sync in its own tone. That one is rewritten on every status change without redrawing anything else, on the overview as on its page (`paintHouse()`).
 - **The one switch:** „Produktsuche im Internet“ has no page of its own, so the whole row is the switch (`role="switch"`, the tap target is the row) and the line under the title says what currently goes out. Everywhere else a choice between two stays a `.seg` like all the others.

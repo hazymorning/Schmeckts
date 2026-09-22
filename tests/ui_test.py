@@ -3091,7 +3091,7 @@ async def test_start(browser, url):
              .map(r => [r.style.getPropertyValue('font-family'), r.style.getPropertyValue('font-display')])"""
     )
     check(
-        sorted(used) == [['Figtree', 'block'], ['Fraunces', 'block']],
+        sorted(used) == [['Faustina', 'block'], ['Figtree', 'block']],
         f'the typefaces are drawn only once they are there, never in a stand-in first ({used})',
     )
     preload = await pg.eval_on_selector_all(
@@ -3099,7 +3099,7 @@ async def test_start(browser, url):
     )
     check(
         preload
-        == [['font', 'font/woff2', 'anonymous', 'fonts/figtree-latin.woff2'], ['font', 'font/woff2', 'anonymous', 'fonts/fraunces-latin.woff2']],
+        == [['font', 'font/woff2', 'anonymous', 'fonts/figtree-latin.woff2'], ['font', 'font/woff2', 'anonymous', 'fonts/faustina-latin.woff2']],
         f'both files are asked for right away ({preload})',
     )
     check(
