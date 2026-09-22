@@ -82,46 +82,40 @@ export function setSheetView(fn) {
 }
 export function renderSheet() {
   if (!sheet) return;
-  // The level being left, for the page's movement: taken before it is drawn over
-  const leaving =
-    dlg.open && isPage(sheet) && sheet.slide ? {html: sheetBody.innerHTML, top: sheetBody.scrollTop} : null;
-  drawView(sheet);
   const key = `${sheet.kind}:${sheet.page || ''}:${sheet.step || ''}:${sheet.id || ''}`;
-  if (key !== viewKey) {
+  const how = sheet.slide;
+  sheet.slide = null;
+  if (key === viewKey) return drawView(sheet); // a change inside the level that is open
+  const swap = () => {
+    drawView(sheet);
     viewKey = key;
     sheetBody.scrollTop = 0;
     markSheetScrolled();
-    const how = sheet.slide;
-    sheet.slide = null;
-    sheetBody.classList.remove('swap-in', 'step-fwd', 'step-back');
-    // Only for a change inside something already open; while it opens, its own entrance covers this
-    if (!dlg.open) return;
-    void sheetBody.offsetWidth;
-    if (!isPage(sheet)) sheetBody.classList.add('swap-in');
-    else if (how) slidePage(how, leaving);
-  }
+    sheetBody.classList.remove('swap-in');
+  };
+  // While it opens, its own entrance covers the change
+  if (!dlg.open) return swap();
+  if (isPage(sheet)) return slidePage(how, swap);
+  swap();
+  void sheetBody.offsetWidth;
+  sheetBody.classList.add('swap-in');
 }
 /* A page moves as a whole: the level you go to comes in from the side while the one you leave goes out the other
-   way. What you leave is a still picture in a layer of its own, inert and gone with the animation, so the views
-   only ever write to the one live body. Under reduced motion nothing moves and no picture is taken. */
-let ghost = null;
-function dropGhost() {
-  ghost?.remove();
-  ghost = null;
-}
-function slidePage(how, leaving) {
-  dropGhost();
-  if (reduceMotion.matches || !leaving) return;
-  const old = document.createElement('div');
-  old.className = `sheet-body page-ghost out-${how}`;
-  old.setAttribute('aria-hidden', 'true');
-  old.inert = true;
-  old.innerHTML = leaving.html;
-  dlg.appendChild(old);
-  old.scrollTop = leaving.top;
-  ghost = old;
-  old.addEventListener('animationend', () => old === ghost && dropGhost(), {once: true});
-  sheetBody.classList.add(how === 'fwd' ? 'step-fwd' : 'step-back');
+   way. The browser takes the picture of the level being left itself (a view transition on .sheet-body), so no
+   copy of a long page has to be built first, which used to cost the first frame. Where that is not available,
+   and under reduced motion, the page is simply swapped. */
+function slidePage(how, swap) {
+  if (!how || reduceMotion.matches || !document.startViewTransition) return swap();
+  const root = document.documentElement,
+    done = () => root.classList.remove('step-fwd', 'step-back');
+  root.classList.add(how === 'back' ? 'step-back' : 'step-fwd');
+  try {
+    document.startViewTransition(swap).finished.then(done, done);
+  } catch {
+    // the transition did not start: the same step without the movement
+    done();
+    swap();
+  }
 }
 export function closeSheet(fromPop = false) {
   if (closing) return closing;
@@ -142,7 +136,6 @@ export function closeSheet(fromPop = false) {
   closing = Promise.all([
     popped,
     hidden.then(() => {
-      dropGhost();
       dlg.classList.remove('closing', 'page');
       dlg.style.transform = '';
       dlg.style.transition = '';

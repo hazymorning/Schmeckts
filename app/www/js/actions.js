@@ -333,7 +333,13 @@ const ACTIONS = {
     savePrefs();
     haptic('select');
     renderSheet();
-  }, // product lookup on the internet, the one switch in the overview, off by default
+  }, // product lookup on the internet, off by default
+  'server-photo'() {
+    prefs.serverPhoto = !prefs.serverPhoto;
+    savePrefs();
+    haptic('select');
+    renderSheet();
+  }, // photo recognition through the server, only on this phone, on by default
   'feed-remind'() {
     haptic('select');
     setFeedRemind(!prefs.feedRemind);

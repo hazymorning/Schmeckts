@@ -1609,44 +1609,54 @@ dialog.sheet.page .sheet-body {
   z-index: 1;
   background: var(--bg);
   padding: 0 var(--space-4) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  view-transition-name: page;
 }
-/* A level deeper and back: the page you go to comes in from the side while the one you leave, a still picture in
-   a layer of its own, goes out the other way. Nothing moves inside either of them. */
-.sheet-body.step-fwd {
-  animation: pageStepIn 0.3s var(--ease-out);
+/* A level deeper and back: the page you go to comes in from the side while the one you leave goes out the other
+   way. The browser takes both pictures itself, so nothing has to be copied first (ui/sheet.js sets the direction
+   on <html>). Nothing moves inside either of them. */
+::view-transition-group(page) {
+  animation-duration: 0.3s;
+  animation-timing-function: var(--ease-out);
 }
-.sheet-body.step-back {
-  animation: pageStepBack 0.3s var(--ease-out);
+/* The default lightens the two pictures where they overlap; here one slides in front of the other. */
+::view-transition-old(page),
+::view-transition-new(page) {
+  mix-blend-mode: normal;
 }
-dialog.sheet.page .page-ghost {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+/* Only the page takes part: nothing on the home page under it changes during the step, and a picture of every
+   card and every meal there would cost the very frame the step needs. The names sit in the style attribute, so
+   this has to be !important, and it is matched only while a step is actually running. */
+html:is(.step-fwd, .step-back) :is(.card, .pend, .tl li, .pet, .fab, .toast) {
+  view-transition-name: none !important;
 }
-dialog.sheet.page .page-ghost.out-fwd {
-  z-index: 0;
-  animation: pageStepAside 0.3s var(--ease-out) forwards;
+html.step-fwd::view-transition-old(page) {
+  animation: pageAside 0.3s var(--ease-out) both;
 }
-dialog.sheet.page .page-ghost.out-back {
-  z-index: 2;
-  animation: pageStepOut 0.3s var(--ease-out) forwards;
+html.step-fwd::view-transition-new(page) {
+  animation: pageFromSide 0.3s var(--ease-out) both;
 }
-@keyframes pageStepIn {
+html.step-back::view-transition-old(page) {
+  animation: pageToSide 0.3s var(--ease-out) both;
+}
+html.step-back::view-transition-new(page) {
+  animation: pageFromAside 0.3s var(--ease-out) both;
+}
+@keyframes pageFromSide {
   from {
     transform: translateX(100%);
   }
 }
-@keyframes pageStepAside {
+@keyframes pageAside {
   to {
     transform: translateX(-25%);
   }
 }
-@keyframes pageStepBack {
+@keyframes pageFromAside {
   from {
     transform: translateX(-25%);
   }
 }
-@keyframes pageStepOut {
+@keyframes pageToSide {
   to {
     transform: translateX(100%);
   }
@@ -2453,6 +2463,8 @@ button.prod-card:active {
   animation-duration: 0.4s;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* The page as a whole never moves or fades: only the pieces with a name of their own do */
+::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

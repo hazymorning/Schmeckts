@@ -1516,8 +1516,8 @@ SERVER_WORDS = re.compile(
 PRIVACY = [
     'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
     'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-    'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Scannen“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
-    'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
+    'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann die Produktsuche im Internet unter „Scannen“, sie ist aus: Sie fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
+    'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken. Die Foto-Erkennung lässt sich unter „Scannen“ abschalten.',
     'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.',
 ]
 
@@ -2269,6 +2269,28 @@ async def test_recognize(browser, url):
         got['source'] == 'server' and got['details']['variety'] == 'Gold Pastete',
         f'connected: the server recognises the photo ({got.get("details")})',
     )
+
+    # „Fotos über den Server erkennen“: there while connected and on by default; off, the phone reads the text
+    await pg.click('[data-action=open-settings]')
+    await idle(pg)
+    scanning = await pg.evaluate(
+        """() => { const g = [...document.querySelectorAll('#sheet .set-group')].find(x => x.previousElementSibling.innerText === 'Scannen');
+          return [...g.querySelectorAll('.set-row')].map(r => [r.querySelector('.t-main b').innerText, r.getAttribute('aria-checked')]); }"""
+    )
+    await pg.click('#sheet [data-action=server-photo]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
+    no_photo, by_code = await ident(photo='AAA'), await ident(code='96385074')
+    check(
+        scanning == [['Produktsuche im Internet', 'false'], ['Fotos über den Server erkennen', 'true']]
+        and await state(pg, 'prefs.serverPhoto') is False
+        and no_photo['source'] == 'text'
+        and by_code['source'] == 'server',
+        f'the photo switch off: the phone reads the text itself, the barcode still goes to the server ({scanning}, {no_photo["source"]}, {by_code["source"]})',
+    )
+    await setp(serverPhoto=True)
 
     # Every stage falls through cleanly to the next, cheapest first
     await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
@@ -3166,6 +3188,19 @@ async def test_start(browser, url):
 GROUPS = """() => [...document.querySelectorAll('#sheet .set-group')].map(g => [g.previousElementSibling.innerText,
   [...g.querySelectorAll('.set-row')].map(r => [r.querySelector('.t-main b').innerText, r.getAttribute('role'),
     r.querySelector('.chev') ? 'chevron' : null])])"""
+# One step between two levels of a page: what the view transition moves, and nothing else. The pictures are only
+# there for the length of the step, so they are collected while it runs.
+PAGE_STEP = """async sel => { const seen = new Map();
+  const watch = setInterval(() => { for (const a of document.getAnimations()) { const p = a.effect?.pseudoElement || '';
+    if (/^::view-transition-(old|new)\\(/.test(p) && !seen.has(p))
+      seen.set(p, [p.slice('::view-transition-'.length).replace('(', ' ').replace(')', ''), a.animationName,
+        a.effect.getComputedTiming().duration]); } }, 16);
+  document.querySelector(sel).click();
+  await new Promise(done => setTimeout(done, 400));
+  clearInterval(watch);
+  return [...seen.values()].sort(); }"""
+
+
 # Where the page stands: its title, whether the sheet is a full-screen page, and how far it sits from the left
 PAGE = """() => { const d = document.getElementById('sheet'), r = d.getBoundingClientRect();
   return [document.querySelector('#sheet .page-title')?.innerText ?? null, d.open, d.classList.contains('page'),
@@ -3230,15 +3265,15 @@ async def test_settings(browser, url):
         and slide[0][1:] == [300, 'translateX(100%)'],
         f'the settings fill the screen and come in from the side in 300 ms ({page}, {slide})',
     )
-    await pg.click('#sheet [data-action=settings-page][data-v=house]')
-    step = await pg.evaluate(
-        """[...document.getElementById('sheet').querySelectorAll('.sheet-body')].flatMap(b => b.getAnimations().map(a =>
-             [b.classList.contains('page-ghost') ? 'leaving' : 'coming', a.animationName, a.effect.getComputedTiming().duration]))"""
-    )
+    step = await pg.evaluate(PAGE_STEP, '#sheet [data-action=settings-page][data-v=house]')
+    await idle(pg)
+    back = await pg.evaluate(PAGE_STEP, '#sheet [data-action=settings-back]')
     await idle(pg)
     check(
-        sorted(step) == [['coming', 'pageStepIn', 300], ['leaving', 'pageStepAside', 300]] and await pg.locator('.page-ghost').count() == 0,
-        f'a page below comes in from the side while the one above it goes out, and nothing of it stays behind ({step})',
+        step == [['new page', 'pageFromSide', 300], ['old page', 'pageAside', 300]]
+        and back == [['new page', 'pageFromAside', 300], ['old page', 'pageToSide', 300]]
+        and await pg.locator('#sheet .sheet-body').count() == 1,
+        f'a page below comes in from the side while the one above it goes out, and back the other way round ({step}, {back})',
     )
     await ctx.close()
 

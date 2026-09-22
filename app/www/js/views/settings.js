@@ -62,6 +62,7 @@ const under = html => `<div class="set-under">${html}</div>`;
 const group = (label, rows) => `<span class="label">${label}</span><div class="set-group">${rows}</div>`;
 
 const LOOKUP = 'Fragt bei unbekannten Barcodes nach, nur mit der Nummer';
+const SERVER_PHOTO = 'Erkennt Marke und Sorte auf dem Packungsfoto. Sonst liest das Handy den Text selbst.';
 
 function overview() {
   const house = isConnected(),
@@ -109,7 +110,13 @@ function overview() {
         pageRow('house', 'house', 'Haushalt', esc(houseSub(notice)), 'houseSub') +
         pageRow('exchange', 'phone', 'Austausch von Hand', 'Änderungen als Datei weitergeben'),
     )}
-    ${group('Scannen', switchRow('lookup', 'search', 'Produktsuche im Internet', LOOKUP, prefs.lookup))}
+    ${group(
+      'Scannen',
+      switchRow('lookup', 'search', 'Produktsuche im Internet', LOOKUP, prefs.lookup) +
+        (house
+          ? switchRow('server-photo', 'camera', 'Fotos über den Server erkennen', SERVER_PHOTO, prefs.serverPhoto)
+          : ''),
+    )}
     ${group(
       'Daten',
       pageRow('backup', 'download', 'Backup', 'Sichern und wieder einlesen') +
@@ -149,8 +156,8 @@ function exchangePage() {
 const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Scannen“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
-  'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann die Produktsuche im Internet unter „Scannen“, sie ist aus: Sie fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
+  'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken. Die Foto-Erkennung lässt sich unter „Scannen“ abschalten.',
   'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.',
 ];
 const privacyPage = () => `<div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
