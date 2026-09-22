@@ -19,3 +19,8 @@ updates:
     directory: /tests
     schedule:
       interval: monthly
+    ignore:
+      # Playwright is raised by hand. Its version decides which Chromium build is needed, and that build has to
+      # be there in two places a bot does not touch: the container image in tests.yml and the ready-made browser
+      # of Claude Code on the web (see .claude/hooks/session-start.sh). Raising only the package breaks both.
+      - dependency-name: playwright
