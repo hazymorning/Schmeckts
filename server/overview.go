@@ -13,7 +13,13 @@ import (
 	"time"
 )
 
-var ratingNames = map[string]string{"gut": "Gut", "mittel": "Mittel", "sosse": "Nur Soße", "schlecht": "Schlecht"}
+// Every level of every scale, with the wording the app uses (RATINGS in app/www/js/config.js). The key alone
+// decides the wording, so the two lists must not drift apart: tests/design_test.py compares them.
+var ratingNames = map[string]string{
+	"top": "Sofort leer", "gut": "Später leer", "mittel": "Halb gegessen", "sosse": "Soße geleckt", "schlecht": "Kaum angerührt",
+	"gern": "Gern gefressen", "normal": "Normal gefressen", "wenig": "Wenig gefressen", "liegen": "Liegen gelassen",
+	"verputzt": "Sofort verputzt", "spaeter": "Später gefressen", "angeknabbert": "Nur angeknabbert", "unberuehrt": "Nicht angerührt",
+}
 
 func visible(rec *Record) bool { return string(rec.F["_del"].V) != "true" }
 

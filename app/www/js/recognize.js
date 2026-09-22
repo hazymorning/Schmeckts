@@ -6,26 +6,52 @@
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhotoText} from './native.js';
-import {readPack} from './ocr.js';
+import {packLines, readPack} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
 import {productsByCode} from './derive.js';
+import {report} from './report.js';
 
 const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'locked']);
-const LOOKING = 'Barcode wird nachgeschlagen …', READING = 'Sorte wird erkannt …';
+const LOOKING = 'Barcode wird nachgeschlagen …',
+  READING = 'Sorte wird erkannt …';
 
 /* One stage: name, when its turn comes, what it shows and what it does. Result {products}, {details} or null. */
 const STEPS = [
-  {name:'codes', when:o => !!o.code, run:o => { const found = productsByCode(o.code); return found.length ? {products:found} : null; }},
-  {name:'online', hint:LOOKING, when:o => !!o.code && !!prefs.lookup, run:o => lookupOnline(o.code).then(asDetails)},
-  {name:'server', hint:o => o.code ? LOOKING : READING, when:() => isConnected(), run:fromServer},
-  {name:'text', when:o => !!o.photo, run:o => readPhotoText(o.photo).then(text => asDetails(readPack(text, db.products)))}
+  {
+    name: 'codes',
+    when: o => !!o.code,
+    run: o => {
+      const found = productsByCode(o.code);
+      return found.length ? {products: found} : null;
+    },
+  },
+  {
+    name: 'online',
+    hint: LOOKING,
+    when: o => !!o.code && !!prefs.lookup,
+    run: o => lookupOnline(o.code).then(asDetails),
+  },
+  {name: 'server', hint: o => (o.code ? LOOKING : READING), when: () => isConnected(), run: fromServer},
+  {
+    name: 'text',
+    when: o => !!o.photo,
+    run: async o => {
+      const text = await readPhotoText(o.photo);
+      const hit = asDetails(readPack(text, db.products));
+      return hit && {...hit, lines: packLines(text)}; // the lines are offered as chips while naming
+    },
+  },
 ];
+
+/* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
+   synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
+export const memLines = new Map();
 
 /* code: the scanned barcode, photo: the photo as base64, note: a short notice for the interface.
    Returns {source, products|details} or {source:'', error} — the form then stays empty. */
-export async function identify({code = '', photo = '', note = () => {}} = {}){
+export async function identify({code = '', photo = '', note = () => {}} = {}) {
   const o = {code, photo};
   let error = null;
   for (const step of STEPS) {
@@ -33,28 +59,42 @@ export async function identify({code = '', photo = '', note = () => {}} = {}){
     try {
       note(typeof step.hint === 'function' ? step.hint(o) : step.hint || '');
       const hit = await step.run(o);
-      if (hit) { note(''); return {source:step.name, ...hit}; }
+      if (hit) {
+        note('');
+        return {source: step.name, ...hit};
+      }
     } catch (e) {
-      error = e;
-      console.warn(`recognition (${step.name}):`, e?.message || e);
+      error = e; // kept for the caller: the last error is what the interface explains
+      report(`recognition (${step.name})`, e);
     }
   }
   note('');
-  return {source:'', error};
+  return {source: '', error};
 }
 
 /* Bring an answer into the server's shape: without a brand and a variety it does not count */
-function asDetails(hit){
-  const brand = String(hit?.brand || '').trim(), variety = String(hit?.variety || '').trim();
+function asDetails(hit) {
+  const brand = String(hit?.brand || '').trim(),
+    variety = String(hit?.variety || '').trim();
   if (!brand && !variety) return null;
-  return {details:{brand, variety, type:TYPES.includes(hit.type) ? hit.type : undefined,
-    animal:SPECIES.some(s => s.k === hit.animal) ? hit.animal : undefined, texture:hit.texture}};
+  return {
+    details: {
+      brand,
+      variety,
+      type: TYPES.includes(hit.type) ? hit.type : undefined,
+      animal: SPECIES.some(s => s.k === hit.animal) ? hit.animal : undefined,
+      texture: hit.texture,
+    },
+  };
 }
 
 /* Server: the lookup for a barcode (from server 1.1.0), AI recognition for a photo */
-async function fromServer({code, photo}){
-  if (code && await serverCan('barcode')) {
-    const hit = await lookupBarcode(code).catch(e => { console.warn('barcode lookup:', e.message); return null; });
+async function fromServer({code, photo}) {
+  if (code && (await serverCan('barcode'))) {
+    const hit = await lookupBarcode(code).catch(e => {
+      report('barcode lookup', e);
+      return null; // the photo recognition below is the next stage
+    });
     const found = hit?.found ? asDetails(hit) : null;
     if (found) return found;
   }
@@ -62,16 +102,22 @@ async function fromServer({code, photo}){
 }
 
 /* Photo recognition through the household server: key, model and prompt live there. */
-export async function recognize(b64){
-  if (!prefs.code) throw Object.assign(new ServerError('none', 'Kein Server verbunden.'), {retry:false});
+export async function recognize(b64) {
+  if (!prefs.code) throw Object.assign(new ServerError('none', 'Kein Server verbunden.'), {retry: false});
   if (status.recognition === false) {
-    throw Object.assign(new ServerError('unavailable', 'Auf dem Server ist die Foto-Erkennung noch nicht eingerichtet.'), {retry:true});
+    throw Object.assign(
+      new ServerError('unavailable', 'Auf dem Server ist die Foto-Erkennung noch nicht eingerichtet.'),
+      {retry: true},
+    );
   }
-  try { return await request('POST', '/api/recognize', {body:{image:b64}, timeout:70e3}); }
-  catch (e) { e.retry = RETRY.has(e.kind); throw e; }
+  try {
+    return await request('POST', '/api/recognize', {body: {image: b64}, timeout: 70e3});
+  } catch (e) {
+    e.retry = RETRY.has(e.kind);
+    throw e;
+  }
 }
 
 /* Look up an unknown barcode through the server (Open Pet Food Facts and Open Food Facts).
    Response {found, brand, variety, type, animal}. The server waits at most 5 seconds per database. */
-export const lookupBarcode = code => request('GET', '/api/barcode/' + encodeURIComponent(code), {timeout:15e3});
-
+export const lookupBarcode = code => request('GET', '/api/barcode/' + encodeURIComponent(code), {timeout: 15e3});

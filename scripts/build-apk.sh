@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # Builds the signed APK to dist/schmeckts-<version>.apk
-# Usage: scripts/build-apk.sh <schmeckts-signing-key.txt>
+# Usage: scripts/build-apk.sh <schmeckts-signing-key.txt> [--tested]
+# --tested: the suite has already run elsewhere and is green. The release workflow passes it, where the tests
+# run as a job of their own beside the build and the APK is only attached once they are through.
 # The version number lives in exactly one place: app/package.json
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIGNING_KEY="$(realpath "${1:?path to schmeckts-signing-key.txt missing}")"
+TESTED="${2:-}"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
-BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+mapfile -t BUILD_TOOL_DIRS < <(printf '%s\n' "$ANDROID_HOME"/build-tools/*/ | sort -V)
+BUILD_TOOLS="${BUILD_TOOL_DIRS[-1]%/}"   # the newest build tools installed
 
-"$ROOT/scripts/test.sh"   # ship tested: no APK without green tests
+if [ "$TESTED" = "--tested" ]; then
+  echo "Tests skipped: they ran elsewhere (--tested)."
+else
+  "$ROOT/scripts/test.sh"   # ship tested: no APK without green tests
+fi
 python3 "$ROOT/scripts/prepare.py"
 cd "$ROOT/app"
 VERSION="$(node -p "require('./package.json').version")"
@@ -17,7 +25,8 @@ npx cap sync android
 
 # The key exists as a file only for as long as signing takes, and is deleted afterwards
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-export SCHMECKTS_PW="$(python3 "$ROOT/scripts/signing-key.py" read "$SIGNING_KEY" "$TMP/key.jks")"
+SCHMECKTS_PW="$(python3 "$ROOT/scripts/signing-key.py" read "$SIGNING_KEY" "$TMP/key.jks")"
+export SCHMECKTS_PW
 mkdir -p "$ROOT/dist"
 OUT="$ROOT/dist/schmeckts-$VERSION.apk"
 "$BUILD_TOOLS/apksigner" sign --ks "$TMP/key.jks" --ks-key-alias schmeckts \
@@ -36,7 +45,9 @@ fi
 grep -q '"android.permission.POST_NOTIFICATIONS"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the notification permission." >&2; rm -f "$OUT"; exit 1; }
 grep -q '"barcode_ui"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the scanner module (barcode_ui)." >&2; rm -f "$OUT"; exit 1; }
 # Privacy: the rules against cloud backup are declared and present in the APK
-grep -q 'dataExtractionRules' <<<"$MANIFEST" && grep -q 'fullBackupContent' <<<"$MANIFEST" || { echo "Error: the manifest is missing the rules against cloud backup." >&2; rm -f "$OUT"; exit 1; }
+if ! grep -q 'dataExtractionRules' <<<"$MANIFEST" || ! grep -q 'fullBackupContent' <<<"$MANIFEST"; then
+  echo "Error: the manifest is missing the rules against cloud backup." >&2; rm -f "$OUT"; exit 1
+fi
 RULES="$("$BUILD_TOOLS/aapt2" dump resources "$OUT" | grep -A1 'xml/data_extraction_rules$' | grep -o 'res/[^ ]*')"  # the build shortens the paths
 "$BUILD_TOOLS/aapt2" dump xmltree --file "$RULES" "$OUT" | grep -q 'cloud-backup' || { echo "Error: data_extraction_rules.xml is missing from the APK." >&2; rm -f "$OUT"; exit 1; }
 # Phones only: no x86 libraries in the APK (text recognition ships one per processor family)

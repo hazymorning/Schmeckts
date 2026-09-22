@@ -2,14 +2,17 @@
    „System“); the colours live in tokens.css. */
 import {$} from '../dom.js';
 import {Native} from '../native.js';
+import {report} from '../report.js';
 import {prefs} from '../store.js';
 
 const darkMQ = matchMedia('(prefers-color-scheme: dark)');
 
-export function applyTheme(){
+export function applyTheme() {
   const root = document.documentElement;
   root.dataset.theme = prefs.theme === 'system' ? (darkMQ.matches ? 'dark' : 'light') : prefs.theme;
   $('meta[name="theme-color"]').content = getComputedStyle(root).backgroundColor;
-  Native?.SystemBars?.setStyle({style: {system:'DEFAULT', light:'LIGHT', dark:'DARK'}[prefs.theme] || 'DEFAULT'}).catch(() => {});
+  Native?.SystemBars?.setStyle({
+    style: {system: 'DEFAULT', light: 'LIGHT', dark: 'DARK'}[prefs.theme] || 'DEFAULT',
+  }).catch(e => report('status bar style', e));
 }
 darkMQ.addEventListener('change', applyTheme);
