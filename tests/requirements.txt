@@ -3,4 +3,4 @@
 # .claude/hooks/session-start.sh), which is why it is pinned to the patch level like everything else.
 pillow==12.3.0
 playwright==1.56.0
-ruff==0.15.8
+ruff==0.16.8

@@ -3,5 +3,11 @@
 line-length = 150
 target-version = "py311"
 
+# The rule set is ours to choose, not the release's to decide: ruff 0.16 widened its default selection from
+# E4/E7/E9/F to dozens of rule families, and the gate would then change with every upgrade. These are the four
+# the project has been held to since the gate was introduced; adding a family is a change of its own.
+[lint]
+select = ["E4", "E7", "E9", "F"]
+
 [format]
 quote-style = "single"
