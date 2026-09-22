@@ -2209,7 +2209,7 @@ async def test_recognize(browser, url):
     await idle(pg)
     await pg.evaluate('window.__ocrDelay = 0')
     filled = await pg.evaluate(
-        "[document.getElementById('f-brand').value, document.getElementById('f-variety').value, document.querySelector('.chip[aria-pressed=true]')?.innerText]"
+        "[document.getElementById('f-brand').value, document.getElementById('f-variety').value, document.querySelector('[data-action=set-type][aria-pressed=true]')?.innerText]"
     )
     read = [c[1]['path'] for c in await pg.evaluate('window.__calls') if c[0] == 'processImage']
     gone = [c[1]['path'] for c in await pg.evaluate('window.__calls') if c[0] == 'deleteFile' and c[1]['directory'] == 'CACHE']
@@ -2295,6 +2295,113 @@ async def test_recognize(browser, url):
     )
     await setp(code='', server='', lookup=False)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)[:2]}')
+    await ctx.close()
+
+
+PACK_TEXT = 'Katzenglück\nZarte Häppchen\nmit Huhn\n4 x 85 g\nZutaten: Fleisch'
+CHIPS = """() => { const box = document.getElementById('suggest'), l = [...box.querySelectorAll('.label')].find(x => x.innerText === 'Auf der Packung gelesen');
+  return l ? [...l.nextElementSibling.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
+FIELDS = "[document.getElementById('f-brand').value, document.getElementById('f-variety').value]"
+
+
+async def test_pack_lines(browser, url):
+    print('what the phone read off the packaging: chips while naming, in memory only')
+
+    async def srv_route(route, request):  # a household server that recognises the photo itself
+        path, now = request.url.split(':8486')[1], int(time.time() * 1000)
+        if path.startswith('/api/info'):
+            body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': [], 'auth': True, 'now': now}
+        elif path.startswith('/api/recognize'):
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/changes') and request.method == 'POST':
+            body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])], 'now': now}
+        elif path.startswith('/api/changes'):
+            body = {'epoch': 'test', 'seq': 0, 'records': [], 'now': now}
+        else:
+            body = {'epoch': 'test', 'seq': 0, 'sum': '', 'fields': 0, 'now': now}
+        await route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+    ctx = await phone(browser)
+    await ctx.route(f'{SRV}/**', srv_route)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    # The phone reads the packaging: the lines it could use appear as chips under the suggestions
+    await pg.evaluate(f'window.__ocrText = {json.dumps(PACK_TEXT)}')
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, '!!db.servings[0]?.guess')
+    await idle(pg)
+    chips = await pg.evaluate(CHIPS)
+    check(
+        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']],
+        f'the lines read appear as chips, and the one already in a field is marked ({chips})',
+    )
+    await shot(pg, 'pack-lines')
+
+    # A tap fills the brand, two more make the variety, and a second tap takes a line out again
+    await pg.fill('#f-variety', '')
+    await pg.evaluate("document.getElementById('f-variety').blur()")
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => { m.sheet.lastField = null; m.renderSheet(); })")
+    await idle(pg)
+    await pg.click('#suggest .chip:has-text("Katzenglück")')
+    await idle(pg)
+    brand = await pg.evaluate(FIELDS)
+    await pg.click('#suggest .chip:has-text("Zarte Häppchen")')
+    await idle(pg)
+    await pg.click('#suggest .chip:has-text("mit Huhn")')
+    await idle(pg)
+    both = await pg.evaluate(FIELDS)
+    await pg.click('#suggest .chip:has-text("mit Huhn")')
+    await idle(pg)
+    check(
+        brand == ['Katzenglück', '']
+        and both == ['Katzenglück', 'Zarte Häppchen mit Huhn']
+        and await pg.evaluate(FIELDS) == ['Katzenglück', 'Zarte Häppchen']
+        and await pg.evaluate(CHIPS) == [['Katzenglück', 'true'], ['Zarte Häppchen', 'true'], ['mit Huhn', 'false']],
+        f'one tap fills „Marke“, the next two „Sorte“, and tapping again takes a line out ({brand}, {both})',
+    )
+
+    # The lines are in memory only: neither the data nor the queue knows them, and a restart loses them
+    kept = await state(pg, 'JSON.stringify([db, queue])')
+    check(
+        'Zarte Häppchen' not in kept and 'Katzenglück' not in kept,
+        'nothing of the lines reaches the data or the queue: they live beside the meal in memory, like the photo',
+    )
+    await pg.reload()
+    await started(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    check(await pg.evaluate(CHIPS) is None, 'after a restart the lines are gone, because they were never stored')
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
+    # Recognised by the server instead: there is nothing the phone read, so there are no chips
+    await pg.evaluate(
+        f"import('./js/store.js').then(m => {{ m.prefs.server = '{SRV}'; m.prefs.code = 'K7PM-3QXD'; m.prefs.mode = 'haushalt'; m.savePrefs(); }})"
+    )
+    await pg.evaluate("import('./js/sync.js').then(m => m.startSync())")
+    await until(pg, "status.state === 'ok'")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, 'db.servings[0]?.productId')
+    await idle(pg)
+    await pg.click('.tl [data-action=open-serving]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    named = await pg.evaluate(FIELDS)
+    check(
+        named == ['Gourmet', 'Gold Pastete'] and await pg.evaluate(CHIPS) is None,
+        f'recognised by the server: the variety is there, and there are no chips, because the phone read nothing ({named})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
 
@@ -3532,6 +3639,7 @@ run_tests(
         'shortcuts': test_shortcuts,
         'scanning': test_scan,
         'recognition': test_recognize,
+        'pack-lines': test_pack_lines,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

@@ -6,7 +6,7 @@
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhotoText} from './native.js';
-import {readPack} from './ocr.js';
+import {packLines, readPack} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
@@ -37,9 +37,17 @@ const STEPS = [
   {
     name: 'text',
     when: o => !!o.photo,
-    run: o => readPhotoText(o.photo).then(text => asDetails(readPack(text, db.products))),
+    run: async o => {
+      const text = await readPhotoText(o.photo);
+      const hit = asDetails(readPack(text, db.products));
+      return hit && {...hit, lines: packLines(text)}; // the lines are offered as chips while naming
+    },
   },
 ];
+
+/* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
+   synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
+export const memLines = new Map();
 
 /* code: the scanned barcode, photo: the photo as base64, note: a short notice for the interface.
    Returns {source, products|details} or {source:'', error} — the form then stays empty. */

@@ -7,6 +7,7 @@ import {db, save} from '../store.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {memPhotos} from '../images.js';
+import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 
 /* The manual buying setting, which holds household-wide and takes precedence over the computed verdict:
@@ -91,6 +92,7 @@ export function linkProduct(s, p) {
   delete s.autoPets;
   delete s.guess;
   memPhotos.delete(s.id);
+  memLines.delete(s.id);
   if (prev && prev !== p.id) cleanupProduct(prev);
 }
 export function mergeProducts(from, into) {
