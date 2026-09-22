@@ -37,7 +37,10 @@ if [ -z "$GO" ]; then
   note_failure 'go (missing, scripts/setup-build-env.sh installs it)'
 else
   GOBIN="$("$GO" env GOPATH)/bin"
-  [ -x "$GOBIN/staticcheck" ] || "$GO" install "honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION"
+  # staticcheck needs a newer Go to build than the server is written for, and that is fine: the linter is not
+  # part of the program. GOTOOLCHAIN=auto lets `go install` fetch the toolchain it asks for, whatever the
+  # environment has set — actions/setup-go 7 pins it to `local`, and the install then fails outright.
+  [ -x "$GOBIN/staticcheck" ] || GOTOOLCHAIN=auto "$GO" install "honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION"
   unformatted="$("$(dirname "$GO")/gofmt" -l server)"
   if [ -n "$unformatted" ]; then
     echo "$unformatted"
