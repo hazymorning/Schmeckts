@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- The splash screen in the app's base colour, so nothing flashes when the app takes over -->
-    <color name="splash_background">#F4F0EC</color>
+    <color name="splash_background">#EEEDE7</color>
 </resources>

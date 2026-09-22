@@ -13,25 +13,25 @@ import xml.etree.ElementTree as ET
 from common import RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
 
 PALETTE = {
-    '--bg': ('#F4F0EC', '#191513'),
-    '--surface': ('#FCFAF7', '#231E1B'),
-    '--surface-2': ('#E8E2DB', '#302A27'),
-    '--ink': ('#2E2724', '#EBE7E2'),
-    '--muted': ('#6C615A', '#B2A9A1'),
-    '--faint': ('#A0958C', '#7C726B'),
-    '--line': ('#D8CFC7', '#403935'),
-    '--accent': ('#965E4B', '#C78F7A'),
-    '--accent-ink': ('#7F4C3A', '#C78F7A'),
-    '--accent-soft': ('#F9E0D7', '#422920'),
-    '--on-accent': ('#FFFFFF', '#191513'),
-    '--good': ('#4F725F', '#97BBAA'),
-    '--good-soft': ('#DBE0DA', '#363731'),
-    '--mid': ('#997238', '#DBB87E'),
-    '--mid-soft': ('#E8DED0', '#43392D'),
-    '--sauce': ('#7C5B45', '#BD9E86'),
-    '--sauce-soft': ('#E2D8D1', '#3E352E'),
-    '--bad': ('#823B4E', '#D88095'),
-    '--bad-soft': ('#EADADA', '#3D2C2C'),
+    '--bg': ('#EEEDE7', '#1B1C17'),
+    '--surface': ('#FAFAF6', '#25261F'),
+    '--surface-2': ('#E4E3DA', '#30312A'),
+    '--ink': ('#25261F', '#ECECE3'),
+    '--muted': ('#62625A', '#A6A699'),
+    '--faint': ('#9D9D92', '#77776C'),
+    '--line': ('#D8D7CD', '#3B3C34'),
+    '--accent': ('#58603F', '#A9B283'),
+    '--accent-ink': ('#4A5134', '#A9B283'),
+    '--accent-soft': ('#DEE0D7', '#393B2E'),
+    '--on-accent': ('#FFFFFF', '#1B1C17'),
+    '--good': ('#4D6C57', '#93BBA0'),
+    '--good-soft': ('#D9DFD8', '#373E34'),
+    '--mid': ('#8A6822', '#D2AE62'),
+    '--mid-soft': ('#E5DECE', '#413C2A'),
+    '--sauce': ('#7A5A43', '#C49C7E'),
+    '--sauce-soft': ('#E2DCD4', '#3E392E'),
+    '--bad': ('#8F3F43', '#D98C8E'),
+    '--bad-soft': ('#E9DCD9', '#3E342F'),
 }
 
 
@@ -107,10 +107,10 @@ async def test_palette(browser, url):
 
 
 LOGOS = {
-    'app/www/img/schmeckts-mark.svg': ['#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
-    'app/www/img/schmeckts-mark-dark.svg': ['#E8E2DB', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+    'app/www/img/schmeckts-mark.svg': ['#25261F', '#86513E', '#A76A53', '#BA7F68', '#A3A97F', '#8A9066'],
+    'app/www/img/schmeckts-mark-dark.svg': ['#ECECE3', '#86513E', '#A76A53', '#BA7F68', '#A3A97F', '#8A9066'],
     'design/schmeckts-mark-mono.svg': ['currentColor'],
-    'design/schmeckts-app-icon.svg': ['#F4F0EC', '#2E2724', '#86513E', '#A76A53', '#BA7F68', '#94B3A5', '#7C9B8D'],
+    'design/schmeckts-app-icon.svg': ['#EEEDE7', '#25261F', '#86513E', '#A76A53', '#BA7F68', '#A3A97F', '#8A9066'],
 }
 
 
@@ -155,12 +155,12 @@ def test_logo_files():
         'splash screen: the app icon\u2019s motif in light, the dark mark in dark; the template\u2019s foreground is dropped',
     )
     check(
-        '#F4F0EC' in (res / 'values/ic_launcher_background.xml').read_text()
-        and '#F4F0EC' in (res / 'values/colors.xml').read_text()
-        and '#191513' in (res / 'values-night/colors.xml').read_text()
+        '#EEEDE7' in (res / 'values/ic_launcher_background.xml').read_text()
+        and '#EEEDE7' in (res / 'values/colors.xml').read_text()
+        and '#1B1C17' in (res / 'values-night/colors.xml').read_text()
         and 'design/schmeckts-app-icon.svg' in (ROOT / 'design/render-icons.py').read_text()
         and 'icon-512' not in (ROOT / 'design/render-icons.py').read_text(),
-        'icon background #F4F0EC, splash screen #F4F0EC in light and #191513 in dark, Android 7 from schmeckts-app-icon.svg',
+        'icon background #EEEDE7, splash screen #EEEDE7 in light and #1B1C17 in dark, Android 7 from schmeckts-app-icon.svg',
     )
 
 
@@ -227,22 +227,22 @@ def test_rules_static():
     js = [f.name for f in (WWW / 'js').rglob('*.js') if re.search(r'text-?transform|letter-?spacing', f.read_text(), re.I)]
     js += [f for f in ('index.html',) if re.search(r'text-transform|letter-spacing', (WWW / f).read_text())]
     check(not bad and not js, f'no text-transform and no positive letter-spacing outside the code field, not in the JavaScript either ({bad + js})')
-    # Typefaces: Figtree and Fraunces ship with the app, Rubik is gone entirely
+    # Typefaces: Figtree and Faustina ship with the app, Rubik is gone entirely
     fonts = sorted(p.name for p in (WWW / 'fonts').iterdir())
     check(
-        fonts == ['OFL-Figtree.txt', 'OFL-Fraunces.txt', 'figtree-latin.woff2', 'fraunces-latin.woff2'],
+        fonts == ['OFL-Faustina.txt', 'OFL-Figtree.txt', 'faustina-latin.woff2', 'figtree-latin.woff2'],
         f'the typefaces with their licences, nothing else ({fonts})',
     )
     check(
-        all('SIL Open Font License' in (WWW / 'fonts' / f).read_text() for f in ('OFL-Figtree.txt', 'OFL-Fraunces.txt'))
+        all('SIL Open Font License' in (WWW / 'fonts' / f).read_text() for f in ('OFL-Figtree.txt', 'OFL-Faustina.txt'))
         and 'Figtree' in (WWW / 'fonts/OFL-Figtree.txt').read_text()
-        and 'Fraunces' in (WWW / 'fonts/OFL-Fraunces.txt').read_text(),
+        and 'Faustina' in (WWW / 'fonts/OFL-Faustina.txt').read_text(),
         'licences: SIL OFL',
     )
     prep = (ROOT / 'scripts/prepare.py').read_text()
     check(
         '8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928' in prep
-        and '5097cb6923bb6938dcfc373e6f99a19fbb603cc32f740cc1ecd9791af359470b' in prep,
+        and 'df206bf23e42149d22847217c70577855c9eebe5ef9d40706199fc9e5bee3450' in prep,
         'prepare.py downloads both typefaces with a checksum',
     )
     blocks = css_blocks(css['tokens.css'])
@@ -250,8 +250,8 @@ def test_rules_static():
     root = next(d for sel, d in blocks if sel == ':root')
     check(
         faces.get('"Figtree"', {}).get('font-weight') == '400 700'
-        and faces.get('"Fraunces"', {}).get('font-weight') == '500 700'
-        and root.get('--font-display') == '"Fraunces","Iowan Old Style",Georgia,serif'
+        and faces.get('"Faustina"', {}).get('font-weight') == '500 700'
+        and root.get('--font-display') == '"Faustina","Iowan Old Style",Georgia,serif'
         and root.get('--font-ui') == '"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
         f'@font-face and the type tokens as specified ({sorted(k for k in faces if k)})',
     )
@@ -270,7 +270,7 @@ def test_rules_static():
     foreign += re.findall(r'\b(?:rgba?|hsla?|oklch)\(', tok)
     check(not outside and not foreign, f'colours only in tokens.css and only from the palette ({outside + foreign})')
     check(
-        set(colors_in((WWW / 'webview-update.html').read_text())) == {'#F4F0EC', '#2E2724', '#191513', '#EBE7E2'},
+        set(colors_in((WWW / 'webview-update.html').read_text())) == {'#EEEDE7', '#25261F', '#1B1C17', '#ECECE3'},
         'webview-update.html (without light-dark()): background and type from the palette',
     )
     res = ROOT / 'app/native/res'
@@ -316,7 +316,7 @@ def test_rules_static():
     )
 
 
-FRAUNCES = '.brand, .card h2, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
 
 
 SCAN = """(allowed) => { const bad = [], seen = new Set();
@@ -340,7 +340,7 @@ SCAN = """(allowed) => { const bad = [], seen = new Set();
     if (!own && el.tagName !== 'INPUT') continue;
     if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
-    if (fam === 'Fraunces') { if (!el.closest(allowed)) bad.push('Fraunces on ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
+    if (fam === 'Faustina') { if (!el.closest(allowed)) bad.push('Faustina on ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
     else if (fam !== 'Figtree') bad.push(fam + ' on ' + tag);
   }
   return {bad: [...new Set(bad)], seen: [...seen]}; }"""
@@ -356,7 +356,7 @@ async def test_rules(browser, url):
         seen, bad = set(), []
 
         async def scan():
-            r = await pg.evaluate(SCAN, FRAUNCES)
+            r = await pg.evaluate(SCAN, FAUSTINA)
             bad.extend(r['bad'])
             seen.update(r['seen'])
 
@@ -371,8 +371,8 @@ async def test_rules(browser, url):
             s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.lineHeight, s.letterSpacing]; }""",
         )
         check(
-            top == [0, 'Schmeckt’s?', 0, 'Fraunces', '650', '30px', '33px', '-0.6px'],
-            f'header ({scheme}): the wordmark only, Fraunces 650, 30px ({top})',
+            top == [0, 'Schmeckt’s?', 0, 'Faustina', '650', '30px', '33px', '-0.45px'],
+            f'header ({scheme}): the wordmark only, Faustina 650, 30px ({top})',
         )
         logo = await pg.eval_on_selector_all(
             '.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0, i.offsetWidth])"
@@ -380,7 +380,7 @@ async def test_rules(browser, url):
         want = 'img/schmeckts-mark.svg' if scheme == 'light' else 'img/schmeckts-mark-dark.svg'
         check(logo == [[want, True, 104]], f'welcome screen ({scheme}): the mark for this scheme ({logo})')
         vs = await pg.evaluate('getComputedStyle(document.body).fontVariationSettings')
-        check(vs == '"SOFT" 100', f'body: font-variation-settings "SOFT" 100 ({vs})')
+        check(vs == 'normal', f'body: no font-variation-settings, Faustina has no axis of its own ({vs})')
         await pg.click('[data-action=demo]')
         await idle(pg)
         if await pg.query_selector('[data-action=close-week]'):  # „Letzte Woche“ only exists Monday to Wednesday
@@ -398,7 +398,7 @@ async def test_rules(browser, url):
               c.firstElementChild.tagName, h.fontFamily.split(',')[0].replace(/"/g, ''), h.fontWeight, h.fontSize, h.lineHeight, h.letterSpacing, h.color === p.color].join('|'); }),
             gaps: cards.slice(1).map((c, i) => Math.round(c.getBoundingClientRect().top - cards[i].getBoundingClientRect().bottom))};
           probe.remove(); return out; })()""")
-        want = 'true|true|none|26px|18px 18px 8px|none|0px|0px|H2|Fraunces|600|21px|26.25px|-0.21px|true'
+        want = 'true|true|none|24px|18px 18px 8px|none|0px|0px|H2|Faustina|600|21px|26.25px|-0.105px|true'
         first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
         check(
             layout['app'] == ['600px', '18px', '18px']
@@ -406,7 +406,7 @@ async def test_rules(browser, url):
             and layout['cards'][0] == first
             and all(c == want for c in layout['cards'][1:])
             and layout['gaps'] == [14] * 5,
-            f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 26px, 18/18/8, without border and shadow, heading Fraunces 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
+            f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
         await pg.click('[data-action=open-settings]')
         await idle(pg)
@@ -469,9 +469,9 @@ async def test_rules(browser, url):
         await idle(pg)
         check(
             not bad,
-            f'Figtree everywhere and Fraunces only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
+            f'Figtree everywhere and Faustina only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
         )
-        check(seen == set(FRAUNCES.split(', ')), f'Fraunces on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
+        check(seen == set(FAUSTINA.split(', ')), f'Faustina on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
 
@@ -662,6 +662,33 @@ def test_spacing_scale():
     check(not loose, f'every distance in app.css comes from the scale ({len(loose)} do not: {loose[:4]})')
 
 
+# One radius per role (PROJECT.md, "Principles"): the four tokens, plus the circle. A literal value would put a
+# fifth radius into the app, which is how the twelve of them came about in the first place.
+RADIUS_ALLOWED = ('50%', '0')
+
+
+def test_radius_scale():
+    """Every border-radius in app.css comes from the tokens in tokens.css; only a circle says 50 %."""
+    scale = {
+        p: v
+        for sel, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8'))
+        if sel == ':root'
+        for p, v in d.items()
+        if p.startswith('--radius-')
+    }
+    check(
+        scale == {'--radius-s': '12px', '--radius-m': '16px', '--radius-l': '24px', '--radius-full': '999px'},
+        f'the four radii in tokens.css: small and nested, controls, containers, pills ({scale})',
+    )
+    loose = []
+    for sel, decls in css_rules((WWW / 'css/app.css').read_text(encoding='utf-8')):
+        for prop, value in decls:
+            if 'radius' not in prop:
+                continue
+            loose += [f'{sel} {prop}:{value}' for part in value.split() if part not in RADIUS_ALLOWED and not part.startswith('var(--radius-')]
+    check(not loose, f'every radius in app.css comes from the tokens ({len(loose)} do not: {loose[:4]})')
+
+
 def test_ratings():
     """The server's overview labels every level of RATINGS, with the app's wording.
 
@@ -716,6 +743,7 @@ async def test_files(browser, url):
     test_rules_static()
     test_pack()
     test_spacing_scale()
+    test_radius_scale()
     test_ratings()
     test_isolated_tests()
     test_prompt()
