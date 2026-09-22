@@ -58,6 +58,25 @@ run 'ruff format' ruff format --quiet --check tests scripts design
 # Shell
 run 'shellcheck' shellcheck scripts/*.sh server/build-deb.sh .claude/hooks/*.sh
 
+# Pinned versions that have to agree. The suites that open the app run in Playwright's own container image, and
+# its tag has to be the version pinned in tests/requirements.txt: the image brings the matching Chromium, while
+# the pinned list is installed over the image's own Playwright. Disagree, and the browser is simply not there —
+# an error that only turns up once a test opens a page, in three jobs at once.
+playwright_pin() {
+  local pin tag
+  pin=$(sed -n 's/^playwright==\(.*\)$/\1/p' tests/requirements.txt)
+  tag=$(sed -n 's|.*image: mcr\.microsoft\.com/playwright/python:v\([^-]*\)-.*|\1|p' .github/workflows/tests.yml | sort -u)
+  if [ -z "$pin" ]; then
+    echo 'tests/requirements.txt pins no playwright version' >&2
+    return 1
+  fi
+  if [ "$tag" != "$pin" ]; then
+    echo "playwright is pinned to $pin, the container image in .github/workflows/tests.yml is v$tag" >&2
+    return 1
+  fi
+}
+run 'playwright pin' playwright_pin
+
 if [ ${#failed[@]} -gt 0 ]; then
   echo "Failed: ${failed[*]}" >&2
   exit 1
