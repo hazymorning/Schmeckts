@@ -71,6 +71,12 @@ if (Native?.App) {
     openLink(url);
   });
 }
+/* The strip behind the status bar is only there once the page has moved (body::before). CSS cannot ask how far
+   the document has scrolled, so the class says it. */
+const markScrolled = () => document.documentElement.classList.toggle('scrolled', window.scrollY > 0);
+markScrolled();
+window.addEventListener('scroll', markScrolled, {passive: true});
+
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && !dlg.open) renderHome();
 });

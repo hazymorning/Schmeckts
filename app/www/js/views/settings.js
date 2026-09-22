@@ -53,8 +53,10 @@ function feedHint() {
 const themeValue = () => (THEMES.find(([v]) => v === prefs.theme) || THEMES[0])[1];
 const remindValue = () => {
   if (!prefs.remind && !prefs.feedRemind) return 'Aus';
+  // „Füttern“ and its an or aus are held together by a no-break space, or a narrow box leaves the two letters
+  // alone on a line of their own.
   const rate = prefs.remind ? `Bewerten ${prefs.remind / 60} Std.` : 'Bewerten aus';
-  return `${rate}, Füttern ${prefs.feedRemind ? 'an' : 'aus'}`;
+  return `${rate}, Füttern\u00a0${prefs.feedRemind ? 'an' : 'aus'}`;
 };
 
 /* A row of the overview. `pageRow` leads to a sub-page and shows the current value, `doRow` runs an action and

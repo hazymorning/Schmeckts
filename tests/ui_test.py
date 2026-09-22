@@ -3123,12 +3123,26 @@ async def test_start(browser, url):
     await idle(pg)
     bar = await pg.evaluate(
         """(() => { const s = getComputedStyle(document.body, '::before');
-          return [s.height, s.position, s.backgroundColor === getComputedStyle(document.body).backgroundColor, s.zIndex,
+          return [s.height, s.position, s.opacity, s.zIndex,
+            s.backgroundImage.includes(getComputedStyle(document.body).backgroundColor),
             getComputedStyle(document.querySelector('.top')).paddingTop]; })()"""
     )
     check(
-        bar == ['24px', 'fixed', True, '10', '36px'],
-        f'behind the status bar a strip of the background, as tall as the inset, and the header below it ({bar})',
+        bar == ['40px', 'fixed', '0', '10', True, '36px'],
+        f'at the top the strip behind the status bar is invisible, so the picture reaches the edge ({bar})',
+    )
+    moved = await pg.evaluate(
+        """(async () => { const wait = ms => new Promise(r => setTimeout(r, ms));
+          document.body.style.minHeight = '3000px';
+          window.scrollTo(0, 60); await wait(300);
+          const on = [document.documentElement.classList.contains('scrolled'),
+            getComputedStyle(document.body, '::before').opacity];
+          window.scrollTo(0, 0); document.body.style.minHeight = ''; await wait(300);
+          return on.concat(getComputedStyle(document.body, '::before').opacity); })()"""
+    )
+    check(
+        moved == [True, '1', '0'],
+        f'once the page has moved the strip is there, and it goes again at the top ({moved})',
     )
     plain = await top_pixel(pg)
     await settings(pg)
@@ -3199,7 +3213,7 @@ async def test_settings(browser, url):
     await settings_back(pg)
     vals = await pg.evaluate("[...document.querySelectorAll('#sheet .val')].map(v => v.innerText)")
     check(
-        vals == ['Dunkel', 'Bewerten 1 Std., Füttern an', 'Anna', 'Nicht verbunden'],
+        vals == ['Dunkel', 'Bewerten 1 Std., Füttern\u00a0an', 'Anna', 'Nicht verbunden'],
         f'the values follow what was set on the pages, without the settings being opened again ({vals})',
     )
 
@@ -3265,7 +3279,7 @@ async def test_settings(browser, url):
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
-    # With movement a page slides in from the side; without it the page is there at once
+    # With movement a page comes in from below, a step back from above; without it the page is there at once
     ctx = await phone(browser, motion=True)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('[data-action=demo]')
@@ -3274,12 +3288,13 @@ async def test_settings(browser, url):
     await idle(pg)
     await pg.click('#sheet [data-action=settings-page][data-v=look]')
     slide = await pg.evaluate(
-        "document.getElementById('sheetBody').getAnimations().map(a => [a.animationName, a.effect.getComputedTiming().duration])"
+        """document.getElementById('sheetBody').getAnimations().map(a => [a.animationName,
+             a.effect.getComputedTiming().duration, a.effect.getKeyframes()[0].transform])"""
     )
     await idle(pg)
     check(
-        [s[0] for s in slide] == ['swapFwd'] and slide[0][1] == 280,
-        f'with movement the page slides in from the side, once and in 280 ms ({slide})',
+        [s[0] for s in slide] == ['swapFwd'] and slide[0][1] == 340 and slide[0][2] == 'translateY(14px)',
+        f'with movement the page comes in from below, once and in 340 ms ({slide})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
