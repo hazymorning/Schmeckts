@@ -51,16 +51,10 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
 
 ## Installieren
 
-Im Play Store gibt es die App nicht, du lädst sie hier direkt herunter. Du brauchst Android 8 oder neuer.
+Diese App gibt es nicht im Play Store, du lädst sie hier direkt herunter.
 
-<!-- Der Button lädt immer die APK aus dem neuesten Release. Das klappt nur, wenn die Datei in jedem Release schmeckts.apk heißt. -->
 <p align="center">
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/6184020c-5ebd-43a7-a672-32a7b55a2039" width="292" alt="APK herunterladen"></a>
-</p>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/5e312f50-e1ec-493b-9ee2-99c3bb88fbed" width="150" alt="QR-Code, der diese Anleitung auf dem Handy öffnet"><br>
-  <sub>Du bist am Computer? Scann den Code mit dem Handy, dann geht diese Anleitung dort auf.</sub>
 </p>
 
 1. Tippe auf dem Handy auf den Download-Button. Wenn der Browser fragt, ob du die Datei behalten willst, bestätige das.
