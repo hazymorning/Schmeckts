@@ -1,6 +1,5 @@
-/* Our own camera for packaging photos. openCamera(hint) returns the photo as a blob, null on „Abbrechen“, and throws
-   without a camera or the permission: the caller then falls back to the camera app. The WebView asks for the
-   permission on first use. */
+/* Our own camera for packaging photos. openCamera(hint) returns the photo as a blob, null on „Abbrechen“, and
+   throws without a camera or the permission: the caller then falls back to the camera app. */
 import {$} from '../dom.js';
 import {esc} from '../text.js';
 

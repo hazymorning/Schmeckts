@@ -81,8 +81,7 @@ async function writeNow(name, text) {
     await FS.rename({from: tmp, to: path, directory: DIR, toDirectory: DIR});
   } catch {
     // If rename will not replace the target, delete first. The target need not exist, so a failing delete is
-    // deliberately passed over; the rename right after it is the one that has to work, and throws if it does not.
-    // If the app crashes in between, read() takes the .tmp.
+    // ignored; the rename after it throws if it fails. If the app crashes in between, read() takes the .tmp.
     await FS.deleteFile({path, directory: DIR}).catch(() => {});
     await FS.rename({from: tmp, to: path, directory: DIR, toDirectory: DIR});
   }
@@ -111,7 +110,7 @@ async function loop() {
     try {
       await writeNow(name, text);
     } catch (e) {
-      if (!pending.has(name)) pending.set(name, job); // retry later; later documents wait
+      if (!pending.has(name)) pending.set(name, job); // retry later; everything queued behind it waits
       busy = false;
       if (!fails++) diskHooks.failed(e);
       report(`saving ${name} failed`, e);

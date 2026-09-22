@@ -7,7 +7,7 @@ TITLE="Schmeckt’s-Server"
 esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
 # Run schmeckts-server as administrator; the output ends up in OUT.
-# If someone cancels the password prompt, the window exits quietly.
+# pkexec returns 126 or 127 when the password prompt is cancelled or authorisation fails; exit without a dialog.
 admin() {
   OUT=$(pkexec /usr/bin/schmeckts-server "$@" 2>&1)
   local rc=$?

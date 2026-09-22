@@ -21,7 +21,7 @@ export async function lookupOnline(code) {
     try {
       hit = await fetchProduct(base, code);
     } catch {
-      continue; // this database is not answering: the next one is tried, and if none answers we throw below
+      continue; // this database is not answering; if none of them answers, the throw below hits
     }
     reached = true;
     if (hit.found) return remember(code, hit);
@@ -78,7 +78,7 @@ function remembered(code) {
   const kept = prefs.codes?.[code];
   if (!kept || Date.now() - kept.at > (kept.found ? KEEP_FOUND : KEEP_MISS)) return null;
   const hit = {...kept};
-  delete hit.at; // when we remembered it is ours to keep, not part of the answer
+  delete hit.at; // the timestamp is cache bookkeeping and stays out of the result
   return hit;
 }
 function remember(code, hit) {

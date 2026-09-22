@@ -56,7 +56,7 @@ export function update() {
       }
     }, 400); // safety net
   } catch {
-    // No view transition to be had here: drawing without one is the same page, only without the movement
+    // startViewTransition failed: draw directly, the same page without the animation
     run();
   }
 }
@@ -69,7 +69,8 @@ export function scrollTop() {
 const HIST = 5; // meals under the calendar; everything else is in the evaluation
 export const homeView = {fresh: null, open: {}};
 
-/* Pet bar: the filter, only from two pets on. With one pet there is nothing to filter, and pets are managed in the settings. */
+/* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
+   settings. */
 function renderPets() {
   const el = $('#pets');
   if (db.pets.length < 2) {
@@ -146,9 +147,9 @@ function homeHTML() {
   return html;
 }
 
-/* Overview: the pet in the filter, the household under „Alle“, with picture, name and the essentials from the model.
-   A tap on the picture opens the pet. Folded up it is two lines ending in „…“; a tap on the card shows the whole text
-   and back again (the state lasts until restart, as with the other cards). */
+/* Overview: the pet in the filter, the household under „Alle“, with picture, name and the essentials from the
+   model. A tap on the picture opens the pet. Folded up it is two lines ending in „…“; a tap on the card shows
+   the whole text and back again (the state lasts until restart, as with the other cards). */
 function overviewHTML(m) {
   const pets = m.overview.pets.map(x => getPet(x.id)),
     one = pets.length === 1 ? pets[0] : null;
@@ -199,7 +200,7 @@ function overviewText({last, pets}) {
           ];
   return [fed, ...taste].filter(Boolean).join(' ');
 }
-/* Folding open or shut without a redraw: only the class changes, and the text eases open or shut as on the other cards */
+/* Fold open or shut without a redraw: only the class changes, the text slides as on the other cards */
 export function toggleOverview() {
   const sec = $('#home .overview'),
     p = sec && $('p', sec);
@@ -346,7 +347,7 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
-/* Letzte Woche: a look back at the previous week (review() in smart.js), facts only; the device remembers „Schließen“ */
+/* Letzte Woche: the previous week from review() in smart.js; the device remembers „Schließen“ */
 function duelText(feeders) {
   // the most first; when several are level it reads „Gleichstand“
   const times = x => `${esc(x.name)} ${x.n}×`,
@@ -370,10 +371,10 @@ function weekHTML(w) {
     <div class="week">${lines.join('')}</div><button class="card-btn" data-action="close-week" data-v="${dayKey(w.start)}">Schließen</button></section>`;
 }
 
-/* Einkaufen: folded up, up to 3 varieties to buy again (including „Gemischt“, with „für …“) and up to 2 no longer
-   bought; unfolded, every variety in three groups with score bars. A manual setting decides the group and shows the
-   pin (groups: shopGroups() in smart.js). Footer „Geschmack bekannt“ from 3 varieties on, with „Als Liste teilen“
-   below it when unfolded. */
+/* Einkaufen: folded up, up to 3 varieties to buy again (including „Gemischt“, with „für …“) and up to 2 no
+   longer bought; unfolded, every variety in three groups with score bars. A manual setting decides the group
+   and shows the pin (groups: shopGroups() in smart.js). Footer „Geschmack bekannt“ from 3 varieties on, with
+   „Als Liste teilen“ below it when unfolded. */
 const SHOP = [
   ['nachkaufen', 'Nachkaufen', 3],
   ['beobachten', 'Beobachten', 0],

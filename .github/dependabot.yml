@@ -1,10 +1,10 @@
-# Updates for everything the project pulls in from outside. Nothing here touches the app's own dependencies
-# beyond opening a pull request; the tests decide whether it may be merged.
-# One group per ecosystem, so a month's updates arrive as one pull request to read and merge rather than one
-# per package: the first run without grouping opened seven at once.
+# Updates for everything the project pulls in from outside. Dependabot only opens the pull request; whether it
+# gets merged depends on the tests.
+# One group per ecosystem, so a month's updates arrive as one pull request rather than one per package: the
+# first run without grouping opened seven at once.
 version: 2
 updates:
-  # The workflows pin every foreign action to a commit; this is what raises the pin.
+  # The workflows pin every third-party action to a commit; this is what raises those pins.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -33,5 +33,5 @@ updates:
     ignore:
       # Playwright is raised by hand. Its version decides which Chromium build is needed, and that build comes
       # with the container image pinned in tests.yml, which no bot touches. Raising only the package leaves the
-      # browser behind, and every suite that opens the app fails at once.
+      # browser behind, and every suite that opens the app fails.
       - dependency-name: playwright

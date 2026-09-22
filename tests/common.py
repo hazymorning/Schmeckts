@@ -104,7 +104,7 @@ window.Capacitor = {isNativePlatform: () => true,
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
-# Everything the page moves while it is being built: layout-shift entries with no tap or key behind them.
+# Layout shifts while the page is being built: entries with no tap or key behind them.
 # Started before the app's own module, so nothing is missed.
 SHIFTS = """
 window.__shifts = [];
@@ -112,8 +112,8 @@ new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadR
   .observe({type: 'layout-shift', buffered: true});
 """
 
-# Android's system font size, simulated: it multiplies every font size the app sets, which is what this does
-# too: every px font size in the style sheets again, scaled, as !important.
+# Android's system font size, simulated: it multiplies every font size the app sets. This re-declares every px
+# font size from the style sheets, scaled, as !important.
 BIG_TEXT = """k => { const s = document.createElement('style');
   s.textContent = [...document.styleSheets].flatMap(x => [...x.cssRules])
     .filter(r => r.style && r.style.fontSize && r.style.fontSize.endsWith('px'))
@@ -204,8 +204,8 @@ def real_errors(errors):
 
 # The tests reach the app's modules through import() inside evaluate. Chromium's inspector holds the promise that
 # evaluate waits on only weakly: while garbage collection runs (lots of data, just reloaded) it occasionally collects
-# it (CDP "Promise was collected", "Execution context was destroyed" in Playwright). So it is not the inspector that
-# waits here: the page stores the result (window.__out) and the test asks for it. Expression or function, as in
+# it (CDP "Promise was collected", "Execution context was destroyed" in Playwright). So the page stores the result
+# (window.__out) and the test asks for it instead of leaving the inspector to wait. Expression or function, as in
 # Playwright.
 CALL = """a => { const v = (EXPR), id = Math.random().toString(36).slice(2), out = (window.__out ||= {})[id] = {};
   Promise.resolve(typeof v === 'function' ? v(a) : v).then(value => { out.value = value; out.done = true; }, e => { out.error = String(e?.stack || e); out.done = true; });
@@ -393,8 +393,8 @@ IDLE = (
 
 
 async def fixed_clock(ctx, **kw):
-    """ctx.clock.install(), and idle() remembers it: with the clock installed the frames stand still, so waiting
-    for them inside the page would never return."""
+    """ctx.clock.install(), marked on the context so idle() can see it: with the clock installed the frames stand
+    still, so waiting for them inside the page would never return."""
     await ctx.clock.install(**kw)
     ctx.schmeckts_fixed_clock = True
 
@@ -427,7 +427,7 @@ PARALLEL = 4  # independent tests at the same time, each on phones of its own; -
 
 def run_tests(tests, camera=()):
     """Runs the tests, or only those named on the command line. Tests run at the same time, at most PARALLEL of
-    them; --serial runs them one after another. Nothing is shared but the little web server and the test photo,
+    them; --serial runs them one after another. Nothing is shared but the local web server and the test photo,
     both read-only, so the order makes no difference, which is what the check per test confirms.
     camera: names of the tests that need a Chromium with a simulated camera device."""
 

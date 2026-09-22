@@ -1,5 +1,5 @@
-/* Light, dark or system. Sets nothing but data-theme to the scheme currently in force (the system's under
-   „System“); the colours live in tokens.css. */
+/* Light, dark or system. Sets data-theme to the scheme in force (the system's under „System“); the colours
+   live in tokens.css. */
 import {$} from '../dom.js';
 import {Native} from '../native.js';
 import {report} from '../report.js';

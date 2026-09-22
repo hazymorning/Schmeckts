@@ -6,7 +6,7 @@ Checks taking data over and connecting, syncing in both directions, live notific
 connection, restarts, a phone with a skewed clock, a restore (new epoch), the checksum, a changed code, the
 protocol version, recognition including the automatic retry, and scanning: lookup through the server, the detour
 via a photo, a known code without a connection, codes from two phones, removal, a server without barcode lookup.
-In the end they must all be level.
+At the end both phones and the server must hold the same data.
 Usage: python3 tests/sync_test.py   (needs Go, builds the server itself)"""
 
 import asyncio
@@ -234,8 +234,8 @@ async def main():
     make_photo()
     go = shutil.which('go') or '/usr/local/go/bin/go'
     binary = os.path.join(tempfile.mkdtemp(), 'schmeckts-server')
-    # -buildvcs=false: the throwaway test binary has no use for the commit it was built from, and asking git for
-    # it fails wherever the checkout belongs to another user than the build does, the CI container for one.
+    # -buildvcs=false: the stamp is pointless in a throwaway test binary, and the git call behind it fails when
+    # the checkout belongs to a different user than the build runs as, which is the case in the CI container.
     subprocess.run([go, 'build', '-buildvcs=false', '-o', binary, '.'], cwd=ROOT / 'server', check=True)
     fake, food = FakeAnthropic(), FakeFoodDB()
     srv = GoServer(binary, fake)
@@ -261,7 +261,7 @@ async def main():
         browser = await p.chromium.launch()
 
         def new_phone():
-            return phone(browser, motion=True)  # as before: these phones do not run under reduced motion
+            return phone(browser, motion=True)  # these phones do not run under reduced motion
 
         try:
             # Phone A is already in use (data without clocks) and connects
@@ -382,7 +382,7 @@ async def main():
             srv.stop()
             await run(b, "db.pets.find(p => p.name === 'Tiger').name = 'Tiger II'; save();")
             await expect(await until_sync(b, "status.state === 'offline'", 15), 'server down: status offline')
-            await b.close()  # phone B off
+            await b.close()
             del PHONES['B']
             srv.start()
             await run(a, "db.pets.find(p => p.name === 'Luna').species = 'Katze'; save();")
@@ -763,7 +763,7 @@ async def main():
             # The protocol does not match
             ctx_d = await new_phone()
 
-            async def newer(route):  # answers like a server with protocol 2, CORS and all
+            async def newer(route):  # answers like a server with protocol 2, CORS headers included
                 cors = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type'}
                 if route.request.method == 'OPTIONS':
                     await route.fulfill(status=204, headers=cors)
@@ -790,7 +790,7 @@ async def main():
             )
             await ctx_d.close()
 
-            # Final state: everyone level
+            # Final state: both phones and the server hold the same data
             print('final state')
             for pg in (a, b):
                 await pg.evaluate("import('./js/sync.js').then(m => m.retrySync())")

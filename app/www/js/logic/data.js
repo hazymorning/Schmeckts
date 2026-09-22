@@ -82,13 +82,13 @@ export async function importData(file) {
       });
     });
   } catch {
-    // Whatever is wrong with the file, a person can only pick another one: the toast says so
+    // One message for every broken file; picking another one is all a person can do here
     toast('Diese Datei ist kein gültiges Backup.');
   }
 }
 const demoId = () => DEMO + uid();
-/* One sample pet with six varieties and their ratings, two people, and the usual feeding times. Everything is
-   made up but has to look like a phone in use, so the evaluation and the insights have something to say. */
+/* One sample pet with six varieties and their ratings, two people, and the usual feeding times. The data is made
+   up, but it has to look like a phone in use so that the evaluation and the insights are not empty. */
 const DEMO_PLAN = [
   ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
   ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],
@@ -101,7 +101,7 @@ const DEMO_PEOPLE = ['Anna', 'Jonas'];
 const DEMO_SLOTS = [7.25, 18.1, 12.5, 19.4]; // typical feeding times, as hours of the day
 const DEMO_CALM = 6; // the newest meals without weak ratings, so the sample never reports „frisst schlechter“
 const DEMO_RATED_AFTER = 2 * 3600e3; // rated two hours after the meal
-const DEMO_OPEN_AGO = 2 * 3600e3; // and the one meal still open was served two hours ago
+const DEMO_OPEN_AGO = 2 * 3600e3; // the one meal still open was served two hours ago
 const DAY = 864e5;
 
 export function loadDemo() {
@@ -131,7 +131,7 @@ function demoMeals(pet) {
   }
   spreadOverDays(made, pet);
   made[3].note = 'Neue Packung';
-  // One meal from two hours ago, still without a rating: „Wie war’s?“ has something to show
+  // One meal from two hours ago, still without a rating, so „Wie war’s?“ is not empty
   made.push({
     id: demoId(),
     productId: byBrand.Felix.id,
@@ -160,8 +160,8 @@ function spreadOverDays(made, pet) {
   });
 }
 
-/* Before connecting: remove the sample data without a trace, it has no business in the household.
-   That includes whatever was served only for the sample pet, and food that hung only on it. */
+/* Before connecting: remove the sample data so that none of it reaches the household. That includes meals
+   served only for the sample pet, and food that no other meal uses. */
 export function purgeDemo() {
   const demo = id => id.startsWith(DEMO);
   const pets = new Set(db.pets.filter(p => demo(p.id)).map(p => p.id));

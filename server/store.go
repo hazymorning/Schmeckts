@@ -314,7 +314,7 @@ func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	return s.st.Epoch, s.st.Seq, out
 }
 
-// Checksum is a checksum over every field and its clock. The app computes it the same way:
+// Checksum hashes every field and its clock. The app computes it the same way:
 // SHA-256 over the sorted lines "collection/id/field@clock\n".
 func (s *Store) Checksum() (epoch string, seq int64, sum string, fields int) {
 	s.mu.Lock()
@@ -372,7 +372,7 @@ func (s *Store) Products(limit int) []string {
 }
 
 // Backup writes a copy once a day and keeps the last 30.
-// Along the way the server forgets very old change ids.
+// It also drops change ids older than keepSeen.
 func (s *Store) Backup(now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

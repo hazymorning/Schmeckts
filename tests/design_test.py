@@ -209,7 +209,7 @@ def css_value(value):
 def css_blocks(text):
     """[(selector, {property: value})] for every innermost block, at-rules such as @font-face included.
 
-    The rules are read, not searched for as text, so Prettier may lay the CSS out however it likes."""
+    Parses the rules instead of matching text, so the way Prettier lays the CSS out makes no difference."""
     return [(' '.join(sel.split()), {p: css_value(v) for p, v in decls}) for sel, decls in css_rules(text)]
 
 
@@ -594,8 +594,8 @@ def test_version_code():
         code = code * 100 + part
     code += prep.VERSION_OFFSET
     src = (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
-    # The Gradle line is glued together from pieces, so it is read with a pattern: the formatter is free to
-    # change the quotes around the offset and to break the line differently.
+    # The Gradle line is built from pieces, so a pattern matches it: the formatter may change the quotes around
+    # the offset and break the line elsewhere.
     hands_over_offset = re.search(r'def appVersionCode = [\'"]\s*\+\s*str\(VERSION_OFFSET\)', src)
     check(
         code > 10400 and hands_over_offset,
@@ -632,8 +632,8 @@ def test_signing_key():
             )
 
 
-# Not distances, so they keep their own value: the room an icon needs inside a field, and the room the
-# feeding button needs under the page. env()'s own fallback is not a distance either and is taken out first.
+# Exceptions to the spacing scale: the room an icon needs inside a field, and the room the feeding button needs
+# under the page. env()'s own fallback is no distance either and is taken out before the check.
 SPACING_ALLOWED = {
     '44px': 'room for the icon in a field: 14 from the edge, 20 wide, 10 to the text',
     '112px': 'room for the feeding button under the page',
@@ -642,7 +642,7 @@ SPACING_PROPS = ('margin', 'padding', 'gap', 'row-gap', 'column-gap')
 
 
 def test_spacing_scale():
-    """Every margin, padding and gap comes from the scale in tokens.css, so no distance is invented on the spot."""
+    """Every margin, padding and gap comes from the scale in tokens.css; a literal px value is not allowed."""
     scale = {
         p: v
         for sel, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8'))
@@ -666,7 +666,7 @@ def test_ratings():
     """The server's overview labels every level of RATINGS, with the app's wording.
 
     The key alone decides points, wording and icon (PROJECT.md, "Evaluation"), so the two lists must not drift
-    apart: the overview would otherwise print "offen" for a level that is perfectly well rated."""
+    apart: the overview would otherwise print "offen" for a level that does have a rating."""
     config = (WWW / 'js/config.js').read_text(encoding='utf-8')
     block = re.search(r'export const RATINGS = \{(.*?)\n\};', config, re.S)
     app = dict(re.findall(r"(\w+):\s*\{label:\s*'([^']+)'", block.group(1) if block else ''))
@@ -678,10 +678,10 @@ def test_ratings():
 
 
 def test_isolated_tests():
-    """Tests run side by side, so every one of them has to work on phones of its own.
+    """Tests run side by side, so each of them needs phones of its own.
 
-    common.phone() is the only place that makes a browser context: run_tests hangs the check on it that each
-    test closes its own again. A context made past it would be outside that check."""
+    common.phone() is the only place that makes a browser context, and run_tests checks after every test that
+    the contexts it made are closed again. A context made past phone() would skip that check."""
     made = 'browser.' + 'new_context('  # in two pieces, or this line would report itself
     stray = []
     for f in sorted((ROOT / 'tests').glob('*.py')):

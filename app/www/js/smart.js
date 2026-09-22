@@ -277,8 +277,8 @@ function hints(sorts, appetites, pet, prefs) {
      count            meals, varieties tried, days fed on and how many days the span holds
      liked            of the ratings in the span, how many went down well (from YES points), as a percentage
      best, worst      the variety that goes down best and the one that goes down worst, from MIN_TOP ratings
-   best and worst need two different varieties, otherwise the same one would be both. `liked` counts the very
-   ratings everything else is computed from, so the ring on the page says nothing of its own. */
+   best and worst need two different varieties, otherwise the same one would be both. `liked` counts the same
+   ratings as everything else, so the ring on the page adds no separate figure. */
 const MIN_TOP = 2;
 export function report(db, prefs, now = Date.now(), days = 0) {
   const petIds = db.pets.map(p => p.id);

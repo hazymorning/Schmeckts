@@ -27,7 +27,8 @@ function cropMove(c, dx, dy, stage) {
   c.cy -= dy * k;
   return clamp(c);
 }
-/* The point (fx, fy) of the stage, 0 to 1, stays put while zooming: the centre for the slider, between the fingers when pinching */
+/* The point (fx, fy) on the stage, 0 to 1, stays put while zooming: the centre for the slider, the midpoint
+   between the fingers when pinching */
 function cropZoom(c, z, fx = 0.5, fy = 0.5) {
   const s0 = side(c),
     px = c.cx + (fx - 0.5) * s0,
@@ -39,7 +40,7 @@ function cropZoom(c, z, fx = 0.5, fy = 0.5) {
   return clamp(c);
 }
 
-/* stage: the square stage, img: the loaded image (hung inside it), slider: the zoom slider */
+/* stage: the square element the crop is shown in, img: the loaded image (hung inside it), slider: the zoom slider */
 export function mountCrop(stage, img, c, slider) {
   const layout = () => {
     const k = stage.clientWidth / side(c),
@@ -65,7 +66,7 @@ export function mountCrop(stage, img, c, slider) {
     try {
       stage.setPointerCapture(e.pointerId);
     } catch {
-      /* the pointer is already gone: panning works without capture, it just stops at the edge of the stage */
+      /* the pointer is already gone: panning works without capture, it stops at the edge of the stage */
     }
     pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
   });

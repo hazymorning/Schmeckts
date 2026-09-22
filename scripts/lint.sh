@@ -2,12 +2,12 @@
 # Style and the usual mistakes, in every language the project uses. The CI job `lint` runs exactly this.
 # JavaScript and CSS: ESLint and Prettier from app/node_modules. Go: gofmt, go vet, staticcheck.
 # Python: ruff. Shell: shellcheck. Nothing is rewritten here; --write and --fix are for a person to run.
-# Every check runs, so one command shows everything that is wrong at once.
+# Every check runs even when an earlier one fails, so one run shows everything that is wrong.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-STATICCHECK_VERSION=2026.2.1   # pinned, like every other tool version
+STATICCHECK_VERSION=2026.2.1   # pinned, raised by hand
 failed=()
 
 run() { # run <name> <command …>
@@ -37,9 +37,9 @@ if [ -z "$GO" ]; then
   note_failure 'go (missing, scripts/setup-build-env.sh installs it)'
 else
   GOBIN="$("$GO" env GOPATH)/bin"
-  # staticcheck needs a newer Go to build than the server is written for, and that is fine: the linter is not
-  # part of the program. GOTOOLCHAIN=auto lets `go install` fetch the toolchain it asks for, whatever the
-  # environment has set. actions/setup-go 7 pins it to `local`, and the install then fails outright.
+  # staticcheck needs a newer Go to build than the server is written for. The linter is not shipped with the
+  # server, so the server's Go version stays where it is. GOTOOLCHAIN=auto lets `go install` fetch the toolchain
+  # it asks for, whatever the environment has set. actions/setup-go 7 pins it to `local` and the install fails.
   [ -x "$GOBIN/staticcheck" ] || GOTOOLCHAIN=auto "$GO" install "honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION"
   unformatted="$("$(dirname "$GO")/gofmt" -l server)"
   if [ -n "$unformatted" ]; then
@@ -66,8 +66,8 @@ run 'shellcheck' shellcheck scripts/*.sh server/build-deb.sh
 
 # Pinned versions that have to agree. The suites that open the app run in Playwright's own container image, and
 # its tag has to be the version pinned in tests/requirements.txt: the image brings the matching Chromium, while
-# the pinned list is installed over the image's own Playwright. Disagree, and the browser is simply not there.
-# That error only turns up once a test opens a page, in three jobs at once.
+# the pinned list is installed over the image's own Playwright. If the two disagree, the browser is missing.
+# That shows up only once a test opens a page, in three jobs at once.
 playwright_pin() {
   local pin tag
   pin=$(sed -n 's/^playwright==\(.*\)$/\1/p' tests/requirements.txt)

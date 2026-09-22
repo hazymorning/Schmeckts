@@ -1,4 +1,4 @@
-// Foundations without a DOM: barcodes, records as fields, the hybrid clock, module layering. Usage: node --test tests/*.test.js
+// Without a DOM: barcodes, records as fields, the hybrid clock, module layering. Usage: node --test tests/*.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';

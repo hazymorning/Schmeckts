@@ -109,7 +109,7 @@ function viewName() {
     ${textureChips(s)}
     <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button></div>`;
 }
-/* Consistency or treat type of variety x (the sheet itself while naming): single choice, only for types that have one */
+/* Consistency or treat type of variety x (the sheet itself while naming): single choice, for types that have one */
 function textureChips(x, note = '') {
   const t = TEXTURES[typeOf(x)];
   return t
@@ -294,9 +294,9 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* The evaluation. One thing stands out, a ring saying how much of what was served went down well; around it
-   only quiet numbers. The span at the top decides what the ring, the numbers and the list show, and it lasts
-   while the app runs; nothing about it is stored.
+/* The evaluation: a ring with the share of what was served that went down well, and the figures beside it.
+   The span at the top decides what the ring, the figures and the list show; it lasts while the app runs and is
+   not stored.
    sheet.at: the id of the day it opens at, coming from the calendar on the home page */
 export const reportState = at => ({kind: 'report', at});
 
@@ -331,7 +331,7 @@ function ring(m) {
       <span>${enough ? 'kam gut an' : 'Noch zu wenig bewertet'}</span></span></div>`;
 }
 
-/* Beside the ring: meals, varieties and the days fed on, each with a small quiet icon */
+/* Beside the ring: meals, varieties and the days fed on, each with a small icon */
 const figRow = (ic, text) => `<li>${icon(ic)}<span>${text}</span></li>`;
 const figures = m =>
   `<ul class="figs">${figRow('bowl', `<b>${m.count.meals}</b> ${m.count.meals === 1 ? 'Mahlzeit' : 'Mahlzeiten'}`)}
@@ -393,8 +393,8 @@ function growHistory() {
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
 
 /* The day line sticks to the top of the sheet while its meals scroll past, and the fine line under it appears
-   only while it does. CSS cannot ask whether something is stuck, so this does: a line that no longer sits fully
-   inside the sheet has arrived at the top. Watched again whenever the history grows. */
+   only while it does. CSS has no way to tell whether an element is stuck, so the observer works it out: a line
+   that no longer sits fully inside the sheet has reached the top. Watched again whenever the history grows. */
 let stuck = null;
 function watchDays() {
   stuck ||= new IntersectionObserver(

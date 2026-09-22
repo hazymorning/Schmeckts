@@ -28,7 +28,7 @@ const defaultPrefs = () => ({
   codes: {},
   exchange: {},
 });
-export const hooks = {changed() {}, saved() {}}; // the interface and the sync hook in here
+export const hooks = {changed() {}, saved() {}}; // main.js sets these: redraw the interface, sync after a save
 
 export function tidy(d) {
   const out = defaults();
@@ -38,7 +38,7 @@ export function tidy(d) {
       r => r && typeof r === 'object' && r.id && !seen.has(r.id) && seen.add(r.id),
     );
   }
-  for (const p of out.pets) delete p.photos; // the album is gone; whatever a household still holds stays untouched there
+  for (const p of out.pets) delete p.photos; // the album is gone; dropped here without deleting it household-wide
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
   for (const s of out.servings) {
     if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed'; // recognition was interrupted
@@ -332,7 +332,7 @@ export function changesSince(peer) {
 }
 
 /* Merges the fields of one record. full: fields holds every field the server knows.
-   Three steps: which fields win by their clock, then either the record that is here or one that comes back. */
+   The clock decides which fields win, then the record here is updated or one that comes back is created. */
 function applyRecord(c, id, fields, full) {
   if (!state.clocks[c] || !validId(id)) return false;
   const list = db[c],

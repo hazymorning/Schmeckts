@@ -10,11 +10,10 @@ const LEVELS = {select: ['LIGHT', 8], success: ['MEDIUM', 16], strong: ['HEAVY',
 export const haptic = (level = 'select') => {
   const [style, ms] = LEVELS[level] || LEVELS.select;
   try {
-    // Feedback and nothing else: a phone without a vibration motor, or one that refuses, changes nothing
-    // that a person could act on, so a failure here is deliberately passed over.
+    // Nothing a person could act on depends on haptics, so a phone that cannot or may not vibrate is ignored here.
     Native?.Haptics ? Native.Haptics.impact({style}).catch(() => {}) : navigator.vibrate?.(ms);
   } catch {
-    /* see above: haptics are a nicety */
+    /* see above */
   }
 };
 
@@ -90,9 +89,9 @@ export async function takePhoto(hint) {
 }
 
 /* Read text off a photo (plugin @capacitor-mlkit/text-recognition, processImage only, Latin script).
-   This runs on the device, without network and without a key; it needs no camera permission, as the photo comes
-   from the existing flow. It sits briefly in the private cache for that and is deleted right after. Returns '' if
-   nothing works. */
+   Runs on the device, without network and without a key; it needs no camera permission, as the photo comes from
+   the existing flow. The plugin reads from a path, so the photo goes into the private cache and is deleted right
+   after. Returns '' on any failure. */
 const TextReader = plugin('TextRecognition');
 const TEXT_FILE = 'schmeckts-ocr.jpg';
 export async function readPhotoText(b64) {

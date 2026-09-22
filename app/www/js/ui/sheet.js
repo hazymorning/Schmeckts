@@ -29,7 +29,7 @@ function push() {
     history.pushState({sheet: depth + 1}, '');
     depth++;
   } catch {
-    /* without an entry of its own the sheet simply does not answer the back gesture */
+    /* without an entry of its own the sheet does not answer the back gesture */
   }
 }
 /* A sub-page inside the open sheet (the settings). It gets a history entry of its own, so the Android back button
@@ -73,7 +73,7 @@ export function renderSheet() {
     const how = sheet.slide ? 'swap-' + sheet.slide : 'swap-in';
     sheet.slide = null;
     sheetBody.classList.remove('swap-in', 'swap-fwd', 'swap-back');
-    // Only for a swap inside an open sheet; while it opens, the sheet's own entrance is animation enough
+    // Only for a swap inside an open sheet; while it opens, the sheet's own entrance animation covers it
     if (dlg.open) {
       void sheetBody.offsetWidth;
       sheetBody.classList.add(how);
@@ -83,8 +83,8 @@ export function renderSheet() {
 export function closeSheet(fromPop = false) {
   if (closing) return closing;
   if (!dlg.open) return Promise.resolve();
-  /* Closing is only done once the sheet's history entry is gone as well: were popstate to arrive after the next
-     sheet has opened, it would close that one */
+  /* Close only once the sheet's history entry is gone as well: a popstate that arrives after the next sheet has
+     opened would close that one */
   const levels = fromPop ? 0 : depth;
   depth = 0;
   const popped = levels ? new Promise(resolve => addEventListener('popstate', resolve, {once: true})) : null;
@@ -151,7 +151,7 @@ dlg.addEventListener('click', e => {
     try {
       dlg.setPointerCapture(e.pointerId);
     } catch {
-      /* the pointer is already gone: the swipe then ends with the next pointerup, which is all it has to do */
+      /* the pointer is already gone: the swipe ends with the next pointerup */
     }
   });
   dlg.addEventListener('pointermove', e => {

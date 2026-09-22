@@ -1,4 +1,4 @@
-// Making sense of packaging text (js/ocr.js), without a device: known varieties, brands, variety, type, species,
+// Reading packaging text (js/ocr.js) without a device: known varieties, brands, variety, type, species,
 // consistency. Usage: node --test tests/*.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';

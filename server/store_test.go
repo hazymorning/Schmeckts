@@ -64,7 +64,7 @@ func TestLaterChangeWinsPerField(t *testing.T) {
 		t.Fatalf("note = %s, expected the later change", got)
 	}
 	if got := field(s, "servings", "srv1", "servedAt"); got != `1` {
-		t.Fatalf("servedAt = %s, other fields must not suffer", got)
+		t.Fatalf("servedAt = %s, other fields must stay as they were", got)
 	}
 }
 

@@ -41,7 +41,7 @@ FONTS = {
 
 
 # Android never installs a package whose versionCode is lower than the installed one. Builds from before the
-# version restart at 0.1.0 reached 10400, so every code we hand out is lifted above that mark. The version name
+# version restart at 0.1.0 reached 10400, so the offset lifts every generated code above that. The version name
 # the user sees is unaffected; versionCode is an internal counter and only has to keep rising.
 VERSION_OFFSET = 20000
 
@@ -129,7 +129,7 @@ def android(fresh):
         '            </intent-filter>\n',
     )
 
-    # Fetch Google's scanner module (scan() from @capacitor-mlkit/barcode-scanning) at install time already.
+    # Fetch Google's scanner module (scan() from @capacitor-mlkit/barcode-scanning) at install time, not on first use.
     edit(
         MAIN / 'AndroidManifest.xml',
         '        </provider>\n    </application>',
@@ -152,8 +152,8 @@ def android(fresh):
         '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />\n'
         # Our own camera for packaging photos (getUserMedia in the WebView): Capacitor forwards the WebView's camera
         # request to Android (BridgeWebChromeClient.onPermissionRequest), which only works with the permission in the
-        # manifest. It is asked for on first use. No camera is required: without one the app takes the route through
-        # the camera app. build-apk.sh checks this.
+        # manifest. It is asked for on first use. No camera is required: without one the app falls back to the
+        # camera app. build-apk.sh checks this.
         '    <uses-permission android:name="android.permission.CAMERA" />\n'
         '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n',
     )

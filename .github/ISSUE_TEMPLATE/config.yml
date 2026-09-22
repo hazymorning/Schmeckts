@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Questions and ideas
-    url: https://github.com/hazymorning/Schmeckts/discussions
-    about: Please raise them in the discussions.
+  - name: Frage zur App
+    url: https://github.com/hazymorning/Schmeckts/discussions/categories/q-a
+    about: Etwas ist unklar, oder du bist dir nicht sicher, ob es ein Fehler ist. Frag hier nach.
+  - name: Idee oder Wunsch
+    url: https://github.com/hazymorning/Schmeckts/discussions/categories/ideas
+    about: Vorschläge für neue Funktionen und Änderungen gehören hierher, nicht in die Fehlerliste.
+  - name: Alles andere
+    url: https://github.com/hazymorning/Schmeckts/discussions/categories/general
+    about: Austausch über die App, den Server und das Projekt.

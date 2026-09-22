@@ -28,7 +28,7 @@ export const RATINGS = {
   angeknabbert: {label: 'Nur angeknabbert', lines: ['Nur', 'angeknabbert'], score: 35},
   unberuehrt: {label: 'Nicht angerührt', lines: ['Nicht', 'angerührt'], score: 0},
 };
-/* Observation scales: what you observe depends on the food type. Only scaleOf knows the mapping. */
+/* Observation scales: what you observe depends on the food type. The mapping is in SCALE_OF. */
 export const SCALES = {
   portion: ['top', 'gut', 'mittel', 'sosse', 'schlecht'], // the bowl after the meal
   bowl: ['gern', 'normal', 'wenig', 'liegen'], // the bowl stands for longer
@@ -38,7 +38,7 @@ const SCALE_OF = {Nassfutter: 'portion', Trockenfutter: 'bowl', Snack: 'bite', S
 export const scaleOf = product => SCALES[SCALE_OF[typeOf(product)]];
 /* Consistency (wet food) and treat type: the variety's optional texture field, per type [key, label, keywords].
    The keywords in brand and variety fill an empty field and stand in for it in the evaluation while it is missing.
-   The keys live in the data. Dry food and other have no choice to make. */
+   The keys live in the data. Dry food and Sonstiges have no entry here. */
 export const TEXTURES = {
   Nassfutter: {
     title: 'Konsistenz',

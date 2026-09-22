@@ -2,7 +2,7 @@
    button. Imports the sheet views and actions, which register themselves as they load.
    store.js loads the stored data before this module runs (top-level await), and the native splash screen stays
    up until the home page is drawn and the typefaces are there (ui/splash.js), so nobody sees the page build up.
-   ui/splash.js comes first, because its safety net is armed as it loads. */
+   ui/splash.js comes first, because its fallback timer starts as the module loads. */
 import {hideSplash, hideSplashWhenReady} from './ui/splash.js';
 import {appInfo, Native} from './native.js';
 import {icon} from './icons.js';
@@ -50,13 +50,13 @@ try {
   clearExports();
 } catch (e) {
   report('start', e);
-  hideSplash(); // whatever happened, the app is on screen and not behind the splash
+  hideSplash(); // whatever happened, the app must not stay behind the splash
 }
 hideSplashWhenReady();
 if (Native?.App) {
   // Back: close an open camera or an open sheet, otherwise send the app to the background (as native apps do)
   Native.App.addListener('backButton', ({canGoBack}) => {
-    if (closeCamera()) return; // an open camera first
+    if (closeCamera()) return;
     if (dlg.open) sheetBack();
     else if (canGoBack) history.back();
     else Native.App.minimizeApp();

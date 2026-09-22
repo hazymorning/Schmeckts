@@ -1,0 +1,83 @@
+name: Fehler melden
+description: Etwas in der App oder im Server macht nachweislich das Falsche.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hierher gehören nur Fehler: etwas tut nachweislich das Falsche und lässt sich wiederholt auslösen.
+
+        Fragen, Ideen und Wünsche gehören in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions).
+        Ein Bericht ohne Schritte zum Nachstellen lässt sich nicht bearbeiten und wird geschlossen.
+
+  - type: checkboxes
+    id: vorab
+    attributes:
+      label: Vorab
+      options:
+        - label: Ich kann den Fehler wiederholt auslösen.
+          required: true
+        - label: Ich habe die [offenen Fehler](https://github.com/hazymorning/Schmeckts/issues) durchgesehen.
+          required: true
+        - label: Ich nutze die neueste Version aus den [Releases](https://github.com/hazymorning/Schmeckts/releases/latest).
+          required: true
+
+  - type: dropdown
+    id: wo
+    attributes:
+      label: Wo tritt der Fehler auf?
+      options:
+        - In der App auf dem Handy
+        - Im Haushalts-Server
+        - Beim Abgleich zwischen beiden
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Die App-Version steht in den Einstellungen ganz unten. Beim Server ist es die Paketversion.
+      placeholder: 0.5.0
+    validations:
+      required: true
+
+  - type: input
+    id: geraet
+    attributes:
+      label: Gerät und Android-Version
+      placeholder: Pixel 7a, Android 14
+    validations:
+      required: true
+
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachstellen
+      description: Nummeriert, vom Öffnen der App an, damit jemand anderes denselben Weg gehen kann.
+      placeholder: |
+        1. App öffnen
+        2. Auf „Füttern“ tippen
+        3. Eine Sorte auswählen
+    validations:
+      required: true
+
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was sollte passieren?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tatsaechlich
+    attributes:
+      label: Was passiert stattdessen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: anhang
+    attributes:
+      label: Screenshot oder Bildschirmaufnahme
+      description: Freiwillig, hilft aber fast immer.

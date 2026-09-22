@@ -39,9 +39,8 @@ function isHome(host) {
 }
 
 /* The address as typed → "http://192.168.1.20:8486", http when none is given. Empty stays empty: there is no default.
-   This is the one place the network rule is checked, and because every request (request) and the live notifications
-   (eventsUrl) get their address through it, it holds for all of them: http only on the home network, every other
-   address needs https. Throws ServerError 'input'. */
+   Both request() and eventsUrl() get their address from here, so the network rule is checked in one place: http
+   only on the home network, https everywhere else. Throws ServerError 'input'. */
 export function normServer(s) {
   let v = String(s || '')
     .trim()
@@ -52,7 +51,7 @@ export function normServer(s) {
   try {
     url = new URL(v);
   } catch {
-    // Whatever URL() did not like, for a person it is one and the same: the address cannot be used
+    // Whatever URL() rejected, the result is the same: the address cannot be used
     throw new ServerError('input', 'Das ist keine gültige Adresse.');
   }
   if (url.protocol !== 'https:' && !isHome(url.hostname))

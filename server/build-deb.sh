@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the installation packages dist/schmeckts-server_<version>_<arch>.deb for amd64 (Intel/AMD) and arm64.
-# The version number lives only in server/VERSION. No package without green tests.
+# The version number lives only in server/VERSION. Vet and the tests run first, and a failure stops the build.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(dirname "$HERE")"   # the repository, for dist/

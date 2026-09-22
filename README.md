@@ -35,7 +35,7 @@ Später, wenn du siehst, was übrig geblieben ist, tippst du eine Bewertung an.
 
 - **Einkaufsliste.** Jede Sorte landet bei „Nachkaufen“ oder „Nicht mehr kaufen“. Du kannst das selbst umstellen und die Liste weitergeben.
 - **Erkenntnisse.** Welche Marke ankommt, welche Konsistenz, welcher Geschmack. Die App meldet sich auch, wenn eine Sorte ständig übrig bleibt oder ein Tier auffällig wenig frisst.
-- **Verlauf.** Ein Kalender über zwei Wochen und die letzten Mahlzeiten. Dahinter jede einzelne, und darüber ein Ring, der für 7 Tage, 30 Tage oder alles sagt, wie viel davon gut angekommen ist.
+- **Verlauf.** Ein Kalender über zwei Wochen und die letzten Mahlzeiten. Dahinter steht jede einzelne Mahlzeit, darüber ein Ring, der für 7 Tage, 30 Tage oder den ganzen Zeitraum zeigt, wie viel davon gut angekommen ist.
 - **Erinnerungen.** Wenn du magst, meldet sich die App zum Bewerten oder zu den Zeiten, zu denen du sonst fütterst. Beides ist zunächst aus.
 - **Mehrere Tiere.** Katzen, Hunde, Kleintiere und Vögel, jedes mit eigenem Profilbild und eigener Auswertung.
 - **Backup.** Alles lässt sich in eine Datei sichern und auf einem neuen Handy wieder einlesen.
@@ -47,10 +47,9 @@ Hell oder dunkel richtet sich danach, wie dein Handy eingestellt ist.
 
 ## Installieren
 
-Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dauert eine Minute, und dein Smartphone wird dich nach deiner Erlaubnis fragen.
+Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dauert eine Minute, und dein Handy fragt dich dabei nach deiner Erlaubnis.
 
-<!-- Dieser Button lädt die APK des neuesten Releases direkt herunter.
-     Er funktioniert nur, wenn jedes Release die APK genau unter diesem Namen enthält: schmeckts.apk -->
+<!-- Der Button lädt die APK des neuesten Releases direkt herunter und funktioniert nur, wenn jedes Release sie genau so nennt: schmeckts.apk -->
 <p align="center">
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/6184020c-5ebd-43a7-a672-32a7b55a2039" width="292" alt="APK herunterladen"></a>
 </p>
@@ -103,7 +102,7 @@ Android 8.0 oder neuer. Der Barcode-Scanner braucht die Google-Play-Dienste, die
 
 Seid ihr zu zweit oder zu dritt, wollt ihr vielleicht dasselbe Tagebuch führen. Dafür gibt es zwei Wege.
 
-Ohne alles Weitere: „Änderungen teilen“ packt deine neuen Einträge in eine Datei, das andere Handy liest sie ein. Das geht per Messenger oder Kabel und kommt ohne Konto aus. Die Datei enthält nur Tiere, Sorten und Mahlzeiten.
+Ohne weitere Einrichtung: „Änderungen teilen“ packt deine neuen Einträge in eine Datei, das andere Handy liest sie ein. Das geht per Messenger oder Kabel und kommt ohne Konto aus. Die Datei enthält nur Tiere, Sorten und Mahlzeiten.
 
 Bequemer wird es mit einem kleinen Server auf einem Rechner, der zu Hause läuft, etwa einem Mini-PC. Dann gleichen sich die Handys von selbst ab, sobald sie im WLAN sind. Außerdem erkennt die App dann optional auch Marke und Sorte direkt vom Foto, statt nur den Text zu lesen, und schlägt unbekannte Barcodes automatisch nach. Die Daten bleiben dabei auf eurem eigenen Rechner.
 
@@ -111,7 +110,9 @@ Der Server muss selbst eingerichtet werden und gehört nicht zur App. [Code und 
 
 ## Fragen
 
-Für Fragen und Ideen bitte die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions) nutzen. Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht
+Für Fragen und Ideen bitte die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions) nutzen. Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht.
+
+Einen Fehler, den du wiederholt auslösen kannst, meldest du über [Fehler melden](https://github.com/hazymorning/Schmeckts/issues/new/choose).
 
 ## Datenschutz
 

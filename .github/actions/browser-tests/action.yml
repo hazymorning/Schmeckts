@@ -1,13 +1,13 @@
 name: Browser tests
 description: >
-  Everything a suite needs that opens the app in Chromium: the Python packages, Node and the fonts.
-  Meant to run inside Playwright's own image, which already brings the browser and its system packages.
+  Installs what the suites that open the app in Chromium need: the Python packages, Node and the fonts.
+  Meant to run inside Playwright's own image, which already has the browser and its system packages.
 
 runs:
   using: composite
   steps:
-    # The image brings playwright itself; pillow and ruff come from the pinned list. --break-system-packages
-    # because the image's Python is the system one (PEP 668); nothing else lives in it.
+    # The image has playwright itself; pillow and ruff come from the pinned list. --break-system-packages
+    # because the image's Python is the system one (PEP 668) and nothing else uses it.
     - name: Python packages
       shell: bash
       run: python3 -m pip install --break-system-packages --requirement tests/requirements.txt
@@ -18,7 +18,7 @@ runs:
         node-version: '22'
 
     # prepare.py downloads the fonts and checks each against a SHA-256: those checksums are the cache key, so
-    # the cache keeps being used for as long as the fonts themselves do not change.
+    # the cache stays valid until the fonts change.
     # The pins in this file are raised by hand: Dependabot reads .github/workflows, not composite actions.
     - name: Font checksums
       id: fonts

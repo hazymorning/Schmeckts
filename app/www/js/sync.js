@@ -137,8 +137,7 @@ const abilities = serverInfo => ({
 /* Can the server do this, "barcode" for instance (from server 1.1.0)? Before the first contact the app asks. */
 export async function serverCan(feature) {
   if (!isConnected()) return false;
-  // Offline, or a server older than 1.1.0: the feature then simply counts as missing, which is the answer
-  // this function gives anyway, so there is nothing to report.
+  // Offline, or a server older than 1.1.0: the feature counts as missing, so the failed check is not worth reporting.
   if (!status.features) await checkInfo(5e3).catch(() => {});
   return !!status.features?.includes(feature);
 }
@@ -249,7 +248,7 @@ function openLive() {
     try {
       x = JSON.parse(e.data);
     } catch {
-      return; // a notice we cannot read tells us nothing; the next cycle catches up anyway
+      return; // unreadable notice: the next cycle catches up anyway
     }
     if (!status.live) setStatus({live: true});
     if (x.epoch !== state.epoch || x.seq > state.seq) syncSoon(50);

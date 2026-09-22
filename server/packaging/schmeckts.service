@@ -13,7 +13,7 @@ StateDirectoryMode=0700
 Restart=on-failure
 RestartSec=3
 
-# The service may write only to its own data directory, and may only reach the network
+# Hardening: writes go only to the state directory, sockets only to IP, Unix and netlink
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
