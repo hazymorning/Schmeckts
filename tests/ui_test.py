@@ -49,6 +49,7 @@ async def settings_page(pg, page, wait=idle):
 
 
 async def settings_back(pg, wait=idle):
+    """One level back. A page has no X, so on the overview the same arrow leads out to the home page."""
     await pg.click('#sheet [data-action=settings-back]')
     await wait(pg)
 
@@ -99,14 +100,13 @@ async def test_tour(browser, url, scheme='light'):
     await idle(pg)
     check(await pg.locator('[data-sec=hist] .tl-item').count() == 5, 'the history shows five meals')
     await shot(pg, f'{scheme}-unfolded')
-    await settings(pg, 'look')
+    await settings(pg)
     other = 'dark' if scheme == 'light' else 'light'
     await pg.click(f'[data-action=theme][data-v={other}]')
     await idle(pg)
     bg = await pg.evaluate('getComputedStyle(document.documentElement).backgroundColor')
     meta = await pg.eval_on_selector('meta[name=theme-color]', 'm => m.content')
     check(bg == meta and await pg.get_attribute('html', 'data-theme') == other, f'theme switched: the background and the browser bar follow ({meta})')
-    await settings_back(pg)
     await shot(pg, f'{scheme}-settings')
     await settings_page(pg, 'house')
     rows = await pg.eval_on_selector_all('#serverBox .btn, #serverBox input', 'l => l.map(e => e.innerText?.trim() || e.id)')
@@ -115,8 +115,8 @@ async def test_tour(browser, url, scheme='light'):
         f'settings, page „Haushalt“ in mode `lokal`: nothing but the way into a household ({rows})',
     )
     await shot(pg, f'{scheme}-settings-house')
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
+    await settings_back(pg)
     await pg.click('[data-sec=shop] [data-action=open-product]')
     await idle(pg)
     check(await pg.locator('.prod-card, .sh-head').count() > 0, 'the food sheet opens')
@@ -146,8 +146,8 @@ async def test_flow(browser, url):
     await pg.fill('#f-name', 'Tiger')
     await pg.click('[data-action=save-pet]')
     await idle(pg)
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    check(await pg.inner_text('#sheet .page-title') == 'Einstellungen', 'saving a pet leads back to the overview')
+    await settings_back(pg)
     check(await state(pg, 'db.pets.length') == 2, 'two pets created')
     await pg.click('#fab')
     await idle(pg)
@@ -206,8 +206,8 @@ async def test_flow(browser, url):
     )
     styles = [c[1]['style'] for c in calls if c[0] == 'impact']
     check({'LIGHT', 'MEDIUM', 'HEAVY'} <= set(styles), f'haptics graded: selection, success, deletion ({sorted(set(styles))})')
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
+    await settings_back(pg)
     # Shortcuts and deep links while the app is running
     await pg.evaluate("window.__urlOpen({url: 'schmeckts://feed'})")
     await pg.wait_for_selector('#sheet .cta.primary')  # the deep link closes the open sheet first, which takes a moment
@@ -1131,6 +1131,18 @@ async def test_milestones(browser, url):
     await ctx.close()
 
 
+# The rating reminder: the switch in its row, the line under the title, and the steps that stand under the row
+# while it is on, each of them one row wide and not cut off.
+REMIND_ROW = """() => { const row = [...document.querySelectorAll('#sheet .set-row')].find(r => r.querySelector('.t-main b')?.innerText === 'Ans Bewerten erinnern');
+  const out = {on: row.getAttribute('aria-checked'), sub: row.querySelector('.t-main small').innerText, seg: []};
+  const seg = row.nextElementSibling?.querySelector('.seg');
+  if (!seg) return out;
+  const lines = new Set([...seg.children].map(b => Math.round(b.getBoundingClientRect().top))).size, widths = [...seg.children].map(b => Math.round(b.getBoundingClientRect().width));
+  out.seg = [...seg.querySelectorAll('button')].map(b => [b.innerText.trim(), b.getAttribute('aria-pressed'), b.dataset.action,
+    lines === 1 && new Set(widths).size === 1 && b.scrollWidth <= b.clientWidth]);
+  return out; }"""
+
+
 async def test_reminders(browser, url):
     print('the rating reminder (plugin simulated)')
     ctx = await phone(browser)
@@ -1149,39 +1161,39 @@ async def test_reminders(browser, url):
     def calls(name):
         return pg.evaluate(f"window.__calls.filter(c => c[0] === '{name}').map(c => c[1])")
 
-    SEG = """() => { const l = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Ans Bewerten erinnern'); let seg = l.nextElementSibling; while (seg && !seg.classList.contains('seg')) seg = seg.nextElementSibling;
-      const rows = new Set([...seg.children].map(b => Math.round(b.getBoundingClientRect().top))).size, widths = [...seg.children].map(b => Math.round(b.getBoundingClientRect().width));
-      return [...seg.querySelectorAll('button')].map(b => [b.innerText.trim(), b.getAttribute('aria-pressed'), b.dataset.action, rows === 1 && new Set(widths).size === 1 && b.scrollWidth <= b.clientWidth]); }"""
-    await settings(pg, 'remind', debounced)
-    seg = await pg.evaluate(SEG)
+    await settings(pg, None, debounced)
+    r = await pg.evaluate(REMIND_ROW)
     check(
-        seg
-        == [
-            ['Aus', 'true', 'remind', True],
-            ['1 Std.', 'false', 'remind', True],
-            ['3 Std.', 'false', 'remind', True],
-            ['6 Std.', 'false', 'remind', True],
-            ['Eigene', 'false', 'remind-own', True],
-        ]
-        and await state(pg, 'prefs.remind') == 0,
-        f'settings, page „Erinnerungen“: Aus · 1 Std. · 3 Std. · 6 Std. · Eigene as a segmented control in one row, „Aus“ by default ({[x[0] for x in seg]})',
+        r == {'on': 'false', 'sub': 'Nach dem Füttern, auf diesem Handy', 'seg': []} and await state(pg, 'prefs.remind') == 0,
+        f'settings: „Ans Bewerten erinnern“ is a switch, off, and while it is off there is no choice of hours ({r})',
     )
     await shot(pg, 'settings-reminder')
-    await pg.click('#sheet [data-action=remind][data-v="60"]')
+    await pg.click('#sheet [data-action=remind-on]')
     await debounced(pg)
-    seg = await pg.evaluate(SEG)
+    r = await pg.evaluate(REMIND_ROW)
     toast = await pg.inner_text('#toast')
     check(
-        len(await calls('requestPermissions')) == 1 and await state(pg, 'prefs.remind') == 0 and seg[0][1] == 'true' and 'nicht erlaubt' in toast,
-        f'switching it on asks for the permission; denied, it goes back to „Aus“ with a short notice („{toast.strip()}“)',
+        len(await calls('requestPermissions')) == 1
+        and await state(pg, 'prefs.remind') == 0
+        and r['on'] == 'false'
+        and r['sub'] == 'Benachrichtigungen sind nicht erlaubt'
+        and 'nicht erlaubt' in toast,
+        f'switching it on asks for the permission; denied, the switch goes back and the row says why ({r["sub"]})',
     )
     await pg.evaluate("localStorage.removeItem('__notifyPermission'); localStorage.setItem('__notifyAnswer', 'granted')")
-    await pg.click('#sheet [data-action=remind][data-v="180"]')
+    await pg.click('#sheet [data-action=remind-on]')
     await debounced(pg)
-    seg = await pg.evaluate(SEG)
+    r = await pg.evaluate(REMIND_ROW)
     await pg.reload()
     await started(pg)
-    check(seg[2][1] == 'true' and await state(pg, 'prefs.remind') == 180, 'granted: 3 Std. chosen and stored, in minutes')
+    check(
+        r['on'] == 'true'
+        and [x[0] for x in r['seg']] == ['1 Std.', '3 Std.', '6 Std.', 'Eigene']
+        and all(x[3] for x in r['seg'])
+        and r['seg'][1][1] == 'true'
+        and await state(pg, 'prefs.remind') == 180,
+        f'granted: the switch turns on with 3 Std., and the steps stand under it in one row ({[x[0] for x in r["seg"]]})',
+    )
     # Serving schedules one, at an approximate time without an exact alarm
     await pg.click('#fab')
     await debounced(pg)
@@ -1253,21 +1265,23 @@ async def test_reminders(browser, url):
         len(notes) == 1 and notes[0]['body'] == 'Lachs in Soße für Mau' and due == t0 - 5 * 60000 + 180 * 60000,
         'the variety recognised or the time changed: the reminder moves along',
     )
-    await settings(pg, 'remind', debounced)
+    await settings(pg, None, debounced)
     await pg.click('#sheet [data-action=remind][data-v="360"]')
     await debounced(pg)
     due60 = await pg.evaluate('t => new Date(t).getTime()', (await pending())[0]['schedule']['at'])
-    await pg.click('#sheet [data-action=remind][data-v="0"]')
+    await pg.click('#sheet [data-action=remind-on]')
     await debounced(pg)
     off = await pending()
     check(
         due60 == t0 - 5 * 60000 + 360 * 60000 and off == [] and await calls('requestPermissions') == [],
-        'a different interval reschedules and „Aus“ cancels everything; once the permission is granted the app does not ask again',
+        'a different step reschedules and the switch cancels everything; once the permission is granted the app does not ask again',
     )
+    await pg.click('#sheet [data-action=remind-on]')
+    await debounced(pg)
+    check(await state(pg, 'prefs.remind') == 360, 'switching it on again takes the step last chosen')
     await pg.click('#sheet [data-action=remind][data-v="60"]')
     await debounced(pg)
-    await pg.click('[data-action=close]')
-    await debounced(pg)
+    await settings_back(pg, debounced)
     await pg.evaluate(PLAN, ['loeschen0001', 0, lachs])
     await debounced(pg)
     before = len(await pending())
@@ -1308,38 +1322,24 @@ async def test_remind(browser, url):
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('[data-action=demo]')
     await debounced(pg)
-    await settings(pg, 'remind', debounced)
-    check(await pg.locator('#f-remind').count() == 0, 'without „Eigene“ there is no number field')
-    hints = [await pg.inner_text('#remind-hint')]
-    await pg.click('[data-action=remind][data-v="60"]')
+    await settings(pg, None, debounced)
+    check(await pg.locator('#f-remind').count() == 0, 'while the reminder is off there is no number field')
+    await pg.click('[data-action=remind-on]')
     await debounced(pg)
-    hints.append(await pg.inner_text('#remind-hint'))
-    await pg.click('[data-action=remind][data-v="0"]')
+    await pg.click('[data-action=remind][data-v="60"]')
     await debounced(pg)
     await pg.click('[data-action=remind-own]')
     await debounced(pg)
-    hints.append(await pg.inner_text('#remind-hint'))
     f = await pg.eval_on_selector('#f-remind', 'f => [f.type, f.min, f.max, f.step, f.value, f.labels[0]?.innerText, f.className]')
     on = await pg.eval_on_selector_all('#sheet [data-action^=remind][aria-pressed=true]', 'l => l.map(b => b.innerText.trim())')
     check(
-        f == ['number', '1', '24', '1', '2', 'Stunden nach dem Füttern', 'field'] and on == ['Eigene'] and await state(pg, 'prefs.remind') == 120,
-        f'„Eigene“ shows a number field for whole hours from 1 to 24, starting at 2 hours from „Aus“; stored in minutes ({f})',
+        f == ['number', '1', '24', '1', '1', 'Stunden nach dem Füttern', 'field'] and on == ['Eigene'] and await state(pg, 'prefs.remind') == 60,
+        f'„Eigene“ shows a number field for whole hours from 1 to 24, starting at the step chosen; stored in minutes ({f})',
     )
     await shot(pg, 'reminder-own')
     await pg.evaluate("document.getElementById('f-remind').__same = true")
     await pg.fill('#f-remind', '5')
     await debounced(pg)
-    hints.append(await pg.inner_text('#remind-hint'))
-    check(
-        hints
-        == [
-            'Dieses Handy erinnert nicht ans Bewerten.',
-            'Dieses Handy erinnert 1 Stunde nach dem Füttern ans Bewerten.',
-            'Dieses Handy erinnert 2 Stunden nach dem Füttern ans Bewerten.',
-            'Dieses Handy erinnert 5 Stunden nach dem Füttern ans Bewerten.',
-        ],
-        f'the note says what the choice means, while typing your own hours too ({hints})',
-    )
     same = await pg.evaluate("[document.getElementById('f-remind').__same === true, document.activeElement.id]")
     check(
         await state(pg, 'prefs.remind') == 300 and same == [True, 'f-remind'],
@@ -1352,8 +1352,7 @@ async def test_remind(browser, url):
     await pg.press('#f-remind', 'Enter')
     await debounced(pg)
     check(await pg.input_value('#f-remind') == '5', 'leaving the field: it shows the current value again')
-    await pg.click('[data-action=close]')
-    await debounced(pg)
+    await settings_back(pg, debounced)
     await pg.click('#fab')
     await debounced(pg)
     await pg.click('.plist [data-action=serve]')
@@ -1362,21 +1361,19 @@ async def test_remind(browser, url):
     check(due == await state(pg, 'db.servings[0].servedAt') + 5 * 3600e3, 'it is scheduled for the serving time plus 5 hours')
     await pg.reload()
     await started(pg)
-    await settings(pg, 'remind', debounced)
+    await settings(pg, None, debounced)
     on = await pg.eval_on_selector_all('#sheet [data-action^=remind][aria-pressed=true]', 'l => l.map(b => b.innerText.trim())')
     check(on == ['Eigene'] and await pg.input_value('#f-remind') == '5', f'after the restart: „Eigene“ with 5 hours ({on})')
     await pg.click('#sheet [data-action=remind][data-v="180"]')
     await debounced(pg)
     check(await pg.locator('#f-remind').count() == 0 and await state(pg, 'prefs.remind') == 180, 'a fixed step hides the field again')
-    await pg.click('#sheet [data-action=remind][data-v="0"]')
-    await debounced(pg)
     await pg.evaluate("localStorage.setItem('__notifyPermission', 'denied'); localStorage.setItem('__notifyAnswer', 'denied')")
     await pg.click('[data-action=remind-own]')
     await debounced(pg)
-    on = await pg.eval_on_selector_all('#sheet [data-action^=remind][aria-pressed=true]', 'l => l.map(b => b.innerText.trim())')
+    r = await pg.evaluate(REMIND_ROW)
     check(
-        on == ['Aus'] and await pg.locator('#f-remind').count() == 0 and 'nicht erlaubt' in await pg.inner_text('#toast'),
-        'without the permission even „Eigene“ stays at „Aus“',
+        r['on'] == 'false' and r['seg'] == [] and await pg.locator('#f-remind').count() == 0 and 'nicht erlaubt' in await pg.inner_text('#toast'),
+        f'without the permission even „Eigene“ leaves the reminder off ({r})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
@@ -1396,45 +1393,39 @@ async def test_feed_remind(browser, url):
     pg, errors = await open_page(ctx, url, native=True)
     await pg.clock.set_fixed_time('2026-06-10T12:00:00+02:00')
     PENDING = "Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications.filter(n => n.extra.feed).map(n => [n.extra.feed, new Date(n.schedule.at).toLocaleString('sv').slice(5, 16), n.title, n.body, n.isExactNotification]).sort())"
-    SECTION = """() => { const b = [...document.querySelectorAll('#sheet [data-action=feed-remind]')], hint = b[0].closest('.seg').previousElementSibling;
-      return [hint.previousElementSibling.innerText, hint.innerText, b.map(x => x.innerText + (x.getAttribute('aria-pressed') === 'true' ? '*' : ''))]; }"""
+    SECTION = """() => { const r = document.querySelector('#sheet [data-action=feed-remind]');
+      return [r.querySelector('.t-main b').innerText, r.querySelector('.t-main small').innerText, r.getAttribute('aria-checked')]; }"""
     await pg.click('.welcome [data-action=add-pet]')
     await idle(pg)
     await pg.fill('#f-name', 'Minka')
     await pg.click('[data-action=save-pet]')
     await idle(pg)
-    await settings(pg, 'remind')
+    await settings(pg)
     empty = await pg.evaluate(SECTION)
     check(
-        empty
-        == [
-            'Ans Füttern erinnern',
-            'Die üblichen Zeiten lernt die App aus dem Verlauf, sobald an vier Tagen etwa zur selben Zeit gefüttert wurde.',
-            ['An', 'Aus*'],
-        ],
-        f'settings, page „Erinnerungen“: below „Ans Bewerten erinnern“ comes „Ans Füttern erinnern“, off by default; without a history the note explains where the times come from ({empty})',
+        empty == ['Ans Füttern erinnern', 'Lernt die üblichen Zeiten aus dem Verlauf', 'false'],
+        f'settings: below „Ans Bewerten erinnern“ comes „Ans Füttern erinnern“, a switch, off by default; without a history its line says where the times come from ({empty})',
     )
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
     await pg.evaluate(FEED_DB)
     await idle(pg)
-    await settings(pg, 'remind')
+    await settings(pg)
     before = await pg.evaluate(SECTION)
     await pg.evaluate("localStorage.setItem('__notifyAnswer', 'denied')")
-    await pg.click('[data-action=feed-remind][data-v=on]')
+    await pg.click('[data-action=feed-remind]')
     await debounced(pg)
     denied = [await state(pg, 'prefs.feedRemind'), 'nicht erlaubt' in await pg.inner_text('#toast'), await pg.evaluate(PENDING)]
     await pg.evaluate("localStorage.setItem('__notifyAnswer', 'granted'); localStorage.setItem('__notifyPermission', 'prompt')")
-    await pg.click('[data-action=feed-remind][data-v=on]')
+    await pg.click('[data-action=feed-remind]')
     await debounced(pg)
     sec, plan = await pg.evaluate(SECTION), await pg.evaluate(PENDING)
     note = ['Schon gefüttert?', 'Um diese Zeit gibt es sonst Futter für Minka.', False]
     check(
         denied == [False, True, []]
-        and before[1] == 'Futter gibt es meist um 07:15 und 18:30 Uhr. Dieses Handy erinnert nicht daran.'
-        and sec[1:] == ['Futter gibt es meist um 07:15 und 18:30 Uhr. Ist 45 Minuten später nichts serviert, erinnert dieses Handy.', ['An*', 'Aus']]
+        and before[1] == 'Meist um 07:15 und 18:30 Uhr'
+        and sec[1:] == ['Meist um 07:15 und 18:30 Uhr', 'true']
         and await state(pg, 'prefs.feedRemind') is True,
-        f'switching it on asks for the permission and stays off without it; the note names the learnt times and what currently applies ({before[1]} / {sec[1]})',
+        f'switching it on asks for the permission and stays off without it; the line names the learnt times ({before[1]} / {sec[1]})',
     )
     check(
         plan
@@ -1448,8 +1439,7 @@ async def test_feed_remind(browser, url):
         f'one is scheduled per usual time 45 minutes later for today and two days ahead, without an exact alarm; this morning\u2019s time has passed ({[x[:2] for x in plan]})',
     )
     await shot(pg, 'settings-feed-reminder')
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
     await pg.clock.set_fixed_time('2026-06-10T18:00:00+02:00')
     await pg.evaluate("import('./js/logic/feeding.js').then(f => f.serveProduct('snack000001'))")
     await debounced(pg)
@@ -1466,8 +1456,8 @@ async def test_feed_remind(browser, url):
     check(await pg.locator('#sheet [data-action=scan]').count() == 1, 'a tap on the notification opens the feeding sheet')
     await pg.click('[data-action=close]')
     await idle(pg)
-    await settings(pg, 'remind')
-    await pg.click('[data-action=feed-remind][data-v=off]')
+    await settings(pg)
+    await pg.click('[data-action=feed-remind]')
     await debounced(pg)
     check(await pg.evaluate(PENDING) == [] and await state(pg, 'prefs.feedRemind') is False, 'switched off: everything scheduled is cancelled')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
@@ -1498,8 +1488,7 @@ async def test_petbar(browser, url):
     await pg.fill('#f-name', 'Tiger')
     await pg.click('[data-action=save-pet]')
     await idle(pg)
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
     bar = await pg.eval_on_selector_all('#pets .pet', 'l => l.map(b => [b.innerText.trim(), b.getAttribute("aria-pressed")])')
     order = await pg.evaluate("[...document.querySelectorAll('.app > *')].filter(e => e.getClientRects().length).map(e => e.id || e.tagName)")
     check(
@@ -1527,7 +1516,7 @@ SERVER_WORDS = re.compile(
 PRIVACY = [
     'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
     'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-    'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Teilen“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
+    'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Scannen“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
     'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
     'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.',
 ]
@@ -1567,8 +1556,8 @@ async def test_modes(browser, url):
         'Adresse' in await pg.inner_text('#serverBox .note.warn') and await state(pg, "prefs.code === '' && prefs.mode === ''"),
         'without an address nothing connects: a clear message',
     )
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
+    await settings_back(pg)
     await pg.click('[data-action=mode-local]')
     await idle(pg)
     btns = await pg.eval_on_selector_all('.welcome button', 'l => l.map(b => b.dataset.action)')
@@ -1616,8 +1605,7 @@ async def test_modes(browser, url):
     seen.append(await texts(pg))  # „So geht’s“ page
     await settings(pg)
     seen.append(await texts(pg))
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
     await pg.click('#fab')
     await idle(pg)
     seen.append(await texts(pg))
@@ -1701,22 +1689,28 @@ async def test_modes(browser, url):
     await settings(pg)
     data = await pg.evaluate(
         """(() => { const l = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Daten');
-          return [...l.nextElementSibling.querySelectorAll('.list-row')].map(b => b.innerText.trim()).concat(
+          return [...l.nextElementSibling.querySelectorAll('.set-row')].map(b => b.innerText.trim()).concat(
             [...l.nextElementSibling.nextElementSibling.querySelectorAll('.btn')].map(b => b.innerText.trim())); })()"""
     )
     check(
-        data == ['Backup', 'Beispieldaten laden', 'Datenschutz', 'Alle Daten löschen'] and await pg.locator('#sheet .privacy').count() == 0,
+        data
+        == [
+            'Backup\nSichern und wieder einlesen',
+            'Beispieldaten laden',
+            'Datenschutz',
+            'Alle Daten löschen',
+        ]
+        and await pg.locator('#sheet .privacy').count() == 0,
         f'settings: the group „Daten“, and „Alle Daten löschen“ below it, set off ({data})',
     )
     await settings_page(pg, 'privacy')
     got = await pg.evaluate(
-        "[document.querySelector('#sheet h2').innerText, ...[...document.querySelectorAll('#sheet .privacy p')].map(p => p.innerText)]"
+        "[document.querySelector('#sheet .page-title').innerText, ...[...document.querySelectorAll('#sheet .privacy p')].map(p => p.innerText)]"
     )
     check(got == ['Datenschutz'] + PRIVACY, f'a tap opens the „Datenschutz“ page with exactly the text laid down ({len(got) - 1} paragraphs)')
     await shot(pg, 'privacy')
-    await pg.click('[data-action=close]')
-    await idle(pg)
-    await settings(pg, 'backup')
+    await settings_back(pg)
+    await settings_page(pg, 'backup')
     await pg.click('[data-action=export]')
     await idle(pg)
     await pg.click('[data-action=export]')
@@ -1730,8 +1724,8 @@ async def test_modes(browser, url):
         len(gone) == 1 and gone[0].startswith('schmeckts-backup-'),
         f'a shared backup does not linger in the cache: deleted before the next export ({gone})',
     )
-    await pg.click('[data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
+    await settings_back(pg)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -2410,8 +2404,8 @@ async def test_exchange(browser, url):
     print('manual exchange: share, receive, answer (two phones without a server)')
 
     async def open_exchange(pg):  # the page „Austausch von Hand“, wherever the phone currently stands
-        if await pg.evaluate("document.getElementById('sheet').open"):
-            await pg.click('[data-action=close]')
+        while await pg.evaluate("document.getElementById('sheet').open"):
+            await pg.click('#sheet [data-action=close], #sheet [data-action=settings-back]')
             await idle(pg)
         await settings(pg, 'exchange')
 
@@ -2504,12 +2498,13 @@ async def test_exchange(browser, url):
     )
 
     # Shared from another app: the app opens the receive flow by itself
-    await b.click('[data-action=close]')
-    await idle(b)
+    while await b.evaluate("document.getElementById('sheet').open"):
+        await b.click('#sheet [data-action=close], #sheet [data-action=settings-back]')
+        await idle(b)
     await b.evaluate("t => localStorage.setItem('__fs:schmeckts-exchange-shared.json', t)", json.dumps(answer))
     await b.evaluate("window.__urlOpen({url: 'content://media/external/file/schmeckts-exchange-shared.json'})")
     await idle(b)
-    opened = await b.evaluate("[document.getElementById('sheet').open, document.querySelector('#sheet h2')?.innerText]")
+    opened = await b.evaluate("[document.getElementById('sheet').open, document.querySelector('#sheet .page-title')?.innerText]")
     check(
         opened == [True, 'Austausch von Hand'] and 'Beide Geräte sind gleich' in await b.inner_text('#sheet .note'),
         f'shared from another app: „Austausch von Hand“ opens with the report ({opened})',
@@ -2693,9 +2688,9 @@ async def test_sheet(browser, url):
     print('the sheet redraws only what has changed')
     ctx, pg, errors = await one_pet(browser, url)
     await settings(pg)
-    await pg.evaluate("document.querySelector('#sheetBody .list-row').dataset.mark = 'x'")
+    await pg.evaluate("document.querySelector('#sheetBody .set-row').dataset.mark = 'x'")
     redraw = "import('./js/ui/sheet.js').then(m => m.renderSheet())"
-    mark = "document.querySelector('#sheetBody .list-row')?.dataset.mark ?? null"
+    mark = "document.querySelector('#sheetBody .set-row')?.dataset.mark ?? null"
     await pg.evaluate(redraw)
     await idle(pg)
     kept = await pg.evaluate(mark)
@@ -2793,34 +2788,35 @@ async def test_mood(browser, url):
             'with only one pet, that pet\u2019s picture',
         )
 
-        # The choice in the settings: on or off, in the style of the other choices
-        async def choose(v):
-            await settings(pg, 'look')
-            seg = await pg.eval_on_selector_all(
+        # The setting: a switch in its row, like every other on or off in the settings
+        async def choose(on):
+            await settings(pg)
+            row = await pg.eval_on_selector(
                 '[data-action=backdrop]',
-                """l => { let lb = l[0].closest('.seg').previousElementSibling; while (lb && !lb.classList.contains('label')) lb = lb.previousElementSibling;
-                  return [lb.innerText, l[0].getBoundingClientRect().height >= 40, ...l.map(b => b.innerText + (b.getAttribute('aria-pressed') === 'true' ? '*' : ''))]; }""",
+                """r => [r.querySelector('.t-main b').innerText, r.querySelector('.t-main small').innerText,
+                  Math.round(r.getBoundingClientRect().height) >= 60, r.getAttribute('role'), r.getAttribute('aria-checked')]""",
             )
-            await pg.click(f'[data-action=backdrop][data-v={v}]')
-            await idle(pg)
-            await pg.click('[data-action=close]')
+            if (row[4] == 'true') != on:
+                await pg.click('[data-action=backdrop]')
+                await idle(pg)
+            await pg.click('#sheet [data-action=settings-back]')
             await pg.clock.run_for(600)
-            await idle(pg)  # the clock is stopped: closing takes 240 ms
-            return seg
+            await idle(pg)  # the clock is stopped: closing takes 300 ms
+            return row
 
-        seg = await choose('off')
+        seg = await choose(False)
         off = [await state(pg, 'prefs.backdrop'), (await pg.evaluate(MOOD))['hidden']]
         await pg.reload()
         await started(pg)
         off.append((await pg.evaluate(MOOD))['hidden'])
-        seg2 = await choose('on')
+        seg2 = await choose(True)
         on = [await state(pg, 'prefs.backdrop'), (await pg.evaluate(MOOD))['hidden']]
         check(
-            seg == ['Profilbild im Hintergrund', True, 'An*', 'Aus']
-            and seg2[2:] == ['An', 'Aus*']
+            seg == ['Profilbild im Hintergrund', 'Blass hinter dem Kopf der Startseite', True, 'switch', 'true']
+            and seg2[4] == 'false'
             and off == [False, True, True]
             and on == [True, False],
-            f'settings: „Profilbild im Hintergrund“ as an An/Aus choice, on by default; off means no layer, across a restart too ({seg}, {off}, {on})',
+            f'settings: „Profilbild im Hintergrund“ as a switch, on by default; off means no layer, across a restart too ({seg}, {off}, {on})',
         )
         check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
         await ctx.close()
@@ -3012,8 +3008,7 @@ async def test_feed_routes(browser, url):
     await idle(pg)
     await settings(pg)
     labels = await pg.eval_on_selector_all('#sheet .label', 'l => l.map(e => e.innerText)')
-    await pg.click('#sheet [data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
     await pg.click('#fab')
     await idle(pg)
     cta = await pg.eval_on_selector_all('#sheet .cta', 'l => l.map(b => [b.dataset.action, Math.round(b.getBoundingClientRect().width)])')
@@ -3145,7 +3140,8 @@ async def test_start(browser, url):
         f'once the page has moved the strip is there, and it goes again at the top ({moved})',
     )
     plain = await top_pixel(pg)
-    await settings(pg)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
     dimmed = await top_pixel(pg)
     check(
         sum(dimmed) < sum(plain) - 60,
@@ -3168,12 +3164,16 @@ async def test_start(browser, url):
 
 
 GROUPS = """() => [...document.querySelectorAll('#sheet .set-group')].map(g => [g.previousElementSibling.innerText,
-  [...g.querySelectorAll('.list-row')].map(r => [r.querySelector('.t-main b').innerText, r.querySelector('.val')?.innerText ?? null])])"""
-HEAD = "[document.querySelector('#sheet h2').innerText, document.getElementById('sheet').open, !!document.querySelector('#sheet [data-action=settings-back]')]"
+  [...g.querySelectorAll('.set-row')].map(r => [r.querySelector('.t-main b').innerText, r.getAttribute('role'),
+    r.querySelector('.chev') ? 'chevron' : null])])"""
+# Where the page stands: its title, whether the sheet is a full-screen page, and how far it sits from the left
+PAGE = """() => { const d = document.getElementById('sheet'), r = d.getBoundingClientRect();
+  return [document.querySelector('#sheet .page-title')?.innerText ?? null, d.open, d.classList.contains('page'),
+    Math.round(r.width), Math.round(r.height), Math.round(r.left)]; }"""
 
 
 async def test_settings(browser, url):
-    print('the settings: an overview of rows leading to pages of its own')
+    print('the settings: a page of grouped rows, each level one step back')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.evaluate("localStorage.setItem('__notifyAnswer', 'granted')")
@@ -3184,83 +3184,141 @@ async def test_settings(browser, url):
     check(
         groups
         == [
-            ['Tiere', [['Mau', None], ['Tier hinzufügen', None]]],
-            ['App', [['Darstellung', 'System'], ['Erinnerungen', 'Aus']]],
+            ['Tiere', [['Mau', None, 'chevron'], ['Tier hinzufügen', None, None]]],
+            ['Darstellung', [['Farbschema', None, None], ['Profilbild im Hintergrund', 'switch', None]]],
+            ['Erinnerungen', [['Ans Bewerten erinnern', 'switch', None], ['Ans Füttern erinnern', 'switch', None]]],
             [
                 'Teilen',
-                [['Dein Name', 'Fehlt noch'], ['Haushalt', 'Nicht verbunden'], ['Austausch von Hand', None], ['Produktsuche im Internet', None]],
+                [['Dein Name', None, None], ['Haushalt', None, 'chevron'], ['Austausch von Hand', None, 'chevron']],
             ],
-            ['Daten', [['Backup', None], ['Beispieldaten laden', None], ['Datenschutz', None]]],
+            ['Scannen', [['Produktsuche im Internet', 'switch', None]]],
+            ['Daten', [['Backup', None, 'chevron'], ['Beispieldaten laden', None, None], ['Datenschutz', None, 'chevron']]],
         ],
-        f'the overview: four groups of rows, each with what is currently set ({[[g[0], len(g[1])] for g in groups]})',
+        f'the overview: six groups, every on or off a switch and only a page behind a chevron ({[[g[0], len(g[1])] for g in groups]})',
     )
     await shot(pg, 'settings-overview')
-
-    # The values in the rows say what is set, and they follow every change on the pages
-    await settings_page(pg, 'look')
-    await shot(pg, 'settings-look')
-    await pg.click('#sheet [data-action=theme][data-v=dark]')
-    await idle(pg)
-    await settings_back(pg)
-    await settings_page(pg, 'remind')
-    await pg.click('#sheet [data-action=remind][data-v="60"]')
-    await idle(pg)
-    await pg.click('#sheet [data-action=feed-remind][data-v=on]')
-    await idle(pg)
-    await settings_back(pg)
-    await settings_page(pg, 'name')
-    await pg.fill('#f-me', 'Anna')
-    await settings_back(pg)
-    vals = await pg.evaluate("[...document.querySelectorAll('#sheet .val')].map(v => v.innerText)")
-    check(
-        vals == ['Dunkel', 'Bewerten 1 Std., Füttern\u00a0an', 'Anna', 'Nicht verbunden'],
-        f'the values follow what was set on the pages, without the settings being opened again ({vals})',
+    # No row carries a value on the right any more: what is set is the control in the row itself
+    vals = await pg.evaluate("[...document.querySelectorAll('#sheet .set-row .val, #sheet .set-row .row-ic')].length")
+    seg = await pg.evaluate(
+        """(() => { const r = [...document.querySelectorAll('#sheet .set-row')].find(x => x.querySelector('.t-main b').innerText === 'Farbschema');
+          const s = r.nextElementSibling.querySelector('.seg');
+          return [[...s.querySelectorAll('button')].map(b => [b.innerText.trim(), b.getAttribute('aria-pressed')]),
+            Math.round(s.getBoundingClientRect().left - r.querySelector('.t-main').getBoundingClientRect().left)]; })()"""
     )
+    check(
+        vals == 0 and seg[0] == [['System', 'true'], ['Hell', 'false'], ['Dunkel', 'false']] and seg[1] == 0,
+        f'no row carries a value on the right, and a segment stands in the text column under its row ({vals}, {seg})',
+    )
+    # The page fills the screen and comes in from the side, its pages the same way
+    page = await pg.evaluate(PAGE)
+    size = await pg.evaluate('[innerWidth, innerHeight]')
+    await ctx.close()
 
-    # One level back: the arrow in the head and Android's back button do the same, and only the overview closes
-    await settings_page(pg, 'backup')
-    deep = await pg.evaluate(HEAD)
+    ctx = await phone(browser, motion=True)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await pg.click('[data-action=open-settings]')
+    slide = await pg.evaluate(
+        """document.getElementById('sheet').getAnimations().map(a => [a.animationName,
+             a.effect.getComputedTiming().duration, a.effect.getKeyframes()[0].transform])"""
+    )
+    await idle(pg)
+    check(
+        page == ['Einstellungen', True, True, size[0], size[1], 0]
+        and [s[0] for s in slide] == ['pageIn']
+        and slide[0][1:] == [300, 'translateX(100%)'],
+        f'the settings fill the screen and come in from the side in 300 ms ({page}, {slide})',
+    )
+    await pg.click('#sheet [data-action=settings-page][data-v=house]')
+    step = await pg.evaluate(
+        """[...document.getElementById('sheet').querySelectorAll('.sheet-body')].flatMap(b => b.getAnimations().map(a =>
+             [b.classList.contains('page-ghost') ? 'leaving' : 'coming', a.animationName, a.effect.getComputedTiming().duration]))"""
+    )
+    await idle(pg)
+    check(
+        sorted(step) == [['coming', 'pageStepIn', 300], ['leaving', 'pageStepAside', 300]] and await pg.locator('.page-ghost').count() == 0,
+        f'a page below comes in from the side while the one above it goes out, and nothing of it stays behind ({step})',
+    )
+    await ctx.close()
+
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.evaluate("localStorage.setItem('__notifyAnswer', 'granted')")
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await settings(pg, 'backup')
+    deep = await pg.evaluate(PAGE)
     await settings_back(pg)
-    up = await pg.evaluate(HEAD)
+    up = await pg.evaluate(PAGE)
     await settings_page(pg, 'exchange')
     await pg.evaluate('window.__back({canGoBack: true})')
     await idle(pg)
-    hardware = await pg.evaluate(HEAD)
+    hardware = await pg.evaluate(PAGE)
     await pg.evaluate('window.__back({canGoBack: true})')
     await idle(pg)
     closed = await pg.evaluate("document.getElementById('sheet').open")
     check(
-        deep == ['Backup', True, True] and up == ['Einstellungen', True, False] and hardware == ['Einstellungen', True, False] and not closed,
-        f'back goes one level at a time, by the arrow as by the hardware button, and only the overview closes the sheet ({deep}, {up}, {hardware}, {closed})',
+        deep[0] == 'Backup' and up[0] == 'Einstellungen' and hardware[0] == 'Einstellungen' and not closed,
+        f'back goes one level at a time, by the arrow as by the hardware button, and only the overview leaves the settings ({deep[0]}, {up[0]}, {hardware[0]}, {closed})',
     )
-
+    # The pet editor is a page of the settings: one level back, and saving or removing leads to the overview
+    await settings(pg)
+    await pg.click('#sheet [data-action=edit-pet]')
+    await idle(pg)
+    pet = await pg.evaluate(PAGE)
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await idle(pg)
+    back = await pg.evaluate(PAGE)
+    check(
+        pet[:3] == ['Tier bearbeiten', True, True] and back[0] == 'Einstellungen',
+        f'the pet editor is a page of the settings, and back from it is one level, not all of them ({pet[0]}, {back[0]})',
+    )
+    await pg.click('#sheet [data-action=edit-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Mimi')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    saved = [await pg.evaluate(PAGE), (await pg.inner_text('#toast')).split('\n')[0], await state(pg, 'db.pets[0].name')]
+    await pg.click('#sheet [data-action=edit-pet]')
+    await idle(pg)
+    await pg.click('[data-action=arm][data-then=delete-pet]')
+    await pg.click('[data-action=arm][data-then=delete-pet]')
+    await idle(pg)
+    removed = [await pg.evaluate(PAGE), (await pg.inner_text('#toast')).split('\n')[0], await state(pg, 'db.pets.length')]
+    check(
+        saved == [['Einstellungen', True, True, 400, 860, 0], 'Gespeichert', 'Mimi']
+        and removed == [['Einstellungen', True, True, 400, 860, 0], 'Mimi entfernt', 0],
+        f'saving and removing a pet lead back to the overview and show the toast there ({saved[1:]}, {removed[1:]})',
+    )
     # The sync notice and „Mit Haushalt verbinden“ lead straight to „Haushalt“, back from there to the overview
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await idle(pg)
     await pg.evaluate("document.querySelector('[data-action=open-server]').click()")
     await idle(pg)
-    jump = await pg.evaluate(HEAD)
+    jump = await pg.evaluate(PAGE)
     await pg.evaluate('window.__back({canGoBack: true})')
     await idle(pg)
     check(
-        jump == ['Haushalt', True, True] and await pg.evaluate(HEAD) == ['Einstellungen', True, False],
-        f'the sync notice opens „Haushalt“ straight away, and back from it leads to the overview, not out ({jump})',
-    )
-
-    # The one switch in the overview: the whole row is the button, and the line under it says what goes out
-    sw = await pg.evaluate(
-        """(() => { const r = [...document.querySelectorAll('#sheet .list-row')].find(x => x.getAttribute('role') === 'switch');
-          return [r.getAttribute('aria-checked'), r.querySelector('.t-main small').innerText.slice(0, 20), Math.round(r.getBoundingClientRect().height)]; })()"""
-    )
-    await pg.click('#sheet [role=switch]')
-    await idle(pg)
-    on = await pg.evaluate(
-        """(() => { const r = document.querySelector('#sheet [role=switch]');
-          return [r.getAttribute('aria-checked'), r.querySelector('.t-main small').innerText.slice(0, 20)]; })()"""
-    )
-    check(
-        sw[:2] == ['false', 'Unbekannte Barcodes '] and sw[2] >= 48 and on == ['true', 'Bei unbekannten Barc'] and await state(pg, 'prefs.lookup'),
-        f'„Produktsuche im Internet“: a row that is the switch, and the line under it says what currently goes out ({sw}, {on})',
+        jump[0] == 'Haushalt' and (await pg.evaluate(PAGE))[0] == 'Einstellungen',
+        f'the sync notice opens „Haushalt“ straight away, and back from it leads to the overview, not out ({jump[0]})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # 390 px: no line under a title runs past two lines, whatever the state says
+    ctx = await phone(browser, width=390)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await settings(pg)
+    long_subs = await pg.evaluate(
+        """[...document.querySelectorAll('#sheet .set-row .t-main small')].map(s => {
+             const lh = parseFloat(getComputedStyle(s).lineHeight);
+             return [s.innerText.slice(0, 24), Math.round(s.getBoundingClientRect().height / lh * 10) / 10]; })
+           .filter(x => x[1] > 2)"""
+    )
+    check(not long_subs, f'at 390 px no line under a title takes more than two lines ({long_subs})')
     await ctx.close()
 
     # 360 px at 130 % system font: the titles stay whole and nothing sticks out sideways
@@ -3272,30 +3330,10 @@ async def test_settings(browser, url):
     await settings(pg)
     await shot(pg, 'settings-overview-big')
     cut = await pg.evaluate(
-        """[...document.querySelectorAll('#sheet .list-row .t-main b')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.innerText)"""
+        """[...document.querySelectorAll('#sheet .set-row .t-main b')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.innerText)"""
     )
     wide = await pg.evaluate("(b => b.scrollWidth - b.clientWidth)(document.getElementById('sheetBody'))")
     check(not cut and wide == 0, f'360 px at 130 %: every title whole and nothing sticking out sideways ({cut}, {wide} px)')
-    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
-    await ctx.close()
-
-    # With movement a page comes in from below, a step back from above; without it the page is there at once
-    ctx = await phone(browser, motion=True)
-    pg, errors = await open_page(ctx, url, native=True)
-    await pg.click('[data-action=demo]')
-    await idle(pg)
-    await pg.click('[data-action=open-settings]')
-    await idle(pg)
-    await pg.click('#sheet [data-action=settings-page][data-v=look]')
-    slide = await pg.evaluate(
-        """document.getElementById('sheetBody').getAnimations().map(a => [a.animationName,
-             a.effect.getComputedTiming().duration, a.effect.getKeyframes()[0].transform])"""
-    )
-    await idle(pg)
-    check(
-        [s[0] for s in slide] == ['swapFwd'] and slide[0][1] == 340 and slide[0][2] == 'translateY(14px)',
-        f'with movement the page comes in from below, once and in 340 ms ({slide})',
-    )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -3444,8 +3482,7 @@ async def test_report(browser, url):
     await idle(pg)
     await settings(pg)
     check(await pg.locator('#sheet [data-action=open-report]').count() == 0, 'the settings no longer lead to the evaluation')
-    await pg.click('#sheet [data-action=close]')
-    await idle(pg)
+    await settings_back(pg)
     await pg.click('[data-sec=hist] [data-action=open-report]')
     await idle(pg)
     head = await pg.inner_text('#sheet .sh-head h2')

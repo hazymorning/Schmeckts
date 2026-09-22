@@ -2,17 +2,15 @@
    To rate: the serving phone schedules it after serving.
    To feed: at the usual times from the history (feedReminders() in smart.js), if nothing has been served by then.
    syncReminders() reconciles what is scheduled with the data, after changes from other phones too. */
-import {$} from '../dom.js';
 import {timeStr} from '../dates.js';
 import {Notifications} from '../native.js';
 import {report} from '../report.js';
-import {REMIND_MAX_AGE, tidyRemind} from '../config.js';
+import {REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
 import {db, prefs, savePrefs} from '../store.js';
 import {feedReminders} from '../smart.js';
 import {getPet, getProduct, getServing, petNames, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
-import {openSheet, renderSheet} from '../ui/sheet.js';
-import {remindHint} from '../views/settings.js';
+import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
 
 const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1; // the plugin needs a whole number
 const isOpen = s => Object.keys(s.pets).some(pid => getPet(pid) && !s.pets[pid].r);
@@ -38,9 +36,10 @@ const feedNotice = x => ({
   extra: {feed: x.key, at: x.at},
 });
 
-/* Settings under „Erinnerung“: switching one on asks for the permission, and without it things stay at „Aus“.
+/* The two switches under „Erinnerungen“: switching one on asks for the permission, and without it the switch
+   goes back to off and its row says why (`denied` on the state, read by views/settings.js).
    redraw: false while the field for your own hours is being typed in */
-async function allowed(wanted) {
+async function allowed(wanted, which) {
   let ok = false;
   try {
     ok =
@@ -51,21 +50,26 @@ async function allowed(wanted) {
     report('notification permission', e);
   }
   if (!ok) toast('Benachrichtigungen sind nicht erlaubt.');
+  if (sheet) {
+    if (ok) delete sheet.denied;
+    else sheet.denied = which;
+  }
   return ok;
 }
+/* The step last chosen, for as long as the app runs: „Aus“ is the switch now, so nothing stores the value.
+   After a fresh start the switch turns on with REMIND_DEFAULT. */
+let lastStep = 0;
+export const remindStep = () => lastStep || REMIND_DEFAULT;
 export async function setRemind(minutes, redraw = true) {
-  const ok = await allowed(minutes);
+  const ok = await allowed(minutes, 'remind');
   prefs.remind = ok ? tidyRemind(minutes) : 0;
+  if (prefs.remind) lastStep = prefs.remind;
   savePrefs();
   syncReminders();
-  if (redraw || !ok) renderSheet();
-  else {
-    const hint = $('#remind-hint');
-    if (hint) hint.textContent = remindHint();
-  } // a full redraw would interrupt the typing, so only the note is updated
+  if (redraw || !ok) renderSheet(); // a full redraw would interrupt the typing in the field for your own hours
 }
 export async function setFeedRemind(on) {
-  prefs.feedRemind = on && (await allowed(true));
+  prefs.feedRemind = on && (await allowed(true, 'feed'));
   savePrefs();
   syncReminders();
   renderSheet();

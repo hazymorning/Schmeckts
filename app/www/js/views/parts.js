@@ -7,7 +7,7 @@ import {queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
 import {rateCls, rOf, scoreCls, VERDICTS} from '../smart.js';
-import {sheet} from '../ui/sheet.js';
+import {isPage, sheet} from '../ui/sheet.js';
 
 export function avatar(pet, cls = '') {
   if (!pet) return '';
@@ -66,6 +66,15 @@ export function resultBadges(s, compact = false) {
     .join('')}</span>`;
 }
 export const closeBtn = `<button class="icon-btn" data-action="close" aria-label="Schließen">${icon('close')}</button>`;
+/* The head of what is open. A sheet carries its title and the X; a page carries the back arrow on a bar that may
+   stay at the top, with the title under it in the style of the header. Which of the two it is comes from the
+   state, not from the view, so the pet editor reads as a sheet from the home page and as a page in the settings.
+   `back` is for a step that is not a level of its own, such as cropping. */
+export const head = (title, back = 'settings-back') =>
+  isPage(sheet)
+    ? `<div class="page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button></div>
+    <h2 class="page-title">${title}</h2>`
+    : `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>`;
 /* A segmented control: one equally wide button per option, the current one pressed. An option is
    [value, label] and may carry an icon and an action of its own. „Eigene“ in the rating reminder is one such,
    because it opens a field instead of setting a value. */
@@ -76,16 +85,6 @@ export const segmented = (action, options, current) =>
         `<button aria-pressed="${value === current}" data-action="${own}" data-v="${esc(value)}">${ic ? icon(ic) : ''}${esc(label)}</button>`,
     )
     .join('')}</div>`;
-/* Two options, „An“ and „Aus“, for a setting that is on or off */
-export const onOff = (action, on) =>
-  segmented(
-    action,
-    [
-      ['on', 'An'],
-      ['off', 'Aus'],
-    ],
-    on ? 'on' : 'off',
-  );
 export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = {}) {
   const on = sheet && sheet.armed === key;
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;

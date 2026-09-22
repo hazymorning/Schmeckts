@@ -80,7 +80,7 @@ async def test_palette(browser, url):
     await idle(pg)
     await pg.click('[data-action=open-settings]')
     await idle(pg)
-    await pg.click('[data-action=close]')
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     names = list(PALETTE) + list(DERIVED)
     for theme, k in (('light', 0), ('dark', 1)):
@@ -316,7 +316,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
 
 
 SCAN = """(allowed) => { const bad = [], seen = new Set();
@@ -429,7 +429,9 @@ async def test_rules(browser, url):
         await pg.fill('#f-code', 'abcd1234')
         code = await pg.eval_on_selector('#f-code', 'f => [getComputedStyle(f).textTransform, getComputedStyle(f).letterSpacing]')
         check(code[0] == 'uppercase' and float(code[1][:-2]) > 0, f'the exception: the household code field ({code})')
-        await pg.click('[data-action=close]')
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+        await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
         await pg.click('#fab')
         await idle(pg)
@@ -457,7 +459,9 @@ async def test_rules(browser, url):
         await scan()
         await pg.click('[data-action=crop-cancel]')
         await idle(pg)
-        await pg.click('[data-action=close]')
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+        await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
         await pg.click('#fab')
         await idle(pg)
@@ -476,7 +480,7 @@ async def test_rules(browser, url):
         await ctx.close()
 
 
-SMALL_ICONS = '.btn .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .list-row .chev, .row-ic .ic, .prod-card .edit .ic, .search .ic, .pick .ic'
+SMALL_ICONS = '.btn .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .set-row .chev, .prod-card .edit .ic, .search .ic, .pick .ic'
 ICONS = """sel => [...document.querySelectorAll(sel)].filter(i => i.getClientRects().length).map(i => { const r = i.getBoundingClientRect(), box = i.closest('.pick, .sugg, .prod-card, .search'),
     b = (box?.querySelector('.field') || box)?.getBoundingClientRect(), left = !!i.closest('.search');
   return {where: i.closest('[class]:not(svg)').className, w: r.width, h: r.height, stroke: getComputedStyle(i).strokeWidth,
@@ -526,7 +530,9 @@ async def test_polish(browser, url):
     await pg.click('#sheet [data-action=edit-pet]')
     await idle(pg)
     icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('[data-action=close]')
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     await pg.click('#fab')
     await idle(pg)
@@ -534,7 +540,7 @@ async def test_polish(browser, url):
     kinds = {i['where'].split()[0] for i in icons}
     odd = [i for i in icons if (i['w'], i['h'], i['stroke']) != (20, 20, '1.8px') or i['edge'] not in (None, 14) or i['mid'] is False]
     check(
-        {'pick', 'sugg', 'edit', 'list-row', 'row-ic', 'btn', 'chip'} <= kinds and not odd,
+        {'pick', 'sugg', 'edit', 'set-row', 'btn', 'chip'} <= kinds and not odd,
         f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))

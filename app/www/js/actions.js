@@ -9,16 +9,16 @@ import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
-import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from './ui/sheet.js';
+import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {expandCard, toggleOverview, update} from './views/home.js';
 import {renderServeHits, renderSuggestions, reportState, reportView} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, togglePackLine, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
-import {setFeedRemind, setRemind} from './logic/reminders.js';
+import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
-import {closeCrop, deletePet, openPet, savePet, setPetPhoto} from './logic/pets.js';
+import {closeCrop, deletePet, editing, openPet, petState, savePet, setPetPhoto} from './logic/pets.js';
 import {exportData, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 
@@ -117,16 +117,11 @@ const ACTIONS = {
     update();
   },
   'add-pet'() {
-    openSheet({
-      kind: 'pet',
-      name: '',
-      species: 'Katze',
-      photo: null,
-      from: sheet?.kind === 'settings' ? 'settings' : null,
-    });
+    if (sheet?.kind === 'settings') openPage('pet', petState(null));
+    else openSheet({kind: 'pet', ...petState(null)});
   },
   'edit-pet'(el) {
-    openPet(el.dataset.id, 'settings');
+    openPet(el.dataset.id, true);
   },
   'open-pet'(el) {
     openPet(el.dataset.id);
@@ -141,7 +136,7 @@ const ACTIONS = {
   },
   'settings-back'() {
     haptic('select');
-    backPage();
+    sheetBack(); // one level, and from the overview out to the home page
   },
   // The span of the evaluation: „7 Tage“, „30 Tage“ or „Alles“, kept while the app runs and never stored
   'report-span'(el) {
@@ -326,8 +321,8 @@ const ACTIONS = {
   'crop-cancel'() {
     closeCrop(false);
   },
-  backdrop(el) {
-    prefs.backdrop = el.dataset.v === 'on';
+  backdrop() {
+    prefs.backdrop = !prefs.backdrop;
     savePrefs();
     haptic('select');
     renderSheet();
@@ -339,10 +334,16 @@ const ACTIONS = {
     haptic('select');
     renderSheet();
   }, // product lookup on the internet, the one switch in the overview, off by default
-  'feed-remind'(el) {
+  'feed-remind'() {
     haptic('select');
-    setFeedRemind(el.dataset.v === 'on');
+    setFeedRemind(!prefs.feedRemind);
   }, // reminder to feed at the usual times
+  'remind-on'() {
+    // the switch: on takes the step last chosen, off keeps it for the next time
+    haptic('select');
+    sheet.ownRemind = false;
+    setRemind(prefs.remind ? 0 : remindStep());
+  },
   remind(el) {
     haptic('select');
     sheet.ownRemind = false;
@@ -416,7 +417,7 @@ export async function openLink(url) {
     .toLowerCase();
   if (!(path in LINKS)) return false;
   if (!db.pets.length) {
-    openSheet({kind: 'pet', name: '', species: 'Katze', photo: null, from: null});
+    openSheet({kind: 'pet', ...petState(null)});
     toast('Leg zuerst dein Tier an.');
     return true;
   }
@@ -471,7 +472,7 @@ document.addEventListener('keydown', e => {
   } else if (e.target.id === 'f-remind') {
     e.preventDefault();
     e.target.blur();
-  } else if (sheet.kind === 'pet') {
+  } else if (editing(sheet)) {
     e.preventDefault();
     savePet();
   } else if (sheet.step === 'name' || sheet.kind === 'new') {

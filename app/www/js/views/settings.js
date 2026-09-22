@@ -1,5 +1,6 @@
-/* The settings: an overview of grouped rows, each leading to a sub-page in the same sheet, and the sub-pages
-   themselves. Everything about the household server lives here too, because that is one of those sub-pages. */
+/* The settings: a page of grouped rows, and behind some of them a page of its own. Everything about the household
+   server lives here too, because that is one of those pages. The pet editor is another; its view sits in
+   views/sheets.js, because the same one is a sheet when it is reached from the home page. */
 import {$} from '../dom.js';
 import {andList, esc} from '../text.js';
 import {appInfo} from '../native.js';
@@ -8,86 +9,65 @@ import {REMIND, REMIND_MAX_H} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {feedSlots} from '../smart.js';
-import {armBtn, avatar, closeBtn, onOff, segmented, syncInfo} from './parts.js';
+import {armBtn, avatar, head, segmented, syncInfo} from './parts.js';
 import {sheet} from '../ui/sheet.js';
 
-/* The choices on the sub-pages. „Eigene“ under the rating reminder opens a field instead of setting a value,
-   so it carries an action of its own. */
 const THEMES = [
   ['system', 'System', 'auto'],
   ['light', 'Hell', 'sun'],
   ['dark', 'Dunkel', 'moon'],
 ];
+/* The steps of the rating reminder without the 0: „Aus“ is the switch now. „Eigene“ opens a field instead of
+   setting a value, so it carries an action of its own. */
 const OWN_REMIND = 'own';
 const REMIND_OPTIONS = [
-  ...REMIND.map(m => [String(m), m ? m / 60 + ' Std.' : 'Aus']),
+  ...REMIND.filter(Boolean).map(m => [String(m), m / 60 + ' Std.']),
   [OWN_REMIND, 'Eigene', '', 'remind-own'],
 ];
+const DENIED = 'Benachrichtigungen sind nicht erlaubt';
 
-/* The notes under the reminders: they say what the chosen setting currently means.
-   logic/reminders.js rewrites the rating one in place, because the permission may be refused after the tap. */
-export const remindHint = () =>
-  !prefs.remind
-    ? 'Dieses Handy erinnert nicht ans Bewerten.'
-    : `Dieses Handy erinnert ${prefs.remind === 60 ? '1 Stunde' : prefs.remind / 60 + ' Stunden'} nach dem Füttern ans Bewerten.`;
-function feedHint() {
-  const slots = feedSlots(db, Date.now()),
-    hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`,
-    on = prefs.feedRemind;
-  if (!slots.length)
-    return (
-      'Die üblichen Zeiten lernt die App aus dem Verlauf, sobald an vier Tagen etwa zur selben Zeit gefüttert wurde.' +
-      (on ? ' Bis dahin kommt keine Erinnerung.' : '')
-    );
-  return (
-    `Futter gibt es meist um ${andList(slots.map(x => hhmm(x.at)))} Uhr. ` +
-    (!on
-      ? 'Dieses Handy erinnert nicht daran.'
-      : `Ist ${slots[0].remind - slots[0].at} Minuten später nichts serviert, erinnert dieses Handy.` +
-        (isConnected() ? ' Was andere inzwischen serviert haben, erfährt es erst, wenn die App offen war.' : ''))
-  );
+/* The lines under the two reminders say what the setting does. The rating one says why instead when the phone
+   refused notifications, because then the switch has jumped back on its own (logic/reminders.js). */
+const remindSub = () => (sheet.denied === 'remind' ? DENIED : 'Nach dem Füttern, auf diesem Handy');
+const hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+function feedSub() {
+  if (sheet.denied === 'feed') return DENIED;
+  const slots = feedSlots(db, Date.now());
+  return slots.length
+    ? `Meist um ${andList(slots.map(x => hhmm(x.at)))} Uhr`
+    : 'Lernt die üblichen Zeiten aus dem Verlauf';
 }
+/* „Haushalt“: the state of the sync in a line, as syncInfo() puts it */
+const houseSub = n => (n.detail ? `${n.title}, ${n.detail.charAt(0).toLowerCase()}${n.detail.slice(1)}` : n.title);
 
-/* What the rows say on the right: the current setting in a few words, so the overview answers most questions
-   without opening anything. */
-const themeValue = () => (THEMES.find(([v]) => v === prefs.theme) || THEMES[0])[1];
-const remindValue = () => {
-  if (!prefs.remind && !prefs.feedRemind) return 'Aus';
-  // „Füttern“ and its an or aus are held together by a no-break space, or a narrow box leaves the two letters
-  // alone on a line of their own.
-  const rate = prefs.remind ? `Bewerten ${prefs.remind / 60} Std.` : 'Bewerten aus';
-  return `${rate}, Füttern\u00a0${prefs.feedRemind ? 'an' : 'aus'}`;
-};
-
-/* A row of the overview. `pageRow` leads to a sub-page and shows the current value, `doRow` runs an action and
-   has neither value nor chevron. `id` on a value lets it be rewritten without a redraw. */
-const rowIc = ic => `<span class="row-ic">${icon(ic)}</span>`;
-const pageRow = (page, ic, title, value = '', tone = '', id = '') =>
-  `<button class="list-row" data-action="settings-page" data-v="${page}">${rowIc(ic)}
-    <span class="t-main"><b>${title}</b></span>
-    ${value ? `<span class="val ${tone}"${id && ` id="${id}"`}>${esc(value)}</span>` : ''}
-    ${icon('chevron', 'chev')}</button>`;
+/* A row of a group. Leading 32px: a plain icon in --muted, or the pet's picture. Then the title and under it at
+   most two lines saying what the setting does. Trailing: a switch, a chevron for a page, or nothing. The whole
+   row is the tap target (PROJECT.md, „Settings“). A segment or a field belonging to a row stands under it in the
+   text column, which the group's grid takes care of. */
+const lead = ic => `<span class="set-ic">${icon(ic)}</span>`;
+const main = (title, sub = '', id = '') =>
+  `<span class="t-main"><b>${title}</b>${sub ? `<small${id ? ` id="${id}"` : ''}>${sub}</small>` : ''}</span>`;
+const chev = icon('chevron', 'chev');
+const pageRow = (page, ic, title, sub = '', id = '') =>
+  `<button class="set-row" data-action="settings-page" data-v="${page}">${lead(ic)}${main(title, sub, id)}${chev}</button>`;
+const switchRow = (action, ic, title, sub, on, id = '') =>
+  `<button class="set-row" role="switch" aria-checked="${on}" data-action="${action}">${lead(ic)}${main(title, sub, id)}
+    <span class="sw" aria-hidden="true"></span></button>`;
 const doRow = (action, ic, title) =>
-  `<button class="list-row" data-action="${action}">${rowIc(ic)}<span class="t-main"><b>${title}</b></span></button>`;
+  `<button class="set-row act" data-action="${action}">${lead(ic)}${main(title)}</button>`;
+const petRow = p =>
+  `<button class="set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p)}${main(esc(p.name), esc(p.species))}${chev}</button>`;
+const labelRow = (ic, title) => `<div class="set-row">${lead(ic)}${main(title)}</div>`;
+const under = html => `<div class="set-under">${html}</div>`;
 const group = (label, rows) => `<span class="label">${label}</span><div class="set-group">${rows}</div>`;
 
-/* „Produktsuche im Internet“ is the one setting that sits in the overview itself: the whole row is the switch, so
-   the tap target is the row, and the line under the title says what currently goes out. */
-const LOOKUP_ON =
-  'Bei unbekannten Barcodes fragt dieses Handy zwei freie Produktdatenbanken. Übertragen wird nur die Nummer.';
-const LOOKUP_OFF = 'Unbekannte Barcodes führen gleich zum Foto. Es geht keine Nummer hinaus.';
-const lookupRow = () =>
-  `<button class="list-row wrap" role="switch" aria-checked="${prefs.lookup}" data-action="lookup">${rowIc('search')}
-    <span class="t-main"><b>Produktsuche im Internet</b><small>${prefs.lookup ? LOOKUP_ON : LOOKUP_OFF}</small></span>
-    <span class="sw" aria-hidden="true"></span></button>`;
-
-const petRow = p =>
-  `<button class="list-row" data-action="edit-pet" data-id="${p.id}">${avatar(p)}
-    <span class="t-main"><b>${esc(p.name)}</b><small>${esc(p.species)}</small></span>${icon('chevron', 'chev')}</button>`;
+const LOOKUP = 'Fragt bei unbekannten Barcodes nach, nur mit der Nummer';
 
 function overview() {
   const house = isConnected(),
     notice = syncInfo();
+  // „Eigene“: chosen, or a stored value that is not one of the steps
+  const own = prefs.remind > 0 && (!!sheet.ownRemind || !REMIND.includes(prefs.remind));
   return `${
     loadError
       ? `<p class="banner">Die gespeicherten Daten konnten nicht gelesen werden. Bitte die App neu starten.</p>`
@@ -96,17 +76,43 @@ function overview() {
         : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`
   }
     ${group('Tiere', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Tier hinzufügen'))}
-    ${group('App', pageRow('look', prefs.theme === 'system' ? 'auto' : prefs.theme === 'dark' ? 'moon' : 'sun', 'Darstellung', themeValue()) + pageRow('remind', 'clock', 'Erinnerungen', remindValue()))}
     ${group(
-      'Teilen',
-      pageRow('name', 'person', 'Dein Name', prefs.name || 'Fehlt noch') +
-        pageRow('house', 'house', 'Haushalt', notice.title, notice.tone, 'houseVal') +
-        pageRow('exchange', 'phone', 'Austausch von Hand') +
-        lookupRow(),
+      'Darstellung',
+      labelRow('auto', 'Farbschema') +
+        under(segmented('theme', THEMES, prefs.theme)) +
+        switchRow(
+          'backdrop',
+          'paw',
+          'Profilbild im Hintergrund',
+          'Blass hinter dem Kopf der Startseite',
+          prefs.backdrop,
+        ),
     )}
     ${group(
+      'Erinnerungen',
+      switchRow('remind-on', 'clock', 'Ans Bewerten erinnern', remindSub(), !!prefs.remind, 'remindSub') +
+        (prefs.remind
+          ? under(
+              segmented('remind', REMIND_OPTIONS, own ? OWN_REMIND : String(prefs.remind)) +
+                (own
+                  ? `<label class="label" for="f-remind">Stunden nach dem Füttern</label>
+              <input id="f-remind" class="field" type="number" inputmode="numeric" min="1" max="${REMIND_MAX_H}" step="1" value="${prefs.remind / 60}" data-remind enterkeyhint="done">`
+                  : ''),
+            )
+          : '') +
+        switchRow('feed-remind', 'clock', 'Ans Füttern erinnern', feedSub(), prefs.feedRemind, 'feedSub'),
+    )}
+    ${group(
+      'Teilen',
+      `<div class="set-row">${lead('person')}<label class="t-main" for="f-me"><b>Dein Name</b></label>
+        <input id="f-me" class="field in-row" data-setting="name" value="${esc(prefs.name)}" placeholder="z. B. Anna" autocomplete="off" autocapitalize="words"></div>` +
+        pageRow('house', 'house', 'Haushalt', esc(houseSub(notice)), 'houseSub') +
+        pageRow('exchange', 'phone', 'Austausch von Hand', 'Änderungen als Datei weitergeben'),
+    )}
+    ${group('Scannen', switchRow('lookup', 'search', 'Produktsuche im Internet', LOOKUP, prefs.lookup))}
+    ${group(
       'Daten',
-      pageRow('backup', 'download', 'Backup') +
+      pageRow('backup', 'download', 'Backup', 'Sichern und wieder einlesen') +
         (house ? '' : doRow('demo', 'sparkle', 'Beispieldaten laden')) +
         pageRow('privacy', 'shield', 'Datenschutz'),
     )}
@@ -118,32 +124,6 @@ function overview() {
     <p class="foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
 }
 
-const lookPage = () => `<span class="label">Farben</span>
-  ${segmented('theme', THEMES, prefs.theme)}
-  <span class="label">Profilbild im Hintergrund</span>
-  <p class="hint">Das Bild des Tieres liegt blass hinter dem Kopf der Startseite.</p>
-  ${onOff('backdrop', prefs.backdrop)}`;
-
-function remindPage() {
-  // „Eigene“: chosen, or a stored value that is not one of the steps
-  const own = prefs.remind > 0 && (!!sheet.ownRemind || !REMIND.includes(prefs.remind));
-  return `<span class="label">Ans Bewerten erinnern</span>
-    <p class="hint" id="remind-hint">${remindHint()}</p>
-    ${segmented('remind', REMIND_OPTIONS, own ? OWN_REMIND : String(prefs.remind))}
-    ${
-      own
-        ? `<label class="label" for="f-remind">Stunden nach dem Füttern</label>
-      <input id="f-remind" class="field" type="number" inputmode="numeric" min="1" max="${REMIND_MAX_H}" step="1" value="${prefs.remind / 60}" data-remind enterkeyhint="done">`
-        : ''
-    }
-    <span class="label">Ans Füttern erinnern</span>
-    <p class="hint">${feedHint()}</p>
-    ${onOff('feed-remind', prefs.feedRemind)}`;
-}
-
-const namePage = () => `<p class="hint">Erscheint im Verlauf, damit im Haushalt alle sehen, wer gefüttert hat.</p>
-  <input id="f-me" class="field" data-setting="name" value="${esc(prefs.name)}" placeholder="z. B. Anna" autocomplete="off" autocapitalize="words">`;
-
 const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gespeichert hat. Ein Import ersetzt die
   Daten auf diesem Handy.</p>
   <div class="btn-col">
@@ -151,7 +131,7 @@ const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gesp
     <label class="btn soft" for="importInput">${icon('upload')}Backup importieren</label>
   </div>`;
 
-/* Sub-page „Austausch von Hand“: changes as a file to another phone and back. The notes say what goes out.
+/* Page „Austausch von Hand“: changes as a file to another phone and back. The notes say what goes out.
    After receiving, the report sits here and, when the other device is missing something, „Antwort senden“
    (sheet.exchange, see logic/exchange.js). */
 function exchangePage() {
@@ -169,13 +149,13 @@ function exchangePage() {
 const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Teilen“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Scannen“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
   'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.',
 ];
 const privacyPage = () => `<div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
-/* Sub-page „Haushalt“. Mode `lokal`: the „Mit Haushalt verbinden“ button, which opens the fields for address
+/* Page „Haushalt“. Mode `lokal`: the „Mit Haushalt verbinden“ button, which opens the fields for address
    and code. Connected: the state of the sync, „Jetzt abgleichen“ and „Verbindung trennen“. Only the hand-started
    sync shows progress (sheet.syncing, see actions.js); syncs in the background stay invisible. */
 function serverSection(notice = syncInfo()) {
@@ -219,32 +199,28 @@ function serverSection(notice = syncInfo()) {
 const housePage = () => `<div id="serverBox"></div>`;
 
 const PAGES = {
-  look: ['Darstellung', lookPage],
-  remind: ['Erinnerungen', remindPage],
-  name: ['Dein Name', namePage],
   house: ['Haushalt', housePage],
   exchange: ['Austausch von Hand', exchangePage],
   backup: ['Backup', backupPage],
   privacy: ['Datenschutz', privacyPage],
 };
-const backBtn = `<button class="icon-btn lead" data-action="settings-back" aria-label="Zurück">${icon('back')}</button>`;
 export function viewSettings() {
   const page = PAGES[sheet.page];
-  if (!page) return `<div class="sh-head"><h2>Einstellungen</h2>${closeBtn}</div>${overview()}`;
-  return `<div class="sh-head">${backBtn}<h2>${page[0]}</h2>${closeBtn}</div>${page[1]()}`;
+  if (!page) return head('Einstellungen') + overview();
+  return head(page[0]) + page[1]();
 }
 
-/* The household, live: on the overview only the value in its row, on the sub-page the whole box. The box is only
+/* The household, live: on the overview only the line under its title, on its page the whole box. The box is only
    rewritten when its visible content changes: status changes with no visible consequence (busy on every short sync)
    do nothing, and when only the line under the title changes, such as the „zuletzt abgeglichen“ timestamp, only its
-   text is swapped. fresh: right after the sheet was drawn, when the box is still empty. */
+   text is swapped. fresh: right after the page was drawn, when the box is still empty. */
 let boxFrame = ''; // the box as last written, without the line under the title
 export function paintHouse(fresh = false) {
   const notice = syncInfo(),
-    val = $('#houseVal');
-  if (val) {
-    val.textContent = notice.title;
-    val.className = 'val ' + notice.tone;
+    row = $('#houseSub');
+  if (row) {
+    row.textContent = houseSub(notice);
+    row.className = notice.tone === 'bad' ? 'warn' : '';
     return;
   }
   const box = $('#serverBox');
