@@ -19,6 +19,8 @@ import {
   sortOf,
 } from '../derive.js';
 import {MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {hasLine} from '../ocr.js';
+import {memLines} from '../recognize.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
@@ -114,6 +116,18 @@ function textureChips(x, note = '') {
     ? `<div class="tex"><span class="label">${t.title}</span><div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}</div>`
     : '';
 }
+/* What the phone read off the packaging, as chips: only the phone's own reading has them (recognize.js), they live
+   in memory only, and a tap puts a line into a field or takes it out again. */
+const packChips = serving => {
+  const lines = (serving && memLines.get(serving.id)) || [];
+  if (!lines.length) return '';
+  return `<span class="label">Auf der Packung gelesen</span><div class="chips">${lines
+    .map(
+      l =>
+        `<button class="chip" aria-pressed="${hasLine(sheet.brand, l) || hasLine(sheet.variety, l)}" data-action="pack-line" data-v="${esc(l)}">${esc(l)}</button>`,
+    )
+    .join('')}</div>`;
+};
 export function renderSuggestions() {
   const box = $('#suggest');
   if (!box || !sheet) return;
@@ -138,7 +152,8 @@ export function renderSuggestions() {
         p =>
           `<button class="sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`,
       )
-      .join('');
+      .join('') +
+    packChips(serving);
 }
 
 /* Feeding: barcode and photo as equally wide buttons; „Füttern beginnt mit“ hides one of them and the other takes

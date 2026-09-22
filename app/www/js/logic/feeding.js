@@ -9,7 +9,7 @@ import {isConnected} from '../sync.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
 import {cropSquare, fileToImage, memPhotos, resize} from '../images.js';
 import {milestones} from '../smart.js';
-import {identify} from '../recognize.js';
+import {identify, memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, dlg, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
@@ -69,6 +69,7 @@ function undoServe(id) {
   if (!s) return;
   db.servings = db.servings.filter(x => x.id !== id);
   memPhotos.delete(id);
+  memLines.delete(id);
   tries.delete(id);
   if (s.productId) cleanupProduct(s.productId);
   if (sheet?.kind === 'serving' && sheet.id === id) closeSheet(); // is being named right now (mode `lokal`)
@@ -213,6 +214,7 @@ function takeResult(s, found, house) {
     s.guess = found.details;
     s.status = 'noserver';
     delete s.error;
+    if (found.lines?.length) memLines.set(s.id, found.lines);
     fillName(s.id, found.details);
   } else if (!house || err?.kind === 'none') {
     s.status = 'noserver';
@@ -275,6 +277,7 @@ function settle(s) {
     delete s.autoPets;
     delete s.guess;
     memPhotos.delete(s.id);
+    memLines.delete(s.id);
   }
   tries.delete(s.id);
 }

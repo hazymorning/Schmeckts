@@ -1,10 +1,13 @@
 /* Making sense of the packaging text: out of the text the phone reads off the photo (native.js) comes the same answer
    the server gives — brand, variety, type, animal, texture. Pure functions, so they can be tested on their own.
-   Order: our own varieties, then a brand from the list, then the most prominent line as the variety. */
+   Order: our own varieties, then a brand — from the list or from one of our own varieties — then the most
+   prominent line as the variety. */
 import {norm} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 
 export const MAX_VARIETY = 40;
+export const PACK_LINES = 8; // as chips while naming, more than this is no longer a glance
+const MIN_BRAND = 4; // our own brands count as brands too, and a shorter word is too general to match on
 const EMPTY = {brand: '', variety: '', type: '', animal: ''};
 const QUANTITY =
   /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
@@ -39,7 +42,9 @@ export function readPack(text, products = []) {
 
   const flat = ` ${norm(raw)} `;
   const brand =
-    BRANDS.filter(b => flat.includes(` ${norm(b)} `)).sort((a, b) => norm(b).length - norm(a).length)[0] || '';
+    brandsOf(products)
+      .filter(b => flat.includes(` ${norm(b)} `))
+      .sort((a, b) => norm(b).length - norm(a).length)[0] || '';
   const type = foodType(raw);
   const variety = pickVariety(raw, brand);
   if (!brand && !variety) return {...EMPTY};
@@ -53,6 +58,20 @@ export function readPack(text, products = []) {
   };
 }
 
+/* Every brand that may be read off a packaging: the list, plus the brands of our own varieties — once each and
+   only from MIN_BRAND characters on. The match is on whole words and the longest hit wins, as before. */
+function brandsOf(products) {
+  const out = [...BRANDS],
+    seen = new Set(BRANDS.map(norm));
+  for (const p of products) {
+    const b = String(p?.brand || '').trim();
+    if (b.length < MIN_BRAND || seen.has(norm(b))) continue;
+    seen.add(norm(b));
+    out.push(b);
+  }
+  return out;
+}
+
 /* Type: the unambiguous keywords first, otherwise the consistency keywords (Soße, Pastete → Nassfutter; Stick, Kau → Snack) */
 function foodType(raw) {
   const direct = TYPE_WORDS.find(([, re]) => re.test(raw));
@@ -64,23 +83,7 @@ function foodType(raw) {
    fit, they are joined in the order they appear on the packaging, at most MAX_VARIETY characters. */
 function pickVariety(raw, brand) {
   const bare = norm(brand);
-  const lines = raw
-    .split(/\r?\n/)
-    .map(l =>
-      withoutBrand(l.replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim(), bare).replace(
-        /^[\s\-–,·|]+|[\s\-–,·|]+$/g,
-        '',
-      ),
-    )
-    .filter(
-      v =>
-        v.length >= 3 &&
-        (v.match(/[A-Za-zÄÖÜäöüß]/g) || []).length >= 3 &&
-        !JUNK.test(v) &&
-        !ADS.test(v) &&
-        norm(v) !== bare,
-    );
-  const scored = lines
+  const scored = packLines(raw, bare)
     .map((v, i) => ({v, i, s: score(v) - Math.min(1, i * 0.2)}))
     .filter(x => x.s > 0)
     .sort((a, b) => b.s - a.s);
@@ -102,6 +105,39 @@ function pickVariety(raw, brand) {
     .slice(0, MAX_VARIETY)
     .trim();
 }
+/* The usable lines of a packaging text: without quantities, advertising, ingredients and bare numbers, none of
+   them twice, at most PACK_LINES, in the order they stand on the packaging. pickVariety picks the variety from
+   these, and while naming they are offered as chips, so the filter exists only once. `bare` is the normalised
+   brand, which is dropped from the front of a line („Sheba Lachs in Soße“ → „Lachs in Soße“). */
+export function packLines(text, bare = '') {
+  const seen = new Set();
+  return String(text || '')
+    .split(/\r?\n/)
+    .map(l =>
+      withoutBrand(l.replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim(), bare).replace(
+        /^[\s\-–,·|]+|[\s\-–,·|]+$/g,
+        '',
+      ),
+    )
+    .filter(v => {
+      if (v.length < 3 || (v.match(/[A-Za-zÄÖÜäöüß]/g) || []).length < 3) return false;
+      if (JUNK.test(v) || ADS.test(v) || norm(v) === bare || seen.has(norm(v))) return false;
+      seen.add(norm(v));
+      return true;
+    })
+    .slice(0, PACK_LINES);
+}
+
+/* A line read off the packaging inside one of the naming fields, whole and between spaces. That is how a second
+   tap finds it again, and why a field that already says something gets the line appended rather than replaced. */
+const tidy = s =>
+  String(s || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+export const hasLine = (value, line) => ` ${tidy(value)} `.includes(` ${tidy(line)} `);
+export const withLine = (value, line) => (tidy(value) ? `${tidy(value)} ${tidy(line)}` : tidy(line));
+export const withoutLine = (value, line) => tidy(` ${tidy(value)} `.replace(` ${tidy(line)} `, ' '));
+
 function withoutBrand(v, bare) {
   // "Sheba Lachs in Soße" → "Lachs in Soße"
   if (!bare) return v;

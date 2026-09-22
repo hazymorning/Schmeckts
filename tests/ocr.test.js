@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BRANDS} from '../app/www/js/config.js';
-import {MAX_VARIETY, readPack} from '../app/www/js/ocr.js';
+import {MAX_VARIETY, PACK_LINES, packLines, readPack} from '../app/www/js/ocr.js';
 
 const VARIETIES = [
   {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
@@ -63,4 +63,38 @@ test('packaging text: with nothing usable everything stays empty', () => {
   for (const text of ['', '   ', '12345\n4008429087455\n850 g', 'NEU\n100 % natürlich']) {
     assert.deepEqual(readPack(text, VARIETIES), {brand: '', variety: '', type: '', animal: ''}, JSON.stringify(text));
   }
+});
+
+test('packaging text: the brands of our own varieties count as brands too', () => {
+  const text = 'Katzenglück\nZarte Häppchen\nmit Huhn';
+  assert.equal(readPack(text).brand, '', 'nothing of our own: the brand is not invented');
+  const mine = readPack(text, [{brand: 'Katzenglück', variety: 'Rind pur', type: 'Nassfutter'}]);
+  assert.deepEqual(
+    [mine.brand, mine.variety],
+    ['Katzenglück', 'Zarte Häppchen mit Huhn'],
+    'one variety of that brand is enough, and it drops out of the variety',
+  );
+  assert.equal(
+    readPack('Bio\nHuhn in Gelee', [{brand: 'Bio', variety: 'Rind pur'}]).brand,
+    '',
+    'too short to match on',
+  );
+  assert.equal(
+    readPack('Katzenglück\nHuhn in Gelee', [{brand: 'Glück', variety: 'Rind pur'}]).brand,
+    '',
+    'whole words only, so no hit inside another one',
+  );
+  assert.equal(
+    readPack('Sheba\nLachs pur', [{brand: 'sheba', variety: 'Rind'}]).brand,
+    'Sheba',
+    'a brand already on the list keeps its spelling and is not counted twice',
+  );
+});
+
+test('packaging text: the readable lines, none of them twice and at most eight', () => {
+  const text = 'Sheba\nNEU\nSelection in Sauce\nmit Lachs\nSELECTION IN SAUCE\n4 x 85 g\nZutaten: Fleisch 40 %';
+  assert.deepEqual(packLines(text), ['Sheba', 'Selection in Sauce', 'mit Lachs'], 'in the order on the packaging');
+  assert.deepEqual(packLines('Sheba\nSheba Lachs in Soße', 'sheba'), ['Lachs in Soße'], 'without the brand in front');
+  const many = Array.from({length: 12}, (_, i) => `Zeile ${'abcdefghijkl'[i]}`).join('\n');
+  assert.equal(packLines(many).length, PACK_LINES);
 });

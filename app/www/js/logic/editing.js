@@ -1,6 +1,7 @@
 /* Rating, naming and deleting meals and food varieties, and removing a variety's barcodes. */
 import {haptic} from '../native.js';
 import {RATINGS} from '../config.js';
+import {hasLine, withLine, withoutLine} from '../ocr.js';
 import {db, save} from '../store.js';
 import {byMe, findProduct, getPet, getProduct, getServing, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
@@ -118,6 +119,20 @@ function backFromNaming() {
   renderSheet();
   update();
 }
+/* A line read off the packaging, tapped: it goes into the field last touched, otherwise into „Marke“ while that is
+   still empty and into „Sorte“ after that. A second tap takes it out again, wherever it ended up. */
+export function togglePackLine(line) {
+  if (!sheet) return;
+  haptic('select');
+  const here = ['brand', 'variety'].find(f => hasLine(sheet[f], line));
+  if (here) sheet[here] = withoutLine(sheet[here], line);
+  else {
+    const f = sheet.lastField || (String(sheet.brand || '').trim() ? 'variety' : 'brand');
+    sheet[f] = withLine(sheet[f], line);
+  }
+  renderSheet();
+}
+
 export function useProduct(pid) {
   const p = getProduct(pid);
   if (!p || !sheet) return;
