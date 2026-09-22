@@ -1,13 +1,12 @@
 /* Contents of the bottom sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
-   the profile picture), settings and evaluation. */
+   the profile picture) and evaluation. The settings have pages of their own and live in views/settings.js. */
 import {$} from '../dom.js';
-import {andList, cap, esc, norm} from '../text.js';
+import {cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
-import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
-import {RATINGS, REMIND, REMIND_MAX_H, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
-import {db, loadError, prefs, queue, storageOK} from '../store.js';
-import {isConnected, status} from '../sync.js';
+import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {db} from '../store.js';
+import {isConnected} from '../sync.js';
 import {
   getPet,
   getProduct,
@@ -19,7 +18,7 @@ import {
   reportModel,
   sortOf,
 } from '../derive.js';
-import {feedSlots, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
@@ -29,15 +28,14 @@ import {
   dayBlocks,
   dayGroups,
   nameBlock,
-  onOff,
   rateRow,
   reasonOf,
   resultBadges,
   segmented,
-  syncInfo,
   thumbOf,
   verdictLabel,
 } from './parts.js';
+import {paintHouse, viewSettings} from './settings.js';
 
 /* The pieces of „Wie war’s?“: the variety as a card that leads to naming, one rating row per pet, and in a
    household the chips that say who was served. */
@@ -207,30 +205,6 @@ function hitList(text, words) {
   const q = esc(text);
   return `<p class="empty"><span>Keine Sorte passt zu „${q}“.</span></p>
     <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neues Futter eintippen</button>`;
-}
-
-/* The notes under the reminders: they say what the chosen setting currently means.
-   For feeding: the usual times from the history, nothing is asked */
-export const remindHint = () =>
-  !prefs.remind
-    ? 'Dieses Handy erinnert nicht ans Bewerten.'
-    : `Dieses Handy erinnert ${prefs.remind === 60 ? '1 Stunde' : prefs.remind / 60 + ' Stunden'} nach dem Füttern ans Bewerten.`;
-function feedHint() {
-  const slots = feedSlots(db, Date.now()),
-    hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`,
-    on = prefs.feedRemind;
-  if (!slots.length)
-    return (
-      'Die üblichen Zeiten lernt die App aus dem Verlauf, sobald an vier Tagen etwa zur selben Zeit gefüttert wurde.' +
-      (on ? ' Bis dahin kommt keine Erinnerung.' : '')
-    );
-  return (
-    `Futter gibt es meist um ${andList(slots.map(x => hhmm(x.at)))} Uhr. ` +
-    (!on
-      ? 'Dieses Handy erinnert nicht daran.'
-      : `Ist ${slots[0].remind - slots[0].at} Minuten später nichts serviert, erinnert dieses Handy.` +
-        (isConnected() ? ' Was andere inzwischen serviert haben, erfährt es erst, wenn die App offen war.' : ''))
-  );
 }
 
 /* Food sheet, section „Kaufen“: the manual setting (Automatisch, Immer kaufen, Nicht kaufen), below it the computed
@@ -441,167 +415,6 @@ function viewPet() {
     ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
 }
 
-/* The choices in the settings. „Eigene“ under the rating reminder opens a field instead of setting a value,
-   so it carries an action of its own. */
-const THEMES = [
-  ['system', 'System', 'auto'],
-  ['light', 'Hell', 'sun'],
-  ['dark', 'Dunkel', 'moon'],
-];
-const OWN_REMIND = 'own';
-const REMIND_OPTIONS = [
-  ...REMIND.map(m => [String(m), m ? m / 60 + ' Std.' : 'Aus']),
-  [OWN_REMIND, 'Eigene', '', 'remind-own'],
-];
-
-function viewSettings() {
-  const st = prefs,
-    house = isConnected(),
-    own = st.remind > 0 && (!!sheet.ownRemind || !REMIND.includes(st.remind)); // „Eigene“: chosen, or a value outside the steps
-  return `<div class="sh-head"><h2>Einstellungen</h2>${closeBtn}</div>
-    ${
-      loadError
-        ? `<p class="banner">Die gespeicherten Daten konnten nicht gelesen werden. Bitte die App neu starten.</p>`
-        : storageOK
-          ? ''
-          : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`
-    }
-    <span class="label">Darstellung</span>
-    ${segmented('theme', THEMES, st.theme)}
-    <span class="label">Profilbild im Hintergrund</span>
-    ${onOff('backdrop', st.backdrop)}
-    <span class="label">Ans Bewerten erinnern</span>
-    <p class="hint" id="remind-hint">${remindHint()}</p>
-    ${segmented('remind', REMIND_OPTIONS, own ? OWN_REMIND : String(st.remind))}
-    ${
-      own
-        ? `<label class="label" for="f-remind">Stunden nach dem Füttern</label>
-      <input id="f-remind" class="field" type="number" inputmode="numeric" min="1" max="${REMIND_MAX_H}" step="1" value="${st.remind / 60}" data-remind enterkeyhint="done">`
-        : ''
-    }
-    <span class="label">Ans Füttern erinnern</span>
-    <p class="hint">${feedHint()}</p>
-    ${onOff('feed-remind', st.feedRemind)}
-    <span class="label">Tiere</span>
-    <div>${db.pets.map(p => `<button class="list-row" data-action="edit-pet" data-id="${p.id}">${avatar(p)}<span class="t-main"><b>${esc(p.name)}</b><small>${esc(p.species)}</small></span>${icon('chevron', 'chev')}</button>`).join('')}
-      <button class="list-row" data-action="add-pet"><span class="av add">${icon('plus')}</span><span class="t-main"><b>Tier hinzufügen</b></span></button></div>
-    <label class="label" for="f-me">Dein Name</label>
-    <p class="hint">Erscheint im Verlauf, damit im Haushalt alle sehen, wer gefüttert hat.</p>
-    <input id="f-me" class="field" data-setting="name" value="${esc(st.name)}" placeholder="z. B. Anna" autocomplete="off" autocapitalize="words">
-    <span class="label" id="server">Haushalt</span>
-    <div id="serverBox"></div>
-    <span class="label">Daten</span>
-    <div class="btn-col">
-      <button class="btn soft" data-action="export">${icon('download')}Backup exportieren</button>
-      <label class="btn soft" for="importInput">${icon('upload')}Backup importieren</label>
-      ${house ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Beispieldaten laden</button>`}
-      <button class="btn soft" data-action="open-privacy">${icon('shield')}Datenschutz</button>
-      ${
-        house
-          ? armBtn('wipe', 'Alle Daten im Haushalt löschen', 'Nochmal tippen: für alle im Haushalt löschen')
-          : armBtn('wipe', 'Alle Daten löschen', 'Nochmal tippen: wirklich alles löschen')
-      }
-    </div>
-    <p class="foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
-}
-
-/* Section „Haushalt“. Mode `lokal`: this phone's settings and the „Mit Haushalt verbinden“ button, which opens the
-   fields for address and code. Connected: the state of the sync, „Jetzt abgleichen“ and „Verbindung trennen“, with the
-   same settings below. Only the hand-started sync shows progress (sheet.syncing, see actions.js); syncs in the
-   background stay invisible. */
-function serverSection(notice = syncInfo()) {
-  const s = sheet || {};
-  const codeRow = `<div class="connect mt-s">
-      <input id="f-code" class="field code" data-field="code" value="${esc(s.code || '')}" placeholder="Haushaltscode" aria-label="Haushaltscode"
-        autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" maxlength="12">
-      <button class="btn primary" data-action="connect"${s.connecting ? ' disabled' : ''}>${s.connecting ? '<span class="spin"></span>Verbinde …' : 'Verbinden'}</button></div>
-      ${s.connectError ? `<p class="note warn" role="alert">${esc(s.connectError)}</p>` : ''}`;
-  const addrField = `<label class="label" for="f-server">Adresse des Servers</label>
-      <input id="f-server" class="field" data-field="server" value="${esc(s.server ?? prefs.server)}" placeholder="http://192.168.… oder https://…"
-        autocomplete="off" inputmode="url" spellcheck="false" enterkeyhint="next">`;
-  if (!isConnected())
-    return (
-      deviceSection() +
-      (s.connectForm
-        ? `<p class="hint">Verbunden sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen. Adresse und Code zeigt „Schmeckt’s-Server einrichten“ auf dem Mini-PC.</p>${addrField}${codeRow}`
-        : `<button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`)
-    );
-  const needCode = status.kind === 'auth';
-  return `<div class="srv ${notice.tone}" role="status"><span class="srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
-    <span class="t-main"><b>${esc(notice.title)}</b><small>${esc(notice.detail)}</small></span></div>
-    ${
-      !needCode
-        ? `<p class="addr"><span>Server ${esc(prefs.server)}</span></p>`
-        : codeRow +
-          (s.editServer
-            ? addrField
-            : `<p class="addr"><span>Server ${esc(prefs.server)}</span><button class="link" data-action="edit-server">Ändern</button></p>`)
-    }
-    <div class="btn-col mt-s">
-      ${
-        needCode
-          ? ''
-          : s.syncing === 'shown'
-            ? `<button class="btn soft" disabled><span class="spin"></span>Abgleich läuft …</button>`
-            : status.state === 'ok' && !queue.length
-              ? '' // all synced: nothing to do
-              : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Jetzt abgleichen</button>`
-      }
-      ${armBtn('disconnect', 'Verbindung trennen', 'Nochmal tippen: trennen, die Daten bleiben hier', {ic: 'unplug', cls: 'plain'})}</div>
-    ${deviceSection()}`;
-}
-
-/* This phone's settings and routes: product lookup on the internet and the manual exchange.
-   The notes say what goes out in each case. After receiving, the report sits here and, when the other device is
-   missing something, „Antwort senden“ (sheet.exchange, see logic/exchange.js). */
-function deviceSection() {
-  const ex = sheet?.exchange;
-  return `<span class="label">Produktsuche im Internet</span>
-    <p class="hint">${
-      prefs.lookup
-        ? 'Bei unbekannten Barcodes fragt dieses Handy zwei freie Produktdatenbanken. Übertragen wird nur die Nummer.'
-        : 'Unbekannte Barcodes führen gleich zum Foto. Es geht keine Nummer hinaus.'
-    }</p>
-    ${onOff('lookup', prefs.lookup)}
-    <span class="label">Austausch von Hand</span>
-    <p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält nur Tiere, Futter und Mahlzeiten.</p>
-    <div class="btn-col">
-      <button class="btn soft" data-action="share-changes">${icon('phone')}Änderungen teilen</button>
-      <label class="btn soft" for="exchangeInput">${icon('upload')}Austausch empfangen</label>
-    </div>
-    ${ex ? `<p class="note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
-}
-/* Drawing the server box. It is only rewritten when its visible content changes: status changes with no visible
-   consequence (busy on every short sync) do nothing, and when only the line under the title changes, such as the
-   „zuletzt abgeglichen“ timestamp, only its text is swapped. fresh: right after the sheet was drawn, when the box is
-   still empty. */
-let boxFrame = ''; // the box as last written, without the line under the title
-export function paintServerBox(fresh = false) {
-  const box = $('#serverBox');
-  if (!box) return;
-  const notice = syncInfo(),
-    frame = serverSection({...notice, detail: ''});
-  if (fresh || frame !== boxFrame) {
-    if (!fresh && document.activeElement?.tagName === 'INPUT' && box.contains(document.activeElement)) return; // do not interrupt while typing
-    boxFrame = frame;
-    box.innerHTML = serverSection(notice);
-    return;
-  }
-  const line = $('.srv small', box);
-  if (line && line.textContent !== notice.detail) line.textContent = notice.detail;
-}
-
-/* Datenschutz: explains both modes factually, without promises; opened from the settings, section „Daten“ */
-const PRIVACY = [
-  'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
-  'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann eine Einstellung unter „Haushalt“, sie ist aus: Die Produktsuche im Internet fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
-  'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Der schickt Packungsfotos zur Erkennung an Anthropic und unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken.',
-  'Ein Backup und das Löschen aller Daten findest du in den Einstellungen unter „Daten“. „Änderungen teilen“ unter „Haushalt“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.',
-];
-const viewPrivacy = () =>
-  `<div class="sh-head"><h2>Datenschutz</h2>${closeBtn}</div><div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
-
 const VIEWS = {
   serving: viewServing,
   feed: viewFeed,
@@ -610,7 +423,6 @@ const VIEWS = {
   pet: viewPet,
   settings: viewSettings,
   report: viewReport,
-  privacy: viewPrivacy,
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
    away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.
@@ -624,7 +436,7 @@ setSheetView(state => {
     sheetBody.innerHTML = html;
     if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // hangs listeners on: exactly once per drawing
   }
-  if (state.kind === 'settings') paintServerBox(fresh);
+  if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
   if (state.kind === 'report') {
     watchDays();

@@ -6,7 +6,7 @@ export const dlg = $('#sheet'),
   sheetBody = $('#sheetBody');
 export let sheet = null; // the state of the open sheet, null when closed
 let viewKey = '',
-  histPushed = false,
+  depth = 0, // history entries of our own: one for the sheet, one more for an open sub-page
   closing = null;
 
 export function openSheet(state) {
@@ -19,13 +19,44 @@ export function openSheet(state) {
     dlg.showModal();
     document.body.classList.add('locked');
     sheetBody.scrollTop = 0; // the browser would otherwise remember the last sheet's scroll position
-    try {
-      history.pushState({sheet: 1}, '');
-      histPushed = true;
-    } catch {
-      histPushed = false; // without an entry of its own the sheet simply does not answer the back gesture
-    }
+    depth = 0;
+    push();
+    if (state.page) push(); // opened straight on a sub-page, so the back gesture leads to the overview first
   }
+}
+function push() {
+  try {
+    history.pushState({sheet: depth + 1}, '');
+    depth++;
+  } catch {
+    /* without an entry of its own the sheet simply does not answer the back gesture */
+  }
+}
+/* A sub-page inside the open sheet (the settings). It gets a history entry of its own, so the Android back button
+   and the back gesture go one level back before they close the sheet. */
+export function openPage(page) {
+  if (!sheet || sheet.page === page) return;
+  sheet.page = page;
+  sheet.slide = 'fwd';
+  push();
+  renderSheet();
+}
+/* One level back. Through the history wherever there is an entry to drop, so the arrow in the head and the hardware
+   button take exactly the same path. */
+export function backPage() {
+  if (depth > 1) history.back();
+  else stepBack();
+}
+/* Android's back button: out of a sub-page first, and only on the overview does the sheet close */
+export function sheetBack() {
+  if (sheet?.page) backPage();
+  else closeSheet();
+}
+function stepBack() {
+  if (!sheet?.page) return;
+  sheet.page = null;
+  sheet.slide = 'back';
+  renderSheet();
 }
 let drawView = () => {}; // set by the sheet views: draws the contents of the open sheet
 export function setSheetView(fn) {
@@ -34,15 +65,18 @@ export function setSheetView(fn) {
 export function renderSheet() {
   if (!sheet) return;
   drawView(sheet);
-  const key = `${sheet.kind}:${sheet.step || ''}:${sheet.id || ''}`;
+  const key = `${sheet.kind}:${sheet.page || ''}:${sheet.step || ''}:${sheet.id || ''}`;
   if (key !== viewKey) {
     viewKey = key;
     sheetBody.scrollTop = 0;
-    sheetBody.classList.remove('swap-in');
+    // A sub-page slides in from the side it lies on, everything else fades up from below
+    const how = sheet.slide ? 'swap-' + sheet.slide : 'swap-in';
+    sheet.slide = null;
+    sheetBody.classList.remove('swap-in', 'swap-fwd', 'swap-back');
     // Only for a swap inside an open sheet; while it opens, the sheet's own entrance is animation enough
     if (dlg.open) {
       void sheetBody.offsetWidth;
-      sheetBody.classList.add('swap-in');
+      sheetBody.classList.add(how);
     }
   }
 }
@@ -51,10 +85,10 @@ export function closeSheet(fromPop = false) {
   if (!dlg.open) return Promise.resolve();
   /* Closing is only done once the sheet's history entry is gone as well: were popstate to arrive after the next
      sheet has opened, it would close that one */
-  const popped =
-    histPushed && !fromPop ? new Promise(resolve => addEventListener('popstate', resolve, {once: true})) : null;
-  if (popped) history.back();
-  histPushed = false;
+  const levels = fromPop ? 0 : depth;
+  depth = 0;
+  const popped = levels ? new Promise(resolve => addEventListener('popstate', resolve, {once: true})) : null;
+  if (popped) history.go(-levels);
   const hidden = reduceMotion.matches
     ? Promise.resolve()
     : new Promise(resolve => {
@@ -85,8 +119,11 @@ export function closeSheet(fromPop = false) {
   return closing;
 }
 window.addEventListener('popstate', () => {
-  if (histPushed) {
-    histPushed = false;
+  if (depth > 1) {
+    depth--;
+    stepBack();
+  } else if (depth) {
+    depth = 0;
     closeSheet(true);
   }
 });

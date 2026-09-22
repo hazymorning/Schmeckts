@@ -9,9 +9,10 @@ import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
-import {closeSheet, openSheet, renderSheet, sheet} from './ui/sheet.js';
+import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from './ui/sheet.js';
 import {expandCard, toggleOverview, update} from './views/home.js';
-import {paintServerBox, renderServeHits, renderSuggestions, reportState, reportView} from './views/sheets.js';
+import {renderServeHits, renderSuggestions, reportState, reportView} from './views/sheets.js';
+import {paintHouse} from './views/settings.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
@@ -55,15 +56,13 @@ function disconnectServer() {
   toast('Verbindung getrennt. Die Daten bleiben auf diesem Handy.');
 }
 function openConnect() {
-  // fields for address and code, from the settings or the welcome page
+  // fields for address and code, from the „Haushalt“ page, from elsewhere in the settings or from the welcome page
   if (sheet?.kind === 'settings') {
     sheet.connectForm = true;
-    renderSheet();
-  } else openSheet({kind: 'settings', connectForm: true});
-  requestAnimationFrame(() => {
-    $('#server')?.scrollIntoView({block: 'start'});
-    $(prefs.server ? '#f-code' : '#f-server')?.focus({preventScroll: true});
-  });
+    if (sheet.page === 'house') renderSheet();
+    else openPage('house');
+  } else openSheet({kind: 'settings', page: 'house', connectForm: true});
+  requestAnimationFrame(() => $(prefs.server ? '#f-code' : '#f-server')?.focus({preventScroll: true}));
 }
 /* „Jetzt abgleichen“: only this hand-started sync shows progress, and only after 600 ms */
 async function syncByHand() {
@@ -73,7 +72,7 @@ async function syncByHand() {
   const timer = setTimeout(() => {
     if (sheet === s) {
       s.syncing = 'shown';
-      paintServerBox();
+      paintHouse();
     }
   }, 600);
   try {
@@ -81,7 +80,7 @@ async function syncByHand() {
   } finally {
     clearTimeout(timer);
     s.syncing = '';
-    if (sheet === s) paintServerBox();
+    if (sheet === s) paintHouse();
   }
 }
 
@@ -135,6 +134,15 @@ const ACTIONS = {
   'open-settings'() {
     openSheet({kind: 'settings'});
   },
+  // The settings: one page per group of settings, the back arrow and the Android back button lead to the overview
+  'settings-page'(el) {
+    haptic('select');
+    openPage(el.dataset.v);
+  },
+  'settings-back'() {
+    haptic('select');
+    backPage();
+  },
   // The span of the evaluation: „7 Tage“, „30 Tage“ or „Alles“, kept while the app runs and never stored
   'report-span'(el) {
     reportView.days = +el.dataset.v;
@@ -144,12 +152,8 @@ const ACTIONS = {
   'open-report'(el) {
     openSheet(reportState(el.dataset.v || null));
   }, // data-v: the day it opens at
-  'open-privacy'() {
-    openSheet({kind: 'privacy'});
-  },
   'open-server'() {
-    openSheet({kind: 'settings'});
-    requestAnimationFrame(() => $('#server')?.scrollIntoView({block: 'start'}));
+    openSheet({kind: 'settings', page: 'house'});
   },
   connect() {
     connectServer();
@@ -326,12 +330,12 @@ const ACTIONS = {
     renderSheet();
     update();
   }, // the profile picture behind the header
-  lookup(el) {
-    prefs.lookup = el.dataset.v === 'on';
+  lookup() {
+    prefs.lookup = !prefs.lookup;
     savePrefs();
     haptic('select');
     renderSheet();
-  }, // product lookup on the internet, off by default
+  }, // product lookup on the internet, the one switch in the overview, off by default
   'feed-remind'(el) {
     haptic('select');
     setFeedRemind(el.dataset.v === 'on');
@@ -360,7 +364,7 @@ const ACTIONS = {
   'share-changes'() {
     haptic('select');
     shareChanges();
-  }, // manual exchange, section „Haushalt“
+  }, // manual exchange, page „Austausch von Hand“
   'send-answer'() {
     haptic('select');
     shareChanges(sheet?.exchange?.peer);

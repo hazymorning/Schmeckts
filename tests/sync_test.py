@@ -200,7 +200,10 @@ async def sync_status(pg):
 
 async def connect(pg, code, server, edit=True):
     if not await pg.locator('#serverBox').count():
-        await pg.click('[data-action=open-settings]')
+        if not await pg.evaluate("document.getElementById('sheet').open"):
+            await pg.click('[data-action=open-settings]')
+            await idle(pg)
+        await pg.click('#sheet [data-action=settings-page][data-v=house]')
         await idle(pg)
     if await pg.locator('#serverBox [data-action=connect-form]').count():  # mode `lokal`: the button opens address and code
         await pg.click('#serverBox [data-action=connect-form]')
@@ -674,12 +677,16 @@ async def main():
             await f.click('#serverBox [data-then=disconnect]')
             await idle(f)
             box = await f.eval_on_selector_all('#serverBox .btn', 'l => l.map(b => b.innerText.trim())')
+            await f.click('#sheet [data-action=settings-back]')  # the footer sits on the overview
+            await idle(f)
             await expect(
                 await state(f, f"prefs.mode === 'lokal' && prefs.code === '' && db.servings.length === {n} && db.pets.length > 0")
-                and box == ['Änderungen teilen', 'Austausch empfangen', 'Mit Haushalt verbinden']
+                and box == ['Mit Haushalt verbinden']
                 and 'Alle Daten bleiben auf diesem Gerät' in await f.inner_text('#sheet .foot'),
-                '„Verbindung trennen“ switches to `lokal`, the data is kept, and the „Haushalt“ section shows only the connect button',
+                '„Verbindung trennen“ switches to `lokal`, the data is kept, and the „Haushalt“ page shows only the connect button',
             )
+            await f.click('#sheet [data-action=settings-page][data-v=house]')
+            await idle(f)
             await f.click('#serverBox [data-action=connect-form]')
             await idle(f)
             await expect(await f.input_value('#f-server') == srv.url, 'connecting again: the address used last is in the field')
