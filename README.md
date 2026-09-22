@@ -14,7 +14,7 @@
   <a href="#installieren"><img src="https://github.com/user-attachments/assets/c6cc3ebb-4e0b-42b5-8fe6-be7890bae7f8" width="292" alt="App installieren"></a>
 </p>
 
-**Schmeckt’s?** ist ein Fütterungstagebuch für Haustiere. Nach dem Füttern tippst du einmal an, wie der Napf aussah. Nach ein paar Tagen weißt du, welche Sorten ankommen und welche du dir sparen kannst.
+**Schmeckt’s?** ist ein Fütterungstagebuch für Haustiere. Nach dem Füttern hältst du mit einem Tipp fest, wie viel im Napf übrig geblieben ist. Schon nach ein paar Tagen siehst du, welche Sorten dein Tier wirklich mag und welche du dir künftig sparen kannst.
 
 <p align="center">
   <picture>
@@ -25,29 +25,29 @@
 
 ## So funktioniert’s
 
-Beim Füttern hältst du den Barcode vor die Kamera. Kennt die App die Sorte schon, steht die Mahlzeit damit im Verlauf.
+Beim Füttern hältst du den Barcode kurz vor die Kamera. Wenn die App die Sorte bereits kennt, steht die Mahlzeit damit auch schon im Verlauf.
 
-Ist die Sorte neu oder hat die Packung keinen Barcode, fotografierst du sie. Die App liest den Text vom Bild und schlägt Marke und Sorte vor, du bestätigst nur noch. Passt der Vorschlag nicht, tippst du dir aus den gelesenen Zeilen zusammen, was auf der Packung steht.
+Bei einer neuen Sorte oder einer Packung ohne Barcode machst du stattdessen ein Foto davon. Die App liest den Text von der Packung und schlägt dir Marke und Sorte vor, du musst das nur noch bestätigen. Wenn der Vorschlag daneben liegt, kannst du dir aus den erkannten Zeilen zusammentippen, was auf der Packung steht.
 
-Später, wenn du siehst, was übrig geblieben ist, tippst du eine Bewertung an.
+Sobald du später nachschaust, was übrig geblieben ist, gibst du noch eine Bewertung ab.
 
-## Was drin steckt
+## Was die App kann
 
-- **Einkaufsliste.** Jede Sorte landet bei „Nachkaufen“ oder „Nicht mehr kaufen“. Du kannst das selbst umstellen und die Liste weitergeben.
-- **Erkenntnisse.** Welche Marke ankommt, welche Konsistenz, welcher Geschmack. Die App meldet sich auch, wenn eine Sorte ständig übrig bleibt oder ein Tier auffällig wenig frisst.
-- **Verlauf.** Ein Kalender über zwei Wochen und die letzten Mahlzeiten. Dahinter steht jede einzelne Mahlzeit, darüber ein Ring, der für 7 Tage, 30 Tage oder den ganzen Zeitraum zeigt, wie viel davon gut angekommen ist.
-- **Erinnerungen.** Wenn du magst, meldet sich die App zum Bewerten oder zu den Zeiten, zu denen du sonst fütterst. Beides ist zunächst aus.
-- **Mehrere Tiere.** Katzen, Hunde, Kleintiere und Vögel, jedes mit eigenem Profilbild und eigener Auswertung.
-- **Backup.** Alles lässt sich in eine Datei sichern und auf einem neuen Handy wieder einlesen.
+- **Einkaufsliste.** Jede Sorte landet automatisch bei „Nachkaufen“ oder „Nicht mehr kaufen“. Du kannst das jederzeit selbst ändern und die Liste an andere weitergeben.
+- **Erkenntnisse.** Du siehst, welche Marke am besten ankommt und worauf dein Tier bei Konsistenz und Geschmack steht. Die App sagt dir außerdem Bescheid, wenn eine Sorte ständig übrig bleibt oder ein Tier auffällig wenig frisst.
+- **Verlauf.** Ein Kalender über zwei Wochen zeigt dir die letzten Mahlzeiten, und dahinter findest du jede einzelne davon. Darüber sitzt ein Ring, der dir wahlweise für 7 Tage, 30 Tage oder den gesamten Zeitraum anzeigt, wie viel davon gut angekommen ist.
+- **Erinnerungen.** Auf Wunsch erinnert dich die App ans Bewerten oder meldet sich zu den Zeiten, zu denen du normalerweise fütterst. Beides ist von Haus aus ausgeschaltet.
+- **Mehrere Tiere.** Katzen, Hunde, Kleintiere und Vögel bekommen jeweils ein eigenes Profilbild und eine eigene Auswertung.
+- **Backup.** Du kannst alles in eine Datei sichern und auf einem neuen Handy wieder einlesen.
 
-Hell oder dunkel richtet sich danach, wie dein Handy eingestellt ist.
+Ob die App hell oder dunkel aussieht, richtet sich nach den Einstellungen deines Handys.
 
 <!-- Sprungziel des QR-Codes (…#how-to-install), bitte nicht entfernen -->
 <a id="how-to-install"></a>
 
 ## Installieren
 
-Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dauert eine Minute, und dein Handy fragt dich dabei nach deiner Erlaubnis.
+Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dauert etwa eine Minute, und dein Handy fragt dich dabei einmal um Erlaubnis.
 
 <!-- Der Button lädt die APK des neuesten Releases direkt herunter und funktioniert nur, wenn jedes Release sie genau so nennt: schmeckts.apk -->
 <p align="center">
@@ -56,19 +56,19 @@ Die App gibt es nicht im Play Store, du lädst sie direkt hier herunter. Das dau
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/5e312f50-e1ec-493b-9ee2-99c3bb88fbed" width="150" alt="QR-Code, der diese Anleitung auf dem Handy öffnet"><br>
-  <sub>Am Rechner? Scanne den Code mit der Kamera deines Handys, dann hast du die Anleitung dort.</sub>
+  <sub>Du sitzt am Rechner? Scanne den Code mit deiner Handykamera, dann hast du die Anleitung direkt auf dem Handy.</sub>
 </p>
 
-1. **Herunterladen.** Tippe auf dem Handy auf den Button. Fragt der Browser, ob du die Datei behalten willst, bestätige.
-2. **Öffnen.** Tippe nach dem Download auf *Öffnen*, oder such `schmeckts.apk` in deinen *Downloads*.
-3. **Erlauben.** Beim ersten Mal fragt Android, ob der Browser Apps installieren darf. Tippe auf *Einstellungen*, schalte *Aus dieser Quelle zulassen* ein, dann zurück.
-4. **Installieren.** Tippe auf *Installieren*, dann auf *Öffnen*. Fertig.
+1. **Herunterladen.** Tippe auf dem Handy auf den Button. Falls der Browser nachfragt, ob du die Datei wirklich behalten möchtest, bestätige das.
+2. **Öffnen.** Tippe nach dem Download auf *Öffnen*, oder suche `schmeckts.apk` in deinen *Downloads*.
+3. **Erlauben.** Beim ersten Mal fragt Android, ob der Browser überhaupt Apps installieren darf. Tippe auf *Einstellungen*, schalte *Aus dieser Quelle zulassen* ein und geh dann wieder zurück.
+4. **Installieren.** Tippe auf *Installieren* und danach auf *Öffnen*. Fertig.
 
 <details>
 <summary><b>Android will die App erst prüfen</b></summary>
 <br>
 
-Weil sie nicht aus dem Play Store kommt, bietet Google Play Protect an, sie vorher zu prüfen. Lass es zu, es dauert einen Moment. Danach installierst du wie gewohnt.
+Da die App nicht aus dem Play Store stammt, bietet Google Play Protect an, sie vorher einmal zu prüfen. Lass das ruhig zu, es dauert nur einen Moment. Danach geht die Installation ganz normal weiter.
 
 </details>
 
@@ -76,7 +76,7 @@ Weil sie nicht aus dem Play Store kommt, bietet Google Play Protect an, sie vorh
 <summary><b>Eine neue Version installieren</b></summary>
 <br>
 
-Lade sie mit demselben Button herunter und installiere sie über die alte. Deine Einträge bleiben. Deinstalliere die alte Version nicht vorher, sonst sind die Daten weg.
+Lade sie über denselben Button herunter und installiere sie einfach über die alte drüber. Deine Einträge bleiben dabei erhalten. Deinstalliere die alte Version auf keinen Fall vorher, sonst sind deine Daten weg.
 
 </details>
 
@@ -84,7 +84,7 @@ Lade sie mit demselben Button herunter und installiere sie über die alte. Deine
 <summary><b>„App nicht installiert“</b></summary>
 <br>
 
-Meist liegt noch eine ältere Testversion auf dem Handy. Sichere in den Einstellungen ein Backup, deinstalliere die alte Version, installiere die neue und lies das Backup wieder ein.
+Meistens liegt dann noch eine ältere Testversion auf dem Handy. Erstelle in den Einstellungen ein Backup, deinstalliere die alte Version, installiere die neue und lies das Backup anschließend wieder ein.
 
 </details>
 
@@ -92,7 +92,7 @@ Meist liegt noch eine ältere Testversion auf dem Handy. Sichere in den Einstell
 <summary><b>Voraussetzungen</b></summary>
 <br>
 
-Android 8.0 oder neuer. Der Barcode-Scanner braucht die Google-Play-Dienste, die fast jedes Handy hat. Alles andere läuft auch ohne sie.
+Du brauchst Android 8.0 oder neuer. Für den Barcode-Scanner werden die Google-Play-Dienste benötigt, die auf fast jedem Handy ohnehin vorhanden sind. Der Rest der App funktioniert auch ohne sie.
 
 </details>
 
@@ -100,33 +100,33 @@ Android 8.0 oder neuer. Der Barcode-Scanner braucht die Google-Play-Dienste, die
 
 ## Wenn mehrere füttern
 
-Seid ihr zu zweit oder zu dritt, wollt ihr vielleicht dasselbe Tagebuch führen. Dafür gibt es zwei Wege.
+Wenn ihr zu zweit oder zu dritt füttert, wollt ihr das Tagebuch wahrscheinlich gemeinsam führen. Dafür gibt es zwei Möglichkeiten.
 
-Ohne weitere Einrichtung: „Änderungen teilen“ packt deine neuen Einträge in eine Datei, das andere Handy liest sie ein. Das geht per Messenger oder Kabel und kommt ohne Konto aus. Die Datei enthält nur Tiere, Sorten und Mahlzeiten.
+Ganz ohne Einrichtung funktioniert „Änderungen teilen“: Die App packt deine neuen Einträge in eine Datei, die das andere Handy dann einliest. Das klappt per Messenger oder Kabel und ohne jedes Konto. In der Datei stehen nur Tiere, Sorten und Mahlzeiten.
 
-Bequemer wird es mit einem kleinen Server auf einem Rechner, der zu Hause läuft, etwa einem Mini-PC. Dann gleichen sich die Handys von selbst ab, sobald sie im WLAN sind. Außerdem erkennt die App dann optional auch Marke und Sorte direkt vom Foto, statt nur den Text zu lesen, und schlägt unbekannte Barcodes automatisch nach. Die Daten bleiben dabei auf eurem eigenen Rechner.
+Bequemer wird es mit einem kleinen Server, der bei euch zu Hause läuft, zum Beispiel auf einem Mini-PC. Dann gleichen sich die Handys von allein ab, sobald sie im WLAN sind. Zusätzlich kann die App dann auf Wunsch Marke und Sorte direkt vom Foto erkennen, statt nur den Text auszulesen, und unbekannte Barcodes automatisch nachschlagen. Eure Daten bleiben trotzdem auf eurem eigenen Rechner.
 
-Der Server muss selbst eingerichtet werden und gehört nicht zur App. [Code und Anleitung liegen hier](server/).
+Den Server musst du allerdings selbst einrichten, er gehört nicht zur App dazu. [Code und Anleitung findest du hier](server/).
 
 ## Fragen
 
-Für Fragen und Ideen bitte die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions) nutzen. Hilfreich sind Handy-Modell, Android-Version und die App-Version, die unten in den Einstellungen steht.
+Für Fragen und Ideen nutzt du am besten die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Hilfreich sind dabei dein Handy-Modell, deine Android-Version und die App-Version, die ganz unten in den Einstellungen steht.
 
-Einen Fehler, den du wiederholt auslösen kannst, meldest du über [Fehler melden](https://github.com/hazymorning/Schmeckts/issues/new/choose).
+Wenn du einen Fehler gefunden hast, den du zuverlässig wieder auslösen kannst, melde ihn bitte über [Fehler melden](https://github.com/hazymorning/Schmeckts/issues/new/choose).
 
 ## Datenschutz
 
-Was du einträgst, liegt auf deinem Handy. Es landet in keiner Cloud-Sicherung, und die App schickt auch von sich aus nichts ins Netz. Den Text auf der Packung liest sie selbst, ohne Verbindung. Werbung und Tracking gibt es nicht.
+Alles, was du einträgst, bleibt auf deinem Handy. Es wandert in keine Cloud-Sicherung, und die App schickt von sich aus auch nichts ins Netz. Den Text auf der Packung liest sie ganz allein, ohne Internetverbindung. Werbung oder Tracking gibt es nicht.
 
-Zwei kleine Ausnahmen: Der Barcode-Scanner stammt von Google und meldet laut Google Gerätedaten wie das Modell, aber keine Bilder. Und wenn du es einschaltest, fragt die App bei unbekannten Barcodes zwei freie Produktdatenbanken; übertragen wird dabei nur die Nummer.
+Zwei kleine Ausnahmen gibt es aber: Der Barcode-Scanner kommt von Google und übermittelt laut Google Gerätedaten wie das Modell, allerdings keine Bilder. Und falls du es einschaltest, fragt die App bei unbekannten Barcodes zwei freie Produktdatenbanken an. Dabei wird wirklich nur die Nummer übertragen.
 
-Die Kamera braucht die App für Fotos. Nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
+Auf die Kamera greift die App nur für die Fotos zu. Nach Benachrichtigungen fragt sie überhaupt erst, wenn du eine Erinnerung einschaltest.
 
 ## Lizenz
 
 Freie Software unter der [GNU Affero General Public License, Version 3](LICENSE). Copyright © 2026 hazymorning.
 
-Der Name „Schmeckt’s?“, das Logo und das App-Icon fallen nicht darunter. Bitte nutze für einen Fork deinen eigenen Namen und deine eigene Gestaltung.
+Der Name „Schmeckt’s?“, das Logo und das App-Icon gehören nicht dazu. Wenn du die App forkst, nimm dafür bitte einen eigenen Namen und eine eigene Gestaltung.
 
 <!-- Sobald das Repo öffentlich ist, passen diese Badges oben dazu. Sie halten sich selbst aktuell:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=965E4B&labelColor=2E2724" alt="Neueste Version"></a>
