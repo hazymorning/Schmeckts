@@ -234,7 +234,9 @@ async def main():
     make_photo()
     go = shutil.which('go') or '/usr/local/go/bin/go'
     binary = os.path.join(tempfile.mkdtemp(), 'schmeckts-server')
-    subprocess.run([go, 'build', '-o', binary, '.'], cwd=ROOT / 'server', check=True)
+    # -buildvcs=false: the throwaway test binary has no use for the commit it was built from, and asking git for
+    # it fails wherever the checkout belongs to another user than the build does — in the CI container, for one.
+    subprocess.run([go, 'build', '-buildvcs=false', '-o', binary, '.'], cwd=ROOT / 'server', check=True)
     fake, food = FakeAnthropic(), FakeFoodDB()
     srv = GoServer(binary, fake)
     srv.cfg['barcodeUrls'] = [food.url]
