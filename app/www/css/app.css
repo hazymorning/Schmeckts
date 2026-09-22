@@ -22,6 +22,7 @@ body {
   text-rendering: geometricPrecision; /* advance widths without hinting's rounding, or gaps open around f and t */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  text-wrap: pretty; /* German settings are long: this keeps a two-letter word from ending up on a line of its own */
   transition:
     background-color 0.45s ease,
     color 0.45s ease;
@@ -122,16 +123,27 @@ input {
 [data-theme="dark"] .mood img {
   opacity: 0.26;
 }
-/* Behind the status bar: the page scrolls right up under the clock, so a strip of the background stays there.
-   Sheets, their dimming and the camera lie above it in any case, because a modal dialog is in the top layer. */
+/* Behind the status bar: nothing while the page sits at the top, so the mood picture reaches the edge of the
+   screen. As soon as the page moves, the strip fades in, and its lower edge is a gradient, so content dissolves
+   under the clock instead of being cut through mid-line. Sheets, their dimming and the camera lie above it in
+   any case, because a modal dialog is in the top layer. */
 body::before {
   content: "";
   position: fixed;
   inset: 0 0 auto 0;
-  height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  background: var(--bg);
+  height: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--space-4));
+  background: linear-gradient(
+    to bottom,
+    var(--bg) var(--safe-area-inset-top, env(safe-area-inset-top, 0px)),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
   z-index: 10;
   pointer-events: none;
+}
+:root.scrolled body::before {
+  opacity: 1;
 }
 .app {
   position: relative;
@@ -326,6 +338,7 @@ body::before {
   margin-top: var(--space-3h);
 }
 .card h2 {
+  text-wrap: balance;
   margin: 0 0 var(--space-1);
   font: 600 21px/1.25 var(--font-display);
   letter-spacing: -0.01em;
@@ -1097,6 +1110,7 @@ button.ov-pic:active {
   display: none;
 } /* data-theme: the scheme currently in force */
 .welcome h2 {
+  text-wrap: balance;
   margin: 0 0 var(--space-2h);
   font: 700 27px/1.15 var(--font-display);
   letter-spacing: -0.02em;
@@ -1581,6 +1595,12 @@ dialog.sheet.closing::backdrop {
   padding: var(--space-1) var(--space-5)
     calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
+/* Scrolled: the first few pixels dissolve, so a line ends softly under the grip rather than being cut. The mask
+   is painted in the scroll box, so it stays at the top while the contents move under it. */
+.sheet-body.scrolled {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--space-4h));
+  mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--space-4h));
+}
 .sheet-body.swap-in {
   animation: swapIn 0.34s var(--ease-out);
 }
@@ -1590,23 +1610,24 @@ dialog.sheet.closing::backdrop {
     transform: translateY(10px);
   }
 }
-/* A sub-page of the settings slides in from the side it lies on, so a step in and a step back are told apart */
+/* A sub-page of the settings comes in the way everything else in the app does, from below, and a step back comes
+   from above, so the two are still told apart. Same 0.34s as swapIn, because it is the same kind of entrance. */
 .sheet-body.swap-fwd {
-  animation: swapFwd 0.28s var(--ease-out);
+  animation: swapFwd 0.34s var(--ease-out);
 }
 .sheet-body.swap-back {
-  animation: swapBack 0.28s var(--ease-out);
+  animation: swapBack 0.34s var(--ease-out);
 }
 @keyframes swapFwd {
   from {
     opacity: 0;
-    transform: translateX(22px);
+    transform: translateY(14px);
   }
 }
 @keyframes swapBack {
   from {
     opacity: 0;
-    transform: translateX(-22px);
+    transform: translateY(-14px);
   }
 }
 .sh-head {
@@ -1618,6 +1639,7 @@ dialog.sheet.closing::backdrop {
   touch-action: none;
 }
 .sh-head h2 {
+  text-wrap: balance;
   flex: 1;
   min-width: 0;
   margin: 0;
@@ -1801,13 +1823,23 @@ button.prod-card:active {
 /* The settings: one group of rows per subject, each row leading to a page of its own (icon, title, the current
    value and the chevron). Only „Produktsuche im Internet“ carries a switch instead, because it has no page. */
 .set-group {
-  padding: 0 var(--space-4);
+  padding: var(--space-1) var(--space-4);
   border-radius: 20px;
   background: var(--surface-2);
-}
+} /* 4px of its own above and below, so the first and the last row are not pressed into the 20px radius */
 .set-group .list-row {
   min-height: 56px;
   gap: var(--space-3);
+}
+/* Every row in a group is built the same way, whatever leads it: a pet's round photo is the size of an icon tile
+   here, so every title starts at the same place, and the two-line row keeps the height of the others, so a box
+   has the same gap above its first row as under its last. */
+.set-group .list-row .av {
+  width: 34px;
+  height: 34px;
+}
+.set-group .list-row.wrap {
+  padding: var(--space-2h) 0;
 }
 .set-group .list-row .t-main {
   flex: 1 0 auto;
@@ -1829,16 +1861,15 @@ button.prod-card:active {
 .val {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 50%;
+  max-width: 65%;
   font-size: 14px;
   line-height: 1.3;
   color: var(--muted);
   text-align: right;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-} /* German settings are long: the value gives way before the title does and may take a second line */
+  overflow-wrap: break-word;
+} /* German settings are long: the value gives way before the title does and takes as many lines as it needs,
+     rather than being cut off at the second one once the system font is large. A pair held together by a
+     no-break space still breaks where the box is narrower than the pair. */
 .val.ok {
   color: var(--accent-ink);
 }
@@ -1897,8 +1928,8 @@ button.prod-card:active {
   display: flex;
   align-items: center;
   gap: var(--space-5);
-  padding: var(--space-1) 0 var(--space-3);
-}
+  padding: var(--space-5) 0 var(--space-3);
+} /* opens with the same 20px a .label opens a block with, or the ring sticks to the filter above it */
 .ring {
   position: relative;
   width: 104px;

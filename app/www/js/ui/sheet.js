@@ -9,6 +9,11 @@ let viewKey = '',
   depth = 0, // history entries of our own: one for the sheet, one more for an open sub-page
   closing = null;
 
+/* The upper edge of a sheet: while its contents are scrolled, the top few pixels fade out, so a line does not
+   end abruptly under the grip. Nothing fades while the sheet sits at the top. */
+const markSheetScrolled = () => sheetBody.classList.toggle('scrolled', sheetBody.scrollTop > 0);
+sheetBody.addEventListener('scroll', markSheetScrolled, {passive: true});
+
 export function openSheet(state) {
   sheet = state;
   renderSheet();
@@ -19,6 +24,7 @@ export function openSheet(state) {
     dlg.showModal();
     document.body.classList.add('locked');
     sheetBody.scrollTop = 0; // the browser would otherwise remember the last sheet's scroll position
+    markSheetScrolled();
     depth = 0;
     push();
     if (state.page) push(); // opened straight on a sub-page, so the back gesture leads to the overview first
@@ -69,7 +75,8 @@ export function renderSheet() {
   if (key !== viewKey) {
     viewKey = key;
     sheetBody.scrollTop = 0;
-    // A sub-page slides in from the side it lies on, everything else fades up from below
+    markSheetScrolled();
+    // A sub-page comes in from below and a step back from above, everything else fades up from below
     const how = sheet.slide ? 'swap-' + sheet.slide : 'swap-in';
     sheet.slide = null;
     sheetBody.classList.remove('swap-in', 'swap-fwd', 'swap-back');
@@ -102,6 +109,7 @@ export function closeSheet(fromPop = false) {
       dlg.style.transform = '';
       dlg.style.transition = '';
       sheetBody.scrollTop = 0;
+      markSheetScrolled();
       dlg.close();
       sheet = null;
       viewKey = '';
