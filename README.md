@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/08e5a009-03aa-4a66-9dd5-d75b8bd6c4c9">
-    <img src="https://github.com/user-attachments/assets/1f57300f-45ce-4b4d-bd1f-7100a660ae49" width="880" alt="Schmeckt’s? – die App, die sich merkt, was deinem Tier wirklich schmeckt.">
-  </picture>
+  <img src="https://github.com/user-attachments/assets/c52ea318-febc-455c-992b-abff5e8857ef" width="880" alt="Schmeckt’s? Die App, die sich merkt, welches Futter bei deinem Tier ankommt.">
 </p>
 
 <p align="center">
@@ -11,10 +8,9 @@
 </p>
 
 <p align="center">
-  <a href="#installieren"><img src="https://github.com/user-attachments/assets/c6cc3ebb-4e0b-42b5-8fe6-be7890bae7f8" width="292" alt="App installieren"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/c9d097c6-4ae7-4b99-8f8f-b1e990b5e6f5" width="292" alt="App installieren"></a>
+  <a href="#installieren"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1798bb44-ce7c-4fe1-aa79-b14bd7346e2e"><img src="https://github.com/user-attachments/assets/382cc84e-bfce-4891-86fc-8ddd5056eef1" width="292" alt="Installationsanleitung"></picture></a>
 </p>
-
-<!-- Katze und Vorgeschichte sind geraten. Bitte durch die echte Geschichte ersetzen und diesen Kommentar löschen. -->
 
 Unsere Katze ist, freundlich gesagt, wählerisch. Manche Sorten sind sofort verputzt, an anderen schnuppert sie nur kurz und geht wieder. Wieder andere findet sie erst super und lässt sie beim nächsten Mal plötzlich stehen. Bei Sorten mit Soße leckt sie fast immer nur die Soße auf, und Fisch kommt mal gut an, mal gar nicht. Was gab es eigentlich zuletzt, und welche Sorte von welcher Marke hatte nochmal welche Konsistenz? Hat sie feste Vorlieben, oder will sie einfach möglichst viel Abwechslung?
 
@@ -24,8 +20,8 @@ Zugegeben, das Ganze ist ein ziemliches Nischenproblem. Dafür steckt in der App
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/ae5c60ed-0210-4f6e-b9e5-21b35b279369">
-    <img src="https://github.com/user-attachments/assets/738f6bfa-3968-4e76-926f-57ef08d34a7f" width="880" alt="Links das Blatt „Was gibt’s heute?“ mit Barcode-Scan, rechts die Übersicht mit Bewertung und Verlauf">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/481ce83a-2c33-40ba-87c5-ab68a3b997fc">
+    <img src="https://github.com/user-attachments/assets/cf267424-b4a5-422d-b85f-401e6f9a9f59" width="880" alt="Links das Blatt „Was gibt’s heute?“ mit Barcode-Scan, rechts die Übersicht mit Bewertung und Verlauf">
   </picture>
 </p>
 
@@ -54,7 +50,7 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
 Diese App gibt es nicht im Play Store, du lädst sie hier direkt herunter.
 
 <p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/6184020c-5ebd-43a7-a672-32a7b55a2039" width="292" alt="APK herunterladen"></a>
+  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/d12e5669-bdf4-4513-805b-bd4b8d16e2eb" width="292" alt="APK herunterladen"></a>
 </p>
 
 1. Tippe auf dem Handy auf den Download-Button. Wenn der Browser fragt, ob du die Datei behalten willst, bestätige das.
