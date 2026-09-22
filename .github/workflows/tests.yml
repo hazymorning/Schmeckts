@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The server uses the standard library only and there is no go.sum: no dependency cache.
       - name: Go
@@ -76,7 +76,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright/python:v1.56.0-noble
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/browser-tests
       - run: scripts/test.sh node storage design perf
 
@@ -86,7 +86,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright/python:v1.56.0-noble
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/browser-tests
       - run: scripts/test.sh ui
 
@@ -97,7 +97,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright/python:v1.56.0-noble
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/browser-tests
       - name: Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
