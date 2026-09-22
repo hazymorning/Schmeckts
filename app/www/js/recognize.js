@@ -1,6 +1,6 @@
 /* Recognising a food packaging. The chain sits in one place (identify) and runs cheapest first:
-   known barcode in the household → product lookup on the internet (if allowed) → server (when connected and it offers
-   it) → on-device text recognition → empty form.
+   known barcode in the household → product lookup on the internet (if allowed) → server (barcode always, the photo
+   only while „Fotos über den Server erkennen“ is on) → on-device text recognition → empty form.
    Every stage may be skipped, an error moves on to the next; note() tells the interface what is running.
    Errors from photo recognition through the server carry retry: true when another attempt is worth it. */
 import {ServerError, request} from './api.js';
@@ -45,6 +45,10 @@ const STEPS = [
   },
 ];
 
+/* Whether the server recognises packaging photos: connected, and not switched off under „Scannen“. With the
+   switch off the photo takes the same way as without a household, the phone reading the text itself. */
+export const photoByServer = () => isConnected() && prefs.serverPhoto;
+
 /* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
    synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
 export const memLines = new Map();
@@ -88,7 +92,8 @@ function asDetails(hit) {
   };
 }
 
-/* Server: the lookup for a barcode (from server 1.1.0), AI recognition for a photo */
+/* Server: the lookup for a barcode (from server 1.1.0), AI recognition for a photo. The switch under „Scannen“
+   holds back the photo only; the barcode goes out as it always did. */
 async function fromServer({code, photo}) {
   if (code && (await serverCan('barcode'))) {
     const hit = await lookupBarcode(code).catch(e => {
@@ -98,7 +103,7 @@ async function fromServer({code, photo}) {
     const found = hit?.found ? asDetails(hit) : null;
     if (found) return found;
   }
-  return photo ? asDetails(await recognize(photo)) : null;
+  return photo && prefs.serverPhoto ? asDetails(await recognize(photo)) : null;
 }
 
 /* Photo recognition through the household server: key, model and prompt are configured there. */

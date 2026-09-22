@@ -25,6 +25,7 @@ const defaultPrefs = () => ({
   activePet: 'all',
   lastPets: [],
   lookup: false,
+  serverPhoto: true,
   codes: {},
   exchange: {},
 });
@@ -59,6 +60,7 @@ function tidyPrefs(p) {
   out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: never set, see load()
   out.lookup = out.lookup === true; // product lookup on the internet, off by default
+  out.serverPhoto = out.serverPhoto !== false; // photo recognition through the server, on by default
   delete out.aiKey; // dropped: the key for photo recognition lives on the server
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {}; // remembered barcode answers
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with

@@ -7,7 +7,6 @@ import {toLocalInput, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
-import {isConnected} from '../sync.js';
 import {
   getPet,
   getProduct,
@@ -21,7 +20,7 @@ import {
 } from '../derive.js';
 import {MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
-import {memLines} from '../recognize.js';
+import {memLines, photoByServer} from '../recognize.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
@@ -91,7 +90,7 @@ function viewName() {
   const photo = serving && (serving.photo || serving.thumb);
   let note = '';
   const retry = label =>
-    serving.photo && isConnected() ? `<button class="link" data-action="retry">${label}</button>` : '';
+    serving.photo && photoByServer() ? `<button class="link" data-action="retry">${label}</button>` : '';
   if (serving?.status === 'reading') note = `<p class="note"><span class="spin"></span>Packung wird gelesen …</p>`;
   else if (serving?.status === 'recognizing')
     note = `<p class="note"><span class="spin"></span>Sorte wird erkannt …</p>`;

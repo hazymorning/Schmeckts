@@ -5,11 +5,10 @@ import {uid} from '../fields.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
-import {isConnected} from '../sync.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
 import {cropSquare, fileToImage, memPhotos, resize} from '../images.js';
 import {milestones} from '../smart.js';
-import {identify, memLines} from '../recognize.js';
+import {identify, memLines, photoByServer} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, dlg, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
@@ -115,7 +114,7 @@ export async function servePhoto(file, scanCode = '') {
     return;
   }
   const full = resize(img, 1100, 0.82),
-    local = !isConnected();
+    local = !photoByServer(); // no server for the photo: the phone reads the text and the variety is typed in
   const {ids, auto} = defaultPets(null);
   const s = {
     id: uid(),
@@ -173,7 +172,7 @@ async function recognizeServing(id) {
     return;
   }
   running.add(id);
-  const house = isConnected(); // in a household the server recognises, otherwise the phone reads the text on the photo
+  const house = photoByServer(); // the server recognises, otherwise the phone reads the text on the photo itself
   s.status = house ? 'recognizing' : 'reading';
   delete s.error;
   save();
@@ -285,7 +284,7 @@ function settle(s) {
 /* Server reachable again: recognise the waiting photos one after another */
 let retrying = false;
 export async function retryWaiting() {
-  if (retrying || !isConnected()) return;
+  if (retrying || !photoByServer()) return;
   retrying = true;
   try {
     for (const s of [...db.servings]) {
