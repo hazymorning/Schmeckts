@@ -1242,6 +1242,7 @@ button.ov-pic:active {
 .sync-chip .ic,
 .sugg > .ic,
 .list-row .chev,
+.row-ic .ic,
 .prod-card .edit .ic,
 .search .ic,
 .pick .ic {
@@ -1589,6 +1590,25 @@ dialog.sheet.closing::backdrop {
     transform: translateY(10px);
   }
 }
+/* A sub-page of the settings slides in from the side it lies on, so a step in and a step back are told apart */
+.sheet-body.swap-fwd {
+  animation: swapFwd 0.28s var(--ease-out);
+}
+.sheet-body.swap-back {
+  animation: swapBack 0.28s var(--ease-out);
+}
+@keyframes swapFwd {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+}
+@keyframes swapBack {
+  from {
+    opacity: 0;
+    transform: translateX(-22px);
+  }
+}
 .sh-head {
   display: flex;
   align-items: center;
@@ -1598,6 +1618,8 @@ dialog.sheet.closing::backdrop {
   touch-action: none;
 }
 .sh-head h2 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font: 700 23px/1.2 var(--font-display);
   letter-spacing: -0.015em;
@@ -1605,6 +1627,9 @@ dialog.sheet.closing::backdrop {
 .sh-head .icon-btn {
   margin-right: calc(-1 * var(--space-3));
 }
+.sh-head .icon-btn.lead {
+  margin: 0 0 0 calc(-1 * var(--space-3));
+} /* the back arrow sits at the leading edge, the title right beside it */
 
 .prod-card {
   display: flex;
@@ -1772,6 +1797,99 @@ button.prod-card:active {
 }
 .list-row .chev {
   color: var(--faint);
+}
+/* The settings: one group of rows per subject, each row leading to a page of its own — icon, title, the current
+   value and the chevron. Only „Produktsuche im Internet“ carries a switch instead, because it has no page. */
+.set-group {
+  padding: 0 var(--space-4);
+  border-radius: 20px;
+  background: var(--surface-2);
+}
+.set-group .list-row {
+  min-height: 56px;
+  gap: var(--space-3);
+}
+.set-group .list-row .t-main {
+  flex: 1 0 auto;
+} /* the title keeps its full width: German settings are long, and the value beside it gives way instead */
+.set-group .list-row.wrap .t-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.row-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: var(--surface);
+  color: var(--muted);
+} /* icon on --surface, as in the server box: the soft fills barely stand out against --surface-2 */
+.val {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--muted);
+  text-align: right;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+} /* German settings are long: the value gives way before the title does and may take a second line */
+.val.ok {
+  color: var(--accent-ink);
+}
+.val.bad {
+  color: var(--bad);
+}
+/* A row whose line under the title is a whole sentence: title and sentence wrap instead of being cut off */
+.list-row.wrap {
+  padding: var(--space-3) 0;
+}
+.list-row.wrap .t-main b {
+  white-space: normal;
+}
+.list-row.wrap .t-main small {
+  white-space: normal;
+  line-height: 1.35;
+  margin-top: var(--space-hair);
+}
+/* The switch. The whole row is the button, so the tap target is the row and the track only shows the state. */
+.sw {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition:
+    background-color 0.25s,
+    box-shadow 0.25s;
+}
+.sw::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    transform 0.25s var(--ease-out),
+    background-color 0.25s;
+}
+[aria-checked="true"] > .sw {
+  background: var(--accent);
+  box-shadow: none;
+}
+[aria-checked="true"] > .sw::after {
+  transform: translateX(18px);
+  background: var(--on-accent);
 }
 /* Evaluation, at a glance: one ring saying how much of what was served went down well, and beside it three
    quiet figures. The ring carries a sentence in aria-label, so nothing rests on its colour alone. */

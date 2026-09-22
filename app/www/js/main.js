@@ -11,10 +11,11 @@ import {hooks} from './store.js';
 import {startSync, syncHooks, syncSoon} from './sync.js';
 import {applyTheme} from './ui/theme.js';
 import {toast} from './ui/toast.js';
-import {closeSheet, dlg, renderSheet, sheet, sheetBody} from './ui/sheet.js';
+import {dlg, renderSheet, sheet, sheetBack, sheetBody} from './ui/sheet.js';
 import {closeCamera} from './ui/camera.js';
 import {renderHome, renderSyncChip, update} from './views/home.js';
-import {paintServerBox} from './views/sheets.js'; // also registers the sheet contents
+import {paintHouse} from './views/settings.js';
+import './views/sheets.js'; // registers the contents of the sheets
 import {retryWaiting} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
@@ -37,7 +38,7 @@ hooks.saved = () => {
 }; // sync shortly after our own save, keep the reminders current
 syncHooks.status = () => {
   renderSyncChip();
-  paintServerBox();
+  paintHouse();
 }; // the box in the settings only changes on new content
 syncHooks.reachable = () => retryWaiting(); // recognise waiting photos as soon as the server is reachable
 diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportieren.');
@@ -56,7 +57,7 @@ if (Native?.App) {
   // Back: close an open camera or an open sheet, otherwise send the app to the background (as native apps do)
   Native.App.addListener('backButton', ({canGoBack}) => {
     if (closeCamera()) return; // an open camera first
-    if (dlg.open) closeSheet();
+    if (dlg.open) sheetBack();
     else if (canGoBack) history.back();
     else Native.App.minimizeApp();
   });

@@ -12,7 +12,7 @@ import {feedReminders} from '../smart.js';
 import {getPet, getProduct, getServing, petNames, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet} from '../ui/sheet.js';
-import {remindHint} from '../views/sheets.js';
+import {remindHint} from '../views/settings.js';
 
 const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1; // the plugin demands a whole number
 const isOpen = s => Object.keys(s.pets).some(pid => getPet(pid) && !s.pets[pid].r);

@@ -417,9 +417,12 @@ async def test_rules(browser, url):
           const c = getComputedStyle(probe).color; probe.remove(); return [s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.color === c, s.textTransform, s.letterSpacing, l.innerText]; }""",
         )
         check(
-            label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Darstellung'],
+            label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Tiere'],
             f'field label: Figtree 600, 13.5px, muted, normal casing ({label})',
         )
+        await pg.click('#sheet [data-action=settings-page][data-v=house]')
+        await idle(pg)
+        await scan()  # the „Haushalt“ page
         await pg.click('#serverBox [data-action=connect-form]')
         await idle(pg)
         await scan()  # Adresse und Code
@@ -473,7 +476,7 @@ async def test_rules(browser, url):
         await ctx.close()
 
 
-SMALL_ICONS = '.btn .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .list-row .chev, .prod-card .edit .ic, .search .ic, .pick .ic'
+SMALL_ICONS = '.btn .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .list-row .chev, .row-ic .ic, .prod-card .edit .ic, .search .ic, .pick .ic'
 ICONS = """sel => [...document.querySelectorAll(sel)].filter(i => i.getClientRects().length).map(i => { const r = i.getBoundingClientRect(), box = i.closest('.pick, .sugg, .prod-card, .search'),
     b = (box?.querySelector('.field') || box)?.getBoundingClientRect(), left = !!i.closest('.search');
   return {where: i.closest('[class]:not(svg)').className, w: r.width, h: r.height, stroke: getComputedStyle(i).strokeWidth,
@@ -531,7 +534,7 @@ async def test_polish(browser, url):
     kinds = {i['where'].split()[0] for i in icons}
     odd = [i for i in icons if (i['w'], i['h'], i['stroke']) != (20, 20, '1.8px') or i['edge'] not in (None, 14) or i['mid'] is False]
     check(
-        {'pick', 'sugg', 'edit', 'list-row', 'btn', 'chip'} <= kinds and not odd,
+        {'pick', 'sugg', 'edit', 'list-row', 'row-ic', 'btn', 'chip'} <= kinds and not odd,
         f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))

@@ -8,7 +8,7 @@ import {Native, fileUrl, haptic} from '../native.js';
 import {report} from '../report.js';
 import {allClocks, changesSince, merge, prefs, savePrefs, state, topClock} from '../store.js';
 import {toast} from '../ui/toast.js';
-import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
+import {openPage, openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 
 const KIND = 'exchange',
@@ -105,7 +105,7 @@ function apply(text) {
   const took = merge(file.records);
   const back = changesSince(file.clocks);
   remember(file.device);
-  // The report sits in the „Haushalt“ section, with the „Antwort senden“ button when the other device is missing something
+  // The report sits on the „Austausch von Hand“ page, with „Antwort senden“ when the other device is missing something
   const info = {
     text: message(took, back.length),
     peer: back.length ? {device: file.device, clocks: file.clocks} : null,
@@ -114,8 +114,9 @@ function apply(text) {
   update();
   if (sheet?.kind === 'settings') {
     sheet.exchange = info;
-    renderSheet();
-  } else openSheet({kind: 'settings', exchange: info});
+    if (sheet.page === 'exchange') renderSheet();
+    else openPage('exchange'); // a file from another app, with the settings already open elsewhere
+  } else openSheet({kind: 'settings', page: 'exchange', exchange: info});
   toast(info.text);
 }
 
