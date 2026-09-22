@@ -16,7 +16,11 @@
 
 <!-- Katze und Vorgeschichte sind geraten. Bitte durch die echte Geschichte ersetzen und diesen Kommentar löschen. -->
 
-Unsere Katze ist wählerisch. Manche Sorten sind in zwei Minuten weg, an anderen schnuppert sie nur kurz und geht wieder. Irgendwann wusste ich im Laden nicht mehr, welche welche war. Also hab ich angefangen mitzuschreiben, und daraus ist mit der Zeit diese App geworden.
+Unsere Katze ist, freundlich gesagt, wählerisch. Manche Sorten sind sofort verputzt, an anderen schnuppert sie nur kurz und geht wieder. Wieder andere findet sie erst super und lässt sie beim nächsten Mal plötzlich stehen. Bei Sorten mit Soße leckt sie fast immer nur die Soße auf, und Fisch kommt mal gut an, mal gar nicht. Was gab es eigentlich zuletzt, und welche Sorte von welcher Marke hatte nochmal welche Konsistenz? Hat sie feste Vorlieben, oder will sie einfach möglichst viel Abwechslung?
+
+Das findet man nur heraus, wenn man mitschreibt, und so ist diese App entstanden. Mitschreiben hält man aber nur durch, wenn es kaum Mühe macht, schließlich füttert man mehrmals am Tag. Deshalb war von Anfang an das Wichtigste, dass das Eintragen schnell und vor allem einfach geht.
+
+Zugegeben, das Ganze ist ein ziemliches Nischenproblem. Dafür steckt in der App ganz schön viel Liebe zum Detail. Und weil Katzen bekanntlich großen Wert auf ihre Privatsphäre legen, bleiben alle Einträge auf deinem Handy.
 
 <p align="center">
   <picture>
