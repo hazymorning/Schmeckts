@@ -67,7 +67,7 @@ export function resultBadges(s, compact = false) {
 }
 export const closeBtn = `<button class="icon-btn" data-action="close" aria-label="Schließen">${icon('close')}</button>`;
 /* A segmented control: one equally wide button per option, the current one pressed. An option is
-   [value, label] and may carry an icon and an action of its own — „Eigene“ in the rating reminder is one such,
+   [value, label] and may carry an icon and an action of its own. „Eigene“ in the rating reminder is one such,
    because it opens a field instead of setting a value. */
 export const segmented = (action, options, current) =>
   `<div class="seg">${options

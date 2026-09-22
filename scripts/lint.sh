@@ -39,7 +39,7 @@ else
   GOBIN="$("$GO" env GOPATH)/bin"
   # staticcheck needs a newer Go to build than the server is written for, and that is fine: the linter is not
   # part of the program. GOTOOLCHAIN=auto lets `go install` fetch the toolchain it asks for, whatever the
-  # environment has set — actions/setup-go 7 pins it to `local`, and the install then fails outright.
+  # environment has set. actions/setup-go 7 pins it to `local`, and the install then fails outright.
   [ -x "$GOBIN/staticcheck" ] || GOTOOLCHAIN=auto "$GO" install "honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION"
   unformatted="$("$(dirname "$GO")/gofmt" -l server)"
   if [ -n "$unformatted" ]; then
@@ -58,13 +58,16 @@ fi
 run 'ruff check' ruff check --quiet tests scripts design
 run 'ruff format' ruff format --quiet --check tests scripts design
 
+# The texts themselves: no long dashes, no emoji, no trailers under a commit. See scripts/text-style.py.
+run 'text style' python3 scripts/text-style.py
+
 # Shell
-run 'shellcheck' shellcheck scripts/*.sh server/build-deb.sh .claude/hooks/*.sh
+run 'shellcheck' shellcheck scripts/*.sh server/build-deb.sh
 
 # Pinned versions that have to agree. The suites that open the app run in Playwright's own container image, and
 # its tag has to be the version pinned in tests/requirements.txt: the image brings the matching Chromium, while
-# the pinned list is installed over the image's own Playwright. Disagree, and the browser is simply not there —
-# an error that only turns up once a test opens a page, in three jobs at once.
+# the pinned list is installed over the image's own Playwright. Disagree, and the browser is simply not there.
+# That error only turns up once a test opens a page, in three jobs at once.
 playwright_pin() {
   local pin tag
   pin=$(sed -n 's/^playwright==\(.*\)$/\1/p' tests/requirements.txt)

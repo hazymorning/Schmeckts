@@ -2406,7 +2406,7 @@ async def test_pack_lines(browser, url):
 
 
 async def test_exchange(browser, url):
-    print('manual exchange: share, receive, answer — two phones without a server')
+    print('manual exchange: share, receive, answer (two phones without a server)')
 
     async def open_exchange(pg):  # the page „Austausch von Hand“, wherever the phone currently stands
         if await pg.evaluate("document.getElementById('sheet').open"):
@@ -3108,7 +3108,7 @@ async def test_start(browser, url):
     )
     await ctx.close()
 
-    # A strip of the background behind the status bar, as tall as the inset — and the sheet's dimming over it.
+    # A strip of the background behind the status bar, as tall as the inset, and the sheet's dimming over it.
     # The inset comes in before the page is built: Chromium does not redo an env() fallback afterwards.
     ctx = await phone(browser)
     pg = await ctx.new_page()
@@ -3409,7 +3409,7 @@ async def test_home_history(browser, url):
 
 
 # The timeline's geometry: how far the line is from the middle of the dot, whether the time fits its column,
-# and how wide that column is — the last one so a larger system font can be seen to have made it wider.
+# and how wide that column is (the last one so a larger system font can be seen to have made it wider).
 TL_GEOMETRY = """t => { const box = t.getBoundingClientRect(), dot = t.querySelector('.tl-node i').getBoundingClientRect();
   const s = getComputedStyle(t, '::before'), middle = box.left + parseFloat(s.left) + parseFloat(s.width) / 2;
   const time = t.querySelector('.tl-time');
@@ -3598,7 +3598,7 @@ async def test_report(browser, url):
         )
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
-    # A tall screen: one page would not fill it, so the next ones follow at once — without that there is no scrolling
+    # A tall screen: one page would not fill it, so the next ones follow at once; without that there is no scrolling
     ctx = await phone(browser, height=1800)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [26, 1])

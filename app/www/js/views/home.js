@@ -34,7 +34,7 @@ import {
 } from './parts.js';
 import {renderMood} from './mood.js';
 
-/* Redraw the home page — with a smooth view transition where possible */
+/* Redraw the home page, with a smooth view transition where possible */
 export function update() {
   let done = false;
   const run = () => {
@@ -304,7 +304,7 @@ function slideHeight(el, h0) {
   setTimeout(end, 300);
 }
 
-/* Hint: the one with the highest precedence — a sentence, a reason, the buttons */
+/* Hint: the one with the highest precedence (a sentence, a reason, the buttons) */
 const HINT_TITLES = {
   appetit: 'Appetit',
   stop: 'Nicht mehr kaufen?',

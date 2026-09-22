@@ -2,7 +2,7 @@ name: Tests
 
 # The whole suite on every push and every pull request, split across jobs that run at the same time, plus the
 # style and mistake checks of scripts/lint.sh. Nothing is built here: no Android SDK, no APK, no .deb.
-# Only what the tests actually need — no JDK either: ui_test.py only reads PhotoPlugin.java as text.
+# Only what the tests actually need, and no JDK either: ui_test.py only reads PhotoPlugin.java as text.
 on:
   push:
   pull_request:

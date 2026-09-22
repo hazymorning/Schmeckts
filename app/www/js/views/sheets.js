@@ -296,7 +296,7 @@ function viewProduct() {
 
 /* The evaluation. One thing stands out, a ring saying how much of what was served went down well; around it
    only quiet numbers. The span at the top decides what the ring, the numbers and the list show, and it lasts
-   while the app runs — nothing about it is stored.
+   while the app runs; nothing about it is stored.
    sheet.at: the id of the day it opens at, coming from the calendar on the home page */
 export const reportState = at => ({kind: 'report', at});
 

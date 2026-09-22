@@ -1,6 +1,6 @@
-# Exact versions, so that a session on the web, the CI and a release build all run the same tools.
-# playwright has to match the ready-made Chromium of Claude Code on the web (build 1194, see
-# .claude/hooks/session-start.sh), which is why it is pinned to the patch level like everything else.
+# Exact versions, so that a run here, the CI and a release build all use the same tools.
+# playwright has to match the Chromium of the container image pinned in .github/workflows/tests.yml (build
+# 1194), which is why it is held to the patch level like everything else.
 pillow==12.3.0
 playwright==1.56.0
 ruff==0.16.8

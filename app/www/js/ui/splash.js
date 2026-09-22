@@ -1,6 +1,6 @@
 /* The native splash screen stays until the app is really there, so nobody watches a web page build itself up.
    It goes when the data is loaded (store.js does that before anything else runs), the home page is drawn, both
-   typefaces are ready and two frames have passed — and in any case after LATEST, whatever went wrong on the way:
+   typefaces are ready and two frames have passed, and in any case after LATEST, whatever went wrong on the way:
    the app must never hang on the splash. In the browser there is none and everything here does nothing. */
 import {Native} from '../native.js';
 import {report} from '../report.js';

@@ -235,7 +235,7 @@ async def main():
     go = shutil.which('go') or '/usr/local/go/bin/go'
     binary = os.path.join(tempfile.mkdtemp(), 'schmeckts-server')
     # -buildvcs=false: the throwaway test binary has no use for the commit it was built from, and asking git for
-    # it fails wherever the checkout belongs to another user than the build does — in the CI container, for one.
+    # it fails wherever the checkout belongs to another user than the build does, the CI container for one.
     subprocess.run([go, 'build', '-buildvcs=false', '-o', binary, '.'], cwd=ROOT / 'server', check=True)
     fake, food = FakeAnthropic(), FakeFoodDB()
     srv = GoServer(binary, fake)

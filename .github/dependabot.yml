@@ -31,7 +31,7 @@ updates:
       pip:
         patterns: ['*']
     ignore:
-      # Playwright is raised by hand. Its version decides which Chromium build is needed, and that build has to
-      # be there in two places a bot does not touch: the container image in tests.yml and the ready-made browser
-      # of Claude Code on the web (see .claude/hooks/session-start.sh). Raising only the package breaks both.
+      # Playwright is raised by hand. Its version decides which Chromium build is needed, and that build comes
+      # with the container image pinned in tests.yml, which no bot touches. Raising only the package leaves the
+      # browser behind, and every suite that opens the app fails at once.
       - dependency-name: playwright
