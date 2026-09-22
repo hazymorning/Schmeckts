@@ -1,21 +1,31 @@
-/* Bottom sheet: opening, closing, swiping, the back gesture.
-   What the sheet contains is registered by the views through setSheetView(). */
+/* Sheets and pages: opening, closing, swiping, the back gesture.
+   A sheet rises from below for one task on top of where you are. A page comes in from the side for a place you
+   go into, fills the screen and takes a level of the history with it (PROJECT.md, „Principles“ 3). Both are the
+   same dialog, because a page is a sheet that fills the screen and moves sideways.
+   What either of them contains is registered by the views through setSheetView(). */
 import {$, reduceMotion} from '../dom.js';
 
 export const dlg = $('#sheet'),
   sheetBody = $('#sheetBody');
-export let sheet = null; // the state of the open sheet, null when closed
+export let sheet = null; // the state of what is open, null when closed
+/* The settings and everything below them are a page; everything else is a sheet. */
+export const isPage = state => state?.kind === 'settings';
+const PAGE_OUT = 300,
+  SHEET_OUT = 240;
 let viewKey = '',
-  depth = 0, // history entries of our own: one for the sheet, one more for an open sub-page
+  depth = 0, // history entries of our own: one per level
+  pageKeys = [], // what openPage() put on the state, taken off again on the way back
   closing = null;
 
 /* The upper edge of a sheet: while its contents are scrolled, the top few pixels fade out, so a line does not
-   end abruptly under the grip. Nothing fades while the sheet sits at the top. */
-const markSheetScrolled = () => sheetBody.classList.toggle('scrolled', sheetBody.scrollTop > 0);
+   end abruptly under the grip. A page has no grip and its bar stays at the top instead, so nothing fades there. */
+const markSheetScrolled = () => sheetBody.classList.toggle('scrolled', !isPage(sheet) && sheetBody.scrollTop > 0);
 sheetBody.addEventListener('scroll', markSheetScrolled, {passive: true});
 
 export function openSheet(state) {
   sheet = state;
+  pageKeys = [];
+  dlg.classList.toggle('page', isPage(state));
   renderSheet();
   if (!dlg.open) {
     dlg.classList.remove('closing');
@@ -27,7 +37,7 @@ export function openSheet(state) {
     markSheetScrolled();
     depth = 0;
     push();
-    if (state.page) push(); // opened straight on a sub-page, so the back gesture leads to the overview first
+    if (state.page) push(); // opened straight on a page below, so back leads to the overview first
   }
 }
 function push() {
@@ -38,54 +48,80 @@ function push() {
     /* without an entry of its own the sheet does not answer the back gesture */
   }
 }
-/* A sub-page inside the open sheet (the settings). It gets a history entry of its own, so the Android back button
-   and the back gesture go one level back before they close the sheet. */
-export function openPage(page) {
+/* One level deeper: „Haushalt“, „Backup“, the pet editor. It gets a history entry of its own, so the arrow in
+   the head, the Android back button and the back gesture all take the same path, one level at a time.
+   `extra` is what that level needs (the pet being edited); the way back takes exactly those keys off again. */
+export function openPage(page, extra = null) {
   if (!sheet || sheet.page === page) return;
-  sheet.page = page;
-  sheet.slide = 'fwd';
+  pageKeys = extra ? Object.keys(extra) : [];
+  Object.assign(sheet, extra, {page, slide: 'fwd'});
   push();
   renderSheet();
 }
-/* One level back. Through the history wherever there is an entry to drop, so the arrow in the head and the hardware
-   button take exactly the same path. */
+/* One level back. Through the history wherever there is an entry to drop, so the arrow in the head and the
+   hardware button take exactly the same path. */
 export function backPage() {
   if (depth > 1) history.back();
   else stepBack();
 }
-/* Android's back button: out of a sub-page first, and only on the overview does the sheet close */
+/* Android's back button: out of a level below first, and only on the overview does the sheet close */
 export function sheetBack() {
   if (sheet?.page) backPage();
   else closeSheet();
 }
 function stepBack() {
   if (!sheet?.page) return;
-  sheet.page = null;
-  sheet.slide = 'back';
+  for (const k of pageKeys) delete sheet[k];
+  pageKeys = [];
+  Object.assign(sheet, {page: null, slide: 'back'});
   renderSheet();
 }
-let drawView = () => {}; // set by the sheet views: draws the contents of the open sheet
+let drawView = () => {}; // set by the sheet views: draws the contents of what is open
 export function setSheetView(fn) {
   drawView = fn;
 }
 export function renderSheet() {
   if (!sheet) return;
+  // The level being left, for the page's movement: taken before it is drawn over
+  const leaving =
+    dlg.open && isPage(sheet) && sheet.slide ? {html: sheetBody.innerHTML, top: sheetBody.scrollTop} : null;
   drawView(sheet);
   const key = `${sheet.kind}:${sheet.page || ''}:${sheet.step || ''}:${sheet.id || ''}`;
   if (key !== viewKey) {
     viewKey = key;
     sheetBody.scrollTop = 0;
     markSheetScrolled();
-    // A sub-page comes in from below and a step back from above, everything else fades up from below
-    const how = sheet.slide ? 'swap-' + sheet.slide : 'swap-in';
+    const how = sheet.slide;
     sheet.slide = null;
-    sheetBody.classList.remove('swap-in', 'swap-fwd', 'swap-back');
-    // Only for a swap inside an open sheet; while it opens, the sheet's own entrance animation covers it
-    if (dlg.open) {
-      void sheetBody.offsetWidth;
-      sheetBody.classList.add(how);
-    }
+    sheetBody.classList.remove('swap-in', 'step-fwd', 'step-back');
+    // Only for a change inside something already open; while it opens, its own entrance covers this
+    if (!dlg.open) return;
+    void sheetBody.offsetWidth;
+    if (!isPage(sheet)) sheetBody.classList.add('swap-in');
+    else if (how) slidePage(how, leaving);
   }
+}
+/* A page moves as a whole: the level you go to comes in from the side while the one you leave goes out the other
+   way. What you leave is a still picture in a layer of its own, inert and gone with the animation, so the views
+   only ever write to the one live body. Under reduced motion nothing moves and no picture is taken. */
+let ghost = null;
+function dropGhost() {
+  ghost?.remove();
+  ghost = null;
+}
+function slidePage(how, leaving) {
+  dropGhost();
+  if (reduceMotion.matches || !leaving) return;
+  const old = document.createElement('div');
+  old.className = `sheet-body page-ghost out-${how}`;
+  old.setAttribute('aria-hidden', 'true');
+  old.inert = true;
+  old.innerHTML = leaving.html;
+  dlg.appendChild(old);
+  old.scrollTop = leaving.top;
+  ghost = old;
+  old.addEventListener('animationend', () => old === ghost && dropGhost(), {once: true});
+  sheetBody.classList.add(how === 'fwd' ? 'step-fwd' : 'step-back');
 }
 export function closeSheet(fromPop = false) {
   if (closing) return closing;
@@ -96,16 +132,18 @@ export function closeSheet(fromPop = false) {
   depth = 0;
   const popped = levels ? new Promise(resolve => addEventListener('popstate', resolve, {once: true})) : null;
   if (popped) history.go(-levels);
+  const out = isPage(sheet) ? PAGE_OUT : SHEET_OUT;
   const hidden = reduceMotion.matches
     ? Promise.resolve()
     : new Promise(resolve => {
         dlg.classList.add('closing');
-        setTimeout(resolve, 240);
+        setTimeout(resolve, out);
       });
   closing = Promise.all([
     popped,
     hidden.then(() => {
-      dlg.classList.remove('closing');
+      dropGhost();
+      dlg.classList.remove('closing', 'page');
       dlg.style.transform = '';
       dlg.style.transition = '';
       sheetBody.scrollTop = 0;
@@ -113,6 +151,7 @@ export function closeSheet(fromPop = false) {
       dlg.close();
       sheet = null;
       viewKey = '';
+      pageKeys = [];
       sheetBody.innerHTML = '';
       document.body.classList.remove('locked');
       const t = $('#toast');
@@ -137,19 +176,20 @@ window.addEventListener('popstate', () => {
 });
 dlg.addEventListener('cancel', e => {
   e.preventDefault();
-  closeSheet();
+  sheetBack(); // on a page that is one level; a sheet has none and closes
 });
 dlg.addEventListener('click', e => {
   if (e.target === dlg) closeSheet();
 });
 
-/* Swiping down closes the sheet */
+/* Swiping down closes a sheet. A page leaves the way it came, by the arrow or by back, so it does not swipe. */
 (() => {
   let startY = 0,
     dy = 0,
     t0 = 0,
     dragging = false;
   dlg.addEventListener('pointerdown', e => {
+    if (isPage(sheet)) return;
     if (!e.target.closest('.grip-zone, .sh-head') || e.target.closest('button, input, label')) return;
     dragging = true;
     startY = e.clientY;

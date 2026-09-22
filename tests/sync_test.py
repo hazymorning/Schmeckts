@@ -225,8 +225,9 @@ async def connect(pg, code, server, edit=True):
 
 
 async def close_sheet(pg):
-    if await pg.evaluate("document.getElementById('sheet').open"):
-        await pg.click('#sheet [data-action=close]')
+    """Out of whatever is open: a sheet has the X, the settings are a page and go by their arrow, one level a time."""
+    while await pg.evaluate("document.getElementById('sheet').open"):
+        await pg.click('#sheet [data-action=close], #sheet [data-action=settings-back]')
         await idle(pg)
 
 

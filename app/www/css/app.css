@@ -1252,8 +1252,7 @@ button.ov-pic:active {
 .toast button .ic,
 .sync-chip .ic,
 .sugg > .ic,
-.list-row .chev,
-.row-ic .ic,
+.set-row .chev,
 .prod-card .edit .ic,
 .search .ic,
 .pick .ic {
@@ -1573,6 +1572,115 @@ dialog.sheet.closing::backdrop {
     opacity: 0;
   }
 }
+/* A page: the settings and everything below them. It fills the screen, comes in from the side and leaves the same
+   way, so a step into the depth never reads as a new layer on top (PROJECT.md, "Principles" 3). Same dialog as a
+   sheet, because a page is a sheet that fills the screen and moves sideways. */
+dialog.sheet.page {
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  border-radius: 0;
+  background: var(--bg);
+}
+dialog.sheet.page .grip-zone {
+  display: none;
+}
+dialog.sheet.page[open] {
+  animation: pageIn 0.3s var(--ease-out);
+}
+dialog.sheet.page.closing {
+  animation: pageOut 0.3s var(--ease-in) forwards;
+}
+@keyframes pageIn {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes pageOut {
+  to {
+    transform: translateX(100%);
+  }
+}
+dialog.sheet.page .sheet-body {
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+  padding: 0 var(--space-4) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+/* A level deeper and back: the page you go to comes in from the side while the one you leave, a still picture in
+   a layer of its own, goes out the other way. Nothing moves inside either of them. */
+.sheet-body.step-fwd {
+  animation: pageStepIn 0.3s var(--ease-out);
+}
+.sheet-body.step-back {
+  animation: pageStepBack 0.3s var(--ease-out);
+}
+dialog.sheet.page .page-ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+dialog.sheet.page .page-ghost.out-fwd {
+  z-index: 0;
+  animation: pageStepAside 0.3s var(--ease-out) forwards;
+}
+dialog.sheet.page .page-ghost.out-back {
+  z-index: 2;
+  animation: pageStepOut 0.3s var(--ease-out) forwards;
+}
+@keyframes pageStepIn {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes pageStepAside {
+  to {
+    transform: translateX(-25%);
+  }
+}
+@keyframes pageStepBack {
+  from {
+    transform: translateX(-25%);
+  }
+}
+@keyframes pageStepOut {
+  to {
+    transform: translateX(100%);
+  }
+}
+/* The bar with the arrow may stay at the top while the page scrolls; below it a gradient, so a line dissolves
+   under it instead of being cut through. */
+.page-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) 0;
+  background: var(--bg);
+}
+.page-bar .icon-btn {
+  margin-left: calc(-1 * var(--space-3));
+}
+.page-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: var(--space-4);
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  pointer-events: none;
+}
+.page-title {
+  margin: 0 0 var(--space-1h);
+  font: 650 30px/1.1 var(--font-display);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
 .grip-zone {
   padding: var(--space-2h) 0 var(--space-1);
   touch-action: none;
@@ -1813,76 +1921,84 @@ button.prod-card:active {
 .list-row + .list-row {
   border-top: 1px solid var(--line);
 }
-.list-row .chev {
-  color: var(--faint);
-}
-/* The settings: one group of rows per subject, each row leading to a page of its own (icon, title, the current
-   value and the chevron). Only „Produktsuche im Internet“ carries a switch instead, because it has no page. */
+/* The settings: one group of rows per subject, each group a card of its own. The group is the grid that holds
+   every row to the same columns, so a segment or a field under a row lines up with the text above it without a
+   distance of its own (PROJECT.md, "Settings"). */
 .set-group {
+  display: grid;
+  grid-template-columns: var(--space-7) 1fr;
+  column-gap: var(--space-3h);
   padding: var(--space-1) var(--space-4);
   border-radius: var(--radius-l);
-  background: var(--surface-2);
+  background: var(--surface);
 } /* 4px of its own above and below, so the first and the last row are not pressed into the corners */
-.set-group .list-row {
-  min-height: 56px;
-  gap: var(--space-3);
+.set-row {
+  position: relative;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3h);
+  min-height: 60px;
+  padding: var(--space-3) 0;
+  text-align: left;
 }
-/* Every row in a group is built the same way, whatever leads it: a pet's round photo is the size of an icon tile
-   here, so every title starts at the same place, and the two-line row keeps the height of the others, so a box
-   has the same gap above its first row as under its last. */
-.set-group .list-row .av {
-  width: 34px;
-  height: 34px;
+/* The line between two rows starts at the text column, so the icons read as a column of their own */
+.set-group > .set-row:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: calc(var(--space-7) + var(--space-3h));
+  right: 0;
+  height: 1px;
+  background: var(--line);
 }
-.set-group .list-row.wrap {
-  padding: var(--space-2h) 0;
-}
-.set-group .list-row .t-main {
-  flex: 1 0 auto;
-} /* the title keeps its full width: German settings are long, and the value beside it gives way instead */
-.set-group .list-row.wrap .t-main {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.row-ic {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-s);
+.set-ic {
+  width: var(--space-7);
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  flex: 0 0 auto;
-  background: var(--surface);
   color: var(--muted);
-} /* icon on --surface, as in the server box: the soft fills barely stand out against --surface-2 */
-.val {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 65%;
+} /* a plain icon, no tile: two levels of container are enough (PROJECT.md, "Principles" 6) */
+.set-row .av {
+  width: var(--space-7);
+  height: var(--space-7);
+}
+.set-row .t-main b {
+  white-space: normal;
+}
+/* At most two lines saying what the setting does: a line that follows the state, such as the sync, cannot push
+   the row further apart than that */
+.set-row .t-main small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
   font-size: 14px;
-  line-height: 1.3;
-  color: var(--muted);
-  text-align: right;
-  overflow-wrap: break-word;
-} /* German settings are long: the value gives way before the title does and takes as many lines as it needs,
-     rather than being cut off at the second one once the system font is large. A pair held together by a
-     no-break space still breaks where the box is narrower than the pair. */
-.val.ok {
-  color: var(--accent-ink);
-}
-.val.bad {
-  color: var(--bad);
-}
-/* A row whose line under the title is a whole sentence: title and sentence wrap instead of being cut off */
-.list-row.wrap {
-  padding: var(--space-3) 0;
-}
-.list-row.wrap .t-main b {
-  white-space: normal;
-}
-.list-row.wrap .t-main small {
-  white-space: normal;
   line-height: 1.35;
   margin-top: var(--space-hair);
+}
+.set-row .chev {
+  color: var(--faint);
+}
+/* A row that acts at once carries no chevron, so its colour says that it does something */
+.set-row.act .set-ic,
+.set-row.act .t-main b {
+  color: var(--accent-ink);
+}
+/* A segment or a field belongs to the row above it and stands in the text column, from the grid */
+.set-under {
+  grid-column: 2;
+  padding-bottom: var(--space-3h);
+}
+.set-under .label {
+  margin-top: var(--space-3);
+}
+.field.in-row {
+  flex: 0 0 auto;
+  width: 130px;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3h);
 }
 /* The switch. The whole row is the button, so the tap target is the row and the track only shows the state. */
 .sw {
@@ -2200,8 +2316,8 @@ button.prod-card:active {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-3h) var(--space-3) var(--space-3);
   border-radius: var(--radius-l);
-  background: var(--surface-2);
-}
+  background: var(--surface);
+} /* a card on the page, like the groups of the overview */
 .srv-ic {
   width: 42px;
   height: 42px;
@@ -2209,7 +2325,7 @@ button.prod-card:active {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--muted);
   transition:
     background-color 0.3s,
@@ -2221,7 +2337,7 @@ button.prod-card:active {
 }
 .srv.ok .srv-ic {
   color: var(--accent-ink);
-} /* the soft fills barely stand out against --surface-2: only the icon carries the colour */
+} /* the soft fills barely stand out beside it: only the icon carries the colour */
 .srv.bad .srv-ic {
   color: var(--bad);
 }

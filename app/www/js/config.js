@@ -167,6 +167,7 @@ export const FLAVORS = [
 /* Rating reminder in minutes after serving, 0 = off: the REMIND steps, or whole hours of your own from 1 to
    REMIND_MAX_H. tidyRemind turns any stored value into a valid one. */
 export const REMIND = [0, 60, 180, 360];
+export const REMIND_DEFAULT = 180; // what the switch turns on with when nothing was chosen yet
 export const REMIND_MAX_H = 24;
 export const tidyRemind = m =>
   Number.isFinite(m) && m > 0 ? Math.min(REMIND_MAX_H, Math.max(1, Math.round(m / 60))) * 60 : 0;

@@ -1,5 +1,6 @@
-/* Creating, editing and deleting pets. The profile picture is cropped (step „crop“ in the pet sheet) and taken over
-   with „Speichern“. */
+/* Creating, editing and deleting pets. The profile picture is cropped (step „crop“) and taken over with
+   „Speichern“. From the home page the editor is a sheet; from the settings it is one of their pages, with a
+   history entry of its own, and saving or removing leads back to the overview. */
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
 import {haptic} from '../native.js';
@@ -8,18 +9,43 @@ import {getPet} from '../derive.js';
 import {cropSquare, fileToImage} from '../images.js';
 import {cropRect, cropStart} from '../ui/crop.js';
 import {toast} from '../ui/toast.js';
-import {closeSheet, openSheet, renderSheet, sheet} from '../ui/sheet.js';
+import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 
-export function openPet(id, from = null) {
+/* Everything the editor puts on the state. As a page these are exactly the keys the way back takes off again. */
+export const petState = p => ({
+  id: p?.id || null,
+  name: p?.name || '',
+  species: p?.species || 'Katze',
+  photo: p?.photo || null,
+  step: null,
+  cropImg: null,
+  crop: null,
+});
+export const editing = s => s?.kind === 'pet' || (s?.kind === 'settings' && s.page === 'pet');
+export function openPet(id, inSettings = false) {
   const p = getPet(id);
   if (!p) return;
-  openSheet({kind: 'pet', id: p.id, name: p.name, species: p.species, photo: p.photo || null, from});
+  if (inSettings) openPage('pet', petState(p));
+  else openSheet({kind: 'pet', ...petState(p)});
+}
+/* Back to where the editor was opened from: in the settings one level up, otherwise out of the sheet. */
+function leave(msg) {
+  if (sheet.kind === 'settings') {
+    backPage();
+    update();
+    toast(msg);
+    return;
+  }
+  closeSheet().then(() => {
+    update();
+    toast(msg);
+  });
 }
 /* Open the crop on a chosen file */
 async function openCrop(load) {
   const s = sheet;
-  if (s?.kind !== 'pet') return;
+  if (!editing(s)) return;
   let img;
   try {
     img = await load();
@@ -57,17 +83,7 @@ export function savePet() {
   else Object.assign(getPet(s.id) || {}, {name, species: s.species, photo: s.photo || null});
   save();
   haptic('success');
-  const msg = !isNew ? 'Gespeichert' : db.pets.length === 1 ? `Willkommen, ${name}!` : `${name} ist dabei`;
-  if (s.from === 'settings') {
-    openSheet({kind: 'settings'});
-    update();
-    toast(msg);
-    return;
-  }
-  closeSheet().then(() => {
-    update();
-    toast(msg);
-  });
+  leave(!isNew ? 'Gespeichert' : db.pets.length === 1 ? `Willkommen, ${name}!` : `${name} ist dabei`);
 }
 export function deletePet() {
   const id = sheet.id,
@@ -87,8 +103,5 @@ export function deletePet() {
   save();
   savePrefs();
   haptic('strong');
-  closeSheet().then(() => {
-    update();
-    toast(`${p.name} entfernt`);
-  });
+  leave(`${p.name} entfernt`);
 }

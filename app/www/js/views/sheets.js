@@ -1,5 +1,6 @@
-/* Contents of the bottom sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
-   the profile picture) and evaluation. The settings have pages of their own and live in views/settings.js. */
+/* Contents of the sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
+   the profile picture) and evaluation. The settings are a page and live in views/settings.js; the pet editor is
+   one of its pages as well, drawn by the same view. */
 import {$} from '../dom.js';
 import {cap, esc, norm} from '../text.js';
 import {toLocalInput, when} from '../dates.js';
@@ -29,6 +30,7 @@ import {
   closeBtn,
   dayBlocks,
   dayGroups,
+  head,
   nameBlock,
   rateRow,
   reasonOf,
@@ -407,7 +409,7 @@ function watchDays() {
 
 /* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
    mountCrop() hangs the image in after drawing. */
-const viewCrop = () => `<div class="sh-head"><h2>Foto zuschneiden</h2>${closeBtn}</div>
+const viewCrop = () => `${head('Foto zuschneiden', 'crop-cancel')}
     <div class="crop" id="cropStage" aria-label="Ausschnitt verschieben"></div>
     <label class="label" for="f-zoom">Zoom</label>
     <input id="f-zoom" class="zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1">
@@ -419,7 +421,7 @@ function viewPet() {
     editing = !!s.id;
   const title = editing ? 'Tier bearbeiten' : db.pets.length ? 'Neues Tier' : 'Wer wird gefüttert?';
   const av = avatar({photo: s.photo, species: s.species}, 'xl');
-  return `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
+  return `${head(title)}
     <label class="pet-photo" for="petPhotoInput" aria-label="Foto wählen">${av}<span class="cam-badge">${icon('camera')}</span></label>
     <label class="photo-hint" for="petPhotoInput">${s.photo ? 'Foto ändern' : 'Foto hinzufügen'}</label>
     <label class="label" for="f-name">Name</label>
@@ -436,7 +438,8 @@ const VIEWS = {
   new: viewName,
   product: viewProduct,
   pet: viewPet,
-  settings: viewSettings,
+  // The pet editor is a page of the settings when it is reached from there, and the same view serves it
+  settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
