@@ -383,7 +383,7 @@ export function review(db, prefs, now, known) {
 
 /* The household's usual feeding times from the meals (excluding treats) of the last 14 days: times at most 90
    minutes apart form one slot, which counts from 4 different days onwards. Minutes since midnight, local time:
-   from the earliest, at the mean time, remind = at + 45 minutes. */
+   from the earliest, at the middle time, remind = at + 45 minutes. */
 const FEED = {span: 14 * DAY, gap: 90, minDays: 4, delay: 45, lead: 60, ahead: 3};
 function mealsIn(db, from, to) {
   const snack = new Set(db.products.filter(p => typeOf(p) === 'Snack').map(p => p.id));
