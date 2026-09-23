@@ -8,7 +8,7 @@ import {toast} from '../ui/toast.js';
 import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
-import {refinePets, serveProduct} from './feeding.js';
+import {refinePets, retryNow, serveProduct} from './feeding.js';
 
 /* The rating is stored and felt on the tap; the interface follows after these delays, so the button animation is
    not cut off. PICKED is the length of that animation in app.css. */
@@ -180,6 +180,8 @@ export function deleteServing(id) {
       db.servings.sort((a, b) => b.servedAt - a.servedAt);
       save();
       update();
+      // Deleted while the photo was being read: that result was dropped meanwhile, so it is read again
+      if (!s.productId && (s.status === 'reading' || s.status === 'recognizing')) retryNow(s.id);
     });
   });
 }

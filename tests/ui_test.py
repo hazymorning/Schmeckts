@@ -2131,6 +2131,130 @@ OFF_HIT = {
 }
 
 
+# The buttons at the end of the sheet: their text, classes, action and where they stand
+END_BUTTONS = """() => [...document.querySelectorAll('#sheet .mt > .btn')].map(b => [b.innerText.trim(), b.className, b.dataset.action,
+  Math.round(b.getBoundingClientRect().top), Math.round(b.getBoundingClientRect().bottom)])"""
+
+
+async def test_discard(browser, url):
+    print('a meal broken off after the photo can be deleted while naming, with undo')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    async def photo():
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await until(pg, "db.servings[0]?.status === 'noserver'")
+        await idle(pg)
+
+    await photo()
+    ends = await pg.evaluate(END_BUTTONS)
+    check(
+        [e[:3] for e in ends] == [['Speichern', 'btn primary', 'save-name'], ['Eintrag löschen', 'btn quiet', 'delete-serving']]
+        and ends[1][3] >= ends[0][4] + 8,
+        f'naming a meal without a variety ends with „Speichern“ and „Eintrag löschen“ under it ({[e[:2] for e in ends]})',
+    )
+    await pg.evaluate('window.__calls.length = 0')
+    await pg.click('#sheet [data-action=delete-serving]')
+    await idle(pg)
+    gone = [
+        await pg.evaluate("document.getElementById('sheet').open"),
+        await state(pg, 'db.servings.length'),
+        await pg.locator('.pend').count(),
+        (await pg.inner_text('#toast')).split('\n')[0],
+        await pg.locator('#toast [data-action=undo]').count(),
+        await pg.evaluate("window.__calls.filter(c => c[0] === 'impact').map(c => c[1].style)"),
+    ]
+    check(gone == [False, 0, 0, 'Eintrag gelöscht', 1, ['HEAVY']], f'one tap deletes it, the sheet closes, the toast offers undo ({gone})')
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    back = await state(pg, '(s => [db.servings.length, s.productId ?? null, s.status, !!s.photo, !!s.thumb])(db.servings[0])')
+    await pg.click('.pend-head')
+    await idle(pg)
+    again = [e[0] for e in await pg.evaluate(END_BUTTONS)]
+    check(
+        back == [1, None, 'noserver', True, True] and again == ['Speichern', 'Eintrag löschen'],
+        f'undo brings the meal back with its photo, still to be named ({back}, {again})',
+    )
+
+    # Where there is nothing to delete, or the meal sheet ends with it anyway, naming does not offer it
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    renamed = await pg.locator('#sheet [data-action=delete-serving]').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.click('#sheet [data-action=new-product]')
+    await idle(pg)
+    typed = await pg.locator('#sheet [data-action=delete-serving]').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => (await import('./js/ui/sheet.js')).openSheet({kind: 'product', id: s.db.products[0].id}))"
+    )
+    await idle(pg)
+    await pg.click('#sheet [data-action=rename-product]')
+    await idle(pg)
+    product = await pg.locator('#sheet [data-action=delete-serving]').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(
+        [renamed, typed, product] == [0, 0, 0],
+        f'not while changing a named meal, typing a new one or renaming a variety ({[renamed, typed, product]})',
+    )
+
+    # The owner's way: an unknown barcode, the photo of the front, then broken off
+    before = await state(pg, '[db.products.length, db.servings.length]')
+    await pg.evaluate(f"window.__barcode = '{SHEBA}'; window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.click('#sheet [data-action=scan]')
+    await until(pg, "db.servings[0]?.scanCode && db.servings[0].status === 'noserver'")
+    await idle(pg)
+    await pg.click('#sheet [data-action=delete-serving]')
+    await idle(pg)
+    after = await state(pg, f"[db.products.length, db.servings.length, db.products.some(p => p.codes?.['{SHEBA}'])]")
+    check(after == before + [False], f'after the scanner too: the meal goes, and no variety got the code ({before}, {after})')
+
+    # Deleted while the phone was still reading the photo: undo reads it again instead of hanging
+    await pg.evaluate('window.__ocrDelay = 1500; window.__ocrDone = 0')
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'reading'")
+    reads = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    was = await pg.evaluate(  # read and tap in one go, so the reading cannot finish in between
+        """import('./js/store.js').then(s => { const was = s.db.servings[0].status;
+          document.querySelector('#sheet [data-action=delete-serving]').click(); return was; })"""
+    )
+    await pg.wait_for_function('window.__ocrDone >= 1')
+    await pg.click('#toast [data-action=undo]')
+    settled = await until(pg, "db.servings[0]?.status === 'noserver'", timeout=4)
+    again = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    check(
+        was == 'reading' and settled and again == reads + 1,
+        f'undone while reading: the photo is read again and the meal does not hang ({was}, {settled}, {reads} then {again})',
+    )
+    await pg.evaluate('window.__ocrDelay = 0')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_recognize(browser, url):
     print('the recognition chain: known code, product lookup, server, text on the device')
     fail = {'online': False, 'server': False}  # so that each stage can be made to fail on purpose
@@ -3881,6 +4005,7 @@ run_tests(
         'shortcuts': test_shortcuts,
         'scanning': test_scan,
         'recognition': test_recognize,
+        'discard': test_discard,
         'pack-lines': test_pack_lines,
         'exchange': test_exchange,
         'crop': test_crop,

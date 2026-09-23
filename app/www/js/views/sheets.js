@@ -59,6 +59,10 @@ const servedForChips = s =>
     )
     .join('')}</div>`;
 
+/* Deleting a meal, at the end of „Wie war’s?“ and of naming a meal that has no variety yet: one tap, undone from the
+   toast, because arming is only for what cannot be undone */
+const deleteMeal = `<button class="btn quiet" data-action="delete-serving">${icon('trash')}Eintrag löschen</button>`;
+
 function viewServing() {
   const s = getServing(sheet.id);
   if (!s)
@@ -75,7 +79,7 @@ function viewServing() {
     <span class="pick"><input id="f-time" class="field" type="datetime-local" data-time="${s.id}" value="${toLocalInput(s.servedAt)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
     <label class="label" for="f-note">Notiz</label>
     <input id="f-note" class="field" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Optional, z. B. neue Packung" autocomplete="off">
-    <div class="mt"><button class="btn quiet" data-action="delete-serving">${icon('trash')}Eintrag löschen</button></div>`;
+    <div class="mt">${deleteMeal}</div>`;
 }
 
 function viewName() {
@@ -110,7 +114,7 @@ function viewName() {
     <span class="label">Art</span>
     <div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>
     ${textureChips(s)}
-    <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button></div>`;
+    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button>${serving && !serving.productId ? deleteMeal : ''}</div>`;
 }
 /* Consistency or treat type of variety x (the sheet itself while naming): single choice, for types that have one */
 function textureChips(x, note = '') {

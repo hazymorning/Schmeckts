@@ -100,7 +100,7 @@ window.Capacitor = {isNativePlatform: () => true,
       return c ? Promise.resolve({barcodes: [{rawValue: c, format: c.length === 12 ? 'UPC_A' : 'EAN_13'}]}) : Promise.reject(new Error('scan canceled.')); }},
   TextRecognition: {processImage: o => { window.__calls.push(['processImage', o ?? null]);
     if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
-    return new Promise(done => setTimeout(() => done({text: window.__ocrText || '', blocks: []}), window.__ocrDelay || 0)); }},
+    return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done({text: window.__ocrText || '', blocks: []}); }, window.__ocrDelay || 0)); }},
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
