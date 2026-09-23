@@ -1605,8 +1605,11 @@ dialog.sheet.page .sheet-body {
   display: flow-root;
 } /* the children's margins count towards the height, so the animation does not jump */
 .card-line {
-  margin: 0 0 var(--space-5);
-} /* 20 to the taste line, whose own 10 collapses into it */
+  margin: 0 0 var(--space-2h);
+}
+.card-line + .taste {
+  margin-top: var(--space-5); /* 20 to the taste line; alone, the line ends 10 above the card's foot */
+}
 .empty {
   display: flex;
   align-items: center;

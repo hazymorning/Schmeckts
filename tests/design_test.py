@@ -398,15 +398,22 @@ FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2,
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
-# recipe, which the static parse cannot see.
+# recipe, which the static parse cannot see. Every entry has to meet a visible element in the views scanned.
 INSETS = {
     '.card': '18px 18px 8px',
     '.group': '4px 16px',
-    '.row, .pend, .card-btn': '10px 0px',
-    '.box, .banner': '12px',
+    '.row': '10px 0px',
+    '.pend': '10px 0px',
+    '.card-btn': '10px 0px',
+    '.box': '12px',
+    '.banner': '12px',
     '.tile': '10px 0px 8px',
-    '.btn, .field:not(.in-row, .pick .field, .search .field)': '12px 16px',
-    '.chip, .field.in-row, .toast button, .cam-hint': '8px 16px',
+    '.btn': '12px 16px',
+    '.field:not(.in-row, .pick .field, .search .field)': '12px 16px',
+    '.chip': '8px 16px',
+    '.field.in-row': '8px 16px',
+    '.toast button': '8px 16px',
+    '.cam-hint': '8px 16px',
     '.badge:not(.ic-only)': '4px 10px',
     '.seg': '4px',
     '.seg button': '8px 6px',
@@ -414,7 +421,7 @@ INSETS = {
 FIGURES_JS = '.num, .tl-time, .pct, .cnt b, .share, .day .dn, .steps .n, .field.code'
 
 
-SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set();
+SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), met = new Set();
   const rgba = c => { const m = (c.match(/[\\d.]+/g) || []).map(Number); return [m[0] || 0, m[1] || 0, m[2] || 0, m.length > 3 ? m[3] : 1]; };
   const lum = c => { const f = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
   const probe = document.createElement('i'); probe.style.color = 'var(--faint)'; document.body.append(probe);
@@ -437,15 +444,17 @@ SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set();
     if (![12, 14, 16, 21, 30].includes(size) || !['400', '600', '650'].includes(s.fontWeight) || ![1.1, 1.25, 1.4, 1.5].includes(lead))
       bad.push(`type ${s.fontWeight} ${s.fontSize}/${s.lineHeight} ${tag}`);
     if (s.letterSpacing !== 'normal' && el.id !== 'f-code' && !(size === 30 && s.letterSpacing === '-0.45px')) bad.push(`tracking ${s.letterSpacing} ${tag}`);
-    if (el.matches(figures) && s.fontVariantNumeric !== 'tabular-nums') bad.push('proportional figures ' + tag);
+    for (const f of figures.split(', ')) if (el.matches(f)) { met.add(f); if (s.fontVariantNumeric !== 'tabular-nums') bad.push('proportional figures ' + tag); }
     if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
     if (fam === 'Faustina') { if (!el.closest(allowed)) bad.push('Faustina on ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
     else if (fam !== 'Figtree') bad.push(fam + ' on ' + tag);
   }
-  for (const [sel, pad] of Object.entries(insets)) for (const b of document.querySelectorAll(sel))
-    if (b.getClientRects().length && getComputedStyle(b).padding !== pad) bad.push(`inset ${sel} ${getComputedStyle(b).padding}`);
-  return {bad: [...new Set(bad)], seen: [...seen]}; }"""
+  for (const [sel, pad] of Object.entries(insets)) for (const b of document.querySelectorAll(sel)) {
+    if (!b.getClientRects().length) continue;
+    met.add(sel);
+    if (getComputedStyle(b).padding !== pad) bad.push(`inset ${sel} ${getComputedStyle(b).padding}`); }
+  return {bad: [...new Set(bad)], seen: [...seen], met: [...met]}; }"""
 
 
 async def test_rules(browser, url):
@@ -455,12 +464,13 @@ async def test_rules(browser, url):
         ctx = await phone(browser, scheme)
         pg, errors = await open_page(ctx, url, choose=False)
         await pg.evaluate('document.fonts.ready')
-        seen, bad = set(), []
+        seen, bad, met = set(), [], set()
 
         async def scan():
             r = await pg.evaluate(SCAN, [FAUSTINA, INSETS, FIGURES_JS])
             bad.extend(r['bad'])
             seen.update(r['seen'])
+            met.update(r['met'])
 
         await scan()  # Willkommen beim ersten Start: Wahl des Modus
         await pg.click('[data-action=mode-local]')
@@ -540,9 +550,10 @@ async def test_rules(browser, url):
         await scan()
         await pg.click('[data-action=close]')
         await idle(pg)
+        await pg.evaluate("import('./js/store.js').then(s => { for (const p of s.db.products) p.codes = {...p.codes, '4001234567890': true}; })")
         await pg.click('[data-sec=shop] [data-action=open-product]')
         await idle(pg)
-        await scan()
+        await scan()  # with a barcode
         await pg.click('[data-action=close]')
         await idle(pg)
         await pg.click('.tl [data-action=open-serving]')
@@ -573,6 +584,38 @@ async def test_rules(browser, url):
         await scan()
         await pg.click('[data-cam=cancel]')
         await idle(pg)
+        await pg.click('#sheet [data-action=close]')
+        await idle(pg)
+        await pg.click('[data-sec=hist] [data-action=open-report]')
+        await idle(pg)
+        await scan()  # „Verlauf“
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+        await pg.click('.pend .rb')
+        await pg.wait_for_selector('#toast [data-action=undo]')
+        await idle(pg)
+        await scan()  # a toast with „Rückgängig“
+        await pg.click('[data-action=open-settings]')
+        await idle(pg)
+        await pg.click('#sheet [data-action=arm][data-then=wipe]')
+        await pg.click('#sheet [data-action=arm][data-then=wipe]')
+        await idle(pg)
+        await pg.click('.welcome [data-action=add-pet]')
+        await idle(pg)
+        await pg.fill('#f-name', 'Minka')
+        await pg.click('[data-action=save-pet]')
+        await idle(pg)
+        await scan()  # the first steps
+        # Where nothing can be stored the home page says so in a banner
+        full = await phone(browser, scheme)
+        await full.add_init_script("Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };")
+        pg2, _ = await open_page(full, url, scheme, choose=False)
+        r = await pg2.evaluate(SCAN, [FAUSTINA, INSETS, FIGURES_JS])
+        bad.extend(r['bad'])
+        met.update(r['met'])
+        await full.close()
+        missed = sorted(set(INSETS) - met) + sorted(set(FIGURES_JS.split(', ')) - met)
+        check(not missed, f'the inset and figure checks met every recipe they name in the views scanned ({scheme}: {missed})')
         check(
             not bad,
             f'Figtree everywhere and Faustina only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
@@ -1225,6 +1268,7 @@ TIMERS_ALLOWED = {
     ('disk.js', '2'): 'the pause doubling',
     ('native.js', '120e3'): 'installing the scanner gives up',
     ('sync.js', '60e3'): 'the sync runs every minute',
+    ('sync.js', '400'): 'the next sync runs shortly after a save, unless the caller says when',
     ('main.js', '60000'): 'the home page is redrawn every minute, so „vor 2 Std.“ stays true',
     ('actions.js', '600'): 'a quick sync shows no spinner',
     ('actions.js', '3500'): 'an armed button disarms again',
@@ -1267,23 +1311,34 @@ def test_motion_js():
         code = re.sub(r'/\*.*?\*/', '', f.read_text(encoding='utf-8'), flags=re.S)
         code = re.sub(r'(?m)(^|[^:\'"`\\])//.*$', r'\1', code)
         bad += [f'{name}: .style.{m[1]}' for m in re.finditer(r'\.style\.(transition\w*|animation\w*)\b', code)]
+        # the same through the other ways into an inline style
+        bad += [
+            f'{name}: {m[0].strip()}'
+            for m in re.finditer(r'(?:\.style\.setProperty\(|\.style\.cssText\b|\.style\[|setAttribute\(\s*[\'"`]style)[^;\n]*', code)
+            if re.search(r'transition|animation', m[0])
+        ]
         bad += [f'{name}: {m[0]}' for m in re.finditer(r'\.animate\(|\b(?:transition|animation)(?:end|start|cancel)\b', code)]
         strings = [m[0] for m in re.finditer(r'([\'"`])(?:(?!\1)[^\\\n]|\\.)*\1', code)]
         bad += [
             f'{name}: {s}'
             for s in strings
-            if re.search(r'cubic-bezier|\bease(-in|-out|-in-out)?\b|\bsteps\(', s)
+            if re.search(r'cubic-bezier|\bease(-in|-out|-in-out)?\b|\bsteps\(|\blinear\b(?!-)', s)
             or re.search(r'\b(transition|animation)\b', s)
             and re.search(r'(?<![\w.])\d*\.?\d+m?s\b', s)
         ]
         bad += [f'{name}: fadeOutDuration without dur()' for _ in re.finditer(r'fadeOutDuration:(?!\s*dur\()', code)]
+        # dur() is read for the native splash screen's fade and nothing else: a wait reads no duration either
+        if name != 'motion.js' and len(re.findall(r'\bdur\(', code)) != len(re.findall(r'fadeOutDuration:\s*dur\(', code)):
+            bad.append(f'{name}: dur() outside the splash screen’s fade')
         consts = dict(re.findall(r'(?:\bconst\s+|\blet\s+|,\s*)([A-Za-z_]\w*)\s*=\s*([^,;\n]+)', code))
+        for k, v in re.findall(r'[(,]\s*([A-Za-z_]\w*)\s*=\s*(\d[\d_.e]*)\s*[,)]', code):  # a parameter's default
+            consts.setdefault(k, v)
         for arg in js_delays(code):
             expr = arg
             for _ in range(2):
                 expr = re.sub(r'\b[A-Za-z_]\w*\b', lambda m: consts.get(m[0], m[0]), expr)
-            if 'dur(' in expr:
-                continue
+            if re.fullmatch(r'[A-Za-z_]\w*', expr.strip()) and (name, arg) not in TIMERS_ALLOWED:
+                bad.append(f'{name}: waits {arg}, which says nothing of how long')
             for n in re.findall(r'(?<![\w.])\d[\d_]*(?:\.\d+)?(?:e\d+)?', expr):
                 if float(n.replace('_', '')) and (name, n) not in TIMERS_ALLOWED:
                     bad.append(f'{name}: waits {arg} = {n}')
