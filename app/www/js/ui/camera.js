@@ -2,6 +2,8 @@
    throws without a camera or the permission: the caller then falls back to the camera app. */
 import {$} from '../dom.js';
 import {esc} from '../text.js';
+import {darkBars} from './theme.js';
+import {dropViewer} from './viewer.js';
 
 const WANT = {audio: false, video: {facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080}}};
 let close = null; // closes the open camera, null when closed
@@ -20,7 +22,9 @@ export async function openCamera(hint) {
     video = $('video', dlg);
   $('.cam-hint', dlg).innerHTML = esc(hint);
   video.srcObject = stream;
+  dropViewer();
   dlg.showModal();
+  darkBars(true);
   return new Promise(resolve => {
     const hidden = () => {
       if (document.hidden) close(null);
@@ -33,6 +37,7 @@ export async function openCamera(hint) {
       dlg.removeEventListener('cancel', cancel);
       document.removeEventListener('visibilitychange', hidden);
       dlg.close();
+      darkBars(false);
       resolve(blob);
     };
     const shoot = () => {

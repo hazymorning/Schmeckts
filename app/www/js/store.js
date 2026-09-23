@@ -97,6 +97,7 @@ export let db = defaults(),
 export const state = tidyState(null);
 export let revision = 0; // counts every change to the data; derive.js then recomputes the evaluation
 export let loadError = null; // stored data present but unreadable: nothing is written then
+export let dbFound = false; // db.json was there and read: only then may what is missing from it be tidied away
 let snap = Object.fromEntries(COLLECTIONS.map(c => [c, new Map()]));
 
 /* For the evaluation (derive.js): varieties whose meals have changed (null: all), and the earliest serving time
@@ -167,6 +168,7 @@ const sortServings = () => db.servings.sort((a, b) => b.servedAt - a.servedAt);
 
 async function load() {
   const [d, p, s, q] = await Promise.all(['db', 'prefs', 'sync', 'queue'].map(read));
+  dbFound = d != null;
   db = tidy(d);
   prefs = tidyPrefs(p);
   Object.assign(state, tidyState(s));

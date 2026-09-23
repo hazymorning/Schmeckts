@@ -1,6 +1,7 @@
 /* Rating, naming and deleting meals and food varieties, and removing a variety's barcodes. */
 import {haptic} from '../native.js';
 import {RATINGS} from '../config.js';
+import {settled} from '../motion.js';
 import {hasLine, withLine, withoutLine} from '../ocr.js';
 import {db, save} from '../store.js';
 import {byMe, findProduct, getPet, getProduct, getServing, pname} from '../derive.js';
@@ -8,13 +9,7 @@ import {toast} from '../ui/toast.js';
 import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
-import {refinePets, serveProduct} from './feeding.js';
-
-/* The rating is stored and felt on the tap; the interface follows after these delays, so the button animation is
-   not cut off. PICKED is the length of that animation in app.css. */
-const PICKED = 220,
-  SHEET_CLOSES = 260,
-  CARD_LEAVES = 440;
+import {refinePets, retryNow, serveProduct} from './feeding.js';
 
 export function rate(el) {
   const s = getServing(el.dataset.s),
@@ -41,18 +36,22 @@ const undoRating = (sid, pid, prev) => () => {
   if (sheet?.kind === 'serving' && sheet.id === sid) renderSheet();
 };
 
+/* The rating is stored and felt on the tap; the interface follows once the button's pop, or the card's fold, has
+   run, so neither is cut off */
 function showRated(el, s, pid, msg, undo) {
   const rated = () => Object.values(s.pets).every(x => x.r);
   if (sheet?.kind === 'serving') {
     // In the sheet: with the last open rating it closes, otherwise it shows the new state
     if (rated()) {
-      setTimeout(() => closeSheet().then(() => afterRating(msg, undo)), SHEET_CLOSES);
+      settled(el)
+        .then(() => closeSheet())
+        .then(() => afterRating(msg, undo));
       return;
     }
-    setTimeout(() => {
+    settled(el).then(() => {
       renderSheet();
       update();
-    }, PICKED);
+    });
     toast(msg, undo);
     return;
   }
@@ -60,7 +59,7 @@ function showRated(el, s, pid, msg, undo) {
   const li = el.closest('.pend'),
     gone = li && rated();
   if (gone) li.classList.add('leaving');
-  setTimeout(() => afterRating(msg, undo), gone ? CARD_LEAVES : PICKED);
+  settled(gone ? li : el).then(() => afterRating(msg, undo));
 }
 function afterRating(msg, undo) {
   update();
@@ -180,6 +179,8 @@ export function deleteServing(id) {
       db.servings.sort((a, b) => b.servedAt - a.servedAt);
       save();
       update();
+      // Deleted while the photo was being read: that result was dropped meanwhile, so it is read again
+      if (!s.productId && (s.status === 'reading' || s.status === 'recognizing')) retryNow(s.id);
     });
   });
 }

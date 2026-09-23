@@ -1,14 +1,16 @@
 /* Every click runs through data-action and the ACTIONS object. Plus input, the keyboard, the file picker
    and the deep links schmeckts://feed, schmeckts://scan and schmeckts://photo. Registers itself as it loads. */
-import {$, reduceMotion} from './dom.js';
+import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
 import {db, prefs, save, savePrefs} from './store.js';
 import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
+import {forgetPhoto, photoSrc} from './photos.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
+import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {expandCard, toggleOverview, update} from './views/home.js';
 import {jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
@@ -188,6 +190,16 @@ const ACTIONS = {
   },
   rate(el) {
     rate(el);
+  },
+  // The packaging photo, large, grown out of its thumbnail. A file that can no longer be read is let go.
+  async 'view-photo'(el) {
+    const s = getServing(el.dataset.s),
+      p = getProduct(el.dataset.p);
+    if ((await openViewer(() => photoSrc(s, p), el)) !== false) return; // open, or already opening
+    if (p) forgetPhoto(p.id);
+    toast('Das Foto ist nicht mehr da.');
+    if (sheet) renderSheet();
+    else update(); // the thumbnail is a plain one again
   },
   'open-serving'(el) {
     const s = getServing(el.dataset.id);
@@ -385,12 +397,9 @@ const ACTIONS = {
     toggleOverview();
   }, // the overview's full text and back
   'jump-day'(el) {
-    const key = el.dataset.day;
     haptic('select');
-    if (sheet?.kind === 'report') return jumpToDay(key); // the calendar of the history page scrolls within it
-    const target = document.getElementById('d-' + key);
-    if (target) target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start'});
-    else openSheet(reportState('d-' + key)); // further back than the home page shows: the history page opens there
+    if (sheet?.kind === 'report') return jumpToDay(el.dataset.day); // the page's own calendar scrolls within it
+    openSheet(reportState('d-' + el.dataset.day)); // the home page shows only the current day: the history page opens there
   },
   undo() {
     const u = toastUndo;

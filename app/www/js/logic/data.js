@@ -7,6 +7,7 @@ import {DEMO, RATINGS} from '../config.js';
 import {db, defaults, prefs, purge, replaceDb, save, savePrefs, tidy} from '../store.js';
 import {isConnected} from '../sync.js';
 import {petMap} from '../derive.js';
+import {sweepPhotos} from '../photos.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
@@ -15,6 +16,7 @@ import {newProduct} from './products.js';
 export function wipe() {
   const house = isConnected();
   replaceDb(defaults());
+  sweepPhotos(new Set());
   prefs.lastPets = [];
   prefs.activePet = 'all';
   save();

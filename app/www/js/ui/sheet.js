@@ -4,23 +4,31 @@
    same dialog, because a page is a sheet that fills the screen and moves sideways.
    What either of them contains is registered by the views through setSheetView(). */
 import {$, reduceMotion} from '../dom.js';
+import {settled} from '../motion.js';
+import {dropViewer} from './viewer.js';
 
 export const dlg = $('#sheet'),
   sheetBody = $('#sheetBody');
 export let sheet = null; // the state of what is open, null when closed
 /* The settings with everything below them, and the history, are a page; everything else is a sheet. */
 export const isPage = state => state?.kind === 'settings' || state?.kind === 'report';
-const PAGE_OUT = 300,
-  SHEET_OUT = 240;
 let viewKey = '',
   depth = 0, // history entries of our own: one per level
   pageKeys = [], // what openPage() put on the state, taken off again on the way back
   closing = null;
 
-/* The upper edge of a sheet: while its contents are scrolled, the top few pixels fade out, so a line does not
-   end abruptly under the grip. A page has no grip and its bar stays at the top instead, so nothing fades there. */
-const markSheetScrolled = () => sheetBody.classList.toggle('scrolled', !isPage(sheet) && sheetBody.scrollTop > 0);
-sheetBody.addEventListener('scroll', markSheetScrolled, {passive: true});
+/* The top edge of what is open (PROJECT.md, „Building blocks“, scroll edge): .scrolled while anything lies under
+   the grip or the bar; on a page .titled once its title has gone under the bar, which then shows it. On the dialog,
+   because the grip is outside the scroll box. Reads first, then writes. */
+const markEdge = () => {
+  const y = sheetBody.scrollTop,
+    bar = isPage(sheet) ? sheetBody.querySelector(':scope > .page-bar') : null,
+    title = bar?.nextElementSibling,
+    titled = !!title && y > 0 && y + bar.offsetHeight >= title.offsetTop + title.offsetHeight;
+  dlg.classList.toggle('scrolled', y > 0);
+  dlg.classList.toggle('titled', titled);
+};
+sheetBody.addEventListener('scroll', markEdge, {passive: true});
 
 export function openSheet(state) {
   sheet = state;
@@ -29,13 +37,13 @@ export function openSheet(state) {
   dlg.classList.toggle('page', isPage(state));
   renderSheet();
   if (!dlg.open) {
-    dlg.classList.remove('closing');
+    dropViewer(); // a link or a notification: the sheet takes the screen, not a photo under it
+    dlg.classList.remove('closing', 'dragging');
     dlg.style.transform = '';
-    dlg.style.transition = '';
     dlg.showModal();
     document.body.classList.add('locked');
     sheetBody.scrollTop = 0; // the browser would otherwise remember the last sheet's scroll position
-    markSheetScrolled();
+    markEdge();
     depth = 0;
     push();
     if (state.page) push(); // opened straight on a page below, so back leads to the overview first
@@ -86,12 +94,16 @@ export function renderSheet() {
   const key = `${sheet.kind}:${sheet.page || ''}:${sheet.step || ''}:${sheet.id || ''}`;
   const how = sheet.slide;
   sheet.slide = null;
-  if (key === viewKey) return drawView(sheet); // a change inside the level that is open
+  if (key === viewKey) {
+    drawView(sheet); // a change inside the level that is open
+    return markEdge();
+  }
   const swap = () => {
+    dlg.classList.remove('scrolled', 'titled'); // the new level arrives at rest, not fading out of the old one's edge
     drawView(sheet);
     viewKey = key;
     sheetBody.scrollTop = 0;
-    markSheetScrolled();
+    markEdge();
     sheetBody.classList.remove('swap-in');
   };
   // While it opens, its own entrance covers the change
@@ -127,21 +139,14 @@ export function closeSheet(fromPop = false) {
   depth = 0;
   const popped = levels ? new Promise(resolve => addEventListener('popstate', resolve, {once: true})) : null;
   if (popped) history.go(-levels);
-  const out = isPage(sheet) ? PAGE_OUT : SHEET_OUT;
-  const hidden = reduceMotion.matches
-    ? Promise.resolve()
-    : new Promise(resolve => {
-        dlg.classList.add('closing');
-        setTimeout(resolve, out);
-      });
+  const hidden = reduceMotion.matches ? Promise.resolve() : (dlg.classList.add('closing'), settled(dlg));
   closing = Promise.all([
     popped,
     hidden.then(() => {
-      dlg.classList.remove('closing', 'page');
+      dlg.classList.remove('closing', 'page', 'dragging');
       dlg.style.transform = '';
-      dlg.style.transition = '';
       sheetBody.scrollTop = 0;
-      markSheetScrolled();
+      markEdge();
       dlg.close();
       sheet = null;
       viewKey = '';
@@ -189,7 +194,7 @@ dlg.addEventListener('click', e => {
     startY = e.clientY;
     dy = 0;
     t0 = performance.now();
-    dlg.style.transition = 'none';
+    dlg.classList.add('dragging');
     try {
       dlg.setPointerCapture(e.pointerId);
     } catch {
@@ -204,12 +209,10 @@ dlg.addEventListener('click', e => {
   const end = () => {
     if (!dragging) return;
     dragging = false;
+    dlg.classList.remove('dragging');
     const v = dy / Math.max(1, performance.now() - t0);
     if (dy > 110 || (v > 0.5 && dy > 24)) closeSheet();
-    else {
-      dlg.style.transition = 'transform .4s cubic-bezier(.22,1,.36,1)';
-      dlg.style.transform = '';
-    }
+    else dlg.style.transform = ''; // back into place: dialog.sheet's transition in app.css
   };
   dlg.addEventListener('pointerup', end);
   dlg.addEventListener('pointercancel', end);

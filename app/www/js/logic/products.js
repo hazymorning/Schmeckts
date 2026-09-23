@@ -3,10 +3,12 @@
    recognised variety disappears together with its code. */
 import {uid} from '../fields.js';
 import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
-import {db, save} from '../store.js';
+import {db, dbFound, loadError, save} from '../store.js';
+import {setAside} from '../disk.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {memPhotos} from '../images.js';
+import {keepPhoto, passPhoto, photoFrom, sweepPhotos} from '../photos.js';
 import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 
@@ -85,6 +87,7 @@ export function linkProduct(s, p) {
   s.productId = p.id;
   p.lastPets = Object.keys(s.pets);
   if (s.scanCode) (p.codes ||= {})[s.scanCode] = true;
+  keepPhoto(p.id, memPhotos.get(s.id) || s.photo?.split(',')[1], s.id); // the meal's photo becomes the variety's
   delete s.photo;
   delete s.thumb;
   delete s.status;
@@ -93,9 +96,18 @@ export function linkProduct(s, p) {
   delete s.guess;
   memPhotos.delete(s.id);
   memLines.delete(s.id);
-  if (prev && prev !== p.id) cleanupProduct(prev);
+  if (prev && prev !== p.id) {
+    // Corrected: the photo goes along when it came from this meal or its variety is left without a meal, and so
+    // does the thumbnail in the second case
+    const last = !db.servings.some(x => x.productId === prev),
+      was = getProduct(prev);
+    if (last && !p.thumb && was?.thumb) p.thumb = was.thumb;
+    if (last || photoFrom(prev) === s.id) passPhoto(prev, p.id);
+    cleanupProduct(prev);
+  }
 }
 export function mergeProducts(from, into) {
+  passPhoto(from.id, into.id);
   db.servings.forEach(s => {
     if (s.productId === from.id) s.productId = into.id;
   });
@@ -103,4 +115,24 @@ export function mergeProducts(from, into) {
   Object.assign((into.codes ||= {}), from.codes); // the barcodes come along
   applyTexture(into, {texture: from.texture});
   db.products = db.products.filter(p => p.id !== from.id);
+}
+
+/* A change from another phone moved meals from a variety that is gone to another one (merged or corrected there):
+   the photo follows them, since the next start would otherwise tidy it away with the old variety. Run at start,
+   after every save here and after every change from elsewhere, so it always knows the step before. */
+let owners = new Map(); // meal → its variety, as of the last look
+export function followPhotos() {
+  for (const s of db.servings) {
+    const was = owners.get(s.id);
+    if (was && s.productId && was !== s.productId && !getProduct(was)) passPhoto(was, s.productId);
+  }
+  owners = new Map(db.servings.map(s => [s.id, s.productId]));
+}
+
+/* At start: the photos of varieties that are gone (deleted here or elsewhere) go too. Not while the stored data
+   could not be read, nor while a data file that could not be read lies set aside: until it is restored, the
+   varieties it holds may come back, so a broken db.json never takes the photos with it. */
+export async function tidyPhotos() {
+  if (loadError || !dbFound || (await setAside())) return;
+  sweepPhotos(new Set([...db.products.map(p => p.id), ...db.servings.map(s => s.productId).filter(Boolean)]));
 }

@@ -69,7 +69,9 @@ const Filesystem = {
     if (v == null) return missing(); localStorage.setItem(key(to), v); localStorage.removeItem(key(from)); return Promise.resolve(); },
   deleteFile: ({path, directory}) => { window.__calls.push(['deleteFile', {path, directory}]); localStorage.removeItem(key(path));
     window.__cache = (window.__cache || []).filter(n => n !== path); return Promise.resolve(); },
-  readdir: ({directory}) => Promise.resolve({files: directory === 'CACHE' ? (window.__cache || []).map(name => ({name})) : []}),
+  readdir: ({path, directory}) => { const at = key(path ? path + '/' : '');
+    return Promise.resolve({files: directory === 'CACHE' ? (window.__cache || []).map(name => ({name}))
+      : Object.keys(localStorage).filter(k => k.startsWith(at) && !k.slice(at.length).includes('/')).map(k => ({name: k.slice(at.length)}))}); },
   stat: ({path}) => localStorage.getItem(key(path)) == null ? missing() : Promise.resolve({type: 'file'})
 };
 window.Capacitor = {isNativePlatform: () => true,
@@ -100,7 +102,7 @@ window.Capacitor = {isNativePlatform: () => true,
       return c ? Promise.resolve({barcodes: [{rawValue: c, format: c.length === 12 ? 'UPC_A' : 'EAN_13'}]}) : Promise.reject(new Error('scan canceled.')); }},
   TextRecognition: {processImage: o => { window.__calls.push(['processImage', o ?? null]);
     if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
-    return new Promise(done => setTimeout(() => done({text: window.__ocrText || '', blocks: []}), window.__ocrDelay || 0)); }},
+    return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done({text: window.__ocrText || '', blocks: []}); }, window.__ocrDelay || 0)); }},
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
@@ -112,10 +114,13 @@ new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadR
   .observe({type: 'layout-shift', buffered: true});
 """
 
-# Android's system font size, simulated: it multiplies every font size the app sets. This re-declares every px
-# font size from the style sheets, scaled, as !important.
-BIG_TEXT = """k => { const s = document.createElement('style');
-  s.textContent = [...document.styleSheets].flatMap(x => [...x.cssRules])
+# Android's system font size, simulated: it multiplies every font size the app sets. This re-declares the text
+# styles (--type-*) and every px font size from the style sheets, scaled, as !important.
+BIG_TEXT = """k => { const s = document.createElement('style'), rules = [...document.styleSheets].flatMap(x => [...x.cssRules]);
+  const px = v => v.replace(/([\\d.]+)px/g, (_, n) => `${(parseFloat(n) * k).toFixed(2)}px`);
+  const types = rules.filter(r => r.selectorText === ':root').flatMap(r => [...r.style].filter(p => p.startsWith('--type-'))
+    .map(p => `${p}:${px(r.style.getPropertyValue(p))} !important`));
+  s.textContent = `:root{${types.join(';')}}` + rules
     .filter(r => r.style && r.style.fontSize && r.style.fontSize.endsWith('px'))
     .map(r => `${r.selectorText}{font-size:${(parseFloat(r.style.fontSize) * k).toFixed(2)}px !important}`).join('');
   document.head.append(s); }"""

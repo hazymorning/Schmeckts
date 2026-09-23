@@ -98,7 +98,9 @@ async def test_tour(browser, url, scheme='light'):
     check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'shopping unfolded: every variety')
     await pg.click('[data-action=expand][data-v=ins]')
     await idle(pg)
-    check(await pg.locator('[data-sec=hist] .tl-item').count() == 5, 'the history shows five meals')
+    current = await pg.evaluate(CURRENT)
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
+    check(shown == current and len(shown) >= 1, f'the history shows the meals of the current day ({len(shown)})')
     await shot(pg, f'{scheme}-unfolded')
     await settings(pg)
     other = 'dark' if scheme == 'light' else 'light'
@@ -349,15 +351,15 @@ async def test_cards(browser, url):
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]')
     await idle(pg)
-    # History: the calendar and the last five meals, grouped by day
-    recent = await pg.evaluate("import('./js/store.js').then(s => s.db.servings.slice(0, 5).map(x => x.id))")
+    # History: the calendar and the meals of the current day
+    current = await pg.evaluate(CURRENT)
     shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
     check(
         await pg.locator('[data-sec=hist] .cal').is_visible()
         and await pg.locator('[data-sec=hist] .tl-node').first.is_visible()
-        and shown == recent
-        and await pg.locator('[data-sec=hist] .tl-day').count() >= 2,
-        f'history: the calendar and the last five meals by day ({len(shown)})',
+        and shown == current
+        and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
+        f'history: the calendar and the meals of the current day ({len(shown)})',
     )
     # Shopping folded up: up to 3 to buy again, below them up to 2 no longer bought
     groups = """import('./js/derive.js').then(d => { const m = d.model(), g = e => e.choice === 'gemischt' ? 'nachkaufen' : e.choice, shown = m.sorts.filter(e => e.n || e.kaufen);
@@ -377,13 +379,17 @@ async def test_cards(browser, url):
         and shop['btn'] == [['Alle anzeigen', 'expand', True, 'false']],
         f'shopping folded up: up to 3 to buy again, up to 2 no longer, „Alle anzeigen“ at the end ({shop["ids"]})',
     )
-    # Keyboard: Enter eases it open (220 ms), the focus stays on the button, space folds it shut
+    # Keyboard: Enter eases it open (--dur-step), the focus stays on the button, space folds it shut
     await pg.focus('[data-sec=shop] [data-action=expand]')
     await pg.keyboard.press('Enter')
     anim = await pg.eval_on_selector(
-        '[data-sec=shop] .card-body', 'b => [b.classList.contains("animating"), b.style.height !== "", b.style.transition]'
+        '[data-sec=shop] .card-body',
+        'b => [b.classList.contains("animating"), b.style.height !== "", b.style.transition, getComputedStyle(b).transitionDuration, getComputedStyle(b).transitionTimingFunction]',
     )
-    check(anim[0] and anim[1] and '0.22s' in anim[2] and 'ease-out' in anim[2], f'the card eases open ({anim[2]})')
+    check(
+        anim[0] and anim[1] and anim[2] == '' and anim[3] == '0.3s' and anim[4] == 'cubic-bezier(0.22, 1, 0.36, 1)',
+        f'the card eases open ({anim[2:]})',
+    )
     await idle(pg)
     shop = await pg.eval_on_selector('[data-sec=shop]', SHOP)
     parts = [(t_, ids) for t_, ids in (('Nachkaufen', m['ja']), ('Beobachten', m['offen']), ('Nicht mehr kaufen', m['nein'])) if ids]
@@ -706,8 +712,9 @@ SCALES_DB = """() => import('./js/store.js').then(async s => { const d = s.defau
 
 async def test_scales(browser, url):
     print('rating per food type: the variety\u2019s scale, four columns at 360 px, a foreign level stays visible, counters in the food sheet')
-    ctx = await phone(browser, width=360, height=800)
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-10T23:30:00+02:00')  # all six meals on one day, so the home page shows them
     await pg.evaluate(SCALES_DB)
     await idle(pg)
     ROW = """row => [...row.children].map(b => { const r = b.getBoundingClientRect(), lines = [...b.querySelectorAll('span, small')];
@@ -821,7 +828,7 @@ async def test_texture(browser, url):
             'labels': ['In Soße', 'In Gelee', 'Pastete', 'Mousse', 'Fester Block', 'Suppe'],
             'on': [],
             'fits': True,
-            'under': 'prod-card',
+            'under': 'box prod-card',
             'note': '',
         },
         f'food sheet, wet food: „Konsistenz“ with six chips under the type, never mandatory, nothing clipped at 360 px ({c})',
@@ -1051,7 +1058,7 @@ async def test_overview(browser, url):
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
     SLIDE = """() => new Promise(done => { const c = document.querySelector('.overview'), p = c.querySelector('p'), h = [p.offsetHeight]; c.click();
-      setTimeout(() => h.push(p.getBoundingClientRect().height, p.classList.contains('animating')), 110);
+      setTimeout(() => h.push(p.getBoundingClientRect().height, p.classList.contains('animating')), 50);
       setTimeout(() => { h.push(p.offsetHeight, p.classList.contains('animating'), p.style.height, p.style.transition); done(h); }, 450); })"""
     up, down = await pg.evaluate(SLIDE), await pg.evaluate(SLIDE)
     check(
@@ -2128,6 +2135,130 @@ OFF_HIT = {
 }
 
 
+# The buttons at the end of the sheet: their text, classes, action and where they stand
+END_BUTTONS = """() => [...document.querySelectorAll('#sheet .mt > .btn')].map(b => [b.innerText.trim(), b.className, b.dataset.action,
+  Math.round(b.getBoundingClientRect().top), Math.round(b.getBoundingClientRect().bottom)])"""
+
+
+async def test_discard(browser, url):
+    print('a meal broken off after the photo can be deleted while naming, with undo')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    async def photo():
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await until(pg, "db.servings[0]?.status === 'noserver'")
+        await idle(pg)
+
+    await photo()
+    ends = await pg.evaluate(END_BUTTONS)
+    check(
+        [e[:3] for e in ends] == [['Speichern', 'btn primary', 'save-name'], ['Eintrag löschen', 'btn quiet', 'delete-serving']]
+        and ends[1][3] >= ends[0][4] + 8,
+        f'naming a meal without a variety ends with „Speichern“ and „Eintrag löschen“ under it ({[e[:2] for e in ends]})',
+    )
+    await pg.evaluate('window.__calls.length = 0')
+    await pg.click('#sheet [data-action=delete-serving]')
+    await idle(pg)
+    gone = [
+        await pg.evaluate("document.getElementById('sheet').open"),
+        await state(pg, 'db.servings.length'),
+        await pg.locator('.pend').count(),
+        (await pg.inner_text('#toast')).split('\n')[0],
+        await pg.locator('#toast [data-action=undo]').count(),
+        await pg.evaluate("window.__calls.filter(c => c[0] === 'impact').map(c => c[1].style)"),
+    ]
+    check(gone == [False, 0, 0, 'Eintrag gelöscht', 1, ['HEAVY']], f'one tap deletes it, the sheet closes, the toast offers undo ({gone})')
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    back = await state(pg, '(s => [db.servings.length, s.productId ?? null, s.status, !!s.photo, !!s.thumb])(db.servings[0])')
+    await pg.click('.pend-head')
+    await idle(pg)
+    again = [e[0] for e in await pg.evaluate(END_BUTTONS)]
+    check(
+        back == [1, None, 'noserver', True, True] and again == ['Speichern', 'Eintrag löschen'],
+        f'undo brings the meal back with its photo, still to be named ({back}, {again})',
+    )
+
+    # Where there is nothing to delete, or the meal sheet ends with it anyway, naming does not offer it
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    renamed = await pg.locator('#sheet [data-action=delete-serving]').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.click('#sheet [data-action=new-product]')
+    await idle(pg)
+    typed = await pg.locator('#sheet [data-action=delete-serving]').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => (await import('./js/ui/sheet.js')).openSheet({kind: 'product', id: s.db.products[0].id}))"
+    )
+    await idle(pg)
+    await pg.click('#sheet [data-action=rename-product]')
+    await idle(pg)
+    product = await pg.locator('#sheet [data-action=delete-serving]').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(
+        [renamed, typed, product] == [0, 0, 0],
+        f'not while changing a named meal, typing a new one or renaming a variety ({[renamed, typed, product]})',
+    )
+
+    # The owner's way: an unknown barcode, the photo of the front, then broken off
+    before = await state(pg, '[db.products.length, db.servings.length]')
+    await pg.evaluate(f"window.__barcode = '{SHEBA}'; window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.click('#sheet [data-action=scan]')
+    await until(pg, "db.servings[0]?.scanCode && db.servings[0].status === 'noserver'")
+    await idle(pg)
+    await pg.click('#sheet [data-action=delete-serving]')
+    await idle(pg)
+    after = await state(pg, f"[db.products.length, db.servings.length, db.products.some(p => p.codes?.['{SHEBA}'])]")
+    check(after == before + [False], f'after the scanner too: the meal goes, and no variety got the code ({before}, {after})')
+
+    # Deleted while the phone was still reading the photo: undo reads it again instead of hanging
+    await pg.evaluate('window.__ocrDelay = 1500; window.__ocrDone = 0')
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'reading'")
+    reads = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    was = await pg.evaluate(  # read and tap in one go, so the reading cannot finish in between
+        """import('./js/store.js').then(s => { const was = s.db.servings[0].status;
+          document.querySelector('#sheet [data-action=delete-serving]').click(); return was; })"""
+    )
+    await pg.wait_for_function('window.__ocrDone >= 1')
+    await pg.click('#toast [data-action=undo]')
+    settled = await until(pg, "db.servings[0]?.status === 'noserver'", timeout=4)
+    again = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    check(
+        was == 'reading' and settled and again == reads + 1,
+        f'undone while reading: the photo is read again and the meal does not hang ({was}, {settled}, {reads} then {again})',
+    )
+    await pg.evaluate('window.__ocrDelay = 0')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_recognize(browser, url):
     print('the recognition chain: known code, product lookup, server, text on the device')
     fail = {'online': False, 'server': False}  # so that each stage can be made to fail on purpose
@@ -2850,6 +2981,10 @@ async def test_mood(browser, url):
     check(old == [True, False], f'the 1.1.0 setting is carried over: „Übersicht“ becomes on and „Aus“ stays off ({old})')
 
 
+# The status bar icons asked for, in order: DARK means light icons for a dark ground
+BARS = "window.__calls.filter(c => c[0] === 'setStyle').map(c => c[1].style)"
+
+
 async def test_camera(browser, url):
     print('our own camera (simulated device)')
     CAM = """() => { const d = document.getElementById('camera'), v = d.querySelector('video'), r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
@@ -2920,13 +3055,15 @@ async def test_camera(browser, url):
         await pg.click('#sheet [data-action=photo]')
         await pg.wait_for_function("document.querySelector('#camera video').videoWidth > 0")
         await idle(pg)
-        was = await pg.evaluate(f"[document.getElementById('camera').open, {LIVE}]")
+        was = await pg.evaluate(f"[document.getElementById('camera').open, {LIVE}, {BARS}.at(-1)]")
         await pg.evaluate(act)
         await idle(pg)
-        now = await pg.evaluate(f"import('./js/ui/sheet.js').then(m => [document.getElementById('camera').open, {LIVE}, m.sheet?.kind])")
+        now = await pg.evaluate(
+            f"import('./js/ui/sheet.js').then(m => [document.getElementById('camera').open, {LIVE}, m.sheet?.kind, {BARS}.at(-1)])"
+        )
         check(
-            was == [True, 1] and now == [False, 0, 'feed'] and await state(pg, 'db.servings.length') == 1,
-            f'{how}: the camera closes and is released at once, nothing is served and the feeding sheet stays ({now})',
+            was == [True, 1, 'DARK'] and now == [False, 0, 'feed', 'DEFAULT'] and await state(pg, 'db.servings.length') == 1,
+            f'{how}: the camera closes and is released at once, nothing is served and the feeding sheet stays; light status bar icons only while it is open ({was}, {now})',
         )
         await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeSheet())")
         await idle(pg)
@@ -3007,6 +3144,477 @@ async def test_no_camera(browser, url):
         chooser.element is not None and not await pg.evaluate("document.getElementById('camera').open"),
         'with no camera: the file picker in the browser',
     )
+    await ctx.close()
+
+
+# The status bar inset, set before the page is built: Chromium does not redo an env() fallback afterwards
+INSET = """addEventListener('DOMContentLoaded', () => { const s = document.createElement('style');
+  s.textContent = ':root{--safe-area-inset-top:24px}'; document.head.append(s); })"""
+VIEWER = """() => { const d = document.getElementById('viewer'), i = d.querySelector('img'), x = d.querySelector('.icon-btn'),
+  r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
+  return [d.open, i.naturalWidth, r(i), r(x), x.getAttribute('aria-label'), getComputedStyle(d).backgroundColor]; }"""
+PHOTO_FILES = "Object.keys(localStorage).filter(k => k.startsWith('__fs:photos/')).sort()"
+# What a view transition moves while a photo opens or closes, collected while it runs (as PAGE_STEP does)
+ZOOM = """async sel => { const seen = new Map();
+  const watch = setInterval(() => { for (const a of document.getAnimations()) { const p = a.effect?.pseudoElement || '';
+    if (/^::view-transition-(old|new|group)\\(/.test(p) && !seen.has(p))
+      seen.set(p, [p.slice('::view-transition-'.length).replace('(', ' ').replace(')', ''), a.animationName,
+        a.effect.getComputedTiming().duration]); } }, 16);
+  document.querySelector(sel).click();
+  await new Promise(done => setTimeout(done, 600));
+  clearInterval(watch);
+  return [...seen.values()].sort(); }"""
+# Whatever is left of a step afterwards: the class on <html> and the names in the style attributes
+ZOOM_LEFT = """() => [document.documentElement.classList.contains('zoom'),
+  [...document.querySelectorAll('.photo-btn img, #viewer, #viewer img')].filter(e => e.style.viewTransitionName).map(e => e.id || e.className)]"""
+
+
+# How wide the photo kept for a variety is
+FILE_WIDTH = """path => new Promise(done => { const i = new Image(); i.onload = () => done(i.naturalWidth); i.onerror = () => done(0);
+  i.src = 'data:image/jpeg;base64,' + localStorage.getItem('__fs:' + path); })"""
+# A change from another phone, as the sync delivers it: [collection, id, {field: value}]
+REMOTE = """list => import('./js/store.js').then(m => { const t = String(Date.now()).padStart(13, '0') + '-0000-fremd';
+  m.merge(list.map(([c, r, f]) => ({c, r, f: Object.fromEntries(Object.entries(f).map(([k, v]) => [k, {v, t}]))}))); })"""
+
+
+def large_pack():
+    """The packaging photo at 1600 px, wider than the 1100 px the phone keeps: shows which size ended up where"""
+    from PIL import Image
+
+    f = PACK.parent / 'package-large.jpg'
+    if not f.exists():
+        Image.open(PACK).resize((1600, 1200)).save(f, quality=85)
+    return str(f)
+
+
+async def viewed(pg, sel):
+    """Taps a photo and waits until the viewer stands open"""
+    await pg.click(sel)
+    await pg.wait_for_function("document.getElementById('viewer').open")
+    await idle(pg)
+
+
+async def closed(pg):
+    await pg.wait_for_function("!document.getElementById('viewer').open")
+    await idle(pg)
+
+
+async def test_photo_viewer(browser, url):
+    print('the packaging photo opens large where one meal or one variety is the subject')
+    big = large_pack()
+    ctx = await phone(browser)
+    await ctx.add_init_script(INSET)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', big)
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    btn = await pg.evaluate(
+        """() => { const b = document.querySelector('#sheet .photo-btn'), body = document.getElementById('sheetBody'), s = getComputedStyle(body);
+          if (!b) return null; const r = b.getBoundingClientRect();
+          return [!!b.querySelector(':scope > .name-photo'), Math.round(r.width) === Math.round(body.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight)),
+            r.height >= 48, getComputedStyle(b).borderRadius, b.getAttribute('aria-label')]; }"""
+    )
+    check(
+        btn == [True, True, True, '24px', 'Foto vergrößern'], f'naming: the photo is a button, as wide as the sheet and as round as the photo ({btn})'
+    )
+    await pg.evaluate('window.__calls.length = 0')
+    await viewed(pg, '#sheet .photo-btn')
+    v = await pg.evaluate(VIEWER)
+    under = await pg.evaluate("document.getElementById('sheet').open")
+    check(
+        v == [True, 1100, [0, 292, 400, 300], [348, 28, 48, 48], 'Schließen', 'rgb(27, 28, 23)'] and under and await pg.evaluate(BARS) == ['DARK'],
+        f'a tap opens it over the sheet: the large photo whole and full width between two bars, the X at the top right, dark with light status bar icons ({v})',
+    )
+    await shot(pg, 'photo-viewer')
+
+    # Back closes only the viewer; a tap on it and Escape close it too
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await viewed(pg, '#sheet .photo-btn')
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await closed(pg)
+    kept = await pg.evaluate(
+        "import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.step, document.getElementById('f-brand').value])"
+    )
+    check(
+        kept == [True, 'name', 'Sheba'] and (await pg.evaluate(BARS))[-1] != 'DARK',
+        f'back closes the viewer and nothing else: naming stays with what was typed, the status bar follows the theme again ({kept})',
+    )
+    await viewed(pg, '#sheet .photo-btn')
+    await pg.keyboard.press('Escape')
+    await closed(pg)
+    check(await pg.evaluate("document.getElementById('sheet').open"), 'Escape closes the viewer and leaves the sheet open')
+
+    # On the home card the thumbnail opens the photo, the rest of the head the meal
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    thumb = await pg.eval_on_selector(
+        '.pend .pend-top > .photo-btn',
+        'b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), getComputedStyle(b).borderRadius]; }',
+    )
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    over = await pg.evaluate("[document.getElementById('viewer').open, document.getElementById('sheet').open]")
+    await pg.click('#viewer .icon-btn')
+    await closed(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    title = await pg.inner_text('#sheet .sh-head h2')
+    check(
+        thumb == [48, 48, '12px'] and over == [True, False] and title == 'Futter benennen',
+        f'„Wie war’s?“ on the home page: the thumbnail opens the photo, the name the meal ({thumb}, {over}, {title})',
+    )
+
+    # Named, the photo goes into a file of its own, and not into the stored data
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    pid = await state(pg, 'db.servings[0].productId')
+    path = f'photos/{pid}.jpg'
+    await until(pg, f"localStorage.getItem('__fs:{path}') && localStorage.getItem('__fs:db.json')?.includes('{pid}')")
+    stored = await pg.evaluate(
+        f"""() => {{ const f = localStorage.getItem('__fs:{path}');
+          return [window.__calls.some(c => c[0] === 'writeFile' && c[1].path === '{path}' && c[1].directory === 'DATA'),
+            !!f && !localStorage.getItem('__fs:db.json').includes(f.slice(-200, -100))]; }}"""
+    )
+    width = await pg.evaluate(FILE_WIDTH, path)
+    photo = await state(pg, '[db.servings[0].photo, db.servings[0].thumb, !!db.products[0].thumb]')
+    check(
+        stored == [True, True] and width == 1100 and photo == [None, None, True],
+        f'once named the large photo is kept as a file of the variety, outside db.json; the meal keeps no photo of its own ({stored}, {width}, {photo})',
+    )
+
+    # The meal sheet and the food sheet open it from the file
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    card = await pg.evaluate(
+        "[!!document.querySelector('#sheet .prod-card > .photo-btn > .thumb.xl'), !!document.querySelector('#sheet .prod-card > .prod-edit[data-action=edit-name]')]"
+    )
+    await viewed(pg, '#sheet .prod-card > .photo-btn')
+    from_file = (await pg.evaluate(VIEWER))[1]
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.click('#sheet .prod-edit')
+    await idle(pg)
+    renaming = await pg.inner_text('#sheet .sh-head h2')
+
+    # Corrected to another variety, the photo and the thumbnail go along
+    await pg.fill('#f-variety', 'Huhn')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    pid = await state(pg, 'db.servings[0].productId')
+    path = f'photos/{pid}.jpg'
+    await until(pg, f"!!localStorage.getItem('__fs:{path}')", timeout=4)
+    moved = [
+        await pg.evaluate(PHOTO_FILES),
+        await state(pg, 'db.products.map(p => [p.variety, !!p.thumb])'),
+        await pg.locator('#sheet .prod-card > .photo-btn > img.thumb').count(),
+    ]
+    check(
+        moved == [[f'__fs:{path}'], [['Huhn', True]], 1],
+        f'a meal put under another variety takes its photo and thumbnail along, the old variety goes ({moved})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+    await idle(pg)
+    food = await pg.locator('#sheet .prod-card > .photo-btn').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(
+        card == [True, True] and from_file == 1100 and renaming == 'Futter ändern' and food == 1,
+        f'meal sheet: the thumbnail opens the photo, the rest of the card leads to naming; the food sheet opens it too ({card}, {from_file}, {renaming}, {food})',
+    )
+
+    # After a restart it is read from the file
+    await pg.reload()
+    await started(pg)
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    check((await pg.evaluate(VIEWER))[1] == 1100, 'after a restart the photo opens from the file')
+    await pg.click('#viewer')
+    await closed(pg)
+
+    # A file that cannot be read: a word, the thumbnail becomes a plain one, the file goes
+    good = await pg.evaluate(f"localStorage.getItem('__fs:{path}')")
+    await pg.evaluate(f"localStorage.setItem('__fs:{path}', 'kaputt')")
+    await pg.reload()
+    await started(pg)
+    await pg.click('.pend .pend-top > .photo-btn')
+    await until(pg, f"!localStorage.getItem('__fs:{path}')", timeout=4)
+    await idle(pg)
+    broken = [
+        await pg.evaluate("document.getElementById('viewer').open"),
+        (await pg.inner_text('#toast')).split('\n')[0],
+        await pg.locator('.photo-btn').count(),
+        await pg.locator('.pend .pend-head > .thumb').count(),
+    ]
+    check(broken == [False, 'Das Foto ist nicht mehr da.', 0, 1], f'a broken file: a word, and the thumbnail is a plain one again ({broken})')
+
+    # Without a file here (a variety from another phone, or from before) the card is the one button it was
+    await pg.click('.pend-head')
+    await idle(pg)
+    plain = await pg.evaluate("[!!document.querySelector('#sheet button.prod-card'), document.querySelectorAll('#sheet .photo-btn').length]")
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(plain == [True, 0], f'without the file the meal card stays one button ({plain})')
+
+    # Tidying up: a file whose variety is gone goes at the next start, and „Alle Daten löschen“ takes all of them
+    await pg.evaluate(f"[localStorage.setItem('__fs:{path}', {json.dumps(good)}), localStorage.setItem('__fs:photos/zzzz9999.jpg', 'x')]")
+    await pg.reload()
+    await started(pg)
+    stray = await pg.evaluate(PHOTO_FILES)
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+    await idle(pg)
+    await pg.click('#sheet [data-action=arm][data-then=delete-product]')
+    await pg.click('#sheet [data-action=arm][data-then=delete-product]')
+    await idle(pg)
+    await pg.reload()
+    await started(pg)
+    deleted = await pg.evaluate(PHOTO_FILES)
+    # After a restart only the meal's smaller photo is left, and that one is kept
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', big)
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await pg.reload()
+    await started(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    await viewed(pg, '#sheet .photo-btn')
+    small = (await pg.evaluate(VIEWER))[1]
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.fill('#f-brand', 'Felix')
+    await pg.fill('#f-variety', 'Huhn')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    felix = await state(pg, 'db.servings[0].productId')
+    await until(pg, f"!!localStorage.getItem('__fs:photos/{felix}.jpg')")
+    check(
+        [small, await pg.evaluate(FILE_WIDTH, f'photos/{felix}.jpg')] == [480, 480],
+        'named after a restart: the photo in the viewer and the one kept are the smaller one the meal had',
+    )
+    await settings(pg)
+    await pg.click('#sheet [data-action=arm][data-then=wipe]')
+    await pg.click('#sheet [data-action=arm][data-then=wipe]')
+    await idle(pg)
+    wiped = await pg.evaluate(PHOTO_FILES)
+    check(
+        stray == [f'__fs:{path}'] and deleted == [] and wiped == [],
+        f'photos of varieties that are gone are removed at the start, and „Alle Daten löschen“ removes them all ({stray}, {deleted}, {wiped})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # In the browser nothing is kept: only the photo of a meal still to be named opens
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await viewed(pg, '#sheet .photo-btn')
+    before = (await pg.evaluate(VIEWER))[1]
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    after = await pg.locator('#sheet .photo-btn').count()
+    check(before == 480 and after == 0, f'browser: the photo opens before naming, and after it there is none to open ({before}, {after})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # From elsewhere: named on another phone, the photo is handed over at once, even without photos to the server,
+    # and when the variety is merged there it follows
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', big)
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    sid = await state(pg, 'db.servings[0].id')
+    rind = {'brand': 'Animonda', 'variety': 'Rind', 'type': 'Nassfutter', 'createdAt': 1}
+    await pg.evaluate(REMOTE, [['products', 'fremdsorte01', rind], ['servings', sid, {'productId': 'fremdsorte01'}]])
+    handed = await until(pg, "!!localStorage.getItem('__fs:photos/fremdsorte01.jpg') && !db.servings[0].photo && !db.servings[0].status", timeout=4)
+    await idle(pg)
+    there = [await pg.evaluate(FILE_WIDTH, 'photos/fremdsorte01.jpg'), await pg.locator('.pend .pend-top > .photo-btn').count()]
+    check(handed and there == [1100, 1], f'named on another phone: the large photo becomes the variety’s here at once ({handed}, {there})')
+    await pg.evaluate(
+        REMOTE,
+        [
+            ['products', 'fremdsorte02', {**rind, 'variety': 'Rind in Soße'}],
+            ['servings', sid, {'productId': 'fremdsorte02'}],
+            ['products', 'fremdsorte01', {'_del': True}],
+        ],
+    )
+    await until(pg, "!!localStorage.getItem('__fs:photos/fremdsorte02.jpg')", timeout=4)
+    await pg.reload()
+    await started(pg)
+    check(
+        await pg.evaluate(PHOTO_FILES) == ['__fs:photos/fremdsorte02.jpg'],
+        f'merged on another phone: the photo follows the meal and survives the next start ({await pg.evaluate(PHOTO_FILES)})',
+    )
+
+    # A sheet from a link over the open photo: the photo goes, back then closes the sheet
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://feed'})")
+    await idle(pg)
+    link = await pg.evaluate("import('./js/ui/sheet.js').then(m => [document.getElementById('viewer').open, m.sheet?.kind])")
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await idle(pg)
+    check(
+        link == [False, 'feed'] and not await pg.evaluate("document.getElementById('sheet').open") and (await pg.evaluate(BARS))[-1] == 'DEFAULT',
+        f'a link opens its sheet in place of the photo, and back closes that sheet ({link})',
+    )
+
+    # The system switching between light and dark keeps the icons light while the photo is open
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    await pg.emulate_media(color_scheme='dark')
+    await pg.emulate_media(color_scheme='light')
+    await idle(pg)
+    switched = (await pg.evaluate(BARS))[-1]
+    # Redrawn under the photo, the thumbnail gets the focus back when it closes
+    await pg.evaluate("import('./js/views/home.js').then(m => m.renderHome())")
+    await pg.keyboard.press('Escape')
+    await closed(pg)
+    focus = await pg.evaluate('document.activeElement.className')
+    check(
+        switched == 'DARK' and focus == 'photo-btn' and (await pg.evaluate(BARS))[-1] == 'DEFAULT',
+        f'a switch of the system theme keeps the icons light over the photo; closing returns the focus to the thumbnail although it was redrawn ({switched}, {focus})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # With motion the photo grows out of its thumbnail and back; only the photo moves, the ground fades
+    ctx = await phone(browser, motion=True)
+    await ctx.add_init_script(INSET)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    opening = await pg.evaluate(ZOOM, '#sheet .prod-card > .photo-btn')
+    await idle(pg)
+    closing = await pg.evaluate(ZOOM, '#viewer')
+    await idle(pg)
+    left = await pg.evaluate(ZOOM_LEFT)
+    check(
+        [o[0] for o in opening] == ['group photo', 'new photo', 'new viewer', 'old photo']
+        and all(o[2] == 300 for o in opening)
+        and ['new viewer', 'fadeIn', 300] in opening,
+        f'opening: the photo grows out of the thumbnail and the ground fades in; nothing else moves ({opening})',
+    )
+    check(
+        [c[0] for c in closing] == ['group photo', 'new photo', 'old photo', 'old viewer']
+        and all(c[2] == 300 for c in closing)
+        and ['old viewer', 'fadeOut', 300] in closing,
+        f'closing: the photo goes back into the thumbnail and the ground fades out ({closing})',
+    )
+    check(left == [False, []], f'afterwards no name and no class of the step is left ({left})')
+    # Back pressed twice while it closes: the next photo still stays open
+    await viewed(pg, '#sheet .prod-card > .photo-btn')
+    await pg.evaluate("document.getElementById('viewer').click(); setTimeout(() => window.__back({canGoBack: true}), 60)")
+    await closed(pg)
+    await viewed(pg, '#sheet .prod-card > .photo-btn')
+    await pg.wait_for_timeout(400)
+    again = await pg.evaluate("document.getElementById('viewer').open")
+    await pg.click('#viewer')
+    await closed(pg)
+    check(again, 'back pressed while the photo was closing does not close the next one')
+    # A level of the sheet or a page opens at rest: its bar title and line never show first and fade out
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    flash = await pg.evaluate(
+        """async () => { const seen = []; document.querySelector('[data-action=open-settings]').click();
+          for (let i = 0; i < 20; i++) { await new Promise(d => requestAnimationFrame(d)); const b = document.querySelector('#sheet .page-bar');
+            if (b) seen.push(Math.max(+getComputedStyle(b.querySelector('.bar-title')).opacity, +getComputedStyle(b, '::after').opacity)); }
+          return Math.max(0, ...seen); }"""
+    )
+    await idle(pg)
+    await pg.evaluate('(b => b.scrollTop = b.scrollHeight)(document.getElementById("sheetBody"))')
+    await idle(pg)
+    deeper = await pg.evaluate(
+        """async () => { const seen = []; document.querySelector('#sheet [data-action=settings-page][data-v=house]').click();
+          for (let i = 0; i < 20; i++) { await new Promise(d => requestAnimationFrame(d)); const b = document.querySelector('#sheet .page-bar');
+            if (b?.querySelector('.bar-title').innerText === 'Haushalt')
+              seen.push(Math.max(+getComputedStyle(b.querySelector('.bar-title')).opacity, +getComputedStyle(b, '::after').opacity)); }
+          return [seen.length > 0, Math.max(0, ...seen)]; }"""
+    )
+    check(
+        flash == 0 and deeper == [True, 0],
+        f'a page, and a level reached from a scrolled one, arrive with neither the bar title nor the line showing, not even for a frame ({flash}, {deeper})',
+    )
+    await idle(pg)
+    await settings_back(pg)
+    await settings_back(pg)
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    redraw = await pg.evaluate(
+        """import('./js/views/home.js').then(m => { const o = document.startViewTransition; let n = 0;
+          document.startViewTransition = function (...a) { n++; return o.apply(this, a); };
+          m.update(); document.startViewTransition = o; return n; })"""
+    )
+    check(redraw == 0, f'a redraw of the home page under the open viewer starts no transition of its own ({redraw})')
+    await pg.click('#viewer')
+    await closed(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # Under reduced motion it simply appears
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    still = await pg.evaluate(ZOOM, '#sheet .photo-btn')
+    check(still == [] and await pg.evaluate("document.getElementById('viewer').open"), f'reduced motion: it opens without a transition ({still})')
     await ctx.close()
 
 
@@ -3140,13 +3748,13 @@ async def test_start(browser, url):
     await idle(pg)
     bar = await pg.evaluate(
         """(() => { const s = getComputedStyle(document.body, '::before');
-          return [s.height, s.position, s.opacity, s.zIndex,
-            s.backgroundImage.includes(getComputedStyle(document.body).backgroundColor),
+          return [s.height, s.position, s.opacity, s.zIndex, s.backgroundImage,
+            s.backgroundColor === getComputedStyle(document.body).backgroundColor,
             getComputedStyle(document.querySelector('.top')).paddingTop]; })()"""
     )
     check(
-        bar == ['40px', 'fixed', '0', '10', True, '36px'],
-        f'at the top the strip behind the status bar is invisible, so the picture reaches the edge ({bar})',
+        bar == ['24px', 'fixed', '0', '5', 'none', True, '36px'],
+        f'at the top the strip behind the status bar is invisible, so the picture reaches the edge; it is exactly as tall as the status bar and plain ({bar})',
     )
     moved = await pg.evaluate(
         """(async () => { const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -3211,6 +3819,204 @@ BODY_BOX = """() => { const b = document.getElementById('sheetBody').getBounding
 PAGE = """() => { const d = document.getElementById('sheet'), r = d.getBoundingClientRect();
   return [document.querySelector('#sheet .page-title')?.innerText ?? null, d.open, d.classList.contains('page'),
     Math.round(r.width), Math.round(r.height), Math.round(r.left)]; }"""
+
+# The top edge of what is open (PROJECT.md, „Building blocks“, scroll edge): the bar, its line and its title
+EDGE = """() => { const d = document.getElementById('sheet'), body = document.getElementById('sheetBody'),
+  bar = body.querySelector(':scope > .page-bar'), title = bar.nextElementSibling, small = bar.querySelector('.bar-title'),
+  line = getComputedStyle(bar, '::after'), r = bar.getBoundingClientRect(), t = title.getBoundingClientRect(),
+  probe = v => { const e = document.createElement('i'); e.style.color = `var(${v})`; d.append(e); const c = getComputedStyle(e).color; e.remove(); return c; };
+  return {bar: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], below: t.top >= r.bottom,
+    seen: document.elementFromPoint(t.left + 8, t.top + 2) === title,
+    line: [line.height, line.backgroundImage, line.opacity, line.backgroundColor === probe('--line')],
+    small: [getComputedStyle(small).opacity, small.innerText === title.innerText, small.getAttribute('aria-hidden')],
+    scrolled: d.classList.contains('scrolled'), titled: d.classList.contains('titled'), wide: body.scrollWidth === body.clientWidth,
+    at: title.offsetTop + title.offsetHeight - bar.offsetHeight}; }"""
+# The colours a token has here, as [r, g, b]
+TOKENS = """list => list.map(v => { const e = document.createElement('i'); e.style.color = `var(${v})`; document.getElementById('sheet').append(e);
+  const c = getComputedStyle(e).color.match(/\\d+/g).map(Number).slice(0, 3); e.remove(); return c; })"""
+
+
+async def column(pg, x, y):
+    """The colours of the screen at x from y - 6 to y + 5, one per row"""
+    import io
+    from PIL import Image
+
+    png = await pg.screenshot(clip={'x': x, 'y': y - 6, 'width': 1, 'height': 12}, scale='css')
+    img = Image.open(io.BytesIO(png)).convert('RGB')
+    return [img.getpixel((0, i)) for i in range(12)]
+
+
+def rows(col, want):
+    """Whether every row is within 2 of the colour expected there"""
+    return all(all(abs(a - b) <= 2 for a, b in zip(c, w)) for c, w in zip(col, want))
+
+
+async def test_edges(browser, url):
+    print('the top edge: nothing fades, the bar ends straight and draws a line only while something lies under it')
+    for scheme in ('light', 'dark'):
+        ctx = await phone(browser, scheme)
+        await ctx.add_init_script(INSET)
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.click('[data-action=demo]')
+        await idle(pg)
+        await settings(pg)
+        rest = await pg.evaluate(EDGE)
+        check(
+            rest['bar'] == [0, 24, 400, 56]
+            and rest['below']
+            and rest['seen']
+            and rest['line'] == ['1px', 'none', '0', True]
+            and rest['small'] == ['0', True, 'true']
+            and rest['wide']
+            and not rest['scrolled'],
+            f'{scheme}, at rest: the bar is the full width and 56px under the status bar, holds the arrow only and lies over nothing ({rest})',
+        )
+        await pg.evaluate("document.getElementById('sheetBody').scrollTop = 1")
+        await idle(pg)
+        one = await pg.evaluate(EDGE)
+        check(
+            one['scrolled'] and one['line'][2] == '1' and one['small'][0] == '0' and not one['titled'],
+            f'{scheme}, moved by a pixel: the line is there, the title not yet ({one["line"]}, {one["small"]})',
+        )
+        at = rest['at']
+        await pg.evaluate(f"document.getElementById('sheetBody').scrollTop = {at - 1}")
+        await idle(pg)
+        before = (await pg.evaluate(EDGE))['titled']
+        await pg.evaluate(f"document.getElementById('sheetBody').scrollTop = {at}")
+        await idle(pg)
+        titled = await pg.evaluate(EDGE)
+        await pg.evaluate("document.getElementById('sheetBody').scrollTop = 0")
+        await idle(pg)
+        back = await pg.evaluate(EDGE)
+        check(
+            not before and titled['titled'] and titled['small'][0] == '1' and not back['scrolled'] and not back['titled'],
+            f'{scheme}: once the title has gone under the bar it stands in the bar, and at the top neither is left ({before}, {titled["small"]}, {back["scrolled"]}, {back["titled"]})',
+        )
+        # The edge in pixels: the bar's ground down to its last row, the line, then the group under it, and no row between
+        bottom = await pg.evaluate(
+            """() => { const body = document.getElementById('sheetBody'), bar = body.querySelector('.page-bar').getBoundingClientRect(),
+              g = body.querySelector('.set-group'); body.scrollTop += g.getBoundingClientRect().top - (bar.bottom - 30); return bar.bottom; }"""
+        )
+        await idle(pg)
+        bg, line, surface = await pg.evaluate(TOKENS, ['--bg', '--line', '--surface'])
+        col = await column(pg, 24, bottom)
+        check(
+            rows(col, [bg] * 5 + [line] + [surface] * 6),
+            f'{scheme}: the content is cut straight at the bar, with the line right at its edge ({col})',
+        )
+        await shot(pg, f'edge-page-{scheme}')
+
+        # A level deeper arrives at rest, and so does the way back
+        await pg.evaluate('(b => b.scrollTop = b.scrollHeight)(document.getElementById("sheetBody"))')
+        await idle(pg)
+        deep = [await pg.evaluate(EDGE)]
+        await settings_page(pg, 'house')
+        deep.append(await pg.evaluate(EDGE))
+        await settings_back(pg)
+        deep.append(await pg.evaluate(EDGE))
+        check(
+            [x['titled'] for x in deep] == [True, False, False] and [x['scrolled'] for x in deep] == [True, False, False],
+            f'{scheme}: a level deeper arrives at rest, and so does the one you come back to ({[(x["scrolled"], x["titled"]) for x in deep]})',
+        )
+        check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+        await ctx.close()
+
+    # „Verlauf“: the day line parks under the bar and takes the line over; with more days than drawn at first and
+    # with fewer, where the list never grows
+    for scheme, n in (('light', 26), ('dark', 8)):
+        ctx = await phone(browser, scheme)
+        await ctx.add_init_script(INSET)
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.evaluate(SORTS, [n, 1])
+        await idle(pg)
+        home = await pg.eval_on_selector('[data-sec=hist] .tl-date', 'd => getComputedStyle(d).position')
+        await pg.click('[data-sec=hist] [data-action=open-report]')
+        await idle(pg)
+        await pg.evaluate("document.getElementById('sheetBody').scrollTop = 40")
+        await pg.wait_for_timeout(150)
+        await idle(pg)
+        ring = await pg.evaluate(
+            "[document.querySelectorAll('#sheet .tl-date.stuck').length, getComputedStyle(document.querySelector('#sheet .page-bar'), '::after').opacity]"
+        )
+        bottom = await pg.evaluate(
+            """() => { const body = document.getElementById('sheetBody'), bar = body.querySelector('.page-bar').getBoundingClientRect(),
+              d = body.querySelector('.tl-date'); body.scrollTop += d.getBoundingClientRect().top - bar.bottom + 60; return bar.bottom; }"""
+        )
+        await pg.wait_for_timeout(150)
+        await idle(pg)
+        parked = await pg.evaluate(
+            f"""() => {{ const d = document.elementFromPoint(innerWidth / 2, {bottom} + 4)?.closest('.tl-date');
+              return d && [d.classList.contains('stuck'), Math.abs(d.getBoundingClientRect().top - {bottom}) <= 0.5,
+                getComputedStyle(d, '::after').opacity, getComputedStyle(document.querySelector('#sheet .page-bar'), '::after').opacity,
+                getComputedStyle(d).position, getComputedStyle(d).top]; }}"""
+        )
+        bg, surface = await pg.evaluate(TOKENS, ['--bg', '--surface'])
+        col = await column(pg, 26, bottom)
+        check(
+            home == 'static' and ring == [0, '1'] and parked == [True, True, '1', '0', 'sticky', '56px'],
+            f'{scheme}, „Verlauf“: the bar draws the line over the ring card; a parked day line takes it over, on the home page it does not stick ({home}, {ring}, {parked})',
+        )
+        check(rows(col, [bg] * 6 + [surface] * 6), f'{scheme}: under the bar the day line follows straight, with no second line ({col})')
+        await shot(pg, f'edge-report-{scheme}')
+        check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+        await ctx.close()
+
+    # A sheet: the grip's line once the contents have moved, and no mask
+    ctx = await phone(browser, width=360, height=640)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [26, 1])
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.click('#sheet [data-action=new-product]')
+    await idle(pg)
+    GRIP = """() => [getComputedStyle(document.querySelector('#sheet .grip-zone'), '::after').opacity,
+      getComputedStyle(document.getElementById('sheetBody')).maskImage, (b => b.scrollHeight > b.clientHeight)(document.getElementById('sheetBody'))]"""
+    still = await pg.evaluate(GRIP)
+    await pg.evaluate("document.getElementById('sheetBody').scrollTop = 40")
+    await idle(pg)
+    moved = await pg.evaluate(GRIP)
+    check(
+        still == ['0', 'none', True] and moved[:2] == ['1', 'none'],
+        f'a sheet: the grip draws its line once the contents have moved, and nothing is masked ({still}, {moved})',
+    )
+    await shot(pg, 'edge-sheet')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # Large system text on a small phone: the bar keeps its height and its title one line
+    ctx = await phone(browser, width=360)
+    pg, errors = await open_page(ctx, url)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await pg.evaluate(BIG_TEXT, 1.3)
+    await settings(pg)
+    await pg.evaluate('(b => b.scrollTop = b.scrollHeight)(document.getElementById("sheetBody"))')
+    await idle(pg)
+    big = await pg.evaluate(
+        """() => { const b = document.querySelector('#sheet .page-bar'), t = b.querySelector('.bar-title'), body = document.getElementById('sheetBody');
+          return [Math.round(b.getBoundingClientRect().height), t.getBoundingClientRect().height <= 1.5 * parseFloat(getComputedStyle(t).lineHeight),
+            body.scrollWidth === body.clientWidth]; }"""
+    )
+    check(big == [56, True, True], f'large text at 360px: the bar stays 56px, its title one line, nothing wider than the screen ({big})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # With motion the line and the title fade in over 200 ms; under reduced motion they switch at once
+    for motion in (True, False):
+        ctx = await phone(browser, motion=motion)
+        pg, errors = await open_page(ctx, url)
+        await settings(pg)
+        fade = await pg.evaluate(
+            """() => { const b = document.querySelector('#sheet .page-bar');
+              return [getComputedStyle(b, '::after').transitionDuration, getComputedStyle(b.querySelector('.bar-title')).transitionDuration]; }"""
+        )
+        quick = all(float(f.rstrip('s')) < 0.01 for f in fade)
+        check(
+            fade == ['0.2s', '0.2s'] if motion else quick,
+            f'{"with motion" if motion else "reduced motion"}: line and title {"fade in over 200 ms" if motion else "switch at once"} ({fade})',
+        )
+        await ctx.close()
 
 
 async def test_settings(browser, url):
@@ -3278,8 +4084,8 @@ async def test_settings(browser, url):
     back = await pg.evaluate(PAGE_STEP, '#sheet [data-action=settings-back]')
     await idle(pg)
     check(
-        step == [['new page', 'pageFromSide', 300], ['old page', 'pageAside', 300]]
-        and back == [['new page', 'pageFromAside', 300], ['old page', 'pageToSide', 300]]
+        step == [['new page', 'pageIn', 300], ['old page', 'pageAside', 300]]
+        and back == [['new page', 'pageFromAside', 300], ['old page', 'pageOut', 300]]
         and await pg.locator('#sheet .sheet-body').count() == 1,
         f'a page below comes in from the side while the one above it goes out, and back the other way round ({step}, {back})',
     )
@@ -3468,12 +4274,45 @@ async def test_suggestions(browser, url):
     await ctx.close()
 
 
+# Meals at given times for the home page's history: pets [id, name], meals [id, time, pet ids, variety]
+AT = """([pets, meals]) => import('./js/store.js').then(async s => { const d = s.defaults();
+  d.pets = pets.map(([id, name], i) => ({id, name, species: 'Katze', createdAt: i}));
+  d.products = ['Lachs', 'Huhn', 'Rind'].map((variety, i) => ({id: 'sorte0000' + i, brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.servings = meals.map(([id, t, ids, v]) => ({id, productId: 'sorte0000' + (v || 0), servedAt: new Date(t).getTime(), note: '',
+    pets: Object.fromEntries(ids.map(pid => [pid, {r: 'gut', at: new Date(t).getTime()}]))}));
+  d.servings.sort((a, b) => b.servedAt - a.servedAt);
+  s.prefs.activePet = 'all'; s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+# What the history card on the home page shows: its day lines, the meals, and the line when there are none
+HOME_HIST = """() => { const c = document.querySelector('[data-sec=hist]'), e = c.querySelector('.empty');
+  return {days: [...c.querySelectorAll('.tl-date')].map(d => [d.querySelector('b').innerText, d.querySelector('span').innerText]),
+    ids: [...c.querySelectorAll('.tl-item')].map(b => b.dataset.id), empty: e ? e.innerText.trim() : null, sketch: !!c.querySelector('.empty .sk'),
+    btn: !!c.querySelector('.card-btn[data-action=open-report]'), cal: c.querySelectorAll('.cal .day.has').length}; }"""
+# The meals the home page should show: today's within the filter, or yesterday's while there are none today
+CURRENT = """() => import('./js/store.js').then(async s => { const {dayKey, addDays} = await import('./js/dates.js'), {servingPets} = await import('./js/derive.js');
+  const now = Date.now(), mine = s.db.servings.filter(x => servingPets(x).length), on = k => mine.filter(x => dayKey(x.servedAt) === k).map(x => x.id);
+  const today = on(dayKey(now)); return today.length ? today : on(dayKey(addDays(now, -1))); })"""
+M, T = 'minka00001', 'tiger00001'
+
+
 async def test_home_history(browser, url):
-    print('the history on the home page: five meals, a calendar, and the button to the history page')
-    ctx = await phone(browser)
+    print('the history on the home page: only what is current, today or else yesterday')
+    ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
-    await pg.evaluate(SORTS, [26, 1])
-    await idle(pg)
+
+    async def seed(now, meals, pets=((M, 'Minka'),)):
+        await pg.clock.set_fixed_time(now)
+        await pg.evaluate(AT, [list(pets), meals])
+        await idle(pg)
+        return await pg.evaluate(HOME_HIST)
+
+    owner = [
+        ['m1', '2026-06-12T07:00', [M]],
+        ['m2', '2026-06-11T07:30', [M]],
+        ['m3', '2026-06-11T12:00', [M]],
+        ['m4', '2026-06-11T18:30', [M]],
+        ['m5', '2026-06-10T08:00', [M]],
+    ]
+    got = await seed('2026-06-12T10:00:00+02:00', owner)
     btn = await pg.eval_on_selector(
         '[data-sec=hist] [data-action=open-report]',
         """b => { const ic = b.querySelector('svg'); const r = ic.getBoundingClientRect();
@@ -3481,30 +4320,92 @@ async def test_home_history(browser, url):
             getComputedStyle(ic).width]; }""",
     )
     check(
-        await pg.locator('[data-sec=hist] .tl-item').count() == 5
-        and await pg.locator('[data-sec=hist] .tl-day').count() == 5
-        and btn == ['Ganzer Verlauf', 'card-btn', True, True, '20px'],
-        f'five meals grouped by day, below them „Ganzer Verlauf“ as a card button with the chevron at its end ({btn})',
+        got['days'] == [['Heute', '1 Mahlzeit']] and got['ids'] == ['m1'] and btn == ['Ganzer Verlauf', 'card-btn', True, True, '20px'],
+        f'something served today: only today, and „Ganzer Verlauf“ below it with the chevron at its end ({got["days"]}, {btn})',
     )
-    # A day in the calendar: near ones scroll on the home page, older ones open the history page there
-    days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
-    await pg.click(f'[data-action=jump-day][data-day="{days[-1]}"]')
-    await idle(pg)
-    near = await pg.evaluate("k => [document.getElementById('sheet').open, !!document.getElementById('d-' + k)]", days[-1])
-    await pg.click(f'[data-action=jump-day][data-day="{days[0]}"]')
-    await idle(pg)
-    at_day = await pg.evaluate(
-        """k => { const d = document.getElementById('sheetBody').querySelector('#d-' + k);
-      const bar = document.querySelector('#sheet .page-bar').getBoundingClientRect();
-      return [document.getElementById('sheet').open, !!d, Math.round((d?.getBoundingClientRect().top ?? 0) - bar.bottom)]; }""",
-        days[0],
-    )
+    got = await seed('2026-06-12T05:30:00+02:00', owner[1:])
     check(
-        near == [False, True] and at_day[:2] == [True, True] and 0 <= at_day[2] < 24,
-        f'a day still on show scrolls, an older one opens the history page right at it ({near}, {at_day})',
+        got['days'] == [['Gestern', '3 Mahlzeiten']] and got['ids'] == ['m4', 'm3', 'm2'],
+        f'early in the morning, nothing yet today: yesterday, whole and newest first ({got["days"]}, {got["ids"]})',
     )
-    await pg.click('#sheet [data-action=settings-back]')
+    got = await seed('2026-06-14T10:00:00+02:00', owner)
+    check(
+        got['days'] == [] and got['empty'] == 'Heute noch nichts serviert.' and not got['sketch'] and got['cal'] >= 1 and got['btn'],
+        f'neither today nor yesterday: a line that says so, the calendar and the button stay ({got})',
+    )
+    pets = ((M, 'Minka'), (T, 'Tiger'), ('mauz000001', 'Mauz'))
+    got = await seed(
+        '2026-06-12T10:00:00+02:00', [['t1', '2026-06-12T08:00', [T]], ['k1', '2026-06-11T08:00', [M]], ['k2', '2026-06-11T18:00', [M]]], pets
+    )
+    everyone = got
+    minka, never = [], []
+    for pet, out in ((M, minka), ('mauz000001', never)):
+        await pg.click(f'[data-action=filter][data-id={pet}]')
+        await idle(pg)
+        out.append(await pg.evaluate(HOME_HIST))
+    check(
+        everyone['ids'] == ['t1']
+        and minka[0]['days'][0][0] == 'Gestern'
+        and minka[0]['ids'] == ['k2', 'k1']
+        and never[0]['empty'] == 'Noch nichts serviert.'
+        and never[0]['sketch'],
+        f'within the pet filter: „Alle“ today, Minka yesterday, a pet never fed the sketch ({everyone["ids"]}, {minka[0]["ids"]}, {never[0]["empty"]})',
+    )
+    got = await seed('2026-06-12T00:05:00+02:00', [['n1', '2026-06-11T23:50', [M]]])
+    check(got['days'] == [['Gestern', '1 Mahlzeit']] and got['ids'] == ['n1'], f'just after midnight the evening meal is yesterday ({got})')
+    got = await seed('2026-06-12T10:00:00+02:00', [['f1', '2026-06-13T09:00', [M]], ['f2', '2026-06-12T07:00', [M]]])
+    check(got['ids'] == ['f2'], f'a meal stamped in the future by another clock does not push today away ({got["ids"]})')
+
+    # The card does not grow with the history: twenty days of three meals weigh nothing
+    today3 = [[f'h{i}', f'2026-06-12T0{7 + i}:00', [M]] for i in range(3)]
+    long = today3 + [[f'd{d}-{i}', f'2026-05-{11 + d:02d}T{8 + 4 * i:02d}:00', [M]] for d in range(20) for i in range(3)]
+    await seed('2026-06-12T12:00:00+02:00', long)
+    tall = await pg.eval_on_selector('[data-sec=hist]', 'c => Math.round(c.getBoundingClientRect().height)')
+    await seed('2026-06-12T12:00:00+02:00', today3 + [['y1', '2026-06-11T08:00', [M]]])
+    short = await pg.eval_on_selector('[data-sec=hist]', 'c => Math.round(c.getBoundingClientRect().height)')
+    check(tall == short, f'the card is as tall after twenty days as after one ({tall}, {short})')
+
+    # Serving switches from yesterday to today, undo switches back
+    await seed('2026-06-12T05:30:00+02:00', owner[1:])
+    await pg.click('#fab')
     await idle(pg)
+    await pg.click('#sheet [data-action=serve]')
+    await idle(pg)
+    served = await pg.evaluate(HOME_HIST)
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    undone = await pg.evaluate(HOME_HIST)
+    check(
+        served['days'] == [['Heute', '1 Mahlzeit']] and len(served['ids']) == 1 and undone['ids'] == ['m4', 'm3', 'm2'],
+        f'the first meal of the day replaces yesterday, and undo brings yesterday back ({served["days"]}, {undone["ids"]})',
+    )
+
+    # A day in the calendar always opens the history page right at that day, also one beyond the days drawn at
+    # first (ten); the home page holds no anchors
+    cal = today3 + [[f'c{d}-{i}', f'2026-06-{1 + d:02d}T{8 + 4 * i:02d}:00', [M]] for d in range(11) for i in range(3)]
+    await seed('2026-06-12T12:00:00+02:00', cal)
+    days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
+    check(days[0] == '2026-06-01' and days[-1] == '2026-06-12', f'the calendar holds today and the first day of last week ({days[0]}, {days[-1]})')
+    at = []
+    for day in (days[-1], days[0]):
+        await pg.click(f'[data-sec=hist] [data-action=jump-day][data-day="{day}"]')
+        await idle(pg)
+        at.append(
+            await pg.evaluate(
+                """k => { const body = document.getElementById('sheetBody'), d = body.querySelector('#d-' + k);
+              const bar = document.querySelector('#sheet .page-bar').getBoundingClientRect(), r = d?.getBoundingClientRect();
+              return [document.getElementById('sheet').open, !!d, Math.round((r?.top ?? 0) - bar.bottom),
+                body.scrollTop + body.clientHeight >= body.scrollHeight - 1 && r.top >= bar.bottom && r.bottom <= innerHeight]; }""",
+                day,
+            )
+        )
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+    anchors = await pg.locator('#home [id^="d-"]').count()
+    check(
+        all(a[:2] == [True, True] and (0 <= a[2] < 24 or a[3]) for a in at) and anchors == 0,
+        f'today and the oldest day open the history page right at that day, at the top or, at the end of the list, whole in view; the home page has no anchors ({at}, {anchors})',
+    )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -3603,7 +4504,7 @@ async def test_report(browser, url):
     check(
         [t[1] for t in tops] == ['kommt am besten an', 'bleibt am ehesten übrig']
         and tops[0][0] != tops[1][0]
-        and all(t[2].endswith(' %') and t[3] == 'tabular-nums' and t[4] and t[5] == 'Figtree' and t[6] == 26 for t in tops),
+        and all(t[2].endswith(' %') and t[3] == 'tabular-nums' and t[4] and t[5] == 'Figtree' and t[6] == 24 for t in tops),
         f'best and weakest under the figures, the percentage the plain figure in --ink ({tops})',
     )
     first = await pg.locator('#sheet .tl-item').count()
@@ -3637,13 +4538,14 @@ async def test_report(browser, url):
         f'the day line sticks under the bar, the separator is straight, two lines for the name ({day_line}, {radius}, {lines})',
     )
     stuck = await pg.evaluate(
-        """async () => { const body = document.getElementById('sheetBody');
-          body.scrollTop = body.scrollHeight;
+        """async () => { const body = document.getElementById('sheetBody'), bar = body.querySelector('.page-bar').getBoundingClientRect();
+          body.scrollTop += body.querySelectorAll('.tl-date')[2].getBoundingClientRect().top - bar.bottom + 40;
           await new Promise(d => setTimeout(d, 250));
-          const on = [...body.querySelectorAll('.tl-date')].filter(d => d.classList.contains('stuck'));
-          return [on.length, on.length ? getComputedStyle(on[0]).borderBottomColor : '']; }"""
+          const d = document.elementFromPoint(innerWidth / 2, bar.bottom + 4)?.closest('.tl-date');
+          return d && [d.classList.contains('stuck'), getComputedStyle(d, '::after').opacity,
+            getComputedStyle(body.querySelector('.page-bar'), '::after').opacity]; }"""
     )
-    check(stuck[0] > 0 and stuck[1] != 'rgba(0, 0, 0, 0)', f'and while it is stuck it carries a fine line ({stuck})')
+    check(stuck == [True, '1', '0'], f'the day line parked under the bar carries the edge’s line, and the bar gives its own up ({stuck})')
 
     # Nothing reaches 70 %: only the weakest variety is named
     await pg.evaluate(
@@ -3668,7 +4570,7 @@ async def test_report(browser, url):
     fills = await pg.eval_on_selector(
         '#sheet .ring-fill', 'c => { const s = getComputedStyle(c); return [s.animationName, s.animationDuration, s.animationIterationCount]; }'
     )
-    check(fills == ['ringFill', '0.35s', '1'], f'with movement it fills itself once, in 350 ms ({fills})')
+    check(fills == ['ringFill', '0.3s', '1'], f'with movement it fills itself once, in 300 ms ({fills})')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -3765,6 +4667,7 @@ run_tests(
     {
         'start': test_start,
         'settings': test_settings,
+        'edges': test_edges,
         'tour': test_tour,
         'flow': test_flow,
         'buying': test_buying,
@@ -3787,6 +4690,7 @@ run_tests(
         'shortcuts': test_shortcuts,
         'scanning': test_scan,
         'recognition': test_recognize,
+        'discard': test_discard,
         'pack-lines': test_pack_lines,
         'exchange': test_exchange,
         'crop': test_crop,
@@ -3794,6 +4698,7 @@ run_tests(
         'mood': test_mood,
         'camera': test_camera,
         'no-camera': test_no_camera,
+        'photo': test_photo_viewer,
     },
     camera=('camera',),
 )

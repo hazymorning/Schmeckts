@@ -22,6 +22,7 @@ import {
 import {GOOD, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer} from '../recognize.js';
+import {hasPhoto} from '../photos.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
@@ -33,6 +34,7 @@ import {
   dayGroups,
   head,
   nameBlock,
+  photoThumb,
   rateRow,
   reasonOf,
   resultBadges,
@@ -44,12 +46,16 @@ import {paintHouse, viewSettings} from './settings.js';
 
 /* The pieces of „Wie war’s?“: the variety as a card that leads to naming, one rating row per pet, and in a
    household the chips that say who was served. */
-const servingCard = (s, p) =>
-  `<button class="prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'lg')}
-    <span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span></button>`;
+const servingCard = (s, p) => {
+  const main = `<span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span>`;
+  // With a large photo on this phone its thumbnail opens it, and the rest of the card leads to naming
+  return hasPhoto(s, p)
+    ? `<div class="box prod-card">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="edit-name" aria-label="Futter ändern">${main}</button></div>`
+    : `<button class="box prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'xl')}${main}</button>`;
+};
 const petRateRow = (s, pid, multi) =>
   `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}
-    ${rateRow(s, pid, true)}</div>`;
+    ${rateRow(s, pid)}</div>`;
 const servedForChips = s =>
   `<span class="label">Serviert für</span><div class="chips">${db.pets
     .map(
@@ -59,10 +65,14 @@ const servedForChips = s =>
     )
     .join('')}</div>`;
 
+/* Deleting a meal, at the end of „Wie war’s?“ and of naming a meal that has no variety yet: one tap, undone from the
+   toast, because arming is only for what cannot be undone */
+const deleteMeal = `<button class="btn quiet" data-action="delete-serving">${icon('trash')}Eintrag löschen</button>`;
+
 function viewServing() {
   const s = getServing(sheet.id);
   if (!s)
-    return `<div class="sh-head"><h2>Eintrag</h2>${closeBtn}</div><p class="empty">Diesen Eintrag gibt es nicht mehr.</p>`;
+    return `<div class="sh-head"><h2>Eintrag</h2>${closeBtn}</div><p class="hint empty">Diesen Eintrag gibt es nicht mehr.</p>`;
   if (sheet.step === 'name') return viewName();
   const p = getProduct(s.productId);
   const ids = Object.keys(s.pets).filter(id => getPet(id));
@@ -75,7 +85,7 @@ function viewServing() {
     <span class="pick"><input id="f-time" class="field" type="datetime-local" data-time="${s.id}" value="${toLocalInput(s.servedAt)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
     <label class="label" for="f-note">Notiz</label>
     <input id="f-note" class="field" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Optional, z. B. neue Packung" autocomplete="off">
-    <div class="mt"><button class="btn quiet" data-action="delete-serving">${icon('trash')}Eintrag löschen</button></div>`;
+    <div class="mt">${deleteMeal}</div>`;
 }
 
 function viewName() {
@@ -89,19 +99,26 @@ function viewName() {
         : serving?.productId
           ? 'Futter ändern'
           : 'Futter benennen';
-  const photo = serving && (serving.photo || serving.thumb);
+  const photo = serving && (serving.photo || serving.thumb),
+    large = serving && hasPhoto(serving, null);
   let note = '';
   const retry = label =>
     serving.photo && photoByServer() ? `<button class="link" data-action="retry">${label}</button>` : '';
-  if (serving?.status === 'reading') note = `<p class="note"><span class="spin"></span>Packung wird gelesen …</p>`;
+  if (serving?.status === 'reading') note = `<p class="hint note"><span class="spin"></span>Packung wird gelesen …</p>`;
   else if (serving?.status === 'recognizing')
-    note = `<p class="note"><span class="spin"></span>Sorte wird erkannt …</p>`;
+    note = `<p class="hint note"><span class="spin"></span>Sorte wird erkannt …</p>`;
   else if (serving?.status === 'waiting')
-    note = `<p class="note">${esc(serving.error || 'Wird erkannt, sobald der Server erreichbar ist.')} ${retry('Jetzt versuchen')}</p>`;
+    note = `<p class="hint note">${esc(serving.error || 'Wird erkannt, sobald der Server erreichbar ist.')} ${retry('Jetzt versuchen')}</p>`;
   else if (serving?.status === 'failed')
-    note = `<p class="note warn">${esc(serving.error || 'Nicht erkannt.')} ${retry('Nochmal versuchen')}</p>`;
+    note = `<p class="hint note warn">${esc(serving.error || 'Nicht erkannt.')} ${retry('Nochmal versuchen')}</p>`;
   return `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
-    ${photo ? `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">` : ''}${note}
+    ${
+      photo
+        ? large
+          ? `<button class="photo-btn" data-action="view-photo" data-s="${serving.id}" data-p="" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
+          : `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">`
+        : ''
+    }${note}
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
@@ -110,7 +127,7 @@ function viewName() {
     <span class="label">Art</span>
     <div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>
     ${textureChips(s)}
-    <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button></div>`;
+    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button>${serving && !serving.productId ? deleteMeal : ''}</div>`;
 }
 /* Consistency or treat type of variety x (the sheet itself while naming): single choice, for types that have one */
 function textureChips(x, note = '') {
@@ -153,7 +170,7 @@ export function renderSuggestions() {
     hits
       .map(
         p =>
-          `<button class="sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`,
+          `<button class="box sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p, 'm')}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`,
       )
       .join('') +
     packChips(serving);
@@ -167,8 +184,8 @@ export function renderSuggestions() {
 const SUGGEST = 3,
   HITS = 8;
 const CTA = {
-  barcode: `<button class="cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
-  foto: `<button class="cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`,
+  barcode: `<button class="box cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
+  foto: `<button class="box cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`,
 };
 function serveRows(prods, code = '') {
   return prods
@@ -177,7 +194,7 @@ function serveRows(prods, code = '') {
       const meta = [p.variety ? p.brand : '', e?.n ? `${e.pct} %` : 'noch nicht bewertet'].filter(Boolean).join(', ');
       return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
         ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>
-        <span class="serve-pill">Servieren</span></button></li>`;
+        <span class="link">Servieren</span></button></li>`;
     })
     .join('');
 }
@@ -186,11 +203,11 @@ function viewFeed() {
   if (pick.length)
     return `<div class="sh-head"><h2>Welche Sorte?</h2>${closeBtn}</div>
     <p class="hint">Dieser Barcode gehört zu mehreren Sorten.</p>
-    <ul class="plist">${serveRows(pick, sheet.code)}</ul>`;
+    <ul class="list plist">${serveRows(pick, sheet.code)}</ul>`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
     <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
-    ${sheet.busy ? `<p class="note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
+    ${sheet.busy ? `<p class="hint note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
     <div class="serve">
       ${
         prods.length > SUGGEST
@@ -205,7 +222,7 @@ function viewFeed() {
 /* The varieties most recently served, at most SUGGEST of them */
 const quickList = prods =>
   prods.length
-    ? `<span class="label">Schon mal gehabt</span><ul class="plist">${serveRows(prods.slice(0, SUGGEST))}</ul>`
+    ? `<span class="label">Schon mal gehabt</span><ul class="list plist">${serveRows(prods.slice(0, SUGGEST))}</ul>`
     : '';
 /* Search in the feeding sheet: the hits take the place of the suggestions, at most HITS. Only this one box is
    rewritten, so the search field neither moves nor loses the focus; the distances above it hang on .serve. */
@@ -219,9 +236,9 @@ function hitList(text, words) {
   const hits = quickProducts()
     .filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
     .slice(0, HITS);
-  if (hits.length) return `<ul class="plist">${serveRows(hits)}</ul>`;
+  if (hits.length) return `<ul class="list plist">${serveRows(hits)}</ul>`;
   const q = esc(text);
-  return `<p class="empty"><span>Keine Sorte passt zu „${q}“.</span></p>
+  return `<p class="hint empty"><span>Keine Sorte passt zu „${q}“.</span></p>
     <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neues Futter eintippen</button>`;
 }
 
@@ -233,7 +250,7 @@ const KAUFEN = [
   ['nicht', 'Nicht kaufen'],
 ];
 const verdictPetRow = (pet, x) =>
-  `<div class="verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
+  `<div class="row verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
     <small>${esc(reasonOf(x))}</small></span></div>`;
 function kaufenHTML(e) {
   const pets = db.pets.length > 1 ? db.pets.filter(pet => e.pets[pet.id]) : [];
@@ -245,7 +262,7 @@ function kaufenHTML(e) {
 
 /* The pieces of the food sheet, each one a row or a block of its own */
 const productCard = (p, served) =>
-  `<div class="prod-card">${thumbOf(null, p, 'lg')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
+  `<div class="box prod-card">${photoThumb(null, p, 'xl')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
     <small>${esc([p.type, `${served}× serviert`].filter(Boolean).join(', '))}</small></span>
     <button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>`;
 /* One counter per level of the variety's scale, levels from another scale that still occur after them */
@@ -253,20 +270,20 @@ const countsRow = (levels, counts) =>
   `<div class="counts">${levels
     .map(
       r =>
-        `<div class="cnt ${rateCls(r)}">${icon('r_' + r)}<b>${counts[r] || 0}</b>
+        `<div class="tile cnt ${rateCls(r)}">${icon('r_' + r)}<b>${counts[r] || 0}</b>
           <span>${RATINGS[r].lines.join('<br>')}</span></div>`,
     )
     .join('')}</div>`;
 const petBar = (pet, x) =>
-  `<div class="pp ${scoreCls(x.score)}">${avatar(pet, 'sm')}<span class="pp-name">${esc(pet.name)}</span>
-    <span class="bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b>${x.pct} %</b></div>`;
+  `<div class="row pp ${scoreCls(x.score)}">${avatar(pet, 's')}<span class="pp-name">${esc(pet.name)}</span>
+    <span class="meter bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b class="share">${x.pct} %</b></div>`;
 const mealRow = s =>
   `<li><button class="row" data-action="open-serving" data-id="${s.id}"><span class="t-main">
     <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s)}</button></li>`;
 const mealMeta = s =>
   [petNames(Object.keys(s.pets).filter(getPet)), s.note ? '„' + s.note + '“' : ''].filter(Boolean).join(', ');
 const barcodeRow = c =>
-  `<li class="list-row"><span class="t-main"><b class="num">${esc(c)}</b></span>
+  `<li class="row"><span class="t-main"><b class="num">${esc(c)}</b></span>
     <button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">
     ${icon('close')}</button></li>`;
 const MEALS_SHOWN = 12; // the rest of the history is in „Verlauf“
@@ -274,7 +291,7 @@ const MEALS_SHOWN = 12; // the rest of the history is in „Verlauf“
 function viewProduct() {
   const p = getProduct(sheet.id);
   if (!p)
-    return `<div class="sh-head"><h2>Futter</h2>${closeBtn}</div><p class="empty">Dieses Futter gibt es nicht mehr.</p>`;
+    return `<div class="sh-head"><h2>Futter</h2>${closeBtn}</div><p class="hint empty">Dieses Futter gibt es nicht mehr.</p>`;
   if (sheet.step === 'name') return viewName();
   const ss = db.servings.filter(s => s.productId === p.id),
     e = sortOf(p.id),
@@ -287,12 +304,12 @@ function viewProduct() {
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
     ${productCard(p, ss.length)}
-    ${textureChips(p, p.texture === 'block' ? '<p class="note">Vor dem Servieren zerkleinern</p>' : '')}
-    ${e.house.n ? countsRow(levels, counts) : `<p class="empty">Noch nicht bewertet.</p>`}
+    ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
+    ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}
     ${kaufenHTML(e)}
     ${perPet ? `<span class="label">Pro Tier</span>${perPet}` : ''}
-    ${hist ? `<span class="label">Verlauf</span><ul class="plist">${hist}</ul>` : ''}
-    ${codes.length ? `<span class="label">Barcodes</span><ul class="plist">${codes.map(barcodeRow).join('')}</ul>` : ''}
+    ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}
+    ${codes.length ? `<span class="label">Barcodes</span><ul class="list plist">${codes.map(barcodeRow).join('')}</ul>` : ''}
     <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Heute servieren</button>
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
@@ -338,7 +355,7 @@ const figures = m =>
 /* Under the figures: the variety that goes down best, named only from GOOD points on, and the weakest one. The
    percentage is the plain figure here, so that the only colour in the card is the rating's icon. */
 const rankRow = (x, r, text) =>
-  `<div class="rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="share">${x.pct} %</b></div>`;
+  `<div class="row rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="share">${x.pct} %</b></div>`;
 function glance(m) {
   const best = m.best && m.best.pct >= GOOD ? rankRow(m.best, 'top', 'kommt am besten an') : '';
   const worst = m.worst ? rankRow(m.worst, 'schlecht', 'bleibt am ehesten übrig') : '';
@@ -358,7 +375,7 @@ function viewReport() {
     ${
       histDays.length
         ? `<div id="histBox">${histHTML(m, 0, upto)}</div>`
-        : `<p class="empty"><span>Noch nichts serviert.</span></p>`
+        : `<p class="hint empty"><span>Noch nichts serviert.</span></p>`
     }</section>`;
 }
 /* A day tapped in the calendar of this page: the list grows until that day is drawn and a page of days under it
@@ -397,17 +414,20 @@ function growHistory() {
 }
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
 
-/* The day line sticks to the top while its meals scroll past, and the fine line under it appears only while it
-   does. CSS has no way to tell whether an element is stuck, so the observer works it out: a line that no longer
-   sits fully inside the scroll box has reached the top. It parks under the bar with the arrow, so the observer
-   looks from the same edge. Watched again whenever the history grows. */
+/* The day line sticks under the bar while its meals scroll past, and carries the edge's line only while it does.
+   CSS has no way to tell whether an element is stuck, so the observer works it out: a line that no longer sits
+   fully inside the box below the bar, and pokes out at its top rather than its bottom, is parked there. The 0
+   threshold also catches a jump straight into that place. Watched again whenever the history grows. */
 let stuck = null;
 function watchDays() {
-  const top = $('.page-bar', sheetBody)?.offsetHeight || 0;
+  const top = parseFloat(getComputedStyle(sheetBody).getPropertyValue('--stick')) || 0; // resolved while hidden too
   stuck?.disconnect();
   stuck = new IntersectionObserver(
-    entries => entries.forEach(e => e.target.classList.toggle('stuck', e.intersectionRatio < 1)),
-    {root: sheetBody, rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: [1]},
+    entries =>
+      entries.forEach(e =>
+        e.target.classList.toggle('stuck', e.intersectionRatio < 1 && e.boundingClientRect.top < e.rootBounds.top),
+      ),
+    {root: sheetBody, rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: [0, 1]},
   );
   for (const line of sheetBody.querySelectorAll('.tl-date')) stuck.observe(line);
 }
@@ -425,10 +445,10 @@ function viewPet() {
   const s = sheet,
     editing = !!s.id;
   const title = editing ? 'Tier bearbeiten' : db.pets.length ? 'Neues Tier' : 'Wer wird gefüttert?';
-  const av = avatar({photo: s.photo, species: s.species}, 'xl');
+  const av = avatar({photo: s.photo, species: s.species}, 'xxxl');
   return `${head(title)}
     <label class="pet-photo" for="petPhotoInput" aria-label="Foto wählen">${av}<span class="cam-badge">${icon('camera')}</span></label>
-    <label class="photo-hint" for="petPhotoInput">${s.photo ? 'Foto ändern' : 'Foto hinzufügen'}</label>
+    <label class="link photo-hint" for="petPhotoInput">${s.photo ? 'Foto ändern' : 'Foto hinzufügen'}</label>
     <label class="label" for="f-name">Name</label>
     <input id="f-name" class="field" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done">
     <span class="label">Tierart</span>
@@ -468,7 +488,7 @@ setSheetView(state => {
   if (state.at) {
     const at = state.at;
     state.at = null;
-    // Only inside the page: the home page carries anchors of the same name
+    // Only inside the page, which holds the day anchors
     requestAnimationFrame(() => $('#' + at, sheetBody)?.scrollIntoView({block: 'start'}));
   } // opened at a given day
 });

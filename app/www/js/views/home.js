@@ -1,6 +1,7 @@
 /* Home page: pet bar and cards in a fixed order, the welcome page when there are no pets. Everything evaluated comes
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
+import {settled} from '../motion.js';
 import {andList, esc} from '../text.js';
 import {addDays, ago, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
@@ -19,8 +20,21 @@ import {
   servingPets,
 } from '../derive.js';
 import {hintKey, rOf, scoreCls, shopGroups} from '../smart.js';
+import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
-import {avatar, calendarHTML, dayBlocks, dayGroups, nameBlock, rateRow, reasonOf, syncChip, thumbOf} from './parts.js';
+import {viewerOpen} from '../ui/viewer.js';
+import {
+  avatar,
+  calendarHTML,
+  dayBlocks,
+  dayGroups,
+  nameBlock,
+  photoThumb,
+  rateRow,
+  reasonOf,
+  syncChip,
+  thumbOf,
+} from './parts.js';
 import {renderMood} from './mood.js';
 
 /* Redraw the home page, with a smooth view transition where possible */
@@ -31,7 +45,7 @@ export function update() {
     done = true;
     renderHome();
   };
-  if (!document.startViewTransition || reduceMotion.matches || dlg.open) return run();
+  if (!document.startViewTransition || reduceMotion.matches || dlg.open || viewerOpen()) return run();
   try {
     const t = document.startViewTransition(run);
     setTimeout(() => {
@@ -55,7 +69,6 @@ export function scrollTop() {
 
 // fresh: id of the meal just served, which slides in on the next draw
 // open: unfolded cards, lasts until the app restarts
-const HIST = 5; // meals under the calendar; everything else is in the evaluation
 export const homeView = {fresh: null, open: {}};
 
 /* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
@@ -69,14 +82,14 @@ function renderPets() {
   }
   el.hidden = false;
   el.innerHTML =
-    `<button class="pet" data-action="filter" data-id="all" aria-pressed="${prefs.activePet === 'all'}" style="view-transition-name:av-all"><span class="av all">${icon('paw')}</span><span>Alle</span></button>` +
+    `<button class="pet" data-action="filter" data-id="all" aria-pressed="${prefs.activePet === 'all'}" style="view-transition-name:av-all"><span class="av xl all">${icon('paw')}</span><span>Alle</span></button>` +
     db.pets
       .map(
         p =>
-          `<button class="pet" data-action="filter" data-id="${p.id}" aria-pressed="${prefs.activePet === p.id}" style="view-transition-name:av-${p.id}">${avatar(p)}<span>${esc(p.name)}</span></button>`,
+          `<button class="pet" data-action="filter" data-id="${p.id}" aria-pressed="${prefs.activePet === p.id}" style="view-transition-name:av-${p.id}">${avatar(p, 'xl')}<span>${esc(p.name)}</span></button>`,
       )
       .join('') +
-    `<button class="pet" data-action="add-pet" aria-label="Tier hinzufügen"><span class="av add">${icon('plus')}</span><span>Neu</span></button>`;
+    `<button class="pet" data-action="add-pet" aria-label="Tier hinzufügen"><span class="av xl add">${icon('plus')}</span><span>Neu</span></button>`;
 }
 
 function renderFab() {
@@ -85,12 +98,14 @@ function renderFab() {
   if (!fab.innerHTML) fab.innerHTML = icon('bowl') + 'Füttern';
 }
 /* On serving: the bowl in the button fills up briefly */
+let fills = 0; // a second serving restarts the bowl: the first run's end must not clear it
 export function fabFill() {
-  const fab = $('#fab');
+  const fab = $('#fab'),
+    run = ++fills;
   fab.classList.remove('filled');
   void fab.offsetWidth;
   fab.classList.add('filled');
-  setTimeout(() => fab.classList.remove('filled'), 1400);
+  settled(fab, true).then(() => run === fills && fab.classList.remove('filled'));
 }
 
 /* Notice at the top: only when changes are waiting or the sync is stuck */
@@ -100,7 +115,7 @@ export function renderSyncChip() {
   el.hidden = !c;
   if (!c) return;
   el.classList.toggle('bad', c.bad);
-  el.innerHTML = `<span class="pill">${icon(c.ic)}<span>${esc(c.label)}</span></span>`;
+  el.innerHTML = `<span class="badge">${icon(c.ic)}<span>${esc(c.label)}</span></span>`;
   el.setAttribute('aria-label', `${c.label}, Haushalt in den Einstellungen öffnen`);
 }
 
@@ -143,10 +158,10 @@ function overviewHTML(m) {
   const pets = m.overview.pets.map(x => getPet(x.id)),
     one = pets.length === 1 ? pets[0] : null;
   const pic = one
-    ? `<button class="ov-pic" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'lg')}</button>`
+    ? `<button class="ov-pic" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'xxl')}</button>`
     : `<span class="ov-pic">${pets
         .slice(0, 2)
-        .map(p => avatar(p, 'pair'))
+        .map(p => avatar(p, 'l pair'))
         .join('')}</span>`;
   const tap = m.overview.last ? ` data-action="toggle-overview" aria-expanded="${!!homeView.open.overview}"` : ''; // „Noch nichts serviert.“ is short
   return `<section class="card overview${homeView.open.overview ? ' open' : ''}" data-sec="overview"${tap} style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${overviewText(m.overview)}</p></div></section>`;
@@ -215,22 +230,26 @@ const welcomeHTML = () => `<div class="welcome">
   </div></div>`;
 
 const stepsHTML = () => `<section class="card" style="view-transition-name:sec-steps"><h2>So geht’s</h2>
-  <div class="steps-hero">${sketch('camera')}</div><ol class="steps">
-  <li><span class="n">1</span><p><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
-  <li><span class="n">2</span><p><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
-  <li><span class="n">3</span><p><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und erste Erkenntnisse.</p></li></ol></section>`;
+  <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
+  <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
+  <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
+  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und erste Erkenntnisse.</p></li></ol></section>`;
 
 /* „Wie war’s?“: only while ratings are still open */
 function pendingHTML(list) {
   const multiHouse = db.pets.length > 1;
   return (
-    `<section class="card" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul>` +
+    `<section class="card" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul class="list">` +
     list
       .map(s => {
         const p = getProduct(s.productId),
           ids = openPets(s),
           multi = ids.length > 1;
-        const head = `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 'sm') : ''}</button>`;
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 's') : ''}`;
+        // With a large photo on this phone its thumbnail is a button of its own, which opens it
+        const head = hasPhoto(s, p)
+          ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
+          : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
         const rows = ids
           .map(
             pid =>
@@ -255,8 +274,9 @@ function card(key, title, {body, more, foot = ''}) {
         : ''
     }${foot}</section>`;
 }
-/* Folding open or shut: swap the content, and the card eases open or shut (220 ms, ease-out), instantly under reduced
-   motion. Without redrawing the page, so the button stays put (focus when using the keyboard). Nothing is stored. */
+/* Folding open or shut: swap the content, and the card eases open or shut (--dur-step, --ease-out), instantly
+   under reduced motion. Without redrawing the page, so the button stays put (focus when using the keyboard).
+   Nothing is stored. */
 export function expandCard(key) {
   if (!CARDS[key]) return;
   homeView.open[key] = !homeView.open[key];
@@ -271,27 +291,19 @@ export function expandCard(key) {
   btn.setAttribute('aria-expanded', String(homeView.open[key]));
   slideHeight(body, h0);
 }
-/* el eases from h0 to its new height (220 ms, ease-out), carrying "animating" while it does; instantly under
+/* el eases from h0 to its new height (--dur-step, --ease-out), carrying "animating" while it does; instantly under
    reduced motion */
 function slideHeight(el, h0) {
   const h1 = el.offsetHeight;
   if (reduceMotion.matches || h1 === h0) return;
-  el.classList.add('animating');
   el.style.height = h0 + 'px';
+  el.classList.add('animating'); // carries the height transition (app.css, Motion)
   void el.offsetHeight;
-  el.style.transition = 'height .22s ease-out';
   el.style.height = h1 + 'px';
-  let ended = false;
-  const end = e => {
-    if (ended || (e && e.target !== el)) return;
-    ended = true;
+  settled(el).then(() => {
     el.style.height = '';
-    el.style.transition = '';
     el.classList.remove('animating');
-    el.removeEventListener('transitionend', end);
-  };
-  el.addEventListener('transitionend', end);
-  setTimeout(end, 300);
+  });
 }
 
 /* Hint: the one with the highest precedence (a sentence, a reason, the buttons) */
@@ -333,7 +345,7 @@ function hintHTML(m) {
         : [`${name} kommt richtig gut an.`, set('immer', 'Immer kaufen') + hide];
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
-    <p class="say">${say}</p><p class="why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
+    <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
 /* Letzte Woche: the previous week from review() in smart.js; the device remembers „Schließen“ */
@@ -374,7 +386,7 @@ function tasteHTML(m) {
   const {known, total} = m.taste,
     pet = getPet(m.pet) || (db.pets.length === 1 ? db.pets[0] : null);
   if (total < 3) return '';
-  return `<p class="taste">${pet ? esc(genitive(pet.name)) + ' Geschmack' : 'Geschmack eurer Tiere'}: ${known} von ${total} Sorten bekannt<span class="meter"><i style="--w:${Math.round((known / total) * 100)}%"></i></span></p>`;
+  return `<p class="hint taste">${pet ? esc(genitive(pet.name)) + ' Geschmack' : 'Geschmack eurer Tiere'}: ${known} von ${total} Sorten bekannt<span class="meter"><i style="--w:${Math.round((known / total) * 100)}%"></i></span></p>`;
 }
 function shopRow(e, bars) {
   const p = e.product,
@@ -383,7 +395,7 @@ function shopRow(e, bars) {
     .filter(Boolean)
     .join(', ');
   return `<li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}
-    <span class="t-main"><b>${esc(pname(p))}</b>${sub ? `<small>${esc(sub)}</small>` : ''}${bars ? `<span class="bar ${cls}"><i style="--w:${Math.max(4, e.pct)}%"></i></span>` : ''}</span>
+    <span class="t-main"><b>${esc(pname(p))}</b>${sub ? `<small>${esc(sub)}</small>` : ''}${bars ? `<span class="meter bar ${cls}"><i style="--w:${Math.max(4, e.pct)}%"></i></span>` : ''}</span>
     ${e.kaufen ? `<span class="pin" title="Eigene Einstellung">${icon('pin')}</span>` : ''}${e.n ? `<span class="pct">${e.pct}<small>%</small></span>` : ''}</button></li>`;
 }
 function shopCard(m) {
@@ -392,7 +404,7 @@ function shopCard(m) {
   if (!g.nachkaufen.length && !g.nicht.length)
     return {
       body:
-        '<p class="card-line">Noch zu wenig Bewertungen. Nach ein paar Mahlzeiten siehst du hier, was ankommt.</p>' +
+        '<p class="hint card-line">Noch zu wenig Bewertungen. Nach ein paar Mahlzeiten siehst du hier, was ankommt.</p>' +
         tasteHTML(m),
       more: false,
     };
@@ -400,7 +412,7 @@ function shopCard(m) {
     SHOP.map(([k, title, max]) => {
       const list = open ? g[k] : g[k].slice(0, max);
       return list.length
-        ? `<h3 class="grp">${title}</h3><ul class="shop">${list.map(e => shopRow(e, open)).join('')}</ul>`
+        ? `<h3 class="label grp">${title}</h3><ul class="list shop">${list.map(e => shopRow(e, open)).join('')}</ul>`
         : '';
     }).join('') +
     tasteHTML(m) +
@@ -427,35 +439,37 @@ function insightCard(m) {
   if (!m.insights.length) return null;
   const list = homeView.open.ins ? m.insights : m.insights.slice(0, 1);
   return {
-    body: `<ul class="ins">${list.map(i => `<li><span class="dot">${icon(INSIGHT[i.kind][0])}</span><span>${insightHTML(i, m)}</span></li>`).join('')}</ul>`,
+    body: `<ul class="list ins">${list.map(i => `<li class="row"><span class="lead">${icon(INSIGHT[i.kind][0])}</span><span>${insightHTML(i, m)}</span></li>`).join('')}</ul>`,
     more: m.insights.length > 1,
   };
 }
 const CARDS = {shop: shopCard, ins: insightCard};
 
-/* Meals within the pet filter, newest first (db.servings is sorted by time descending): the first n for the
-   timeline and everything since `since` for the calendar. Both in one pass, which stops as soon as both are done. */
-function someServings(n, since) {
-  const first = [],
-    recent = [];
-  for (const s of db.servings) {
-    if (first.length >= n && s.servedAt < since) break;
-    if (!servingPets(s).length) continue;
-    if (first.length < n) first.push(s);
-    if (s.servedAt >= since) recent.push(s);
-  }
-  return {first, recent};
-}
-/* Below the calendar the latest HIST meals, grouped by day, and the button to „Verlauf“, where the whole history
-   is. The calendar always shows its two weeks. */
+/* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while
+   nothing has been served today, each day whole. One pass over the calendar's two weeks, newest first, which stops
+   at its first day, so years of data cost nothing. The button leads to „Verlauf“, where the whole history is. */
 function historyHTML() {
-  const {first, recent} = someServings(HIST, addDays(weekStart(Date.now()), -7));
-  const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
+  const now = Date.now(),
+    since = addDays(weekStart(now), -7), // the calendar's first day, always before yesterday
+    today = dayKey(now),
+    yesterday = dayKey(addDays(now, -1)),
+    recent = [],
+    days = {[today]: [], [yesterday]: []};
+  for (const s of db.servings) {
+    if (s.servedAt < since) break;
+    if (!servingPets(s).length) continue;
+    recent.push(s);
+    days[dayKey(s.servedAt)]?.push(s);
+  }
+  const shown = days[today].length ? days[today] : days[yesterday],
+    multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
   return (
     calendarHTML(recent) +
-    (first.length
-      ? dayBlocks(dayGroups(first), {multiHouse, fresh: homeView.fresh, anchors: true})
-      : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
+    (shown.length
+      ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
+      : recent.length || db.servings.some(s => servingPets(s).length)
+        ? `<p class="hint empty"><span>Heute noch nichts serviert.</span></p>`
+        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert.</span></p>`) +
     // The only way to „Verlauf“, so it reads like the other cards' buttons and says where it leads
     `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
   );
