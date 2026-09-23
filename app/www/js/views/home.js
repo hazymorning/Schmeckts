@@ -55,7 +55,6 @@ export function scrollTop() {
 
 // fresh: id of the meal just served, which slides in on the next draw
 // open: unfolded cards, lasts until the app restarts
-const HIST = 5; // meals under the calendar; everything else is in the evaluation
 export const homeView = {fresh: null, open: {}};
 
 /* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
@@ -433,29 +432,31 @@ function insightCard(m) {
 }
 const CARDS = {shop: shopCard, ins: insightCard};
 
-/* Meals within the pet filter, newest first (db.servings is sorted by time descending): the first n for the
-   timeline and everything since `since` for the calendar. Both in one pass, which stops as soon as both are done. */
-function someServings(n, since) {
-  const first = [],
-    recent = [];
-  for (const s of db.servings) {
-    if (first.length >= n && s.servedAt < since) break;
-    if (!servingPets(s).length) continue;
-    if (first.length < n) first.push(s);
-    if (s.servedAt >= since) recent.push(s);
-  }
-  return {first, recent};
-}
-/* Below the calendar the latest HIST meals, grouped by day, and the button to „Verlauf“, where the whole history
-   is. The calendar always shows its two weeks. */
+/* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while
+   nothing has been served today, each day whole. One pass over the calendar's two weeks, newest first, which stops
+   at its first day, so years of data cost nothing. The button leads to „Verlauf“, where the whole history is. */
 function historyHTML() {
-  const {first, recent} = someServings(HIST, addDays(weekStart(Date.now()), -7));
-  const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
+  const now = Date.now(),
+    since = addDays(weekStart(now), -7), // the calendar's first day, always before yesterday
+    today = dayKey(now),
+    yesterday = dayKey(addDays(now, -1)),
+    recent = [],
+    days = {[today]: [], [yesterday]: []};
+  for (const s of db.servings) {
+    if (s.servedAt < since) break;
+    if (!servingPets(s).length) continue;
+    recent.push(s);
+    days[dayKey(s.servedAt)]?.push(s);
+  }
+  const shown = days[today].length ? days[today] : days[yesterday],
+    multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
   return (
     calendarHTML(recent) +
-    (first.length
-      ? dayBlocks(dayGroups(first), {multiHouse, fresh: homeView.fresh, anchors: true})
-      : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
+    (shown.length
+      ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
+      : recent.length || db.servings.some(s => servingPets(s).length)
+        ? `<p class="empty"><span>Heute noch nichts serviert.</span></p>`
+        : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
     // The only way to „Verlauf“, so it reads like the other cards' buttons and says where it leads
     `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
   );

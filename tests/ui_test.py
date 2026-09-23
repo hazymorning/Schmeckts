@@ -98,7 +98,9 @@ async def test_tour(browser, url, scheme='light'):
     check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'shopping unfolded: every variety')
     await pg.click('[data-action=expand][data-v=ins]')
     await idle(pg)
-    check(await pg.locator('[data-sec=hist] .tl-item').count() == 5, 'the history shows five meals')
+    current = await pg.evaluate(CURRENT)
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
+    check(shown == current and len(shown) >= 1, f'the history shows the meals of the current day ({len(shown)})')
     await shot(pg, f'{scheme}-unfolded')
     await settings(pg)
     other = 'dark' if scheme == 'light' else 'light'
@@ -349,15 +351,15 @@ async def test_cards(browser, url):
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]')
     await idle(pg)
-    # History: the calendar and the last five meals, grouped by day
-    recent = await pg.evaluate("import('./js/store.js').then(s => s.db.servings.slice(0, 5).map(x => x.id))")
+    # History: the calendar and the meals of the current day
+    current = await pg.evaluate(CURRENT)
     shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
     check(
         await pg.locator('[data-sec=hist] .cal').is_visible()
         and await pg.locator('[data-sec=hist] .tl-node').first.is_visible()
-        and shown == recent
-        and await pg.locator('[data-sec=hist] .tl-day').count() >= 2,
-        f'history: the calendar and the last five meals by day ({len(shown)})',
+        and shown == current
+        and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
+        f'history: the calendar and the meals of the current day ({len(shown)})',
     )
     # Shopping folded up: up to 3 to buy again, below them up to 2 no longer bought
     groups = """import('./js/derive.js').then(d => { const m = d.model(), g = e => e.choice === 'gemischt' ? 'nachkaufen' : e.choice, shown = m.sorts.filter(e => e.n || e.kaufen);
@@ -706,8 +708,9 @@ SCALES_DB = """() => import('./js/store.js').then(async s => { const d = s.defau
 
 async def test_scales(browser, url):
     print('rating per food type: the variety\u2019s scale, four columns at 360 px, a foreign level stays visible, counters in the food sheet')
-    ctx = await phone(browser, width=360, height=800)
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-10T23:30:00+02:00')  # all six meals on one day, so the home page shows them
     await pg.evaluate(SCALES_DB)
     await idle(pg)
     ROW = """row => [...row.children].map(b => { const r = b.getBoundingClientRect(), lines = [...b.querySelectorAll('span, small')];
@@ -3468,12 +3471,45 @@ async def test_suggestions(browser, url):
     await ctx.close()
 
 
+# Meals at given times for the home page's history: pets [id, name], meals [id, time, pet ids, variety]
+AT = """([pets, meals]) => import('./js/store.js').then(async s => { const d = s.defaults();
+  d.pets = pets.map(([id, name], i) => ({id, name, species: 'Katze', createdAt: i}));
+  d.products = ['Lachs', 'Huhn', 'Rind'].map((variety, i) => ({id: 'sorte0000' + i, brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.servings = meals.map(([id, t, ids, v]) => ({id, productId: 'sorte0000' + (v || 0), servedAt: new Date(t).getTime(), note: '',
+    pets: Object.fromEntries(ids.map(pid => [pid, {r: 'gut', at: new Date(t).getTime()}]))}));
+  d.servings.sort((a, b) => b.servedAt - a.servedAt);
+  s.prefs.activePet = 'all'; s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+# What the history card on the home page shows: its day lines, the meals, and the line when there are none
+HOME_HIST = """() => { const c = document.querySelector('[data-sec=hist]'), e = c.querySelector('.empty');
+  return {days: [...c.querySelectorAll('.tl-date')].map(d => [d.querySelector('b').innerText, d.querySelector('span').innerText]),
+    ids: [...c.querySelectorAll('.tl-item')].map(b => b.dataset.id), empty: e ? e.innerText.trim() : null, sketch: !!c.querySelector('.empty .sk'),
+    btn: !!c.querySelector('.card-btn[data-action=open-report]'), cal: c.querySelectorAll('.cal .day.has').length}; }"""
+# The meals the home page should show: today's within the filter, or yesterday's while there are none today
+CURRENT = """() => import('./js/store.js').then(async s => { const {dayKey, addDays} = await import('./js/dates.js'), {servingPets} = await import('./js/derive.js');
+  const now = Date.now(), mine = s.db.servings.filter(x => servingPets(x).length), on = k => mine.filter(x => dayKey(x.servedAt) === k).map(x => x.id);
+  const today = on(dayKey(now)); return today.length ? today : on(dayKey(addDays(now, -1))); })"""
+M, T = 'minka00001', 'tiger00001'
+
+
 async def test_home_history(browser, url):
-    print('the history on the home page: five meals, a calendar, and the button to the history page')
-    ctx = await phone(browser)
+    print('the history on the home page: only what is current, today or else yesterday')
+    ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
-    await pg.evaluate(SORTS, [26, 1])
-    await idle(pg)
+
+    async def seed(now, meals, pets=((M, 'Minka'),)):
+        await pg.clock.set_fixed_time(now)
+        await pg.evaluate(AT, [list(pets), meals])
+        await idle(pg)
+        return await pg.evaluate(HOME_HIST)
+
+    owner = [
+        ['m1', '2026-06-12T07:00', [M]],
+        ['m2', '2026-06-11T07:30', [M]],
+        ['m3', '2026-06-11T12:00', [M]],
+        ['m4', '2026-06-11T18:30', [M]],
+        ['m5', '2026-06-10T08:00', [M]],
+    ]
+    got = await seed('2026-06-12T10:00:00+02:00', owner)
     btn = await pg.eval_on_selector(
         '[data-sec=hist] [data-action=open-report]',
         """b => { const ic = b.querySelector('svg'); const r = ic.getBoundingClientRect();
@@ -3481,30 +3517,88 @@ async def test_home_history(browser, url):
             getComputedStyle(ic).width]; }""",
     )
     check(
-        await pg.locator('[data-sec=hist] .tl-item').count() == 5
-        and await pg.locator('[data-sec=hist] .tl-day').count() == 5
-        and btn == ['Ganzer Verlauf', 'card-btn', True, True, '20px'],
-        f'five meals grouped by day, below them „Ganzer Verlauf“ as a card button with the chevron at its end ({btn})',
+        got['days'] == [['Heute', '1 Mahlzeit']] and got['ids'] == ['m1'] and btn == ['Ganzer Verlauf', 'card-btn', True, True, '20px'],
+        f'something served today: only today, and „Ganzer Verlauf“ below it with the chevron at its end ({got["days"]}, {btn})',
     )
-    # A day in the calendar: near ones scroll on the home page, older ones open the history page there
-    days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
-    await pg.click(f'[data-action=jump-day][data-day="{days[-1]}"]')
-    await idle(pg)
-    near = await pg.evaluate("k => [document.getElementById('sheet').open, !!document.getElementById('d-' + k)]", days[-1])
-    await pg.click(f'[data-action=jump-day][data-day="{days[0]}"]')
-    await idle(pg)
-    at_day = await pg.evaluate(
-        """k => { const d = document.getElementById('sheetBody').querySelector('#d-' + k);
-      const bar = document.querySelector('#sheet .page-bar').getBoundingClientRect();
-      return [document.getElementById('sheet').open, !!d, Math.round((d?.getBoundingClientRect().top ?? 0) - bar.bottom)]; }""",
-        days[0],
-    )
+    got = await seed('2026-06-12T05:30:00+02:00', owner[1:])
     check(
-        near == [False, True] and at_day[:2] == [True, True] and 0 <= at_day[2] < 24,
-        f'a day still on show scrolls, an older one opens the history page right at it ({near}, {at_day})',
+        got['days'] == [['Gestern', '3 Mahlzeiten']] and got['ids'] == ['m4', 'm3', 'm2'],
+        f'early in the morning, nothing yet today: yesterday, whole and newest first ({got["days"]}, {got["ids"]})',
     )
-    await pg.click('#sheet [data-action=settings-back]')
+    got = await seed('2026-06-14T10:00:00+02:00', owner)
+    check(
+        got['days'] == [] and got['empty'] == 'Heute noch nichts serviert.' and not got['sketch'] and got['cal'] >= 1 and got['btn'],
+        f'neither today nor yesterday: a line that says so, the calendar and the button stay ({got})',
+    )
+    pets = ((M, 'Minka'), (T, 'Tiger'), ('mauz000001', 'Mauz'))
+    got = await seed(
+        '2026-06-12T10:00:00+02:00', [['t1', '2026-06-12T08:00', [T]], ['k1', '2026-06-11T08:00', [M]], ['k2', '2026-06-11T18:00', [M]]], pets
+    )
+    everyone = got
+    minka, never = [], []
+    for pet, out in ((M, minka), ('mauz000001', never)):
+        await pg.click(f'[data-action=filter][data-id={pet}]')
+        await idle(pg)
+        out.append(await pg.evaluate(HOME_HIST))
+    check(
+        everyone['ids'] == ['t1']
+        and minka[0]['days'][0][0] == 'Gestern'
+        and minka[0]['ids'] == ['k2', 'k1']
+        and never[0]['empty'] == 'Noch nichts serviert.'
+        and never[0]['sketch'],
+        f'within the pet filter: „Alle“ today, Minka yesterday, a pet never fed the sketch ({everyone["ids"]}, {minka[0]["ids"]}, {never[0]["empty"]})',
+    )
+    got = await seed('2026-06-12T00:05:00+02:00', [['n1', '2026-06-11T23:50', [M]]])
+    check(got['days'] == [['Gestern', '1 Mahlzeit']] and got['ids'] == ['n1'], f'just after midnight the evening meal is yesterday ({got})')
+    got = await seed('2026-06-12T10:00:00+02:00', [['f1', '2026-06-13T09:00', [M]], ['f2', '2026-06-12T07:00', [M]]])
+    check(got['ids'] == ['f2'], f'a meal stamped in the future by another clock does not push today away ({got["ids"]})')
+
+    # The card does not grow with the history: twenty days of three meals weigh nothing
+    today3 = [[f'h{i}', f'2026-06-12T0{7 + i}:00', [M]] for i in range(3)]
+    long = today3 + [[f'd{d}-{i}', f'2026-05-{11 + d:02d}T{8 + 4 * i:02d}:00', [M]] for d in range(20) for i in range(3)]
+    await seed('2026-06-12T12:00:00+02:00', long)
+    tall = await pg.eval_on_selector('[data-sec=hist]', 'c => Math.round(c.getBoundingClientRect().height)')
+    await seed('2026-06-12T12:00:00+02:00', today3 + [['y1', '2026-06-11T08:00', [M]]])
+    short = await pg.eval_on_selector('[data-sec=hist]', 'c => Math.round(c.getBoundingClientRect().height)')
+    check(tall == short, f'the card is as tall after twenty days as after one ({tall}, {short})')
+
+    # Serving switches from yesterday to today, undo switches back
+    await seed('2026-06-12T05:30:00+02:00', owner[1:])
+    await pg.click('#fab')
     await idle(pg)
+    await pg.click('#sheet [data-action=serve]')
+    await idle(pg)
+    served = await pg.evaluate(HOME_HIST)
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    undone = await pg.evaluate(HOME_HIST)
+    check(
+        served['days'] == [['Heute', '1 Mahlzeit']] and len(served['ids']) == 1 and undone['ids'] == ['m4', 'm3', 'm2'],
+        f'the first meal of the day replaces yesterday, and undo brings yesterday back ({served["days"]}, {undone["ids"]})',
+    )
+
+    # A day in the calendar always opens the history page right at that day; the home page holds no anchors
+    await seed('2026-06-12T12:00:00+02:00', long)
+    days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
+    at = []
+    for day in (days[-1], days[0]):
+        await pg.click(f'[data-sec=hist] [data-action=jump-day][data-day="{day}"]')
+        await idle(pg)
+        at.append(
+            await pg.evaluate(
+                """k => { const d = document.getElementById('sheetBody').querySelector('#d-' + k);
+              const bar = document.querySelector('#sheet .page-bar').getBoundingClientRect();
+              return [document.getElementById('sheet').open, !!d, Math.round((d?.getBoundingClientRect().top ?? 0) - bar.bottom)]; }""",
+                day,
+            )
+        )
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+    anchors = await pg.locator('#home [id^="d-"]').count()
+    check(
+        all(a[:2] == [True, True] and 0 <= a[2] < 24 for a in at) and anchors == 0,
+        f'today and the oldest day open the history page right at that day, and the home page has no anchors ({at}, {anchors})',
+    )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 

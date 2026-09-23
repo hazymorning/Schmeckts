@@ -468,7 +468,7 @@ setSheetView(state => {
   if (state.at) {
     const at = state.at;
     state.at = null;
-    // Only inside the page: the home page carries anchors of the same name
+    // Only inside the page, which holds the day anchors
     requestAnimationFrame(() => $('#' + at, sheetBody)?.scrollIntoView({block: 'start'}));
   } // opened at a given day
 });

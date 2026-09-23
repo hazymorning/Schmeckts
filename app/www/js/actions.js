@@ -1,6 +1,6 @@
 /* Every click runs through data-action and the ACTIONS object. Plus input, the keyboard, the file picker
    and the deep links schmeckts://feed, schmeckts://scan and schmeckts://photo. Registers itself as it loads. */
-import {$, reduceMotion} from './dom.js';
+import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
@@ -385,12 +385,9 @@ const ACTIONS = {
     toggleOverview();
   }, // the overview's full text and back
   'jump-day'(el) {
-    const key = el.dataset.day;
     haptic('select');
-    if (sheet?.kind === 'report') return jumpToDay(key); // the calendar of the history page scrolls within it
-    const target = document.getElementById('d-' + key);
-    if (target) target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start'});
-    else openSheet(reportState('d-' + key)); // further back than the home page shows: the history page opens there
+    if (sheet?.kind === 'report') return jumpToDay(el.dataset.day); // the page's own calendar scrolls within it
+    openSheet(reportState('d-' + el.dataset.day)); // the home page shows only the current day: the history page opens there
   },
   undo() {
     const u = toastUndo;

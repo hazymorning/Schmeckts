@@ -151,7 +151,7 @@ export function dayGroups(list) {
   }
   return groups;
 }
-/* anchors: ids for the days, where the home page's calendar jumps to; fresh: the meal just served */
+/* anchors: ids for the days of the history page, where a calendar jumps to; fresh: the meal just served */
 export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}) {
   return groups
     .map(
