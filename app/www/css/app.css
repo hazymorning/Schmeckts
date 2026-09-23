@@ -1608,9 +1608,15 @@ dialog.sheet.page.closing {
     transform: translateX(100%);
   }
 }
+/* A page always fills the dialog, however little it holds. Sized by its contents it would be 844px on one level
+   and 260px on the next, and the step would then scale both pictures into a box shrinking between the two while
+   they slide: the top would stand still and the bottom drag after it (PROJECT.md, „Principles“ 3: the height
+   never jumps). */
 dialog.sheet.page .sheet-body {
   position: relative;
   z-index: 1;
+  flex: 1;
+  min-height: 0;
   background: var(--bg);
   padding: 0 var(--space-4) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   view-transition-name: page;
@@ -1627,11 +1633,15 @@ dialog.sheet.page[data-kind="report"] .page-title {
 /* A level deeper and back: the page you go to comes in from the side while the one you leave goes out the other
    way. The browser takes both pictures itself, so nothing has to be copied first (ui/sheet.js sets the direction
    on <html>). Nothing moves inside either of them. */
+/* Nothing but the two pictures moves: the box they sit in is the same on every level, so anything the browser
+   would animate on it can only fight the slide. */
 ::view-transition-group(page) {
-  animation-duration: 0.3s;
-  animation-timing-function: var(--ease-out);
+  animation: none;
 }
 /* The default lightens the two pictures where they overlap; here one slides in front of the other. */
+::view-transition-image-pair(page) {
+  isolation: auto;
+}
 ::view-transition-old(page),
 ::view-transition-new(page) {
   mix-blend-mode: normal;

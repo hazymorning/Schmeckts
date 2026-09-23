@@ -3189,16 +3189,22 @@ GROUPS = """() => [...document.querySelectorAll('#sheet .set-group')].map(g => [
   [...g.querySelectorAll('.set-row')].map(r => [r.querySelector('.t-main b').innerText, r.getAttribute('role'),
     r.querySelector('.chev') ? 'chevron' : null])])"""
 # One step between two levels of a page: what the view transition moves, and nothing else. The pictures are only
-# there for the length of the step, so they are collected while it runs.
+# there for the length of the step, so they are collected while it runs. A group among them would mean the box
+# itself is being animated as well, which scales both pictures while they slide.
 PAGE_STEP = """async sel => { const seen = new Map();
   const watch = setInterval(() => { for (const a of document.getAnimations()) { const p = a.effect?.pseudoElement || '';
-    if (/^::view-transition-(old|new)\\(/.test(p) && !seen.has(p))
+    if (/^::view-transition-(old|new|group)\\(/.test(p) && !seen.has(p))
       seen.set(p, [p.slice('::view-transition-'.length).replace('(', ' ').replace(')', ''), a.animationName,
         a.effect.getComputedTiming().duration]); } }, 16);
   document.querySelector(sel).click();
   await new Promise(done => setTimeout(done, 400));
   clearInterval(watch);
   return [...seen.values()].sort(); }"""
+
+# The page body fills the dialog on every level, so that the step has nothing but the two pictures to move
+BODY_BOX = """() => { const b = document.getElementById('sheetBody').getBoundingClientRect();
+  const d = document.getElementById('sheet'), s = getComputedStyle(d);
+  return [Math.round(b.height), Math.round(d.getBoundingClientRect().height - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom))]; }"""
 
 
 # Where the page stands: its title, whether the sheet is a full-screen page, and how far it sits from the left
@@ -3265,8 +3271,10 @@ async def test_settings(browser, url):
         and slide[0][1:] == [300, 'translateX(100%)'],
         f'the settings fill the screen and come in from the side in 300 ms ({page}, {slide})',
     )
+    long_page = await pg.evaluate(BODY_BOX)
     step = await pg.evaluate(PAGE_STEP, '#sheet [data-action=settings-page][data-v=house]')
     await idle(pg)
+    short_page = await pg.evaluate(BODY_BOX)
     back = await pg.evaluate(PAGE_STEP, '#sheet [data-action=settings-back]')
     await idle(pg)
     check(
@@ -3274,6 +3282,10 @@ async def test_settings(browser, url):
         and back == [['new page', 'pageFromAside', 300], ['old page', 'pageToSide', 300]]
         and await pg.locator('#sheet .sheet-body').count() == 1,
         f'a page below comes in from the side while the one above it goes out, and back the other way round ({step}, {back})',
+    )
+    check(
+        long_page == short_page and long_page[0] == long_page[1],
+        f'and the page fills the dialog whatever it holds, so the step scales nothing ({long_page}, {short_page})',
     )
     await ctx.close()
 
