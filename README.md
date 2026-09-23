@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c52ea318-febc-455c-992b-abff5e8857ef" width="880" alt="Schmeckt’s? Die App, die sich merkt, welches Futter bei deinem Tier ankommt.">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/c52ea318-febc-455c-992b-abff5e8857ef">
+    <img src="https://github.com/user-attachments/assets/14afd13f-12c3-417d-b01c-f75f93e1caa9" width="880" alt="Schmeckt’s? Die App, die sich merkt, welches Futter bei deinem Tier ankommt.">
+  </picture>
 </p>
 
 <p align="center">
