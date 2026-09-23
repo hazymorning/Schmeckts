@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Design rules from PROJECT.md: palette and contrasts, typefaces, logo, animation, every view in light and dark.
+"""Design rules from PROJECT.md: palette and contrasts, type, space, sizes and motion, logo, every view in light and dark.
 Usage: python3 tests/design_test.py [name …]"""
 
 import contextlib
@@ -102,6 +102,10 @@ async def test_palette(browser, url):
             len(got) == 5 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, RATING[:1] + RATING)),
             f'the rating buttons show the rating colours, „Sofort leer“ and „Später leer“ both --good ({theme})',
         )
+    check(
+        await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
+        'dur() reads the duration tokens',
+    )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
@@ -213,16 +217,92 @@ def css_blocks(text):
     return [(' '.join(sel.split()), {p: css_value(v) for p, v in decls}) for sel, decls in css_rules(text)]
 
 
+SECTIONS = ('Foundations', 'Recipes', 'Views', 'Motion')
+KEYFRAME_STEP = re.compile(r'(from|to|[\d.]+%)(\s*,\s*(from|to|[\d.]+%))*')
+REDUCED = '@media (prefers-reduced-motion: reduce)'
+
+
+def tokens_root(sel=':root'):
+    return {p: v for s, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8')) if s == sel for p, v in d.items()}
+
+
+def cut_block(text, head):
+    """(text without the at-rule that starts with head, that rule's body)"""
+    i = text.find(head)
+    if i < 0:
+        return text, ''
+    j = k = text.index('{', i) + 1
+    depth = 1
+    while depth:
+        depth += {'{': 1, '}': -1}.get(text[k], 0)
+        k += 1
+    return text[:i] + text[k:], text[j : k - 1]
+
+
+def keyframes(text):
+    """{name: body} of every @keyframes, brace-matched"""
+    out = {}
+    for m in re.finditer(r'@keyframes\s+([\w-]+)\s*\{', text):
+        depth, i = 1, m.end()
+        while depth:
+            depth += {'{': 1, '}': -1}.get(text[i], 0)
+            i += 1
+        out[m.group(1)] = text[m.end() : i - 1]
+    return out
+
+
+def app_decls():
+    """(section, selector, property, value) for app.css, keyframe steps and the reduced-motion rule left out"""
+    text = re.sub(r'/\*(?! == )(.*?)\*/', '', (WWW / 'css/app.css').read_text(encoding='utf-8'), flags=re.S)
+    text = cut_block(text, REDUCED)[0]
+    parts = re.split(r'/\* == (\w+) == \*/', text)
+    out = []
+    for name, body in zip(['(before)'] + parts[1::2], [parts[0]] + parts[2::2]):
+        for sel, decls in css_rules(body):
+            sel = ' '.join(sel.split())
+            if KEYFRAME_STEP.fullmatch(sel):
+                continue
+            out += [(name, sel, p, css_value(v)) for p, v in decls]
+    return out
+
+
+def split_top(value):
+    """value split at commas outside parentheses: var(--c, var(--line)) stays whole"""
+    parts, depth, cur = [], 0, ''
+    for ch in value:
+        depth += {'(': 1, ')': -1}.get(ch, 0)
+        if ch == ',' and not depth:
+            parts.append(cur.strip())
+            cur = ''
+        else:
+            cur += ch
+    return [p for p in parts + [cur.strip()] if p]
+
+
+def literal_px(value):
+    """px literals other than 0, env() fallbacks taken out"""
+    bare = re.sub(r'env\([^()]*(\([^()]*\))?[^()]*\)', '', value)
+    return [x for x in re.findall(r'(?<![\w.-])-?\d*\.?\d+px', bare) if float(x[:-2]) != 0]
+
+
+def subjects(sel):
+    return [re.split(r'\s*[\s>+~]\s*', s.strip())[-1] for s in split_top(sel)]
+
+
 def test_rules_static():
     print('design rules in the sources')
     css = {f: (WWW / 'css' / f).read_text() for f in ('tokens.css', 'app.css')}
+    blocks = css_blocks(css['tokens.css'])
+    root = next(d for sel, d in blocks if sel == ':root')
     bad = []
     for f, text in css.items():
         for sel, decls in css_rules(text):
             for prop, val in decls:
                 if prop == 'text-transform' and val != 'none' and '.field.code' not in sel:
                     bad.append(f'{sel} {prop}:{val}')
-                if prop == 'letter-spacing' and not val.startswith('-') and val not in ('0', 'normal') and '.field.code' not in sel:
+                # a token counts with its value, or var(--track-title) would read as positive
+                real = root.get(val[4:-1], val) if val.startswith('var(--') else val
+                if prop == 'letter-spacing' and not real.startswith('-') and real not in ('0', 'normal') and '.field.code' not in sel:
                     bad.append(f'{sel} {prop}:{val}')
     js = [f.name for f in (WWW / 'js').rglob('*.js') if re.search(r'text-?transform|letter-?spacing', f.read_text(), re.I)]
     js += [f for f in ('index.html',) if re.search(r'text-transform|letter-spacing', (WWW / f).read_text())]
@@ -245,9 +325,7 @@ def test_rules_static():
         and 'df206bf23e42149d22847217c70577855c9eebe5ef9d40706199fc9e5bee3450' in prep,
         'prepare.py downloads both typefaces with a checksum',
     )
-    blocks = css_blocks(css['tokens.css'])
     faces = {d.get('font-family'): d for sel, d in blocks if sel == '@font-face'}
-    root = next(d for sel, d in blocks if sel == ':root')
     check(
         faces.get('"Figtree"', {}).get('font-weight') == '400 700'
         and faces.get('"Faustina"', {}).get('font-weight') == '500 700'
@@ -286,14 +364,7 @@ def test_rules_static():
         f'Android resources use the palette\u2019s values only, apart from the logo vectors ({android})',
     )
     # Animation as movement and opacity within the shape only: no fill, no shadow, no border in @keyframes
-    frames = {}
-    for f, text in css.items():
-        for m in re.finditer(r'@keyframes\s+([\w-]+)\s*\{', text):
-            depth, i = 1, m.end()
-            while depth:
-                depth += {'{': 1, '}': -1}.get(text[i], 0)
-                i += 1
-            frames[m.group(1)] = text[m.end() : i - 1]
+    frames = {n: body for text in css.values() for n, body in keyframes(text).items()}
     loud = [
         f'{n}: {p}'
         for n, body in frames.items()
@@ -326,7 +397,24 @@ def test_rules_static():
 FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
 
 
-SCAN = """(allowed) => { const bad = [], seen = new Set();
+# The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
+# recipe, which the static parse cannot see.
+INSETS = {
+    '.card': '18px 18px 8px',
+    '.group': '4px 16px',
+    '.row, .pend, .card-btn': '10px 0px',
+    '.box, .banner': '12px',
+    '.tile': '10px 0px 8px',
+    '.btn, .field:not(.in-row, .pick .field, .search .field)': '12px 16px',
+    '.chip, .field.in-row, .toast button, .cam-hint': '8px 16px',
+    '.badge:not(.ic-only)': '4px 10px',
+    '.seg': '4px',
+    '.seg button': '8px 6px',
+}
+FIGURES_JS = '.num, .tl-time, .pct, .cnt b, .share, .day .dn, .steps .n, .field.code'
+
+
+SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set();
   const rgba = c => { const m = (c.match(/[\\d.]+/g) || []).map(Number); return [m[0] || 0, m[1] || 0, m[2] || 0, m.length > 3 ? m[3] : 1]; };
   const lum = c => { const f = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
   const probe = document.createElement('i'); probe.style.color = 'var(--faint)'; document.body.append(probe);
@@ -345,11 +433,18 @@ SCAN = """(allowed) => { const bad = [], seen = new Set();
     if (el.id !== 'f-code' && s.textTransform !== 'none') bad.push('uppercase ' + tag);
     if (el.id !== 'f-code' && s.letterSpacing !== 'normal' && parseFloat(s.letterSpacing) > 0) bad.push('letter-spaced ' + tag);
     if (!own && el.tagName !== 'INPUT') continue;
+    const size = parseFloat(s.fontSize), lead = Math.round(parseFloat(s.lineHeight) / size * 100) / 100;
+    if (![12, 14, 16, 21, 30].includes(size) || !['400', '600', '650'].includes(s.fontWeight) || ![1.1, 1.25, 1.4, 1.5].includes(lead))
+      bad.push(`type ${s.fontWeight} ${s.fontSize}/${s.lineHeight} ${tag}`);
+    if (s.letterSpacing !== 'normal' && el.id !== 'f-code' && !(size === 30 && s.letterSpacing === '-0.45px')) bad.push(`tracking ${s.letterSpacing} ${tag}`);
+    if (el.matches(figures) && s.fontVariantNumeric !== 'tabular-nums') bad.push('proportional figures ' + tag);
     if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
     if (fam === 'Faustina') { if (!el.closest(allowed)) bad.push('Faustina on ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
     else if (fam !== 'Figtree') bad.push(fam + ' on ' + tag);
   }
+  for (const [sel, pad] of Object.entries(insets)) for (const b of document.querySelectorAll(sel))
+    if (b.getClientRects().length && getComputedStyle(b).padding !== pad) bad.push(`inset ${sel} ${getComputedStyle(b).padding}`);
   return {bad: [...new Set(bad)], seen: [...seen]}; }"""
 
 
@@ -363,7 +458,7 @@ async def test_rules(browser, url):
         seen, bad = set(), []
 
         async def scan():
-            r = await pg.evaluate(SCAN, FAUSTINA)
+            r = await pg.evaluate(SCAN, [FAUSTINA, INSETS, FIGURES_JS])
             bad.extend(r['bad'])
             seen.update(r['seen'])
 
@@ -405,7 +500,7 @@ async def test_rules(browser, url):
               c.firstElementChild.tagName, h.fontFamily.split(',')[0].replace(/"/g, ''), h.fontWeight, h.fontSize, h.lineHeight, h.letterSpacing, h.color === p.color].join('|'); }),
             gaps: cards.slice(1).map((c, i) => Math.round(c.getBoundingClientRect().top - cards[i].getBoundingClientRect().bottom))};
           probe.remove(); return out; })()""")
-        want = 'true|true|none|24px|18px 18px 8px|none|0px|0px|H2|Faustina|600|21px|26.25px|-0.105px|true'
+        want = 'true|true|none|24px|18px 18px 8px|none|0px|0px|H2|Faustina|600|21px|26.25px|normal|true'
         first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
         check(
             layout['app'] == ['600px', '18px', '18px']
@@ -419,13 +514,13 @@ async def test_rules(browser, url):
         await idle(pg)
         await scan()
         label = await pg.eval_on_selector(
-            '.label',
+            '#sheet .label',
             """l => { const s = getComputedStyle(l), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.after(probe);
           const c = getComputedStyle(probe).color; probe.remove(); return [s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.color === c, s.textTransform, s.letterSpacing, l.innerText]; }""",
         )
         check(
-            label == ['Figtree', '600', '13.5px', True, 'none', 'normal', 'Tiere'],
-            f'field label: Figtree 600, 13.5px, muted, normal casing ({label})',
+            label == ['Figtree', '600', '14px', True, 'none', 'normal', 'Tiere'],
+            f'field label: Figtree 600, 14px, muted, normal casing ({label})',
         )
         await pg.click('#sheet [data-action=settings-page][data-v=house]')
         await idle(pg)
@@ -487,7 +582,7 @@ async def test_rules(browser, url):
         await ctx.close()
 
 
-SMALL_ICONS = '.btn .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .set-row .chev, .prod-card .edit .ic, .search .ic, .pick .ic'
+SMALL_ICONS = '.btn:not(.fab) .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .set-row .chev, .prod-card .edit .ic, .search .ic, .pick .ic'
 ICONS = """sel => [...document.querySelectorAll(sel)].filter(i => i.getClientRects().length).map(i => { const r = i.getBoundingClientRect(), box = i.closest('.pick, .sugg, .prod-card, .search'),
     b = (box?.querySelector('.field') || box)?.getBoundingClientRect(), left = !!i.closest('.search');
   return {where: i.closest('[class]:not(svg)').className, w: r.width, h: r.height, stroke: getComputedStyle(i).strokeWidth,
@@ -547,7 +642,7 @@ async def test_polish(browser, url):
     kinds = {i['where'].split()[0] for i in icons}
     odd = [i for i in icons if (i['w'], i['h'], i['stroke']) != (20, 20, '1.8px') or i['edge'] not in (None, 14) or i['mid'] is False]
     check(
-        {'pick', 'sugg', 'edit', 'set-row', 'btn', 'chip'} <= kinds and not odd,
+        {'pick', 'box', 'edit', 'row', 'btn', 'chip'} <= kinds and not odd,
         f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -645,12 +740,10 @@ def test_signing_key():
             )
 
 
-# Exceptions to the spacing scale: the room an icon needs inside a field, and the room the feeding button needs
-# under the page. env()'s own fallback is no distance either and is taken out before the check.
-SPACING_ALLOWED = {
-    '44px': 'room for the icon in a field: 14 from the edge, 20 wide, 10 to the text',
-    '112px': 'room for the feeding button under the page',
-}
+# Exceptions to the spacing scale, each with its reason; there are none now that the room for a field's icon and
+# for the feeding button are sums of tokens. env()'s own fallback is no distance either and is taken out before
+# the check.
+SPACING_ALLOWED = {}
 SPACING_PROPS = ('margin', 'padding', 'gap', 'row-gap', 'column-gap')
 
 
@@ -663,7 +756,7 @@ def test_spacing_scale():
         for p, v in d.items()
         if p.startswith('--space-')
     }
-    want = ['--space-hair'] + [f'--space-{n}{h}' for n in range(1, 8) for h in ('', 'h') if not (n == 7 and h)]
+    want = ['--space-hair'] + [f'--space-{n}{h}' for n in range(1, 8) for h in ('', 'h') if not (n == 7 and h) and not (n in (5, 6) and h)]
     check(sorted(scale) == sorted(want), f'the scale in tokens.css: {len(scale)} steps ({sorted(scale)})')
     loose = []
     for sel, decls in css_rules((WWW / 'css/app.css').read_text(encoding='utf-8')):
@@ -700,6 +793,506 @@ def test_radius_scale():
                 continue
             loose += [f'{sel} {prop}:{value}' for part in value.split() if part not in RADIUS_ALLOWED and not part.startswith('var(--radius-')]
     check(not loose, f'every radius in app.css comes from the tokens ({len(loose)} do not: {loose[:4]})')
+
+
+# ---------------------------------------------------------------- type
+TYPE_STYLES = {
+    '--type-title': '650 30px/1.1 var(--font-display)',
+    '--type-heading': '600 21px/1.25 var(--font-display)',
+    '--type-subheading': '600 16px/1.25 var(--font-display)',
+    '--type-body': '400 16px/1.5 var(--font-ui)',
+    '--type-body-strong': '600 16px/1.5 var(--font-ui)',
+    '--type-small': '400 14px/1.4 var(--font-ui)',
+    '--type-small-strong': '600 14px/1.4 var(--font-ui)',
+    '--type-caption': '400 12px/1.25 var(--font-ui)',
+    '--type-caption-strong': '600 12px/1.25 var(--font-ui)',
+}
+TYPE_SCALE = ({'12', '14', '16', '21', '30'}, {'1.1', '1.25', '1.4', '1.5'}, {'400', '600', '650'})
+# Figures take table figures in the very rule that sets their font, because the font shorthand resets them
+FIGURES = {
+    '.pct',
+    '.ring-mid .pct',
+    '.cnt b',
+    '.share',
+    '.tl-time',
+    '.day .dn',
+    '.day.has .dn',
+    '.day.today .dn',
+    '.steps .n',
+    '.field.code',
+    '.t-main .num',
+}
+FIGURE_SUBJECT = re.compile(r'\.(pct|share|tl-time|dn|n|num)\b|^b$')
+# Type set other than through a style, each with its reason
+TYPE_ALLOWED = {
+    ('b, strong', 'font-weight', 'var(--weight-strong)'): 'bold in running text is the app’s 600, not the browser’s bolder',
+    ('.field.code', 'letter-spacing', 'var(--track-code)'): 'the one positive tracking: the household code is spelled out',
+    ('.field.code', 'text-transform', 'uppercase'): 'the household code',
+    ('.field.code::placeholder', 'letter-spacing', 'normal'): 'the placeholder is a sentence',
+    ('.field.code::placeholder', 'text-transform', 'none'): 'the placeholder is a sentence',
+    ('.pct small', 'letter-spacing', 'normal'): 'the Figtree % sign does not take the title’s tracking it inherits in the ring',
+    ('.tl-note', 'font-style', 'italic'): 'a note in the timeline is the one quoted text',
+}
+
+
+def test_type_scale():
+    """Nine text styles from one scale; app.css sets type only through them (PROJECT.md, "Type")."""
+    root = tokens_root()
+    styles = {k: v for k, v in root.items() if k.startswith('--type-')}
+    check(styles == TYPE_STYLES, f'the nine text styles in tokens.css ({sorted(set(styles.items()) ^ set(TYPE_STYLES.items()))})')
+    sizes, leads, weights = TYPE_SCALE
+    off = [
+        k
+        for k, v in styles.items()
+        if not (m := re.fullmatch(r'(\d+) (\d+)px ?/ ?([\d.]+) var\(--font-(?:ui|display)\)', v))
+        or m[1] not in weights
+        or m[2] not in sizes
+        or m[3] not in leads
+    ]
+    check(not off, f'every style from the scale: sizes {sorted(sizes)}, leadings {sorted(leads)}, weights {sorted(weights)} ({off})')
+    check(
+        {k: root.get(k) for k in ('--weight-strong', '--track-title', '--track-code')}
+        == {'--weight-strong': '600', '--track-title': '-0.015em', '--track-code': '0.14em'},
+        'bold in running text, the title’s tracking and the code field’s as tokens',
+    )
+    decls, loose, rules = app_decls(), [], {}
+    for _, sel, p, v in decls:
+        rules.setdefault(sel, []).append((p, v))
+        if (sel, p, v) in TYPE_ALLOWED:
+            continue
+        if p == 'font' and v != 'inherit' and not (v.startswith('var(') and v[4:-1] in TYPE_STYLES):
+            loose.append(f'{sel} font:{v}')
+        elif p in ('font-size', 'line-height', 'font-family', 'font-weight', 'font-stretch', 'font-style', 'font-variant', 'text-transform'):
+            loose.append(f'{sel} {p}:{v}')
+        elif p == 'letter-spacing' and v != 'var(--track-title)':
+            loose.append(f'{sel} {p}:{v}')
+        elif p == 'font-variant-numeric' and not (sel in FIGURES and v == 'tabular-nums'):
+            loose.append(f'{sel} {p}:{v}')
+    check(not loose, f'app.css sets type only as font: var(--type-…) ({len(loose)} do not: {loose[:4]})')
+    odd = []
+    for sel, ds in rules.items():
+        d = dict(ds)
+        if (d.get('font') == 'var(--type-title)') != (d.get('letter-spacing') == 'var(--track-title)'):
+            odd.append(f'{sel}: the title and its tracking')
+        if 'font' in d and (sel in FIGURES or any(FIGURE_SUBJECT.search(s) and s != 'b' or s == 'b' and '.cnt' in sel for s in subjects(sel))):
+            names = [p for p, _ in ds]
+            if sel not in FIGURES or d.get('font-variant-numeric') != 'tabular-nums' or names.index('font-variant-numeric') < names.index('font'):
+                odd.append(f'{sel}: a figure takes tabular-nums after its font, in FIGURES')
+    check(not odd, f'the title always with its tracking and nowhere else; every figure tabular in its own rule ({odd})')
+    js = [
+        f.name
+        for f in (WWW / 'js').rglob('*.js')
+        if re.search(
+            r'\.style\.(font\w*|lineHeight|letterSpacing)\b|style="[^"]*\b(font|line-height|letter-spacing)\b', f.read_text(encoding='utf-8')
+        )
+    ]
+    check(not js, f'no type set from JavaScript ({js})')
+
+
+# ---------------------------------------------------------------- motion
+DURATIONS = {'--dur-fade': '200ms', '--dur-step': '300ms', '--dur-long': '1200ms'}
+EASINGS = {'--ease-out': 'cubic-bezier(0.22,1,0.36,1)', '--ease-in': 'cubic-bezier(0.5,0,0.75,0)', '--ease-spring': 'cubic-bezier(0.34,1.45,0.64,1)'}
+STATE = ('transform', 'opacity', 'color', 'background-color', 'border-color', 'box-shadow')
+LIBRARY = {
+    'fadeIn': 'a dimming or a ground appears',
+    'fadeOut': 'and goes',
+    'sheetIn': 'a sheet rises',
+    'sheetOut': 'a sheet sinks',
+    'pageIn': 'a page, or the level you go to, comes in from the side',
+    'pageOut': 'a page, or the level you leave going back, goes out',
+    'pageAside': 'the level you leave going deeper moves a quarter aside',
+    'pageFromAside': 'and comes back',
+    'appear': 'content appears in place',
+    'vanish': 'a piece of the home page goes',
+    'dropIn': 'a new meal arrives at the top of „Heute“',
+    'leave': 'a rated meal folds away',
+    'pop': 'a confirmation',
+    'bowlFill': 'the bowl in the feeding button',
+    'ringFill': 'the ring draws its share',
+    'spin': 'waiting',
+    'shimmer': 'a line still loading',
+}
+# Keyframes move and fade; these three do what their purpose needs besides
+KEYFRAME_ALLOWED = {
+    'ringFill': {'stroke-dashoffset'},
+    'shimmer': {'background-position'},
+    'leave': {'max-height', 'padding-top', 'padding-bottom', 'border-top-width'},
+}
+TRANSITION_PART = re.compile(
+    r'(transform|opacity|color|background-color|border-color|box-shadow|height) var\(--dur-(fade|step)\) var\(--ease-(out|in|spring)\)'
+)
+PRESS = ('scale(var(--press))', 'scale(var(--press-wide))')
+# The browser names these animations itself, so only their timing can be set, and only from the tokens
+MOTION_LONGHANDS = {'::view-transition-group(*)', '::view-transition-group(photo)'}
+# Under reduced motion nothing moves: the one place with literal times, and all it may say
+REDUCED_RULES = {
+    '*,*::before,*::after,::backdrop': {
+        'animation-duration': '0.01ms !important',
+        'animation-iteration-count': '1 !important',
+        'transition-duration': '0.01ms !important',
+    },
+    'html': {'transition': 'none !important'},
+}
+
+
+def test_motion_scale():
+    """Three durations, three curves, one state transition, two presses, a closed library of keyframes (PROJECT.md, "Motion")."""
+    root = tokens_root()
+    got = {k: v for k, v in root.items() if k.startswith(('--dur-', '--ease-'))}
+    check(got == {**DURATIONS, **EASINGS}, f'durations and curves in tokens.css ({sorted(set(got.items()) ^ set({**DURATIONS, **EASINGS}.items()))})')
+    check(root.get('--state') == ','.join(f'{p} var(--dur-fade) var(--ease-out)' for p in STATE), f'--state: {STATE} in --dur-fade with --ease-out')
+    check(root.get('--press') == '0.95' and root.get('--press-wide') == '0.98', 'two press scales')
+    tok, app = (WWW / 'css/tokens.css').read_text(encoding='utf-8'), (WWW / 'css/app.css').read_text(encoding='utf-8')
+    frames = keyframes(re.sub(r'/\*.*?\*/', '', tok, flags=re.S))
+    check(
+        set(frames) == set(LIBRARY) and not keyframes(app),
+        f'@keyframes only in tokens.css and only the library ({sorted(set(frames) ^ set(LIBRARY))}, app.css: {sorted(keyframes(app))})',
+    )
+    loud = [
+        f'{n}: {p}'
+        for n, body in frames.items()
+        for _, ds in css_rules(body)
+        for p, _ in ds
+        if p not in {'transform', 'opacity'} | KEYFRAME_ALLOWED.get(n, set())
+    ]
+    check(not loud, f'the library moves and fades, nothing else ({loud})')
+    reduced = {' '.join(s.split()).replace(', ', ','): d for s, d in css_blocks(cut_block(re.sub(r'/\*.*?\*/', '', app, flags=re.S), REDUCED)[1])}
+    check(reduced == REDUCED_RULES, f'under reduced motion nothing moves, ::backdrop named beside * ({reduced})')
+    loose, used = [], set()
+    for sec, sel, p, v in app_decls():
+        if p == 'transition':
+            if v not in ('none', 'var(--state)') and not all(TRANSITION_PART.fullmatch(x) for x in split_top(v)):
+                loose.append(f'{sel} transition:{v}')
+        elif p == 'animation':
+            for part in split_top(v):
+                w = part.split()
+                if w == ['none']:
+                    continue
+                name = [x for x in w if x in LIBRARY]
+                dur = [x for x in w if re.fullmatch(r'var\(--dur-(fade|step|long)\)', x)]
+                ease = [x for x in w if re.fullmatch(r'var\(--ease-(out|in|spring)\)|linear', x)]
+                rest = [x for x in w if x not in name + dur + ease and x not in ('both', 'forwards', 'infinite')]
+                loop = 'linear' in ease or 'infinite' in w
+                if (
+                    len(name) != 1
+                    or len(dur) != 1
+                    or len(ease) != 1
+                    or rest
+                    or loop
+                    and not ('linear' in ease and 'infinite' in w and dur == ['var(--dur-long)'])
+                ):
+                    loose.append(f'{sel} animation:{part}')
+                used.update(name)
+        elif p.startswith(('transition-', 'animation-')):
+            ok = sel in MOTION_LONGHANDS and (
+                p == 'animation-duration'
+                and re.fullmatch(r'var\(--dur-(fade|step)\)', v)
+                or p == 'animation-timing-function'
+                and re.fullmatch(r'var\(--ease-(out|in)\)', v)
+            )
+            if not ok:
+                loose.append(f'{sel} {p}:{v}')
+        elif p == 'transform' and sel.endswith(':active') and v not in PRESS:
+            loose.append(f'{sel} {p}:{v}')
+        if (
+            p in ('transition', 'animation') or p.startswith(('transition-', 'animation-')) or p == 'transform' and sel.endswith(':active')
+        ) and sec != 'Motion':
+            loose.append(f'{sel} {p}: motion lives in the Motion section')
+    check(not loose, f'every movement from the tokens and the library, in the Motion section ({len(loose)} not: {loose[:4]})')
+    check(used == set(LIBRARY), f'every motion of the library is in use ({sorted(set(LIBRARY) - used)})')
+
+
+# ---------------------------------------------------------------- layers, lines, sizes, opacity
+LAYERS = {'--z-raise': '1', '--z-sticky': '2', '--z-bar': '3', '--z-fab': '4', '--z-strip': '5', '--z-toast': '6'}
+SIZES = {
+    '--icon-s': '20px',
+    '--icon': '24px',
+    '--icon-l': '32px',
+    '--icon-stroke': '1.8',
+    '--icon-stroke-l': '1.4',
+    '--tap-s': '44px',
+    '--tap': '48px',
+    '--control': '52px',
+    '--control-l': '56px',
+    '--bar': '56px',
+    '--col-figure': '52px',
+    '--pic-xs': '24px',
+    '--pic-s': '32px',
+    '--pic-m': '40px',
+    '--pic-l': '48px',
+    '--pic-xl': '56px',
+    '--pic-xxl': '72px',
+    '--pic-xxxl': '112px',
+    '--page-width': '600px',
+    '--gutter': 'var(--space-4h)',
+}
+LINES = {'--hairline': '1px', '--stroke': '2px', '--divider': 'var(--hairline) solid var(--line)'}
+OPACITY = {'--dim': '0.35', '--busy': '0.6', '--mood': '0.16', '--mood-filter': 'saturate(0.85)'}
+RING = re.compile(r'(inset )?0 0 0 (var\(--(hairline|stroke)\)|calc\([2-4] \* var\(--stroke\)\)|100vmax) var\(--[\w-]+(,var\(--[\w-]+\))?\)')
+MIN_HEIGHT = {'0', 'var(--tap-s)', 'var(--tap)', 'var(--control)', 'var(--control-l)', 'var(--bar)'}
+SIZE_PROPS = (
+    'width',
+    'height',
+    'min-width',
+    'min-height',
+    'max-width',
+    'max-height',
+    'top',
+    'right',
+    'bottom',
+    'left',
+    'inset',
+    'stroke-width',
+    'flex-basis',
+    'transform',
+    'scroll-margin-top',
+    'grid-template-columns',
+    'background-size',
+)
+# The size of one component that nothing else shares, so it is no token; each with its reason
+GEOMETRY_ALLOWED = {
+    '.mood': 'the mood picture is 260px tall (PROJECT.md)',
+    '.badge': 'a badge without an icon is as tall as one with: the small icon and the inset around it',
+    '.pend': 'max-height 900px: where a rated meal starts folding away from',
+    '.meter': 'a progress bar is 6px thick',
+    '.dots': 'the row of meal dots under a day is 6px tall',
+    '.dots i': 'a meal dot, 6px',
+    '.tl-node i': 'a meal on the timeline, 12px',
+    '.hero': 'the welcome picture, a 148px circle',
+    '.hero .logo': 'the mark in it, 104px',
+    '.grip': 'the grip of a sheet, 40 by 5',
+    '.name-photo': 'the packaging photo while naming, 150px tall',
+    '.pp .pp-name': 'names line up in a 64px column before their bars',
+    '.field.in-row': 'a field beside a row’s title, about 130px wide (PROJECT.md)',
+    '.sw': 'the switch track, 46 by 28',
+    '.sw::after': 'its knob, 22, 3 from the edge',
+    '[aria-checked="true"] > .sw::after': 'its travel, 18',
+    '.ring': 'the evaluation’s ring, 104; views/sheets.js draws it at that size',
+    '.ring circle': 'its 10px stroke, the same in views/sheets.js',
+    '.ring-mid > span': 'the caption wraps inside the ring, 76 wide',
+    '.shutter': 'the camera’s shutter, 78',
+    '.crop': 'the crop stage, at most 340',
+    '.toast': 'a toast is never wider than 520px',
+}
+ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
+
+
+def test_layers_lines_sizes():
+    """Layers, lines, rings, shadows, sizes and opacities come from tokens.css (PROJECT.md, "Sizes, lines, layers")."""
+    root = tokens_root()
+    check({k: root.get(k) for k in LAYERS} == LAYERS and not [k for k in root if k.startswith('--z-') and k not in LAYERS], f'six layers {LAYERS}')
+    check(
+        {k: root.get(k) for k in SIZES} == SIZES and not [k for k in root if k.startswith(('--pic-', '--icon')) and k not in SIZES],
+        'icons, controls and pictures as tokens',
+    )
+    check(
+        {k: root.get(k) for k in {**LINES, **OPACITY}} == {**LINES, **OPACITY} and tokens_root(':root[data-theme="dark"]').get('--mood') == '0.26',
+        'lines and opacities as tokens',
+    )
+    shadows = sorted(k for k in root if 'shadow' in k)
+    check(shadows == ['--shadow-high', '--shadow-low'], f'two shadows ({shadows})')
+    loose = []
+    for _, sel, p, v in app_decls():
+        subj = subjects(sel)
+        if p == 'z-index' and v not in {f'var({k})' for k in LAYERS} | {'auto'}:
+            loose.append(f'{sel} z-index:{v}')
+        elif p == 'box-shadow' and v not in ('none', 'var(--shadow-low)', 'var(--shadow-high)') and not all(RING.fullmatch(x) for x in split_top(v)):
+            loose.append(f'{sel} box-shadow:{v}')
+        elif re.match(r'(border(?!-radius)|outline)', p) and literal_px(v):
+            loose.append(f'{sel} {p}:{v}')
+        elif p == 'opacity' and v not in ('0', '1', 'var(--dim)', 'var(--busy)', 'var(--mood)'):
+            loose.append(f'{sel} opacity:{v}')
+        elif p == 'filter' and v not in ('none', 'var(--mood-filter)'):
+            loose.append(f'{sel} filter:{v}')
+        elif p == 'min-height' and v not in MIN_HEIGHT and sel not in GEOMETRY_ALLOWED:
+            loose.append(f'{sel} min-height:{v}')
+        elif p == 'stroke-width' and v not in ('var(--icon-stroke)', 'var(--icon-stroke-l)') and sel not in GEOMETRY_ALLOWED:
+            loose.append(f'{sel} stroke-width:{v}')
+        elif p in ('width', 'height') and any(re.search(r'\.(ic|chev|spin)$', s) for s in subj) and v not in ICON_SIZES and not v.endswith('%'):
+            loose.append(f'{sel} {p}:{v} (an icon)')
+        elif p in ('width', 'height') and any(re.search(r'\.(av|thumb|sk)\b', s) for s in subj) and not re.fullmatch(r'var\(--pic-\w+\)|100%', v):
+            loose.append(f'{sel} {p}:{v} (a picture)')
+        elif p in SIZE_PROPS and literal_px(v) and sel not in GEOMETRY_ALLOWED:
+            loose.append(f'{sel} {p}:{v}')
+        elif p in ('width', 'height', 'min-width', 'min-height', 'grid-template-columns') and re.search(r'(^| )var\(--space-[\w-]+\)( |$)', v):
+            loose.append(f'{sel} {p}:{v} (a distance is no size)')
+        elif p == 'transform' and not sel.endswith(':active') and re.search(r'scale[XY]?\((?!0\)|1\))', v):
+            loose.append(f'{sel} transform:{v} (a scale outside the press and the library)')
+    check(not loose, f'layers, lines, rings, shadows, sizes and opacities from tokens.css ({len(loose)} not: {loose[:6]})')
+    ring = {(sel, p): v for _, sel, p, v in app_decls() if (sel, p) in (('.ring', 'width'), ('.ring circle', 'stroke-width'))}
+    js = (WWW / 'js/views/sheets.js').read_text(encoding='utf-8')
+    drawn = [m and m[1] + 'px' for m in (re.search(rf'\b{n} = (\d+)', js) for n in ('RING', 'RING_STROKE'))]
+    check(
+        drawn == [ring.get(('.ring', 'width')), ring.get(('.ring circle', 'stroke-width'))],
+        f'views/sheets.js draws the ring at the size and stroke app.css gives it ({drawn}, {ring})',
+    )
+
+
+# ---------------------------------------------------------------- boxes and sections
+# Padding belongs to a recipe. A value means that exact value; None means tokens and env() only (the page
+# scaffolding). A new box takes one of these recipes; where none fits, the recipe comes first, here and in PROJECT.md.
+PADDING = {
+    '.card': 'var(--inset-card)',
+    '.group': 'var(--inset-group)',
+    '.row': 'var(--inset-row)',
+    '.pend': 'var(--inset-row)',
+    '.card-btn': 'var(--inset-row)',
+    '.box': 'var(--inset-box)',
+    '.banner': 'var(--inset-box)',
+    '.tile': 'var(--inset-tile)',
+    '.btn': 'var(--inset-control)',
+    '.field': 'var(--inset-control)',
+    '.field.in-row': 'var(--inset-compact)',
+    '.pick .field': 'var(--field-room)',
+    '.search .field': 'var(--field-room)',
+    '.chip': 'var(--inset-compact)',
+    '.toast button': 'var(--inset-compact)',
+    '.cam-hint': 'var(--inset-compact)',
+    '.badge': 'var(--inset-badge)',
+    '.seg': 'var(--space-1)',
+    '.seg button': 'var(--space-2) var(--space-1h)',
+    '.link': 'var(--space-3) 0',
+    '.day': 'var(--space-1) 0 var(--space-2)',
+    '.toast': 'var(--space-2) var(--space-2) var(--space-2) var(--gutter)',
+    '.toast.plain': 'var(--gutter)',
+    '.head': '0 var(--gutter)',
+    '.tl-date': 'var(--space-2h) 0 var(--space-hair)',
+    '.grip-zone': 'var(--space-2h) 0 var(--space-2)',
+    '.sync-chip': '0 var(--space-1)',
+    '.pets': 'var(--space-2h) var(--space-1) var(--space-3h)',
+    '.app': None,
+    '.top': None,
+    '.sheet-body': None,
+    'dialog.sheet.page': None,
+    'dialog.sheet.page .sheet-body': None,
+    '.cam-bar': None,
+    '.viewer[open]': None,
+}
+VIEWS_FORBIDDEN = re.compile(
+    r'(padding|font|line-height|letter-spacing|text-transform|border-radius|box-shadow|z-index|transition|animation|stroke-width|min-height)'
+)
+
+
+def test_boxes():
+    """A box pads with its recipe's inset; screens only place recipes (PROJECT.md, "Recipes")."""
+    root = tokens_root()
+    check(
+        all(
+            k in root
+            for k in (
+                '--inset-card',
+                '--inset-group',
+                '--inset-row',
+                '--inset-box',
+                '--inset-tile',
+                '--inset-control',
+                '--inset-compact',
+                '--inset-badge',
+                '--field-room',
+            )
+        ),
+        'one inset per kind of box in tokens.css',
+    )
+    decls = app_decls()
+    check(
+        [s for s in dict.fromkeys(d[0] for d in decls) if s != '(before)'] == list(SECTIONS),
+        f'app.css in four sections: {SECTIONS} ({list(dict.fromkeys(d[0] for d in decls))})',
+    )
+    loose = []
+    for sec, sel, p, v in decls:
+        if p.startswith('padding') and v != '0':
+            want = PADDING.get(sel, KeyError)
+            if want is KeyError or (want and v != want) or literal_px(v) or sec == 'Views':
+                loose.append(f'{sel} {p}:{v}')
+        elif sec == 'Views' and VIEWS_FORBIDDEN.match(p):
+            loose.append(f'{sel} {p} (a screen places recipes and styles none)')
+        elif (
+            sec == 'Views'
+            and re.match(r'(width|height|max-width|max-height)$', p)
+            and not re.fullmatch(r'auto|none|0|\d+%|\d+ch|min-content|max-content|fit-content', v)
+        ):
+            loose.append(f'{sel} {p}:{v} (a size belongs to a recipe)')
+    check(not loose, f'padding only in the recipes that own it, screens only placing ({len(loose)}: {loose[:6]})')
+
+
+# ---------------------------------------------------------------- JavaScript
+# Delays that measure no movement, each with its reason. Anything that waits for motion uses settled() from js/motion.js.
+TIMERS_ALLOWED = {
+    ('api.js', '20e3'): 'a request gives up',
+    ('store.js', '120'): 'the change hook runs once per burst of edits',
+    ('disk.js', '60e3'): 'saving retries at most once a minute',
+    ('disk.js', '5e3'): 'first after five seconds',
+    ('disk.js', '2'): 'the pause doubling',
+    ('native.js', '120e3'): 'installing the scanner gives up',
+    ('sync.js', '60e3'): 'the sync runs every minute',
+    ('main.js', '60000'): 'the home page is redrawn every minute, so „vor 2 Std.“ stays true',
+    ('actions.js', '600'): 'a quick sync shows no spinner',
+    ('actions.js', '3500'): 'an armed button disarms again',
+    ('actions.js', '400'): 'a note is saved once typing pauses',
+    ('ui/toast.js', '2600'): 'how long a message stays to be read',
+    ('ui/toast.js', '5200'): 'and one with „Rückgängig“',
+    ('ui/splash.js', '2500'): 'the splash screen goes, whatever failed on the way',
+    ('views/home.js', '400'): 'a view transition whose callback never ran is skipped',
+    ('logic/reminders.js', '250'): 'reminders are reconciled once per burst',
+    ('logic/data.js', '2000'): 'the download has started before its address is revoked',
+    ('logic/exchange.js', '2000'): 'the download has started before its address is revoked',
+}
+
+
+def js_delays(code):
+    """The last argument of every setTimeout and setInterval call, all brackets matched"""
+    out = []
+    for m in re.finditer(r'\bset(?:Timeout|Interval)\(', code):
+        depth, i, parts, cur = 1, m.end(), [], ''
+        while depth and i < len(code):
+            ch = code[i]
+            depth += {'(': 1, '[': 1, '{': 1, ')': -1, ']': -1, '}': -1}.get(ch, 0)
+            if ch == ',' and depth == 1:
+                parts.append(cur)
+                cur = ''
+            elif depth:
+                cur += ch
+            i += 1
+        parts = [x.strip() for x in parts + [cur] if x.strip()]
+        if len(parts) > 1:
+            out.append(parts[-1])
+    return out
+
+
+def test_motion_js():
+    """JavaScript states no duration or curve: it starts motion with a class and waits with settled() (PROJECT.md, "Motion")."""
+    bad = []
+    for f in sorted((WWW / 'js').rglob('*.js')):
+        name = f.relative_to(WWW / 'js').as_posix()
+        code = re.sub(r'/\*.*?\*/', '', f.read_text(encoding='utf-8'), flags=re.S)
+        code = re.sub(r'(?m)(^|[^:\'"`\\])//.*$', r'\1', code)
+        bad += [f'{name}: .style.{m[1]}' for m in re.finditer(r'\.style\.(transition\w*|animation\w*)\b', code)]
+        bad += [f'{name}: {m[0]}' for m in re.finditer(r'\.animate\(|\b(?:transition|animation)(?:end|start|cancel)\b', code)]
+        strings = [m[0] for m in re.finditer(r'([\'"`])(?:(?!\1)[^\\\n]|\\.)*\1', code)]
+        bad += [
+            f'{name}: {s}'
+            for s in strings
+            if re.search(r'cubic-bezier|\bease(-in|-out|-in-out)?\b|\bsteps\(', s)
+            or re.search(r'\b(transition|animation)\b', s)
+            and re.search(r'(?<![\w.])\d*\.?\d+m?s\b', s)
+        ]
+        bad += [f'{name}: fadeOutDuration without dur()' for _ in re.finditer(r'fadeOutDuration:(?!\s*dur\()', code)]
+        consts = dict(re.findall(r'(?:\bconst\s+|\blet\s+|,\s*)([A-Za-z_]\w*)\s*=\s*([^,;\n]+)', code))
+        for arg in js_delays(code):
+            expr = arg
+            for _ in range(2):
+                expr = re.sub(r'\b[A-Za-z_]\w*\b', lambda m: consts.get(m[0], m[0]), expr)
+            if 'dur(' in expr:
+                continue
+            for n in re.findall(r'(?<![\w.])\d[\d_]*(?:\.\d+)?(?:e\d+)?', expr):
+                if float(n.replace('_', '')) and (name, n) not in TIMERS_ALLOWED:
+                    bad.append(f'{name}: waits {arg} = {n}')
+    motion = (WWW / 'js/motion.js').read_text(encoding='utf-8') if (WWW / 'js/motion.js').exists() else ''
+    check(
+        'export function dur(' in motion and 'export function settled(' in motion,
+        'js/motion.js: dur() reads a duration token, settled() waits for CSS',
+    )
+    check(not bad, f'no duration, curve or transition of its own in js/ ({len(bad)}: {bad})')
 
 
 def test_ratings():
@@ -757,6 +1350,11 @@ async def test_files(browser, url):
     test_pack()
     test_spacing_scale()
     test_radius_scale()
+    test_type_scale()
+    test_motion_scale()
+    test_layers_lines_sizes()
+    test_boxes()
+    test_motion_js()
     test_ratings()
     test_isolated_tests()
     test_prompt()

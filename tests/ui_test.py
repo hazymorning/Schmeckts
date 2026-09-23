@@ -379,13 +379,17 @@ async def test_cards(browser, url):
         and shop['btn'] == [['Alle anzeigen', 'expand', True, 'false']],
         f'shopping folded up: up to 3 to buy again, up to 2 no longer, „Alle anzeigen“ at the end ({shop["ids"]})',
     )
-    # Keyboard: Enter eases it open (220 ms), the focus stays on the button, space folds it shut
+    # Keyboard: Enter eases it open (--dur-step), the focus stays on the button, space folds it shut
     await pg.focus('[data-sec=shop] [data-action=expand]')
     await pg.keyboard.press('Enter')
     anim = await pg.eval_on_selector(
-        '[data-sec=shop] .card-body', 'b => [b.classList.contains("animating"), b.style.height !== "", b.style.transition]'
+        '[data-sec=shop] .card-body',
+        'b => [b.classList.contains("animating"), b.style.height !== "", b.style.transition, getComputedStyle(b).transitionDuration, getComputedStyle(b).transitionTimingFunction]',
     )
-    check(anim[0] and anim[1] and '0.22s' in anim[2] and 'ease-out' in anim[2], f'the card eases open ({anim[2]})')
+    check(
+        anim[0] and anim[1] and anim[2] == '' and anim[3] == '0.3s' and anim[4] == 'cubic-bezier(0.22, 1, 0.36, 1)',
+        f'the card eases open ({anim[2:]})',
+    )
     await idle(pg)
     shop = await pg.eval_on_selector('[data-sec=shop]', SHOP)
     parts = [(t_, ids) for t_, ids in (('Nachkaufen', m['ja']), ('Beobachten', m['offen']), ('Nicht mehr kaufen', m['nein'])) if ids]
@@ -824,7 +828,7 @@ async def test_texture(browser, url):
             'labels': ['In Soße', 'In Gelee', 'Pastete', 'Mousse', 'Fester Block', 'Suppe'],
             'on': [],
             'fits': True,
-            'under': 'prod-card',
+            'under': 'box prod-card',
             'note': '',
         },
         f'food sheet, wet food: „Konsistenz“ with six chips under the type, never mandatory, nothing clipped at 360 px ({c})',
@@ -1054,7 +1058,7 @@ async def test_overview(browser, url):
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
     SLIDE = """() => new Promise(done => { const c = document.querySelector('.overview'), p = c.querySelector('p'), h = [p.offsetHeight]; c.click();
-      setTimeout(() => h.push(p.getBoundingClientRect().height, p.classList.contains('animating')), 110);
+      setTimeout(() => h.push(p.getBoundingClientRect().height, p.classList.contains('animating')), 50);
       setTimeout(() => { h.push(p.offsetHeight, p.classList.contains('animating'), p.style.height, p.style.transition); done(h); }, 450); })"""
     up, down = await pg.evaluate(SLIDE), await pg.evaluate(SLIDE)
     check(
@@ -3264,7 +3268,7 @@ async def test_photo_viewer(browser, url):
     await idle(pg)
     title = await pg.inner_text('#sheet .sh-head h2')
     check(
-        thumb == [50, 50, '12px'] and over == [True, False] and title == 'Futter benennen',
+        thumb == [48, 48, '12px'] and over == [True, False] and title == 'Futter benennen',
         f'„Wie war’s?“ on the home page: the thumbnail opens the photo, the name the meal ({thumb}, {over}, {title})',
     )
 
@@ -3294,7 +3298,7 @@ async def test_photo_viewer(browser, url):
     await pg.click('.pend-head')
     await idle(pg)
     card = await pg.evaluate(
-        "[!!document.querySelector('#sheet .prod-card > .photo-btn > .thumb.lg'), !!document.querySelector('#sheet .prod-card > .prod-edit[data-action=edit-name]')]"
+        "[!!document.querySelector('#sheet .prod-card > .photo-btn > .thumb.xl'), !!document.querySelector('#sheet .prod-card > .prod-edit[data-action=edit-name]')]"
     )
     await viewed(pg, '#sheet .prod-card > .photo-btn')
     from_file = (await pg.evaluate(VIEWER))[1]
@@ -3749,7 +3753,7 @@ async def test_start(browser, url):
             getComputedStyle(document.querySelector('.top')).paddingTop]; })()"""
     )
     check(
-        bar == ['24px', 'fixed', '0', '10', 'none', True, '36px'],
+        bar == ['24px', 'fixed', '0', '5', 'none', True, '36px'],
         f'at the top the strip behind the status bar is invisible, so the picture reaches the edge; it is exactly as tall as the status bar and plain ({bar})',
     )
     moved = await pg.evaluate(
@@ -4080,8 +4084,8 @@ async def test_settings(browser, url):
     back = await pg.evaluate(PAGE_STEP, '#sheet [data-action=settings-back]')
     await idle(pg)
     check(
-        step == [['new page', 'pageFromSide', 300], ['old page', 'pageAside', 300]]
-        and back == [['new page', 'pageFromAside', 300], ['old page', 'pageToSide', 300]]
+        step == [['new page', 'pageIn', 300], ['old page', 'pageAside', 300]]
+        and back == [['new page', 'pageFromAside', 300], ['old page', 'pageOut', 300]]
         and await pg.locator('#sheet .sheet-body').count() == 1,
         f'a page below comes in from the side while the one above it goes out, and back the other way round ({step}, {back})',
     )
@@ -4500,7 +4504,7 @@ async def test_report(browser, url):
     check(
         [t[1] for t in tops] == ['kommt am besten an', 'bleibt am ehesten übrig']
         and tops[0][0] != tops[1][0]
-        and all(t[2].endswith(' %') and t[3] == 'tabular-nums' and t[4] and t[5] == 'Figtree' and t[6] == 26 for t in tops),
+        and all(t[2].endswith(' %') and t[3] == 'tabular-nums' and t[4] and t[5] == 'Figtree' and t[6] == 24 for t in tops),
         f'best and weakest under the figures, the percentage the plain figure in --ink ({tops})',
     )
     first = await pg.locator('#sheet .tl-item').count()
@@ -4566,7 +4570,7 @@ async def test_report(browser, url):
     fills = await pg.eval_on_selector(
         '#sheet .ring-fill', 'c => { const s = getComputedStyle(c); return [s.animationName, s.animationDuration, s.animationIterationCount]; }'
     )
-    check(fills == ['ringFill', '0.35s', '1'], f'with movement it fills itself once, in 350 ms ({fills})')
+    check(fills == ['ringFill', '0.3s', '1'], f'with movement it fills itself once, in 300 ms ({fills})')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 

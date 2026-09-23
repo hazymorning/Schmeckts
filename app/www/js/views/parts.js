@@ -45,13 +45,13 @@ export function nameBlock(s, p, inSheet = false) {
 /* Rating buttons: equally wide in one row, the variety's scale in its own order; an icon and two lines per button.
    A stored level from another scale (the variety's type has changed) sits above them as a badge. */
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
-export function rateRow(s, pid, big = false) {
+export function rateRow(s, pid) {
   const scale = scaleOf(getProduct(s.productId)),
     cur = rOf(s.pets[pid]);
-  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="rate-row${big ? ' big' : ''}">${scale
+  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="rate-row">${scale
     .map(
       r =>
-        `<button class="rb ${rateCls(r)}" aria-pressed="${cur === r}" aria-label="${RATINGS[r].label}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}">${icon('r_' + r)}<span>${RATINGS[r].lines[0]}</span><small>${RATINGS[r].lines[1]}</small></button>`,
+        `<button class="tile rb ${rateCls(r)}" aria-pressed="${cur === r}" aria-label="${RATINGS[r].label}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}">${icon('r_' + r)}<span>${RATINGS[r].lines[0]}</span><small>${RATINGS[r].lines[1]}</small></button>`,
     )
     .join('')}</div>`;
 }
@@ -80,7 +80,7 @@ export const closeBtn = `<button class="icon-btn" data-action="close" aria-label
    cropping. */
 export const head = (title, back = 'settings-back') =>
   isPage(sheet)
-    ? `<div class="page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span></div>
+    ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span></div>
     <h2 class="page-title">${title}</h2>`
     : `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>`;
 /* A segmented control: one equally wide button per option, the current one pressed. An option is
@@ -179,8 +179,8 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
             : s.status === 'reading'
               ? 'Wird gelesen …'
               : 'Unbekanntes Futter';
-        return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="tl-item" data-action="open-serving" data-id="${s.id}">
-        <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p)}
+        return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-serving" data-id="${s.id}">
+        <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
         ${resultBadges(s, true)}</button></li>`;
       })

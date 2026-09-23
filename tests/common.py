@@ -114,10 +114,13 @@ new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadR
   .observe({type: 'layout-shift', buffered: true});
 """
 
-# Android's system font size, simulated: it multiplies every font size the app sets. This re-declares every px
-# font size from the style sheets, scaled, as !important.
-BIG_TEXT = """k => { const s = document.createElement('style');
-  s.textContent = [...document.styleSheets].flatMap(x => [...x.cssRules])
+# Android's system font size, simulated: it multiplies every font size the app sets. This re-declares the text
+# styles (--type-*) and every px font size from the style sheets, scaled, as !important.
+BIG_TEXT = """k => { const s = document.createElement('style'), rules = [...document.styleSheets].flatMap(x => [...x.cssRules]);
+  const px = v => v.replace(/([\\d.]+)px/g, (_, n) => `${(parseFloat(n) * k).toFixed(2)}px`);
+  const types = rules.filter(r => r.selectorText === ':root').flatMap(r => [...r.style].filter(p => p.startsWith('--type-'))
+    .map(p => `${p}:${px(r.style.getPropertyValue(p))} !important`));
+  s.textContent = `:root{${types.join(';')}}` + rules
     .filter(r => r.style && r.style.fontSize && r.style.fontSize.endsWith('px'))
     .map(r => `${r.selectorText}{font-size:${(parseFloat(r.style.fontSize) * k).toFixed(2)}px !important}`).join('');
   document.head.append(s); }"""

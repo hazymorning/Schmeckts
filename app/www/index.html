@@ -24,7 +24,7 @@
   <nav class="pets" id="pets" aria-label="Tier auswählen" hidden></nav>
   <main id="home"></main>
 </div>
-<button class="fab" id="fab" data-action="feed" hidden></button>
+<button class="btn primary fab" id="fab" data-action="feed" hidden></button>
 
 <dialog class="sheet" id="sheet" aria-label="Details">
   <div class="grip-zone"><div class="grip"></div></div>
@@ -34,15 +34,15 @@
   <input type="file" id="importInput" accept="application/json,.json" hidden>
   <input type="file" id="exchangeInput" accept="application/json,.json" hidden>
 </dialog>
-<dialog class="camera" id="camera" aria-label="Kamera"> <!-- in-app camera for packaging photos, ui/camera.js -->
+<dialog class="camera fullscreen" id="camera" aria-label="Kamera"> <!-- in-app camera for packaging photos, ui/camera.js -->
   <video autoplay playsinline muted></video>
   <p class="cam-hint" role="status"></p>
   <div class="cam-bar">
-    <button class="cam-cancel" data-cam="cancel">Abbrechen</button>
+    <button class="btn soft cam-cancel" data-cam="cancel">Abbrechen</button>
     <button class="shutter" data-cam="shoot" aria-label="Auslösen"></button>
   </div>
 </dialog>
-<dialog class="viewer" id="viewer" aria-label="Foto"> <!-- the packaging photo, large: ui/viewer.js -->
+<dialog class="viewer fullscreen" id="viewer" aria-label="Foto"> <!-- the packaging photo, large: ui/viewer.js -->
   <img alt="Foto der Packung">
   <button class="icon-btn" aria-label="Schließen" data-icon="close"></button>
 </dialog>

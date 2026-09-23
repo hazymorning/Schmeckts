@@ -44,22 +44,22 @@ const houseSub = n => (n.detail ? `${n.title}, ${n.detail.charAt(0).toLowerCase(
    most two lines saying what the setting does. Trailing: a switch, a chevron for a page, or nothing. The whole
    row is the tap target (PROJECT.md, „Settings“). A segment or a field belonging to a row stands under it in the
    text column, which the group's grid takes care of. */
-const lead = ic => `<span class="set-ic">${icon(ic)}</span>`;
+const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 const main = (title, sub = '', id = '') =>
   `<span class="t-main"><b>${title}</b>${sub ? `<small${id ? ` id="${id}"` : ''}>${sub}</small>` : ''}</span>`;
 const chev = icon('chevron', 'chev');
 const pageRow = (page, ic, title, sub = '', id = '') =>
-  `<button class="set-row" data-action="settings-page" data-v="${page}">${lead(ic)}${main(title, sub, id)}${chev}</button>`;
+  `<button class="row set-row" data-action="settings-page" data-v="${page}">${lead(ic)}${main(title, sub, id)}${chev}</button>`;
 const switchRow = (action, ic, title, sub, on, id = '') =>
-  `<button class="set-row" role="switch" aria-checked="${on}" data-action="${action}">${lead(ic)}${main(title, sub, id)}
+  `<button class="row set-row" role="switch" aria-checked="${on}" data-action="${action}">${lead(ic)}${main(title, sub, id)}
     <span class="sw" aria-hidden="true"></span></button>`;
 const doRow = (action, ic, title) =>
-  `<button class="set-row act" data-action="${action}">${lead(ic)}${main(title)}</button>`;
+  `<button class="row set-row act" data-action="${action}">${lead(ic)}${main(title)}</button>`;
 const petRow = p =>
-  `<button class="set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p)}${main(esc(p.name), esc(p.species))}${chev}</button>`;
-const labelRow = (ic, title) => `<div class="set-row">${lead(ic)}${main(title)}</div>`;
+  `<button class="row set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p, 's')}${main(esc(p.name), esc(p.species))}${chev}</button>`;
+const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(title)}</div>`;
 const under = html => `<div class="set-under">${html}</div>`;
-const group = (label, rows) => `<span class="label">${label}</span><div class="set-group">${rows}</div>`;
+const group = (label, rows) => `<span class="label">${label}</span><div class="group set-group">${rows}</div>`;
 
 const LOOKUP = 'Fragt bei unbekannten Barcodes nach, nur mit der Nummer';
 const SERVER_PHOTO = 'Erkennt Marke und Sorte auf dem Packungsfoto. Sonst liest das Handy den Text selbst.';
@@ -105,7 +105,7 @@ function overview() {
     )}
     ${group(
       'Teilen',
-      `<div class="set-row">${lead('person')}<label class="t-main" for="f-me"><b>Dein Name</b></label>
+      `<div class="row set-row">${lead('person')}<label class="t-main" for="f-me"><b>Dein Name</b></label>
         <input id="f-me" class="field in-row" data-setting="name" value="${esc(prefs.name)}" placeholder="z. B. Anna" autocomplete="off" autocapitalize="words"></div>` +
         pageRow('house', 'house', 'Haushalt', esc(houseSub(notice)), 'houseSub') +
         pageRow('exchange', 'phone', 'Austausch von Hand', 'Änderungen als Datei weitergeben'),
@@ -128,7 +128,7 @@ function overview() {
         ? armBtn('wipe', 'Alle Daten im Haushalt löschen', 'Nochmal tippen: für alle im Haushalt löschen')
         : armBtn('wipe', 'Alle Daten löschen', 'Nochmal tippen: wirklich alles löschen')
     }</div>
-    <p class="foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
+    <p class="hint foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
 }
 
 const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gespeichert hat. Ein Import ersetzt die
@@ -149,7 +149,7 @@ function exchangePage() {
       <button class="btn soft" data-action="share-changes">${icon('phone')}Änderungen teilen</button>
       <label class="btn soft" for="exchangeInput">${icon('upload')}Austausch empfangen</label>
     </div>
-    ${ex ? `<p class="note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col mt-s"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
+    ${ex ? `<p class="hint note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col mt-s"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
 }
 
 /* Datenschutz: what happens to the data in each of the two modes */
@@ -171,7 +171,7 @@ function serverSection(notice = syncInfo()) {
       <input id="f-code" class="field code" data-field="code" value="${esc(s.code || '')}" placeholder="Haushaltscode" aria-label="Haushaltscode"
         autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" maxlength="12">
       <button class="btn primary" data-action="connect"${s.connecting ? ' disabled' : ''}>${s.connecting ? '<span class="spin"></span>Verbinde …' : 'Verbinden'}</button></div>
-      ${s.connectError ? `<p class="note warn" role="alert">${esc(s.connectError)}</p>` : ''}`;
+      ${s.connectError ? `<p class="hint note warn" role="alert">${esc(s.connectError)}</p>` : ''}`;
   const addrField = `<label class="label" for="f-server">Adresse des Servers</label>
       <input id="f-server" class="field" data-field="server" value="${esc(s.server ?? prefs.server)}" placeholder="http://192.168.… oder https://…"
         autocomplete="off" inputmode="url" spellcheck="false" enterkeyhint="next">`;
@@ -181,15 +181,15 @@ function serverSection(notice = syncInfo()) {
       : `<p class="hint">Alle Daten bleiben auf diesem Handy. Verbunden sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen.</p>
         <button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`;
   const needCode = status.kind === 'auth';
-  return `<div class="srv ${notice.tone}" role="status"><span class="srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
-    <span class="t-main"><b>${esc(notice.title)}</b><small>${esc(notice.detail)}</small></span></div>
+  return `<div class="group srv ${notice.tone}" role="status"><div class="row"><span class="thumb m srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
+    <span class="t-main"><b>${esc(notice.title)}</b><small>${esc(notice.detail)}</small></span></div></div>
     ${
       !needCode
-        ? `<p class="addr"><span>Server ${esc(prefs.server)}</span></p>`
+        ? `<p class="hint addr"><span>Server ${esc(prefs.server)}</span></p>`
         : codeRow +
           (s.editServer
             ? addrField
-            : `<p class="addr"><span>Server ${esc(prefs.server)}</span><button class="link" data-action="edit-server">Ändern</button></p>`)
+            : `<p class="hint addr"><span>Server ${esc(prefs.server)}</span><button class="link" data-action="edit-server">Ändern</button></p>`)
     }
     <div class="btn-col mt-s">
       ${
