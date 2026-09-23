@@ -1,7 +1,7 @@
 /* The packaging text (read off the photo in native.js) into the same answer the server gives: brand, variety,
    type, animal, texture. Pure functions, so they can be tested on their own.
-   Order: our own varieties, then a brand (from the list or from one of our own varieties), then the most
-   prominent line as the variety. */
+   Order: put the misread words right, then our own varieties, then a brand (from the list or from one of our own
+   varieties), then the most prominent line as the variety. */
 import {norm} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 
@@ -20,7 +20,7 @@ const has = (text, re) => re.test(text);
 
 /* text: the text that was read, products: our own varieties. With nothing usable everything stays empty. */
 export function readPack(text, products = []) {
-  const raw = String(text || '');
+  const raw = cleanText(text, products);
   if (!raw.trim()) return {...EMPTY};
   const tight = squeeze(raw);
   const known = products
@@ -46,7 +46,7 @@ export function readPack(text, products = []) {
       .filter(b => flat.includes(` ${norm(b)} `))
       .sort((a, b) => norm(b).length - norm(a).length)[0] || '';
   const type = foodType(raw);
-  const variety = pickVariety(raw, brand);
+  const variety = pickVariety(raw, brand, products);
   if (!brand && !variety) return {...EMPTY};
   const texture = TEXTURES[type]?.items.find(([, , re]) => re.test(raw))?.[0];
   return {
@@ -81,9 +81,9 @@ function foodType(raw) {
 
 /* Variety: the most prominent line, without quantities, advertising, ingredients and bare numbers. Where several
    fit, they are joined in the order they appear on the packaging, at most MAX_VARIETY characters. */
-function pickVariety(raw, brand) {
+function pickVariety(raw, brand, products) {
   const bare = norm(brand);
-  const scored = packLines(raw, bare)
+  const scored = packLines(raw, bare, products)
     .map((v, i) => ({v, i, s: score(v) - Math.min(1, i * 0.2)}))
     .filter(x => x.s > 0)
     .sort((a, b) => b.s - a.s);
@@ -109,9 +109,9 @@ function pickVariety(raw, brand) {
    them twice, at most PACK_LINES, in the order they stand on the packaging. pickVariety picks the variety from
    these, and while naming they are offered as chips, so the filter exists only once. `bare` is the normalised
    brand, which is dropped from the front of a line („Sheba Lachs in Soße“ → „Lachs in Soße“). */
-export function packLines(text, bare = '') {
+export function packLines(text, bare = '', products = []) {
   const seen = new Set();
-  return String(text || '')
+  return cleanText(text, products)
     .split(/\r?\n/)
     .map(l =>
       withoutBrand(l.replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim(), bare).replace(
@@ -122,10 +122,78 @@ export function packLines(text, bare = '') {
     .filter(v => {
       if (v.length < 3 || (v.match(/[A-Za-zÄÖÜäöüß]/g) || []).length < 3) return false;
       if (JUNK.test(v) || ADS.test(v) || norm(v) === bare || seen.has(norm(v))) return false;
+      if (!says(v)) return false;
       seen.add(norm(v));
       return true;
     })
     .slice(0, PACK_LINES);
+}
+
+/* A line has to say something of its own: words like „mit“ alone, and a line that is nothing but promises, are
+   no help while naming and only make the chips longer. */
+const SMALL = new Set(
+  'und oder mit ohne in im am an auf aus bei fur von vor zu zum zur neu the and with for'.split(' '),
+);
+const CLAIMS =
+  /ohne (?:zusatz von )?(?:zucker|soja|getreide|gluten|farbstoffe|konservierungsstoffe|k(?:ü|ue)nstliche[a-zäöüß]*)|(?:zucker|getreide|gluten)frei/gi;
+const says = v =>
+  !!v.replace(CLAIMS, ' ').trim() &&
+  norm(v)
+    .split(' ')
+    .some(w => w.length >= 3 && !SMALL.has(w));
+
+/* Packaging print often shouts („TRULAHN & WILD aN SAUCE“), and written out that way a variety shouts through the
+   whole app. A line that is mostly capitals is set in title case, with the small words German keeps small; a line
+   already written normally is left as it is. */
+const LETTER = /[\p{L}]/gu;
+const WORDS = /\p{L}[\p{L}'’]*/gu;
+function unshout(line) {
+  const letters = line.match(LETTER) || [];
+  if (letters.length < 2 || letters.filter(c => c === c.toLocaleUpperCase('de')).length / letters.length < 0.6)
+    return line;
+  return line
+    .toLocaleLowerCase('de')
+    .replace(WORDS, (w, at) => (at && SMALL.has(norm(w)) ? w : w[0].toLocaleUpperCase('de') + w.slice(1)));
+}
+
+/* The text as it can be read: the shouting taken out of every line, then the words the phone almost read put
+   right („MLAMOR“ becomes „Miamor“), so that a variety already in the household is found again although a letter
+   came out wrong. Measured against the brands we know and the words of our own varieties, from MIN_FIX
+   characters, one mistake up to seven characters and two from eight, and only when exactly one word is that
+   close: anything that could be two things stays as it was. Running it twice changes nothing more. */
+const MIN_FIX = 5;
+const WORD = new RegExp(`\\p{L}{${MIN_FIX},}`, 'gu');
+export function cleanText(text, products = []) {
+  const raw = String(text || '')
+    .split(/\r?\n/)
+    .map(unshout)
+    .join('\n');
+  const vocabulary = new Map();
+  for (const s of [...BRANDS, ...products.flatMap(p => [p?.brand, p?.variety])])
+    for (const w of String(s || '').split(/[^\p{L}]+/u))
+      if (w.length >= MIN_FIX && !vocabulary.has(norm(w))) vocabulary.set(norm(w), w);
+  return raw.replace(WORD, word => {
+    const w = norm(word);
+    if (vocabulary.has(w)) return word;
+    const hits = [...vocabulary].filter(([v]) => close(w, v));
+    return hits.length === 1 ? hits[0][1] : word;
+  });
+}
+const close = (a, b) => {
+  const max = Math.max(a.length, b.length) >= 8 ? 2 : 1;
+  return Math.abs(a.length - b.length) <= max && distance(a, b, max) <= max;
+};
+/* Levenshtein, given up as soon as every way through costs more than max */
+function distance(a, b, max) {
+  let prev = [...Array(b.length + 1).keys()];
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++)
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (Math.min(...row) > max) return max + 1;
+    prev = row;
+  }
+  return prev[b.length];
 }
 
 /* A line read off the packaging inside one of the naming fields, whole and between spaces. That is how a second
