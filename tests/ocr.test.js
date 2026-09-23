@@ -98,3 +98,35 @@ test('packaging text: the readable lines, none of them twice and at most eight',
   const many = Array.from({length: 12}, (_, i) => `Zeile ${'abcdefghijkl'[i]}`).join('\n');
   assert.equal(packLines(many).length, PACK_LINES);
 });
+
+test('packaging text: a line that shouts is set in title case', () => {
+  assert.deepEqual(packLines('TRULAHN & WILD aN SAUCE\nFEINE HÄPPCHEN'), ['Trulahn & Wild an Sauce', 'Feine Häppchen']);
+  assert.deepEqual(
+    packLines('Selection in Sauce\nmit Lachs'),
+    ['Selection in Sauce', 'mit Lachs'],
+    'a line already written normally is left as it is',
+  );
+  assert.equal(readPack('SHEBA\nLACHS IN SOSSE').variety, 'Lachs in Sosse', 'and the variety with it');
+});
+
+test('packaging text: a line that says nothing of its own drops out', () => {
+  assert.deepEqual(packLines('mit\nohne Soja ohne Zusatz von Zucker\nHuhn ohne Zucker\nund mit'), ['Huhn ohne Zucker']);
+});
+
+test('packaging text: a word the phone almost read is put right', () => {
+  const mine = [{brand: 'Miamor', variety: 'Truthahn & Wild in Sauce', type: 'Nassfutter', texture: 'sosse'}];
+  const read = 'MLAMOR\nTRULAHN & WILD aN SAUCE\nAURIN\n100 g';
+  assert.equal(readPack(read).brand, 'Miamor', 'a brand from the list, one letter wrong');
+  assert.deepEqual(packLines(read, '', mine).slice(0, 2), ['Miamor', 'Truthahn & Wild an Sauce']);
+  assert.equal(
+    readPack(read, mine).variety,
+    'Truthahn & Wild an Sauce',
+    'a word of our own varieties, two letters wrong',
+  );
+  assert.equal(packLines('Aurin\nLachs pur')[0], 'Aurin', 'a word close to nothing we know stays as it was');
+  assert.equal(
+    readPack('Sheba\nSelection in Sauce\nmit Lachs').variety,
+    'Selection in Sauce mit Lachs',
+    'and a text that was read properly is not touched',
+  );
+});

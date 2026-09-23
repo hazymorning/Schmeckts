@@ -40,7 +40,8 @@ const STEPS = [
     run: async o => {
       const text = await readPhotoText(o.photo);
       const hit = asDetails(readPack(text, db.products));
-      return hit && {...hit, lines: packLines(text)}; // the lines are offered as chips while naming
+      // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
+      return hit && {...hit, lines: packLines(text, '', db.products)};
     },
   },
 ];
