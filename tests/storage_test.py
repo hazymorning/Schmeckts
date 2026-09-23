@@ -60,8 +60,15 @@ async def test_files(browser, url):
     await pg.reload()
     await started(pg)
     check(
+        await pg.evaluate("localStorage.getItem('__fs:photos/abcd1234.jpg') === 'x'"),
+        'readable data again, but the unreadable copy still lies set aside: its varieties may come back, so the photo stays',
+    )
+    await pg.evaluate(f"localStorage.removeItem('{aside[0]}')")
+    await pg.reload()
+    await started(pg)
+    check(
         await pg.evaluate("localStorage.getItem('__fs:photos/abcd1234.jpg') === null"),
-        'with readable data a photo whose variety is not in it is removed at the start',
+        'with readable data and nothing set aside, a photo whose variety is not in it is removed at the start',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()

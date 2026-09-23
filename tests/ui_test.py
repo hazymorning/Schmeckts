@@ -3165,6 +3165,24 @@ ZOOM_LEFT = """() => [document.documentElement.classList.contains('zoom'),
   [...document.querySelectorAll('.photo-btn img, #viewer, #viewer img')].filter(e => e.style.viewTransitionName).map(e => e.id || e.className)]"""
 
 
+# How wide the photo kept for a variety is
+FILE_WIDTH = """path => new Promise(done => { const i = new Image(); i.onload = () => done(i.naturalWidth); i.onerror = () => done(0);
+  i.src = 'data:image/jpeg;base64,' + localStorage.getItem('__fs:' + path); })"""
+# A change from another phone, as the sync delivers it: [collection, id, {field: value}]
+REMOTE = """list => import('./js/store.js').then(m => { const t = String(Date.now()).padStart(13, '0') + '-0000-fremd';
+  m.merge(list.map(([c, r, f]) => ({c, r, f: Object.fromEntries(Object.entries(f).map(([k, v]) => [k, {v, t}]))}))); })"""
+
+
+def large_pack():
+    """The packaging photo at 1600 px, wider than the 1100 px the phone keeps: shows which size ended up where"""
+    from PIL import Image
+
+    f = PACK.parent / 'package-large.jpg'
+    if not f.exists():
+        Image.open(PACK).resize((1600, 1200)).save(f, quality=85)
+    return str(f)
+
+
 async def viewed(pg, sel):
     """Taps a photo and waits until the viewer stands open"""
     await pg.click(sel)
@@ -3179,6 +3197,7 @@ async def closed(pg):
 
 async def test_photo_viewer(browser, url):
     print('the packaging photo opens large where one meal or one variety is the subject')
+    big = large_pack()
     ctx = await phone(browser)
     await ctx.add_init_script(INSET)
     pg, errors = await open_page(ctx, url, native=True)
@@ -3189,7 +3208,7 @@ async def test_photo_viewer(browser, url):
     await idle(pg)
     await pg.click('#fab')
     await idle(pg)
-    await pg.set_input_files('#camInputSheet', str(PACK))
+    await pg.set_input_files('#camInputSheet', big)
     await until(pg, "db.servings[0]?.status === 'noserver'")
     await idle(pg)
     btn = await pg.evaluate(
@@ -3206,8 +3225,8 @@ async def test_photo_viewer(browser, url):
     v = await pg.evaluate(VIEWER)
     under = await pg.evaluate("document.getElementById('sheet').open")
     check(
-        v == [True, 480, [0, 292, 400, 300], [348, 28, 48, 48], 'Schließen', 'rgb(27, 28, 23)'] and under and await pg.evaluate(BARS) == ['DARK'],
-        f'a tap opens it over the sheet: the photo whole and full width between two bars, the X at the top right, dark with light status bar icons ({v})',
+        v == [True, 1100, [0, 292, 400, 300], [348, 28, 48, 48], 'Schließen', 'rgb(27, 28, 23)'] and under and await pg.evaluate(BARS) == ['DARK'],
+        f'a tap opens it over the sheet: the large photo whole and full width between two bars, the X at the top right, dark with light status bar icons ({v})',
     )
     await shot(pg, 'photo-viewer')
 
@@ -3262,12 +3281,10 @@ async def test_photo_viewer(browser, url):
           return [window.__calls.some(c => c[0] === 'writeFile' && c[1].path === '{path}' && c[1].directory === 'DATA'),
             !!f && !localStorage.getItem('__fs:db.json').includes(f.slice(-200, -100))]; }}"""
     )
-    width = await pg.evaluate(
-        f"new Promise(done => {{ const i = new Image(); i.onload = () => done(i.naturalWidth); i.src = 'data:image/jpeg;base64,' + localStorage.getItem('__fs:{path}'); }})"
-    )
+    width = await pg.evaluate(FILE_WIDTH, path)
     photo = await state(pg, '[db.servings[0].photo, db.servings[0].thumb, !!db.products[0].thumb]')
     check(
-        stored == [True, True] and width == 480 and photo == [None, None, True],
+        stored == [True, True] and width == 1100 and photo == [None, None, True],
         f'once named the large photo is kept as a file of the variety, outside db.json; the meal keeps no photo of its own ({stored}, {width}, {photo})',
     )
 
@@ -3286,6 +3303,23 @@ async def test_photo_viewer(browser, url):
     await pg.click('#sheet .prod-edit')
     await idle(pg)
     renaming = await pg.inner_text('#sheet .sh-head h2')
+
+    # Corrected to another variety, the photo and the thumbnail go along
+    await pg.fill('#f-variety', 'Huhn')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    pid = await state(pg, 'db.servings[0].productId')
+    path = f'photos/{pid}.jpg'
+    await until(pg, f"!!localStorage.getItem('__fs:{path}')", timeout=4)
+    moved = [
+        await pg.evaluate(PHOTO_FILES),
+        await state(pg, 'db.products.map(p => [p.variety, !!p.thumb])'),
+        await pg.locator('#sheet .prod-card > .photo-btn > img.thumb').count(),
+    ]
+    check(
+        moved == [[f'__fs:{path}'], [['Huhn', True]], 1],
+        f'a meal put under another variety takes its photo and thumbnail along, the old variety goes ({moved})',
+    )
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
@@ -3294,7 +3328,7 @@ async def test_photo_viewer(browser, url):
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(
-        card == [True, True] and from_file == 480 and renaming == 'Futter ändern' and food == 1,
+        card == [True, True] and from_file == 1100 and renaming == 'Futter ändern' and food == 1,
         f'meal sheet: the thumbnail opens the photo, the rest of the card leads to naming; the food sheet opens it too ({card}, {from_file}, {renaming}, {food})',
     )
 
@@ -3302,7 +3336,7 @@ async def test_photo_viewer(browser, url):
     await pg.reload()
     await started(pg)
     await viewed(pg, '.pend .pend-top > .photo-btn')
-    check((await pg.evaluate(VIEWER))[1] == 480, 'after a restart the photo opens from the file')
+    check((await pg.evaluate(VIEWER))[1] == 1100, 'after a restart the photo opens from the file')
     await pg.click('#viewer')
     await closed(pg)
 
@@ -3343,18 +3377,31 @@ async def test_photo_viewer(browser, url):
     await pg.reload()
     await started(pg)
     deleted = await pg.evaluate(PHOTO_FILES)
+    # After a restart only the meal's smaller photo is left, and that one is kept
     await pg.click('#fab')
     await idle(pg)
-    await pg.set_input_files('#camInputSheet', str(PACK))
+    await pg.set_input_files('#camInputSheet', big)
     await until(pg, "db.servings[0]?.status === 'noserver'")
+    await pg.reload()
+    await started(pg)
+    await pg.click('.pend-head')
     await idle(pg)
+    await viewed(pg, '#sheet .photo-btn')
+    small = (await pg.evaluate(VIEWER))[1]
+    await pg.click('#viewer')
+    await closed(pg)
     await pg.fill('#f-brand', 'Felix')
     await pg.fill('#f-variety', 'Huhn')
     await pg.click('[data-action=save-name]')
     await idle(pg)
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
-    await until(pg, "Object.keys(localStorage).some(k => k.startsWith('__fs:photos/'))")
+    felix = await state(pg, 'db.servings[0].productId')
+    await until(pg, f"!!localStorage.getItem('__fs:photos/{felix}.jpg')")
+    check(
+        [small, await pg.evaluate(FILE_WIDTH, f'photos/{felix}.jpg')] == [480, 480],
+        'named after a restart: the photo in the viewer and the one kept are the smaller one the meal had',
+    )
     await settings(pg)
     await pg.click('#sheet [data-action=arm][data-then=wipe]')
     await pg.click('#sheet [data-action=arm][data-then=wipe]')
@@ -3390,6 +3437,74 @@ async def test_photo_viewer(browser, url):
     await idle(pg)
     after = await pg.locator('#sheet .photo-btn').count()
     check(before == 480 and after == 0, f'browser: the photo opens before naming, and after it there is none to open ({before}, {after})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # From elsewhere: named on another phone, the photo is handed over at once, even without photos to the server,
+    # and when the variety is merged there it follows
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', big)
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    sid = await state(pg, 'db.servings[0].id')
+    rind = {'brand': 'Animonda', 'variety': 'Rind', 'type': 'Nassfutter', 'createdAt': 1}
+    await pg.evaluate(REMOTE, [['products', 'fremdsorte01', rind], ['servings', sid, {'productId': 'fremdsorte01'}]])
+    handed = await until(pg, "!!localStorage.getItem('__fs:photos/fremdsorte01.jpg') && !db.servings[0].photo && !db.servings[0].status", timeout=4)
+    await idle(pg)
+    there = [await pg.evaluate(FILE_WIDTH, 'photos/fremdsorte01.jpg'), await pg.locator('.pend .pend-top > .photo-btn').count()]
+    check(handed and there == [1100, 1], f'named on another phone: the large photo becomes the variety’s here at once ({handed}, {there})')
+    await pg.evaluate(
+        REMOTE,
+        [
+            ['products', 'fremdsorte02', {**rind, 'variety': 'Rind in Soße'}],
+            ['servings', sid, {'productId': 'fremdsorte02'}],
+            ['products', 'fremdsorte01', {'_del': True}],
+        ],
+    )
+    await until(pg, "!!localStorage.getItem('__fs:photos/fremdsorte02.jpg')", timeout=4)
+    await pg.reload()
+    await started(pg)
+    check(
+        await pg.evaluate(PHOTO_FILES) == ['__fs:photos/fremdsorte02.jpg'],
+        f'merged on another phone: the photo follows the meal and survives the next start ({await pg.evaluate(PHOTO_FILES)})',
+    )
+
+    # A sheet from a link over the open photo: the photo goes, back then closes the sheet
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://feed'})")
+    await idle(pg)
+    link = await pg.evaluate("import('./js/ui/sheet.js').then(m => [document.getElementById('viewer').open, m.sheet?.kind])")
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await idle(pg)
+    check(
+        link == [False, 'feed'] and not await pg.evaluate("document.getElementById('sheet').open") and (await pg.evaluate(BARS))[-1] == 'DEFAULT',
+        f'a link opens its sheet in place of the photo, and back closes that sheet ({link})',
+    )
+
+    # The system switching between light and dark keeps the icons light while the photo is open
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    await pg.emulate_media(color_scheme='dark')
+    await pg.emulate_media(color_scheme='light')
+    await idle(pg)
+    switched = (await pg.evaluate(BARS))[-1]
+    # Redrawn under the photo, the thumbnail gets the focus back when it closes
+    await pg.evaluate("import('./js/views/home.js').then(m => m.renderHome())")
+    await pg.keyboard.press('Escape')
+    await closed(pg)
+    focus = await pg.evaluate('document.activeElement.className')
+    check(
+        switched == 'DARK' and focus == 'photo-btn' and (await pg.evaluate(BARS))[-1] == 'DEFAULT',
+        f'a switch of the system theme keeps the icons light over the photo; closing returns the focus to the thumbnail although it was redrawn ({switched}, {focus})',
+    )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -3433,8 +3548,42 @@ async def test_photo_viewer(browser, url):
         f'closing: the photo goes back into the thumbnail and the ground fades out ({closing})',
     )
     check(left == [False, []], f'afterwards no name and no class of the step is left ({left})')
+    # Back pressed twice while it closes: the next photo still stays open
+    await viewed(pg, '#sheet .prod-card > .photo-btn')
+    await pg.evaluate("document.getElementById('viewer').click(); setTimeout(() => window.__back({canGoBack: true}), 60)")
+    await closed(pg)
+    await viewed(pg, '#sheet .prod-card > .photo-btn')
+    await pg.wait_for_timeout(400)
+    again = await pg.evaluate("document.getElementById('viewer').open")
+    await pg.click('#viewer')
+    await closed(pg)
+    check(again, 'back pressed while the photo was closing does not close the next one')
+    # A level of the sheet or a page opens at rest: its bar title and line never show first and fade out
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
+    flash = await pg.evaluate(
+        """async () => { const seen = []; document.querySelector('[data-action=open-settings]').click();
+          for (let i = 0; i < 20; i++) { await new Promise(d => requestAnimationFrame(d)); const b = document.querySelector('#sheet .page-bar');
+            if (b) seen.push(Math.max(+getComputedStyle(b.querySelector('.bar-title')).opacity, +getComputedStyle(b, '::after').opacity)); }
+          return Math.max(0, ...seen); }"""
+    )
+    await idle(pg)
+    await pg.evaluate('(b => b.scrollTop = b.scrollHeight)(document.getElementById("sheetBody"))')
+    await idle(pg)
+    deeper = await pg.evaluate(
+        """async () => { const seen = []; document.querySelector('#sheet [data-action=settings-page][data-v=house]').click();
+          for (let i = 0; i < 20; i++) { await new Promise(d => requestAnimationFrame(d)); const b = document.querySelector('#sheet .page-bar');
+            if (b?.querySelector('.bar-title').innerText === 'Haushalt')
+              seen.push(Math.max(+getComputedStyle(b.querySelector('.bar-title')).opacity, +getComputedStyle(b, '::after').opacity)); }
+          return [seen.length > 0, Math.max(0, ...seen)]; }"""
+    )
+    check(
+        flash == 0 and deeper == [True, 0],
+        f'a page, and a level reached from a scrolled one, arrive with neither the bar title nor the line showing, not even for a frame ({flash}, {deeper})',
+    )
+    await idle(pg)
+    await settings_back(pg)
+    await settings_back(pg)
     await viewed(pg, '.pend .pend-top > .photo-btn')
     redraw = await pg.evaluate(
         """import('./js/views/home.js').then(m => { const o = document.startViewTransition; let n = 0;
@@ -3768,12 +3917,13 @@ async def test_edges(browser, url):
         check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
         await ctx.close()
 
-    # „Verlauf“: the day line parks under the bar and takes the line over
-    for scheme in ('light', 'dark'):
+    # „Verlauf“: the day line parks under the bar and takes the line over; with more days than drawn at first and
+    # with fewer, where the list never grows
+    for scheme, n in (('light', 26), ('dark', 8)):
         ctx = await phone(browser, scheme)
         await ctx.add_init_script(INSET)
         pg, errors = await open_page(ctx, url, scheme)
-        await pg.evaluate(SORTS, [26, 1])
+        await pg.evaluate(SORTS, [n, 1])
         await idle(pg)
         home = await pg.eval_on_selector('[data-sec=hist] .tl-date', 'd => getComputedStyle(d).position')
         await pg.click('[data-sec=hist] [data-action=open-report]')
@@ -4226,18 +4376,22 @@ async def test_home_history(browser, url):
         f'the first meal of the day replaces yesterday, and undo brings yesterday back ({served["days"]}, {undone["ids"]})',
     )
 
-    # A day in the calendar always opens the history page right at that day; the home page holds no anchors
-    await seed('2026-06-12T12:00:00+02:00', long)
+    # A day in the calendar always opens the history page right at that day, also one beyond the days drawn at
+    # first (ten); the home page holds no anchors
+    cal = today3 + [[f'c{d}-{i}', f'2026-06-{1 + d:02d}T{8 + 4 * i:02d}:00', [M]] for d in range(11) for i in range(3)]
+    await seed('2026-06-12T12:00:00+02:00', cal)
     days = await pg.eval_on_selector_all('[data-sec=hist] .cal .day.has', 'l => l.map(b => b.dataset.day)')
+    check(days[0] == '2026-06-01' and days[-1] == '2026-06-12', f'the calendar holds today and the first day of last week ({days[0]}, {days[-1]})')
     at = []
     for day in (days[-1], days[0]):
         await pg.click(f'[data-sec=hist] [data-action=jump-day][data-day="{day}"]')
         await idle(pg)
         at.append(
             await pg.evaluate(
-                """k => { const d = document.getElementById('sheetBody').querySelector('#d-' + k);
-              const bar = document.querySelector('#sheet .page-bar').getBoundingClientRect();
-              return [document.getElementById('sheet').open, !!d, Math.round((d?.getBoundingClientRect().top ?? 0) - bar.bottom)]; }""",
+                """k => { const body = document.getElementById('sheetBody'), d = body.querySelector('#d-' + k);
+              const bar = document.querySelector('#sheet .page-bar').getBoundingClientRect(), r = d?.getBoundingClientRect();
+              return [document.getElementById('sheet').open, !!d, Math.round((r?.top ?? 0) - bar.bottom),
+                body.scrollTop + body.clientHeight >= body.scrollHeight - 1 && r.top >= bar.bottom && r.bottom <= innerHeight]; }""",
                 day,
             )
         )
@@ -4245,8 +4399,8 @@ async def test_home_history(browser, url):
         await idle(pg)
     anchors = await pg.locator('#home [id^="d-"]').count()
     check(
-        all(a[:2] == [True, True] and 0 <= a[2] < 24 for a in at) and anchors == 0,
-        f'today and the oldest day open the history page right at that day, and the home page has no anchors ({at}, {anchors})',
+        all(a[:2] == [True, True] and (0 <= a[2] < 24 or a[3]) for a in at) and anchors == 0,
+        f'today and the oldest day open the history page right at that day, at the top or, at the end of the list, whole in view; the home page has no anchors ({at}, {anchors})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
@@ -4380,13 +4534,14 @@ async def test_report(browser, url):
         f'the day line sticks under the bar, the separator is straight, two lines for the name ({day_line}, {radius}, {lines})',
     )
     stuck = await pg.evaluate(
-        """async () => { const body = document.getElementById('sheetBody');
-          body.scrollTop = body.scrollHeight;
+        """async () => { const body = document.getElementById('sheetBody'), bar = body.querySelector('.page-bar').getBoundingClientRect();
+          body.scrollTop += body.querySelectorAll('.tl-date')[2].getBoundingClientRect().top - bar.bottom + 40;
           await new Promise(d => setTimeout(d, 250));
-          const on = [...body.querySelectorAll('.tl-date')].filter(d => d.classList.contains('stuck'));
-          return [on.length, on.length ? getComputedStyle(on.at(-1), '::after').opacity : '']; }"""
+          const d = document.elementFromPoint(innerWidth / 2, bar.bottom + 4)?.closest('.tl-date');
+          return d && [d.classList.contains('stuck'), getComputedStyle(d, '::after').opacity,
+            getComputedStyle(body.querySelector('.page-bar'), '::after').opacity]; }"""
     )
-    check(stuck[0] > 0 and stuck[1] == '1', f'and while it is stuck it carries the edge’s line ({stuck})')
+    check(stuck == [True, '1', '0'], f'the day line parked under the bar carries the edge’s line, and the bar gives its own up ({stuck})')
 
     # Nothing reaches 70 %: only the weakest variety is named
     await pg.evaluate(

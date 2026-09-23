@@ -4,6 +4,7 @@
    same dialog, because a page is a sheet that fills the screen and moves sideways.
    What either of them contains is registered by the views through setSheetView(). */
 import {$, reduceMotion} from '../dom.js';
+import {dropViewer} from './viewer.js';
 
 export const dlg = $('#sheet'),
   sheetBody = $('#sheetBody');
@@ -24,7 +25,7 @@ const markEdge = () => {
   const y = sheetBody.scrollTop,
     bar = isPage(sheet) ? sheetBody.querySelector(':scope > .page-bar') : null,
     title = bar?.nextElementSibling,
-    titled = !!title && y + bar.offsetHeight >= title.offsetTop + title.offsetHeight;
+    titled = !!title && y > 0 && y + bar.offsetHeight >= title.offsetTop + title.offsetHeight;
   dlg.classList.toggle('scrolled', y > 0);
   dlg.classList.toggle('titled', titled);
 };
@@ -37,6 +38,7 @@ export function openSheet(state) {
   dlg.classList.toggle('page', isPage(state));
   renderSheet();
   if (!dlg.open) {
+    dropViewer(); // a link or a notification: the sheet takes the screen, not a photo under it
     dlg.classList.remove('closing');
     dlg.style.transform = '';
     dlg.style.transition = '';
@@ -99,6 +101,7 @@ export function renderSheet() {
     return markEdge();
   }
   const swap = () => {
+    dlg.classList.remove('scrolled', 'titled'); // the new level arrives at rest, not fading out of the old one's edge
     drawView(sheet);
     viewKey = key;
     sheetBody.scrollTop = 0;

@@ -8,21 +8,25 @@ import {darkBars} from './theme.js';
 
 const dlg = $('#viewer'),
   img = $('img', dlg);
-let busy = false, // opening or closing: taps and back wait for it
+let opening = false, // loading and growing: taps and back wait for it
+  closing = false,
   closeLater = false, // back arrived while it was opening
+  run = 0, // counts the openings, so one that dropViewer() cut short does not go on
   from = null; // the meal and variety of the thumbnail it grew out of, to find that again when it closes
 
-export const viewerOpen = () => busy || dlg.open;
+export const viewerOpen = () => opening || closing || dlg.open;
 
 /* load() resolves to the photo as a data URL, or null; btn is the thumbnail's button.
-   true: open, false: nothing to show, null: already open or opening. */
+   true: open, false: nothing to show, null: already open or opening, or cut short. */
 export async function openViewer(load, btn) {
   if (viewerOpen()) return null;
-  busy = true;
+  const mine = ++run;
+  opening = true;
+  closeLater = false;
   let src;
   try {
     src = await load();
-    if (src) {
+    if (src && mine === run) {
       img.src = src;
       await img.decode();
     }
@@ -30,18 +34,21 @@ export async function openViewer(load, btn) {
     report('opening the photo', e);
     src = null;
   }
+  if (mine !== run) return null;
   if (!src) {
     img.removeAttribute('src');
-    busy = false;
+    opening = closeLater = false;
     return false;
   }
   img.style.setProperty('--ar', img.naturalWidth / img.naturalHeight);
   from = {s: btn.dataset.s || '', p: btn.dataset.p || ''};
   await zoom($('img', btn), img, () => {
+    if (mine !== run) return;
     dlg.showModal();
     darkBars(true);
   });
-  busy = false;
+  if (mine !== run) return null;
+  opening = false;
   if (closeLater) {
     closeLater = false;
     closeViewer();
@@ -51,25 +58,47 @@ export async function openViewer(load, btn) {
 
 /* true when it took the back button */
 export function closeViewer() {
-  if (busy) {
+  if (opening) {
     closeLater = true;
     return true;
   }
+  if (closing) return true;
   if (!dlg.open) return false;
-  busy = true;
+  closing = true;
+  const mine = run;
   // The thumbnail may have been drawn anew meanwhile (a change from the server): look it up again
   const box = $('#sheet').open ? $('#sheetBody') : $('#home'),
-    thumb = from && $(`[data-action=view-photo][data-s="${from.s}"][data-p="${from.p}"] img`, box),
+    btn = from && $(`[data-action=view-photo][data-s="${from.s}"][data-p="${from.p}"]`, box),
+    thumb = btn && $('img', btn),
     r = thumb?.getBoundingClientRect(),
     seen = r && r.bottom > 0 && r.top < innerHeight ? thumb : null;
   zoom(img, seen, () => {
-    dlg.close();
-    darkBars(false);
+    if (mine !== run) return;
+    shut();
+    // Focus goes back to the thumbnail; the one it came from may have been replaced by a redraw
+    const at = document.activeElement;
+    if (btn && (!at || at === document.body || !at.isConnected || dlg.contains(at))) btn.focus({preventScroll: true});
   }).then(() => {
+    if (mine !== run) return;
     img.removeAttribute('src'); // the decoded photo is let go
-    busy = false;
+    closing = false;
   });
   return true;
+}
+
+function shut() {
+  dlg.close();
+  darkBars(false);
+}
+
+/* At once and without a step: something else takes the screen (a sheet or the camera from a link or a
+   notification), which must not open underneath it */
+export function dropViewer() {
+  if (!viewerOpen()) return;
+  run++;
+  if (dlg.open) shut();
+  img.removeAttribute('src');
+  opening = closing = closeLater = false;
 }
 
 /* One step between the thumbnail and the photo: the two share the name `photo` for the length of the step, the

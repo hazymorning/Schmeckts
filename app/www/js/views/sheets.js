@@ -420,7 +420,7 @@ sheetBody.addEventListener('scroll', growHistory, {passive: true});
    threshold also catches a jump straight into that place. Watched again whenever the history grows. */
 let stuck = null;
 function watchDays() {
-  const top = $('.page-bar', sheetBody)?.offsetHeight || 0;
+  const top = parseFloat(getComputedStyle(sheetBody).getPropertyValue('--stick')) || 0; // resolved while hidden too
   stuck?.disconnect();
   stuck = new IntersectionObserver(
     entries =>

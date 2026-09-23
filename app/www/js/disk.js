@@ -68,6 +68,17 @@ export async function read(name) {
   }
 }
 
+/* Whether a file that could not be read lies set aside; also when that cannot be told, so nothing is tidied away */
+export async function setAside() {
+  if (!FS) return false;
+  try {
+    return (await FS.readdir({path: '', directory: DIR})).files.some(f => /\.corrupt-\d+\.json$/.test(f.name));
+  } catch (e) {
+    report('looking for set-aside data', e);
+    return true;
+  }
+}
+
 /* Writing */
 async function writeNow(name, text) {
   if (!FS) {

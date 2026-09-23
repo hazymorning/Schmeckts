@@ -271,7 +271,7 @@ function settle(s) {
   if (p)
     linkProduct(s, p); // tidies up and attaches a scanned code
   else {
-    keepPhoto(s.productId, memPhotos.get(s.id) || s.photo?.split(',')[1]); // the variety has not arrived here yet
+    keepPhoto(s.productId, memPhotos.get(s.id) || s.photo?.split(',')[1], s.id); // the variety has not arrived here yet
     delete s.photo;
     delete s.status;
     delete s.error;
@@ -283,9 +283,21 @@ function settle(s) {
   tries.delete(s.id);
 }
 
+/* Meals named meanwhile on another phone, whether photos go to the server or not: at start, after every change
+   from elsewhere and before recognising. refresh: redraw what shows such a meal (a change from elsewhere redraws
+   everything anyway). */
+export function settleNamed(refresh = true) {
+  const named = db.servings.filter(s => s.productId && (s.status || s.photo));
+  for (const s of named) settle(s);
+  if (!named.length) return;
+  save();
+  if (refresh) for (const s of named) refreshServing(s.id);
+}
+
 /* Server reachable again: recognise the waiting photos one after another */
 let retrying = false;
 export async function retryWaiting() {
+  settleNamed();
   if (retrying || !photoByServer()) return;
   retrying = true;
   try {

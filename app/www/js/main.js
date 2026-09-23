@@ -17,10 +17,10 @@ import {closeViewer} from './ui/viewer.js';
 import {renderHome, renderSyncChip, update} from './views/home.js';
 import {paintHouse} from './views/settings.js';
 import './views/sheets.js'; // registers the contents of the sheets
-import {retryWaiting} from './logic/feeding.js';
+import {retryWaiting, settleNamed} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
-import {tidyPhotos} from './logic/products.js';
+import {followPhotos, tidyPhotos} from './logic/products.js';
 import {openLink} from './actions.js'; // also registers clicks and input
 import {report} from './report.js';
 
@@ -30,6 +30,8 @@ document.querySelectorAll('[data-icon]').forEach(el => {
 const typingIn = box => document.activeElement?.tagName === 'INPUT' && box?.contains(document.activeElement);
 hooks.changed = () => {
   // changes from other devices
+  settleNamed(false);
+  followPhotos();
   update();
   if (sheet && !typingIn(sheetBody)) renderSheet();
   syncReminders(); // rated or deleted elsewhere: cancel the reminder
@@ -37,6 +39,7 @@ hooks.changed = () => {
 hooks.saved = () => {
   syncSoon(400);
   syncReminders();
+  followPhotos(); // knows where each meal is now, for the next change from elsewhere
 }; // sync shortly after our own save, keep the reminders current
 syncHooks.status = () => {
   renderSyncChip();
@@ -47,6 +50,8 @@ diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportie
 try {
   startSync();
   applyTheme();
+  settleNamed(false); // named on another phone while this one was away
+  followPhotos();
   renderHome(); // drawn exactly once before the splash goes
   startReminders();
   clearExports();
