@@ -2977,6 +2977,10 @@ async def test_mood(browser, url):
     check(old == [True, False], f'the 1.1.0 setting is carried over: „Übersicht“ becomes on and „Aus“ stays off ({old})')
 
 
+# The status bar icons asked for, in order: DARK means light icons for a dark ground
+BARS = "window.__calls.filter(c => c[0] === 'setStyle').map(c => c[1].style)"
+
+
 async def test_camera(browser, url):
     print('our own camera (simulated device)')
     CAM = """() => { const d = document.getElementById('camera'), v = d.querySelector('video'), r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
@@ -3047,13 +3051,15 @@ async def test_camera(browser, url):
         await pg.click('#sheet [data-action=photo]')
         await pg.wait_for_function("document.querySelector('#camera video').videoWidth > 0")
         await idle(pg)
-        was = await pg.evaluate(f"[document.getElementById('camera').open, {LIVE}]")
+        was = await pg.evaluate(f"[document.getElementById('camera').open, {LIVE}, {BARS}.at(-1)]")
         await pg.evaluate(act)
         await idle(pg)
-        now = await pg.evaluate(f"import('./js/ui/sheet.js').then(m => [document.getElementById('camera').open, {LIVE}, m.sheet?.kind])")
+        now = await pg.evaluate(
+            f"import('./js/ui/sheet.js').then(m => [document.getElementById('camera').open, {LIVE}, m.sheet?.kind, {BARS}.at(-1)])"
+        )
         check(
-            was == [True, 1] and now == [False, 0, 'feed'] and await state(pg, 'db.servings.length') == 1,
-            f'{how}: the camera closes and is released at once, nothing is served and the feeding sheet stays ({now})',
+            was == [True, 1, 'DARK'] and now == [False, 0, 'feed', 'DEFAULT'] and await state(pg, 'db.servings.length') == 1,
+            f'{how}: the camera closes and is released at once, nothing is served and the feeding sheet stays; light status bar icons only while it is open ({was}, {now})',
         )
         await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeSheet())")
         await idle(pg)
@@ -3134,6 +3140,328 @@ async def test_no_camera(browser, url):
         chooser.element is not None and not await pg.evaluate("document.getElementById('camera').open"),
         'with no camera: the file picker in the browser',
     )
+    await ctx.close()
+
+
+# The status bar inset, set before the page is built: Chromium does not redo an env() fallback afterwards
+INSET = """addEventListener('DOMContentLoaded', () => { const s = document.createElement('style');
+  s.textContent = ':root{--safe-area-inset-top:24px}'; document.head.append(s); })"""
+VIEWER = """() => { const d = document.getElementById('viewer'), i = d.querySelector('img'), x = d.querySelector('.icon-btn'),
+  r = e => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
+  return [d.open, i.naturalWidth, r(i), r(x), x.getAttribute('aria-label'), getComputedStyle(d).backgroundColor]; }"""
+PHOTO_FILES = "Object.keys(localStorage).filter(k => k.startsWith('__fs:photos/')).sort()"
+# What a view transition moves while a photo opens or closes, collected while it runs (as PAGE_STEP does)
+ZOOM = """async sel => { const seen = new Map();
+  const watch = setInterval(() => { for (const a of document.getAnimations()) { const p = a.effect?.pseudoElement || '';
+    if (/^::view-transition-(old|new|group)\\(/.test(p) && !seen.has(p))
+      seen.set(p, [p.slice('::view-transition-'.length).replace('(', ' ').replace(')', ''), a.animationName,
+        a.effect.getComputedTiming().duration]); } }, 16);
+  document.querySelector(sel).click();
+  await new Promise(done => setTimeout(done, 600));
+  clearInterval(watch);
+  return [...seen.values()].sort(); }"""
+# Whatever is left of a step afterwards: the class on <html> and the names in the style attributes
+ZOOM_LEFT = """() => [document.documentElement.classList.contains('zoom'),
+  [...document.querySelectorAll('.photo-btn img, #viewer, #viewer img')].filter(e => e.style.viewTransitionName).map(e => e.id || e.className)]"""
+
+
+async def viewed(pg, sel):
+    """Taps a photo and waits until the viewer stands open"""
+    await pg.click(sel)
+    await pg.wait_for_function("document.getElementById('viewer').open")
+    await idle(pg)
+
+
+async def closed(pg):
+    await pg.wait_for_function("!document.getElementById('viewer').open")
+    await idle(pg)
+
+
+async def test_photo_viewer(browser, url):
+    print('the packaging photo opens large where one meal or one variety is the subject')
+    ctx = await phone(browser)
+    await ctx.add_init_script(INSET)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    btn = await pg.evaluate(
+        """() => { const b = document.querySelector('#sheet .photo-btn'), body = document.getElementById('sheetBody'), s = getComputedStyle(body);
+          if (!b) return null; const r = b.getBoundingClientRect();
+          return [!!b.querySelector(':scope > .name-photo'), Math.round(r.width) === Math.round(body.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight)),
+            r.height >= 48, getComputedStyle(b).borderRadius, b.getAttribute('aria-label')]; }"""
+    )
+    check(
+        btn == [True, True, True, '24px', 'Foto vergrößern'], f'naming: the photo is a button, as wide as the sheet and as round as the photo ({btn})'
+    )
+    await pg.evaluate('window.__calls.length = 0')
+    await viewed(pg, '#sheet .photo-btn')
+    v = await pg.evaluate(VIEWER)
+    under = await pg.evaluate("document.getElementById('sheet').open")
+    check(
+        v == [True, 480, [0, 292, 400, 300], [348, 28, 48, 48], 'Schließen', 'rgb(27, 28, 23)'] and under and await pg.evaluate(BARS) == ['DARK'],
+        f'a tap opens it over the sheet: the photo whole and full width between two bars, the X at the top right, dark with light status bar icons ({v})',
+    )
+    await shot(pg, 'photo-viewer')
+
+    # Back closes only the viewer; a tap on it and Escape close it too
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await viewed(pg, '#sheet .photo-btn')
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await closed(pg)
+    kept = await pg.evaluate(
+        "import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.step, document.getElementById('f-brand').value])"
+    )
+    check(
+        kept == [True, 'name', 'Sheba'] and (await pg.evaluate(BARS))[-1] != 'DARK',
+        f'back closes the viewer and nothing else: naming stays with what was typed, the status bar follows the theme again ({kept})',
+    )
+    await viewed(pg, '#sheet .photo-btn')
+    await pg.keyboard.press('Escape')
+    await closed(pg)
+    check(await pg.evaluate("document.getElementById('sheet').open"), 'Escape closes the viewer and leaves the sheet open')
+
+    # On the home card the thumbnail opens the photo, the rest of the head the meal
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    thumb = await pg.eval_on_selector(
+        '.pend .pend-top > .photo-btn',
+        'b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), getComputedStyle(b).borderRadius]; }',
+    )
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    over = await pg.evaluate("[document.getElementById('viewer').open, document.getElementById('sheet').open]")
+    await pg.click('#viewer .icon-btn')
+    await closed(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    title = await pg.inner_text('#sheet .sh-head h2')
+    check(
+        thumb == [50, 50, '12px'] and over == [True, False] and title == 'Futter benennen',
+        f'„Wie war’s?“ on the home page: the thumbnail opens the photo, the name the meal ({thumb}, {over}, {title})',
+    )
+
+    # Named, the photo goes into a file of its own, and not into the stored data
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    pid = await state(pg, 'db.servings[0].productId')
+    path = f'photos/{pid}.jpg'
+    await until(pg, f"localStorage.getItem('__fs:{path}') && localStorage.getItem('__fs:db.json')?.includes('{pid}')")
+    stored = await pg.evaluate(
+        f"""() => {{ const f = localStorage.getItem('__fs:{path}');
+          return [window.__calls.some(c => c[0] === 'writeFile' && c[1].path === '{path}' && c[1].directory === 'DATA'),
+            !!f && !localStorage.getItem('__fs:db.json').includes(f.slice(-200, -100))]; }}"""
+    )
+    width = await pg.evaluate(
+        f"new Promise(done => {{ const i = new Image(); i.onload = () => done(i.naturalWidth); i.src = 'data:image/jpeg;base64,' + localStorage.getItem('__fs:{path}'); }})"
+    )
+    photo = await state(pg, '[db.servings[0].photo, db.servings[0].thumb, !!db.products[0].thumb]')
+    check(
+        stored == [True, True] and width == 480 and photo == [None, None, True],
+        f'once named the large photo is kept as a file of the variety, outside db.json; the meal keeps no photo of its own ({stored}, {width}, {photo})',
+    )
+
+    # The meal sheet and the food sheet open it from the file
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    card = await pg.evaluate(
+        "[!!document.querySelector('#sheet .prod-card > .photo-btn > .thumb.lg'), !!document.querySelector('#sheet .prod-card > .prod-edit[data-action=edit-name]')]"
+    )
+    await viewed(pg, '#sheet .prod-card > .photo-btn')
+    from_file = (await pg.evaluate(VIEWER))[1]
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.click('#sheet .prod-edit')
+    await idle(pg)
+    renaming = await pg.inner_text('#sheet .sh-head h2')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+    await idle(pg)
+    food = await pg.locator('#sheet .prod-card > .photo-btn').count()
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(
+        card == [True, True] and from_file == 480 and renaming == 'Futter ändern' and food == 1,
+        f'meal sheet: the thumbnail opens the photo, the rest of the card leads to naming; the food sheet opens it too ({card}, {from_file}, {renaming}, {food})',
+    )
+
+    # After a restart it is read from the file
+    await pg.reload()
+    await started(pg)
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    check((await pg.evaluate(VIEWER))[1] == 480, 'after a restart the photo opens from the file')
+    await pg.click('#viewer')
+    await closed(pg)
+
+    # A file that cannot be read: a word, the thumbnail becomes a plain one, the file goes
+    good = await pg.evaluate(f"localStorage.getItem('__fs:{path}')")
+    await pg.evaluate(f"localStorage.setItem('__fs:{path}', 'kaputt')")
+    await pg.reload()
+    await started(pg)
+    await pg.click('.pend .pend-top > .photo-btn')
+    await until(pg, f"!localStorage.getItem('__fs:{path}')", timeout=4)
+    await idle(pg)
+    broken = [
+        await pg.evaluate("document.getElementById('viewer').open"),
+        (await pg.inner_text('#toast')).split('\n')[0],
+        await pg.locator('.photo-btn').count(),
+        await pg.locator('.pend .pend-head > .thumb').count(),
+    ]
+    check(broken == [False, 'Das Foto ist nicht mehr da.', 0, 1], f'a broken file: a word, and the thumbnail is a plain one again ({broken})')
+
+    # Without a file here (a variety from another phone, or from before) the card is the one button it was
+    await pg.click('.pend-head')
+    await idle(pg)
+    plain = await pg.evaluate("[!!document.querySelector('#sheet button.prod-card'), document.querySelectorAll('#sheet .photo-btn').length]")
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(plain == [True, 0], f'without the file the meal card stays one button ({plain})')
+
+    # Tidying up: a file whose variety is gone goes at the next start, and „Alle Daten löschen“ takes all of them
+    await pg.evaluate(f"[localStorage.setItem('__fs:{path}', {json.dumps(good)}), localStorage.setItem('__fs:photos/zzzz9999.jpg', 'x')]")
+    await pg.reload()
+    await started(pg)
+    stray = await pg.evaluate(PHOTO_FILES)
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+    await idle(pg)
+    await pg.click('#sheet [data-action=arm][data-then=delete-product]')
+    await pg.click('#sheet [data-action=arm][data-then=delete-product]')
+    await idle(pg)
+    await pg.reload()
+    await started(pg)
+    deleted = await pg.evaluate(PHOTO_FILES)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await pg.fill('#f-brand', 'Felix')
+    await pg.fill('#f-variety', 'Huhn')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await until(pg, "Object.keys(localStorage).some(k => k.startsWith('__fs:photos/'))")
+    await settings(pg)
+    await pg.click('#sheet [data-action=arm][data-then=wipe]')
+    await pg.click('#sheet [data-action=arm][data-then=wipe]')
+    await idle(pg)
+    wiped = await pg.evaluate(PHOTO_FILES)
+    check(
+        stray == [f'__fs:{path}'] and deleted == [] and wiped == [],
+        f'photos of varieties that are gone are removed at the start, and „Alle Daten löschen“ removes them all ({stray}, {deleted}, {wiped})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # In the browser nothing is kept: only the photo of a meal still to be named opens
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await viewed(pg, '#sheet .photo-btn')
+    before = (await pg.evaluate(VIEWER))[1]
+    await pg.click('#viewer')
+    await closed(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    after = await pg.locator('#sheet .photo-btn').count()
+    check(before == 480 and after == 0, f'browser: the photo opens before naming, and after it there is none to open ({before}, {after})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # With motion the photo grows out of its thumbnail and back; only the photo moves, the ground fades
+    ctx = await phone(browser, motion=True)
+    await ctx.add_init_script(INSET)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    opening = await pg.evaluate(ZOOM, '#sheet .prod-card > .photo-btn')
+    await idle(pg)
+    closing = await pg.evaluate(ZOOM, '#viewer')
+    await idle(pg)
+    left = await pg.evaluate(ZOOM_LEFT)
+    check(
+        [o[0] for o in opening] == ['group photo', 'new photo', 'new viewer', 'old photo']
+        and all(o[2] == 300 for o in opening)
+        and ['new viewer', 'fadeIn', 300] in opening,
+        f'opening: the photo grows out of the thumbnail and the ground fades in; nothing else moves ({opening})',
+    )
+    check(
+        [c[0] for c in closing] == ['group photo', 'new photo', 'old photo', 'old viewer']
+        and all(c[2] == 300 for c in closing)
+        and ['old viewer', 'fadeOut', 300] in closing,
+        f'closing: the photo goes back into the thumbnail and the ground fades out ({closing})',
+    )
+    check(left == [False, []], f'afterwards no name and no class of the step is left ({left})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await viewed(pg, '.pend .pend-top > .photo-btn')
+    redraw = await pg.evaluate(
+        """import('./js/views/home.js').then(m => { const o = document.startViewTransition; let n = 0;
+          document.startViewTransition = function (...a) { n++; return o.apply(this, a); };
+          m.update(); document.startViewTransition = o; return n; })"""
+    )
+    check(redraw == 0, f'a redraw of the home page under the open viewer starts no transition of its own ({redraw})')
+    await pg.click('#viewer')
+    await closed(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # Under reduced motion it simply appears
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    still = await pg.evaluate(ZOOM, '#sheet .photo-btn')
+    check(still == [] and await pg.evaluate("document.getElementById('viewer').open"), f'reduced motion: it opens without a transition ({still})')
     await ctx.close()
 
 
@@ -3267,13 +3595,13 @@ async def test_start(browser, url):
     await idle(pg)
     bar = await pg.evaluate(
         """(() => { const s = getComputedStyle(document.body, '::before');
-          return [s.height, s.position, s.opacity, s.zIndex,
-            s.backgroundImage.includes(getComputedStyle(document.body).backgroundColor),
+          return [s.height, s.position, s.opacity, s.zIndex, s.backgroundImage,
+            s.backgroundColor === getComputedStyle(document.body).backgroundColor,
             getComputedStyle(document.querySelector('.top')).paddingTop]; })()"""
     )
     check(
-        bar == ['40px', 'fixed', '0', '10', True, '36px'],
-        f'at the top the strip behind the status bar is invisible, so the picture reaches the edge ({bar})',
+        bar == ['24px', 'fixed', '0', '10', 'none', True, '36px'],
+        f'at the top the strip behind the status bar is invisible, so the picture reaches the edge; it is exactly as tall as the status bar and plain ({bar})',
     )
     moved = await pg.evaluate(
         """(async () => { const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -3338,6 +3666,203 @@ BODY_BOX = """() => { const b = document.getElementById('sheetBody').getBounding
 PAGE = """() => { const d = document.getElementById('sheet'), r = d.getBoundingClientRect();
   return [document.querySelector('#sheet .page-title')?.innerText ?? null, d.open, d.classList.contains('page'),
     Math.round(r.width), Math.round(r.height), Math.round(r.left)]; }"""
+
+# The top edge of what is open (PROJECT.md, „Building blocks“, scroll edge): the bar, its line and its title
+EDGE = """() => { const d = document.getElementById('sheet'), body = document.getElementById('sheetBody'),
+  bar = body.querySelector(':scope > .page-bar'), title = bar.nextElementSibling, small = bar.querySelector('.bar-title'),
+  line = getComputedStyle(bar, '::after'), r = bar.getBoundingClientRect(), t = title.getBoundingClientRect(),
+  probe = v => { const e = document.createElement('i'); e.style.color = `var(${v})`; d.append(e); const c = getComputedStyle(e).color; e.remove(); return c; };
+  return {bar: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], below: t.top >= r.bottom,
+    seen: document.elementFromPoint(t.left + 8, t.top + 2) === title,
+    line: [line.height, line.backgroundImage, line.opacity, line.backgroundColor === probe('--line')],
+    small: [getComputedStyle(small).opacity, small.innerText === title.innerText, small.getAttribute('aria-hidden')],
+    scrolled: d.classList.contains('scrolled'), titled: d.classList.contains('titled'), wide: body.scrollWidth === body.clientWidth,
+    at: title.offsetTop + title.offsetHeight - bar.offsetHeight}; }"""
+# The colours a token has here, as [r, g, b]
+TOKENS = """list => list.map(v => { const e = document.createElement('i'); e.style.color = `var(${v})`; document.getElementById('sheet').append(e);
+  const c = getComputedStyle(e).color.match(/\\d+/g).map(Number).slice(0, 3); e.remove(); return c; })"""
+
+
+async def column(pg, x, y):
+    """The colours of the screen at x from y - 6 to y + 5, one per row"""
+    import io
+    from PIL import Image
+
+    png = await pg.screenshot(clip={'x': x, 'y': y - 6, 'width': 1, 'height': 12}, scale='css')
+    img = Image.open(io.BytesIO(png)).convert('RGB')
+    return [img.getpixel((0, i)) for i in range(12)]
+
+
+def rows(col, want):
+    """Whether every row is within 2 of the colour expected there"""
+    return all(all(abs(a - b) <= 2 for a, b in zip(c, w)) for c, w in zip(col, want))
+
+
+async def test_edges(browser, url):
+    print('the top edge: nothing fades, the bar ends straight and draws a line only while something lies under it')
+    for scheme in ('light', 'dark'):
+        ctx = await phone(browser, scheme)
+        await ctx.add_init_script(INSET)
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.click('[data-action=demo]')
+        await idle(pg)
+        await settings(pg)
+        rest = await pg.evaluate(EDGE)
+        check(
+            rest['bar'] == [0, 24, 400, 56]
+            and rest['below']
+            and rest['seen']
+            and rest['line'] == ['1px', 'none', '0', True]
+            and rest['small'] == ['0', True, 'true']
+            and rest['wide']
+            and not rest['scrolled'],
+            f'{scheme}, at rest: the bar is the full width and 56px under the status bar, holds the arrow only and lies over nothing ({rest})',
+        )
+        await pg.evaluate("document.getElementById('sheetBody').scrollTop = 1")
+        await idle(pg)
+        one = await pg.evaluate(EDGE)
+        check(
+            one['scrolled'] and one['line'][2] == '1' and one['small'][0] == '0' and not one['titled'],
+            f'{scheme}, moved by a pixel: the line is there, the title not yet ({one["line"]}, {one["small"]})',
+        )
+        at = rest['at']
+        await pg.evaluate(f"document.getElementById('sheetBody').scrollTop = {at - 1}")
+        await idle(pg)
+        before = (await pg.evaluate(EDGE))['titled']
+        await pg.evaluate(f"document.getElementById('sheetBody').scrollTop = {at}")
+        await idle(pg)
+        titled = await pg.evaluate(EDGE)
+        await pg.evaluate("document.getElementById('sheetBody').scrollTop = 0")
+        await idle(pg)
+        back = await pg.evaluate(EDGE)
+        check(
+            not before and titled['titled'] and titled['small'][0] == '1' and not back['scrolled'] and not back['titled'],
+            f'{scheme}: once the title has gone under the bar it stands in the bar, and at the top neither is left ({before}, {titled["small"]}, {back["scrolled"]}, {back["titled"]})',
+        )
+        # The edge in pixels: the bar's ground down to its last row, the line, then the group under it, and no row between
+        bottom = await pg.evaluate(
+            """() => { const body = document.getElementById('sheetBody'), bar = body.querySelector('.page-bar').getBoundingClientRect(),
+              g = body.querySelector('.set-group'); body.scrollTop += g.getBoundingClientRect().top - (bar.bottom - 30); return bar.bottom; }"""
+        )
+        await idle(pg)
+        bg, line, surface = await pg.evaluate(TOKENS, ['--bg', '--line', '--surface'])
+        col = await column(pg, 24, bottom)
+        check(
+            rows(col, [bg] * 5 + [line] + [surface] * 6),
+            f'{scheme}: the content is cut straight at the bar, with the line right at its edge ({col})',
+        )
+        await shot(pg, f'edge-page-{scheme}')
+
+        # A level deeper arrives at rest, and so does the way back
+        await pg.evaluate('(b => b.scrollTop = b.scrollHeight)(document.getElementById("sheetBody"))')
+        await idle(pg)
+        deep = [await pg.evaluate(EDGE)]
+        await settings_page(pg, 'house')
+        deep.append(await pg.evaluate(EDGE))
+        await settings_back(pg)
+        deep.append(await pg.evaluate(EDGE))
+        check(
+            [x['titled'] for x in deep] == [True, False, False] and [x['scrolled'] for x in deep] == [True, False, False],
+            f'{scheme}: a level deeper arrives at rest, and so does the one you come back to ({[(x["scrolled"], x["titled"]) for x in deep]})',
+        )
+        check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+        await ctx.close()
+
+    # „Verlauf“: the day line parks under the bar and takes the line over
+    for scheme in ('light', 'dark'):
+        ctx = await phone(browser, scheme)
+        await ctx.add_init_script(INSET)
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.evaluate(SORTS, [26, 1])
+        await idle(pg)
+        home = await pg.eval_on_selector('[data-sec=hist] .tl-date', 'd => getComputedStyle(d).position')
+        await pg.click('[data-sec=hist] [data-action=open-report]')
+        await idle(pg)
+        await pg.evaluate("document.getElementById('sheetBody').scrollTop = 40")
+        await pg.wait_for_timeout(150)
+        await idle(pg)
+        ring = await pg.evaluate(
+            "[document.querySelectorAll('#sheet .tl-date.stuck').length, getComputedStyle(document.querySelector('#sheet .page-bar'), '::after').opacity]"
+        )
+        bottom = await pg.evaluate(
+            """() => { const body = document.getElementById('sheetBody'), bar = body.querySelector('.page-bar').getBoundingClientRect(),
+              d = body.querySelector('.tl-date'); body.scrollTop += d.getBoundingClientRect().top - bar.bottom + 60; return bar.bottom; }"""
+        )
+        await pg.wait_for_timeout(150)
+        await idle(pg)
+        parked = await pg.evaluate(
+            f"""() => {{ const d = document.elementFromPoint(innerWidth / 2, {bottom} + 4)?.closest('.tl-date');
+              return d && [d.classList.contains('stuck'), Math.abs(d.getBoundingClientRect().top - {bottom}) <= 0.5,
+                getComputedStyle(d, '::after').opacity, getComputedStyle(document.querySelector('#sheet .page-bar'), '::after').opacity,
+                getComputedStyle(d).position, getComputedStyle(d).top]; }}"""
+        )
+        bg, surface = await pg.evaluate(TOKENS, ['--bg', '--surface'])
+        col = await column(pg, 26, bottom)
+        check(
+            home == 'static' and ring == [0, '1'] and parked == [True, True, '1', '0', 'sticky', '56px'],
+            f'{scheme}, „Verlauf“: the bar draws the line over the ring card; a parked day line takes it over, on the home page it does not stick ({home}, {ring}, {parked})',
+        )
+        check(rows(col, [bg] * 6 + [surface] * 6), f'{scheme}: under the bar the day line follows straight, with no second line ({col})')
+        await shot(pg, f'edge-report-{scheme}')
+        check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+        await ctx.close()
+
+    # A sheet: the grip's line once the contents have moved, and no mask
+    ctx = await phone(browser, width=360, height=640)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(SORTS, [26, 1])
+    await idle(pg)
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.click('#sheet [data-action=new-product]')
+    await idle(pg)
+    GRIP = """() => [getComputedStyle(document.querySelector('#sheet .grip-zone'), '::after').opacity,
+      getComputedStyle(document.getElementById('sheetBody')).maskImage, (b => b.scrollHeight > b.clientHeight)(document.getElementById('sheetBody'))]"""
+    still = await pg.evaluate(GRIP)
+    await pg.evaluate("document.getElementById('sheetBody').scrollTop = 40")
+    await idle(pg)
+    moved = await pg.evaluate(GRIP)
+    check(
+        still == ['0', 'none', True] and moved[:2] == ['1', 'none'],
+        f'a sheet: the grip draws its line once the contents have moved, and nothing is masked ({still}, {moved})',
+    )
+    await shot(pg, 'edge-sheet')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # Large system text on a small phone: the bar keeps its height and its title one line
+    ctx = await phone(browser, width=360)
+    pg, errors = await open_page(ctx, url)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await pg.evaluate(BIG_TEXT, 1.3)
+    await settings(pg)
+    await pg.evaluate('(b => b.scrollTop = b.scrollHeight)(document.getElementById("sheetBody"))')
+    await idle(pg)
+    big = await pg.evaluate(
+        """() => { const b = document.querySelector('#sheet .page-bar'), t = b.querySelector('.bar-title'), body = document.getElementById('sheetBody');
+          return [Math.round(b.getBoundingClientRect().height), t.getBoundingClientRect().height <= 1.5 * parseFloat(getComputedStyle(t).lineHeight),
+            body.scrollWidth === body.clientWidth]; }"""
+    )
+    check(big == [56, True, True], f'large text at 360px: the bar stays 56px, its title one line, nothing wider than the screen ({big})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # With motion the line and the title fade in over 200 ms; under reduced motion they switch at once
+    for motion in (True, False):
+        ctx = await phone(browser, motion=motion)
+        pg, errors = await open_page(ctx, url)
+        await settings(pg)
+        fade = await pg.evaluate(
+            """() => { const b = document.querySelector('#sheet .page-bar');
+              return [getComputedStyle(b, '::after').transitionDuration, getComputedStyle(b.querySelector('.bar-title')).transitionDuration]; }"""
+        )
+        quick = all(float(f.rstrip('s')) < 0.01 for f in fade)
+        check(
+            fade == ['0.2s', '0.2s'] if motion else quick,
+            f'{"with motion" if motion else "reduced motion"}: line and title {"fade in over 200 ms" if motion else "switch at once"} ({fade})',
+        )
+        await ctx.close()
 
 
 async def test_settings(browser, url):
@@ -3859,9 +4384,9 @@ async def test_report(browser, url):
           body.scrollTop = body.scrollHeight;
           await new Promise(d => setTimeout(d, 250));
           const on = [...body.querySelectorAll('.tl-date')].filter(d => d.classList.contains('stuck'));
-          return [on.length, on.length ? getComputedStyle(on[0]).borderBottomColor : '']; }"""
+          return [on.length, on.length ? getComputedStyle(on.at(-1), '::after').opacity : '']; }"""
     )
-    check(stuck[0] > 0 and stuck[1] != 'rgba(0, 0, 0, 0)', f'and while it is stuck it carries a fine line ({stuck})')
+    check(stuck[0] > 0 and stuck[1] == '1', f'and while it is stuck it carries the edge’s line ({stuck})')
 
     # Nothing reaches 70 %: only the weakest variety is named
     await pg.evaluate(
@@ -3983,6 +4508,7 @@ run_tests(
     {
         'start': test_start,
         'settings': test_settings,
+        'edges': test_edges,
         'tour': test_tour,
         'flow': test_flow,
         'buying': test_buying,
@@ -4013,6 +4539,7 @@ run_tests(
         'mood': test_mood,
         'camera': test_camera,
         'no-camera': test_no_camera,
+        'photo': test_photo_viewer,
     },
     camera=('camera',),
 )

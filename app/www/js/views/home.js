@@ -19,8 +19,21 @@ import {
   servingPets,
 } from '../derive.js';
 import {hintKey, rOf, scoreCls, shopGroups} from '../smart.js';
+import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
-import {avatar, calendarHTML, dayBlocks, dayGroups, nameBlock, rateRow, reasonOf, syncChip, thumbOf} from './parts.js';
+import {viewerOpen} from '../ui/viewer.js';
+import {
+  avatar,
+  calendarHTML,
+  dayBlocks,
+  dayGroups,
+  nameBlock,
+  photoThumb,
+  rateRow,
+  reasonOf,
+  syncChip,
+  thumbOf,
+} from './parts.js';
 import {renderMood} from './mood.js';
 
 /* Redraw the home page, with a smooth view transition where possible */
@@ -31,7 +44,7 @@ export function update() {
     done = true;
     renderHome();
   };
-  if (!document.startViewTransition || reduceMotion.matches || dlg.open) return run();
+  if (!document.startViewTransition || reduceMotion.matches || dlg.open || viewerOpen()) return run();
   try {
     const t = document.startViewTransition(run);
     setTimeout(() => {
@@ -229,7 +242,11 @@ function pendingHTML(list) {
         const p = getProduct(s.productId),
           ids = openPets(s),
           multi = ids.length > 1;
-        const head = `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 'sm') : ''}</button>`;
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 'sm') : ''}`;
+        // With a large photo on this phone its thumbnail is a button of its own, which opens it
+        const head = hasPhoto(s, p)
+          ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
+          : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
         const rows = ids
           .map(
             pid =>

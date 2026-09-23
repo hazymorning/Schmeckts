@@ -123,21 +123,17 @@ input {
   opacity: 0.26;
 }
 /* Behind the status bar: nothing while the page sits at the top, so the mood picture reaches the edge of the
-   screen. As soon as the page moves, the strip fades in, and its lower edge is a gradient, so content dissolves
-   under the clock instead of being cut through mid-line. Sheets, their dimming and the camera lie above it in
-   any case, because a modal dialog is in the top layer. */
+   screen. As soon as the page moves, a strip of the page's ground exactly as tall as the status bar appears and
+   cuts the content straight; it has no line, because the status bar is the edge of the screen. Sheets, their
+   dimming and the camera lie above it in any case, because a modal dialog is in the top layer. */
 body::before {
   content: "";
   position: fixed;
   inset: 0 0 auto 0;
-  height: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--space-4));
-  background: linear-gradient(
-    to bottom,
-    var(--bg) var(--safe-area-inset-top, env(safe-area-inset-top, 0px)),
-    transparent
-  );
+  height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  background: var(--bg);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur-fade) var(--ease-out);
   z-index: 10;
   pointer-events: none;
 }
@@ -336,12 +332,15 @@ body::before {
 .card + .card {
   margin-top: var(--space-3h);
 }
-.card h2 {
-  text-wrap: balance;
-  margin: 0 0 var(--space-1);
+.card h2,
+.bar-title {
   font: 600 21px/1.25 var(--font-display);
   letter-spacing: -0.005em;
   color: var(--ink);
+}
+.card h2 {
+  text-wrap: balance;
+  margin: 0 0 var(--space-1);
 }
 .card ul,
 .card ol {
@@ -504,10 +503,27 @@ body::before {
   width: 72px;
   height: 72px;
   border-radius: 50%;
+}
+.ov-pic,
+.photo-btn {
   transition: transform 0.2s var(--ease-out);
 }
-button.ov-pic:active {
+button.ov-pic:active,
+.photo-btn:active {
   transform: scale(0.95);
+}
+/* A packaging photo that opens large (ui/viewer.js): the button takes the shape of its picture, so the focus ring
+   follows it */
+.photo-btn {
+  display: block;
+  flex: none;
+  border-radius: var(--radius-s);
+}
+.photo-btn:has(> .lg, > .name-photo) {
+  border-radius: var(--radius-l);
+}
+.photo-btn:has(> .name-photo) {
+  width: 100%;
 }
 .ov-pic .av.pair {
   position: absolute;
@@ -566,14 +582,23 @@ button.ov-pic:active {
     border-top-width: 0;
   }
 }
-.pend-head {
+.pend-head,
+.pend-top {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  margin-bottom: var(--space-2h);
+}
+.pend-head {
   width: 100%;
   min-height: 48px;
   text-align: left;
-  margin-bottom: var(--space-2h);
+}
+/* With a large photo on this phone the thumbnail is a button of its own beside the head */
+.pend-top > .pend-head {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
 }
 .pet-rate + .pet-rate {
   margin-top: var(--space-3);
@@ -964,24 +989,21 @@ button.ov-pic:active {
 .tl-day + .tl-day {
   border-top: 1px solid var(--line);
 }
-/* The day line stays at the top while its meals scroll past, and the border under it shows only while it does.
-   CSS cannot match that state, so views/sheets.js sets .stuck. */
 .tl-date {
-  position: sticky;
-  top: var(--stick, 0px);
-  z-index: 2;
-  background: var(--surface);
-  padding: var(--space-2h) 0 var(--space-hair);
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.2s;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2h);
+  padding: var(--space-2h) 0 var(--space-hair);
   margin-bottom: var(--space-hair);
 }
-.tl-date.stuck {
-  border-bottom-color: var(--line);
+/* On „Verlauf“ the day line stays under the bar while its meals scroll past (views/sheets.js marks it .stuck, which
+   CSS cannot match). On the home page, where at most one day is shown, it scrolls with its card. */
+.days .tl-date {
+  position: sticky;
+  top: var(--stick);
+  z-index: 2;
+  background: var(--surface);
 }
 .tl-date b {
   font: 600 15px var(--font-display);
@@ -1593,10 +1615,10 @@ dialog.sheet.page .grip-zone {
   display: none;
 }
 dialog.sheet.page[open] {
-  animation: pageIn 0.3s var(--ease-out);
+  animation: pageIn var(--dur-step) var(--ease-out);
 }
 dialog.sheet.page.closing {
-  animation: pageOut 0.3s var(--ease-in) forwards;
+  animation: pageOut var(--dur-step) var(--ease-in) forwards;
 }
 @keyframes pageIn {
   from {
@@ -1618,14 +1640,14 @@ dialog.sheet.page .sheet-body {
   flex: 1;
   min-height: 0;
   background: var(--bg);
-  padding: 0 var(--space-4) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  --page-x: var(--space-4);
+  padding: 0 var(--page-x) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   view-transition-name: page;
-  --stick: calc(48px + 2 * var(--space-2)); /* the bar with the arrow: what stays at the top parks under it */
+  --stick: var(--bar); /* what stays at the top parks under the bar */
 }
 /* „Verlauf“: cards on the page ground, as wide as and as far apart as the ones on the home page */
 dialog.sheet.page[data-kind="report"] .sheet-body {
-  padding-left: var(--space-4h);
-  padding-right: var(--space-4h);
+  --page-x: var(--space-4h);
 }
 dialog.sheet.page[data-kind="report"] .page-title {
   margin-bottom: var(--space-3h);
@@ -1646,23 +1668,23 @@ dialog.sheet.page[data-kind="report"] .page-title {
 ::view-transition-new(page) {
   mix-blend-mode: normal;
 }
-/* Only the page takes part: nothing on the home page under it changes during the step, and a picture of every
-   card and every meal there would cost the very frame the step needs. The names sit in the style attribute, so
-   this has to be !important, and it is matched only while a step is actually running. */
-html:is(.step-fwd, .step-back) :is(.card, .pend, .tl li, .pet, .fab, .toast) {
+/* Only the page takes part, or the photo: nothing on the home page under it changes during the step, and a picture
+   of every card and every meal there would cost the very frame the step needs. The names sit in the style
+   attribute, so this has to be !important, and it is matched only while a step is actually running. */
+html:is(.step-fwd, .step-back, .zoom) :is(.card, .pend, .tl li, .pet, .fab, .toast) {
   view-transition-name: none !important;
 }
 html.step-fwd::view-transition-old(page) {
-  animation: pageAside 0.3s var(--ease-out) both;
+  animation: pageAside var(--dur-step) var(--ease-out) both;
 }
 html.step-fwd::view-transition-new(page) {
-  animation: pageFromSide 0.3s var(--ease-out) both;
+  animation: pageFromSide var(--dur-step) var(--ease-out) both;
 }
 html.step-back::view-transition-old(page) {
-  animation: pageToSide 0.3s var(--ease-out) both;
+  animation: pageToSide var(--dur-step) var(--ease-out) both;
 }
 html.step-back::view-transition-new(page) {
-  animation: pageFromAside 0.3s var(--ease-out) both;
+  animation: pageFromAside var(--dur-step) var(--ease-out) both;
 }
 @keyframes pageFromSide {
   from {
@@ -1684,29 +1706,63 @@ html.step-back::view-transition-new(page) {
     transform: translateX(100%);
   }
 }
-/* The bar with the arrow may stay at the top while the page scrolls; below it a gradient, so a line dissolves
-   under it instead of being cut through. */
+/* The bar with the arrow stays at the top while the page scrolls, in the page's own colour and the full width, so
+   at rest it does not read as a bar. The negative margins take it to the edges of the scroll box. */
 .page-bar {
   position: sticky;
   top: 0;
   z-index: 3; /* above the day lines of the history, which park under it */
   display: flex;
   align-items: center;
-  padding: var(--space-2) 0;
+  gap: var(--space-1);
+  min-height: var(--bar);
+  margin: 0 calc(-1 * var(--page-x));
+  padding: 0 var(--page-x);
   background: var(--bg);
 }
 .page-bar .icon-btn {
   margin-left: calc(-1 * var(--space-3));
 }
-.page-bar::after {
+/* The page's title, small beside the arrow once the large one has gone under the bar (.titled, ui/sheet.js) */
+.bar-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity var(--dur-fade) var(--ease-out);
+}
+#sheet.titled .bar-title {
+  opacity: 1;
+}
+/* Edges (PROJECT.md, „Building blocks“, scroll edge): what stays at the top is opaque and ends straight; a 1px line
+   shows only while something lies under it, and of stacked edges only the lowest draws it. No fades. The line sits
+   inside its own element's box, so it never covers content. */
+.grip-zone {
+  position: relative;
+}
+.grip-zone::after,
+.page-bar::after,
+.days .tl-date::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  top: 100%;
-  height: var(--space-4);
-  background: linear-gradient(to bottom, var(--bg), transparent);
+  bottom: 0;
+  height: 1px;
+  background: var(--line);
+  opacity: 0;
+  transition: opacity var(--dur-fade) var(--ease-out);
   pointer-events: none;
+}
+#sheet.scrolled .grip-zone::after,
+#sheet.scrolled .page-bar::after,
+.days .tl-date.stuck::after {
+  opacity: 1;
+}
+#sheet.scrolled:has(.tl-date.stuck) .page-bar::after {
+  opacity: 0; /* the day line under it draws the line */
 }
 .page-title {
   margin: 0 0 var(--space-1h);
@@ -1715,7 +1771,7 @@ html.step-back::view-transition-new(page) {
   color: var(--ink);
 }
 .grip-zone {
-  padding: var(--space-2h) 0 var(--space-1);
+  padding: var(--space-2h) 0 var(--space-2);
   touch-action: none;
   cursor: grab;
   flex: 0 0 auto;
@@ -1732,12 +1788,6 @@ html.step-back::view-transition-new(page) {
   overscroll-behavior: contain;
   padding: var(--space-1) var(--space-5)
     calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-}
-/* Scrolled: the first few pixels dissolve, so a line ends softly under the grip rather than being cut. The mask
-   is painted in the scroll box, so it stays at the top while the contents move under it. */
-.sheet-body.scrolled {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--space-4h));
-  mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--space-4h));
 }
 .sheet-body.swap-in {
   animation: swapIn 0.34s var(--ease-out);
@@ -1791,20 +1841,32 @@ html.step-back::view-transition-new(page) {
   margin: 0 0 0 calc(-1 * var(--space-3));
 } /* the back arrow sits at the leading edge, the title right beside it */
 
-.prod-card {
+.prod-card,
+.prod-edit {
   display: flex;
   align-items: center;
   gap: var(--space-3h);
-  width: 100%;
   min-height: 48px;
+  text-align: left;
+}
+.prod-card {
+  width: 100%;
   padding: var(--space-3);
   margin-bottom: var(--space-4h);
   border-radius: var(--radius-l);
   background: var(--surface-2);
-  text-align: left;
+}
+/* With a large photo on this phone the thumbnail opens it and the rest of the card leads to naming */
+.prod-edit {
+  flex: 1;
+  min-width: 0;
+}
+button.prod-card,
+.prod-edit {
   transition: transform 0.2s var(--ease-out);
 }
-button.prod-card:active {
+button.prod-card:active,
+.prod-edit:active {
   transform: scale(0.985);
 }
 .prod-card .edit {
@@ -2185,8 +2247,9 @@ button.prod-card:active {
   font-variant-numeric: tabular-nums;
 }
 
-/* Our own camera: full screen, always dark (color-scheme resolves the tokens dark), the preview fills the area */
-.camera {
+/* Our own camera and the photo viewer: full screen, always dark (color-scheme resolves the tokens dark) */
+.camera,
+.viewer {
   color-scheme: dark;
   position: fixed;
   inset: 0;
@@ -2203,6 +2266,31 @@ button.prod-card:active {
 }
 .camera::backdrop {
   background: var(--bg);
+}
+/* The packaging photo, large (ui/viewer.js): whole and as large as it fits between two rows as tall as a page bar,
+   the X in the top one. The img box is exactly the photo, which the step from the thumbnail needs. The dialog is its
+   own ground and fades with the photo; a backdrop would appear at once. */
+.viewer::backdrop {
+  background: none;
+}
+.viewer[open] {
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  padding: calc(var(--bar) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 0
+    calc(var(--bar) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+.viewer img {
+  flex: none;
+  width: min(100cqw, 100cqh * var(--ar, 1));
+  aspect-ratio: var(--ar, 1);
+}
+.viewer .icon-btn {
+  position: absolute;
+  top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--space-1));
+  right: var(--space-1);
 }
 .camera video {
   position: absolute;
@@ -2508,6 +2596,25 @@ button.prod-card:active {
 ::view-transition-new(.fresh):only-child {
   animation: slideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 } /* a new entry slides into „Heute“ (view-transition-class) */
+/* A photo grows out of its thumbnail to the whole screen and back (ui/viewer.js): only the photo moves, the ground
+   fades. z-index: on opening the ground's group comes later in the tree and would cover the photo. The thumbnail is
+   the middle square of the photo, which cover gives back, so the first frame matches it. */
+::view-transition-group(photo) {
+  z-index: 1;
+  animation-duration: var(--dur-step);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition-old(photo),
+::view-transition-new(photo) {
+  height: 100%;
+  object-fit: cover;
+}
+::view-transition-new(viewer):only-child {
+  animation: fadeIn var(--dur-step) var(--ease-out) both;
+}
+::view-transition-old(viewer):only-child {
+  animation: fadeOut var(--dur-step) var(--ease-out) both;
+}
 @keyframes vtIn {
   from {
     opacity: 0;

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Storage of the Android app: files in app storage, written atomically, a crash while saving, a corrupted file.
+"""Storage of the Android app: files in app storage, written atomically, a crash while saving, a corrupted file,
+the packaging photos beside them.
 Usage: python3 tests/storage_test.py"""
 
 import json
@@ -38,6 +39,7 @@ async def test_files(browser, url):
         ),
         'afterwards it is in db.json, and without a server the queue is empty again',
     )
+    await pg.evaluate("localStorage.setItem('__fs:photos/abcd1234.jpg', 'x')")
     await pg.evaluate("localStorage.setItem('__fs:db.json', '{kaputt')")
     await pg.reload()
     await started(pg)
@@ -49,6 +51,17 @@ async def test_files(browser, url):
     check(
         await state(pg, "Object.keys(state.clocks.pets).length === 0 && state.epoch === ''"),
         'without data the clocks do not count either, and the next sync is a full one',
+    )
+    check(
+        await pg.evaluate("localStorage.getItem('__fs:photos/abcd1234.jpg') === 'x'"),
+        'a packaging photo stays while the stored data could not be read: its variety may still be in there',
+    )
+    await pg.evaluate(f"localStorage.setItem('__fs:db.json', {json.dumps(json.dumps(SAVED))})")
+    await pg.reload()
+    await started(pg)
+    check(
+        await pg.evaluate("localStorage.getItem('__fs:photos/abcd1234.jpg') === null"),
+        'with readable data a photo whose variety is not in it is removed at the start',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()

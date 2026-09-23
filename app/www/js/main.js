@@ -13,12 +13,14 @@ import {applyTheme} from './ui/theme.js';
 import {toast} from './ui/toast.js';
 import {dlg, renderSheet, sheet, sheetBack, sheetBody} from './ui/sheet.js';
 import {closeCamera} from './ui/camera.js';
+import {closeViewer} from './ui/viewer.js';
 import {renderHome, renderSyncChip, update} from './views/home.js';
 import {paintHouse} from './views/settings.js';
 import './views/sheets.js'; // registers the contents of the sheets
 import {retryWaiting} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
+import {tidyPhotos} from './logic/products.js';
 import {openLink} from './actions.js'; // also registers clicks and input
 import {report} from './report.js';
 
@@ -48,15 +50,16 @@ try {
   renderHome(); // drawn exactly once before the splash goes
   startReminders();
   clearExports();
+  tidyPhotos();
 } catch (e) {
   report('start', e);
   hideSplash(); // whatever happened, the app must not stay behind the splash
 }
 hideSplashWhenReady();
 if (Native?.App) {
-  // Back: close an open camera or an open sheet, otherwise send the app to the background (as native apps do)
+  // Back: close an open camera, the photo or an open sheet, otherwise send the app to the background (as native apps do)
   Native.App.addListener('backButton', ({canGoBack}) => {
-    if (closeCamera()) return;
+    if (closeCamera() || closeViewer()) return;
     if (dlg.open) sheetBack();
     else if (canGoBack) history.back();
     else Native.App.minimizeApp();

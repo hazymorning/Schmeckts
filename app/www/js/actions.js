@@ -7,8 +7,10 @@ import {REMIND_MAX_H, textureOf} from './config.js';
 import {db, prefs, save, savePrefs} from './store.js';
 import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
+import {forgetPhoto, photoSrc} from './photos.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
+import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {expandCard, toggleOverview, update} from './views/home.js';
 import {jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
@@ -188,6 +190,16 @@ const ACTIONS = {
   },
   rate(el) {
     rate(el);
+  },
+  // The packaging photo, large, grown out of its thumbnail. A file that can no longer be read is let go.
+  async 'view-photo'(el) {
+    const s = getServing(el.dataset.s),
+      p = getProduct(el.dataset.p);
+    if ((await openViewer(() => photoSrc(s, p), el)) !== false) return; // open, or already opening
+    if (p) forgetPhoto(p.id);
+    toast('Das Foto ist nicht mehr da.');
+    if (sheet) renderSheet();
+    else update(); // the thumbnail is a plain one again
   },
   'open-serving'(el) {
     const s = getServing(el.dataset.id);

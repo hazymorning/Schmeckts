@@ -7,6 +7,7 @@ import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
 import {cropSquare, fileToImage, memPhotos, resize} from '../images.js';
+import {keepPhoto} from '../photos.js';
 import {milestones} from '../smart.js';
 import {identify, memLines, photoByServer} from '../recognize.js';
 import {toast} from '../ui/toast.js';
@@ -270,6 +271,7 @@ function settle(s) {
   if (p)
     linkProduct(s, p); // tidies up and attaches a scanned code
   else {
+    keepPhoto(s.productId, memPhotos.get(s.id) || s.photo?.split(',')[1]); // the variety has not arrived here yet
     delete s.photo;
     delete s.status;
     delete s.error;

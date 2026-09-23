@@ -22,6 +22,7 @@ import {
 import {GOOD, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer} from '../recognize.js';
+import {hasPhoto} from '../photos.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
@@ -33,6 +34,7 @@ import {
   dayGroups,
   head,
   nameBlock,
+  photoThumb,
   rateRow,
   reasonOf,
   resultBadges,
@@ -44,9 +46,13 @@ import {paintHouse, viewSettings} from './settings.js';
 
 /* The pieces of „Wie war’s?“: the variety as a card that leads to naming, one rating row per pet, and in a
    household the chips that say who was served. */
-const servingCard = (s, p) =>
-  `<button class="prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'lg')}
-    <span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span></button>`;
+const servingCard = (s, p) => {
+  const main = `<span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span>`;
+  // With a large photo on this phone its thumbnail opens it, and the rest of the card leads to naming
+  return hasPhoto(s, p)
+    ? `<div class="prod-card">${photoThumb(s, p, 'lg')}<button class="prod-edit" data-action="edit-name" aria-label="Futter ändern">${main}</button></div>`
+    : `<button class="prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'lg')}${main}</button>`;
+};
 const petRateRow = (s, pid, multi) =>
   `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}
     ${rateRow(s, pid, true)}</div>`;
@@ -93,7 +99,8 @@ function viewName() {
         : serving?.productId
           ? 'Futter ändern'
           : 'Futter benennen';
-  const photo = serving && (serving.photo || serving.thumb);
+  const photo = serving && (serving.photo || serving.thumb),
+    large = serving && hasPhoto(serving, null);
   let note = '';
   const retry = label =>
     serving.photo && photoByServer() ? `<button class="link" data-action="retry">${label}</button>` : '';
@@ -105,7 +112,13 @@ function viewName() {
   else if (serving?.status === 'failed')
     note = `<p class="note warn">${esc(serving.error || 'Nicht erkannt.')} ${retry('Nochmal versuchen')}</p>`;
   return `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
-    ${photo ? `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">` : ''}${note}
+    ${
+      photo
+        ? large
+          ? `<button class="photo-btn" data-action="view-photo" data-s="${serving.id}" data-p="" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
+          : `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">`
+        : ''
+    }${note}
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
@@ -249,7 +262,7 @@ function kaufenHTML(e) {
 
 /* The pieces of the food sheet, each one a row or a block of its own */
 const productCard = (p, served) =>
-  `<div class="prod-card">${thumbOf(null, p, 'lg')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
+  `<div class="prod-card">${photoThumb(null, p, 'lg')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
     <small>${esc([p.type, `${served}× serviert`].filter(Boolean).join(', '))}</small></span>
     <button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>`;
 /* One counter per level of the variety's scale, levels from another scale that still occur after them */
@@ -401,17 +414,20 @@ function growHistory() {
 }
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
 
-/* The day line sticks to the top while its meals scroll past, and the fine line under it appears only while it
-   does. CSS has no way to tell whether an element is stuck, so the observer works it out: a line that no longer
-   sits fully inside the scroll box has reached the top. It parks under the bar with the arrow, so the observer
-   looks from the same edge. Watched again whenever the history grows. */
+/* The day line sticks under the bar while its meals scroll past, and carries the edge's line only while it does.
+   CSS has no way to tell whether an element is stuck, so the observer works it out: a line that no longer sits
+   fully inside the box below the bar, and pokes out at its top rather than its bottom, is parked there. The 0
+   threshold also catches a jump straight into that place. Watched again whenever the history grows. */
 let stuck = null;
 function watchDays() {
   const top = $('.page-bar', sheetBody)?.offsetHeight || 0;
   stuck?.disconnect();
   stuck = new IntersectionObserver(
-    entries => entries.forEach(e => e.target.classList.toggle('stuck', e.intersectionRatio < 1)),
-    {root: sheetBody, rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: [1]},
+    entries =>
+      entries.forEach(e =>
+        e.target.classList.toggle('stuck', e.intersectionRatio < 1 && e.boundingClientRect.top < e.rootBounds.top),
+      ),
+    {root: sheetBody, rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: [0, 1]},
   );
   for (const line of sheetBody.querySelectorAll('.tl-date')) stuck.observe(line);
 }

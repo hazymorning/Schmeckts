@@ -16,3 +16,9 @@ export function applyTheme() {
   }).catch(e => report('status bar style', e));
 }
 darkMQ.addEventListener('change', applyTheme);
+
+/* The camera and the photo viewer are always dark: light status bar icons while one of them is open */
+export function darkBars(on) {
+  if (!on) return applyTheme();
+  Native?.SystemBars?.setStyle({style: 'DARK'}).catch(e => report('status bar style', e));
+}

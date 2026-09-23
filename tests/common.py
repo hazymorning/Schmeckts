@@ -69,7 +69,8 @@ const Filesystem = {
     if (v == null) return missing(); localStorage.setItem(key(to), v); localStorage.removeItem(key(from)); return Promise.resolve(); },
   deleteFile: ({path, directory}) => { window.__calls.push(['deleteFile', {path, directory}]); localStorage.removeItem(key(path));
     window.__cache = (window.__cache || []).filter(n => n !== path); return Promise.resolve(); },
-  readdir: ({directory}) => Promise.resolve({files: directory === 'CACHE' ? (window.__cache || []).map(name => ({name})) : []}),
+  readdir: ({path, directory}) => Promise.resolve({files: directory === 'CACHE' ? (window.__cache || []).map(name => ({name}))
+    : Object.keys(localStorage).filter(k => path && k.startsWith(key(path + '/'))).map(k => ({name: k.slice(key(path + '/').length)}))}),
   stat: ({path}) => localStorage.getItem(key(path)) == null ? missing() : Promise.resolve({type: 'file'})
 };
 window.Capacitor = {isNativePlatform: () => true,

@@ -305,6 +305,13 @@ def test_rules_static():
         frames and not loud,
         f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}',
     )
+    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask and
+    # the loading shimmer, a mask only in the mood picture
+    shades = sorted({(sel, p) for sel, decls in css_rules(css['app.css']) for p, v in decls if 'gradient' in v or 'mask' in p})
+    check(
+        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background')],
+        f'no fade at an edge: gradients only in .mood and .skel, a mask only in .mood ({shades})',
+    )
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
     ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
     check(not focus and ring, f'focus rings follow the radius: an outline and no radius of their own on focus ({focus})')
@@ -316,7 +323,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
 
 
 SCAN = """(allowed) => { const bad = [], seen = new Set();

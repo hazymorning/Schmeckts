@@ -3,10 +3,11 @@
    recognised variety disappears together with its code. */
 import {uid} from '../fields.js';
 import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
-import {db, save} from '../store.js';
+import {db, dbFound, loadError, save} from '../store.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {memPhotos} from '../images.js';
+import {keepPhoto, movePhoto, sweepPhotos} from '../photos.js';
 import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 
@@ -85,6 +86,7 @@ export function linkProduct(s, p) {
   s.productId = p.id;
   p.lastPets = Object.keys(s.pets);
   if (s.scanCode) (p.codes ||= {})[s.scanCode] = true;
+  keepPhoto(p.id, memPhotos.get(s.id) || s.photo?.split(',')[1]); // the meal's photo becomes the variety's
   delete s.photo;
   delete s.thumb;
   delete s.status;
@@ -96,6 +98,7 @@ export function linkProduct(s, p) {
   if (prev && prev !== p.id) cleanupProduct(prev);
 }
 export function mergeProducts(from, into) {
+  movePhoto(from.id, into.id);
   db.servings.forEach(s => {
     if (s.productId === from.id) s.productId = into.id;
   });
@@ -103,4 +106,11 @@ export function mergeProducts(from, into) {
   Object.assign((into.codes ||= {}), from.codes); // the barcodes come along
   applyTexture(into, {texture: from.texture});
   db.products = db.products.filter(p => p.id !== from.id);
+}
+
+/* At start: the photos of varieties that are gone (deleted here or elsewhere) go too. Not while the stored data
+   could not be read, so a broken db.json never takes the photos with it. */
+export function tidyPhotos() {
+  if (loadError || !dbFound) return;
+  sweepPhotos(new Set([...db.products.map(p => p.id), ...db.servings.map(s => s.productId).filter(Boolean)]));
 }

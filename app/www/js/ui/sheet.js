@@ -17,10 +17,18 @@ let viewKey = '',
   pageKeys = [], // what openPage() put on the state, taken off again on the way back
   closing = null;
 
-/* The upper edge of a sheet: while its contents are scrolled, the top few pixels fade out, so a line does not
-   end abruptly under the grip. A page has no grip and its bar stays at the top instead, so nothing fades there. */
-const markSheetScrolled = () => sheetBody.classList.toggle('scrolled', !isPage(sheet) && sheetBody.scrollTop > 0);
-sheetBody.addEventListener('scroll', markSheetScrolled, {passive: true});
+/* The top edge of what is open (PROJECT.md, „Building blocks“, scroll edge): .scrolled while anything lies under
+   the grip or the bar; on a page .titled once its title has gone under the bar, which then shows it. On the dialog,
+   because the grip is outside the scroll box. Reads first, then writes. */
+const markEdge = () => {
+  const y = sheetBody.scrollTop,
+    bar = isPage(sheet) ? sheetBody.querySelector(':scope > .page-bar') : null,
+    title = bar?.nextElementSibling,
+    titled = !!title && y + bar.offsetHeight >= title.offsetTop + title.offsetHeight;
+  dlg.classList.toggle('scrolled', y > 0);
+  dlg.classList.toggle('titled', titled);
+};
+sheetBody.addEventListener('scroll', markEdge, {passive: true});
 
 export function openSheet(state) {
   sheet = state;
@@ -35,7 +43,7 @@ export function openSheet(state) {
     dlg.showModal();
     document.body.classList.add('locked');
     sheetBody.scrollTop = 0; // the browser would otherwise remember the last sheet's scroll position
-    markSheetScrolled();
+    markEdge();
     depth = 0;
     push();
     if (state.page) push(); // opened straight on a page below, so back leads to the overview first
@@ -86,12 +94,15 @@ export function renderSheet() {
   const key = `${sheet.kind}:${sheet.page || ''}:${sheet.step || ''}:${sheet.id || ''}`;
   const how = sheet.slide;
   sheet.slide = null;
-  if (key === viewKey) return drawView(sheet); // a change inside the level that is open
+  if (key === viewKey) {
+    drawView(sheet); // a change inside the level that is open
+    return markEdge();
+  }
   const swap = () => {
     drawView(sheet);
     viewKey = key;
     sheetBody.scrollTop = 0;
-    markSheetScrolled();
+    markEdge();
     sheetBody.classList.remove('swap-in');
   };
   // While it opens, its own entrance covers the change
@@ -141,7 +152,7 @@ export function closeSheet(fromPop = false) {
       dlg.style.transform = '';
       dlg.style.transition = '';
       sheetBody.scrollTop = 0;
-      markSheetScrolled();
+      markEdge();
       dlg.close();
       sheet = null;
       viewKey = '';
