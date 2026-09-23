@@ -2,7 +2,7 @@
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {andList, esc} from '../text.js';
-import {addDays, ago, dayKey, dayLabel, weekStart} from '../dates.js';
+import {addDays, ago, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {RATINGS, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
@@ -20,18 +20,7 @@ import {
 } from '../derive.js';
 import {hintKey, rOf, scoreCls, shopGroups} from '../smart.js';
 import {dlg} from '../ui/sheet.js';
-import {
-  avatar,
-  dayBlocks,
-  dayGroups,
-  fedLabel,
-  nameBlock,
-  rateRow,
-  reasonOf,
-  servingNode,
-  syncChip,
-  thumbOf,
-} from './parts.js';
+import {avatar, calendarHTML, dayBlocks, dayGroups, nameBlock, rateRow, reasonOf, syncChip, thumbOf} from './parts.js';
 import {renderMood} from './mood.js';
 
 /* Redraw the home page, with a smooth view transition where possible */
@@ -419,8 +408,7 @@ function shopCard(m) {
   return {body, more: g.beobachten.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2};
 }
 
-/* Erkenntnisse: the most important one folded up, all of them unfolded; no card without an insight. A text button at
-   the bottom leads to the evaluation. */
+/* Erkenntnisse: the most important one folded up, all of them unfolded; no card without an insight. */
 const INSIGHT = {
   marke: ['award', 'Marke'],
   konsistenz: ['layers', 'Konsistenz'],
@@ -445,32 +433,6 @@ function insightCard(m) {
 }
 const CARDS = {shop: shopCard, ins: insightCard};
 
-/* Verlauf: a two-week calendar and the latest meals below it (building blocks in parts.js) */
-function calendarHTML(list) {
-  const byDay = new Map();
-  for (const s of list) {
-    const k = dayKey(s.servedAt);
-    if (!byDay.has(k)) byDay.set(k, []);
-    byDay.get(k).push(s);
-  }
-  const d = new Date();
-  d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7); // Monday of the previous week
-  const todayKey = dayKey(Date.now());
-  let cells = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<span class="wd">${w}</span>`).join(''),
-    future = false;
-  for (let i = 0; i < 14; i++) {
-    const k = dayKey(d.getTime()),
-      items = byDay.get(k) || [],
-      isToday = k === todayKey;
-    const dots = items.slice(0, 3).map(servingNode).join('') + (items.length > 3 ? '<b>+</b>' : '');
-    const label = dayLabel(d.getTime()) + (items.length ? ', ' + fedLabel(items) : ', nichts eingetragen');
-    cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="dots">${dots}</span></button>`;
-    if (isToday) future = true;
-    d.setDate(d.getDate() + 1);
-  }
-  return `<div class="cal">${cells}</div>`;
-}
 /* Meals within the pet filter, newest first (db.servings is sorted by time descending): the first n for the
    timeline and everything since `since` for the calendar. Both in one pass, which stops as soon as both are done. */
 function someServings(n, since) {
@@ -484,8 +446,8 @@ function someServings(n, since) {
   }
   return {first, recent};
 }
-/* Below the calendar the latest HIST meals, grouped by day, and the button to the evaluation, where the whole
-   history is. The calendar always shows its two weeks. */
+/* Below the calendar the latest HIST meals, grouped by day, and the button to „Verlauf“, where the whole history
+   is. The calendar always shows its two weeks. */
 function historyHTML() {
   const {first, recent} = someServings(HIST, addDays(weekStart(Date.now()), -7));
   const multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
@@ -494,7 +456,7 @@ function historyHTML() {
     (first.length
       ? dayBlocks(dayGroups(first), {multiHouse, fresh: homeView.fresh, anchors: true})
       : `<p class="empty">${sketch('empty')}<span>Noch nichts serviert.</span></p>`) +
-    // The only way to the evaluation, so it reads like the other cards' buttons and says where it leads
+    // The only way to „Verlauf“, so it reads like the other cards' buttons and says where it leads
     `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
   );
 }

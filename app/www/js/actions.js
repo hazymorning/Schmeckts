@@ -11,7 +11,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {expandCard, toggleOverview, update} from './views/home.js';
-import {renderServeHits, renderSuggestions, reportState, reportView} from './views/sheets.js';
+import {jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, togglePackLine, useProduct} from './logic/editing.js';
@@ -137,12 +137,6 @@ const ACTIONS = {
   'settings-back'() {
     haptic('select');
     sheetBack(); // one level, and from the overview out to the home page
-  },
-  // The span of the evaluation: „7 Tage“, „30 Tage“ or „Alles“, kept while the app runs and never stored
-  'report-span'(el) {
-    reportView.days = +el.dataset.v;
-    haptic('select');
-    renderSheet();
   },
   'open-report'(el) {
     openSheet(reportState(el.dataset.v || null));
@@ -391,11 +385,12 @@ const ACTIONS = {
     toggleOverview();
   }, // the overview's full text and back
   'jump-day'(el) {
-    const key = el.dataset.day,
-      target = document.getElementById('d-' + key);
+    const key = el.dataset.day;
     haptic('select');
+    if (sheet?.kind === 'report') return jumpToDay(key); // the calendar of the history page scrolls within it
+    const target = document.getElementById('d-' + key);
     if (target) target.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start'});
-    else openSheet(reportState('d-' + key)); // further back: the whole history is in the evaluation
+    else openSheet(reportState('d-' + key)); // further back than the home page shows: the history page opens there
   },
   undo() {
     const u = toastUndo;

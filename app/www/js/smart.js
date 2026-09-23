@@ -6,8 +6,8 @@ import {addDays, dayKey, dayStart, weekStart} from './dates.js';
 const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
 const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // reference time of the weights, irrelevant to the score
-const YES = 70,
-  NO = 40;
+export const GOOD = 70; // from this many points a rating, a variety or a share counts as going down well
+const NO = 40;
 export const MIN_RATED = 3; // from this many ratings within the filter there are insights and an evaluation
 const APPETITE = {recent: 72 * 36e5, usual: 30 * DAY, minRecent: 3, minUsual: 8, minSorts: 2, drop: 30, below: 50};
 const TASTE_SPAN = 180 * DAY;
@@ -21,7 +21,7 @@ const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
 const MILESTONES = {meals: [50, 100, 250, 500, 1000], sorts: [10, 25, 50]};
 export const rOf = x => (RATINGS[x?.r] ? x.r : null); // unknown values from other devices do not count
 /* Colour class of a score and of a level. The level follows its points: from 70 --good, from 40 --mid, below that --sauce, at 0 --bad */
-export const scoreCls = v => (v >= YES ? 'r-good' : v >= NO ? 'r-mid' : 'r-bad');
+export const scoreCls = v => (v >= GOOD ? 'r-good' : v >= NO ? 'r-mid' : 'r-bad');
 export const rateCls = r => {
   const v = RATINGS[r].score;
   return v > 0 && v < NO ? 'r-sauce' : scoreCls(v);
@@ -57,7 +57,7 @@ function statOf(sum) {
     pct,
     counts: sum.counts,
     last: sum.last,
-    verdict: sum.n >= 3 && pct >= YES ? 'nachkaufen' : sum.n >= 2 && pct < NO ? 'nicht' : 'beobachten',
+    verdict: sum.n >= 3 && pct >= GOOD ? 'nachkaufen' : sum.n >= 2 && pct < NO ? 'nicht' : 'beobachten',
   };
 }
 
@@ -275,7 +275,7 @@ function hints(sorts, appetites, pet, prefs) {
    a span of the last `days` calendar days (0 = everything):
      meals            every meal within the filter and the span, newest first
      count            meals, varieties tried, days fed on and how many days the span holds
-     liked            of the ratings in the span, how many went down well (from YES points), as a percentage
+     liked            of the ratings in the span, how many went down well (from GOOD points), as a percentage
      best, worst      the variety that goes down best and the one that goes down worst, from MIN_TOP ratings
    best and worst need two different varieties, otherwise the same one would be both. `liked` counts the same
    ratings as everything else, so the ring on the page adds no separate figure. */
@@ -299,7 +299,7 @@ export function report(db, prefs, now = Date.now(), days = 0) {
     .map(([id, sum]) => ({product: products.get(id), ...statOf(sum)}))
     .filter(x => x.n >= MIN_TOP)
     .sort((a, b) => b.score - a.score || b.n - a.n);
-  const good = rated.filter(x => RATINGS[x.r].score >= YES).length;
+  const good = rated.filter(x => RATINGS[x.r].score >= GOOD).length;
   return {
     pet,
     days,

@@ -16,6 +16,8 @@ export const findProduct = (brand, variety) =>
 export const productsByCode = code => db.products.filter(p => p.codes?.[code]); // several for multipacks
 export const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r && inFilter(pid) && getPet(pid));
 export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) && getPet(pid));
+// Every meal within the pet filter, newest first: what the list on the history page shows, whatever is evaluated
+export const servingsInFilter = () => db.servings.filter(s => servingPets(s).length);
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
 
 /* The evaluation model and the weekly review, recomputed only when the data, the pet filter, the hidden hints, the

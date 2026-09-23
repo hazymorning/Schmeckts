@@ -1,9 +1,9 @@
 /* Contents of the sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
    the profile picture) and evaluation. The settings are a page and live in views/settings.js; the pet editor is
    one of its pages as well, drawn by the same view. */
-import {$} from '../dom.js';
+import {$, reduceMotion} from '../dom.js';
 import {cap, esc, norm} from '../text.js';
-import {toLocalInput, when} from '../dates.js';
+import {addDays, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -16,9 +16,10 @@ import {
   productsByCode,
   quickProducts,
   reportModel,
+  servingsInFilter,
   sortOf,
 } from '../derive.js';
-import {MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer} from '../recognize.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
@@ -26,6 +27,7 @@ import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
 import {
   armBtn,
   avatar,
+  calendarHTML,
   closeBtn,
   dayBlocks,
   dayGroups,
@@ -295,18 +297,12 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* The evaluation: a ring with the share of what was served that went down well, and the figures beside it.
-   The span at the top decides what the ring, the figures and the list show; it lasts while the app runs and is
-   not stored.
-   sheet.at: the id of the day it opens at, coming from the calendar on the home page */
+/* „Verlauf“: a page of two cards. „Die letzten 30 Tage“ holds the ring, the figures and the best and weakest
+   variety; the card under it holds the calendar and every meal there has ever been.
+   sheet.at: the id of the day it opens at, coming from a calendar */
 export const reportState = at => ({kind: 'report', at});
 
-const SPANS = [
-  ['7', '7 Tage'],
-  ['30', '30 Tage'],
-  ['0', 'Alles'],
-];
-export const reportView = {days: 30}; // „30 Tage“ to begin with
+const REPORT_DAYS = 30; // what is evaluated; the list itself always shows the whole history
 
 /* The ring: how many of the ratings in the span were good ones (from 70 points, as everywhere else). 104px
    across, the arc a dashed circle whose gap shrinks to the share. Under MIN_RATED ratings it shows the bare
@@ -339,37 +335,45 @@ const figures = m =>
     ${figRow('layers', `<b>${m.count.sorts}</b> ${m.count.sorts === 1 ? 'Sorte' : 'Sorten'}`)}
     ${figRow('calendar', `an <b>${m.count.days}</b> von ${m.count.span} ${m.count.span === 1 ? 'Tag' : 'Tagen'}`)}</ul>`;
 
+/* Under the figures: the variety that goes down best, named only from GOOD points on, and the weakest one. The
+   percentage is the plain figure here, so that the only colour in the card is the rating's icon. */
 const rankRow = (x, r, text) =>
-  `<div class="rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="pct">${x.pct} %</b></div>`;
+  `<div class="rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="share">${x.pct} %</b></div>`;
 function glance(m) {
+  const best = m.best && m.best.pct >= GOOD ? rankRow(m.best, 'top', 'kommt am besten an') : '';
+  const worst = m.worst ? rankRow(m.worst, 'schlecht', 'bleibt am ehesten übrig') : '';
   return `<div class="glance">${ring(m)}${figures(m)}</div>
-    ${
-      m.best
-        ? `<div class="tops">${rankRow(m.best, 'top', 'kommt am besten an')}
-      ${m.worst ? rankRow(m.worst, 'schlecht', 'bleibt am ehesten übrig') : ''}</div>`
-        : ''
-    }`;
+    ${best || worst ? `<div class="tops">${best}${worst}</div>` : ''}`;
 }
 
 function viewReport() {
-  let m = reportModel(reportView.days);
+  const m = reportModel(REPORT_DAYS),
+    all = servingsInFilter();
   const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
-  histDays = dayGroups(m.meals);
-  // A day tapped in the calendar that lies further back than the span: then the span is the whole history
-  if (sheet.at && !histDays.some(g => 'd-' + g.key === sheet.at)) {
-    reportView.days = 0;
-    m = reportModel(0);
-    histDays = dayGroups(m.meals);
-  }
+  histDays = dayGroups(all);
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
-  return `<div class="sh-head"><h2>Verlauf${who}</h2>${closeBtn}</div>
-    ${segmented('report-span', SPANS, String(reportView.days))}
-    ${glance(m)}
+  return `${head('Verlauf' + who)}
+    <section class="card"><h2>Die letzten ${REPORT_DAYS} Tage</h2>${glance(m)}</section>
+    <section class="card days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
       histDays.length
         ? `<div id="histBox">${histHTML(m, 0, upto)}</div>`
-        : `<p class="empty"><span>${reportView.days ? 'In diesem Zeitraum gab es nichts.' : 'Noch nichts serviert.'}</span></p>`
-    }`;
+        : `<p class="empty"><span>Noch nichts serviert.</span></p>`
+    }</section>`;
+}
+/* A day tapped in the calendar of this page: the list grows until that day is drawn and a page of days under it
+   as well, because only then can the day reach the top of the screen. */
+export function jumpToDay(key) {
+  const at = histDays.findIndex(g => g.key === key);
+  if (at < 0) return;
+  const box = $('#histBox');
+  if (box) {
+    const m = reportModel(REPORT_DAYS);
+    while (box.children.length < histDays.length && box.children.length <= at + HIST_PAGE)
+      box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
+    watchDays();
+  }
+  $('#d-' + key, sheetBody)?.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start'});
 }
 
 /* The history grows as you scroll instead of laying out years of meals in one go: HIST_PAGE days at a time,
@@ -383,7 +387,7 @@ const histHTML = (m, from, to) =>
 function growHistory() {
   const box = $('#histBox');
   if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
-  const m = reportModel(reportView.days);
+  const m = reportModel(REPORT_DAYS);
   while (
     box.children.length < histDays.length &&
     sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800
@@ -393,16 +397,18 @@ function growHistory() {
 }
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
 
-/* The day line sticks to the top of the sheet while its meals scroll past, and the fine line under it appears
-   only while it does. CSS has no way to tell whether an element is stuck, so the observer works it out: a line
-   that no longer sits fully inside the sheet has reached the top. Watched again whenever the history grows. */
+/* The day line sticks to the top while its meals scroll past, and the fine line under it appears only while it
+   does. CSS has no way to tell whether an element is stuck, so the observer works it out: a line that no longer
+   sits fully inside the scroll box has reached the top. It parks under the bar with the arrow, so the observer
+   looks from the same edge. Watched again whenever the history grows. */
 let stuck = null;
 function watchDays() {
-  stuck ||= new IntersectionObserver(
+  const top = $('.page-bar', sheetBody)?.offsetHeight || 0;
+  stuck?.disconnect();
+  stuck = new IntersectionObserver(
     entries => entries.forEach(e => e.target.classList.toggle('stuck', e.intersectionRatio < 1)),
-    {root: sheetBody, rootMargin: '-1px 0px 0px 0px', threshold: [1]},
+    {root: sheetBody, rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: [1]},
   );
-  stuck.disconnect();
   for (const line of sheetBody.querySelectorAll('.tl-date')) stuck.observe(line);
 }
 
@@ -462,6 +468,7 @@ setSheetView(state => {
   if (state.at) {
     const at = state.at;
     state.at = null;
-    requestAnimationFrame(() => $('#' + at)?.scrollIntoView({block: 'start'}));
+    // Only inside the page: the home page carries anchors of the same name
+    requestAnimationFrame(() => $('#' + at, sheetBody)?.scrollIntoView({block: 'start'}));
   } // opened at a given day
 });

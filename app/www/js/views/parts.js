@@ -114,6 +114,33 @@ export function servingNode(s) {
     : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
   return `<i class="${cls}"></i>`;
 }
+/* Verlauf: a two-week calendar of the meals handed in, on the home page as on the history page. A day with
+   meals leads to them, the days to come are faint, and today carries the accent. */
+export function calendarHTML(list) {
+  const byDay = new Map();
+  for (const s of list) {
+    const k = dayKey(s.servedAt);
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(s);
+  }
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7); // Monday of the previous week
+  const todayKey = dayKey(Date.now());
+  let cells = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<span class="wd">${w}</span>`).join(''),
+    future = false;
+  for (let i = 0; i < 14; i++) {
+    const k = dayKey(d.getTime()),
+      items = byDay.get(k) || [],
+      isToday = k === todayKey;
+    const dots = items.slice(0, 3).map(servingNode).join('') + (items.length > 3 ? '<b>+</b>' : '');
+    const label = dayLabel(d.getTime()) + (items.length ? ', ' + fedLabel(items) : ', nichts eingetragen');
+    cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="dots">${dots}</span></button>`;
+    if (isToday) future = true;
+    d.setDate(d.getDate() + 1);
+  }
+  return `<div class="cal">${cells}</div>`;
+}
 export function dayGroups(list) {
   const groups = [];
   for (const s of list) {
