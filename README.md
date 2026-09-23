@@ -45,8 +45,13 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
 - Du kannst mehrere Tiere anlegen, auch Hunde, Kaninchen oder Vögel. Jedes wird für sich ausgewertet.
 - Mit einem Backup nimmst du alles aufs neue Handy mit.
 
+> [!TIP]
+> Der Füttern-Modus hat einen eigenen Link: `schmeckts://fuettern`. Leg ihn dir zum Beispiel in die Schnelleinstellungen, dann öffnet sich die App direkt bei „Was gibt’s heute?“ und du kannst sofort scannen.
+
 <!-- Der QR-Code springt hierher (…#how-to-install). Nicht löschen. -->
 <a id="how-to-install"></a>
+
+<br>
 
 ## Installieren
 
