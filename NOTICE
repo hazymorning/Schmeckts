@@ -1,0 +1,11 @@
+Schmeckt’s? contains information from Open Pet Food Facts, which is made available here under the Open Database
+License (ODbL).
+
+Open Pet Food Facts: https://world.openpetfoodfacts.org
+Open Database License 1.0: https://opendatacommons.org/licenses/odbl/1-0/
+Database Contents License 1.0, for the individual contents: https://opendatacommons.org/licenses/dbcl/1-0/
+
+That information is the word list app/www/js/vocab.js: brand names and words from the names of products, taken from
+the export of the database by scripts/vocab.py. The list is a database derived from Open Pet Food Facts and is
+available under the Open Database License 1.0 as well. It is here in full, in this repository and inside the app, and
+scripts/vocab.py is how it is made from the export.

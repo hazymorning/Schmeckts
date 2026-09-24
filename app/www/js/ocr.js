@@ -3,14 +3,15 @@
    What was read comes as the plugin's lines with their place and size (readingOf() in reading.js), or as plain
    text, one line per line, the way the tests write it. Plain text has no sizes: every line counts the same, and
    none is left out for being small or slanted.
-   Order: put the misread words right, then our own varieties, then a brand (from the list or from one of our own
-   varieties), then the most prominent line, with what belongs to it, as the variety. */
+   Order: put the misread words right, then our own varieties, then a brand (from the list, from one of our own
+   varieties or from Open Pet Food Facts), then the most prominent line, with what belongs to it, as the variety. */
 import {norm} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
+import {VOCAB_BRANDS, VOCAB_WORDS} from './vocab.js';
 
 export const MAX_VARIETY = 40;
 export const PACK_LINES = 8; // shown as chips while naming; beyond this there are too many to scan
-const MIN_BRAND = 4; // our own brands count as brands too, and a shorter word is too general to match on
+const MIN_BRAND = 4; // letters and digits of a brand at least; a shorter one is too general to match on or correct to
 
 /* What the size and the direction of a line say. Starting values from the way type is set, until readings of
    real packaging (tests/fixtures/ocr) say better. Heights are the plugin's line heights in pixels. */
@@ -167,37 +168,49 @@ const flavourOrTexture = v =>
   FLAVORS.some(([, re]) => re.test(v)) || Object.values(TEXTURES).some(t => t.items.some(([, , re]) => re.test(v)));
 /* A line holding something we know keeps its place however small or slanted it is: a flavour, a consistency, a
    brand, one of our own varieties */
-const holdsKnown = (v, products) =>
-  flavourOrTexture(v) ||
-  brandsOf(products).some(b => ` ${norm(v)} `.includes(` ${norm(b)} `)) ||
-  products.some(p => squeeze(p?.variety).length >= 4 && squeeze(v).includes(squeeze(p.variety)));
+const holdsKnown = (v, products) => {
+  const flat = ` ${norm(v)} `;
+  return (
+    flavourOrTexture(v) ||
+    brandsOf(products).some(b => flat.includes(` ${b.key} `)) ||
+    products.some(p => squeeze(p?.variety).length >= 4 && squeeze(v).includes(squeeze(p.variety)))
+  );
+};
 
-/* Brand: a hit from the list (brandsOf) on whole words. From the plugin a hit in one of the two largest lines or in
-   the top third of the photo comes first, where the logo stands; after that, and in plain text, the longest. */
+/* Brand: a hit from brandsOf() on whole words. From the plugin a hit in one of the two largest lines or in the top
+   third of the photo comes first, where the logo stands. After that, and in plain text, a brand from the list or of
+   our own varieties before one only Open Pet Food Facts knows (its list holds words like „Katzenfutter“ as well),
+   then the longest. */
 function pickBrand(page, raw, products) {
   const flat = ` ${norm(raw)} `;
-  const hits = brandsOf(products).filter(b => flat.includes(` ${norm(b)} `));
-  if (hits.length < 2 || !page.geo) return hits.sort((a, b) => norm(b).length - norm(a).length)[0] || '';
+  const hits = brandsOf(products).filter(b => flat.includes(` ${b.key} `));
+  const order = (x, y) => x.vocab - y.vocab || y.key.length - x.key.length;
+  if (hits.length < 2 || !page.geo) return hits.sort(order)[0]?.name || '';
   const big = [...page.lines].sort((a, b) => b.h - a.h).slice(0, 2);
   const rank = b => {
-    const at = page.lines.filter(l => ` ${norm(l.text)} `.includes(` ${norm(b)} `));
+    const at = page.lines.filter(l => ` ${norm(l.text)} `.includes(` ${b.key} `));
     return (at.some(l => big.includes(l)) ? 2 : 0) + (at.some(l => l.cy < page.height / 3) ? 1 : 0);
   };
-  return hits.map(b => ({b, r: rank(b)})).sort((x, y) => y.r - x.r || norm(y.b).length - norm(x.b).length)[0].b;
+  return hits.map(b => ({...b, r: rank(b)})).sort((x, y) => y.r - x.r || order(x, y))[0].name;
 }
 
-/* Every brand that may be read off a packaging: the list, plus the brands of our own varieties; once each and
-   only from MIN_BRAND characters on. The match is on whole words and the longest hit wins. */
+/* Every brand that may be read off a packaging: the list, the brands of our own varieties, then those of Open Pet
+   Food Facts (VOCAB_BRANDS in vocab.js); once each, in the spelling that comes first, so the list's wins, and only
+   from MIN_BRAND letters and digits on. [{name, key, vocab}], key being the normalised name and vocab whether only
+   Open Pet Food Facts has it. The match is on whole words. */
+const brandEntry = (name, vocab = false) => ({name: String(name || '').trim(), key: norm(name), vocab});
+/* A brand of Open Pet Food Facts that only names the animal or the food („Katzenfutter“, „Dog food“) is none */
+const onlyFood = b =>
+  b.key
+    .split(' ')
+    .every(w => /^(?:food|futter|nahrung)$/.test(w) || [...ANIMAL_WORDS, ...TYPE_WORDS].some(([, re]) => re.test(w)));
+const LISTED_BRANDS = BRANDS.map(b => brandEntry(b)),
+  VOCAB_BRAND_ENTRIES = VOCAB_BRANDS.map(b => brandEntry(b, true)).filter(b => !onlyFood(b));
 function brandsOf(products) {
-  const out = [...BRANDS],
-    seen = new Set(BRANDS.map(norm));
-  for (const p of products) {
-    const b = String(p?.brand || '').trim();
-    if (b.length < MIN_BRAND || seen.has(norm(b))) continue;
-    seen.add(norm(b));
-    out.push(b);
-  }
-  return out;
+  const seen = new Set();
+  return [...LISTED_BRANDS, ...products.map(p => brandEntry(p?.brand)), ...VOCAB_BRAND_ENTRIES].filter(
+    b => b.key.replace(/ /g, '').length >= MIN_BRAND && !seen.has(b.key) && seen.add(b.key),
+  );
 }
 
 /* Type: the unambiguous keywords first, otherwise the consistency keywords (Soße, Pastete → Nassfutter; Stick, Kau → Snack) */
@@ -373,40 +386,103 @@ function unshout(line) {
 }
 
 /* The text as it can be read: the shouting taken out of every line, then the words the phone almost read put
-   right („MLAMOR“ becomes „Miamor“), so that a variety already in the household is found again although a letter
-   came out wrong. Measured against the brands we know and the words of our own varieties, from MIN_FIX
-   characters, one mistake up to seven characters and two from eight, and only when exactly one word is that
-   close: anything that could be two things stays as it was. Running it twice changes nothing more. */
-const MIN_FIX = 5;
+   right („MLAMOR“ becomes „Miamor“, „Ragoul“ „Ragout“), so that a variety already in the household is found again
+   although a letter came out wrong. Measured against the words of the brands (brandsOf()), of our own varieties
+   and of the product names of Open Pet Food Facts (VOCAB_WORDS), from MIN_FIX letters on: one mistake up to seven
+   letters and two from eight, and only when exactly one word is that close, so anything that could be two things
+   stays as it was. A word put right takes the list's spelling before ours and ours before that of Open Pet Food
+   Facts. Running it twice changes nothing more.
+   A word we know stays as it is, and so do the small words of COMMON and a word we know with another ending
+   („Sorte“ beside „Sorten“): against more than a thousand words, those are what would otherwise be put wrong
+   („das“ would become „Dan“, „sind“ „Rind“). */
+const MIN_FIX = 3;
 const WORD = new RegExp(`\\p{L}{${MIN_FIX},}`, 'gu');
+const SPREAD = 2; // only words at most this many letters longer or shorter are measured at all
+// Articles, pronouns, forms of „sein“ and „haben“, conjunctions and prepositions, German and English, normalised
+const COMMON = new Set(
+  (
+    'der die das den dem des ein eine einer eines einem einen kein keine keiner keines keinem keinen ist sind war ' +
+    'waren wird werden wurde hat haben kann darf muss soll will ich sie wir ihr uns euch sich mir dir ihm ihn mich ' +
+    'dich bin bist ihre ihrer ihren sein seine seiner seinen mein meine dein deine unser unsere euer eure diese ' +
+    'dieser dieses diesem diesen jede jeder jedes alle aller alles allen und oder aber auch als also wie wenn dann ' +
+    'dass weil denn doch noch nur schon sehr mehr hier dort was wer wen wem warum weg gar ganz nicht nichts nie ' +
+    'immer bis durch gegen ohne uber unter nach seit vom zum zur beim ins ans aufs fur mit bei von vor aus auf nein ' +
+    'the and for with from this that these those are was were has have had not all any but our your their its his ' +
+    'her who what when where why how can will may yes'
+  ).split(' '),
+);
 export function cleanText(text, products = []) {
   const raw = String(text || '')
     .split(/\r?\n/)
     .map(unshout)
     .join('\n');
-  const vocabulary = new Map();
-  for (const s of [...BRANDS, ...products.flatMap(p => [p?.brand, p?.variety])])
-    for (const w of String(s || '').split(/[^\p{L}]+/u))
-      if (w.length >= MIN_FIX && !vocabulary.has(norm(w))) vocabulary.set(norm(w), w);
+  const [brands, varieties] = [products.map(p => p?.brand), products.map(p => p?.variety)];
+  const fixed = fixedWords(),
+    own = lexicon([...wordsOf(MIN_BRAND, brands), ...wordsOf(MIN_FIX, varieties)]);
+  const spelling = w => fixed.listed.get(w) || own.spelling.get(w) || fixed.lexicon.spelling.get(w);
   return raw.replace(WORD, word => {
     const w = norm(word);
-    if (vocabulary.has(w)) return word;
-    const hits = [...vocabulary].filter(([v]) => close(w, v));
-    return hits.length === 1 ? hits[0][1] : word;
+    if (!w || w.includes(' ') || SMALL.has(w) || COMMON.has(w) || spelling(w)) return word;
+    if (fixedNear.size > 20000) fixedNear.clear();
+    if (!fixedNear.has(w)) fixedNear.set(w, near(fixed.lexicon, w));
+    const hits = new Set([...fixedNear.get(w), ...near(own, w)]);
+    if ([...hits].some(v => v.startsWith(w) || w.startsWith(v))) return word;
+    return hits.size === 1 ? spelling([...hits][0]) : word;
   });
 }
+/* The words that do not change with the household, made on first use: listed, the spelling of the words of the
+   brands on the list, which comes first; lexicon, those with the words of the brands of Open Pet Food Facts and of
+   its product names. A brand's words count from MIN_BRAND letters on, like the brands themselves. */
+let fixedOnce = null;
+function fixedWords() {
+  if (fixedOnce) return fixedOnce;
+  const brands = brandsOf([]).map(b => b.name);
+  fixedOnce = {
+    listed: lexicon(wordsOf(MIN_BRAND, BRANDS)).spelling,
+    lexicon: lexicon([...wordsOf(MIN_BRAND, brands), ...wordsOf(MIN_FIX, VOCAB_WORDS)]),
+  };
+  return fixedOnce;
+}
+const fixedNear = new Map(); // what near() found among them, by word
+/* The words of texts from `least` letters on */
+const wordsOf = (least, texts) =>
+  texts.flatMap(t => String(t || '').split(/[^\p{L}]+/u)).filter(w => norm(w).length >= least);
+/* Words to measure against: {spelling: normalised → as first written, byLength: [[normalised]]} */
+function lexicon(words) {
+  const spelling = new Map(),
+    byLength = [];
+  for (const w of words) {
+    const n = norm(w);
+    if (n.includes(' ') || spelling.has(n)) continue;
+    spelling.set(n, w);
+    (byLength[n.length] ||= []).push(n);
+  }
+  return {spelling, byLength};
+}
+/* The words of a lexicon close to w (close()), looked for only among those at most SPREAD letters longer or
+   shorter */
+function near(lex, w) {
+  const out = [];
+  for (let n = Math.max(MIN_FIX, w.length - SPREAD); n <= w.length + SPREAD; n++)
+    for (const v of lex.byLength[n] || []) if (close(w, v)) out.push(v);
+  return out;
+}
+/* One mistake while both words have up to seven letters, two when one of them has eight or more */
 const close = (a, b) => {
   const max = Math.max(a.length, b.length) >= 8 ? 2 : 1;
   return Math.abs(a.length - b.length) <= max && distance(a, b, max) <= max;
 };
 /* Levenshtein, given up as soon as every way through costs more than max */
 function distance(a, b, max) {
-  let prev = [...Array(b.length + 1).keys()];
+  let prev = Array.from({length: b.length + 1}, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     const row = [i];
-    for (let j = 1; j <= b.length; j++)
+    let least = i;
+    for (let j = 1; j <= b.length; j++) {
       row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    if (Math.min(...row) > max) return max + 1;
+      least = Math.min(least, row[j]);
+    }
+    if (least > max) return max + 1;
     prev = row;
   }
   return prev[b.length];

@@ -130,6 +130,8 @@ Die App ist freie Software unter der [GNU Affero General Public License, Version
 
 Der Name „Schmeckt’s?“, das Logo und das App-Icon fallen nicht unter die Lizenz. Wenn du die App forkst, such dir bitte einen eigenen Namen und ein eigenes Design aus.
 
+Enthält Informationen aus [Open Pet Food Facts](https://world.openpetfoodfacts.org), die hier unter der [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/) verfügbar gemacht werden. Das ist die Wortliste, mit der die App falsch gelesene Wörter auf Packungen berichtigt (`app/www/js/vocab.js`, mehr dazu in [NOTICE](NOTICE)).
+
 <!-- Wenn das Repo öffentlich ist, können diese Badges oben mit rein. Sie aktualisieren sich von selbst:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=58603F&labelColor=25261F" alt="Neueste Version"></a>
   <a href="https://github.com/hazymorning/Schmeckts/releases"><img src="https://img.shields.io/github/downloads/hazymorning/Schmeckts/total?label=Downloads&color=58603F&labelColor=25261F" alt="Downloads"></a>

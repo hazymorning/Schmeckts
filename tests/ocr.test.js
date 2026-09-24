@@ -4,9 +4,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
 import {BRANDS} from '../app/www/js/config.js';
-import {focusOf, joinReadings, MAX_VARIETY, PACK_LINES, packLines, readPack, SECOND_PASS} from '../app/www/js/ocr.js';
+import {
+  cleanText,
+  focusOf,
+  joinReadings,
+  MAX_VARIETY,
+  PACK_LINES,
+  packLines,
+  readPack,
+  SECOND_PASS,
+} from '../app/www/js/ocr.js';
 import {jpegSize, readingOf} from '../app/www/js/reading.js';
 import {norm} from '../app/www/js/text.js';
+import {VOCAB_BRANDS, VOCAB_WORDS} from '../app/www/js/vocab.js';
 
 const VARIETIES = [
   {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
@@ -103,7 +113,10 @@ test('packaging text: the readable lines, none of them twice and at most eight',
 });
 
 test('packaging text: a line that shouts is set in title case', () => {
-  assert.deepEqual(packLines('TRULAHN & WILD aN SAUCE\nFEINE HÄPPCHEN'), ['Trulahn & Wild an Sauce', 'Feine Häppchen']);
+  assert.deepEqual(packLines('TRULAHN & WILD aN SAUCE\nFEINE HÄPPCHEN'), [
+    'Truthahn & Wild an Sauce',
+    'Feine Häppchen',
+  ]);
   assert.deepEqual(
     packLines('Selection in Sauce\nmit Lachs'),
     ['Selection in Sauce', 'mit Lachs'],
@@ -132,6 +145,48 @@ test('packaging text: a word the phone almost read is put right', () => {
     'Selection in Sauce mit Lachs',
     'and a text that was read properly is not touched',
   );
+});
+
+test('packaging text: the words of Open Pet Food Facts put misread words right as well', () => {
+  assert.ok(
+    VOCAB_WORDS.includes('Ragout') && VOCAB_WORDS.includes('Häppchen') && VOCAB_WORDS.includes('Trockenfutter'),
+  );
+  assert.equal(cleanText('Ragoul Royal'), 'Ragout Royal');
+  assert.equal(cleanText('HÄPPCHEM IN GELEE'), 'Häppchen in Gelee');
+  assert.equal(cleanText('Trockenfuttcr'), 'Trockenfutter');
+  assert.equal(readPack('Sheba\nRagoul mit Huhn').variety, 'Ragout mit Huhn', 'and the variety with them');
+});
+
+test('packaging text: how many mistakes a word may carry depends on its length', () => {
+  assert.equal(cleanText('Hubn'), 'Huhn', 'three or four letters: one, where exactly one word is that close');
+  assert.equal(cleanText('Lamn'), 'Lamn', 'not where two are („Lamm“, „Lamb“)');
+  assert.equal(cleanText('Kitlen'), 'Kitten', 'five to seven letters: one');
+  assert.equal(cleanText('Kiflen'), 'Kiflen', 'not two');
+  assert.equal(cleanText('Katzcnmlch'), 'Katzenmilch', 'from eight letters two');
+  assert.equal(cleanText('Katzcnmlcb'), 'Katzcnmlcb', 'not three');
+});
+
+test('packaging text: small words, and a word we know with another ending, stay as they are', () => {
+  assert.equal(cleanText('Das ist ein Menü'), 'Das ist ein Menü', 'not „Dan“ or „Dein“');
+  assert.equal(cleanText('sind'), 'sind', 'not „Rind“');
+  assert.equal(cleanText('Sorte'), 'Sorte', 'not „Sorten“');
+  assert.equal(cleanText('zart'), 'zart', 'not „Zarte“');
+  assert.equal(
+    cleanText('Dah'),
+    'Dah',
+    'a brand counts from four letters, and its words too: not „Dan“ of „Marly & Dan“',
+  );
+});
+
+test('packaging text: the brands of Open Pet Food Facts count as brands too, after ours', () => {
+  assert.ok(VOCAB_BRANDS.includes('Carnilove') && !BRANDS.includes('Carnilove'));
+  assert.equal(readPack('Carnilove\nLamm in Sauce').brand, 'Carnilove');
+  assert.equal(readPack('CARNILOVF\nLamm in Sauce').brand, 'Carnilove', 'one letter wrong');
+  assert.ok(VOCAB_BRANDS.includes('Mjamjam') && BRANDS.includes('MjAMjAM'));
+  assert.equal(readPack('MJAMJAN\nHuhn in Gelee').brand, 'MjAMjAM', 'in the spelling of the list');
+  assert.equal(readPack('Pro Plan\nCarnilove\nLamm').brand, 'Pro Plan', 'a brand of the list first, though shorter');
+  assert.equal(readPack('Katzenfutter mit Lachs').brand, '', 'one that only names the animal or the food is none');
+  assert.equal(readPack('Dia\nHuhn in Gelee').brand, '', 'nor one under four letters');
 });
 
 /* The plugin's answer for a few lines, one block each: [text, height, top, options]. The words stand side by side
