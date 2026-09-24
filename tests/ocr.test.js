@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
 import {BRANDS} from '../app/www/js/config.js';
 import {MAX_VARIETY, PACK_LINES, packLines, readPack} from '../app/www/js/ocr.js';
-import {jpegSize} from '../app/www/js/reading.js';
+import {jpegSize, readingOf} from '../app/www/js/reading.js';
 import {norm} from '../app/www/js/text.js';
 
 const VARIETIES = [
@@ -134,6 +134,161 @@ test('packaging text: a word the phone almost read is put right', () => {
   );
 });
 
+/* The plugin's answer for a few lines, one block each: [text, height, top, options]. The words stand side by side
+   with a word space (a third of the height), or as given in words: [text, {gap, size}], a smaller word sitting on
+   the line. tilt in radians, lang as the plugin names it. */
+function plugin(rows, width = 800, height = 1000) {
+  const lines = rows.map(([text, h, top, {left = 40, tilt = 0, lang = 'de', words} = {}]) => {
+    const u = [Math.cos(tilt), Math.sin(tilt)];
+    const at = (s, d) => ({x: Math.round(left + s * u[0] - d * u[1]), y: Math.round(top + s * u[1] + d * u[0])});
+    const shape = (s0, s1, d0, d1) => {
+      const cornerPoints = [at(s0, d0), at(s1, d0), at(s1, d1), at(s0, d1)],
+        xs = cornerPoints.map(c => c.x),
+        ys = cornerPoints.map(c => c.y);
+      const boundingBox = {
+        left: Math.min(...xs),
+        top: Math.min(...ys),
+        right: Math.max(...xs),
+        bottom: Math.max(...ys),
+      };
+      return {boundingBox, cornerPoints, recognizedLanguage: lang};
+    };
+    let end = 0;
+    const elements = (words || text.split(' ').map(w => [w])).map(([w, {gap = h / 3, size = h} = {}], i) => {
+      const from = i ? end + gap : 0;
+      end = from + w.length * size * 0.6;
+      return {text: w, ...shape(from, end, h - size, h)};
+    });
+    return {text, ...shape(0, end, 0, h), elements};
+  });
+  return readingOf(
+    {text: rows.map(r => r[0]).join('\n'), blocks: lines.map(l => ({text: l.text, lines: [l]}))},
+    width,
+    height,
+  );
+}
+
+test('packaging photos: the lines with their size, place and direction', () => {
+  const read = plugin([
+    ['Huhn in Gelee', 60, 100, {left: 50}],
+    ['Auri', 24, 400, {tilt: 0.35, lang: 'und'}],
+  ]);
+  assert.equal(read.lines.length, 2);
+  const [level, slanted] = read.lines;
+  assert.deepEqual(
+    [level.text, level.h, level.cx, level.tilt, level.lang, level.elements.map(e => e.text)],
+    ['Huhn in Gelee', 60, 50 + (11 * 36 + 2 * 20) / 2, 0, 'de', ['Huhn', 'in', 'Gelee']],
+  );
+  assert.ok(Math.abs(slanted.h - 24) < 1 && Math.abs(slanted.tilt - 0.35) < 0.02, 'a slanted line is as tall as it is');
+  assert.ok(slanted.box.bottom - slanted.box.top > 40, 'while its box is taller');
+  assert.deepEqual(readingOf({text: 'x', blocks: [{lines: [{text: 'ohne Box'}]}]}).lines, [], 'no box, no line');
+});
+
+test('packaging photos: a space where the words stand apart, none where they touch', () => {
+  const read = plugin([
+    ['HUHN &LACHS', 90, 100, {words: [['HUHN'], ['&'], ['LACHS']]}],
+    ['Zusa tz', 30, 300, {words: [['Zusa'], ['tz', {gap: 3}]]}],
+  ]);
+  assert.deepEqual(packLines(read), ['Huhn & Lachs', 'Zusatz']);
+  const badges = plugin([
+    ['Huhn in Gelee', 60, 100],
+    ['ohne Sojaohne Zucker', 30, 300, {words: [['ohne'], ['Soja'], ['ohne', {gap: 60}], ['Zucker']]}],
+  ]);
+  assert.deepEqual(packLines(badges), ['Huhn in Gelee'], 'two badges read as one line come apart, and promises go');
+});
+
+test('packaging photos: a small scrap in front of large print is dropped unless it is a word', () => {
+  const scrap = plugin([['A HUHN', 90, 100, {words: [['A', {size: 11}], ['HUHN']]}]]);
+  assert.deepEqual(packLines(scrap), ['Huhn']);
+  const word = plugin([['mit HUHN & LACHS', 90, 100, {words: [['mit', {size: 11}], ['HUHN'], ['&'], ['LACHS']]}]]);
+  assert.deepEqual(packLines(word), ['Mit Huhn & Lachs'], 'the small „mit“, read right, stays');
+  const line = plugin([
+    ['Ragout', 40, 40],
+    ['mlt', 30, 100],
+    ['HUHN & LACHS', 90, 140],
+    ['Sud', 30, 260],
+  ]);
+  assert.deepEqual(packLines(line), ['Ragout', 'Huhn & Lachs', 'Sud'], 'nor as a line of its own right before it');
+});
+
+test('packaging photos: badges, small print and scraps of the picture stay out, unless they name something known', () => {
+  const read = plugin([
+    ['Feine Filets', 60, 100],
+    ['Huhn in Gelee', 60, 180],
+    ['Auri', 24, 400, {tilt: 0.35}],
+    ['mit Lachs', 20, 450, {tilt: 0.4}],
+    ['Schonend gegart', 20, 500, {tilt: -0.3}],
+    ['Hergestellt in Europa', 8, 900],
+    ['Rind', 8, 950],
+    ['Leckerer Genuss', 30, 700],
+  ]);
+  assert.deepEqual(packLines(read), ['Feine Filets', 'Huhn in Gelee', 'mit Lachs', 'Leckerer Genuss', 'Rind']);
+  const turned = plugin([
+    ['Huhn in Gelee', 60, 100, {tilt: Math.PI / 2, left: 400}],
+    ['Feine Filets', 60, 100, {tilt: Math.PI / 2, left: 300}],
+  ]);
+  assert.deepEqual(packLines(turned).sort(), ['Feine Filets', 'Huhn in Gelee'], 'a photo taken sideways is no badge');
+  assert.deepEqual(
+    packLines('Auri\nHergestellt in Europa'),
+    ['Auri', 'Hergestellt in Europa'],
+    'plain text has no sizes, so nothing goes for being small',
+  );
+});
+
+test('packaging photos: the largest line is the variety, and what stands near it joins', () => {
+  const carny = plugin([
+    ['animonda', 50, 40],
+    ['Carny', 120, 120],
+    ['Adult', 30, 260],
+    ['Rind & Huhn', 40, 300],
+    ['Mit Rind und Huhn schmeckt es jeder Katze', 40, 800],
+  ]);
+  assert.deepEqual(
+    [readPack(carny).brand, readPack(carny).variety],
+    ['Animonda', 'Carny Rind & Huhn'],
+    'large print beats a flavour in smaller print, the flavour below joins, the brand and a far line do not',
+  );
+  const alike = plugin([
+    ['Feine Filets', 60, 100],
+    ['Huhn in Gelee', 58, 700],
+  ]);
+  assert.equal(readPack(alike).variety, 'Huhn in Gelee', 'about the same height: the keywords decide');
+  const taller = plugin([
+    ['Feine Filets', 90, 100],
+    ['Huhn in Gelee', 58, 700],
+  ]);
+  assert.equal(readPack(taller).variety, 'Feine Filets', 'half as tall again: the height decides');
+  const block = plugin([
+    ['Ragout Royal', 52, 170, {left: 200}],
+    ['HUHN & LACHS', 90, 246],
+    ['in Sauce', 36, 350, {left: 300}],
+  ]);
+  assert.equal(readPack(block).variety, 'Ragout Royal Huhn & Lachs in Sauce', 'in reading order');
+  const long = plugin([
+    ['Zarte Filetstreifen in feiner Sauce', 90, 100],
+    ['Huhn, Lachs und Forelle mit Gemüse', 80, 200],
+  ]);
+  assert.equal(readPack(long).variety, 'Zarte Filetstreifen in feiner Sauce', 'nothing that would make it too long');
+});
+
+test('packaging photos: the brand where the logo stands wins over a longer one in small print', () => {
+  const rows = [
+    ['Sheba', 80, 40],
+    ['Lachs in Soße', 50, 150],
+    ['Ein Produkt wie Perfect Fit', 20, 900],
+  ];
+  assert.equal(readPack(plugin(rows)).brand, 'Sheba');
+  assert.equal(readPack(rows.map(r => r[0]).join('\n')).brand, 'Perfect Fit', 'plain text: the longest');
+});
+
+test('packaging photos: more lines than chips, the largest stay, in the order they stand', () => {
+  const rows = Array.from({length: 10}, (_, i) => [`Zeile ${'abcdefghij'[i]}`, i < 8 ? 30 : 60, 100 + i * 80]);
+  assert.deepEqual(
+    packLines(plugin(rows)),
+    ['a', 'b', 'c', 'd', 'e', 'f', 'i', 'j'].map(c => `Zeile ${c}`),
+  );
+});
+
 test('packaging photos: the size of a photo, straight from its header', () => {
   const segment = (marker, body) => [0xff, marker, (body.length + 2) >> 8, (body.length + 2) & 255, ...body];
   const jpeg = (...parts) => Buffer.from([0xff, 0xd8, ...parts.flat()]).toString('base64');
@@ -166,9 +321,10 @@ const fixtures = () =>
 
 /* What the app makes of one fixture, and where that differs from what was expected: {field: what came out} */
 function misses(f) {
-  const products = f.products || [];
-  const got = readPack(f.result.text, products),
-    chips = packLines(f.result.text, '', products),
+  const products = f.products || [],
+    read = readingOf(f.result, f.width, f.height);
+  const got = readPack(read, products),
+    chips = packLines(read, '', products),
     want = f.expected;
   const same = (value, expected) => [expected].flat().some(e => norm(e) === norm(value));
   const out = {};

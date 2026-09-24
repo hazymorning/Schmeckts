@@ -2555,6 +2555,25 @@ async def test_pack_lines(browser, url):
     await pg.click('[data-action=close]')
     await idle(pg)
 
+    # The plugin's whole answer, with sizes and places: badges, a scrap of the picture and the small letter in front
+    # of the large print stay out, and the product line above the flavour joins the variety
+    miamor = json.loads((ROOT / 'tests/fixtures/ocr/miamor-ragout-royal.json').read_text())
+    await pg.evaluate('r => { window.__ocrResult = r; }', miamor['result'])
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, '!!db.servings[0]?.guess')
+    await idle(pg)
+    chips, fields = await pg.evaluate(CHIPS), await pg.evaluate(FIELDS)
+    check(
+        [c[0] for c in chips] == ['miamor', 'Ragout Royal', 'Huhn & Lachs', 'in Sauce']
+        and fields == ['Miamor', 'Ragout Royal Huhn & Lachs in Sauce'],
+        f'read by size and place: only the label as chips, and the variety from the largest line and what stands by it ({chips}, {fields})',
+    )
+    await pg.evaluate('window.__ocrResult = null')
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
     # Recognised by the server instead: there is nothing the phone read, so there are no chips
     await pg.evaluate(
         f"import('./js/store.js').then(m => {{ m.prefs.server = '{SRV}'; m.prefs.code = 'K7PM-3QXD'; m.prefs.mode = 'haushalt'; m.savePrefs(); }})"

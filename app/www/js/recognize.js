@@ -40,9 +40,9 @@ const STEPS = [
     run: async o => {
       const read = await readPhoto(o.photo);
       if (read.raw) last = {meal: o.meal, at: Date.now(), ...read};
-      const hit = asDetails(readPack(read.text, db.products));
+      const hit = asDetails(readPack(read, db.products));
       // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
-      return hit && {...hit, lines: packLines(read.text, '', db.products)};
+      return hit && {...hit, lines: packLines(read, '', db.products)};
     },
   },
 ];

@@ -1,13 +1,36 @@
 /* The packaging text (read off the photo in native.js) into the same answer the server gives: brand, variety,
    type, animal, texture. Pure functions, so they can be tested on their own.
+   What was read comes as the plugin's lines with their place and size (readingOf() in reading.js), or as plain
+   text, one line per line, the way the tests write it. Plain text has no sizes: every line counts the same, and
+   none is left out for being small or slanted.
    Order: put the misread words right, then our own varieties, then a brand (from the list or from one of our own
-   varieties), then the most prominent line as the variety. */
+   varieties), then the most prominent line, with what belongs to it, as the variety. */
 import {norm} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 
 export const MAX_VARIETY = 40;
 export const PACK_LINES = 8; // shown as chips while naming; beyond this there are too many to scan
 const MIN_BRAND = 4; // our own brands count as brands too, and a shorter word is too general to match on
+
+/* What the size and the direction of a line say. Starting values from the way type is set, until readings of
+   real packaging (tests/fixtures/ocr) say better. Heights are the plugin's line heights in pixels. */
+// A space between two words from this share of the line height on. A word space measures 0.25 to 0.5 of the line
+// height, the letters of one word stand at most 0.15 apart; at 0.25 two words in a line with descenders ran together.
+const GAP = 0.15;
+// Radians (9°) off the direction most lines run in: a round badge or a scrap of the picture, not the label.
+const TILT = 0.15;
+// Share of the middle line height. Below it is small print or noise: ML Kit wants 16 px a letter, and at 1100 px a
+// photo's small print has less.
+const SMALL_PRINT = 0.4;
+// Heights within a quarter of each other count as alike: only among such lines do the keywords decide the variety.
+const LIKE = 1.25;
+const HEIGHT_WEIGHT = 8 / Math.log(LIKE); // a line LIKE times taller outweighs every keyword score() gives (8 at most)
+// Lines at most this many heights of the main line away from the variety belong to the same label.
+const NEAR = 1.5;
+// A line near the variety and at least this share of the main line's height is part of the name, keyword or not
+// (the product line above the flavour); a smaller one only with a flavour or a consistency („in Sauce“).
+const BESIDE = 0.5;
+
 const EMPTY = {brand: '', variety: '', type: '', animal: ''};
 const QUANTITY =
   /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
@@ -18,9 +41,11 @@ const ADS =
 const squeeze = s => norm(s).replace(/ /g, ''); // insensitive to case, hyphens and spaces
 const has = (text, re) => re.test(text);
 
-/* text: the text that was read, products: our own varieties. With nothing usable everything stays empty. */
-export function readPack(text, products = []) {
-  const raw = cleanText(text, products);
+/* read: what was read, as the plugin's lines (readingOf) or as plain text; products: our own varieties. With
+   nothing usable everything stays empty. */
+export function readPack(read, products = []) {
+  const page = pageOf(read, products);
+  const raw = page.lines.map(l => l.text).join('\n');
   if (!raw.trim()) return {...EMPTY};
   const tight = squeeze(raw);
   const known = products
@@ -40,13 +65,9 @@ export function readPack(text, products = []) {
       texture: known.texture,
     };
 
-  const flat = ` ${norm(raw)} `;
-  const brand =
-    brandsOf(products)
-      .filter(b => flat.includes(` ${norm(b)} `))
-      .sort((a, b) => norm(b).length - norm(a).length)[0] || '';
+  const brand = pickBrand(page, raw, products);
   const type = foodType(raw);
-  const variety = pickVariety(raw, brand, products);
+  const variety = pickVariety(page, brand, products);
   if (!brand && !variety) return {...EMPTY};
   const texture = TEXTURES[type]?.items.find(([, , re]) => re.test(raw))?.[0];
   return {
@@ -56,6 +77,103 @@ export function readPack(text, products = []) {
     animal: ANIMAL_WORDS.find(([, re]) => re.test(raw))?.[0] || '',
     ...(texture ? {texture} : {}),
   };
+}
+
+/* What was read as lines, each with its text and height and, from the plugin, its place:
+   {geo, lines, mid, tilt, height, words}. A plugin's line gets its text from its words (spoken()), then everything
+   is put straight like plain text (cleanText()); the lines stand in reading order. mid is the middle line height,
+   tilt the direction most lines run in, height the photo's. An answer without lines (a plugin that only gave its
+   text) is read as plain text. */
+function pageOf(read, products) {
+  const words = knownWords(products);
+  const geo = typeof read === 'object' && read?.lines?.length > 0;
+  const lines = geo
+    ? read.lines.map(l => ({...l, text: spoken(l, words)}))
+    : String((typeof read === 'object' ? read?.text : read) || '')
+        .split(/\r?\n/)
+        .map(text => ({text, h: 1}));
+  const clean = cleanText(lines.map(l => l.text.replace(/[\r\n]+/g, ' ')).join('\n'), products).split('\n');
+  lines.forEach((l, i) => (l.text = clean[i]));
+  return {
+    geo,
+    lines: geo ? readingOrder(lines) : lines,
+    mid: median(lines.map(l => l.h)) || 1,
+    tilt: geo ? median(lines.map(l => l.tilt || 0)) : 0,
+    height: (geo && read.height) || Math.max(0, ...lines.map(l => l.box?.bottom || 0)),
+    words,
+  };
+}
+
+/* The text of a line from its words: a space where they stand apart, none where they touch, whatever the plugin
+   made of it („&Lachs“, three badges run together). A scrap of one to three letters at either end that is far
+   smaller than the rest and no word we know goes: the small „mit“ in front of large print, read as „A“. */
+function spoken(line, words) {
+  const u = {x: Math.cos(line.tilt || 0), y: Math.sin(line.tilt || 0)};
+  const parts = (line.elements || [])
+    .map(e => {
+      const at = e.cx * u.x + e.cy * u.y; // where its middle stands along the line
+      return {text: e.text, h: e.h, from: at - e.w / 2, to: at + e.w / 2};
+    })
+    .sort((a, b) => a.from - b.from);
+  if (!parts.length) return String(line.text || '');
+  const tallest = Math.max(...parts.map(p => p.h));
+  const scrap = p => /^\p{L}{1,3}$/u.test(p.text) && p.h < SMALL_PRINT * tallest && !words.has(norm(p.text));
+  while (parts.length > 1 && scrap(parts[0])) parts.shift();
+  while (parts.length > 1 && scrap(parts.at(-1))) parts.pop();
+  return parts.map((p, i) => (i && p.from - parts[i - 1].to >= GAP * line.h ? ' ' : '') + p.text).join('');
+}
+
+/* Lines in the order a person reads them: top to bottom, left to right within a row. Two lines whose middles are
+   less than half the smaller height apart share a row. */
+function readingOrder(lines) {
+  const rows = [];
+  for (const l of [...lines].sort((a, b) => a.cy - b.cy)) {
+    const row = rows.at(-1);
+    if (row && Math.abs(l.cy - row.cy) < Math.min(l.h, row.h) / 2) row.lines.push(l);
+    else rows.push({cy: l.cy, h: l.h, lines: [l]});
+  }
+  return rows.flatMap(r => r.lines.sort((a, b) => a.box.left - b.box.left));
+}
+
+const median = values => {
+  const v = values.filter(Number.isFinite).sort((a, b) => a - b);
+  return v.length ? (v[(v.length - 1) >> 1] + v[v.length >> 1]) / 2 : 0;
+};
+/* How far apart two directions are, in radians from 0 to π */
+const turn = (a, b) => Math.abs(((((a - b) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+/* Small print, or slanted against the rest: a badge, the picture */
+const noise = (l, page) => turn(l.tilt || 0, page.tilt) > TILT || l.h < SMALL_PRINT * page.mid;
+/* The gap between two lines' boxes, the wider of across and down */
+const apart = (a, b) =>
+  Math.max(0, a.box.left - b.box.right, b.box.left - a.box.right, a.box.top - b.box.bottom, b.box.top - a.box.bottom);
+
+/* Words we know: the small words, and every word of the brands on the list and of our own varieties */
+const knownWords = products =>
+  new Set([
+    ...SMALL,
+    ...[...BRANDS, ...products.flatMap(p => [p?.brand, p?.variety])].flatMap(s => norm(s).split(' ')).filter(Boolean),
+  ]);
+const flavourOrTexture = v =>
+  FLAVORS.some(([, re]) => re.test(v)) || Object.values(TEXTURES).some(t => t.items.some(([, , re]) => re.test(v)));
+/* A line holding something we know keeps its place however small or slanted it is: a flavour, a consistency, a
+   brand, one of our own varieties */
+const holdsKnown = (v, products) =>
+  flavourOrTexture(v) ||
+  brandsOf(products).some(b => ` ${norm(v)} `.includes(` ${norm(b)} `)) ||
+  products.some(p => squeeze(p?.variety).length >= 4 && squeeze(v).includes(squeeze(p.variety)));
+
+/* Brand: a hit from the list (brandsOf) on whole words. From the plugin a hit in one of the two largest lines or in
+   the top third of the photo comes first, where the logo stands; after that, and in plain text, the longest. */
+function pickBrand(page, raw, products) {
+  const flat = ` ${norm(raw)} `;
+  const hits = brandsOf(products).filter(b => flat.includes(` ${norm(b)} `));
+  if (hits.length < 2 || !page.geo) return hits.sort((a, b) => norm(b).length - norm(a).length)[0] || '';
+  const big = [...page.lines].sort((a, b) => b.h - a.h).slice(0, 2);
+  const rank = b => {
+    const at = page.lines.filter(l => ` ${norm(l.text)} `.includes(` ${norm(b)} `));
+    return (at.some(l => big.includes(l)) ? 2 : 0) + (at.some(l => l.cy < page.height / 3) ? 1 : 0);
+  };
+  return hits.map(b => ({b, r: rank(b)})).sort((x, y) => y.r - x.r || norm(y.b).length - norm(x.b).length)[0].b;
 }
 
 /* Every brand that may be read off a packaging: the list, plus the brands of our own varieties; once each and
@@ -79,54 +197,75 @@ function foodType(raw) {
   return Object.entries(TEXTURES).find(([, t]) => t.items.some(([, , re]) => re.test(raw)))?.[0] || '';
 }
 
-/* Variety: the most prominent line, without quantities, advertising, ingredients and bare numbers. Where several
-   fit, they are joined in the order they appear on the packaging, at most MAX_VARIETY characters. */
-function pickVariety(raw, brand, products) {
-  const bare = norm(brand);
-  const scored = packLines(raw, bare, products)
-    .map((v, i) => ({v, i, s: score(v) - Math.min(1, i * 0.2)}))
-    .filter(x => x.s > 0)
-    .sort((a, b) => b.s - a.s);
-  if (!scored.length) return '';
-  const take = [scored[0]];
-  for (const x of scored.slice(1)) {
-    if (x.s < 1) break;
-    const merged = [...take, x]
-      .sort((a, b) => a.i - b.i)
-      .map(y => y.v)
-      .join(' ');
-    if (merged.length > MAX_VARIETY) break;
-    take.push(x);
-  }
-  return take
-    .sort((a, b) => a.i - b.i)
-    .map(x => x.v)
-    .join(' ')
-    .slice(0, MAX_VARIETY)
-    .trim();
+/* Variety: the most prominent line and what belongs to it, at most MAX_VARIETY characters, joined in the order
+   they stand on the packaging. From the plugin prominent means large (the height against the middle line height),
+   and the keywords only decide between lines of about the same height; lines near it that are large as well or
+   carry a flavour or a consistency join it (the product line above the flavour, „in Sauce“ below it), and the
+   brand does not. From plain text the keywords decide, and the other lines with one join. */
+function pickVariety(page, brand, products) {
+  const lines = usable(page, norm(brand), products).map((l, i) => {
+    const s = score(l.text) - Math.min(1, i * 0.2);
+    return {...l, i, s, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid)};
+  });
+  const ranked = lines.filter(x => x.p > 0).sort((a, b) => b.p - a.p);
+  if (!ranked.length) return '';
+  const main = ranked[0],
+    take = [main];
+  const fits = x => joined([...take, x]).length <= MAX_VARIETY;
+  if (page.geo) {
+    const kin = lines.filter(x => x !== main && (x.h >= BESIDE * main.h || flavourOrTexture(x.text)));
+    for (;;) {
+      const next = kin
+        .filter(x => !take.includes(x) && take.some(y => apart(x, y) <= NEAR * main.h) && fits(x))
+        .sort((a, b) => Math.min(...take.map(y => apart(a, y))) - Math.min(...take.map(y => apart(b, y))))[0];
+      if (!next) break;
+      take.push(next);
+    }
+  } else
+    for (const x of ranked.slice(1)) {
+      if (x.s < 1 || !fits(x)) break;
+      take.push(x);
+    }
+  return joined(take).slice(0, MAX_VARIETY).trim();
 }
-/* The usable lines of a packaging text: without quantities, advertising, ingredients and bare numbers, none of
-   them twice, at most PACK_LINES, in the order they stand on the packaging. pickVariety picks the variety from
-   these, and while naming they are offered as chips, so the filter exists only once. `bare` is the normalised
-   brand, which is dropped from the front of a line („Sheba Lachs in Soße“ → „Lachs in Soße“). */
-export function packLines(text, bare = '', products = []) {
-  const seen = new Set();
-  return cleanText(text, products)
-    .split(/\r?\n/)
-    .map(l =>
-      withoutBrand(l.replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim(), bare).replace(
-        /^[\s\-–,·|]+|[\s\-–,·|]+$/g,
-        '',
-      ),
-    )
-    .filter(v => {
-      if (v.length < 3 || (v.match(/[A-Za-zÄÖÜäöüß]/g) || []).length < 3) return false;
-      if (JUNK.test(v) || ADS.test(v) || norm(v) === bare || seen.has(norm(v))) return false;
-      if (!says(v)) return false;
-      seen.add(norm(v));
-      return true;
-    })
-    .slice(0, PACK_LINES);
+const joined = lines =>
+  [...lines]
+    .sort((a, b) => a.i - b.i)
+    .map(l => l.text)
+    .join(' ');
+
+/* The usable lines of what was read: without quantities, advertising, ingredients and bare numbers, none of them
+   twice, in the order they stand on the packaging, each with its size and place. From the plugin also without
+   small print and slanted lines unless they hold something we know, and without a scrap of up to three letters
+   that is no word right before the largest line. `bare` is the normalised brand, which is dropped from the front
+   of a line („Sheba Lachs in Soße“ → „Lachs in Soße“). */
+function usable(page, bare, products) {
+  const seen = new Set(),
+    out = [];
+  const largest = page.geo && page.lines.reduce((a, b) => (b.h > a.h ? b : a));
+  page.lines.forEach((l, i) => {
+    const v = withoutBrand(l.text.replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim(), bare).replace(
+      /^[\s\-–,·|]+|[\s\-–,·|]+$/g,
+      '',
+    );
+    if (v.length < 3 || (v.match(/[A-Za-zÄÖÜäöüß]/g) || []).length < 3) return;
+    if (JUNK.test(v) || ADS.test(v) || norm(v) === bare || seen.has(norm(v))) return;
+    if (!says(v)) return;
+    if (page.geo && noise(l, page) && !holdsKnown(v, products)) return;
+    if (page.geo && page.lines[i + 1] === largest && /^\p{L}{3}$/u.test(v) && !page.words.has(norm(v))) return;
+    seen.add(norm(v));
+    out.push({...l, text: v});
+  });
+  return out;
+}
+
+/* The lines of a packaging offered as chips while naming: the usable lines, so the filter the variety is picked
+   with exists only once. At most PACK_LINES, the largest where there are more, in the order they stand on the
+   packaging. */
+export function packLines(read, bare = '', products = []) {
+  const lines = usable(pageOf(read, products), bare, products);
+  const keep = new Set([...lines].sort((a, b) => b.h - a.h).slice(0, PACK_LINES));
+  return lines.filter(l => keep.has(l)).map(l => l.text);
 }
 
 /* A line has to say something of its own: words like „mit“ alone, and a line that is nothing but promises, are
