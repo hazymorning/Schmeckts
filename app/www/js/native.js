@@ -1,4 +1,5 @@
 /* Bridge to Android. In the app the Capacitor plugins are available; in the browser Native is null. */
+import {jpegSize} from './reading.js';
 import {report} from './report.js';
 
 export const Native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins : null;
@@ -91,15 +92,21 @@ export async function takePhoto(hint) {
 /* Read text off a photo (plugin @capacitor-mlkit/text-recognition, processImage only, Latin script).
    Runs on the device, without network and without a key; it needs no camera permission, as the photo comes from
    the existing flow. The plugin reads from a path, so the photo goes into the private cache and is deleted right
-   after. Returns '' on any failure. */
+   after. Returns {text, width, height, ms, raw}: the text, the size of the photo, how long the plugin took and its
+   whole answer (blocks, lines and words with their boxes), which recognize.js keeps in memory for
+   schmeckts://ocr-dump. Empty on any failure. */
 const TextReader = plugin('TextRecognition');
 const TEXT_FILE = 'schmeckts-ocr.jpg';
-export async function readPhotoText(b64) {
-  if (!TextReader || !Native?.Filesystem || !b64) return '';
+const UNREAD = {text: '', width: 0, height: 0, ms: 0, raw: null};
+export async function readPhoto(b64) {
+  if (!TextReader || !Native?.Filesystem || !b64) return {...UNREAD};
   try {
     const {uri} = await Native.Filesystem.writeFile({path: TEXT_FILE, data: b64, directory: 'CACHE'});
     try {
-      return String((await TextReader.processImage({path: uri}))?.text || '');
+      const start = performance.now();
+      const raw = (await TextReader.processImage({path: uri})) || {};
+      const ms = Math.round(performance.now() - start);
+      return {text: String(raw.text || ''), ...jpegSize(b64), ms, raw};
     } finally {
       await Native.Filesystem.deleteFile({path: TEXT_FILE, directory: 'CACHE'}).catch(e =>
         report('deleting the photo from the cache', e),
@@ -107,7 +114,7 @@ export async function readPhotoText(b64) {
     }
   } catch (e) {
     report('text on the photo', e);
-    return '';
+    return {...UNREAD};
   }
 }
 

@@ -5,7 +5,7 @@
    Errors from photo recognition through the server carry retry: true when another attempt is worth it. */
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
-import {readPhotoText} from './native.js';
+import {readPhoto} from './native.js';
 import {packLines, readPack} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
@@ -38,10 +38,11 @@ const STEPS = [
     name: 'text',
     when: o => !!o.photo,
     run: async o => {
-      const text = await readPhotoText(o.photo);
-      const hit = asDetails(readPack(text, db.products));
+      const read = await readPhoto(o.photo);
+      if (read.raw) last = {meal: o.meal, at: Date.now(), ...read};
+      const hit = asDetails(readPack(read.text, db.products));
       // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
-      return hit && {...hit, lines: packLines(text, '', db.products)};
+      return hit && {...hit, lines: packLines(read.text, '', db.products)};
     },
   },
 ];
@@ -54,10 +55,16 @@ export const photoByServer = () => isConnected() && prefs.serverPhoto;
    synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
 export const memLines = new Map();
 
-/* code: the scanned barcode, photo: the photo as base64, note: a short notice for the interface.
-   Returns {source, products|details} or {source:'', error}; the form then stays empty. */
-export async function identify({code = '', photo = '', note = () => {}} = {}) {
-  const o = {code, photo};
+/* The phone's last reading of a packaging, in memory only like the lines: the plugin's whole answer, the size of the
+   photo, how long it took and the meal it belongs to. schmeckts://ocr-dump shares it as a test fixture
+   (exportReading() in logic/data.js); nothing else looks at it. */
+let last = null;
+export const lastReading = () => last;
+
+/* code: the scanned barcode, photo: the photo as base64, meal: the meal it is for, note: a short notice for the
+   interface. Returns {source, products|details} or {source:'', error}; the form then stays empty. */
+export async function identify({code = '', photo = '', meal = '', note = () => {}} = {}) {
+  const o = {code, photo, meal};
   let error = null;
   for (const step of STEPS) {
     if (!step.when(o)) continue;

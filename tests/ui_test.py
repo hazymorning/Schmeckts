@@ -2316,6 +2316,20 @@ async def test_recognize(browser, url):
     async def setp(**kw):
         await pg.evaluate("p => import('./js/store.js').then(m => { Object.assign(m.prefs, p); })", kw)
 
+    async def dump():  # schmeckts://ocr-dump: the last reading as a fixture, through a file and the share menu
+        before = len(await pg.evaluate('window.__calls'))
+        await pg.evaluate("window.__urlOpen({url: 'schmeckts://ocr-dump'})")
+        await idle(pg)
+        shared = [c[1] for c in (await pg.evaluate('window.__calls'))[before:] if c[0] == 'share']
+        name = shared[0]['files'][0].split('/')[-1] if shared else ''
+        return name, json.loads(await pg.evaluate(f"localStorage.getItem('__fs:{name}')") or 'null')
+
+    nothing = await dump()
+    check(
+        nothing == ('', None) and await pg.inner_text('#toast') == 'Noch kein Foto gelesen.',
+        f'schmeckts://ocr-dump before the phone has read anything: nothing to share ({nothing})',
+    )
+
     # On-device text recognition: in mode `lokal` the photo prefills „Futter benennen“
     await pg.evaluate("window.__ocrText = 'Sheba\\nNEU\\nSelection in Sauce\\nmit Lachs\\n4 x 85 g\\nZutaten: Fleisch 40 %'; window.__ocrDelay = 400")
     await pg.click('#fab')
@@ -2357,6 +2371,18 @@ async def test_recognize(browser, url):
         p == ['Sheba', 'Selection in Sauce mit Lachs', 'Nassfutter', 'sosse'] and not await state(pg, 'db.servings[0].guess'),
         f'confirmed: the variety is created including its consistency, and the guess is gone ({p})',
     )
+    name, fixture = await dump()
+    want = {'brand': 'Sheba', 'variety': 'Selection in Sauce mit Lachs', 'type': 'Nassfutter', 'texture': 'sosse', 'locked': False}
+    check(
+        re.fullmatch(r'schmeckts-ocr-\d{4}-\d\d-\d\d-\d\d-\d\d-\d\d\.json', name)
+        and [fixture['width'], fixture['height']] == [480, 360]
+        and fixture['result'] == {'text': 'Sheba\nNEU\nSelection in Sauce\nmit Lachs\n4 x 85 g\nZutaten: Fleisch 40 %', 'blocks': []}
+        and {k: fixture['expected'].get(k) for k in want} == want
+        and fixture['ms'] >= 0,
+        f'schmeckts://ocr-dump: the last reading as a fixture, with the size of the photo and the variety it was named as ({name}, {fixture and fixture["expected"]})',
+    )
+    kept = await state(pg, 'JSON.stringify([db, prefs, queue])')
+    check('Zutaten: Fleisch' not in kept, 'the reading itself lives in memory only: it is in neither the data, the settings nor the queue')
     # The same packaging again: our own variety is recognised, spelled differently too
     await pg.evaluate("window.__ocrText = 'SHEBA  selection-in-sauce mit LACHS 85g'")
     got = await ident(photo='AAA')

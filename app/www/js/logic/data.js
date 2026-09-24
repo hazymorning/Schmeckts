@@ -1,13 +1,14 @@
 /* Exporting and importing a backup, sample data, deleting everything.
    With a server, import and delete apply to the whole household. Sample data exists only without a server. */
 import {uid} from '../fields.js';
-import {Native, haptic} from '../native.js';
+import {Native, appInfo, haptic} from '../native.js';
 import {report} from '../report.js';
 import {DEMO, RATINGS} from '../config.js';
 import {db, defaults, prefs, purge, replaceDb, save, savePrefs, tidy} from '../store.js';
 import {isConnected} from '../sync.js';
-import {petMap} from '../derive.js';
+import {getProduct, getServing, petMap} from '../derive.js';
 import {sweepPhotos} from '../photos.js';
+import {lastReading} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
@@ -65,6 +66,44 @@ export async function exportData() {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   toast('Backup gespeichert');
+}
+/* The phone's last reading of a packaging photo as a test fixture for tests/fixtures/ocr (PROJECT.md, „Text
+   recognition“): the plugin's own answer, the size of the photo and, once the meal has been named, what it really
+   was, for a person to check before the file goes into the tests. Only through the deep link schmeckts://ocr-dump,
+   never from the interface, and only while the app has not been closed since: the reading lives in memory. */
+export async function exportReading() {
+  const r = lastReading();
+  if (!r || !Native?.Filesystem || !Native?.Share) return toast('Noch kein Foto gelesen.');
+  await clearExports();
+  const p = getProduct(getServing(r.meal)?.productId);
+  const fixture = {
+    about: p ? [p.brand, p.variety].filter(Boolean).join(' ') : '',
+    taken: new Date(r.at).toISOString(),
+    app: appInfo.version,
+    width: r.width,
+    height: r.height,
+    ms: r.ms,
+    expected: {
+      brand: p ? p.brand || '' : null, // null: not named yet, a person fills it in
+      variety: p ? p.variety || '' : null,
+      type: p?.type || null,
+      animal: p?.animal || null,
+      texture: p?.texture || null,
+      locked: false,
+    },
+    result: r.raw,
+  };
+  // One field per line: the expectations are read and changed by hand, the plugin's answer is data
+  const json = `{\n${Object.entries(fixture)
+    .map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`)
+    .join(',\n')}\n}\n`;
+  const name = `schmeckts-ocr-${fixture.taken.slice(0, 19).replace(/[T:]/g, '-')}.json`;
+  try {
+    const {uri} = await Native.Filesystem.writeFile({path: name, data: json, directory: 'CACHE', encoding: 'utf8'});
+    await Native.Share.share({title: name, files: [uri], dialogTitle: 'Gelesenen Text teilen'});
+  } catch (e) {
+    if (!/cancel/i.test(String(e?.message))) toast('Der gelesene Text konnte nicht geteilt werden.');
+  }
 }
 export async function importData(file) {
   if (!file) return;

@@ -180,7 +180,7 @@ async function recognizeServing(id) {
   refreshServing(id);
   let found = {source: '', error: null};
   try {
-    found = await identify({code: s.scanCode || '', photo: b64});
+    found = await identify({code: s.scanCode || '', photo: b64, meal: id});
   } catch (e) {
     report('recognition', e);
   }

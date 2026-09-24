@@ -29,7 +29,7 @@ note_failure() {
 [ -x app/node_modules/.bin/eslint ] || (cd app && npm ci --no-audit --no-fund >/dev/null)
 run 'eslint' app/node_modules/.bin/eslint --config app/eslint.config.mjs --max-warnings 0 app/www/js tests
 run 'prettier' app/node_modules/.bin/prettier --config app/.prettierrc.json --check --log-level warn \
-  'app/www/**/*.js' 'app/www/**/*.css' 'tests/*.test.js'
+  'app/www/**/*.js' 'app/www/**/*.css' 'tests/*.test.js' 'tests/notes.js'
 
 # Go. The toolchain is not always on the PATH (scripts/setup-build-env.sh puts it in /usr/local/go).
 GO="$(command -v go || { [ -x /usr/local/go/bin/go ] && echo /usr/local/go/bin/go; } || true)"

@@ -2,8 +2,11 @@
 // consistency. Usage: node --test tests/*.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readdirSync, readFileSync} from 'node:fs';
 import {BRANDS} from '../app/www/js/config.js';
 import {MAX_VARIETY, PACK_LINES, packLines, readPack} from '../app/www/js/ocr.js';
+import {jpegSize} from '../app/www/js/reading.js';
+import {norm} from '../app/www/js/text.js';
 
 const VARIETIES = [
   {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
@@ -129,4 +132,69 @@ test('packaging text: a word the phone almost read is put right', () => {
     'Selection in Sauce mit Lachs',
     'and a text that was read properly is not touched',
   );
+});
+
+test('packaging photos: the size of a photo, straight from its header', () => {
+  const segment = (marker, body) => [0xff, marker, (body.length + 2) >> 8, (body.length + 2) & 255, ...body];
+  const jpeg = (...parts) => Buffer.from([0xff, 0xd8, ...parts.flat()]).toString('base64');
+  const frame = segment(0xc0, [8, 0x04, 0x4c, 0x03, 0x39, 3]); // 1100 high, 825 wide
+  const tables = segment(0xdb, Array(65).fill(1));
+  assert.deepEqual(jpegSize(jpeg(segment(0xe0, Array(14).fill(0)), tables, frame)), {width: 825, height: 1100});
+  assert.deepEqual(
+    jpegSize(jpeg(segment(0xe1, Array(30000).fill(7)), frame)),
+    {width: 825, height: 1100},
+    'behind the large preview a camera puts in front',
+  );
+  assert.deepEqual(
+    jpegSize(jpeg(segment(0xc4, Array(20).fill(0)), segment(0xc2, [8, 0, 10, 0, 20, 3]))),
+    {width: 20, height: 10},
+    'progressive, and the Huffman tables in between are no frame',
+  );
+  for (const bad of ['', 'kein Foto!', Buffer.from('GIF89a').toString('base64')])
+    assert.deepEqual(jpegSize(bad), {width: 0, height: 0}, bad);
+});
+
+/* Readings of real packaging (tests/fixtures/ocr, how to collect them: PROJECT.md, „Text recognition“): the
+   plugin's whole answer and what the packaging really said. Every one counts towards the hit rate, printed with
+   the results; one marked `locked` has been read right once and has to stay right. */
+const FIXTURES = new URL('./fixtures/ocr/', import.meta.url);
+const fixtures = () =>
+  readdirSync(FIXTURES)
+    .filter(name => name.endsWith('.json'))
+    .sort()
+    .map(name => ({name, ...JSON.parse(readFileSync(new URL(name, FIXTURES), 'utf8'))}));
+
+/* What the app makes of one fixture, and where that differs from what was expected: {field: what came out} */
+function misses(f) {
+  const products = f.products || [];
+  const got = readPack(f.result.text, products),
+    chips = packLines(f.result.text, '', products),
+    want = f.expected;
+  const same = (value, expected) => [expected].flat().some(e => norm(e) === norm(value));
+  const out = {};
+  if (!same(got.brand, want.brand)) out.brand = got.brand;
+  if (!same(got.variety, want.variety)) out.variety = got.variety;
+  for (const k of ['type', 'animal', 'texture']) if (want[k] && got[k] !== want[k]) out[k] = got[k] ?? '';
+  if (want.chips && JSON.stringify(chips) !== JSON.stringify(want.chips)) out.chips = chips;
+  return out;
+}
+
+test('packaging photos: the fixtures from real readings, with the hit rate', t => {
+  const all = fixtures();
+  for (const f of all) {
+    const ok = x => typeof x === 'string' || (Array.isArray(x) && x.length > 0);
+    assert.ok(ok(f.expected?.brand) && ok(f.expected?.variety), `${f.name}: brand and variety are filled in`);
+    assert.ok(f.width > 0 && f.height > 0 && Array.isArray(f.result?.blocks), `${f.name}: the size and the answer`);
+  }
+  const rows = all.map(f => ({f, miss: misses(f)}));
+  const count = pick => `${rows.filter(r => pick(r.miss)).length}/${rows.length}`;
+  t.diagnostic(
+    `OCR fixtures: brand ${count(m => !('brand' in m))}, variety ${count(m => !('variety' in m))}, ` +
+      `both ${count(m => !('brand' in m) && !('variety' in m))}`,
+  );
+  for (const {f, miss} of rows)
+    if (Object.keys(miss).length)
+      t.diagnostic(`  ${f.name}${f.expected.locked ? ' (locked)' : ''}: ${JSON.stringify(miss)}`);
+  const broken = rows.filter(r => r.f.expected.locked && Object.keys(r.miss).length).map(r => r.f.name);
+  assert.deepEqual(broken, [], 'a fixture that was read right once stays right');
 });
