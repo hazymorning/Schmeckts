@@ -6,8 +6,8 @@
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhoto} from './native.js';
-import {photoOf, READ_MAX, readable} from './images.js';
-import {packLines, readPack} from './ocr.js';
+import {cropped, photoOf, readable} from './images.js';
+import {CROP_WIDTH, focusOf, joinReadings, packLines, readPack, SECOND_PASS, SECOND_PASS_MS} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
@@ -39,15 +39,33 @@ const STEPS = [
     name: 'text',
     when: o => !!o.photo,
     run: async o => {
-      const read = await readPhoto(o.sharp || o.photo);
-      if (read.raw) last = {meal: o.meal, at: Date.now(), ...read};
-      if (timing.on && o.sharp) await measure(o, read);
+      const first = await readPhoto(o.sharp || o.photo);
+      const second = await readAgain(o.sharp || o.photo, first);
+      if (first.raw) last = {meal: o.meal, at: Date.now(), ...first, ...(second ? {second} : {})};
+      if (timing.on && o.sharp) await measure(o, first);
+      const read = second ? joinReadings(first, second.read, second) : first;
       const hit = asDetails(readPack(read, db.products));
       // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
       return hit && {...hit, lines: packLines(read, '', db.products)};
     },
   },
 ];
+
+/* The second reading (SECOND_PASS in ocr.js): the part around the variety, enlarged, read again. Only after a first
+   reading that was quick enough and found a line that stands out. {crop, scale, read} or null; anything that goes
+   wrong on the way leaves the first reading as it is. */
+async function readAgain(b64, first) {
+  const crop = SECOND_PASS && first.raw && first.ms <= SECOND_PASS_MS ? focusOf(first, db.products) : null;
+  if (!crop) return null;
+  try {
+    const part = await cropped(await photoOf(b64), crop, CROP_WIDTH);
+    const read = await readPhoto(part.b64);
+    return read.raw ? {...crop, scale: part.scale, read} : null;
+  } catch (e) {
+    report('reading the variety a second time', e);
+    return null;
+  }
+}
 
 /* Whether the server recognises packaging photos: connected, and not switched off under „Scannen“. With the
    switch off the photo takes the same way as without a household, the phone reading the text itself. */
@@ -63,18 +81,20 @@ export const memLines = new Map();
 let last = null;
 export const lastReading = () => last;
 
-/* How long the plugin takes by the size of the photo, for choosing READ_MAX (PROJECT.md): schmeckts://ocr-measure
-   switches it on for as long as the app runs, and every photo is then read at 1100 and 1800 px as well. Written to
-   the console and shared with schmeckts://ocr-dump, never stored. ms: {px: [milliseconds]} */
+/* How long the plugin takes by the size of the photo, for choosing READ_MAX in images.js (PROJECT.md):
+   schmeckts://ocr-measure switches it on for as long as the app runs, and every photo larger than 1100 or 1800 px is
+   then read at those sizes as well. Written to the console and shared with schmeckts://ocr-dump, never stored.
+   ms: {px: [milliseconds]} */
 export const timing = {on: false, ms: {}};
 async function measure(o, read) {
   const took = (px, ms) => {
     (timing.ms[px] ||= []).push(ms);
     console.info(`reading at ${px} px: ${ms} ms`); // the measurement is what this is for, so it goes to the console
   };
-  took(Math.max(read.width, read.height), read.ms);
-  const img = await photoOf(o.sharp);
-  for (const px of [1100, 1800].filter(n => n < READ_MAX)) took(px, (await readPhoto(await readable(img, px))).ms);
+  const edge = Math.max(read.width, read.height),
+    img = await photoOf(o.sharp);
+  took(edge, read.ms);
+  for (const px of [1100, 1800].filter(n => n < edge)) took(px, (await readPhoto(await readable(img, px))).ms);
 }
 
 /* code: the scanned barcode, photo: the photo as base64, sharp: the same photo larger for reading its text on the

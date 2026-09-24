@@ -2608,13 +2608,15 @@ async def test_pack_lines(browser, url):
     await idle(pg)
 
     # The plugin's whole answer, with sizes and places: badges, a scrap of the picture and the small letter in front
-    # of the large print stay out, and the product line above the flavour joins the variety
+    # of the large print stay out, and the product line above the flavour joins the variety. The part around the
+    # variety is then cut out of the photo, enlarged to 1600 px and read a second time (here it finds nothing new).
     miamor = json.loads((ROOT / 'tests/fixtures/ocr/miamor-ragout-royal.json').read_text())
-    await pg.evaluate('r => { window.__ocrResult = r; }', miamor['result'])
+    meals = await state(pg, 'db.servings.length')
+    await pg.evaluate('r => { window.__ocrQueue = [r, {text: "", blocks: []}]; window.__ocrPhotos = []; }', miamor['result'])
     await pg.click('#fab')
     await idle(pg)
-    await pg.set_input_files('#camInputSheet', str(PACK))
-    await until(pg, '!!db.servings[0]?.guess')
+    await pg.set_input_files('#camInputSheet', str(PACK_LARGE))
+    await until(pg, f'db.servings.length > {meals} && !!db.servings[0].guess')
     await idle(pg)
     chips, fields = await pg.evaluate(CHIPS), await pg.evaluate(FIELDS)
     check(
@@ -2622,7 +2624,26 @@ async def test_pack_lines(browser, url):
         and fields == ['Miamor', 'Ragout Royal Huhn & Lachs in Sauce'],
         f'read by size and place: only the label as chips, and the variety from the largest line and what stands by it ({chips}, {fields})',
     )
-    await pg.evaluate('window.__ocrResult = null')
+    photos = await pg.evaluate("import('./js/reading.js').then(g => window.__ocrPhotos.map(b => g.jpegSize(b)).map(x => [x.width, x.height]))")
+    again = await pg.evaluate(
+        "import('./js/recognize.js').then(r => { const s = r.lastReading().second; return [s.left, s.top, s.right, s.bottom, s.scale]; })"
+    )
+    check(
+        photos == [[2400, 1800], [1600, 543]] and again[:4] == [0, 113, 973, 443] and abs(again[4] - 1600 / 973) < 1e-9,
+        f'read a second time: the lines around the largest one, a quarter more on every side, enlarged to 1600 px ({photos}, {again})',
+    )
+    before = len(await pg.evaluate('window.__calls'))
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://ocr-dump'})")
+    await idle(pg)
+    name = [c[1] for c in (await pg.evaluate('window.__calls'))[before:] if c[0] == 'share'][0]['files'][0].split('/')[-1]
+    second = json.loads(await pg.evaluate(f"localStorage.getItem('__fs:{name}')"))['second']
+    check(
+        sorted(second) == ['crop', 'height', 'ms', 'result', 'scale', 'width']
+        and second['crop'] == {'left': 0, 'top': 113, 'right': 973, 'bottom': 443}
+        and [second['width'], second['height']] == [1600, 543]
+        and second['result'] == {'text': '', 'blocks': []},
+        f'and the fixture carries the second reading, as tests/ocr.test.js reads it ({sorted(second)})',
+    )
     await pg.click('[data-action=close]')
     await idle(pg)
 
@@ -3139,8 +3160,11 @@ async def test_camera(browser, url):
         after[:3] == [False, 'serving', 'name'] and s == [1, 'noserver', 'data:image/jpeg;base64,', True] and await pg.evaluate(LIVE) == 0,
         f'the shutter takes the picture at once, without a confirmation: served, shrunk, on to naming; and the camera is released ({after}, {s})',
     )
-    await until(pg, 'db.servings[0].status === "noserver"')
-    read = await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading() && [r.lastReading().width, r.lastReading().height])")
+    for _ in range(100):  # the reading is in memory beside the data, so until() does not see it
+        read = await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading() && [r.lastReading().width, r.lastReading().height])")
+        if read:
+            break
+        await asyncio.sleep(0.1)
     stills = await pg.evaluate('window.__stills')
     check(
         stills == [{'imageWidth': 1920}] and read == [1920, 1080],

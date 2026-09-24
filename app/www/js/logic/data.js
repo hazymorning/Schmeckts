@@ -93,6 +93,8 @@ export async function exportReading() {
       locked: false,
     },
     result: r.raw,
+    // the part around the variety read a second time: where in the photo, how much larger, and what came out
+    ...(r.second ? {second: secondOf(r.second)} : {}),
   };
   // One field per line: the expectations are read and changed by hand, the plugin's answer is data
   const json = `{\n${Object.entries(fixture)
@@ -106,6 +108,14 @@ export async function exportReading() {
     if (!/cancel/i.test(String(e?.message))) toast('Der gelesene Text konnte nicht geteilt werden.');
   }
 }
+const secondOf = ({left, top, right, bottom, scale, read}) => ({
+  crop: {left, top, right, bottom},
+  scale,
+  width: read.width,
+  height: read.height,
+  ms: read.ms,
+  result: read.raw,
+});
 export async function importData(file) {
   if (!file) return;
   try {

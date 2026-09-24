@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
 import {BRANDS} from '../app/www/js/config.js';
-import {MAX_VARIETY, PACK_LINES, packLines, readPack} from '../app/www/js/ocr.js';
+import {focusOf, joinReadings, MAX_VARIETY, PACK_LINES, packLines, readPack, SECOND_PASS} from '../app/www/js/ocr.js';
 import {jpegSize, readingOf} from '../app/www/js/reading.js';
 import {norm} from '../app/www/js/text.js';
 
@@ -289,6 +289,56 @@ test('packaging photos: more lines than chips, the largest stay, in the order th
   );
 });
 
+test('packaging photos: the part around the variety is read again, and laid over the first reading', () => {
+  const f = JSON.parse(readFileSync(new URL('miamor-ragout-royal.json', FIXTURES), 'utf8'));
+  const first = readingOf(f.result, f.width, f.height);
+  const crop = focusOf(first);
+  assert.deepEqual(crop, {left: 0, top: 113, right: 825, bottom: 443}, 'the three lines, a quarter more on every side');
+  assert.equal(
+    focusOf(
+      plugin([
+        ['Huhn in Gelee', 40, 100],
+        ['Feine Filets', 40, 200],
+      ]),
+    ),
+    null,
+    'nothing stands out',
+  );
+  assert.equal(focusOf('Huhn in Gelee\nFeine Filets'), null, 'plain text has no places');
+  // Read again at twice the size: the small „mit“ comes out right this time
+  const second = plugin(
+    [
+      ['Ragout Royal', 104, 110, {left: 410, lang: 'fr'}],
+      ['mit HUHN & LACHS', 180, 266, {left: 116, words: [['mit', {size: 22}], ['HUHN'], ['&'], ['LACHS']]}],
+      ['in Sauce', 72, 478, {left: 600}],
+    ],
+    1650,
+    660,
+  );
+  const joined = joinReadings(first, second, {...crop, scale: 2});
+  assert.equal(readPack(joined).variety, 'Ragout Royal Mit Huhn & Lachs in Sauce');
+  assert.deepEqual(
+    joined.lines.map(l => l.text).filter(t => /HUHN|Ragout|Sauce/.test(t)),
+    ['Ragout Royal', 'mit HUHN & LACHS', 'in Sauce'],
+    'each line once, as read the second time',
+  );
+  const moved = joined.lines.find(l => l.text === 'in Sauce');
+  assert.deepEqual([moved.box.left, moved.box.top, moved.h], [300, 352, 36], 'moved back into the photo');
+  // A line the cut goes through stays as first read, and the scrap of it read again does not come twice
+  const cut = joinReadings(
+    plugin([
+      ['Huhn in Gelee', 60, 100],
+      ['Zusammensetzung Fleisch', 20, 300],
+    ]),
+    plugin([
+      ['Huhn in Gelee', 60, 50],
+      ['Zusammense', 10, 250],
+    ]),
+    {left: 0, top: 50, right: 800, bottom: 310, scale: 1},
+  );
+  assert.deepEqual(cut.lines.map(l => l.text).sort(), ['Huhn in Gelee', 'Zusammensetzung Fleisch']);
+});
+
 test('packaging photos: the size of a photo, straight from its header', () => {
   const segment = (marker, body) => [0xff, marker, (body.length + 2) >> 8, (body.length + 2) & 255, ...body];
   const jpeg = (...parts) => Buffer.from([0xff, 0xd8, ...parts.flat()]).toString('base64');
@@ -319,10 +369,19 @@ const fixtures = () =>
     .sort()
     .map(name => ({name, ...JSON.parse(readFileSync(new URL(name, FIXTURES), 'utf8'))}));
 
+/* A fixture's reading as the app has it: the first one, with the second laid over it where the fixture has one
+   and `again` asks for it */
+function readingIn(f, again) {
+  const first = readingOf(f.result, f.width, f.height);
+  if (!again || !f.second) return first;
+  const {crop, scale, width, height, result} = f.second;
+  return joinReadings(first, readingOf(result, width, height), {...crop, scale});
+}
+
 /* What the app makes of one fixture, and where that differs from what was expected: {field: what came out} */
-function misses(f) {
+function misses(f, again) {
   const products = f.products || [],
-    read = readingOf(f.result, f.width, f.height);
+    read = readingIn(f, again);
   const got = readPack(read, products),
     chips = packLines(read, '', products),
     want = f.expected;
@@ -342,12 +401,17 @@ test('packaging photos: the fixtures from real readings, with the hit rate', t =
     assert.ok(ok(f.expected?.brand) && ok(f.expected?.variety), `${f.name}: brand and variety are filled in`);
     assert.ok(f.width > 0 && f.height > 0 && Array.isArray(f.result?.blocks), `${f.name}: the size and the answer`);
   }
-  const rows = all.map(f => ({f, miss: misses(f)}));
-  const count = pick => `${rows.filter(r => pick(r.miss)).length}/${rows.length}`;
-  t.diagnostic(
-    `OCR fixtures: brand ${count(m => !('brand' in m))}, variety ${count(m => !('variety' in m))}, ` +
-      `both ${count(m => !('brand' in m) && !('variety' in m))}`,
-  );
+  const rate = again => {
+    const rows = all.map(f => ({f, miss: misses(f, again)}));
+    const count = pick => `${rows.filter(r => pick(r.miss)).length}/${rows.length}`;
+    const brand = m => !('brand' in m),
+      variety = m => !('variety' in m);
+    return {rows, said: `brand ${count(brand)}, variety ${count(variety)}, both ${count(m => brand(m) && variety(m))}`};
+  };
+  const {rows, said} = rate(SECOND_PASS); // as the app reads now
+  t.diagnostic(`OCR fixtures: ${said}`);
+  if (all.some(f => f.second))
+    t.diagnostic(`  ${SECOND_PASS ? 'without' : 'with'} the second reading: ${rate(!SECOND_PASS).said}`);
   for (const {f, miss} of rows)
     if (Object.keys(miss).length)
       t.diagnostic(`  ${f.name}${f.expected.locked ? ' (locked)' : ''}: ${JSON.stringify(miss)}`);

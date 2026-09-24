@@ -30,8 +30,9 @@ SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 
 # (= an app restart); shared files in the CACHE live there too, so tests can read their contents. rename replaces
 # the target as it does on Linux. Calls end up in window.__calls.
 # A file from another app (content://…) is served by convertFileSrc out of the simulated file system.
-# Text recognition answers with window.__ocrResult (the plugin's whole answer, as in tests/fixtures/ocr) or, without
-# it, with window.__ocrText and no blocks, after window.__ocrDelay ms; window.__ocrError makes it fail.
+# Text recognition answers with the next of window.__ocrQueue, otherwise with window.__ocrResult (the plugin's whole
+# answer, as in tests/fixtures/ocr) or, without it, with window.__ocrText and no blocks, after window.__ocrDelay ms;
+# window.__ocrError makes it fail. The photos it was given collect in window.__ocrPhotos (base64).
 # Deep links: window.__urlOpen({url}) fires appUrlOpen; if sessionStorage.__launchUrl is set at load time, the
 # event arrives right after the listener registers, as on a cold start (Capacitor holds it back). Our own photo
 # plugin returns window.__photo (base64) or rejects when it is missing. The barcode scanner (scan() only, as in the
@@ -104,9 +105,10 @@ window.Capacitor = {isNativePlatform: () => true,
       if (window.__scanError) return Promise.reject(new Error(window.__scanError));
       return c ? Promise.resolve({barcodes: [{rawValue: c, format: c.length === 12 ? 'UPC_A' : 'EAN_13'}]}) : Promise.reject(new Error('scan canceled.')); }},
   TextRecognition: {processImage: o => { window.__calls.push(['processImage', o ?? null]);
+    (window.__ocrPhotos ||= []).push(localStorage.getItem(key(String(o?.path).split('/').pop())));
     if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
-    return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1;
-      done(window.__ocrResult || {text: window.__ocrText || '', blocks: []}); }, window.__ocrDelay || 0)); }},
+    const answer = window.__ocrQueue?.shift() || window.__ocrResult || {text: window.__ocrText || '', blocks: []};
+    return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done(answer); }, window.__ocrDelay || 0)); }},
   Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 

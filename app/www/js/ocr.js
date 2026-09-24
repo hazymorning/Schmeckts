@@ -31,6 +31,16 @@ const NEAR = 1.5;
 // (the product line above the flavour); a smaller one only with a flavour or a consistency („in Sauce“).
 const BESIDE = 0.5;
 
+/* The second reading (recognize.js): the part around the variety cut out, enlarged and read again, and its lines laid
+   over the first reading's. Off here, and the fixtures measure without it. */
+export const SECOND_PASS = true;
+export const SECOND_PASS_MS = 2000; // only after a first reading that took at most this long
+export const CROP_WIDTH = 1600; // the part is read at least this wide, in pixels
+const DOMINANT = 1.5; // something to look at closer: the variety's main line this many middle line heights at least
+const MARGIN = 0.25; // around the lines cut out, this share of their width and height
+const OVERLAP = 0.6; // a line of the second reading replaces one of the first where one covers more of the other
+const INSIDE = 0.9; // and only a line the part holds whole, so a line the cut goes through stays as first read
+
 const EMPTY = {brand: '', variety: '', type: '', animal: ''};
 const QUANTITY =
   /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
@@ -203,10 +213,7 @@ function foodType(raw) {
    carry a flavour or a consistency join it (the product line above the flavour, „in Sauce“ below it), and the
    brand does not. From plain text the keywords decide, and the other lines with one join. */
 function pickVariety(page, brand, products) {
-  const lines = usable(page, norm(brand), products).map((l, i) => {
-    const s = score(l.text) - Math.min(1, i * 0.2);
-    return {...l, i, s, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid)};
-  });
+  const lines = scored(page, brand, products);
   const ranked = lines.filter(x => x.p > 0).sort((a, b) => b.p - a.p);
   if (!ranked.length) return '';
   const main = ranked[0],
@@ -228,6 +235,12 @@ function pickVariety(page, brand, products) {
     }
   return joined(take).slice(0, MAX_VARIETY).trim();
 }
+/* The usable lines with their keyword score (s) and prominence (p), and their place in reading order (i) */
+const scored = (page, brand, products) =>
+  usable(page, norm(brand), products).map((l, i) => {
+    const s = score(l.text) - Math.min(1, i * 0.2);
+    return {...l, i, s, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid)};
+  });
 const joined = lines =>
   [...lines]
     .sort((a, b) => a.i - b.i)
@@ -267,6 +280,70 @@ export function packLines(read, bare = '', products = []) {
   const keep = new Set([...lines].sort((a, b) => b.h - a.h).slice(0, PACK_LINES));
   return lines.filter(l => keep.has(l)).map(l => l.text);
 }
+
+/* Where to read a second time: around the variety's main line and the lines right above and below it, with MARGIN
+   on every side, within the photo; {left, top, right, bottom} in its pixels. null when nothing stands out, that is
+   when the main line is not DOMINANT times the middle line height, and for plain text. */
+export function focusOf(read, products = []) {
+  const page = pageOf(read, products);
+  if (!page.geo) return null;
+  const raw = page.lines.map(l => l.text).join('\n');
+  const main = scored(page, pickBrand(page, raw, products), products)
+    .filter(x => x.p > 0)
+    .sort((a, b) => b.p - a.p)[0];
+  if (!main || main.h < DOMINANT * page.mid) return null;
+  const across = l => Math.min(l.box.right, main.box.right) > Math.max(l.box.left, main.box.left);
+  const above = page.lines.filter(l => l.cy < main.box.top && across(l)).sort((a, b) => b.cy - a.cy)[0];
+  const below = page.lines.filter(l => l.cy > main.box.bottom && across(l)).sort((a, b) => a.cy - b.cy)[0];
+  const lines = [main, above, below].filter(Boolean);
+  const box = {
+    left: Math.min(...lines.map(l => l.box.left)),
+    top: Math.min(...lines.map(l => l.box.top)),
+    right: Math.max(...lines.map(l => l.box.right)),
+    bottom: Math.max(...lines.map(l => l.box.bottom)),
+  };
+  const [dx, dy] = [MARGIN * (box.right - box.left), MARGIN * (box.bottom - box.top)];
+  const width = read.width || Math.max(...page.lines.map(l => l.box.right)),
+    height = read.height || Math.max(...page.lines.map(l => l.box.bottom));
+  return {
+    left: Math.max(0, Math.floor(box.left - dx)),
+    top: Math.max(0, Math.floor(box.top - dy)),
+    right: Math.min(width, Math.ceil(box.right + dx)),
+    bottom: Math.min(height, Math.ceil(box.bottom + dy)),
+  };
+}
+
+/* The second reading laid over the first: its lines, moved back into the photo (crop: the part, and the scale it was
+   enlarged by), replace the first reading's lines they overlap by more than OVERLAP, as long as the part holds those
+   whole; lines it read that are new join in (a „mit“, a „in Sauce“ too small the first time), lines already kept do
+   not come twice. */
+export function joinReadings(first, second, crop) {
+  const back = x => {
+    const [sx, sy] = [v => crop.left + v / crop.scale, v => crop.top + v / crop.scale];
+    const b = x.box;
+    return {
+      ...x,
+      box: {left: sx(b.left), top: sy(b.top), right: sx(b.right), bottom: sy(b.bottom)},
+      w: x.w / crop.scale,
+      h: x.h / crop.scale,
+      cx: sx(x.cx),
+      cy: sy(x.cy),
+    };
+  };
+  const moved = (second?.lines || []).map(l => ({...back(l), elements: (l.elements || []).map(back)}));
+  const within = l => shared(l.box, crop) >= INSIDE * area(l.box);
+  const kept = first.lines.filter(l => !(within(l) && moved.some(m => overlaps(l, m))));
+  return {...first, lines: [...kept, ...moved.filter(m => !kept.some(l => overlaps(l, m)))]};
+}
+const area = b => Math.max(0, b.right - b.left) * Math.max(0, b.bottom - b.top);
+const shared = (a, b) =>
+  area({
+    left: Math.max(a.left, b.left),
+    top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right),
+    bottom: Math.min(a.bottom, b.bottom),
+  });
+const overlaps = (a, b) => shared(a.box, b.box) > OVERLAP * Math.min(area(a.box), area(b.box));
 
 /* A line has to say something of its own: words like „mit“ alone, and a line that is nothing but promises, are
    no help while naming and only make the chips longer. */
