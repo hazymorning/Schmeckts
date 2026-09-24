@@ -31,6 +31,10 @@ const NEAR = 1.5;
 // A line near the variety and at least this share of the main line's height is part of the name, keyword or not
 // (the product line above the flavour); a smaller one only with a flavour or a consistency („in Sauce“).
 const BESIDE = 0.5;
+// A line the plugin read as neither German nor English weighs this much less as the variety, half of what keywords
+// can give („Poulet & Saumon“ beside „Huhn & Lachs“); it stays a chip. „und“ is the plugin's „undetermined“.
+const FOREIGN = 4;
+const OURS = new Set(['', 'und', 'de', 'en']);
 
 /* The second reading (recognize.js): the part around the variety cut out, enlarged and read again, and its lines laid
    over the first reading's. Off here, and the fixtures measure without it. */
@@ -252,7 +256,8 @@ function pickVariety(page, brand, products) {
 const scored = (page, brand, products) =>
   usable(page, norm(brand), products).map((l, i) => {
     const s = score(l.text) - Math.min(1, i * 0.2);
-    return {...l, i, s, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid)};
+    const foreign = OURS.has(String(l.lang || '').split('-')[0]) ? 0 : FOREIGN;
+    return {...l, i, s, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid) - foreign};
   });
 const joined = lines =>
   [...lines]
@@ -363,10 +368,17 @@ const overlaps = (a, b) => shared(a.box, b.box) > OVERLAP * Math.min(area(a.box)
 const SMALL = new Set(
   'und oder mit ohne in im am an auf aus bei fur von vor zu zum zur neu the and with for'.split(' '),
 );
-const CLAIMS =
-  /ohne (?:zusatz von )?(?:zucker|soja|getreide|gluten|farbstoffe|konservierungsstoffe|k(?:ü|ue)nstliche[a-zäöüß]*)|(?:zucker|getreide|gluten)frei/gi;
+/* A promise: „ohne“, up to two words, and what is left out („ohne Zusatz von Zucker“, the „tz v“ lost as well), or
+   „…frei“. Badges read as one line glue them together („ohne Sojaohne Zucker“), so where „ohne“ and a promise
+   follow a letter, they are taken apart first: „Bohne ohne Zucker“ stays what it is. */
+const LEFT_OUT = 'zucker|soja|getreide|gluten|farbstoffe|konservierungsstoffe|k(?:ü|ue)nstliche[a-zäöüß]*';
+const UP_TO_TWO = '(?:(?!ohne\\b)[\\p{L}-]+ ){0,2}';
+const CLAIMS = new RegExp(`ohne ${UP_TO_TWO}(?:${LEFT_OUT})|(?:zucker|getreide|gluten)frei`, 'giu');
+const GLUED = new RegExp(`(\\p{L})(ohne ?${UP_TO_TWO}(?:${LEFT_OUT}))`, 'giu'),
+  GLUED_AFTER = new RegExp(`\\bohne(?=${LEFT_OUT})`, 'giu');
+const unglued = v => v.replace(GLUED, '$1 $2').replace(GLUED_AFTER, 'ohne ');
 const says = v =>
-  !!v.replace(CLAIMS, ' ').trim() &&
+  !!unglued(v).replace(CLAIMS, ' ').trim() &&
   norm(v)
     .split(' ')
     .some(w => w.length >= 3 && !SMALL.has(w));
@@ -414,7 +426,7 @@ const COMMON = new Set(
 export function cleanText(text, products = []) {
   const raw = String(text || '')
     .split(/\r?\n/)
-    .map(unshout)
+    .map(line => unshout(line.replace(JOIN, '$1 $2 ')))
     .join('\n');
   const [brands, varieties] = [products.map(p => p?.brand), products.map(p => p?.variety)];
   const fixed = fixedWords(),
@@ -422,6 +434,7 @@ export function cleanText(text, products = []) {
   const spelling = w => fixed.listed.get(w) || own.spelling.get(w) || fixed.lexicon.spelling.get(w);
   return raw.replace(WORD, word => {
     const w = norm(word);
+    if (ONE_WORD_BRANDS.has(w)) return ONE_WORD_BRANDS.get(w); // „miamor“ off a logo is „Miamor“
     if (!w || w.includes(' ') || SMALL.has(w) || COMMON.has(w) || spelling(w)) return word;
     if (fixedNear.size > 20000) fixedNear.clear();
     if (!fixedNear.has(w)) fixedNear.set(w, near(fixed.lexicon, w));
@@ -430,6 +443,11 @@ export function cleanText(text, products = []) {
     return hits.size === 1 ? spelling([...hits][0]) : word;
   });
 }
+/* „&“, „+“ or „/“ between two words, however the plugin spaced it: „Huhn&Lachs“ → „Huhn & Lachs“ */
+const JOIN = /(\p{L})\s*([&+/])\s*(?=\p{L})/gu;
+/* The brands of one word on the list, in its spelling: a logo in small letters („miamor“) or shouting reads as the
+   brand is written. Only the list's: many of Open Pet Food Facts are ordinary words as well („Classic“, „Good“). */
+const ONE_WORD_BRANDS = new Map(BRANDS.filter(b => /^\p{L}+$/u.test(b)).map(b => [norm(b), b]));
 /* The words that do not change with the household, made on first use: listed, the spelling of the words of the
    brands on the list, which comes first; lexicon, those with the words of the brands of Open Pet Food Facts and of
    its product names. A brand's words count from MIN_BRAND letters on, like the brands themselves. */

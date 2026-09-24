@@ -2621,7 +2621,7 @@ async def test_pack_lines(browser, url):
     await idle(pg)
     chips, fields = await pg.evaluate(CHIPS), await pg.evaluate(FIELDS)
     check(
-        [c[0] for c in chips] == ['miamor', 'Ragout Royal', 'Huhn & Lachs', 'in Sauce']
+        [c[0] for c in chips] == ['Miamor', 'Ragout Royal', 'Huhn & Lachs', 'in Sauce']
         and fields == ['Miamor', 'Ragout Royal Huhn & Lachs in Sauce'],
         f'read by size and place: only the label as chips, and the variety from the largest line and what stands by it ({chips}, {fields})',
     )

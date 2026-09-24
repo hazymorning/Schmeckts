@@ -189,6 +189,39 @@ test('packaging text: the brands of Open Pet Food Facts count as brands too, aft
   assert.equal(readPack('Dia\nHuhn in Gelee').brand, '', 'nor one under four letters');
 });
 
+test('packaging text: „&“, „+“ and „/“ between two words stand between spaces, in plain text too', () => {
+  assert.deepEqual(packLines('HUHN &LACHS\nRind/Lamm\nEnte+Pute\nAdult 1+'), [
+    'Huhn & Lachs',
+    'Rind / Lamm',
+    'Ente + Pute',
+    'Adult 1+',
+  ]);
+  assert.equal(cleanText('Huhn & Lachs'), 'Huhn & Lachs', 'spaced already: left as it is');
+});
+
+test('packaging text: a shouting line is set in title case whatever stands between its words', () => {
+  assert.equal(cleanText('HUHN & LACHS 1+'), 'Huhn & Lachs 1+', '„&“ and figures are no letters');
+  assert.equal(cleanText('RIND 100 %'), 'Rind 100 %');
+});
+
+test('packaging text: promises glued together come apart, and a line of nothing but promises drops out', () => {
+  assert.deepEqual(packLines('ohne Sojaohne Zusaon Zucker\nohneSoja\nohne künstliche Farbstoffe\nHuhn ohne Zucker'), [
+    'Huhn ohne Zucker',
+  ]);
+  const bean = packLines('Lamm mit Bohne ohne Zucker');
+  assert.ok(bean.length === 1 && !/\bB ohne/.test(bean[0]), `„Bohne“ is no glued promise: ${bean}`);
+});
+
+test('packaging text: a brand read off a logo in small letters is written as on the list', () => {
+  assert.equal(readPack('miamor\nHuhn in Gelee').brand, 'Miamor');
+  assert.deepEqual(
+    packLines('miamor\nmjamjam\nHuhn in Gelee'),
+    ['Miamor', 'MjAMjAM', 'Huhn in Gelee'],
+    'the chips too',
+  );
+  assert.deepEqual(packLines('dein Bestes Rind'), ['dein Bestes Rind'], 'a brand of several words is also just words');
+});
+
 /* The plugin's answer for a few lines, one block each: [text, height, top, options]. The words stand side by side
    with a word space (a third of the height), or as given in words: [text, {gap, size}], a smaller word sitting on
    the line. tilt in radians, lang as the plugin names it. */
@@ -392,6 +425,20 @@ test('packaging photos: the part around the variety is read again, and laid over
     {left: 0, top: 50, right: 800, bottom: 310, scale: 1},
   );
   assert.deepEqual(cut.lines.map(l => l.text).sort(), ['Huhn in Gelee', 'Zusammensetzung Fleisch']);
+});
+
+test('packaging photos: a line in another language weighs less as the variety, and stays a chip', () => {
+  const read = plugin([
+    ['Pollo Rustico', 60, 100, {lang: 'it'}],
+    ['Senior Menü', 60, 700, {lang: 'de-DE'}],
+  ]);
+  assert.equal(readPack(read).variety, 'Senior Menü');
+  assert.equal(packLines(read).length, 2);
+  const same = plugin([
+    ['Pollo Rustico', 60, 100, {lang: 'und'}],
+    ['Senior Menü', 60, 700, {lang: 'de'}],
+  ]);
+  assert.notEqual(readPack(same).variety, 'Senior Menü', '„und“, no language named: no weight taken');
 });
 
 test('packaging photos: the size of a photo, straight from its header', () => {
