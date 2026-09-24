@@ -6,7 +6,7 @@ import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
-import {cropSquare, fileToImage, memPhotos, resize} from '../images.js';
+import {cropSquare, fileToImage, memPhotos, readable, resize} from '../images.js';
 import {keepPhoto} from '../photos.js';
 import {milestones} from '../smart.js';
 import {identify, memLines, photoByServer} from '../recognize.js';
@@ -146,7 +146,14 @@ export async function servePhoto(file, scanCode = '') {
     ),
     () => undoServe(s.id),
   );
-  recognizeServing(s.id); // recognize.js picks the source; in mode `lokal` the phone reads the text itself
+  // recognize.js picks the source. Where the phone reads the text itself, it reads it off the original with its long
+  // edge capped (READ_MAX), made once the meal is on screen and only for this first reading.
+  (local ? readable(img) : Promise.resolve(''))
+    .catch(e => {
+      report('the photo for reading', e);
+      return ''; // read off the 1100 px copy instead
+    })
+    .then(sharp => recognizeServing(s.id, sharp));
 }
 
 const running = new Set(); // recognitions in flight
@@ -159,7 +166,7 @@ export function retryNow(id) {
   recognizeServing(id);
 }
 
-async function recognizeServing(id) {
+async function recognizeServing(id, sharp = '') {
   const s = getServing(id);
   if (!s || running.has(id)) return;
   const b64 = memPhotos.get(id) || (s.photo || '').split(',')[1];
@@ -180,7 +187,7 @@ async function recognizeServing(id) {
   refreshServing(id);
   let found = {source: '', error: null};
   try {
-    found = await identify({code: s.scanCode || '', photo: b64, meal: id});
+    found = await identify({code: s.scanCode || '', photo: b64, sharp, meal: id});
   } catch (e) {
     report('recognition', e);
   }

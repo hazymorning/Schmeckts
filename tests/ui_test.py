@@ -2,6 +2,7 @@
 """Flows and interface of the app in Chromium, without a server, with simulated Android plugins.
 Usage: python3 tests/ui_test.py [name …] [--shots]   (--shots leaves screenshots in dist/test/)"""
 
+import asyncio
 import base64
 import json
 import re
@@ -12,6 +13,7 @@ from common import (
     BIG_TEXT,
     NATIVE,
     PACK,
+    PACK_LARGE,
     ROOT,
     SAVED,
     SHEBA,
@@ -2383,6 +2385,56 @@ async def test_recognize(browser, url):
     )
     kept = await state(pg, 'JSON.stringify([db, prefs, queue])')
     check('Zutaten: Fleisch' not in kept, 'the reading itself lives in memory only: it is in neither the data, the settings nor the queue')
+
+    # A camera's large photo: the phone reads the text at 2400 px, and keeps 1100 and 480 px as before
+    before = await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading().at)")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK_LARGE))
+    for _ in range(100):  # the reading is in memory beside the data, so state() and until() do not see it
+        if await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading().at)") > before:
+            break
+        await asyncio.sleep(0.1)
+    await idle(pg)
+    sizes = await pg.evaluate(
+        """Promise.all([import('./js/recognize.js'), import('./js/images.js'), import('./js/store.js'), import('./js/reading.js')])
+          .then(([r, i, s, g]) => { const meal = s.db.servings[0], wh = x => [x.width, x.height];
+            return [wh(r.lastReading()), wh(g.jpegSize(i.memPhotos.get(meal.id))), wh(g.jpegSize(meal.photo.split(',')[1]))]; })"""
+    )
+    check(
+        sizes == [[2400, 1800], [1100, 825], [480, 360]],
+        f'the text is read off the photo at 2400 px, what is kept stays at 1100 and 480 px ({sizes})',
+    )
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
+    # schmeckts://ocr-measure: every photo read at 1100 and 1800 px as well, the times shared with the fixture
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://ocr-measure'})")
+    await idle(pg)
+    switched = await pg.inner_text('#toast')
+    reads = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK_LARGE))
+    for _ in range(100):
+        if await pg.evaluate("import('./js/recognize.js').then(r => (r.timing.ms[1800] || []).length)"):
+            break
+        await asyncio.sleep(0.1)
+    await idle(pg)
+    _, fixture = await dump()
+    measured = {px: len(ms) for px, ms in (fixture or {}).get('timings', {}).items()}
+    more = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length") - reads
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://ocr-measure'})")
+    await idle(pg)
+    check(
+        switched == 'Lesezeiten werden gemessen.'
+        and measured == {'1100': 1, '1800': 1, '2400': 1}
+        and more == 3
+        and await pg.inner_text('#toast') == 'Lesezeiten werden nicht mehr gemessen.',
+        f'schmeckts://ocr-measure: the photo read at 1100, 1800 and 2400 px, the times in the fixture ({measured}, {more} readings)',
+    )
+    await pg.click('[data-action=close]')
+    await idle(pg)
     # The same packaging again: our own variety is recognised, spelled differently too
     await pg.evaluate("window.__ocrText = 'SHEBA  selection-in-sauce mit LACHS 85g'")
     got = await ident(photo='AAA')
@@ -3037,7 +3089,10 @@ async def test_camera(browser, url):
         shutter: r(d.querySelector('.shutter')), cancel: d.querySelector('[data-cam=cancel]').innerText, scheme: getComputedStyle(d).colorScheme, btns: d.querySelectorAll('button').length}; }"""
     LIVE = "navigator.mediaDevices.__streams.filter(s => s.getTracks().some(t => t.readyState === 'live')).length"
     SPY = """(() => { const md = navigator.mediaDevices, orig = md.getUserMedia.bind(md); md.__streams = []; md.__asked = [];
-      md.getUserMedia = c => { md.__asked.push(c); return window.__denyCamera ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : orig(c).then(s => (md.__streams.push(s), s)); }; })()"""
+      md.getUserMedia = c => { md.__asked.push(c); return window.__denyCamera ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : orig(c).then(s => (md.__streams.push(s), s)); };
+      const take = ImageCapture.prototype.takePhoto; window.__stills = [];   // the fake camera takes a still of 1920 x 1080 at most
+      ImageCapture.prototype.takePhoto = function (o) { window.__stills.push(o ?? null);
+        return window.__stillFails ? Promise.reject(new DOMException('Camera busy', 'UnknownError')) : take.call(this, o); }; })()"""
     ctx = await phone(browser, permissions=['camera'])
     pg, errors = await open_page(ctx, url, native=True)
     await pg.evaluate(SPY)
@@ -3083,6 +3138,13 @@ async def test_camera(browser, url):
     check(
         after[:3] == [False, 'serving', 'name'] and s == [1, 'noserver', 'data:image/jpeg;base64,', True] and await pg.evaluate(LIVE) == 0,
         f'the shutter takes the picture at once, without a confirmation: served, shrunk, on to naming; and the camera is released ({after}, {s})',
+    )
+    await until(pg, 'db.servings[0].status === "noserver"')
+    read = await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading() && [r.lastReading().width, r.lastReading().height])")
+    stills = await pg.evaluate('window.__stills')
+    check(
+        stills == [{'imageWidth': 1920}] and read == [1920, 1080],
+        f'the photo comes from the sensor as close to 2400 px as the camera offers, and the phone reads its text at that size ({stills}, {read})',
     )
     await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeSheet())")
     await idle(pg)
@@ -3136,10 +3198,15 @@ async def test_camera(browser, url):
     await pg.wait_for_function("document.querySelector('#camera video').videoWidth > 0")
     await idle(pg)
     check((await pg.evaluate(CAM))['open'], 'the shortcut and schmeckts://photo open our own camera')
+    await pg.evaluate('window.__stillFails = true')
     await pg.click('#camera .shutter')
     await pg.wait_for_selector('#sheet #f-brand')
     await idle(pg)
-    check(await state(pg, 'db.servings.length') == 3, 'and serve once the shutter is pressed')
+    check(
+        await state(pg, "db.servings.length === 3 && db.servings[0].photo?.startsWith('data:image/jpeg')") and await pg.evaluate(LIVE) == 0,
+        'and serve once the shutter is pressed; when the sensor will not give a photo, the frame on screen does',
+    )
+    await pg.evaluate('window.__stillFails = false')
     await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeSheet())")
     await idle(pg)
     # Fallback: permission denied → the camera app through the photo plugin

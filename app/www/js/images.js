@@ -1,6 +1,36 @@
 /* Reading, shrinking and cropping photos. */
 export const memPhotos = new Map(); // large photos in memory only, for recognition
 
+/* The photo the phone reads the text off: the original, its long edge capped. ML Kit wants 16 px a letter, and at
+   the 1100 px of memPhotos the small print („mit“, „in Sauce“) has less. How long reading takes: PROJECT.md. */
+export const READ_MAX = 2400;
+const READ_QUALITY = 0.9;
+/* That photo as base64 (READ_MAX, or max for measuring). At this size a JPEG takes a moment to encode, which
+   toBlob does off the main thread. */
+export function readable(img, max = READ_MAX) {
+  const s = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * s);
+  c.height = Math.round(img.height * s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return new Promise((done, fail) =>
+    c.toBlob(b => (b ? done(b) : fail(new Error('JPEG not encoded'))), 'image/jpeg', READ_QUALITY),
+  ).then(
+    b =>
+      new Promise((done, fail) => {
+        const r = new FileReader();
+        r.onload = () => done(String(r.result).split(',')[1]);
+        r.onerror = () => fail(r.error);
+        r.readAsDataURL(b);
+      }),
+  );
+}
+/* A photo given as base64 back as an image */
+export const photoOf = b64 =>
+  fetch('data:image/jpeg;base64,' + b64)
+    .then(r => r.blob())
+    .then(fileToImage);
+
 export function fileToImage(file) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file),

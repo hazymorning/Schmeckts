@@ -21,6 +21,7 @@ SHOTS = ROOT / 'dist/test' if '--shots' in sys.argv else None
 
 
 PACK = ROOT / 'dist/test/package.jpg'  # created at start-up
+PACK_LARGE = ROOT / 'dist/test/package-large.jpg'  # the same, as a camera's photo of 3000 x 2250
 
 
 SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 0036000291452
@@ -324,6 +325,7 @@ def make_photo():
     im = Image.new('RGB', (480, 360), (214, 120, 60))
     ImageDraw.Draw(im).rectangle((60, 90, 420, 270), fill=(250, 240, 225))
     im.save(PACK, quality=70)
+    im.resize((3000, 2250)).save(PACK_LARGE, quality=70)
 
 
 _pictures = []

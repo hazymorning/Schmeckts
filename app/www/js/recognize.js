@@ -6,6 +6,7 @@
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhoto} from './native.js';
+import {photoOf, READ_MAX, readable} from './images.js';
 import {packLines, readPack} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
@@ -38,8 +39,9 @@ const STEPS = [
     name: 'text',
     when: o => !!o.photo,
     run: async o => {
-      const read = await readPhoto(o.photo);
+      const read = await readPhoto(o.sharp || o.photo);
       if (read.raw) last = {meal: o.meal, at: Date.now(), ...read};
+      if (timing.on && o.sharp) await measure(o, read);
       const hit = asDetails(readPack(read, db.products));
       // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
       return hit && {...hit, lines: packLines(read, '', db.products)};
@@ -61,10 +63,25 @@ export const memLines = new Map();
 let last = null;
 export const lastReading = () => last;
 
-/* code: the scanned barcode, photo: the photo as base64, meal: the meal it is for, note: a short notice for the
-   interface. Returns {source, products|details} or {source:'', error}; the form then stays empty. */
-export async function identify({code = '', photo = '', meal = '', note = () => {}} = {}) {
-  const o = {code, photo, meal};
+/* How long the plugin takes by the size of the photo, for choosing READ_MAX (PROJECT.md): schmeckts://ocr-measure
+   switches it on for as long as the app runs, and every photo is then read at 1100 and 1800 px as well. Written to
+   the console and shared with schmeckts://ocr-dump, never stored. ms: {px: [milliseconds]} */
+export const timing = {on: false, ms: {}};
+async function measure(o, read) {
+  const took = (px, ms) => {
+    (timing.ms[px] ||= []).push(ms);
+    console.info(`reading at ${px} px: ${ms} ms`); // the measurement is what this is for, so it goes to the console
+  };
+  took(Math.max(read.width, read.height), read.ms);
+  const img = await photoOf(o.sharp);
+  for (const px of [1100, 1800].filter(n => n < READ_MAX)) took(px, (await readPhoto(await readable(img, px))).ms);
+}
+
+/* code: the scanned barcode, photo: the photo as base64, sharp: the same photo larger for reading its text on the
+   phone (images.js, READ_MAX), meal: the meal it is for, note: a short notice for the interface.
+   Returns {source, products|details} or {source:'', error}; the form then stays empty. */
+export async function identify({code = '', photo = '', sharp = '', meal = '', note = () => {}} = {}) {
+  const o = {code, photo, sharp, meal};
   let error = null;
   for (const step of STEPS) {
     if (!step.when(o)) continue;

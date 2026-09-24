@@ -8,7 +8,7 @@ import {db, defaults, prefs, purge, replaceDb, save, savePrefs, tidy} from '../s
 import {isConnected} from '../sync.js';
 import {getProduct, getServing, petMap} from '../derive.js';
 import {sweepPhotos} from '../photos.js';
-import {lastReading} from '../recognize.js';
+import {lastReading, timing} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
@@ -83,6 +83,7 @@ export async function exportReading() {
     width: r.width,
     height: r.height,
     ms: r.ms,
+    ...(timing.on ? {timings: timing.ms} : {}), // milliseconds per reading by the long edge (schmeckts://ocr-measure)
     expected: {
       brand: p ? p.brand || '' : null, // null: not named yet, a person fills it in
       variety: p ? p.variety || '' : null,
