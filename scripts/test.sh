@@ -30,7 +30,11 @@ for suite in "${SUITES[@]}"; do
         echo "Note: Go is missing, the server tests were skipped (scripts/setup-build-env.sh installs Go)."
       fi
       ;;
-    node) node --test --test-reporter=dot "$ROOT"/tests/*.test.js ;;
+    node)
+      # dots, and what the tests have to say about themselves (the hit rate of the text recognition, tests/notes.js)
+      node --test --test-reporter=dot --test-reporter-destination=stdout \
+        --test-reporter="$ROOT/tests/notes.js" --test-reporter-destination=stdout "$ROOT"/tests/*.test.js
+      ;;
     sync)
       if [ -n "$GO" ]; then
         PATH="$PATH:$(dirname "$GO")" python3 "$ROOT/tests/sync_test.py"

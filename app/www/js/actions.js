@@ -8,6 +8,7 @@ import {db, prefs, save, savePrefs} from './store.js';
 import {checkServer, disconnect, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
 import {forgetPhoto, photoSrc} from './photos.js';
+import {timing} from './recognize.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
@@ -21,7 +22,7 @@ import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
 import {closeCrop, deletePet, editing, openPet, petState, savePet, setPetPhoto} from './logic/pets.js';
-import {exportData, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
+import {exportData, exportReading, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 
 /* Connecting to the household: check address, protocol and code first, then remove the sample data and sync */
@@ -413,7 +414,9 @@ const ACTIONS = {
 
 /* Deep links and app shortcuts: schmeckts://feed opens the feeding sheet, schmeckts://scan starts the scanner in it
    (logic/scan.js), schmeckts://photo our own camera (shootPhoto in logic/feeding.js). The German names from before
-   the move to English keep working: they sit in people's shortcuts. After „Abbrechen“ the feeding sheet stays open. */
+   the move to English keep working: they sit in people's shortcuts. After „Abbrechen“ the feeding sheet stays open.
+   schmeckts://ocr-dump is for collecting test fixtures and shares the last text read off a photo (logic/data.js),
+   schmeckts://ocr-measure switches the measuring of how long reading takes on and off (recognize.js). */
 const LINKS = {feed: null, fuettern: null, scan, photo: shootPhoto, foto: shootPhoto};
 export async function openLink(url) {
   const raw = String(url || '');
@@ -425,6 +428,15 @@ export async function openLink(url) {
     .replace(/^schmeckts:\/*/i, '')
     .replace(/[/?#].*$/, '')
     .toLowerCase();
+  if (path === 'ocr-dump') {
+    await exportReading();
+    return true;
+  }
+  if (path === 'ocr-measure') {
+    timing.on = !timing.on;
+    toast(timing.on ? 'Lesezeiten werden gemessen.' : 'Lesezeiten werden nicht mehr gemessen.');
+    return true;
+  }
   if (!(path in LINKS)) return false;
   if (!db.pets.length) {
     openSheet({kind: 'pet', ...petState(null)});

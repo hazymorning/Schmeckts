@@ -22,7 +22,7 @@ export default [
     rules,
   },
   {
-    files: ['tests/**/*.test.js'],
+    files: ['tests/**/*.test.js', 'tests/notes.js'],
     languageOptions: {ecmaVersion: 2024, sourceType: 'module', globals: {...globals.node, ...globals.nodeBuiltin}},
     linterOptions: {reportUnusedDisableDirectives: 'error'},
     rules,
