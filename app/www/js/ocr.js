@@ -23,16 +23,18 @@ const TILT = 0.15;
 // Share of the middle line height. Below it is small print or noise: ML Kit wants 16 px a letter, and at 1100 px a
 // photo's small print has less.
 const SMALL_PRINT = 0.4;
-// Heights within a quarter of each other count as alike: only among such lines do the keywords decide the variety.
+// Heights within a quarter of each other count as alike: between two lines with the same keywords only one more
+// than this much taller wins by its size, and among lines without a keyword it outweighs what the length gives.
 const LIKE = 1.25;
-const HEIGHT_WEIGHT = 8 / Math.log(LIKE); // a line LIKE times taller outweighs every keyword score() gives (8 at most)
+const HEIGHT_WEIGHT = 8 / Math.log(LIKE);
 // Lines at most this many heights of the main line away from the variety belong to the same label.
 const NEAR = 1.5;
 // A line near the variety and at least this share of the main line's height is part of the name, keyword or not
 // (the product line above the flavour); a smaller one only with a flavour or a consistency („in Sauce“).
 const BESIDE = 0.5;
-// A line the plugin read as neither German nor English weighs this much less as the variety, half of what keywords
-// can give („Poulet & Saumon“ beside „Huhn & Lachs“); it stays a chip. „und“ is the plugin's „undetermined“.
+// A line the plugin read as neither German nor English comes after one in our languages with the same keywords
+// („Poulet & Saumon“ beside „Huhn & Lachs“) and weighs this much less among lines without any; it stays a chip.
+// „und“ is the plugin's „undetermined“.
 const FOREIGN = 4;
 const OURS = new Set(['', 'und', 'de', 'en']);
 
@@ -51,8 +53,10 @@ const QUANTITY =
   /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
 const JUNK =
   /zutaten|zusammensetzung|analytische|bestandteile|inhaltsstoff|rohprotein|rohfett|rohasche|feuchtigkeit|vitamin|zusatzstoff|alleinfutter|ergänzungsfutter|haltbar|füllmenge|gmbh|www\.|@|\bean\b/i;
-const ADS =
-  /^(?:neu|new|jetzt|jetzt neu|gratis|aktion|vorteilspack|sparpack|premium|qualität|natürlich|frisch|lecker|100\s*%\s*natürlich|ohne zucker)$|^\d+\s*%/i;
+const AD_WORDS = 'neu new jetzt gratis aktion vorteilspack sparpack premium qualität natürlich frisch lecker'.split(
+  ' ',
+);
+const ADS = new RegExp(`^(?:${AD_WORDS.join('|')}|jetzt neu|100\\s*%\\s*natürlich|ohne zucker)$|^\\d+\\s*%`, 'i');
 const squeeze = s => norm(s).replace(/ /g, ''); // insensitive to case, hyphens and spaces
 const has = (text, re) => re.test(text);
 
@@ -182,20 +186,26 @@ const holdsKnown = (v, products) => {
 };
 
 /* Brand: a hit from brandsOf() on whole words. From the plugin a hit in one of the two largest lines or in the top
-   third of the photo comes first, where the logo stands. After that, and in plain text, a brand from the list or of
-   our own varieties before one only Open Pet Food Facts knows (its list holds words like „Katzenfutter“ as well),
-   then the longest. */
+   third of the photo comes first, where the logo stands, and a brand only Open Pet Food Facts knows counts only in
+   one of the two largest lines: its list holds ordinary words as well („Classic“ of „CLASSIC ADULT“ in small
+   print). After that, and in plain text, a brand from the list or of our own varieties before one only Open Pet
+   Food Facts knows („Katzenfutter“ is none), then the longest. */
 function pickBrand(page, raw, products) {
   const flat = ` ${norm(raw)} `;
   const hits = brandsOf(products).filter(b => flat.includes(` ${b.key} `));
   const order = (x, y) => x.vocab - y.vocab || y.key.length - x.key.length;
-  if (hits.length < 2 || !page.geo) return hits.sort(order)[0]?.name || '';
+  if (!page.geo) return hits.sort(order)[0]?.name || '';
   const big = [...page.lines].sort((a, b) => b.h - a.h).slice(0, 2);
   const rank = b => {
     const at = page.lines.filter(l => ` ${norm(l.text)} `.includes(` ${b.key} `));
     return (at.some(l => big.includes(l)) ? 2 : 0) + (at.some(l => l.cy < page.height / 3) ? 1 : 0);
   };
-  return hits.map(b => ({...b, r: rank(b)})).sort((x, y) => y.r - x.r || order(x, y))[0].name;
+  return (
+    hits
+      .map(b => ({...b, r: rank(b)}))
+      .filter(b => !b.vocab || b.r >= 2)
+      .sort((x, y) => y.r - x.r || order(x, y))[0]?.name || ''
+  );
 }
 
 /* Every brand that may be read off a packaging: the list, the brands of our own varieties, then those of Open Pet
@@ -224,17 +234,15 @@ function foodType(raw) {
   return Object.entries(TEXTURES).find(([, t]) => t.items.some(([, , re]) => re.test(raw)))?.[0] || '';
 }
 
-/* Variety: the most prominent line and what belongs to it, at most MAX_VARIETY characters, joined in the order
-   they stand on the packaging. From the plugin prominent means large (the height against the middle line height),
-   and the keywords only decide between lines of about the same height; lines near it that are large as well or
-   carry a flavour or a consistency join it (the product line above the flavour, „in Sauce“ below it), and the
-   brand does not. From plain text the keywords decide, and the other lines with one join. */
+/* Variety: the main line (mainOf()) and what belongs to it, at most MAX_VARIETY characters, joined in the order
+   they stand on the packaging. From the plugin, lines near it join it when they are at least half as tall (the
+   product line above the flavour) or carry a flavour or a consistency („in Sauce“ below it); the brand does not.
+   From plain text the other lines with a keyword join. */
 function pickVariety(page, brand, products) {
   const lines = scored(page, brand, products);
-  const ranked = lines.filter(x => x.p > 0).sort((a, b) => b.p - a.p);
-  if (!ranked.length) return '';
-  const main = ranked[0],
-    take = [main];
+  const main = mainOf(lines);
+  if (!main) return '';
+  const take = [main];
   const fits = x => joined([...take, x]).length <= MAX_VARIETY;
   if (page.geo) {
     const kin = lines.filter(x => x !== main && (x.h >= BESIDE * main.h || flavourOrTexture(x.text)));
@@ -246,44 +254,74 @@ function pickVariety(page, brand, products) {
       take.push(next);
     }
   } else
-    for (const x of ranked.slice(1)) {
+    for (const x of lines.filter(y => y !== main).sort((a, b) => b.s - a.s)) {
       if (x.s < 1 || !fits(x)) break;
       take.push(x);
     }
-  return joined(take).slice(0, MAX_VARIETY).trim();
+  return cut(joined(take));
 }
-/* The usable lines with their keyword score (s) and prominence (p), and their place in reading order (i) */
+/* The variety's main line: the one whose keywords say most (keywords()), since the largest print on a packaging is
+   as often the logo, a product line or a slogan as the flavour. Between lines with the same keywords one in our
+   languages comes first, then one more than LIKE times taller than the others, then the one standing first, as
+   the name stands above what is said about it („Mit Rind und Huhn schmeckt es jeder Katze“). Without any keyword
+   the most prominent line (p), which from the plugin is the largest. */
+function mainOf(lines) {
+  let pool = lines.filter(x => x.k > 0);
+  if (!pool.length) return lines.filter(x => x.p > 0).sort((a, b) => b.p - a.p)[0];
+  const most = (xs, f) => xs.filter(x => f(x) === Math.max(...xs.map(f)));
+  pool = most(
+    most(pool, x => x.k),
+    x => -x.foreign,
+  );
+  const tallest = Math.max(...pool.map(x => x.h));
+  return pool.filter(x => x.h * LIKE >= tallest).sort((a, b) => a.i - b.i)[0];
+}
+/* The usable lines with what their keywords say (k), their score with the length (s), whether the plugin read them
+   in another language (foreign), their prominence (p) and their place in reading order (i) */
 const scored = (page, brand, products) =>
   usable(page, norm(brand), products).map((l, i) => {
-    const s = score(l.text) - Math.min(1, i * 0.2);
-    const foreign = OURS.has(String(l.lang || '').split('-')[0]) ? 0 : FOREIGN;
-    return {...l, i, s, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid) - foreign};
+    const k = keywords(l.text),
+      s = k + Math.min(2, l.text.length / 12) - Math.min(1, i * 0.2),
+      foreign = OURS.has(String(l.lang || '').split('-')[0]) ? 0 : 1;
+    return {...l, i, k, s, foreign, p: s + HEIGHT_WEIGHT * Math.log(l.h / page.mid) - FOREIGN * foreign};
   });
+/* The lines of the variety in the order they stand, a small word opening a later one in small letters („in Sauce“) */
 const joined = lines =>
   [...lines]
     .sort((a, b) => a.i - b.i)
-    .map(l => l.text)
+    .map((l, n) => (n ? l.text.replace(/^\p{L}+/u, w => (SMALL.has(norm(w)) ? w.toLocaleLowerCase('de') : w)) : l.text))
     .join(' ');
+/* At most MAX_VARIETY characters: cut where a part in another language begins („ / “, „ | “), otherwise after a whole
+   word, and without a joining „&“ or „/“ or a small word („in“, „mit“) left at the end */
+function cut(v) {
+  if (v.length <= MAX_VARIETY) return v.trim();
+  const head = v.slice(0, MAX_VARIETY + 1),
+    part = Math.max(head.lastIndexOf(' / '), head.lastIndexOf(' | ')),
+    word = head.lastIndexOf(' ');
+  let out = part > 0 ? head.slice(0, part) : word > 0 ? head.slice(0, word) : v.slice(0, MAX_VARIETY);
+  const loose = /(?:[\s&+/|,·–-]+|\s(\p{L}+))$/u;
+  for (let end; (end = out.match(loose)) && (!end[1] || SMALL.has(norm(end[1])));) out = out.slice(0, end.index);
+  return out.trim();
+}
 
 /* The usable lines of what was read: without quantities, advertising, ingredients and bare numbers, none of them
    twice, in the order they stand on the packaging, each with its size and place. From the plugin also without
-   small print and slanted lines unless they hold something we know, and without a scrap of up to three letters
-   that is no word right before the largest line. `bare` is the normalised brand, which is dropped from the front
-   of a line („Sheba Lachs in Soße“ → „Lachs in Soße“). */
+   small print and slanted lines unless they hold something we know. A line of three letters or fewer that is no
+   word we know drops out („4Uri“, a scrap of a badge). `bare` is the normalised brand, which is dropped from the
+   front of a line („Sheba Lachs in Soße“ → „Lachs in Soße“). */
 function usable(page, bare, products) {
   const seen = new Set(),
     out = [];
-  const largest = page.geo && page.lines.reduce((a, b) => (b.h > a.h ? b : a));
-  page.lines.forEach((l, i) => {
+  page.lines.forEach(l => {
     const v = withoutBrand(l.text.replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim(), bare).replace(
       /^[\s\-–,·|]+|[\s\-–,·|]+$/g,
       '',
     );
-    if (v.length < 3 || (v.match(/[A-Za-zÄÖÜäöüß]/g) || []).length < 3) return;
+    const letters = v.replace(/[^\p{L}]/gu, '');
+    if (letters.length < 3 || (letters.length === 3 && !page.words.has(norm(letters)))) return;
     if (JUNK.test(v) || ADS.test(v) || norm(v) === bare || seen.has(norm(v))) return;
     if (!says(v)) return;
     if (page.geo && noise(l, page) && !holdsKnown(v, products)) return;
-    if (page.geo && page.lines[i + 1] === largest && /^\p{L}{3}$/u.test(v) && !page.words.has(norm(v))) return;
     seen.add(norm(v));
     out.push({...l, text: v});
   });
@@ -306,9 +344,7 @@ export function focusOf(read, products = []) {
   const page = pageOf(read, products);
   if (!page.geo) return null;
   const raw = page.lines.map(l => l.text).join('\n');
-  const main = scored(page, pickBrand(page, raw, products), products)
-    .filter(x => x.p > 0)
-    .sort((a, b) => b.p - a.p)[0];
+  const main = mainOf(scored(page, pickBrand(page, raw, products), products));
   if (!main || main.h < DOMINANT * page.mid) return null;
   const across = l => Math.min(l.box.right, main.box.right) > Math.max(l.box.left, main.box.left);
   const above = page.lines.filter(l => l.cy < main.box.top && across(l)).sort((a, b) => b.cy - a.cy)[0];
@@ -404,13 +440,15 @@ function unshout(line) {
    letters and two from eight, and only when exactly one word is that close, so anything that could be two things
    stays as it was. A word put right takes the list's spelling before ours and ours before that of Open Pet Food
    Facts. Running it twice changes nothing more.
-   A word we know stays as it is, and so do the small words of COMMON and a word we know with another ending
-   („Sorte“ beside „Sorten“): against more than a thousand words, those are what would otherwise be put wrong
-   („das“ would become „Dan“, „sind“ „Rind“). */
+   A word we know stays as it is, and so do the small words of COMMON, the words of KEPT and a word we know with
+   another ending („Sorte“ beside „Sorten“): against more than a thousand words, those are what would otherwise be
+   put wrong („das“ would become „Dan“, „sind“ „Rind“, „frisch“ „Fisch“). */
 const MIN_FIX = 3;
 const WORD = new RegExp(`\\p{L}{${MIN_FIX},}`, 'gu');
 const SPREAD = 2; // only words at most this many letters longer or shorter are measured at all
 // Articles, pronouns, forms of „sein“ and „haben“, conjunctions and prepositions, German and English, normalised
+/* Words of advertising and of quantities, which the text is searched for anyway: „frisch“ must not become „Fisch“ */
+const KEPT = new Set([...AD_WORDS, 'stück', 'stücke'].map(norm));
 const COMMON = new Set(
   (
     'der die das den dem des ein eine einer eines einem einen kein keine keiner keines keinem keinen ist sind war ' +
@@ -426,7 +464,7 @@ const COMMON = new Set(
 export function cleanText(text, products = []) {
   const raw = String(text || '')
     .split(/\r?\n/)
-    .map(line => unshout(line.replace(JOIN, '$1 $2 ')))
+    .map(line => unshout(spaced(line)))
     .join('\n');
   const [brands, varieties] = [products.map(p => p?.brand), products.map(p => p?.variety)];
   const fixed = fixedWords(),
@@ -435,7 +473,7 @@ export function cleanText(text, products = []) {
   return raw.replace(WORD, word => {
     const w = norm(word);
     if (ONE_WORD_BRANDS.has(w)) return ONE_WORD_BRANDS.get(w); // „miamor“ off a logo is „Miamor“
-    if (!w || w.includes(' ') || SMALL.has(w) || COMMON.has(w) || spelling(w)) return word;
+    if (!w || w.includes(' ') || SMALL.has(w) || COMMON.has(w) || KEPT.has(w) || spelling(w)) return word;
     if (fixedNear.size > 20000) fixedNear.clear();
     if (!fixedNear.has(w)) fixedNear.set(w, near(fixed.lexicon, w));
     const hits = new Set([...fixedNear.get(w), ...near(own, w)]);
@@ -443,8 +481,23 @@ export function cleanText(text, products = []) {
     return hits.size === 1 ? spelling([...hits][0]) : word;
   });
 }
-/* „&“, „+“ or „/“ between two words, however the plugin spaced it: „Huhn&Lachs“ → „Huhn & Lachs“ */
+/* What the plugin ran together or misread in a way the letters alone do not put right: „&“, „+“ or „/“ between
+   two words however it spaced them („Huhn&Lachs“), a small word glued to the next („vonZucker“), a shouted word
+   glued to the next („TURKEYHuhn“), and „Mt“, the small „mit“ in script */
 const JOIN = /(\p{L})\s*([&+/])\s*(?=\p{L})/gu;
+const GLUE = 'von mit und oder ohne in im am an auf aus bei für vor zu zum zur'.split(' ');
+const GLUED_SMALL = new RegExp(
+  `(?<!\\p{L})(${GLUE.map(w => `[${w[0]}${w[0].toUpperCase()}]${w.slice(1)}`).join('|')})(?=\\p{Lu}\\p{Ll})`,
+  'gu',
+);
+const GLUED_CAPS = /(\p{Lu}{2,})(\p{Lu}\p{Ll})/gu;
+const MT = /(?<![\p{L}\p{N}])(?:Mt|mt|MT)(?![\p{L}\p{N}])/gu;
+const spaced = line =>
+  line
+    .replace(JOIN, '$1 $2 ')
+    .replace(GLUED_SMALL, '$1 ')
+    .replace(GLUED_CAPS, '$1 $2')
+    .replace(MT, m => (m === 'MT' ? 'MIT' : m[0] === 'M' ? 'Mit' : 'mit'));
 /* The brands of one word on the list, in its spelling: a logo in small letters („miamor“) or shouting reads as the
    brand is written. Only the list's: many of Open Pet Food Facts are ordinary words as well („Classic“, „Good“). */
 const ONE_WORD_BRANDS = new Map(BRANDS.filter(b => /^\p{L}+$/u.test(b)).map(b => [norm(b), b]));
@@ -454,11 +507,8 @@ const ONE_WORD_BRANDS = new Map(BRANDS.filter(b => /^\p{L}+$/u.test(b)).map(b =>
 let fixedOnce = null;
 function fixedWords() {
   if (fixedOnce) return fixedOnce;
-  const brands = brandsOf([]).map(b => b.name);
-  fixedOnce = {
-    listed: lexicon(wordsOf(MIN_BRAND, BRANDS)).spelling,
-    lexicon: lexicon([...wordsOf(MIN_BRAND, brands), ...wordsOf(MIN_FIX, VOCAB_WORDS)]),
-  };
+  const listed = wordsOf(MIN_BRAND, BRANDS);
+  fixedOnce = {listed: lexicon(listed).spelling, lexicon: lexicon([...listed, ...wordsOf(MIN_FIX, VOCAB_WORDS)])};
   return fixedOnce;
 }
 const fixedNear = new Map(); // what near() found among them, by word
@@ -527,8 +577,8 @@ function withoutBrand(v, bare) {
   }
   return v;
 }
-const score = v =>
+/* What the keywords of a line say about it being the variety: a flavour 3, a consistency 2, the type 1 */
+const keywords = v =>
   (FLAVORS.some(([, re]) => has(v, re)) ? 3 : 0) +
   (Object.values(TEXTURES).some(t => t.items.some(([, , re]) => has(v, re))) ? 2 : 0) +
-  (TYPE_WORDS.some(([, re]) => has(v, re)) ? 1 : 0) +
-  Math.min(2, v.length / 12);
+  (TYPE_WORDS.some(([, re]) => has(v, re)) ? 1 : 0);
