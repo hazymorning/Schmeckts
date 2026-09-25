@@ -55,8 +55,6 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
 
 ## Installieren
 
-Diese App gibt es nicht im Play Store, du lädst sie hier direkt herunter.
-
 <p align="center">
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/d12e5669-bdf4-4513-805b-bd4b8d16e2eb" width="292" alt="APK herunterladen"></a>
 </p>
