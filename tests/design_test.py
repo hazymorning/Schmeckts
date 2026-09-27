@@ -95,12 +95,22 @@ async def test_palette(browser, url):
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
         check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
-        got = await pg.evaluate(
-            "['top','gut','mittel','sosse','schlecht'].map(r => getComputedStyle(document.querySelector('.rb[data-r=' + r + '] .ic')).color)"
+        # The rating slider in the rating colours: its track from stop to stop, and the level above it
+        track, shown = await pg.evaluate(
+            """() => import('./js/ui/slider.js').then(async m => { const s = document.querySelector('.pend .slider'), shown = [];
+          const track = getComputedStyle(s.querySelector('.slider-track')).backgroundImage.match(/rgba?\\([^)]*\\)/g);
+          for (const r of ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht']) {
+            m.showLevel(s, r);
+            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))); // the ring's colour eases over
+            shown.push([getComputedStyle(s.querySelector('.rate-now .ic')).color, getComputedStyle(s.querySelector('.slider-thumb')).borderTopColor]); }
+          m.showLevel(s, null); return [track, shown]; })"""
         )
+        tones = ('--good', '--good', '--mid', '--mid', '--sauce', '--bad')
         check(
-            len(got) == 5 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, RATING[:1] + RATING)),
-            f'the rating buttons show the rating colours, „Sofort leer“ and „Später leer“ both --good ({theme})',
+            len(track) == 6
+            and all(near(g, PALETTE[r][k], 1) for g, r in zip(track, tones))
+            and all(near(icon, PALETTE[r][k], 1) and near(ring, PALETTE[r][k], 1) for (icon, ring), r in zip(shown, tones)),
+            f'the rating slider in the rating colours, track, level and thumb: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
@@ -376,12 +386,12 @@ def test_rules_static():
         frames and not loud,
         f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}',
     )
-    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask and
-    # the loading shimmer, a mask only in the mood picture
+    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask, the
+    # loading shimmer and the rating slider's track, a mask only in the mood picture
     shades = sorted({(sel, p) for sel, decls in css_rules(css['app.css']) for p, v in decls if 'gradient' in v or 'mask' in p})
     check(
-        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background')],
-        f'no fade at an edge: gradients only in .mood and .skel, a mask only in .mood ({shades})',
+        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background'), ('.slider-track', 'background')],
+        f'no fade at an edge: gradients only in .mood, .skel and the rating slider\u2019s track, a mask only in .mood ({shades})',
     )
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
     ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
@@ -394,7 +404,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .rate-now b, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -407,7 +417,6 @@ INSETS = {
     '.card-btn': '10px 0px',
     '.box': '12px',
     '.banner': '12px',
-    '.tile': '10px 0px 8px',
     '.btn': '12px 16px',
     '.field:not(.in-row, .pick .field, .search .field)': '12px 16px',
     '.chip': '8px 16px',
@@ -591,10 +600,15 @@ async def test_rules(browser, url):
         await scan()  # „Verlauf“
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
-        await pg.click('.pend .rb')
+        await pg.click('.pend .slider-bar button', force=True)  # the level's button takes no pointer: the click lands on the track there
         await pg.wait_for_selector('#toast [data-action=undo]')
         await idle(pg)
         await scan()  # a toast with „Rückgängig“
+        await pg.click('.tl [data-action=open-serving]')
+        await idle(pg)
+        await scan()  # the meal just rated: its level above the slider
+        await pg.click('[data-action=close]')
+        await idle(pg)
         await pg.click('[data-action=open-settings]')
         await idle(pg)
         await pg.click('#sheet [data-action=arm][data-then=wipe]')
@@ -620,7 +634,10 @@ async def test_rules(browser, url):
             not bad,
             f'Figtree everywhere and Faustina only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
         )
-        check(seen == set(FAUSTINA.split(', ')), f'Faustina on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
+        check(
+            seen == set(FAUSTINA.split(', ')),
+            f'Faustina on the wordmark, headings, day lines, percentages, counters, the level on the rating slider, initials ({sorted(seen)})',
+        )
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
 
@@ -1051,6 +1068,7 @@ SIZES = {
     '--icon-s': '20px',
     '--icon': '24px',
     '--icon-l': '32px',
+    '--icon-xl': '56px',
     '--icon-stroke': '1.8',
     '--icon-stroke-l': '1.4',
     '--tap-s': '44px',
@@ -1116,8 +1134,10 @@ GEOMETRY_ALLOWED = {
     '.shutter': 'the camera’s shutter, 78',
     '.crop': 'the crop stage, at most 340',
     '.toast': 'a toast is never wider than 520px',
+    '.slider-track': 'the rating slider\u2019s track, 8px thick',
+    '.slider-bar button::before': 'a stop on it, 4px',
 }
-ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
+ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)', 'var(--icon-xl)'}
 
 
 def test_layers_lines_sizes():
@@ -1182,7 +1202,6 @@ PADDING = {
     '.card-btn': 'var(--inset-row)',
     '.box': 'var(--inset-box)',
     '.banner': 'var(--inset-box)',
-    '.tile': 'var(--inset-tile)',
     '.btn': 'var(--inset-control)',
     '.field': 'var(--inset-control)',
     '.field.in-row': 'var(--inset-compact)',
@@ -1227,7 +1246,6 @@ def test_boxes():
                 '--inset-group',
                 '--inset-row',
                 '--inset-box',
-                '--inset-tile',
                 '--inset-control',
                 '--inset-compact',
                 '--inset-badge',
@@ -1361,7 +1379,7 @@ def test_ratings():
     go = (ROOT / 'server/overview.go').read_text(encoding='utf-8')
     names = re.search(r'var ratingNames = map\[string\]string\{(.*?)\n\}', go, re.S)
     server = dict(re.findall(r'"(\w+)":\s*"([^"]+)"', names.group(1) if names else ''))
-    check(len(app) == 13, f'RATINGS in config.js holds every level ({sorted(app)})')
+    check(len(app) == 14, f'RATINGS in config.js holds every level ({sorted(app)})')
     check(app == server, f'server/overview.go labels exactly those levels, with the same wording ({sorted(set(app.items()) ^ set(server.items()))})')
 
 

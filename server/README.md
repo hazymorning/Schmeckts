@@ -2,9 +2,10 @@
 
 Den Server brauchst du nur, wenn mehrere Menschen dasselbe Fütterungstagebuch führen wollen. Er ist ein kleines
 Programm für einen Rechner, der bei euch zu Hause läuft, und dafür reicht schon ein Mini-PC. Er verwaltet die
-gemeinsamen Daten, gibt Packungsfotos zur Erkennung weiter und schlägt Barcodes nach. Die gespeicherten Daten
-bleiben dabei bei euch, nach draußen gehen nur die Packungsfotos und die Barcode-Anfragen. [Die App](../README.md)
-läuft aber auch ohne ihn.
+gemeinsamen Daten, gibt Packungsfotos zur Erkennung weiter und schlägt Barcodes nach. Vor einer Erinnerung ans
+Füttern fragen die Handys bei ihm nach, ob schon jemand gefüttert hat. Die gespeicherten Daten bleiben dabei bei
+euch, nach draußen gehen nur die Packungsfotos und die Barcode-Anfragen. [Die App](../README.md) läuft aber auch
+ohne ihn.
 
 In diesem Ordner liegt alles, was dazugehört: das Go-Programm, `packaging/` für das Debian-Paket und
 `build-deb.sh`, mit dem es gebaut wird.

@@ -1,14 +1,15 @@
-/* Recurring building blocks of the views: avatars, thumbnails, rating buttons, sync status. */
+/* Recurring building blocks of the views: avatars, thumbnails, the rating slider, sync status. */
 import {esc} from '../text.js';
 import {ago, dayKey, dayLabel, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
-import {queue} from '../store.js';
+import {db, queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {rateCls, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {rateCls, rateTone, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
+import {levelHTML, sliderCls} from '../ui/slider.js';
 
 export function avatar(pet, cls = '') {
   if (!pet) return '';
@@ -42,18 +43,32 @@ export function nameBlock(s, p, inSheet = false) {
   const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
-/* Rating buttons: equally wide in one row, the variety's scale in its own order; an icon and two lines per button.
-   A stored level from another scale (the variety's type has changed) sits above them as a badge. */
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
-export function rateRow(s, pid) {
+/* The rating slider: the variety's scale on one track from the best level to the worst, in the levels' colours, with
+   a stop for each. Above it the level the thumb stands on; before a rating there is no thumb and it asks, and so it
+   does with a level stored from another scale (the type has changed), which it shows until one of its own replaces
+   it. Under it the two ends of the scale. The stops are the levels' buttons, for the keyboard and a screen reader;
+   a finger works the track (ui/slider.js). */
+export const scaleEnds = levels =>
+  `<p class="ends"><span>${RATINGS[levels[0]].label}</span><span>${RATINGS[levels.at(-1)].label}</span></p>`;
+export function rateSlider(s, pid) {
   const scale = scaleOf(getProduct(s.productId)),
-    cur = rOf(s.pets[pid]);
-  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="rate-row">${scale
-    .map(
-      r =>
-        `<button class="tile rb ${rateCls(r)}" aria-pressed="${cur === r}" aria-label="${RATINGS[r].label}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}">${icon('r_' + r)}<span>${RATINGS[r].lines[0]}</span><small>${RATINGS[r].lines[1]}</small></button>`,
-    )
-    .join('')}</div>`;
+    cur = rOf(s.pets[pid]),
+    pet = db.pets.length > 1 ? getPet(pid) : null;
+  const colours = scale
+      .map((r, i) => `var(--${rateTone(r)}) calc(var(--thumb) / 2 + (100% - var(--thumb)) * ${i / (scale.length - 1)})`)
+      .join(', '),
+    stops = scale
+      .map(
+        (r, i) =>
+          `<button style="--i:${i}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}"></button>`,
+      )
+      .join('');
+  const at = scale.includes(cur) ? `;--at:${scale.indexOf(cur)}` : '';
+  return `<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
+    <div class="rate-now">${levelHTML(cur, scale)}</div>
+    <div class="slider-bar"><span class="slider-track" style="--stops:${colours}"></span>${stops}<span class="slider-thumb"></span></div>
+    ${scaleEnds(scale)}</div>`;
 }
 export function resultBadges(s, compact = false) {
   const ids = servingPets(s);

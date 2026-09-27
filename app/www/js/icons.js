@@ -14,11 +14,17 @@ const FULL =
   BOWL +
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
 const I = {
+  ask: BOWL, // an empty bowl: the question before a rating
   r_top: BOWL + HEART,
   r_gut: BOWL + LATER,
   r_mittel:
     '<path d="M5.3 14.3h13.4l-.75 3.1a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
     BOWL,
+  // started eagerly and left the rest: more than half still in the bowl, the heart above it broken
+  r_eager:
+    '<path d="M5.08 13.4h13.84l-.97 4a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
+    BOWL +
+    '<path d="M12 9.4c-1.8-1.1-3.6-2.6-3.6-4.3a1.75 1.75 0 0 1 3.6-.8 1.75 1.75 0 0 1 3.6.8c0 1.7-1.8 3.2-3.6 4.3z"/><path d="M12 4.3l-.9 1.8 1.4 1-.5 2.3"/>',
   r_sosse:
     BOWL +
     DOT(9, 15.4) +

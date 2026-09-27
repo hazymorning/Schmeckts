@@ -17,6 +17,7 @@ import {closeViewer} from './ui/viewer.js';
 import {renderHome, renderSyncChip, update} from './views/home.js';
 import {paintHouse} from './views/settings.js';
 import './views/sheets.js'; // registers the contents of the sheets
+import './ui/slider.js'; // the rating slider under a finger, registers itself
 import {retryWaiting, settleNamed} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';

@@ -641,47 +641,118 @@ dialog.sheet.page .sheet-body {
   font: var(--type-small);
   margin: 0 0 var(--space-3h);
 }
-.tile {
+/* Rating slider (views/parts.js, ui/slider.js): above the track the level the thumb stands on, large, with what the
+   bowl looks like. The track runs from the best level to the worst in their colours, with a stop for each, and the
+   thumb, ringed in its level's colour, glides from stop to stop. The whole bar takes the finger; the stops are the
+   levels' buttons, which only the keyboard and a screen reader use. Before a rating there is no thumb. */
+.rate-now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.rate-now .ic {
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+  stroke-width: var(--icon-stroke-l);
+  color: var(--c, var(--faint));
+}
+.rate-now p {
+  margin: 0;
+  min-width: 0;
+}
+.rate-now b,
+.rate-now small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rate-now b {
+  font: var(--type-heading);
+}
+.rate-now .ask b {
+  font: var(--type-body-strong);
+} /* the question before a rating is quieter than an answer */
+.rate-now small {
+  font: var(--type-small);
+  color: var(--muted);
+}
+.slider-bar {
+  --thumb: 28px; /* a stop's centre runs from half of it to the other end less half of it */
+  container-type: inline-size; /* the thumb goes its way in the bar's width, cqw */
+  position: relative;
+  height: var(--tap);
+  cursor: pointer;
+  touch-action: pan-y; /* up and down the page scrolls; sideways the finger slides */
+}
+.slider-track {
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, var(--stops));
+}
+.slider-bar button {
+  position: absolute;
+  inset: 0 auto;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--i) / (var(--n) - 1));
+  width: var(--tap-s);
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-s);
+  pointer-events: none; /* the finger belongs to the bar */
+}
+.slider-bar button::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.slider-thumb {
+  position: absolute;
+  top: calc(50% - var(--thumb) / 2);
+  left: 0;
+  width: var(--thumb);
+  height: var(--thumb);
+  transform: translateX(calc((100cqw - var(--thumb)) * var(--at) / (var(--n) - 1)));
+  border: calc(2 * var(--stroke)) solid var(--c);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-low);
+  pointer-events: none;
+}
+.slider.unset .slider-thumb {
+  display: none;
+}
+/* The two ends of a scale, under the slider and under the counters */
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--muted);
+}
+/* A counter: a level's icon with how often it was chosen under it */
+.cnt .ic {
+  width: var(--icon-l);
+  height: var(--icon-l);
+  stroke-width: var(--icon-stroke-l);
+}
+.cnt {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--inset-tile);
-  border-radius: var(--radius-m);
-  background: var(--surface-2);
-}
-.tile .ic {
-  width: var(--icon-l);
-  height: var(--icon-l);
-  margin-bottom: var(--space-1);
+  gap: var(--space-hair);
   color: var(--c);
-  stroke-width: var(--icon-stroke-l);
 }
-/* Rating buttons: an icon with two lines below it */
-.rb {
-  font: var(--type-caption-strong);
-  color: var(--ink);
-  white-space: nowrap;
-}
-.rb small {
-  font: var(--type-caption);
-  color: var(--muted);
-}
-.rb:is([aria-pressed="true"], .picked) {
-  background: var(--cs);
-  box-shadow: inset 0 0 0 var(--stroke) var(--c);
-}
-.rb[aria-pressed="true"] small {
-  color: var(--ink);
-} /* on the soft fill --muted does not reach 4.5:1 */
 .cnt b {
   font: var(--type-heading);
   font-variant-numeric: tabular-nums;
-}
-.cnt span {
-  font: var(--type-caption);
-  text-align: center;
-  white-space: nowrap;
-  color: var(--muted);
+  color: var(--ink);
 }
 
 /* Controls */
@@ -1667,16 +1738,11 @@ dialog.sheet.page .sheet-body {
 .pet-rate + .pet-rate {
   margin-top: var(--space-3);
 }
-/* Equally wide buttons in one row, as many as the scale has levels. At 360px and five levels each button keeps a
-   good 54px, and „angerührt“ needs 52 */
-.rate-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-1);
+.rate-now {
+  margin: var(--space-1) 0 var(--space-hair);
 }
-.pet-rate > .badge {
-  margin-bottom: var(--space-2);
+.slider .ends {
+  margin-top: calc(-1 * var(--space-2));
 }
 
 /* Hint, Letzte Woche, Einkaufen, Erkenntnisse */
@@ -1883,8 +1949,9 @@ dialog.sheet.page[data-kind="report"] .page-title {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-1);
-  margin-bottom: var(--space-1);
+}
+.tally {
+  margin: var(--space-2h) 0 var(--space-1);
 }
 .pp .meter {
   flex: 1;
@@ -2004,7 +2071,6 @@ body,
 .pet .av,
 .row,
 .box,
-.tile,
 .btn,
 .card-btn,
 .chip,
@@ -2038,23 +2104,16 @@ dialog.sheet {
 dialog.sheet.dragging {
   transition: none;
 } /* the finger leads */
+.slider-thumb {
+  transition:
+    transform var(--dur-step) var(--ease-out),
+    border-color var(--dur-fade) var(--ease-out);
+} /* the rating slider's thumb glides from stop to stop, its ring taking the level's colour on the way */
 /* Press */
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
-:is(
-  .icon-btn,
-  .chip,
-  .pet,
-  button.tile,
-  .day.has,
-  button.ov-pic,
-  .photo-btn,
-  .pet-photo,
-  .shutter,
-  .sync-chip,
-  .fab
-):active {
+:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {
@@ -2175,7 +2234,7 @@ html.step-back::view-transition-new(page) {
   overflow: hidden;
   animation: leave var(--dur-step) var(--ease-in) both;
 }
-.rb.picked,
+.rate-now.picked,
 .fab.filled {
   animation: pop var(--dur-step) var(--ease-spring);
 }

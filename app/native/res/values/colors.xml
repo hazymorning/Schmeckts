@@ -2,4 +2,6 @@
 <resources>
     <!-- The splash screen in the app's base colour, so nothing flashes when the app takes over -->
     <color name="splash_background">#EEEDE7</color>
+    <!-- The feeding reminder's icon colour, the accent as for the rating reminder (capacitor.config.json) -->
+    <color name="notification">#58603F</color>
 </resources>

@@ -35,9 +35,10 @@ import {
   head,
   nameBlock,
   photoThumb,
-  rateRow,
+  rateSlider,
   reasonOf,
   resultBadges,
+  scaleEnds,
   segmented,
   thumbOf,
   verdictLabel,
@@ -55,7 +56,7 @@ const servingCard = (s, p) => {
 };
 const petRateRow = (s, pid, multi) =>
   `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}
-    ${rateRow(s, pid)}</div>`;
+    ${rateSlider(s, pid)}</div>`;
 const servedForChips = s =>
   `<span class="label">Serviert für</span><div class="chips">${db.pets
     .map(
@@ -265,15 +266,15 @@ const productCard = (p, served) =>
   `<div class="box prod-card">${photoThumb(null, p, 'xl')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
     <small>${esc([p.type, `${served}× serviert`].filter(Boolean).join(', '))}</small></span>
     <button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>`;
-/* One counter per level of the variety's scale, levels from another scale that still occur after them */
+/* One counter per level of the variety's scale, levels from another scale that still occur after them: the level's
+   icon with how often it was chosen, and the ends of the row under it as under the rating scale */
 const countsRow = (levels, counts) =>
-  `<div class="counts">${levels
+  `<div class="tally"><div class="counts">${levels
     .map(
       r =>
-        `<div class="tile cnt ${rateCls(r)}">${icon('r_' + r)}<b>${counts[r] || 0}</b>
-          <span>${RATINGS[r].lines.join('<br>')}</span></div>`,
+        `<span class="cnt ${rateCls(r)}" role="img" aria-label="${RATINGS[r].label}: ${counts[r] || 0}">${icon('r_' + r)}<b>${counts[r] || 0}</b></span>`,
     )
-    .join('')}</div>`;
+    .join('')}</div>${scaleEnds(levels)}</div>`;
 const petBar = (pet, x) =>
   `<div class="row pp ${scoreCls(x.score)}">${avatar(pet, 's')}<span class="pp-name">${esc(pet.name)}</span>
     <span class="meter bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b class="share">${x.pct} %</b></div>`;

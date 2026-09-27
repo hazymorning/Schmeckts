@@ -1,3 +1,12 @@
+schmeckts-server (1.2.0) unstable; urgency=medium
+
+  * New /api/fed: whether a meal has been served since a given time. The
+    phones ask it before a feeding reminder, so nobody is reminded of a
+    meal someone else has already served.
+  * The overview names the new rating level "Erst gierig".
+
+ -- Schmeckts <schmeckts@localhost>  Sun, 27 Sep 2026 20:00:00 +0200
+
 schmeckts-server (1.1.0) unstable; urgency=medium
 
   * Barcode lookup through Open Pet Food Facts and Open Food Facts,

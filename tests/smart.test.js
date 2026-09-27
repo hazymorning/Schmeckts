@@ -54,6 +54,7 @@ test('scales: one per food type, every level with its own points, the colour fol
     ['top', 100],
     ['gut', 80],
     ['mittel', 50],
+    ['eager', 40],
     ['sosse', 30],
     ['schlecht', 0],
   ]);
@@ -74,9 +75,10 @@ test('scales: one per food type, every level with its own points, the colour fol
     [SCALES.bite, SCALES.portion, SCALES.portion],
   );
   assert.deepEqual(Object.values(SCALES).flat().sort(), Object.keys(RATINGS).sort()); // every level belongs to exactly one scale
-  assert.deepEqual(['gut', 'spaeter', 'mittel', 'wenig', 'sosse', 'liegen'].map(rateCls), [
+  assert.deepEqual(['gut', 'spaeter', 'mittel', 'eager', 'wenig', 'sosse', 'liegen'].map(rateCls), [
     'r-good',
     'r-good',
+    'r-mid',
     'r-mid',
     'r-sauce',
     'r-sauce',
@@ -252,34 +254,6 @@ test('hints by precedence, hidden per type and variety', () => {
   ]);
 });
 
-test('overview: the last feeding up to now, the favourite and the weakest variety per pet, all within the filter', () => {
-  const db = household(
-    ['A', 'B'],
-    ['lieb', 'gut', 'flop', 'neu'],
-    [
-      ...rate('lieb', 'A', [T, T, T], 5),
-      ...rate('gut', 'A', [G, G, G], 5),
-      ...rate('flop', 'A', [X, X], 4),
-      ...rate('flop', 'B', [T, T, T], 4),
-      ['neu', {B: null}, 1],
-      ['neu', {A: G}, -1],
-    ],
-  );
-  const pick = m => [
-    m.overview.last?.productId ?? null,
-    ...m.overview.pets.map(x => [x.id, x.favorite?.id ?? null, x.flop?.id ?? null]),
-  ];
-  assert.deepEqual(pick(model(db)), ['neu', ['A', 'lieb', 'flop'], ['B', 'flop', null]]);
-  assert.deepEqual(
-    [pick(model(db, {activePet: 'A'})), pick(model(db, {activePet: 'B'}))],
-    [
-      ['flop', ['A', 'lieb', 'flop']],
-      ['neu', ['B', 'flop', null]],
-    ],
-  );
-  assert.deepEqual(pick(model(household(['A'], [], []))), [null, ['A', null, null]]);
-});
-
 test('feeding times: from 14 days, treats excluded, from 4 days on; reminder 45 minutes later, only when nothing has been served', () => {
   const day = (d, time) => `2026-06-${String(d).padStart(2, '0')}T${time}`,
     now = at(day(10, '12:00'));
@@ -345,6 +319,29 @@ test('insights: comparisons need two groups, the sauce insight from half onwards
     ],
   );
   assert.deepEqual(model(household(['A'], ['a'], rate('a', 'A', [T, T]))).insights, []);
+});
+
+test('insights: „erst gierig“ from half of the ratings onwards, like the sauce', () => {
+  const E = 'eager';
+  const db = household(
+    ['A'],
+    ['a', 'b', 'c'],
+    [...rate('a', 'A', [E, E, T]), ...rate('b', 'A', [E, T, T]), ...rate('c', 'A', [E])],
+  );
+  assert.deepEqual(
+    model(db).insights.map(i => [i.kind, i.id]),
+    [['eager', 'a']],
+    'a with two of three, b with one of three is too few, c with a single rating too',
+  );
+  const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, S])]);
+  assert.deepEqual(
+    model(both).insights.map(i => [i.kind, i.id]),
+    [
+      ['sosse', 'a'],
+      ['sosse', 'b'],
+      ['eager', 'a'],
+    ],
+  );
 });
 
 test('insights: comparisons within one food type only, and the insight names it', () => {

@@ -7,23 +7,27 @@ import {db, save} from '../store.js';
 import {byMe, findProduct, getPet, getProduct, getServing, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
+import {showLevel} from '../ui/slider.js';
 import {update} from '../views/home.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, retryNow, serveProduct} from './feeding.js';
 
+/* Rates what a meal was for one pet, from a level's button on the rating slider, which shows the level and pops.
+   A level the meal already holds stays as it is: a second tap while the card folds away, Enter twice. */
 export function rate(el) {
   const s = getServing(el.dataset.s),
     pid = el.dataset.p,
     r = el.dataset.r;
-  if (!s || !s.pets[pid] || !RATINGS[r]) return;
+  if (!s || !s.pets[pid] || !RATINGS[r] || s.pets[pid].r === r) return;
   const prev = {...s.pets[pid]};
   s.pets[pid] = {r, at: Date.now(), ...byMe()};
   save();
-  haptic('select');
-  el.classList.add('picked');
+  haptic('success');
+  const shown = showLevel(el.closest('.slider'), r);
+  shown.classList.add('picked');
   const pet = getPet(pid);
   const msg = `${RATINGS[r].label} gespeichert${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}`;
-  showRated(el, s, pid, msg, undoRating(s.id, pid, prev));
+  showRated(shown, s, pid, msg, undoRating(s.id, pid, prev));
 }
 
 /* Puts the rating that was there back, wherever the tap came from */
@@ -36,8 +40,8 @@ const undoRating = (sid, pid, prev) => () => {
   if (sheet?.kind === 'serving' && sheet.id === sid) renderSheet();
 };
 
-/* The rating is stored and felt on the tap; the interface follows once the button's pop, or the card's fold, has
-   run, so neither is cut off */
+/* The rating is stored and felt at once; the interface follows once the level's pop, or the card's fold, has run,
+   so neither is cut off */
 function showRated(el, s, pid, msg, undo) {
   const rated = () => Object.values(s.pets).every(x => x.r);
   if (sheet?.kind === 'serving') {

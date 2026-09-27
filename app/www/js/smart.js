@@ -20,12 +20,12 @@ export const VERDICTS = {
 const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
 const MILESTONES = {meals: [50, 100, 250, 500, 1000], sorts: [10, 25, 50]};
 export const rOf = x => (RATINGS[x?.r] ? x.r : null); // unknown values from other devices do not count
-/* Colour class of a score and of a level. The level follows its points: from 70 --good, from 40 --mid, below that --sauce, at 0 --bad */
-export const scoreCls = v => (v >= GOOD ? 'r-good' : v >= NO ? 'r-mid' : 'r-bad');
-export const rateCls = r => {
-  const v = RATINGS[r].score;
-  return v > 0 && v < NO ? 'r-sauce' : scoreCls(v);
-};
+/* Colour of a score and of a level, as the tone (good, mid, sauce, bad) and as its class. The level follows its
+   points: from 70 --good, from 40 --mid, below that --sauce, at 0 --bad */
+const toneOf = v => (v >= GOOD ? 'good' : v >= NO ? 'mid' : 'bad');
+export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score < NO ? 'sauce' : toneOf(RATINGS[r].score));
+export const scoreCls = v => 'r-' + toneOf(v);
+export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
 const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) || [])[0];
 
@@ -95,7 +95,7 @@ function houseVerdict(pets) {
   return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : 'beobachten'};
 }
 
-/* Model  = {pet, sorts, byId, rated, overview, insights, hints, tastes, taste}
+/* Model  = {pet, sorts, byId, rated, insights, hints, tastes, taste}
    Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
             the filter: n, score, pct, verdict, counts, last, yes, no}
    Stat  = {n, score, pct, verdict, counts, last: {pid, r, t, id}} */
@@ -138,28 +138,10 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     sorts,
     byId,
     rated: sorts.reduce((a, e) => a + e.n, 0),
-    overview: overviewOf(db, pet, sorts, now),
     insights: insights(sorts),
     hints: hints(sorts, appetite(db, pet ? [pet] : petIds, now), pet, prefs),
     tastes,
     taste: pet ? tastes[pet] : {known: total('known'), total: total('total')},
-  };
-}
-
-/* Short overview within the filter: the last feeding up to now and, per pet, the favourite variety (verdict
-   „Nachkaufen“, best score) and the weakest (verdict „Nicht mehr kaufen“, worst score): {last, pets: [{id, favorite, flop}]} */
-function overviewOf(db, pet, sorts, now) {
-  const ids = pet ? [pet] : db.pets.map(p => p.id);
-  const pick = (id, verdict, sign) =>
-    sorts
-      .filter(e => e.pets[id]?.verdict === verdict)
-      .sort((a, b) => sign * (b.pets[id].score - a.pets[id].score))[0] || null;
-  return {
-    last: db.servings.reduce(
-      (a, s) => (s.servedAt <= now && (!a || s.servedAt > a.servedAt) && ids.some(id => s.pets?.[id]) ? s : a),
-      null,
-    ),
-    pets: ids.map(id => ({id, favorite: pick(id, 'nachkaufen', 1), flop: pick(id, 'nicht', -1)})),
   };
 }
 
@@ -184,9 +166,11 @@ function tastesOf(db, byId, now) {
   return out;
 }
 
-/* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“.
-   No statements about buying */
-const sauceShare = x => (x.counts.sosse || 0) / x.n;
+/* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“ and
+   „erst gierig“. No statements about buying */
+const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
+const sauceShare = x => shareOf(x, 'sosse');
+const PATTERNS = ['sosse', 'eager']; // levels that say how a variety is eaten, each an insight of its own
 function insights(sorts) {
   if (sorts.reduce((a, e) => a + e.n, 0) < MIN_RATED) return [];
   const out = [];
@@ -208,10 +192,11 @@ function insights(sorts) {
     compare('konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]); // the field, falling back to the keywords only when it is missing
     compare('geschmack', p => keywordOf(FLAVORS, p.variety));
   }
-  sorts
-    .filter(e => e.n >= 2 && sauceShare(e) >= 0.5)
-    .slice(0, 2)
-    .forEach(e => out.push({kind: 'sosse', id: e.id}));
+  for (const kind of PATTERNS)
+    sorts
+      .filter(e => e.n >= 2 && shareOf(e, kind) >= 0.5)
+      .slice(0, 2)
+      .forEach(e => out.push({kind, id: e.id}));
   return out;
 }
 
@@ -383,14 +368,20 @@ export function review(db, prefs, now, known) {
 
 /* The household's usual feeding times from the meals (excluding treats) of the last 14 days: times at most 90
    minutes apart form one slot, which counts from 4 different days onwards. Minutes since midnight, local time:
-   from the earliest, at the middle time, remind = at + 45 minutes. */
+   from the earliest, at the middle time, remind = at + 45 minutes. With pets, only their meals count. */
 const FEED = {span: 14 * DAY, gap: 90, minDays: 4, delay: 45, lead: 60, ahead: 3};
-function mealsIn(db, from, to) {
+function mealsIn(db, from, to, pets) {
   const snack = new Set(db.products.filter(p => typeOf(p) === 'Snack').map(p => p.id));
-  return db.servings.filter(s => s.servedAt > from && s.servedAt <= to && !snack.has(s.productId));
+  return db.servings.filter(
+    s =>
+      s.servedAt > from &&
+      s.servedAt <= to &&
+      !snack.has(s.productId) &&
+      (!pets || Object.keys(s.pets || {}).some(id => pets.includes(id))),
+  );
 }
-export function feedSlots(db, now) {
-  const times = mealsIn(db, now - FEED.span, now)
+export function feedSlots(db, now, pets) {
+  const times = mealsIn(db, now - FEED.span, now, pets)
       .map(s => {
         const d = new Date(s.servedAt);
         return {min: d.getHours() * 60 + d.getMinutes(), day: dayKey(s.servedAt)};
@@ -407,7 +398,8 @@ export function feedSlots(db, now) {
     .map(g => ({from: g[0].min, at: g[g.length >> 1].min, remind: g[g.length >> 1].min + FEED.delay}));
 }
 /* Feeding reminders for today and the two days after: one per usual time, unless a meal was already served that day
-   from an hour before the earliest usual time. {key: 'day|time', at} */
+   from an hour before the earliest usual time. {key: 'day|time', at, since}: since is where that hour begins, from
+   when a meal served on another phone makes the reminder unnecessary as well (logic/reminders.js). */
 export function feedReminders(db, now) {
   const out = [],
     atMinute = (i, min) => {
@@ -418,11 +410,43 @@ export function feedReminders(db, now) {
     };
   for (const slot of feedSlots(db, now))
     for (let i = 0; i < FEED.ahead; i++) {
-      const at = atMinute(i, slot.remind);
-      if (at > now && !mealsIn(db, atMinute(i, slot.from - FEED.lead) - 1, at).length)
-        out.push({key: `${dayKey(at)}|${slot.at}`, at});
+      const at = atMinute(i, slot.remind),
+        since = atMinute(i, slot.from - FEED.lead);
+      if (at > now && !mealsIn(db, since - 1, at).length) out.push({key: `${dayKey(at)}|${slot.at}`, at, since});
     }
   return out;
+}
+
+/* Today's usual times a meal has been served for since, as the keys of their reminders: a reminder already shown for
+   one of them can go */
+export function fedToday(db, now) {
+  const today = dayStart(now);
+  return feedSlots(db, now)
+    .filter(slot => mealsIn(db, today + (slot.from - FEED.lead) * 6e4 - 1, now).length)
+    .map(slot => `${dayKey(now)}|${slot.at}`);
+}
+
+/* When the next meal of the pets usually comes, from their usual times: {at} later today, {at, tomorrow: true} when
+   today's are over, {at, due: true} while one of them is on (from its earliest time to an hour after the reminder)
+   and nothing has been served for it yet. A time counts as served like a reminder does, by a meal from an hour
+   before it. null without usual times. at: minutes since midnight. */
+export function nextMeal(db, now, pets) {
+  const slots = feedSlots(db, now, pets),
+    today = dayStart(now),
+    minute = (now - today) / 6e4,
+    meals = mealsIn(db, today - FEED.lead * 6e4 - 1, now, pets); // from an hour before midnight, for a time just after it
+  for (const slot of slots) {
+    if (meals.some(s => s.servedAt >= today + (slot.from - FEED.lead) * 6e4)) continue;
+    if (minute < slot.from) return {at: slot.at};
+    if (minute <= slot.remind + FEED.lead) return {at: slot.at, due: true};
+  }
+  return slots.length ? {at: slots[0].at, tomorrow: true} : null;
+}
+
+/* The next meal milestone and how many meals are left to it, null past the last one */
+export function nextMilestone(db) {
+  const n = MILESTONES.meals.find(x => x > db.servings.length);
+  return n ? {n, left: n - db.servings.length} : null;
 }
 
 export function milestones(db) {
