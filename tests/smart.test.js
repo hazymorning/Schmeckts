@@ -254,34 +254,6 @@ test('hints by precedence, hidden per type and variety', () => {
   ]);
 });
 
-test('overview: the last feeding up to now, the favourite and the weakest variety per pet, all within the filter', () => {
-  const db = household(
-    ['A', 'B'],
-    ['lieb', 'gut', 'flop', 'neu'],
-    [
-      ...rate('lieb', 'A', [T, T, T], 5),
-      ...rate('gut', 'A', [G, G, G], 5),
-      ...rate('flop', 'A', [X, X], 4),
-      ...rate('flop', 'B', [T, T, T], 4),
-      ['neu', {B: null}, 1],
-      ['neu', {A: G}, -1],
-    ],
-  );
-  const pick = m => [
-    m.overview.last?.productId ?? null,
-    ...m.overview.pets.map(x => [x.id, x.favorite?.id ?? null, x.flop?.id ?? null]),
-  ];
-  assert.deepEqual(pick(model(db)), ['neu', ['A', 'lieb', 'flop'], ['B', 'flop', null]]);
-  assert.deepEqual(
-    [pick(model(db, {activePet: 'A'})), pick(model(db, {activePet: 'B'}))],
-    [
-      ['flop', ['A', 'lieb', 'flop']],
-      ['neu', ['B', 'flop', null]],
-    ],
-  );
-  assert.deepEqual(pick(model(household(['A'], [], []))), [null, ['A', null, null]]);
-});
-
 test('feeding times: from 14 days, treats excluded, from 4 days on; reminder 45 minutes later, only when nothing has been served', () => {
   const day = (d, time) => `2026-06-${String(d).padStart(2, '0')}T${time}`,
     now = at(day(10, '12:00'));

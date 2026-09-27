@@ -3,9 +3,9 @@
 import {$, reduceMotion} from '../dom.js';
 import {settled} from '../motion.js';
 import {andList, esc} from '../text.js';
-import {addDays, ago, dayKey, weekStart} from '../dates.js';
+import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
-import {RATINGS, TEXTURES, TYPES, typeOf} from '../config.js';
+import {RATINGS, TEXTURES, TYPES} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {
@@ -19,7 +19,7 @@ import {
   pname,
   servingPets,
 } from '../derive.js';
-import {hintKey, rOf, scoreCls, shopGroups} from '../smart.js';
+import {hintKey, scoreCls, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
 import {viewerOpen} from '../ui/viewer.js';
@@ -36,6 +36,7 @@ import {
   thumbOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
+import {overviewHTML} from './overview.js';
 
 /* Redraw the home page, with a smooth view transition where possible */
 export function update() {
@@ -136,7 +137,7 @@ function homeHTML() {
   if (!db.pets.length) return banner + welcomeHTML();
   const pend = pendingServings(),
     m = db.servings.length ? model() : null;
-  let html = banner + (m ? overviewHTML(m) : '');
+  let html = banner + (m ? overviewHTML(m, homeView.open.overview) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
   else {
@@ -151,59 +152,6 @@ function homeHTML() {
   return html;
 }
 
-/* Overview: the pet in the filter, the household under „Alle“, with picture, name and the essentials from the
-   model. A tap on the picture opens the pet. Folded up it is two lines ending in „…“; a tap on the card shows
-   the whole text and back again (the state lasts until restart, as with the other cards). */
-function overviewHTML(m) {
-  const pets = m.overview.pets.map(x => getPet(x.id)),
-    one = pets.length === 1 ? pets[0] : null;
-  const pic = one
-    ? `<button class="ov-pic" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'xxl')}</button>`
-    : `<span class="ov-pic">${pets
-        .slice(0, 2)
-        .map(p => avatar(p, 'l pair'))
-        .join('')}</span>`;
-  const tap = m.overview.last ? ` data-action="toggle-overview" aria-expanded="${!!homeView.open.overview}"` : ''; // „Noch nichts serviert.“ is short
-  return `<section class="card overview${homeView.open.overview ? ' open' : ''}" data-sec="overview"${tap} style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${overviewText(m.overview)}</p></div></section>`;
-}
-/* The overview's sentences, the essentials in bold. One pet: „Bekam zuletzt vor 2 Std. einen Snack: Käse (Sofort
-   verputzt). Am liebsten Lachs, Rind kommt nicht an.“ Several: who last had what, then the favourite variety per pet
-   and what does not go down well. */
-function overviewText({last, pets}) {
-  if (!last) return 'Noch nichts serviert.';
-  const many = pets.length > 1,
-    sort = e => `<b>${esc(pname(e.product))}</b>`,
-    pet = x => esc(getPet(x.id).name);
-  const p = getProduct(last.productId),
-    ids = servingPets(last),
-    since = ago(last.servedAt),
-    r = ids.length === 1 && rOf(last.pets[ids[0]]);
-  const who = many ? `${esc(petNames(ids))} ${ids.length > 1 ? 'bekamen' : 'bekam'}` : 'Bekam';
-  const what = p
-    ? (typeOf(p) === 'Snack' ? 'einen Snack: ' : '') + sort({product: p})
-    : 'Futter, das noch keinen Namen hat';
-  const by = isConnected() && last.by ? `, serviert von <b>${esc(last.by)}</b>` : ''; // in a household it matters who fed
-  const fed = `${who}${since === 'gerade eben' ? '' : ' zuletzt'} <b>${/^\d/.test(since) ? 'am ' : ''}${esc(since)}</b> ${what}${by}${ids.length > 1 ? '' : ` (${r ? RATINGS[r].label : 'noch offen'})`}.`;
-  const favs = pets.filter(x => x.favorite),
-    flops = pets.filter(x => x.flop);
-  const taste =
-    !favs.length && !flops.length
-      ? ['Für einen Liebling fehlen noch Bewertungen.']
-      : !many
-        ? [
-            favs.length && flops.length
-              ? `Am liebsten ${sort(favs[0].favorite)}, ${sort(flops[0].flop)} kommt nicht an.`
-              : favs.length
-                ? `Am liebsten ${sort(favs[0].favorite)}.`
-                : `${sort(flops[0].flop)} kommt nicht an.`,
-          ]
-        : [
-            favs.length &&
-              favs.map((x, i) => `${pet(x)}${i ? '' : ' mag am liebsten'} ${sort(x.favorite)}`).join(', ') + '.',
-            flops.length && 'Nicht an kommt ' + flops.map(x => `bei ${pet(x)} ${sort(x.flop)}`).join(', ') + '.',
-          ];
-  return [fed, ...taste].filter(Boolean).join(' ');
-}
 /* Fold open or shut without a redraw: only the class changes, the text slides as on the other cards */
 export function toggleOverview() {
   const sec = $('#home .overview'),

@@ -1041,6 +1041,9 @@ async def test_texture(browser, url):
     await ctx.close()
 
 
+# The overview's line about the animal on the page's today, from the lists in views/overview.js
+FACT = """kind => import('./js/views/overview.js').then(o => { const l = o.FACTS[kind] || o.GENERAL, d = new Date();
+  d.setHours(0, 0, 0, 0); return l[Math.round(d.getTime() / 864e5) % l.length]; })"""
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['lachs', 'Lachs', 'Nassfutter'], ['rind', 'Rind', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '00001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
@@ -1050,7 +1053,7 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print('overview: a low card with picture, name and the essentials, two lines and unfolding; counting in the history, the gap above the calendar')
+    print('overview: a low card with picture, name and a glance at the day, never a rating; two lines and unfolding; counting in the history')
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
@@ -1062,7 +1065,7 @@ async def test_overview(browser, url):
         text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
         dots: ps.webkitLineClamp === '2' && ps.display !== 'block', tap: [c.dataset.action ?? null, c.getAttribute('aria-expanded')], wide: document.documentElement.scrollWidth > innerWidth}; }"""
     c = await pg.evaluate(CARD)
-    text = 'Bekam zuletzt vor 1 Std. einen Snack: Käse (Sofort verputzt). Am liebsten Lachs, Rind kommt nicht an.'
+    text = 'Heute 1 Mahlzeit und 1 Snack, zuletzt vor 1 Std. Es gab einen Snack: Käse. ' + await pg.evaluate(FACT, 'Katze')
     check(
         c
         == {
@@ -1072,14 +1075,14 @@ async def test_overview(browser, url):
             'sameFont': True,
             'pic': ['BUTTON', 1, 72, True],
             'text': text,
-            'bold': ['vor 1 Std.', 'Käse', 'Lachs', 'Rind'],
+            'bold': ['1 Mahlzeit', '1 Snack', 'vor 1 Std.', 'Käse'],
             'lines': 2,
             'cut': True,
             'dots': True,
             'tap': ['toggle-overview', 'false'],
             'wide': False,
         },
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, the essentials in bold; never more than two lines (108 px), and longer text ends in „…“ ({c})',
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, today\u2019s meals and the last one in bold, what it was, something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
     )
     await shot(pg, 'overview-360')
     await pg.evaluate("window.__card = document.querySelector('.overview')")
@@ -1114,7 +1117,7 @@ async def test_overview(browser, url):
     )
     await pg.click('[data-action=close]')
     await idle(pg)
-    # Several pets: who last had what, the favourite variety per pet and what does not go down well
+    # Several pets: today's meals of all of them, who had the last one, when the next one usually comes
     await pg.evaluate("""import('./js/store.js').then(async s => { const now = Date.now(), H = 36e5;
       s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Hund', createdAt: 2});
       s.db.products.push({id: 'pute000001', brand: 'Rinti', variety: 'Pute', type: 'Nassfutter', codes: {}, createdAt: 1});
@@ -1131,24 +1134,31 @@ async def test_overview(browser, url):
     )
     await idle(pg)
     kiwi = await pg.evaluate(CARD)
+    general, dog = await pg.evaluate(FACT, 'Andere'), await pg.evaluate(FACT, 'Hund')
     check(
         [house['title'], house['pic'][:2], house['text'], house['bold']]
         == [
             'Minka und Tiger',
             ['SPAN', 2],
-            'Minka und Tiger bekamen zuletzt vor 5 Min. Lachs. Minka mag am liebsten Lachs, Tiger Pute. Nicht an kommt bei Minka Rind.',
-            ['vor 5 Min.', 'Lachs', 'Lachs', 'Pute', 'Rind'],
+            'Heute 2 Mahlzeiten und 1 Snack, zuletzt vor 5 Min. Minka und Tiger bekamen Lachs. Die nächste Mahlzeit gibt es morgen, meist gegen 10 Uhr. '
+            + general,
+            ['2 Mahlzeiten', '1 Snack', 'vor 5 Min.', 'Lachs', '10 Uhr'],
         ]
         and house['height'] == 108
         and house['dots'],
-        f'under „Alle“ with several pets the text names them: who last had what, the favourite variety per pet, and what does not go down well with whom ({house["text"]})',
+        f'under „Alle“ with several pets: the meals of all of them, who had the last one, the usual time tomorrow once today\u2019s is served, and for a cat and a dog something about any animal ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['text']]
-        == ['Tiger', ['BUTTON', 1], 'Bekam zuletzt vor 5 Min. Lachs (noch offen). Am liebsten Pute.']
+        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Heute 1 Mahlzeit, zuletzt vor 5 Min. Es gab Lachs. ' + dog]
         and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']] == ['Noch nichts serviert.', False, [None, None], 108],
         f'the overview follows the filter; without a meal there is nothing to unfold ({tiger["text"]} / {kiwi["text"]})',
     )
+    # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
+    words = await pg.evaluate("import('./js/config.js').then(c => Object.values(c.RATINGS).map(x => x.label))")
+    rated = [
+        t for t in (c['text'], house['text'], tiger['text']) for w in words + ['Liebling', 'am liebsten', 'kommt', 'bewertet', 'offen', '%'] if w in t
+    ]
+    check(not rated, f'the overview never says how a meal went ({rated})')
     # In a household it matters who fed. prefs.code only in memory: saving it would start a sync
     by = await pg.evaluate("""import('./js/store.js').then(async s => { const h = await import('./js/views/home.js');
       s.prefs.activePet = 'all'; s.db.servings[0].by = 'Anna';
@@ -1157,7 +1167,36 @@ async def test_overview(browser, url):
       s.prefs.code = 'K7PM-3QXD'; h.renderHome(); const house = text();
       s.prefs.code = ''; h.renderHome();
       return [alone, house]; })""")
-    check('Anna' not in by[0] and 'serviert von Anna' in by[1], f'in a household the overview says who fed, on your own it does not ({by[1]})')
+    check(
+        'Anna' not in by[0] and by[1].startswith('Heute 2 Mahlzeiten und 1 Snack, zuletzt vor 5 Min. von Anna. '),
+        f'in a household the overview says who fed, on your own it does not ({by[1]})',
+    )
+    # The line that changes from day to day: what is only true today first, the rest taking turns over five days
+    LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
+      const last = s.db.servings.find(x => x.pets.minka00001), code = s.prefs.code;
+      const g = {last, meals: 2, snacks: 4, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], streak: 12, premiere: null,
+        idea: {id: 'rind00001', days: 12}, next: {at: 1110}, milestone: {n: 100, left: 40}};
+      s.prefs.code = 'K7PM-3QXD';
+      const text = (x, at = now) => o.overviewText(x, pets, at).replace(/<[^>]+>/g, '');
+      const days = [0, 1, 2, 3, 4].map(i => text(g, now + i * 864e5).split('. ').slice(-2).join('. '));
+      const first = [{premiere: 'lachs00001'}, {milestone: {n: 100, left: 3}}, {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}]
+        .map(x => text({...g, ...x}));
+      s.prefs.code = code; return [days, first]; })"""
+    days, first = await pg.evaluate(LINES)
+    turns = [
+        'Beim Füttern liegt diese Woche Anna vorn, 6 zu 4.',
+        'Seit 12 Tagen jeden Tag eingetragen.',
+        'Wie wär’s mal wieder mit Rind? Das gab es seit 12 Tagen nicht.',
+        'Schon 4 Snacks heute. Wer kann da schon nein sagen?',
+    ]
+    check(
+        all(any(d.endswith(t) for d in days) for t in turns)
+        and first[0].endswith('Heute zum ersten Mal: Lachs.')
+        and first[1].endswith('Noch 3× füttern bis zum 100. Mal.')
+        and 'Um diese Zeit gibt es sonst Futter. ' in first[2]
+        and 'Die nächste Mahlzeit gibt es morgen, meist gegen 7:15 Uhr. ' in first[3],
+        f'the last line: a first time or a milestone close by when there is one, otherwise the duel, the streak, an idea and the treats take turns with something about the animal ({days}, {first})',
+    )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
     # With motion: the text eases open and shut, and nothing is left behind afterwards
