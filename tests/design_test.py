@@ -96,11 +96,11 @@ async def test_palette(browser, url):
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
         check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
         got = await pg.evaluate(
-            "['top','gut','mittel','sosse','schlecht'].map(r => getComputedStyle(document.querySelector('.rb[data-r=' + r + '] .ic')).color)"
+            "['top','gut','mittel','eager','sosse','schlecht'].map(r => getComputedStyle(document.querySelector('.scale [data-r=' + r + '] .ic')).color)"
         )
         check(
-            len(got) == 5 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, RATING[:1] + RATING)),
-            f'the rating buttons show the rating colours, „Sofort leer“ and „Später leer“ both --good ({theme})',
+            len(got) == 6 and all(near(g, PALETTE[r][k], 1) for g, r in zip(got, ('--good', '--good', '--mid', '--mid', '--sauce', '--bad'))),
+            f'the rating scale shows the rating colours, „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig, dann Schluss“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
@@ -407,7 +407,7 @@ INSETS = {
     '.card-btn': '10px 0px',
     '.box': '12px',
     '.banner': '12px',
-    '.tile': '10px 0px 8px',
+    '.scale': '4px',
     '.btn': '12px 16px',
     '.field:not(.in-row, .pick .field, .search .field)': '12px 16px',
     '.chip': '8px 16px',
@@ -591,7 +591,7 @@ async def test_rules(browser, url):
         await scan()  # „Verlauf“
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
-        await pg.click('.pend .rb')
+        await pg.click('.pend .scale button')
         await pg.wait_for_selector('#toast [data-action=undo]')
         await idle(pg)
         await scan()  # a toast with „Rückgängig“
@@ -1182,7 +1182,7 @@ PADDING = {
     '.card-btn': 'var(--inset-row)',
     '.box': 'var(--inset-box)',
     '.banner': 'var(--inset-box)',
-    '.tile': 'var(--inset-tile)',
+    '.scale': 'var(--space-1)',
     '.btn': 'var(--inset-control)',
     '.field': 'var(--inset-control)',
     '.field.in-row': 'var(--inset-compact)',
@@ -1227,7 +1227,6 @@ def test_boxes():
                 '--inset-group',
                 '--inset-row',
                 '--inset-box',
-                '--inset-tile',
                 '--inset-control',
                 '--inset-compact',
                 '--inset-badge',
@@ -1361,7 +1360,7 @@ def test_ratings():
     go = (ROOT / 'server/overview.go').read_text(encoding='utf-8')
     names = re.search(r'var ratingNames = map\[string\]string\{(.*?)\n\}', go, re.S)
     server = dict(re.findall(r'"(\w+)":\s*"([^"]+)"', names.group(1) if names else ''))
-    check(len(app) == 13, f'RATINGS in config.js holds every level ({sorted(app)})')
+    check(len(app) == 14, f'RATINGS in config.js holds every level ({sorted(app)})')
     check(app == server, f'server/overview.go labels exactly those levels, with the same wording ({sorted(set(app.items()) ^ set(server.items()))})')
 
 

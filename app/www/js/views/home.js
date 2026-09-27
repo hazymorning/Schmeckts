@@ -426,11 +426,13 @@ const INSIGHT = {
   konsistenz: ['layers', 'Konsistenz'],
   geschmack: ['fish', 'Geschmack'],
   sosse: ['drop'],
+  eager: ['r_eager'],
 };
 function insightHTML(i, m) {
   // one sentence, emphasis in <b>
-  if (i.kind === 'sosse')
-    return `Bei <b>${esc(pname(m.byId.get(i.id).product))}</b> wird meist nur die Soße geschleckt.`;
+  const sort = () => `<b>${esc(pname(m.byId.get(i.id).product))}</b>`;
+  if (i.kind === 'sosse') return `Bei ${sort()} wird meist nur die Soße geschleckt.`;
+  if (i.kind === 'eager') return `Bei ${sort()} geht es meist gierig los, dann bleibt der Rest stehen.`;
   const label =
     i.kind === 'konsistenz' ? TEXTURES[i.type].title : INSIGHT[i.kind][1] + (i.type === TYPES[0] ? '' : ` (${i.type})`); // „Snack-Art“ already names the type
   return `${label}: <b>${esc(i.best.key)}</b> kommt am besten an (${i.best.pct} %), <b>${esc(i.worst.key)}</b> am wenigsten (${i.worst.pct} %).`;

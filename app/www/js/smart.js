@@ -184,9 +184,11 @@ function tastesOf(db, byId, now) {
   return out;
 }
 
-/* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“.
-   No statements about buying */
-const sauceShare = x => (x.counts.sosse || 0) / x.n;
+/* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“ and
+   „erst gierig, dann Schluss“. No statements about buying */
+const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
+const sauceShare = x => shareOf(x, 'sosse');
+const PATTERNS = ['sosse', 'eager']; // levels that say how a variety is eaten, each an insight of its own
 function insights(sorts) {
   if (sorts.reduce((a, e) => a + e.n, 0) < MIN_RATED) return [];
   const out = [];
@@ -208,10 +210,11 @@ function insights(sorts) {
     compare('konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]); // the field, falling back to the keywords only when it is missing
     compare('geschmack', p => keywordOf(FLAVORS, p.variety));
   }
-  sorts
-    .filter(e => e.n >= 2 && sauceShare(e) >= 0.5)
-    .slice(0, 2)
-    .forEach(e => out.push({kind: 'sosse', id: e.id}));
+  for (const kind of PATTERNS)
+    sorts
+      .filter(e => e.n >= 2 && shareOf(e, kind) >= 0.5)
+      .slice(0, 2)
+      .forEach(e => out.push({kind, id: e.id}));
   return out;
 }
 

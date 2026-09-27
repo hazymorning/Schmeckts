@@ -54,6 +54,7 @@ test('scales: one per food type, every level with its own points, the colour fol
     ['top', 100],
     ['gut', 80],
     ['mittel', 50],
+    ['eager', 40],
     ['sosse', 30],
     ['schlecht', 0],
   ]);
@@ -74,9 +75,10 @@ test('scales: one per food type, every level with its own points, the colour fol
     [SCALES.bite, SCALES.portion, SCALES.portion],
   );
   assert.deepEqual(Object.values(SCALES).flat().sort(), Object.keys(RATINGS).sort()); // every level belongs to exactly one scale
-  assert.deepEqual(['gut', 'spaeter', 'mittel', 'wenig', 'sosse', 'liegen'].map(rateCls), [
+  assert.deepEqual(['gut', 'spaeter', 'mittel', 'eager', 'wenig', 'sosse', 'liegen'].map(rateCls), [
     'r-good',
     'r-good',
+    'r-mid',
     'r-mid',
     'r-sauce',
     'r-sauce',
@@ -345,6 +347,29 @@ test('insights: comparisons need two groups, the sauce insight from half onwards
     ],
   );
   assert.deepEqual(model(household(['A'], ['a'], rate('a', 'A', [T, T]))).insights, []);
+});
+
+test('insights: „erst gierig, dann Schluss“ from half of the ratings onwards, like the sauce', () => {
+  const E = 'eager';
+  const db = household(
+    ['A'],
+    ['a', 'b', 'c'],
+    [...rate('a', 'A', [E, E, T]), ...rate('b', 'A', [E, T, T]), ...rate('c', 'A', [E])],
+  );
+  assert.deepEqual(
+    model(db).insights.map(i => [i.kind, i.id]),
+    [['eager', 'a']],
+    'a with two of three, b with one of three is too few, c with a single rating too',
+  );
+  const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, S])]);
+  assert.deepEqual(
+    model(both).insights.map(i => [i.kind, i.id]),
+    [
+      ['sosse', 'a'],
+      ['sosse', 'b'],
+      ['eager', 'a'],
+    ],
+  );
 });
 
 test('insights: comparisons within one food type only, and the insight names it', () => {

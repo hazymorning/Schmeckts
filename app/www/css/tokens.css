@@ -47,7 +47,6 @@
   --inset-group: var(--space-1) var(--space-4); /* .group: 4 above and below its rows, 16 at the sides */
   --inset-row: var(--space-2h) 0; /* .row, .pend, .card-btn: 10 above and below */
   --inset-box: var(--space-3); /* .box and .banner: 12 all round a filled box */
-  --inset-tile: var(--space-2h) 0 var(--space-2); /* .tile: a cell with centred content, 10 above and 8 below */
   --inset-control: var(--space-3) var(--space-4); /* .btn, .field: 12 by 16; the height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* .chip, .field.in-row, the toast's action, .cam-hint: 8 by 16 */
   --inset-badge: var(--space-1) var(--space-2h); /* .badge: 4 by 10 */
@@ -57,7 +56,7 @@
 
   /* Radius: one per role (PROJECT.md, "Principles" 2). A circle is 50%. */
   --radius-s: 12px; /* small and nested: thumbnails, the chosen segment, a button inside a control */
-  --radius-m: 16px; /* controls and boxes you tap: buttons, fields, tiles, boxes, the toast */
+  --radius-m: 16px; /* controls and boxes you tap: buttons, fields, rating scales, boxes, the toast */
   --radius-l: 24px; /* containers: cards, groups, the top of a sheet, large photo frames */
   --radius-full: 999px; /* pills, lines and bars */
 
@@ -88,11 +87,11 @@
     transform var(--dur-fade) var(--ease-out), opacity var(--dur-fade) var(--ease-out),
     color var(--dur-fade) var(--ease-out), background-color var(--dur-fade) var(--ease-out),
     border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out); /* every change of state */
-  --press: 0.95; /* a pressed control, picture or tile */
+  --press: 0.95; /* a pressed control or picture */
   --press-wide: 0.98; /* a pressed row, box or button as wide as its container */
 
   /* Layers, lowest first. Dialogs (sheet, page, camera, photo viewer) are in the top layer and take none. */
-  --z-raise: 1; /* above its neighbours inside one component: the timeline's dot, a page's body, the moving photo */
+  --z-raise: 1; /* above its neighbours inside one component: the timeline's dot, a page's body, the moving photo, the name above a sliding finger */
   --z-sticky: 2; /* sticks while its list scrolls: the day line */
   --z-bar: 3; /* the bar at the top of a page, above what sticks under it */
   --z-fab: 4; /* the feeding button over the page */
@@ -102,10 +101,10 @@
   /* Sizes */
   --icon-s: 20px; /* inside controls, rows, fields and badges; chevrons; the spinner */
   --icon: 24px; /* on its own: icon buttons, a row's leading icon, the feeding button */
-  --icon-l: 32px; /* a rating shown as the content: rating buttons, count tiles, the two feeding choices */
+  --icon-l: 32px; /* a rating shown as the content: rating scales, counters, the two feeding choices */
   --icon-stroke: 1.8; /* the icon set's line, for icons at 20 and 24px and the sketches */
   --icon-stroke-l: 1.4; /* icons at 32px, and the placeholder in a picture from --pic-xxl up */
-  --tap-s: 44px; /* one choice among several side by side: chip, segment, the toast's action, a field in a row */
+  --tap-s: 44px; /* one choice among several side by side: chip, segment, a level of a rating scale, the toast's action, a field in a row */
   --tap: 48px; /* the smallest tap target: icon buttons, rows, text buttons */
   --control: 52px; /* a button or a field, the toast */
   --control-l: 56px; /* the feeding button; a settings row */

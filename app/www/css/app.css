@@ -641,47 +641,75 @@ dialog.sheet.page .sheet-body {
   font: var(--type-small);
   margin: 0 0 var(--space-3h);
 }
-.tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--inset-tile);
+/* Rating scale: the levels of a scale side by side on one track, as a segmented control is, an icon each in the
+   level's colour. The chosen level, and while a finger slides along the track the one under it, sits in its soft
+   colour with a ring. The track is as tall as a control; each level keeps at least 44px at 360px with six. */
+.rate {
+  position: relative;
+}
+.scale {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: var(--space-1);
   border-radius: var(--radius-m);
   background: var(--surface-2);
+  touch-action: pan-y; /* up and down still scrolls the page; sideways the finger slides along the scale */
 }
-.tile .ic {
+.scale button {
+  display: grid;
+  place-items: center;
+  min-height: var(--tap-s);
+  border-radius: var(--radius-s);
+  color: var(--c);
+}
+.scale .ic,
+.cnt .ic {
   width: var(--icon-l);
   height: var(--icon-l);
-  margin-bottom: var(--space-1);
-  color: var(--c);
   stroke-width: var(--icon-stroke-l);
 }
-/* Rating buttons: an icon with two lines below it */
-.rb {
-  font: var(--type-caption-strong);
-  color: var(--ink);
-  white-space: nowrap;
-}
-.rb small {
-  font: var(--type-caption);
-  color: var(--muted);
-}
-.rb:is([aria-pressed="true"], .picked) {
+.scale button:is([aria-pressed="true"], .hot, .picked) {
   background: var(--cs);
   box-shadow: inset 0 0 0 var(--stroke) var(--c);
 }
-.rb[aria-pressed="true"] small {
+.scale.sliding button:not(.hot) {
+  background: none;
+  box-shadow: none;
+} /* while sliding only the level under the finger */
+/* Under a scale: its two ends, or the chosen level under its icon, in the same columns as the track */
+.scale-say {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  font: var(--type-caption);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.scale-say span {
+  justify-self: center;
+}
+.scale-say .first {
+  justify-self: start;
+}
+.scale-say .last {
+  justify-self: end;
+}
+.scale-say.chosen {
+  font: var(--type-caption-strong);
   color: var(--ink);
-} /* on the soft fill --muted does not reach 4.5:1 */
+}
+/* A counter: a level's icon with how often it was chosen under it */
+.cnt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-hair);
+  color: var(--c);
+}
 .cnt b {
   font: var(--type-heading);
   font-variant-numeric: tabular-nums;
-}
-.cnt span {
-  font: var(--type-caption);
-  text-align: center;
-  white-space: nowrap;
-  color: var(--muted);
+  color: var(--ink);
 }
 
 /* Controls */
@@ -943,6 +971,27 @@ dialog.sheet.page .sheet-body {
 }
 .badge.open {
   color: var(--muted);
+}
+/* The level under the finger while it slides: a badge floating above it, since the finger covers the icon. Centred
+   over its level (--at of --n), and at either end flush with the track. */
+.scale-tip {
+  position: absolute;
+  bottom: calc(100% + var(--space-1));
+  left: calc(var(--space-1) + (var(--at) + 0.5) * (100% - 2 * var(--space-1)) / var(--n));
+  transform: translateX(-50%);
+  z-index: var(--z-raise);
+  background: var(--cs);
+  box-shadow: var(--shadow-high);
+  pointer-events: none;
+}
+.scale-tip.first {
+  left: 0;
+  transform: none;
+}
+.scale-tip.last {
+  left: auto;
+  right: 0;
+  transform: none;
 }
 .badge.ic-only {
   min-height: 0;
@@ -1667,13 +1716,8 @@ dialog.sheet.page .sheet-body {
 .pet-rate + .pet-rate {
   margin-top: var(--space-3);
 }
-/* Equally wide buttons in one row, as many as the scale has levels. At 360px and five levels each button keeps a
-   good 54px, and „angerührt“ needs 52 */
-.rate-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-1);
+.scale-say {
+  margin: var(--space-1) 0 0;
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
@@ -1883,8 +1927,9 @@ dialog.sheet.page[data-kind="report"] .page-title {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-1);
-  margin-bottom: var(--space-1);
+}
+.rate.tally {
+  margin: var(--space-2h) 0 var(--space-1);
 }
 .pp .meter {
   flex: 1;
@@ -2004,7 +2049,8 @@ body,
 .pet .av,
 .row,
 .box,
-.tile,
+.scale,
+.scale button,
 .btn,
 .card-btn,
 .chip,
@@ -2021,6 +2067,10 @@ body,
 .pet-photo,
 .srv-ic {
   transition: var(--state);
+}
+/* The level under a sliding finger shows at once and fades in */
+.scale-tip {
+  animation: fadeIn var(--dur-fade) var(--ease-out);
 }
 /* What appears at an edge fades by opacity */
 body::before,
@@ -2039,22 +2089,10 @@ dialog.sheet.dragging {
   transition: none;
 } /* the finger leads */
 /* Press */
-:is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
+:is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head, .scale):active {
   transform: scale(var(--press-wide));
 }
-:is(
-  .icon-btn,
-  .chip,
-  .pet,
-  button.tile,
-  .day.has,
-  button.ov-pic,
-  .photo-btn,
-  .pet-photo,
-  .shutter,
-  .sync-chip,
-  .fab
-):active {
+:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {
@@ -2175,7 +2213,7 @@ html.step-back::view-transition-new(page) {
   overflow: hidden;
   animation: leave var(--dur-step) var(--ease-in) both;
 }
-.rb.picked,
+.scale button.picked,
 .fab.filled {
   animation: pop var(--dur-step) var(--ease-spring);
 }

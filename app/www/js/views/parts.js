@@ -42,18 +42,26 @@ export function nameBlock(s, p, inSheet = false) {
   const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
-/* Rating buttons: equally wide in one row, the variety's scale in its own order; an icon and two lines per button.
-   A stored level from another scale (the variety's type has changed) sits above them as a badge. */
+/* Rating scale: the variety's levels in their own order on one track, an icon each in the level's colour. A tap
+   rates, and so does sliding along the track and letting go (ui/scale.js). Under the track the two ends of the
+   scale, or the chosen level under its icon. A stored level from another scale (the variety's type has changed)
+   sits above it as a badge. */
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
+export function scaleSay(levels, at = -1) {
+  const span = i =>
+    `<span class="${i === 0 ? 'first' : i === levels.length - 1 ? 'last' : ''}" style="grid-column:${i + 1}">${RATINGS[levels[i]].label}</span>`;
+  return `<p class="scale-say${at < 0 ? '' : ' chosen'}">${at < 0 ? span(0) + span(levels.length - 1) : span(at)}</p>`;
+}
 export function rateRow(s, pid) {
   const scale = scaleOf(getProduct(s.productId)),
     cur = rOf(s.pets[pid]);
-  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="rate-row">${scale
+  const stops = scale
     .map(
       r =>
-        `<button class="tile rb ${rateCls(r)}" aria-pressed="${cur === r}" aria-label="${RATINGS[r].label}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}">${icon('r_' + r)}<span>${RATINGS[r].lines[0]}</span><small>${RATINGS[r].lines[1]}</small></button>`,
+        `<button class="${rateCls(r)}" aria-pressed="${cur === r}" aria-label="${RATINGS[r].label}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}">${icon('r_' + r)}</button>`,
     )
-    .join('')}</div>`;
+    .join('');
+  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="rate" style="--n:${scale.length}"><div class="scale" role="group" aria-label="Bewertung">${stops}</div>${scaleSay(scale, scale.indexOf(cur))}</div>`;
 }
 export function resultBadges(s, compact = false) {
   const ids = servingPets(s);
