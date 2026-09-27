@@ -45,10 +45,10 @@ export function nameBlock(s, p, inSheet = false) {
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
 /* The rating slider: the variety's scale on one track from the best level to the worst, in the levels' colours, with
-   a stop for each. Above it the level the thumb stands on; before a rating there is no thumb and it asks, and so it
-   does with a level stored from another scale (the type has changed), which it shows until one of its own replaces
-   it. Under it the two ends of the scale. The stops are the levels' buttons, for the keyboard and a screen reader;
-   a finger works the track (ui/slider.js). */
+   a stop for each, and under it the two ends of the scale. A level the meal holds has the thumb on its stop and its
+   name under it; before a rating there is no thumb. A level stored from another scale (the type has changed) stands
+   above it as a badge until one of its own replaces it. While a finger slides, the level it stands on floats above
+   the thumb (ui/slider.js). The stops are the levels' buttons, for the keyboard and a screen reader. */
 export const scaleEnds = levels =>
   `<p class="ends"><span>${RATINGS[levels[0]].label}</span><span>${RATINGS[levels.at(-1)].label}</span></p>`;
 export function rateSlider(s, pid) {
@@ -65,10 +65,9 @@ export function rateSlider(s, pid) {
       )
       .join('');
   const at = scale.includes(cur) ? `;--at:${scale.indexOf(cur)}` : '';
-  return `<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
-    <div class="rate-now">${levelHTML(cur, scale)}</div>
-    <div class="slider-bar"><span class="slider-track" style="--stops:${colours}"></span>${stops}<span class="slider-thumb"></span></div>
-    ${scaleEnds(scale)}</div>`;
+  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
+    <div class="slider-bar"><span class="slider-track" style="--stops:${colours}"></span>${stops}<span class="slider-thumb"></span><span class="badge slider-tip" aria-hidden="true">${levelHTML(cur)}</span></div>
+    <div class="slider-say">${scaleEnds(scale)}<p class="slider-held"><span>${levelHTML(cur)}</span></p></div></div>`;
 }
 export function resultBadges(s, compact = false) {
   const ids = servingPets(s);

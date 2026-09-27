@@ -12,23 +12,22 @@ export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1))
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]); // without a known type: wet food
 /* Rating levels of every scale. What is measured is acceptance: score, 0 to 100. The keys live in the data and never
-   change; the key alone determines points, wording and icon. note: what the bowl or the morsel looks like, under the
-   level while the rating slider shows it. */
+   change; the key alone determines points, wording and icon. */
 export const RATINGS = {
-  top: {label: 'Sofort leer', note: 'Napf blitzblank', score: 100},
-  gut: {label: 'Später leer', note: 'Nach und nach aufgegessen', score: 80},
-  mittel: {label: 'Halb gegessen', note: 'Die Hälfte blieb übrig', score: 50},
-  eager: {label: 'Erst gierig', note: 'Dann stehen gelassen', score: 40},
-  sosse: {label: 'Soße geleckt', note: 'Die Stückchen liegen noch da', score: 30},
-  schlecht: {label: 'Kaum angerührt', note: 'Der Napf ist noch fast voll', score: 0},
-  gern: {label: 'Gern gefressen', note: 'Kräftig zugelangt', score: 100},
-  normal: {label: 'Normal gefressen', note: 'Wie sonst auch', score: 80},
-  wenig: {label: 'Wenig gefressen', note: 'Nur ein paar Bröckchen', score: 35},
-  liegen: {label: 'Liegen gelassen', note: 'Kaum etwas angerührt', score: 0},
-  verputzt: {label: 'Sofort verputzt', note: 'Weg in einem Happs', score: 100},
-  spaeter: {label: 'Später gefressen', note: 'Erst beschnuppert', score: 70},
-  angeknabbert: {label: 'Nur angeknabbert', note: 'Ein Rest blieb liegen', score: 35},
-  unberuehrt: {label: 'Nicht angerührt', note: 'Nicht mal probiert', score: 0},
+  top: {label: 'Sofort leer', score: 100},
+  gut: {label: 'Später leer', score: 80},
+  mittel: {label: 'Halb gegessen', score: 50},
+  eager: {label: 'Erst gierig', score: 40},
+  sosse: {label: 'Soße geleckt', score: 30},
+  schlecht: {label: 'Kaum angerührt', score: 0},
+  gern: {label: 'Gern gefressen', score: 100},
+  normal: {label: 'Normal gefressen', score: 80},
+  wenig: {label: 'Wenig gefressen', score: 35},
+  liegen: {label: 'Liegen gelassen', score: 0},
+  verputzt: {label: 'Sofort verputzt', score: 100},
+  spaeter: {label: 'Später gefressen', score: 70},
+  angeknabbert: {label: 'Nur angeknabbert', score: 35},
+  unberuehrt: {label: 'Nicht angerührt', score: 0},
 };
 /* Observation scales: what you observe depends on the food type. The mapping is in SCALE_OF. */
 export const SCALES = {
