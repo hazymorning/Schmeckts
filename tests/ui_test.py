@@ -79,7 +79,7 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('.plist [data-action=serve]')
     await idle(pg)
     check(await state(pg, 'db.servings.length') == before + 1, 'a known variety served')
-    await pg.click('.pend [data-action=rate][data-r=gut]')
+    await pg.click('.pend [data-action=rate][data-r=gut]', force=True)  # the level's button takes no pointer: the click lands on the track there
     await idle(pg)
     check(await state(pg, 'Object.values(db.servings[0].pets)[0].r') == 'gut', 'rated with one tap')
     heads = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.classList.contains("card") ? s.querySelector("h2").innerText : "-")')
@@ -167,9 +167,9 @@ async def test_flow(browser, url):
     await pg.click('[data-action=save-name]')
     await idle(pg)
     rates = pg.locator('#sheet .pet-rate')
-    await rates.nth(0).locator('[data-r=gut]').click()
+    await rates.nth(0).locator('[data-r=gut]').click(force=True)
     await idle(pg)
-    await rates.nth(1).locator('[data-r=sosse]').click()
+    await rates.nth(1).locator('[data-r=sosse]').click(force=True)
     await idle(pg)
     check(await state(pg, 'Object.values(db.servings[0].pets).map(x => x.r).join()') == 'gut,sosse', 'both pets rated')
     check(await state(pg, "!('photo' in db.servings[0]) && !('status' in db.servings[0])"), 'after naming: photo and status tidied up')
@@ -539,48 +539,63 @@ def house_meals():
     )
 
 
-# A rating scale as the page shows it: its levels, the track's height, what stands under it (text, distance from its
-# own edge of the track, clipped) and whether the page stays within the screen
-SCALE = """rate => { const t = rate.querySelector('.scale').getBoundingClientRect();
-  return {levels: [...rate.querySelectorAll('.scale button')].map(b => { const r = b.getBoundingClientRect();
-      return {r: b.dataset.r, label: b.getAttribute('aria-label'), w: r.width, h: r.height, top: Math.round(r.top), icon: !!b.querySelector('svg path, svg circle')}; }),
-    track: Math.round(t.height),
-    say: [...rate.querySelector('.scale-say').children].map(e => { const r = e.getBoundingClientRect();
-      return [e.innerText, Math.round(e.classList.contains('last') ? t.right - r.right : r.left - t.left), r.left < t.left - .5 || r.right > t.right + .5]; }),
+# The rating slider as the page shows it: its stops (level, name, centre from the bar's start, size, pressed), the bar
+# and the track (height, distance from the bar's ends), the stop the thumb stands on (None without a thumb), what
+# stands above the track, the two ends under it (text, distance from the track's end) and whether the page stays
+# within the screen
+SLIDER = """slider => { const bar = slider.querySelector('.slider-bar'), b = bar.getBoundingClientRect(), t = slider.querySelector('.slider-track').getBoundingClientRect(),
+    thumb = slider.querySelector('.slider-thumb'), on = getComputedStyle(thumb).display !== 'none';
+  const stops = [...bar.querySelectorAll('button')].map(e => { const r = e.getBoundingClientRect();
+    return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: Math.round((r.left + r.width / 2 - b.left) * 10) / 10, w: r.width, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true'}; });
+  const x = on && new DOMMatrix(getComputedStyle(thumb).transform).m41 + parseFloat(getComputedStyle(bar).getPropertyValue('--thumb')) / 2;
+  return {stops, bar: [Math.round(b.width), Math.round(b.height)], track: [Math.round(t.height), Math.round(t.left - b.left), Math.round(b.right - t.right)],
+    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, icon: !!slider.querySelector('.rate-now svg path'),
+    now: slider.querySelector('.rate-now').innerText.split('\\n'),
+    ends: [...slider.querySelectorAll('.ends span')].map((e, i) => { const r = e.getBoundingClientRect(); return [e.innerText, Math.round(i ? t.right - r.right : r.left - t.left)]; }),
     page: document.documentElement.scrollWidth <= innerWidth}; }"""
 
 
+def even(stops, thumb=28):
+    """The stops from half a thumb in at either end, equally far apart and at least a small tap target apart"""
+    gaps = [b['x'] - a['x'] for a, b in zip(stops, stops[1:])]
+    return max(gaps) - min(gaps) < 0.6 and min(gaps) >= 44 and stops[0]['x'] == thumb / 2
+
+
 async def test_week(browser, url):
-    print('home page: rating buttons, „Letzte Woche“, „Geschmack bekannt“, sharing the list, appetite')
+    print('home page: the rating slider, „Letzte Woche“, „Geschmack bekannt“, sharing the list, appetite')
     ctx = await phone(browser, motion=True, width=360, height=800, timezone_id='Europe/Berlin', permissions=['clipboard-read', 'clipboard-write'])
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T10:00:00+02:00')
     await pg.click('[data-action=demo]')
     await idle(pg)
-    # The rating scale at 360 px, in the card and in the sheet: the six levels on one track, each at least 44 px
-    # wide, and the two ends of the scale named under it
+    # The rating slider at 360 px, in the card and in the sheet: the six levels as stops on one track in the scale's
+    # order, far enough apart for a finger, no thumb before a rating but the question, the ends named under it
     levels = [
         ['top', 'Sofort leer'],
         ['gut', 'Später leer'],
         ['mittel', 'Halb gegessen'],
-        ['eager', 'Erst gierig, dann Schluss'],
+        ['eager', 'Erst gierig'],
         ['sosse', 'Soße geleckt'],
         ['schlecht', 'Kaum angerührt'],
     ]
-    for where, sel in (('card „Wie war’s?“', '.pend .rate'), ('sheet', '#sheet .rate')):
+    for where, sel in (('card „Wie war’s?“', '.pend .slider'), ('sheet', '#sheet .slider')):
         if where == 'sheet':
             await pg.click('.pend-head')
             await idle(pg)
-        b = await pg.eval_on_selector(sel, SCALE)
+        b = await pg.eval_on_selector(sel, SLIDER)
         check(
-            [[x['r'], x['label']] for x in b['levels']] == levels
-            and len({x['top'] for x in b['levels']}) == 1
-            and max(x['w'] for x in b['levels']) - min(x['w'] for x in b['levels']) < 0.6
-            and all(x['icon'] and x['w'] >= 44 and x['h'] >= 44 for x in b['levels'])
-            and b['track'] == 52
-            and b['say'] == [['Sofort leer', 0, False], ['Kaum angerührt', 0, False]]
+            [[x['r'], x['label']] for x in b['stops']] == levels
+            and even(b['stops'])
+            and b['stops'][-1]['x'] == b['bar'][0] - 14
+            and all(x['w'] == 44 and x['h'] == 48 and not x['pressed'] for x in b['stops'])
+            and b['bar'][1] == 48
+            and b['track'] == [8, 0, 0]
+            and b['thumb'] is None
+            and b['icon']
+            and b['now'] == ['Wie sieht der Napf aus?', 'Tippen oder schieben']
+            and b['ends'] == [['Sofort leer', 0], ['Kaum angerührt', 0]]
             and b['page'],
-            f'{where}: six levels on one track in the scale\u2019s order, equally wide and at least 44 px, the ends named under it, nothing wider than 360 px ({[round(x["w"], 1) for x in b["levels"]]}, {b["say"]})',
+            f'{where}: six stops on one track in the scale\u2019s order, {b["stops"][1]["x"] - b["stops"][0]["x"]} px apart, no thumb yet but the question, the ends under it, nothing wider than 360 px ({b["now"]}, {b["ends"]})',
         )
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
@@ -731,7 +746,7 @@ SCALES_DB = """() => import('./js/store.js').then(async s => { const d = s.defau
 
 
 async def test_scales(browser, url):
-    print('rating per food type: the variety\u2019s scale, four columns at 360 px, a foreign level stays visible, counters in the food sheet')
+    print('rating per food type: the variety\u2019s scale, four stops at 360 px, a foreign level stays visible, counters in the food sheet')
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-10T23:30:00+02:00')  # all six meals on one day, so the home page shows them
@@ -746,28 +761,27 @@ async def test_scales(browser, url):
             ['unberuehrt', 'Nicht angerührt'],
         ],
     }
+    ask = {'Trockenfutter': 'Wie sieht der Napf aus?', 'Snack': 'Wie kam es an?'}
     for i, (kind, levels) in enumerate(want.items()):
-        b = await pg.locator('.pend .rate').nth(i).evaluate(SCALE)
+        b = await pg.locator('.pend .slider').nth(i).evaluate(SLIDER)
         check(
-            [[x['r'], x['label']] for x in b['levels']] == levels
-            and len({x['top'] for x in b['levels']}) == 1
-            and max(x['w'] for x in b['levels']) - min(x['w'] for x in b['levels']) < 0.6
-            and all(x['icon'] and x['h'] >= 44 for x in b['levels'])
-            and [x[0] for x in b['say']] == [levels[0][1], levels[-1][1]]
-            and not any(x[2] for x in b['say'])
+            [[x['r'], x['label']] for x in b['stops']] == levels
+            and even(b['stops'])
+            and b['now'] == [ask[kind], 'Tippen oder schieben']
+            and b['ends'] == [[levels[0][1], 0], [levels[-1][1], 0]]
             and b['page'],
-            f'{kind}: four equally wide levels of its own scale with icons, its ends under them, nothing clipped at 360 px',
+            f'{kind}: four stops of its own scale, far apart, its own question, its ends under them, nothing clipped at 360 px ({b["now"]})',
         )
     await shot(pg, 'rating-scales-360')
-    # A stored level from another scale: its own wording and icon, and one tap replaces it
+    # A stored level from another scale: its own wording and icon above the track, without a thumb, and none of the
+    # four is chosen; one tap replaces it
     await pg.click('.tl-item[data-id=meal000002]')
     await idle(pg)
-    old = await pg.evaluate(
-        "[document.querySelector('#sheet .pet-rate > .badge')?.innerText.trim(), !!document.querySelector('#sheet .pet-rate > .badge svg'), document.querySelectorAll('#sheet .scale button').length, document.querySelectorAll('#sheet .scale button[aria-pressed=true]').length, document.querySelector('#sheet .scale-say').innerText]"
-    )
+    b = await pg.eval_on_selector('#sheet .slider', SLIDER)
+    old = [b['now'], b['icon'], len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], [x[0] for x in b['ends']]]
     check(
-        old == ['Später leer', True, 4, 0, 'Gern gefressen\nLiegen gelassen'],
-        f'a level outside the scale sits above the four levels with its own wording and icon, and none of them is chosen ({old})',
+        old == [['Später leer', 'Nach und nach aufgegessen'], True, 4, [], None, ['Gern gefressen', 'Liegen gelassen']],
+        f'a level outside the scale stands above the track with its own wording and icon, without a thumb, and none of the four is chosen ({old})',
     )
     card = await pg.evaluate("[...document.querySelectorAll('#sheet .prod-card small, #sheet .prod-card b')].map(e => e.innerText)")
     check(
@@ -798,24 +812,23 @@ async def test_scales(browser, url):
     await idle(pg)
     await pg.click('.tl-item[data-id=meal000002]')
     await idle(pg)
-    await pg.click('#sheet [data-r=normal]')
+    await pg.click('#sheet [data-r=liegen]', force=True)
     await idle(pg)
     r = await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r")
     await pg.click('.tl-item[data-id=meal000002]')
     await idle(pg)
-    now = await pg.evaluate(
-        "[!!document.querySelector('#sheet .pet-rate > .badge'), document.querySelector('#sheet .scale button[aria-pressed=true]')?.dataset.r, document.querySelector('#sheet .scale-say').innerText]"
-    )
+    b = await pg.eval_on_selector('#sheet .slider', SLIDER)
+    now = [b['now'], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['page']]
     check(
-        r == 'normal' and now == [False, 'normal', 'Normal gefressen'],
-        f'one tap on a level replaces the old one, whose name then stands under it ({r}, {now})',
+        r == 'liegen' and now == [['Liegen gelassen', 'Kaum etwas angerührt'], ['liegen'], 3, True],
+        f'one tap on a level replaces the old one, which then stands above the track with the thumb on its stop, at the end of the track without pushing the page wider ({r}, {now})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
 
 async def test_slide(browser, url):
-    print('rating by sliding along the scale: the level under the finger lights up with its name above it, letting go rates it')
+    print('the rating slider under a finger: a tap rates, sliding shows every level and rates where it is let go, scrolling rates nothing')
     ctx = await phone(browser, touch=True, width=360, height=800)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]')
@@ -823,80 +836,134 @@ async def test_slide(browser, url):
     cdp = await ctx.new_cdp_session(pg)
 
     async def touch(kind, x=0, y=0):  # a real finger: the browser decides on scrolling and on a click itself
-        await cdp.send('Input.dispatchTouchEvent', {'type': kind, 'touchPoints': [] if kind == 'touchEnd' else [{'x': x, 'y': y}]})
+        await cdp.send('Input.dispatchTouchEvent', {'type': kind, 'touchPoints': [] if kind in ('touchEnd', 'touchCancel') else [{'x': x, 'y': y}]})
 
-    # Every click that reaches a level, after the app's own handling: exactly one per rating
+    # Every click that reaches a level (exactly one per rating) and every vibration (8 ms a tick, 16 ms a rating)
     await pg.evaluate(
-        "window.__rated = []; document.addEventListener('click', e => { const b = e.target.closest('.scale button'); if (b) window.__rated.push(b.dataset.r); })"
+        """() => { window.__rated = []; window.__buzz = []; Object.defineProperty(navigator, 'vibrate', {value: ms => window.__buzz.push(ms)});
+      document.addEventListener('click', e => { const b = e.target.closest('.slider-bar button'); if (b) window.__rated.push(b.dataset.r); }); }"""
     )
     STOPS = 'l => l.map(b => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })'
-    TIP = """() => { const t = document.querySelector('.scale-tip'), s = t && t.previousElementSibling;
-      if (!t) return null; const r = t.getBoundingClientRect(), k = s.getBoundingClientRect();
-      return {text: t.innerText, above: r.bottom <= k.top, inside: r.left >= k.left - .5 && r.right <= k.right + .5, hot: [...s.querySelectorAll('.hot')].map(b => b.dataset.r), sliding: s.classList.contains('sliding')}; }"""
+    SHOWN = """() => { const s = document.querySelector('.pend .slider');
+      return [s.querySelector('.rate-now b').innerText, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none']; }"""
+    ASKING = ['Wie sieht der Napf aus?', False]
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
+    clicks = '(() => { const r = [window.__rated, window.__buzz]; window.__rated = []; window.__buzz = []; return r; })()'
+
+    async def stops():
+        return await pg.eval_on_selector_all('.pend .slider-bar button', STOPS)
+
+    async def undo():
+        await pg.click('#toast [data-action=undo]')
+        await idle(pg)
+        await pg.evaluate(clicks)  # forget what came before, and the undo's own tick
+
     await pg.evaluate("import('./js/derive.js').then(d => { window.__open = d.pendingServings()[0].id; })")
-    stops = await pg.eval_on_selector_all('.pend .scale button', STOPS)
-    x0, y0 = stops[0]
+    # Sliding: the finger down changes nothing yet; sideways it shows each level it reaches with a tick, and letting
+    # go rates the last one
+    at = await stops()
+    (x0, y0), x3 = at[0], at[3][0]
     await touch('touchStart', x0, y0)
-    first = await pg.evaluate(TIP)
-    for x, _ in stops[1:4]:
-        await touch('touchMove', x, y0)
-    moved = await pg.evaluate(TIP)
+    down = await pg.evaluate(SHOWN)
+    for i in range(1, 11):
+        await touch('touchMove', x0 + (x3 - x0) * i / 10, y0 + 2)
+    moved = [await pg.evaluate(SHOWN), await state(pg, RATED)]
     await shot(pg, 'rating-slide-360')
     await touch('touchEnd')
     await idle(pg)
-    after = [await state(pg, RATED), await pg.evaluate('window.__rated'), await pg.inner_text('#toast span'), await pg.evaluate(TIP)]
+    after = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span')]
     check(
-        first == {'text': 'Sofort leer', 'above': True, 'inside': True, 'hot': ['top'], 'sliding': True}
-        and moved == {'text': 'Erst gierig, dann Schluss', 'above': True, 'inside': True, 'hot': ['eager'], 'sliding': True},
-        f'the finger down lights up the level under it and names it above the track; sliding takes both along ({first}, {moved})',
+        down == ASKING and moved == [['Erst gierig', True], None],
+        f'the finger down changes nothing; sliding sideways shows the level with the thumb on its stop and rates nothing yet ({down}, {moved})',
     )
     check(
-        after == ['eager', ['eager'], 'Erst gierig, dann Schluss gespeichert', None],
-        f'letting go rates the level under the finger, once, and the name above the track goes ({after})',
+        after == ['eager', [['eager'], [8, 8, 8, 8, 16]], 'Erst gierig gespeichert'],
+        f'letting go rates the level it stands on, once, after a light tick at each of the four levels on the way ({after})',
     )
-    await pg.click('#toast [data-action=undo]')
-    await idle(pg)
-    # A tap: the finger down and up on one level rates it, and the click the browser sends after it does not rate again
-    stops = await pg.eval_on_selector_all('.pend .scale button', STOPS)
-    await pg.evaluate('window.__rated = []')
-    await touch('touchStart', *stops[1])
+    await undo()
+    # A tap rates the level under the finger, without the ticks of sliding
+    await touch('touchStart', *(await stops())[1])
     await touch('touchEnd')
     await idle(pg)
-    tap = [await state(pg, RATED), await pg.evaluate('window.__rated')]
-    check(tap == ['gut', ['gut']], f'a tap rates the level under the finger, once ({tap})')
-    await pg.click('#toast [data-action=undo]')
-    await idle(pg)
-    # Moving up or down scrolls the page instead: that cancels
-    stops = await pg.eval_on_selector_all('.pend .scale button', STOPS)
-    await pg.evaluate('window.__rated = []')
+    tap = [await state(pg, RATED), await pg.evaluate(clicks)]
+    check(tap == ['gut', [['gut'], [16]]], f'a tap rates the level under the finger, once ({tap})')
+    await undo()
+    # Up or down, even a little sideways, the page scrolls and the slider neither shows nor rates anything
     top = await pg.evaluate('scrollY')
-    x, y = stops[2]
+    x, y = (await stops())[2]
     await touch('touchStart', x, y)
     for dy in range(10, 130, 10):
-        await touch('touchMove', x, y - dy)
+        await touch('touchMove', x + dy / 10, y - dy)
     await touch('touchEnd')
     await idle(pg)
-    scrolled = [await pg.evaluate('scrollY') > top, await state(pg, RATED), await pg.evaluate('window.__rated'), await pg.evaluate(TIP)]
-    check(scrolled == [True, None, [], None], f'moving up scrolls the page and rates nothing ({scrolled})')
-    await pg.evaluate('scrollTo(0, 0)')
+    scrolled = [await pg.evaluate('scrollY') > top, await state(pg, RATED), await pg.evaluate(clicks), await pg.evaluate(SHOWN)]
+    check(scrolled == [True, None, [[], []], ASKING], f'moving up scrolls the page and rates nothing ({scrolled})')
+    # A touch while the page is still scrolling (a fling going on) only stops it; once the page rests, a tap rates
+    x, y = (await stops())[4]
+    await pg.evaluate('window.__fling = setInterval(() => scrollBy(0, 1), 16)')
+    await pg.wait_for_timeout(100)
+    await touch('touchStart', x, y)
+    await touch('touchEnd')
+    await pg.evaluate('clearInterval(window.__fling)')
     await idle(pg)
-    # With the mouse: letting go well above the track rates nothing either
-    stops = await pg.eval_on_selector_all('.pend .scale button', STOPS)
-    x, y = stops[5]
-    await pg.mouse.move(x, y)
+    stopped = [await state(pg, RATED), await pg.evaluate(clicks)]
+    await pg.wait_for_timeout(300)
+    await touch('touchStart', *(await stops())[4])
+    await touch('touchEnd')
+    stopped.append(await until(pg, f"{RATED} === 'sosse'", 3))
+    check(stopped == [None, [[], []], True], f'a touch that stops the page scrolling rates nothing, the next one does ({stopped})')
+    await undo()
+    # The system takes the touch away while it slides: back to what the meal holds, nothing rated
+    at = await stops()
+    await touch('touchStart', *at[1])
+    for i in range(1, 6):
+        await touch('touchMove', at[1][0] + (at[3][0] - at[1][0]) * i / 5, at[1][1])
+    sliding = await pg.evaluate(SHOWN)
+    await touch('touchCancel')
+    await idle(pg)
+    cancelled = [sliding, await pg.evaluate(SHOWN), await state(pg, RATED), (await pg.evaluate(clicks))[0]]
+    check(
+        cancelled == [['Erst gierig', True], ASKING, None, []],
+        f'a cancelled slide goes back to the question and rates nothing ({cancelled})',
+    )
+    # Redrawn under the finger (a change from another phone): nothing is rated
+    await touch('touchStart', *(await stops())[1])
+    await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome())")
+    await touch('touchEnd')
+    await idle(pg)
+    redrawn = [await state(pg, RATED), (await pg.evaluate(clicks))[0]]
+    check(redrawn == [None, []], f'a slider drawn anew under the finger rates nothing ({redrawn})')
+    # The mouse slides as soon as it is pressed
+    at = await stops()
+    await pg.mouse.move(*at[5])
     await pg.mouse.down()
-    await pg.mouse.move(x, y - 150, steps=5)
+    await pg.mouse.move(*at[4], steps=4)
     await pg.mouse.up()
     await idle(pg)
-    away = [await state(pg, RATED), await pg.evaluate('window.__rated')]
-    check(away == [None, []], f'letting go well away from the track rates nothing ({away})')
+    mouse = [await state(pg, RATED), (await pg.evaluate(clicks))[0]]
+    check(mouse == ['sosse', ['sosse']], f'with the mouse: pressed on one level, let go on the next, that one is rated ({mouse})')
+    await undo()
     # The keyboard: a level is a button like any other
-    await pg.focus('.pend .scale [data-r=mittel]')
+    await pg.focus('.pend .slider-bar [data-r=mittel]')
     await pg.keyboard.press('Enter')
     await idle(pg)
-    keys = [await state(pg, RATED), await pg.evaluate('window.__rated')]
+    keys = [await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(keys == ['mittel', ['mittel']], f'Enter on a level rates it ({keys})')
+    # In the sheet the rated meal holds its level: a tap on it changes nothing, a tap on another rates that one
+    sid = await pg.evaluate('window.__open')
+    await pg.click(f'.tl-item[data-id={sid}]')
+    await idle(pg)
+    await pg.wait_for_timeout(200)  # the page has just scrolled to the meal, and a touch that soon would only stop it
+    at = await pg.eval_on_selector_all('#sheet .slider-bar button', STOPS)
+    await touch('touchStart', *at[2])
+    await touch('touchEnd')
+    await idle(pg)
+    held = [await pg.evaluate("document.getElementById('sheet').open"), (await pg.evaluate(clicks))[0]]
+    await touch('touchStart', *at[0])
+    await touch('touchEnd')
+    await idle(pg)
+    held += [await state(pg, RATED), (await pg.evaluate(clicks))[0]]
+    check(held == [True, [], 'top', ['top']], f'a tap on the level a meal holds changes nothing, one on another replaces it ({held})')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -1376,19 +1443,19 @@ async def test_reminders(browser, url):
     await debounced(pg)
     opened = await pg.evaluate("import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.kind, m.sheet?.id])")
     check(
-        opened == [True, 'serving', s['id']] and await pg.locator('#sheet .scale button').count() == 6 * len(s['pets']),
+        opened == [True, 'serving', s['id']] and await pg.locator('#sheet .slider-bar button').count() == 6 * len(s['pets']),
         f'a tap on the notification opens that meal\u2019s sheet for rating ({opened[1]})',
     )
     # Rating: only once every pet is rated is it cancelled
     if len(s['pets']) > 1:
-        await pg.click('#sheet .pet-rate:nth-child(1 of .pet-rate) [data-r=top]')
+        await pg.click('#sheet .pet-rate:nth-child(1 of .pet-rate) [data-r=top]', force=True)
         await debounced(pg)
         half = len(await pending())
-        await pg.click('#sheet .pet-rate:nth-child(2 of .pet-rate) [data-r=gut]')
+        await pg.click('#sheet .pet-rate:nth-child(2 of .pet-rate) [data-r=gut]', force=True)
         await debounced(pg)
     else:
         half = 1
-        await pg.click('#sheet [data-r=top]')
+        await pg.click('#sheet [data-r=top]', force=True)
         await debounced(pg)
     check(
         half == 1 and await pending() == [] and any(c[0]['id'] == n['id'] for c in await calls('cancelNotes')),

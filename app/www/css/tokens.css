@@ -56,20 +56,20 @@
 
   /* Radius: one per role (PROJECT.md, "Principles" 2). A circle is 50%. */
   --radius-s: 12px; /* small and nested: thumbnails, the chosen segment, a button inside a control */
-  --radius-m: 16px; /* controls and boxes you tap: buttons, fields, rating scales, boxes, the toast */
+  --radius-m: 16px; /* controls and boxes you tap: buttons, fields, boxes, the toast */
   --radius-l: 24px; /* containers: cards, groups, the top of a sheet, large photo frames */
   --radius-full: 999px; /* pills, lines and bars */
 
   /* Type: five sizes, four leadings, three weights. app.css sets type only as font: var(--type-...). */
   --type-title: 650 30px/1.1 var(--font-display); /* wordmark, page title, welcome heading, the ring's figure; always with --track-title */
-  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, percentages, counts, initials */
+  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, percentages, counts, initials, the level on the rating slider */
   --type-subheading: 600 16px/1.25 var(--font-display); /* day lines, initials in small thumbnails */
   --type-body: 400 16px/1.5 var(--font-ui); /* running text, fields, a card's own sentence */
   --type-body-strong: 600 16px/1.5 var(--font-ui); /* row titles, button labels, figures in Figtree */
   --type-small: 400 14px/1.4 var(--font-ui); /* secondary text: a row's second line, hints, notes, the toast, day numbers */
   --type-small-strong: 600 14px/1.4 var(--font-ui); /* labels and small controls: field labels, chips, segments, text buttons, times */
   --type-caption: 400 12px/1.25 var(--font-ui); /* under a figure or a picture: a rating's second line, pet names, units */
-  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays, a rating button's first line */
+  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays */
   --weight-strong: 600; /* b and strong inside running text */
   --track-title: -0.015em; /* only with --type-title: Faustina runs narrow at that size */
   --track-code: 0.14em; /* only in the household code field */
@@ -91,7 +91,7 @@
   --press-wide: 0.98; /* a pressed row, box or button as wide as its container */
 
   /* Layers, lowest first. Dialogs (sheet, page, camera, photo viewer) are in the top layer and take none. */
-  --z-raise: 1; /* above its neighbours inside one component: the timeline's dot, a page's body, the moving photo, the name above a sliding finger */
+  --z-raise: 1; /* above its neighbours inside one component: the timeline's dot, a page's body, the moving photo */
   --z-sticky: 2; /* sticks while its list scrolls: the day line */
   --z-bar: 3; /* the bar at the top of a page, above what sticks under it */
   --z-fab: 4; /* the feeding button over the page */
@@ -101,10 +101,11 @@
   /* Sizes */
   --icon-s: 20px; /* inside controls, rows, fields and badges; chevrons; the spinner */
   --icon: 24px; /* on its own: icon buttons, a row's leading icon, the feeding button */
-  --icon-l: 32px; /* a rating shown as the content: rating scales, counters, the two feeding choices */
+  --icon-l: 32px; /* a rating shown as the content: counters, the two feeding choices */
+  --icon-xl: 56px; /* a rating shown large: the level the rating slider stands on */
   --icon-stroke: 1.8; /* the icon set's line, for icons at 20 and 24px and the sketches */
   --icon-stroke-l: 1.4; /* icons at 32px, and the placeholder in a picture from --pic-xxl up */
-  --tap-s: 44px; /* one choice among several side by side: chip, segment, a level of a rating scale, the toast's action, a field in a row */
+  --tap-s: 44px; /* one choice among several side by side: chip, segment, a stop on the rating slider, the toast’s action, a field in a row */
   --tap: 48px; /* the smallest tap target: icon buttons, rows, text buttons */
   --control: 52px; /* a button or a field, the toast */
   --control-l: 56px; /* the feeding button; a settings row */
@@ -154,7 +155,7 @@
   --seg-on: light-dark(#fafaf6, #3b3c34); /* the chosen segment: light --surface, dark --line */
   --toast-action: light-dark(#a9b283, #4a5134); /* undo on the toast (fill --ink): the other mode's accent */
   --backdrop: light-dark(#25261f66, #1b1c17b3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
-  --shadow-low: 0 1px 4px light-dark(#25261f1a, #1b1c174d); /* resting lift: the chosen segment, the welcome picture */
+  --shadow-low: 0 1px 4px light-dark(#25261f1a, #1b1c174d); /* resting lift: the chosen segment, the welcome picture, the rating slider's thumb */
   --shadow-high:
     0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759); /* what floats: sheet, feeding button, toast */
 }

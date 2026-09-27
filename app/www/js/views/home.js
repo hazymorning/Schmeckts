@@ -30,7 +30,7 @@ import {
   dayGroups,
   nameBlock,
   photoThumb,
-  rateRow,
+  rateSlider,
   reasonOf,
   syncChip,
   thumbOf,
@@ -201,7 +201,7 @@ function pendingHTML(list) {
         const rows = ids
           .map(
             pid =>
-              `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateRow(s, pid)}</div>`,
+              `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateSlider(s, pid)}</div>`,
           )
           .join('');
         return `<li class="pend" data-id="${s.id}" style="view-transition-name:sv-${s.id};view-transition-class:${homeView.fresh === s.id ? 'fresh' : 'item'}">${head}${rows}</li>`;

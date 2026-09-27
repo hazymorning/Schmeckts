@@ -321,7 +321,7 @@ test('insights: comparisons need two groups, the sauce insight from half onwards
   assert.deepEqual(model(household(['A'], ['a'], rate('a', 'A', [T, T]))).insights, []);
 });
 
-test('insights: „erst gierig, dann Schluss“ from half of the ratings onwards, like the sauce', () => {
+test('insights: „erst gierig“ from half of the ratings onwards, like the sauce', () => {
   const E = 'eager';
   const db = household(
     ['A'],

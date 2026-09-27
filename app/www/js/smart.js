@@ -20,12 +20,12 @@ export const VERDICTS = {
 const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
 const MILESTONES = {meals: [50, 100, 250, 500, 1000], sorts: [10, 25, 50]};
 export const rOf = x => (RATINGS[x?.r] ? x.r : null); // unknown values from other devices do not count
-/* Colour class of a score and of a level. The level follows its points: from 70 --good, from 40 --mid, below that --sauce, at 0 --bad */
-export const scoreCls = v => (v >= GOOD ? 'r-good' : v >= NO ? 'r-mid' : 'r-bad');
-export const rateCls = r => {
-  const v = RATINGS[r].score;
-  return v > 0 && v < NO ? 'r-sauce' : scoreCls(v);
-};
+/* Colour of a score and of a level, as the tone (good, mid, sauce, bad) and as its class. The level follows its
+   points: from 70 --good, from 40 --mid, below that --sauce, at 0 --bad */
+const toneOf = v => (v >= GOOD ? 'good' : v >= NO ? 'mid' : 'bad');
+export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score < NO ? 'sauce' : toneOf(RATINGS[r].score));
+export const scoreCls = v => 'r-' + toneOf(v);
+export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
 const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) || [])[0];
 
@@ -167,7 +167,7 @@ function tastesOf(db, byId, now) {
 }
 
 /* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“ and
-   „erst gierig, dann Schluss“. No statements about buying */
+   „erst gierig“. No statements about buying */
 const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
 const PATTERNS = ['sosse', 'eager']; // levels that say how a variety is eaten, each an insight of its own
