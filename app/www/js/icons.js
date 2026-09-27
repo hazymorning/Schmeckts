@@ -14,7 +14,6 @@ const FULL =
   BOWL +
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
 const I = {
-  ask: BOWL, // an empty bowl: the question before a rating
   r_top: BOWL + HEART,
   r_gut: BOWL + LATER,
   r_mittel:

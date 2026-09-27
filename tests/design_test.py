@@ -95,14 +95,14 @@ async def test_palette(browser, url):
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
         check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
-        # The rating slider in the rating colours: its track from stop to stop, and the level above it
+        # The rating slider in the rating colours: its track from stop to stop, the thumb's ring and the level's icon
         track, shown = await pg.evaluate(
             """() => import('./js/ui/slider.js').then(async m => { const s = document.querySelector('.pend .slider'), shown = [];
           const track = getComputedStyle(s.querySelector('.slider-track')).backgroundImage.match(/rgba?\\([^)]*\\)/g);
           for (const r of ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht']) {
             m.showLevel(s, r);
             await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))); // the ring's colour eases over
-            shown.push([getComputedStyle(s.querySelector('.rate-now .ic')).color, getComputedStyle(s.querySelector('.slider-thumb')).borderTopColor]); }
+            shown.push([getComputedStyle(s.querySelector('.slider-held .ic')).color, getComputedStyle(s.querySelector('.slider-thumb')).borderTopColor]); }
           m.showLevel(s, null); return [track, shown]; })"""
         )
         tones = ('--good', '--good', '--mid', '--mid', '--sauce', '--bad')
@@ -110,7 +110,7 @@ async def test_palette(browser, url):
             len(track) == 6
             and all(near(g, PALETTE[r][k], 1) for g, r in zip(track, tones))
             and all(near(icon, PALETTE[r][k], 1) and near(ring, PALETTE[r][k], 1) for (icon, ring), r in zip(shown, tones)),
-            f'the rating slider in the rating colours, track, level and thumb: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
+            f'the rating slider in the rating colours, track, thumb and level: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
@@ -404,7 +404,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .rate-now b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -606,7 +606,7 @@ async def test_rules(browser, url):
         await scan()  # a toast with „Rückgängig“
         await pg.click('.tl [data-action=open-serving]')
         await idle(pg)
-        await scan()  # the meal just rated: its level above the slider
+        await scan()  # the meal just rated: its level under the thumb
         await pg.click('[data-action=close]')
         await idle(pg)
         await pg.click('[data-action=open-settings]')
@@ -634,10 +634,7 @@ async def test_rules(browser, url):
             not bad,
             f'Figtree everywhere and Faustina only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
         )
-        check(
-            seen == set(FAUSTINA.split(', ')),
-            f'Faustina on the wordmark, headings, day lines, percentages, counters, the level on the rating slider, initials ({sorted(seen)})',
-        )
+        check(seen == set(FAUSTINA.split(', ')), f'Faustina on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
 
@@ -1068,7 +1065,6 @@ SIZES = {
     '--icon-s': '20px',
     '--icon': '24px',
     '--icon-l': '32px',
-    '--icon-xl': '56px',
     '--icon-stroke': '1.8',
     '--icon-stroke-l': '1.4',
     '--tap-s': '44px',
@@ -1136,8 +1132,9 @@ GEOMETRY_ALLOWED = {
     '.toast': 'a toast is never wider than 520px',
     '.slider-track': 'the rating slider\u2019s track, 8px thick',
     '.slider-bar button::before': 'a stop on it, 4px',
+    '.slider-say': 'the row under it is as tall without a level as with one and its small icon',
 }
-ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)', 'var(--icon-xl)'}
+ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
 
 
 def test_layers_lines_sizes():
