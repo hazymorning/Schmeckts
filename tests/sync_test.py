@@ -360,6 +360,39 @@ async def main():
             await expect(await planned([]), 'reminder: cancelled when another phone deletes the meal')
             await a.evaluate("import('./js/store.js').then(s => { s.prefs.remind = 0; })")
 
+            # The feeding reminder: phone A hands its plugin (simulated) the server and the code, and the server answers
+            # the question the plugin asks when a reminder is due with a meal served on phone B; a treat does not count
+            await a.evaluate(
+                "import('./js/store.js').then(async s => { s.prefs.feedRemind = true; (await import('./js/logic/reminders.js')).syncReminders(); })"
+            )
+            await a.wait_for_function("JSON.parse(localStorage.getItem('__feed') || '{}').code === 'K7PM-3QXD'")
+            handed = await a.evaluate("JSON.parse(localStorage.getItem('__feed'))")
+            since = int(time.time() * 1000)
+            before = srv.get(f'/api/fed?since={since}')
+            await run(
+                b,
+                """db.products.push({id: 'snackprod001', brand: 'Dreamies', variety: 'Käse', type: 'Snack', codes: {}, createdAt: Date.now()});
+              db.servings.unshift({id: 'snackmeal001', productId: 'snackprod001', servedAt: Date.now(), by: 'Jonas', pets: {lxpet00001: {r: null, at: null}}, note: ''}); save();""",
+            )
+            await until(b, 'queue.length === 0')
+            treat = srv.get(f'/api/fed?since={since}')
+            await run(
+                b,
+                "db.servings.unshift({id: 'fedmeal00001', productId: 'lxprod0001', servedAt: Date.now(), by: 'Jonas', pets: {lxpet00001: {r: null, at: null}}, note: ''}); save();",
+            )
+            await until(b, 'queue.length === 0')
+            meal = srv.get(f'/api/fed?since={since}')
+            await expect(
+                [handed['server'], handed['code']] == [srv.url, CODE]
+                and before == {'fed': False, 'at': 0, 'by': ''}
+                and not treat['fed']
+                and meal['fed']
+                and meal['by'] == 'Jonas'
+                and meal['at'] >= since,
+                f'feeding reminder: the plugin gets server and code, and the server knows of the meal phone B has served, not of its treat ({meal})',
+            )
+            await a.evaluate("import('./js/store.js').then(s => { s.prefs.feedRemind = false; })")
+
             # The queue without a connection survives a restart
             await block(ctx_a)
             await run(a, "db.pets.push({id: 'lunapet00001', name: 'Luna', species: 'Hund', photo: null, createdAt: Date.now()}); save();")

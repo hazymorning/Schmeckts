@@ -42,6 +42,8 @@ SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 
 # reload. The permission is in localStorage.__notifyPermission (otherwise "prompt"), the answer to the request in
 # localStorage.__notifyAnswer (otherwise "granted"). A tap: window.__tapNote({actionId: 'tap', notification}); if
 # sessionStorage.__launchNote is set at load time, it arrives right after the listener registers, as on a cold start.
+# Our own feeding reminder keeps the last set it was handed in localStorage.__feed; a tap on one of its reminders opens
+# schmeckts://feed in the app (window.__urlOpen).
 NATIVE = """
 window.__calls = []; window.__back = null; window.__urlOpen = null;
 // How often the home page has been written: the splash should go after exactly one drawing of it
@@ -64,6 +66,8 @@ const LocalNotifications = {
   addListener: (e, fn) => { if (e === 'localNotificationActionPerformed') { window.__tapNote = fn; const t = sessionStorage.getItem('__launchNote'); if (t) fn(JSON.parse(t)); }
     return Promise.resolve({remove: () => {}}); }
 };
+const FeedReminder = {set: o => { const set = JSON.parse(JSON.stringify(o)); window.__calls.push(['feedSet', set]);
+  localStorage.setItem('__feed', JSON.stringify(set)); return Promise.resolve({}); }};
 const Filesystem = {
   readFile: ({path}) => { const v = localStorage.getItem(key(path)); return v == null ? missing() : Promise.resolve({data: v}); },
   writeFile: ({path, data, directory}) => { window.__calls.push(['writeFile', {path, directory}]);
@@ -109,7 +113,7 @@ window.Capacitor = {isNativePlatform: () => true,
     if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
     const answer = window.__ocrQueue?.shift() || window.__ocrResult || {text: window.__ocrText || '', blocks: []};
     return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done(answer); }, window.__ocrDelay || 0)); }},
-  Filesystem, LocalNotifications, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
+  Filesystem, LocalNotifications, FeedReminder, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
 # Layout shifts while the page is being built: entries with no tap or key behind them.

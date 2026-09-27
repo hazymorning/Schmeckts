@@ -398,7 +398,8 @@ export function feedSlots(db, now, pets) {
     .map(g => ({from: g[0].min, at: g[g.length >> 1].min, remind: g[g.length >> 1].min + FEED.delay}));
 }
 /* Feeding reminders for today and the two days after: one per usual time, unless a meal was already served that day
-   from an hour before the earliest usual time. {key: 'day|time', at} */
+   from an hour before the earliest usual time. {key: 'day|time', at, since}: since is where that hour begins, from
+   when a meal served on another phone makes the reminder unnecessary as well (logic/reminders.js). */
 export function feedReminders(db, now) {
   const out = [],
     atMinute = (i, min) => {
@@ -409,9 +410,9 @@ export function feedReminders(db, now) {
     };
   for (const slot of feedSlots(db, now))
     for (let i = 0; i < FEED.ahead; i++) {
-      const at = atMinute(i, slot.remind);
-      if (at > now && !mealsIn(db, atMinute(i, slot.from - FEED.lead) - 1, at).length)
-        out.push({key: `${dayKey(at)}|${slot.at}`, at});
+      const at = atMinute(i, slot.remind),
+        since = atMinute(i, slot.from - FEED.lead);
+      if (at > now && !mealsIn(db, since - 1, at).length) out.push({key: `${dayKey(at)}|${slot.at}`, at, since});
     }
   return out;
 }

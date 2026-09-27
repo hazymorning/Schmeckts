@@ -77,6 +77,34 @@ function browserNotifications() {
 }
 export const Notifications = plugin('LocalNotifications') || browserNotifications();
 
+/* Our own plugin (app/native/java) for the feeding reminder: set() takes every reminder at once, each {id, at, since,
+   title, body, sure}, with the household server while connected, and the ids of those shown for a time that has
+   been served since (dismiss). When one is due it asks the server whether a meal has been served since `since` and
+   stays quiet if so; a tap opens schmeckts://feed. In the browser the page's own notifications stand in while the
+   page is open, without asking anyone, and a tap reaches the listeners for 'tap'. */
+function browserFeedReminder() {
+  const N = window.Notification,
+    timers = [],
+    taps = [];
+  const show = r => {
+    if (N?.permission !== 'granted') return;
+    new N(r.title, {body: r.body}).onclick = () => {
+      window.focus();
+      taps.forEach(fn => fn());
+    };
+  };
+  return {
+    set: async ({reminders}) => {
+      timers.splice(0).forEach(clearTimeout);
+      for (const r of reminders) timers.push(setTimeout(() => show(r), Math.max(0, r.at - Date.now())));
+    },
+    addListener: async (event, fn) => {
+      if (event === 'tap') taps.push(fn);
+    },
+  };
+}
+export const FeedReminder = plugin('FeedReminder') || browserFeedReminder();
+
 /* Our own plugin (app/native/java): starts the camera app when the app's own camera (ui/camera.js) will not run.
    hint appears briefly above the camera. */
 const Photo = plugin('Photo');

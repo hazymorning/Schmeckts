@@ -297,3 +297,44 @@ func TestBrokenAnthropicAddress(t *testing.T) {
 		t.Fatal("a broken address has to be an error")
 	}
 }
+
+func TestFedSince(t *testing.T) {
+	a := newTestAPI(t, "")
+	ms := now.UnixMilli()
+	serve := func(id, product, by string, at int64, extra map[string]any) Change {
+		f := map[string]any{"productId": product, "servedAt": at, "by": by, "pets": map[string]any{"pet1": map[string]any{"r": nil}}, "_del": false}
+		for k, v := range extra {
+			f[k] = v
+		}
+		return chg("change-"+id, "servings", id, clock(ms, 0, "anna"), f)
+	}
+	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
+		chg("change-snack", "products", "snack001", clock(ms, 0, "anna"), map[string]any{"type": "Snack", "variety": "Käse"}),
+		chg("change-nass", "products", "nass0001", clock(ms, 0, "anna"), map[string]any{"type": "Nassfutter", "variety": "Lachs"}),
+		serve("meal0001", "nass0001", "Anna", ms-5*3600000, nil),
+		serve("meal0002", "snack001", "Jonas", ms-60000, nil),
+		serve("meal0003", "nass0001", "Jonas", ms-30*60000, map[string]any{"_del": true}),
+	}})
+	ask := func(q string) (int, map[string]any) {
+		status, out, _ := call(a, "GET", "/api/fed"+q, testCode, nil)
+		return status, out
+	}
+	if s, out := ask("?since=" + itoa(ms-3600000)); s != 200 || out["fed"] != false || out["at"] != float64(0) {
+		t.Fatalf("a treat and a deleted meal in the last hour are no meal: %d %v", s, out)
+	}
+	if _, out := ask("?since=" + itoa(ms-6*3600000)); out["fed"] != true || out["at"] != float64(ms-5*3600000) || out["by"] != "Anna" {
+		t.Fatalf("the meal five hours ago: %v", out)
+	}
+	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{serve("meal0004", "", "", ms-10*60000, nil)}})
+	if _, out := ask("?since=" + itoa(ms-3600000)); out["fed"] != true || out["at"] != float64(ms-10*60000) || out["by"] != "" {
+		t.Fatalf("a meal without a variety yet counts: %v", out)
+	}
+	for _, q := range []string{"", "?since=", "?since=gestern", "?since=-5"} {
+		if s, _ := ask(q); s != 400 {
+			t.Fatalf("%q: %d, expected 400", q, s)
+		}
+	}
+	if s, _, _ := call(a, "GET", "/api/fed?since=1", "", nil); s != 401 {
+		t.Fatalf("without a code: %d", s)
+	}
+}

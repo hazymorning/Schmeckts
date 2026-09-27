@@ -1542,11 +1542,12 @@ FEED_DB = """() => import('./js/store.js').then(async s => { const d = s.default
 
 
 async def test_feed_remind(browser, url):
-    print('the feeding reminder: the usual times from the history, scheduled only while nothing has been served')
+    print('the feeding reminder: the usual times from the history, handed to our own plugin, which asks the household server first')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url, native=True)
     await pg.clock.set_fixed_time('2026-06-10T12:00:00+02:00')
-    PENDING = "Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications.filter(n => n.extra.feed).map(n => [n.extra.feed, new Date(n.schedule.at).toLocaleString('sv').slice(5, 16), n.title, n.body, n.isExactNotification]).sort())"
+    SET = "JSON.parse(localStorage.getItem('__feed') || '{\"reminders\": []}')"
+    PENDING = f"(() => {{ const t = x => new Date(x).toLocaleString('sv').slice(5, 16); return {SET}.reminders.map(r => [r.key, t(r.at), t(r.since), r.title, r.body, r.sure]).sort(); }})()"
     SECTION = """() => { const r = document.querySelector('#sheet [data-action=feed-remind]');
       return [r.querySelector('.t-main b').innerText, r.querySelector('.t-main small').innerText, r.getAttribute('aria-checked')]; }"""
     await pg.click('.welcome [data-action=add-pet]')
@@ -1561,6 +1562,10 @@ async def test_feed_remind(browser, url):
         f'settings: below „Ans Bewerten erinnern“ comes „Ans Füttern erinnern“, a switch, off by default; without a history its line says where the times come from ({empty})',
     )
     await settings_back(pg)
+    # A feeding reminder left over from 0.10, when LocalNotifications held them, goes on the next reconcile
+    await pg.evaluate(
+        "localStorage.setItem('__notes', JSON.stringify([{id: 99, title: 'Schon gefüttert?', body: 'alt', extra: {feed: '2026-06-10|1110', at: 1}}]))"
+    )
     await pg.evaluate(FEED_DB)
     await idle(pg)
     await settings(pg)
@@ -1572,8 +1577,7 @@ async def test_feed_remind(browser, url):
     await pg.evaluate("localStorage.setItem('__notifyAnswer', 'granted'); localStorage.setItem('__notifyPermission', 'prompt')")
     await pg.click('[data-action=feed-remind]')
     await debounced(pg)
-    sec, plan = await pg.evaluate(SECTION), await pg.evaluate(PENDING)
-    note = ['Schon gefüttert?', 'Um diese Zeit gibt es sonst Futter für Minka.', False]
+    sec, plan, handed = await pg.evaluate(SECTION), await pg.evaluate(PENDING), await pg.evaluate(SET)
     check(
         denied == [False, True, []]
         and before[1] == 'Meist um 07:15 und 18:30 Uhr'
@@ -1581,39 +1585,57 @@ async def test_feed_remind(browser, url):
         and await state(pg, 'prefs.feedRemind') is True,
         f'switching it on asks for the permission and stays off without it; the line names the learnt times ({before[1]} / {sec[1]})',
     )
+    note = ['Schon gefüttert?', 'Um diese Zeit gibt es sonst Futter für Minka.']
+    evening = note + ['Heute Abend ist noch nichts eingetragen. Um diese Zeit gibt es sonst Futter für Minka.']
+    morning = note + ['Heute Morgen ist noch nichts eingetragen. Um diese Zeit gibt es sonst Futter für Minka.']
     check(
         plan
         == [
-            ['2026-06-10|1110', '06-10 19:15'] + note,
-            ['2026-06-11|1110', '06-11 19:15'] + note,
-            ['2026-06-11|435', '06-11 08:00'] + note,
-            ['2026-06-12|1110', '06-12 19:15'] + note,
-            ['2026-06-12|435', '06-12 08:00'] + note,
-        ],
-        f'one is scheduled per usual time 45 minutes later for today and two days ahead, without an exact alarm; this morning\u2019s time has passed ({[x[:2] for x in plan]})',
+            ['2026-06-10|1110', '06-10 19:15', '06-10 17:30'] + evening,
+            ['2026-06-11|1110', '06-11 19:15', '06-11 17:30'] + evening,
+            ['2026-06-11|435', '06-11 08:00', '06-11 06:15'] + morning,
+            ['2026-06-12|1110', '06-12 19:15', '06-12 17:30'] + evening,
+            ['2026-06-12|435', '06-12 08:00', '06-12 06:15'] + morning,
+        ]
+        and 'server' not in handed
+        and 'code' not in handed
+        and await pg.evaluate("JSON.parse(localStorage.getItem('__notes') || '[]').filter(n => n.extra?.feed).length") == 0,
+        f'one per usual time 45 minutes later for today and two days ahead, each with the hour before the usual time it asks about and the text for when nobody has entered anything; without a household no server goes along; this morning\u2019s time has passed; the old reminder is gone ({[x[:3] for x in plan]})',
     )
     await shot(pg, 'settings-feed-reminder')
     await settings_back(pg)
+    # In a household the plugin gets the server and the code, so it can ask whether someone else has fed
+    house = await pg.evaluate("""import('./js/store.js').then(async s => { const r = await import('./js/logic/reminders.js');
+      s.prefs.code = 'K7PM-3QXD'; s.prefs.server = 'http://192.168.178.20:8486'; r.syncReminders();
+      await new Promise(done => setTimeout(done, 400)); const set = JSON.parse(localStorage.getItem('__feed'));
+      s.prefs.code = ''; s.prefs.server = ''; r.syncReminders(); await new Promise(done => setTimeout(done, 400));
+      return [set.server, set.code, set.reminders.length, 'server' in JSON.parse(localStorage.getItem('__feed'))]; })""")
+    check(
+        house == ['http://192.168.178.20:8486', 'K7PM-3QXD', 5, False],
+        f'connected, the server and the household code go along to the plugin, and go again on disconnecting ({house})',
+    )
     await pg.clock.set_fixed_time('2026-06-10T18:00:00+02:00')
     await pg.evaluate("import('./js/logic/feeding.js').then(f => f.serveProduct('snack000001'))")
     await debounced(pg)
-    snack = len(await pg.evaluate(PENDING))
+    snack = [len(await pg.evaluate(PENDING)), await pg.evaluate(f'{SET}.dismiss.length')]
     await pg.evaluate("import('./js/logic/feeding.js').then(f => f.serveProduct('nass000001'))")
     await debounced(pg)
     fed = [x[0] for x in await pg.evaluate(PENDING)]
     check(
-        snack == 5 and fed == ['2026-06-11|1110', '2026-06-11|435', '2026-06-12|1110', '2026-06-12|435'],
-        f'a treat cancels nothing, while a meal at the usual time cancels today\u2019s reminder ({snack}, {fed})',
+        snack == [5, 0]
+        and fed == ['2026-06-11|1110', '2026-06-11|435', '2026-06-12|1110', '2026-06-12|435']
+        and await pg.evaluate(f'{SET}.dismiss.length') == 2,
+        f'a treat changes nothing, while a meal at the usual time drops today\u2019s reminder, and takes back today\u2019s reminders should they already be shown ({snack}, {fed})',
     )
-    await pg.evaluate("window.__tapNote({actionId: 'tap', notification: {extra: {feed: '2026-06-11|435'}}})")
+    await pg.evaluate("window.__urlOpen({url: 'schmeckts://feed'})")
     await idle(pg)
-    check(await pg.locator('#sheet [data-action=scan]').count() == 1, 'a tap on the notification opens the feeding sheet')
+    check(await pg.locator('#sheet [data-action=scan]').count() == 1, 'a tap on the reminder opens the feeding sheet through schmeckts://feed')
     await pg.click('[data-action=close]')
     await idle(pg)
     await settings(pg)
     await pg.click('[data-action=feed-remind]')
     await debounced(pg)
-    check(await pg.evaluate(PENDING) == [] and await state(pg, 'prefs.feedRemind') is False, 'switched off: everything scheduled is cancelled')
+    check(await pg.evaluate(PENDING) == [] and await state(pg, 'prefs.feedRemind') is False, 'switched off: the plugin holds none')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -2034,6 +2056,17 @@ async def test_shortcuts(browser, url):
     )
     photo = (ROOT / 'app/native/java/de/schmeckts/app/PhotoPlugin.java').read_text()
     check('ACTION_IMAGE_CAPTURE' in photo and 'hint' in photo, 'the photo plugin uses the system camera, with a hint above it')
+    feed = ''.join((ROOT / f'app/native/java/de/schmeckts/app/{n}.java').read_text() for n in ('FeedReminderPlugin', 'FeedReceiver', 'FeedCheck'))
+    check(
+        'registerPlugin(FeedReminderPlugin.class)' in prep
+        and 'android:name=".FeedReceiver" android:exported="false"' in prep
+        and 'android.intent.action.BOOT_COMPLETED' in prep
+        and 'setAndAllowWhileIdle' in feed
+        and 'setExact' not in feed
+        and '/api/fed?since=' in feed
+        and 'schmeckts://feed' in feed,
+        'the feeding reminder: its plugin and receiver registered, inexact alarms set again after a restart, the server asked through /api/fed, a tap opening schmeckts://feed',
+    )
     check(
         'com.google.mlkit.vision.DEPENDENCIES' in prep and 'barcode_ui' in prep,
         'prepare.py declares Google\u2019s scanner module in the manifest (barcode_ui)',

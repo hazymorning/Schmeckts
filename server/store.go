@@ -371,6 +371,31 @@ func (s *Store) Products(limit int) []string {
 	return names
 }
 
+// LastMeal is the newest meal served at or after since, treats left out: its time in ms and who served it, 0 and ""
+// without one. A meal whose variety is unknown or gone counts, as it does in the app.
+func (s *Store) LastMeal(since int64) (at int64, by string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	snacks := map[string]bool{}
+	for id, rec := range s.st.Records["products"] {
+		var kind string
+		json.Unmarshal(rec.F["type"].V, &kind)
+		snacks[id] = kind == "Snack"
+	}
+	for _, rec := range s.st.Records["servings"] {
+		var served float64
+		var product, name string
+		json.Unmarshal(rec.F["servedAt"].V, &served)
+		json.Unmarshal(rec.F["productId"].V, &product)
+		if string(rec.F["_del"].V) == "true" || int64(served) < since || int64(served) <= at || snacks[product] {
+			continue
+		}
+		json.Unmarshal(rec.F["by"].V, &name)
+		at, by = int64(served), strings.TrimSpace(name)
+	}
+	return at, by
+}
+
 // Backup writes a copy once a day and keeps the last 30.
 // It also drops change ids older than keepSeen.
 func (s *Store) Backup(now time.Time) error {

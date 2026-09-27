@@ -9,6 +9,7 @@ package main
 //   GET  /api/events?code=…         live notice of new numbers (server-sent events)
 //   POST /api/recognize             recognise a packaging photo: {"image":"<base64>"}
 //   GET  /api/barcode/<code>        look food up by EAN: {"found", "brand", "variety", "type", "animal"}
+//   GET  /api/fed?since=<ms>        whether a meal has been served since then: {"fed", "at", "by"}
 //
 // Reachable from private networks only (home network, WireGuard) and only with the household
 // code, as "Authorization: Bearer <code>" or, for /api/events, as ?code=.
@@ -102,6 +103,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", a.auth(a.events))
 	mux.HandleFunc("POST /api/recognize", a.auth(a.recognize))
 	mux.HandleFunc("GET /api/barcode/{code}", a.auth(a.barcode))
+	mux.HandleFunc("GET /api/fed", a.auth(a.fed))
 	return a.guard(mux)
 }
 
@@ -201,7 +203,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	epoch, seq := a.store.Seq()
 	out := map[string]any{"app": "schmeckts", "version": version, "protocol": protocolVersion,
 		"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "recognition": a.cfg.Get().APIKey != "",
-		"features": []string{"barcode"}}
+		"features": []string{"barcode", "fed"}}
 	if givenCode(r) != "" {
 		status, msg := a.checkCode(r)
 		out["auth"] = status == http.StatusOK
@@ -365,4 +367,17 @@ func (a *API) barcode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
+}
+
+// fed says whether a meal has been served since a moment, and when and by whom the newest one was. A phone asks
+// before its feeding reminder goes off, so nobody is reminded of a meal someone else has already served. Treats do
+// not count, as they do not in the app's feeding times.
+func (a *API) fed(w http.ResponseWriter, r *http.Request) {
+	since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+	if err != nil || since <= 0 {
+		fail(w, http.StatusBadRequest, "Ungültige Anfrage.")
+		return
+	}
+	at, by := a.store.LastMeal(since)
+	writeJSON(w, http.StatusOK, map[string]any{"fed": at > 0, "at": at, "by": by})
 }
