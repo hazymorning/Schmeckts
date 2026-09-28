@@ -1366,25 +1366,36 @@ dialog.sheet.page .sheet-body {
   color: var(--muted);
 }
 /* The two columns before the meal, in em of their own text: with a larger system font they grow with it and
-   the line keeps running through the middle of the dot. */
+   the line keeps running through the middle of the dot. At 14px they are whole pixels, 49 and 28, so the dot's
+   middle falls on a pixel and the line lies exactly on it. Each meal draws its piece of the line, from its top to
+   its dot and from its dot to its foot, a dot sitting in the middle of its meal however tall that is: the line runs
+   from the first dot to the last and no further, and one meal alone has none. */
 .tl {
   list-style: none;
   margin: 0;
   padding: 0;
-  position: relative;
-  --tl-time: 3.3em;
-  --tl-node: 1.8em;
+  --tl-time: 3.5em;
+  --tl-node: 2em;
 }
-.tl::before {
+.tl > li {
+  position: relative;
+}
+.tl > li:not(:first-child)::before,
+.tl > li:not(:last-child)::after {
   content: "";
   position: absolute;
   font: var(--type-small);
-  left: calc(var(--tl-time) + var(--tl-node) / 2);
-  top: calc(var(--space-2h) + var(--pic-m) / 2);
-  bottom: calc(var(--space-2h) + var(--pic-m) / 2);
+  left: calc(var(--tl-time) + var(--tl-node) / 2 - var(--stroke) / 2);
   width: var(--stroke);
-  border-radius: var(--radius-full);
   background: var(--line);
+}
+.tl > li::before {
+  top: 0;
+  bottom: 50%;
+}
+.tl > li::after {
+  top: 50%;
+  bottom: 0;
 }
 .tl-item {
   border-radius: var(--radius-m);

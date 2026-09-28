@@ -4828,13 +4828,19 @@ async def test_home_history(browser, url):
     await ctx.close()
 
 
-# The timeline's geometry: how far the line is from the middle of the dot, whether the time fits its column,
-# and how wide that column is, so the caller can compare 100 % with 130 % system font.
-TL_GEOMETRY = """t => { const box = t.getBoundingClientRect(), dot = t.querySelector('.tl-node i').getBoundingClientRect();
-  const s = getComputedStyle(t, '::before'), middle = box.left + parseFloat(s.left) + parseFloat(s.width) / 2;
-  const time = t.querySelector('.tl-time');
-  return [Math.round(middle - (dot.left + dot.width / 2)), time.scrollWidth <= time.clientWidth + 1,
-    Math.round(time.getBoundingClientRect().width)]; }"""
+# The timelines' geometry: how far, at most, a piece of the line is from the middle of its meal's dot (across and at
+# the end that meets the dot), whether the line starts at the first dot and ends at the last (one meal alone: none),
+# whether the times fit their column, and how wide that column is, so the caller can compare 100 % with 130 % system
+# font.
+TL_GEOMETRY = """l => { let off = 0, ends = true, fits = true;
+  for (const t of l) { const items = [...t.children];
+    items.forEach((li, i) => { const box = li.getBoundingClientRect(), d = li.querySelector('.tl-node i').getBoundingClientRect(), dx = d.left + d.width / 2 - box.left, dy = d.top + d.height / 2 - box.top;
+      ['::before', '::after'].forEach((w, j) => { const s = getComputedStyle(li, w), want = j ? i < items.length - 1 : i > 0;
+        if ((s.content !== 'none') !== want) ends = false;
+        if (s.content === 'none') return;
+        off = Math.max(off, Math.abs(parseFloat(s.left) + parseFloat(s.width) / 2 - dx), Math.abs((j ? parseFloat(s.top) : box.height - parseFloat(s.bottom)) - dy)); }); });
+    const time = t.querySelector('.tl-time'); fits = fits && time.scrollWidth <= time.clientWidth + 1; }
+  return [Math.round(off * 100) / 100, ends, fits, Math.round(l[0].querySelector('.tl-time').getBoundingClientRect().width)]; }"""
 
 
 # The history page: its two cards, as wide as and as far apart as the ones on the home page
@@ -5033,13 +5039,13 @@ async def test_report(browser, url):
             f'{scheme}, 360 px: a page to begin with, the rest follows on scrolling, nothing clipped ({first} of 26, {wide})',
         )
         await shot(pg, f'report-{scheme}')
-        small = await pg.eval_on_selector('#sheet .tl', TL_GEOMETRY)
+        small = await pg.eval_on_selector_all('#sheet .tl', TL_GEOMETRY)
         await pg.evaluate(BIG_TEXT, 1.3)
         await idle(pg)
-        geo = await pg.eval_on_selector('#sheet .tl', TL_GEOMETRY)
+        geo = await pg.eval_on_selector_all('#sheet .tl', TL_GEOMETRY)
         check(
-            abs(small[0]) <= 1 and small[1] and abs(geo[0]) <= 1 and geo[1] and geo[2] > small[2],
-            f'{scheme}: the line runs through the middle of the dot and the time fits, at 100 % and at 130 % ({small}, {geo})',
+            small[0] <= 0.1 and small[1] and small[2] and geo[0] <= 0.1 and geo[1] and geo[2] and geo[3] > small[3],
+            f'{scheme}: the line runs exactly through the middle of every dot, from the first dot of a day to its last and no further, and the time fits, at 100 % and at 130 % ({small}, {geo})',
         )
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
