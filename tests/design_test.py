@@ -1364,6 +1364,30 @@ def test_motion_js():
     check(not bad, f'no duration, curve or transition of its own in js/ ({len(bad)}: {bad})')
 
 
+def test_strip():
+    """The rating strip is a variant of the calendar's dots, not a recipe of its own (PROJECT.md, "Recipes").
+
+    It sits under the dots in the Recipes section and says only that it never shrinks, so its dots, their size and
+    colours and the „+“ are the calendar's; a screen only places it."""
+    decls = app_decls()
+    own = [(sec, p, v) for sec, sel, p, v in decls if sel == '.dots.strip']
+    elsewhere = [f'{sel} {p}:{v}' for sec, sel, p, v in decls if 'strip' in sel and sel != '.dots.strip' and (sec != 'Views' or p not in PLACING)]
+    order = [sel for sec, sel, p, v in decls if sec == 'Recipes' and sel.startswith('.dots')]
+    js = (WWW / 'js/views/parts.js').read_text(encoding='utf-8')
+    check(
+        own == [('Recipes', 'flex', 'none')] and not elsewhere and order[-1] == '.dots.strip' and 'class="dots strip"' in js,
+        f'the strip: the calendar’s dots as a variant under their recipe, nothing of its own but that it never shrinks ({own}, {elsewhere})',
+    )
+    check(
+        re.search(r'\bconst STRIP = 8\b', js) and "'<b>+</b>'" in js and 'role="img" aria-label=' in js,
+        'at most 8 dots, the „+“ in front of them where there are more, and what they say in words as the label',
+    )
+
+
+# What a screen may set on a recipe it places (PROJECT.md, "Where styles live")
+PLACING = ('display', 'gap', 'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'flex', 'order', 'align-self', 'justify-self')
+
+
 def test_ratings():
     """The server's overview labels every level of RATINGS, with the app's wording.
 
@@ -1424,6 +1448,7 @@ async def test_files(browser, url):
     test_layers_lines_sizes()
     test_boxes()
     test_motion_js()
+    test_strip()
     test_ratings()
     test_isolated_tests()
     test_prompt()

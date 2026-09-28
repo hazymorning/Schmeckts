@@ -164,6 +164,21 @@ export function calendarHTML(list) {
   }
   return `<div class="cal">${cells}</div>`;
 }
+/* Ratings as a strip of the calendar's dots, each in its rating's colour, the oldest on the left and the newest on the
+   right: at most STRIP of them, and where there are more a „+“ in front, as the calendar puts it after its dots. What
+   they say in words is its label, so nothing rests on colour. ratings: rating keys, oldest first (ratingsIn() in
+   smart.js). Nothing without a rating. */
+const STRIP = 8;
+export function strip(ratings) {
+  if (!ratings.length) return '';
+  const counts = {};
+  for (const r of ratings) counts[r] = (counts[r] || 0) + 1;
+  const said = evidenceOf({n: ratings.length, counts});
+  return `<span class="dots strip" role="img" aria-label="${esc(said)}">${ratings.length > STRIP ? '<b>+</b>' : ''}${ratings
+    .slice(-STRIP)
+    .map(r => `<i class="${rateCls(r)}"></i>`)
+    .join('')}</span>`;
+}
 export function dayGroups(list) {
   const groups = [];
   for (const s of list) {

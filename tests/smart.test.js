@@ -2,7 +2,21 @@
 process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyze, feedReminders, feedSlots, hintKey, milestones, rateCls, report, week} from '../app/www/js/smart.js';
+import {
+  analyze,
+  changes,
+  feedReminders,
+  feedSlots,
+  habits,
+  hintKey,
+  milestones,
+  profile,
+  rateCls,
+  ratingsIn,
+  report,
+  variety,
+  week,
+} from '../app/www/js/smart.js';
 import {RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
 
 const DAY = 864e5,
@@ -10,20 +24,22 @@ const DAY = 864e5,
 const [T, G, M, S, X] = ['top', 'gut', 'mittel', 'sosse', 'schlecht'];
 const at = text => new Date(text).getTime();
 
-/* meals: [variety, {pet: rating}, days ago or 'YYYY-MM-DDThh:mm', person] */
+/* meals: [variety, {pet: rating}, days ago or 'YYYY-MM-DDThh:mm', person]; newest first, as the app keeps them */
 function household(pets, products, meals) {
   return {
     pets: pets.map(id => ({id, name: id})),
     products: products
       .map(p => (typeof p === 'string' ? {id: p} : p))
       .map(p => ({brand: '', variety: '', codes: {}, ...p})),
-    servings: meals.map(([productId, rated, when, by], i) => ({
-      id: 'meal' + i,
-      productId,
-      by,
-      servedAt: typeof when === 'string' ? at(when) : NOW - when * DAY,
-      pets: Object.fromEntries(Object.entries(rated).map(([pet, r]) => [pet, {r}])),
-    })),
+    servings: meals
+      .map(([productId, rated, when, by], i) => ({
+        id: 'meal' + i,
+        productId,
+        by,
+        servedAt: typeof when === 'string' ? at(when) : NOW - when * DAY,
+        pets: Object.fromEntries(Object.entries(rated).map(([pet, r]) => [pet, {r}])),
+      }))
+      .sort((a, b) => b.servedAt - a.servedAt),
   };
 }
 const rate = (sort, pet, ratings, daysAgo = 0) => ratings.map(r => [sort, {[pet]: r}, daysAgo]);
@@ -303,7 +319,7 @@ const insights = db =>
   model(db).insights.map(i => (i.sorts ? [i.kind, i.sorts] : [i.kind, i.type, i.best.key, i.worst.key]));
 
 test('insights: groups of two varieties rated twice each, far apart, every variety of one above every one of the other', () => {
-  const sort = (id, brand, variety) => ({id, brand, variety});
+  const sort = (id, brand, name) => ({id, brand, variety: name});
   const four = [
     sort('a', 'Sheba', 'Lachs in Soße'),
     sort('b', 'Sheba', 'Huhn in Soße'),
@@ -448,6 +464,342 @@ test('consistency insights: the texture field, the keywords only when it is miss
       ['konsistenz', 'Nassfutter', 'In Gelee', 'Pastete'],
       ['konsistenz', 'Snack', 'Creme', 'Knusprig'],
     ],
+  );
+});
+
+/* The profile as [dimension, type, [[group, good, of], …] best first, clear] */
+const profiled = (db, prefs) =>
+  profile(model(db, prefs)).map(d => [d.kind, d.type, d.groups.map(g => [g.key, g.good, g.n]), d.clear]);
+const FOUR = [
+  {id: 'a', brand: 'Sheba', variety: 'Lachs in Soße'},
+  {id: 'b', brand: 'Sheba', variety: 'Huhn in Soße'},
+  {id: 'c', brand: 'Felix', variety: 'Lachs in Gelee'},
+  {id: 'd', brand: 'Felix', variety: 'Huhn in Gelee'},
+];
+
+test('profile: every dimension with two groups of two varieties rated twice, ranked, and clear where far apart', () => {
+  const db = household(['A'], FOUR, [
+    ...rate('a', 'A', [T, T]),
+    ...rate('b', 'A', [T, G]),
+    ...rate('c', 'A', [X, X]),
+    ...rate('d', 'A', [S, X]),
+  ]);
+  assert.deepEqual(
+    profiled(db),
+    [
+      [
+        'konsistenz',
+        'Nassfutter',
+        [
+          ['In Soße', 4, 4],
+          ['In Gelee', 0, 4],
+        ],
+        true,
+      ],
+      [
+        'geschmack',
+        'Nassfutter',
+        [
+          ['Huhn', 2, 4],
+          ['Lachs', 2, 4],
+        ],
+        false,
+      ],
+      [
+        'marke',
+        'Nassfutter',
+        [
+          ['Sheba', 4, 4],
+          ['Felix', 0, 4],
+        ],
+        true,
+      ],
+    ],
+    'a fixed order of dimensions, each shown on its own; level groups are not clear, and they rank by name',
+  );
+  assert.deepEqual(
+    profiled(household(['A'], [FOUR[0], FOUR[2]], [...rate('a', 'A', [T, T]), ...rate('c', 'A', [X, X])])),
+    [],
+    'one variety a group: that is a verdict, not a profile',
+  );
+  assert.deepEqual(
+    profiled(
+      household(['A'], FOUR, [
+        ...rate('a', 'A', [T]),
+        ...rate('b', 'A', [T, G]),
+        ...rate('c', 'A', [X, X]),
+        ...rate('d', 'A', [S, X]),
+      ]),
+    ),
+    [],
+    'a variety rated once does not count, so every group it is in is too small',
+  );
+  const carried = profiled(
+    household(['A'], FOUR, [
+      ...rate('a', 'A', [T, T, T, T]),
+      ...rate('b', 'A', [X, X]),
+      ...rate('c', 'A', [X, X]),
+      ...rate('d', 'A', [G, X]),
+    ]),
+  )[0];
+  assert.deepEqual(
+    carried,
+    [
+      'konsistenz',
+      'Nassfutter',
+      [
+        ['In Soße', 4, 6],
+        ['In Gelee', 1, 4],
+      ],
+      false,
+    ],
+    'far enough apart on the whole, but a sauce variety left behind a jelly one: ranked, and not clear',
+  );
+});
+
+test('profile: within one food type, with the pet filter, and every group’s ratings oldest first', () => {
+  const sort = (id, brand, type) => ({id, brand, variety: 'Huhn', type});
+  const dry = household(
+    ['A', 'B'],
+    [
+      sort('t1', 'Felix', 'Trockenfutter'),
+      sort('t2', 'Felix', 'Trockenfutter'),
+      sort('t3', 'Josera', 'Trockenfutter'),
+      sort('t4', 'Josera', 'Trockenfutter'),
+      sort('n1', 'Sheba', 'Nassfutter'),
+    ],
+    [
+      ['t1', {A: 'liegen'}, 9],
+      ['t1', {A: 'wenig'}, 8],
+      ['t2', {A: 'liegen'}, 7],
+      ['t2', {A: 'normal'}, 6],
+      ['t3', {A: 'gern', B: 'liegen'}, 5],
+      ['t3', {A: 'gern', B: 'liegen'}, 4],
+      ['t4', {A: 'normal', B: 'liegen'}, 3],
+      ['t4', {A: 'gern', B: 'wenig'}, 2],
+      ['n1', {A: 'top'}, 1],
+      ['n1', {A: 'top'}, 1],
+    ],
+  );
+  assert.deepEqual(profiled(dry, {activePet: 'A'}), [
+    [
+      'marke',
+      'Trockenfutter',
+      [
+        ['Josera', 4, 4],
+        ['Felix', 1, 4],
+      ],
+      true,
+    ],
+  ]);
+  assert.deepEqual(
+    profiled(dry),
+    [
+      [
+        'marke',
+        'Trockenfutter',
+        [
+          ['Josera', 4, 8],
+          ['Felix', 1, 4],
+        ],
+        false,
+      ],
+    ],
+    'the whole household: Tiger left Josera, so it is no longer clear; the wet food variety stands alone',
+  );
+  const minka = model(dry, {activePet: 'A'});
+  assert.deepEqual(
+    profile(minka)[0].groups.map(g => ratingsIn(minka, g.ids)),
+    [
+      ['gern', 'gern', 'normal', 'gern'],
+      ['liegen', 'wenig', 'liegen', 'normal'],
+    ],
+    'the ratings of a group oldest first, only those within the filter',
+  );
+});
+
+test('habits: „nur die Soße“ and „erst gierig“ from two varieties where it happened at least half of the time', () => {
+  const E = 'eager';
+  const db = household(
+    ['A'],
+    ['a', 'b', 'c', 'd'],
+    [...rate('a', 'A', [S, S, T]), ...rate('b', 'A', [S, G]), ...rate('c', 'A', [S]), ...rate('d', 'A', [E, E, T])],
+  );
+  assert.deepEqual(
+    habits(model(db)),
+    [
+      {
+        kind: 'sosse',
+        sorts: [
+          {id: 'a', k: 2, n: 3},
+          {id: 'b', k: 1, n: 2},
+        ],
+      },
+    ],
+    'c rated once does not count; „erst gierig“ with one variety is no habit',
+  );
+  const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, E])]);
+  assert.deepEqual(
+    habits(model(both)).map(x => x.kind),
+    ['sosse', 'eager'],
+  );
+});
+
+/* A pet's meals in the order they were served, the oldest first, one a day up to yesterday: [variety, rating] */
+const inTurn = (pet, meals) => meals.map(([sort, r], i) => [sort, {[pet]: r}, meals.length - i]);
+/* Meals in runs of one variety, [variety, rating …] each: a run's first meal follows another variety, the rest of it
+   the same one */
+const runs = (pet, list) =>
+  inTurn(
+    pet,
+    list.flatMap(([sort, ...rs]) => rs.map(r => [sort, r])),
+  );
+const tried = (meals, prefs, pets = ['A']) =>
+  variety(model(household(pets, ['x', 'y', {id: 'snack', type: 'Snack'}], meals), prefs)).map(v => [
+    v.pet,
+    v.kind,
+    v.same.good,
+    v.same.n,
+    v.other.good,
+    v.other.n,
+  ]);
+
+test('Abwechslung: after the same variety against the rest, 25 points apart, either way', () => {
+  // 8 runs of two and 7 single meals: 15 after another variety (12 good), 8 after the same one (3 good)
+  const likes = runs('A', [
+    ['x', T, T],
+    ['y', T, T],
+    ['x', T, T],
+    ['y', T, X],
+    ['x', T, X],
+    ['y', T, X],
+    ['x', T, X],
+    ['y', X, X],
+    ['x', T],
+    ['y', T],
+    ['x', T],
+    ['y', X],
+    ['x', T],
+    ['y', X],
+    ['x', T],
+  ]);
+  assert.deepEqual(tried(likes), [['A', 'abwechslung', 3, 8, 12, 15]]);
+  const habit = runs('A', [
+    ['x', X, T],
+    ['y', X, T],
+    ['x', X, T],
+    ['y', T, T],
+    ['x', X, T],
+    ['y', X, T],
+    ['x', T, X],
+    ['y', X, T],
+  ]);
+  assert.deepEqual(tried(habit), [['A', 'gewohnheit', 7, 8, 2, 8]]);
+});
+
+test('Abwechslung: at least 6 ratings on either side, exactly 25 points is enough, treats do not count', () => {
+  const pairs = (same, other) =>
+    runs(
+      'A',
+      same.map((r, i) => [i % 2 ? 'y' : 'x', other[i], r]),
+    );
+  assert.deepEqual(tried(pairs([X, X, X, X, X], [T, T, T, T, T])), [], 'five meals after the same variety are too few');
+  assert.deepEqual(
+    tried(pairs([T, T, T, X, X, X], [T, T, T, T, T, T])),
+    [['A', 'abwechslung', 3, 6, 6, 6]],
+    'six on either side are enough',
+  );
+  assert.deepEqual(
+    tried(
+      runs('A', [
+        ['x', T, T],
+        ['y', T, T],
+        ['x', T, T],
+        ['y', T, X],
+        ['x', X, X],
+        ['y', X, X],
+        ['x', T],
+        ['y', T],
+      ]),
+    ),
+    [['A', 'abwechslung', 3, 6, 6, 8]],
+    '3 of 6 against 6 of 8: exactly 25 points',
+  );
+  assert.deepEqual(
+    tried(
+      runs('A', [
+        ['x', T, T],
+        ['y', T, T],
+        ['x', T, T],
+        ['y', T, T],
+        ['x', T, X],
+        ['y', T, X],
+        ['x', T],
+        ['y', T],
+        ['x', T],
+        ['y', X],
+      ]),
+    ),
+    [],
+    '4 of 6 against 9 of 10: 23 points',
+  );
+  const around = inTurn('A', [
+    ['x0', T],
+    ['snack', 'verputzt'],
+    ['x0', X],
+    [null, T],
+    ['x0', T],
+  ]);
+  assert.deepEqual(
+    model(household(['A'], ['x0', {id: 'snack', type: 'Snack'}], around)).repeats,
+    {A: {same: {n: 1, good: 0}, other: {n: 2, good: 2}}},
+    'a treat between two meals of the same variety leaves it a repeat, a meal of unknown food does not',
+  );
+});
+
+test('Abwechslung: one per pet, and only the pet in the filter', () => {
+  const likes = runs('A', [
+    ['x', T, X],
+    ['y', T, X],
+    ['x', T, X],
+    ['y', T, X],
+    ['x', T, X],
+    ['y', T, X],
+    ['x', T],
+  ]);
+  const both = [...likes, ...likes.map(([sort, {A: r}, when]) => [sort, {B: r === T ? X : T}, when + 0.5])];
+  assert.deepEqual(tried(both, {}, ['A', 'B']), [
+    ['A', 'abwechslung', 0, 6, 7, 7],
+    ['B', 'gewohnheit', 6, 6, 0, 7],
+  ]);
+  assert.deepEqual(tried(both, {activePet: 'B'}, ['A', 'B']), [['B', 'gewohnheit', 6, 6, 0, 7]]);
+});
+
+test('changes: the varieties whose verdict became „Nachkaufen“ or „Nicht mehr kaufen“ within the span', () => {
+  const db = household(
+    ['Minka', 'Tiger'],
+    ['lachs', 'neu', 'rind', 'huhn', 'spaet', 'pute'],
+    [
+      ...rate('lachs', 'Minka', [T, T, T], 20),
+      ...rate('neu', 'Minka', [G], 20),
+      ...rate('neu', 'Minka', [T, T], 2),
+      ...rate('rind', 'Minka', [X], 20),
+      ...rate('rind', 'Minka', [X], 3),
+      ...rate('huhn', 'Minka', [X, X], 20),
+      ...rate('spaet', 'Minka', [T, T, T], -1),
+      ...rate('pute', 'Tiger', [S, X], 4),
+    ],
+  );
+  assert.deepEqual(
+    changes(db, {activePet: 'all'}, NOW, 7),
+    {nachkaufen: ['neu'], nicht: ['rind', 'pute']},
+    'not what held before the span or is still to come, the clearest first',
+  );
+  assert.deepEqual(changes(db, {activePet: 'Tiger'}, NOW, 7), {nachkaufen: [], nicht: ['pute']});
+  assert.deepEqual(
+    changes(db, {activePet: 'all'}, NOW, 30),
+    {nachkaufen: ['lachs', 'neu'], nicht: ['rind', 'huhn', 'pute']},
+    'a longer span reaches further back',
   );
 });
 

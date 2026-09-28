@@ -1651,6 +1651,10 @@ dialog.sheet.page .sheet-body {
   font: var(--type-caption-strong);
   color: var(--faint);
 }
+/* A strip of ratings (strip() in views/parts.js): the same dots, oldest first, as a whole that never shrinks */
+.dots.strip {
+  flex: none;
+}
 
 /* == Views == */
 /* Home: header and cards */
