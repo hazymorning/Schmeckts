@@ -1932,6 +1932,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .sugg > .ic {
   color: var(--faint);
 }
+/* The food sheet: the variety's ratings as a strip, oldest first, over its counters */
+.sheet-body > .strip {
+  margin-bottom: var(--space-3h);
+}
 .counts {
   display: grid;
   grid-auto-flow: column;

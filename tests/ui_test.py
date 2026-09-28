@@ -340,6 +340,33 @@ async def test_buying(browser, url):
         f'food sheet „Kaufen“: Automatisch · Immer kaufen · Nicht kaufen, the verdict below, one line per pet with its ratings in words ({lines})',
     )
     await shot(pg, 'food-buying')
+    # Above the counters the variety's ratings as a strip, within the pet filter, the oldest on the left
+    STRIP = f"""import('./js/store.js').then(async s => {{ const {{rateCls}} = await import('./js/smart.js'), el = document.querySelector('#sheet .strip');
+      const want = s.db.servings.filter(x => x.productId === '{lachs}' && x.servedAt <= Date.now()).sort((a, b) => a.servedAt - b.servedAt)
+        .flatMap(x => Object.entries(x.pets).filter(([pid, v]) => v.r && (s.prefs.activePet === 'all' || pid === s.prefs.activePet)).map(([, v]) => rateCls(v.r)));
+      return [[...el.querySelectorAll('i')].map(i => i.className), want, el.nextElementSibling.classList.contains('tally'), el.getAttribute('aria-label')]; }})"""
+    everyone = await pg.evaluate(STRIP)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('[data-action=filter][data-id=tigerpet01]')
+    await idle(pg)
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{lachs}'}}))")
+    await idle(pg)
+    tiger_strip = await pg.evaluate(STRIP)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('[data-action=filter][data-id=all]')
+    await idle(pg)
+    check(
+        everyone[0] == everyone[1]
+        and len(everyone[0]) == 6
+        and everyone[0][-2:] == ['r-bad', 'r-bad']
+        and everyone[2:] == [True, 'Mal so, mal so: 3× gut gefressen, 2× kaum angerührt, 1× halb gegessen']
+        and tiger_strip == [['r-bad', 'r-bad'], ['r-bad', 'r-bad'], True, 'Beide Male kaum angerührt'],
+        f'food sheet: above the counters a strip of the ratings within the filter, the oldest on the left, and in words what they say ({everyone}, {tiger_strip})',
+    )
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{lachs}'}}))")
+    await idle(pg)
     await pg.click('#sheet [data-action=buy][data-v=nicht]')
     await idle(pg)
     check(

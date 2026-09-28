@@ -23,7 +23,7 @@ import {
   servingsInFilter,
   sortOf,
 } from '../derive.js';
-import {MIN_RATED, rateCls, scoreCls, shopGroups, VERDICTS} from '../smart.js';
+import {MIN_RATED, rateCls, ratingsIn, scoreCls, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -45,6 +45,7 @@ import {
   scaleEnds,
   segmented,
   shopRow,
+  strip,
   habitRow,
   lead,
   likesList,
@@ -321,6 +322,7 @@ function viewProduct() {
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
     ${productCard(p, ss.length)}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
+    ${strip(ratingsIn(model(), [p.id]))}
     ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}
     ${kaufenHTML(e)}
     ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}
