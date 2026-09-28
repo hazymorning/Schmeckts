@@ -1,24 +1,14 @@
 /* Home page: pet bar and cards in a fixed order, the welcome page when there are no pets. Everything evaluated comes
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
-import {settled} from '../motion.js';
+import {settled, slideHeight} from '../motion.js';
 import {andList, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {RATINGS, TEXTURES, TYPES} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {
-  getPet,
-  getProduct,
-  lastWeek,
-  model,
-  openPets,
-  pendingServings,
-  petNames,
-  pname,
-  servingPets,
-} from '../derive.js';
+import {getPet, getProduct, lastWeek, model, pendingServings, petNames, pname, servingPets} from '../derive.js';
 import {hintKey, scoreCls, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
@@ -70,7 +60,8 @@ export function scrollTop() {
 
 // fresh: id of the meal just served, which slides in on the next draw
 // open: unfolded cards, lasts until the app restarts
-export const homeView = {fresh: null, open: {}};
+// held: meals rated in „Wie war’s?“ that stay there a moment longer (logic/editing.js), each with the pets rated there
+export const homeView = {fresh: null, open: {}, held: new Map()};
 
 /* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
    settings. */
@@ -135,7 +126,8 @@ function homeHTML() {
       ? ''
       : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert. Öffne die Datei lokal im Browser, dann bleiben deine Daten erhalten.</p>`;
   if (!db.pets.length) return banner + welcomeHTML();
-  const pend = pendingServings(),
+  const open = new Set(pendingServings()),
+    pend = db.servings.filter(s => open.has(s) || (homeView.held.has(s.id) && rateRows(s).length)),
     m = db.servings.length ? model() : null;
   let html = banner + (m ? overviewHTML(m, homeView.open.overview) : '');
   if (pend.length) html += pendingHTML(pend);
@@ -183,7 +175,8 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und erste Erkenntnisse.</p></li></ol></section>`;
 
-/* „Wie war’s?“: only while ratings are still open */
+/* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. */
+const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
 function pendingHTML(list) {
   const multiHouse = db.pets.length > 1;
   return (
@@ -191,7 +184,7 @@ function pendingHTML(list) {
     list
       .map(s => {
         const p = getProduct(s.productId),
-          ids = openPets(s),
+          ids = rateRows(s),
           multi = ids.length > 1;
         const main = `<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 's') : ''}`;
         // With a large photo on this phone its thumbnail is a button of its own, which opens it
@@ -239,21 +232,6 @@ export function expandCard(key) {
   btn.setAttribute('aria-expanded', String(homeView.open[key]));
   slideHeight(body, h0);
 }
-/* el eases from h0 to its new height (--dur-step, --ease-out), carrying "animating" while it does; instantly under
-   reduced motion */
-function slideHeight(el, h0) {
-  const h1 = el.offsetHeight;
-  if (reduceMotion.matches || h1 === h0) return;
-  el.style.height = h0 + 'px';
-  el.classList.add('animating'); // carries the height transition (app.css, Motion)
-  void el.offsetHeight;
-  el.style.height = h1 + 'px';
-  settled(el).then(() => {
-    el.style.height = '';
-    el.classList.remove('animating');
-  });
-}
-
 /* Hint: the one with the highest precedence (a sentence, a reason, the buttons) */
 const HINT_TITLES = {
   appetit: 'Appetit',

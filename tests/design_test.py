@@ -1135,7 +1135,6 @@ GEOMETRY_ALLOWED = {
     '.toast': 'a toast is never wider than 520px',
     '.slider-track': 'the rating slider\u2019s track, 12px thick',
     '.slider-bar button::before': 'a stop on it, 4px',
-    '.slider-say': 'the row above it is as tall with the ends of the scale as with the name of a level',
 }
 ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
 
@@ -1215,6 +1214,7 @@ PADDING = {
     '.seg button': 'var(--space-2) var(--space-1h)',
     '.link': 'var(--space-3) 0',
     '.day': 'var(--space-1) 0 var(--space-2)',
+    '.slider-tip': 'var(--inset-compact)',
     '.toast': 'var(--space-2) var(--space-2) var(--space-2) var(--gutter)',
     '.toast.plain': 'var(--gutter)',
     '.head': '0 var(--gutter)',
@@ -1296,6 +1296,8 @@ TIMERS_ALLOWED = {
     ('ui/splash.js', '2500'): 'the splash screen goes, whatever failed on the way',
     ('views/home.js', '400'): 'a view transition whose callback never ran is skipped',
     ('logic/reminders.js', '250'): 'reminders are reconciled once per burst',
+    ('logic/editing.js', '1500'): 'a meal just rated stays a moment, to be read and put right, before it folds away',
+    ('ui/slider.js', '100'): 'a finger resting on the rating slider is answered after Android’s tap timeout',
     ('logic/data.js', '2000'): 'the download has started before its address is revoked',
     ('logic/exchange.js', '2000'): 'the download has started before its address is revoked',
 }

@@ -6,14 +6,16 @@ import {hasLine, withLine, withoutLine} from '../ocr.js';
 import {db, save} from '../store.js';
 import {byMe, findProduct, getPet, getProduct, getServing, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
-import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
-import {showLevel} from '../ui/slider.js';
-import {update} from '../views/home.js';
+import {closeSheet, dlg, renderSheet, sheet} from '../ui/sheet.js';
+import {setLevel, untouched} from '../ui/slider.js';
+import {viewerOpen} from '../ui/viewer.js';
+import {homeView, update} from '../views/home.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, retryNow, serveProduct} from './feeding.js';
 
-/* Rates what a meal was for one pet, from a level's button on the rating slider, which shows the level and pops.
-   A level the meal already holds stays as it is: a second tap while the card folds away, Enter twice. */
+/* Rates what a meal was for one pet, from a level's button on the rating slider, which then shows the level, pops
+   and says it under the track. The toast confirms at once, with „Rückgängig“. A level the meal already holds stays
+   as it is: a second tap, Enter twice. */
 export function rate(el) {
   const s = getServing(el.dataset.s),
     pid = el.dataset.p,
@@ -23,11 +25,13 @@ export function rate(el) {
   s.pets[pid] = {r, at: Date.now(), ...byMe()};
   save();
   haptic('success');
-  const shown = showLevel(el.closest('.slider'), r);
-  shown.classList.add('picked');
-  const pet = getPet(pid);
-  const msg = `${RATINGS[r].label} gespeichert${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}`;
-  showRated(shown, s, pid, msg, undoRating(s.id, pid, prev));
+  const disc = setLevel(el.closest('.slider'), r),
+    pet = getPet(pid);
+  toast(
+    `${RATINGS[r].label} gespeichert${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}`,
+    undoRating(s.id, pid, prev),
+  );
+  showRated(disc, s, pid);
 }
 
 /* Puts the rating that was there back, wherever the tap came from */
@@ -40,34 +44,49 @@ const undoRating = (sid, pid, prev) => () => {
   if (sheet?.kind === 'serving' && sheet.id === sid) renderSheet();
 };
 
-/* The rating is stored and felt at once; the interface follows once the level's pop, or the card's fold, has run,
-   so neither is cut off */
-function showRated(el, s, pid, msg, undo) {
-  const rated = () => Object.values(s.pets).every(x => x.r);
-  if (sheet?.kind === 'serving') {
-    // In the sheet: with the last open rating it closes, otherwise it shows the new state
-    if (rated()) {
-      settled(el)
-        .then(() => closeSheet())
-        .then(() => afterRating(msg, undo));
-      return;
-    }
-    settled(el).then(() => {
-      renderSheet();
-      update();
-    });
-    toast(msg, undo);
+/* Once every pet of a meal is rated, the meal stays where it was rated for a moment, to be read and put right with
+   another slide; then the card in „Wie war’s?“ folds away, or the sheet closes. Rated again, the moment starts over;
+   a finger still on a slider holds it until it lifts. */
+const HOLD = 1500; // ms
+const holds = new Map(); // meal id → the number of its newest hold: an older one that ends leaves the meal alone
+let lastHold = 0;
+const rated = s => Object.values(s.pets).every(x => x.r);
+function showRated(disc, s, pid) {
+  const inSheet = sheet?.kind === 'serving' && sheet.id === s.id;
+  if (!inSheet) {
+    // the pet's row stays in „Wie war’s?“ while the meal does, the rest of the home page follows once the pop has run
+    if (!homeView.held.has(s.id)) homeView.held.set(s.id, new Set());
+    homeView.held.get(s.id).add(pid);
+  }
+  settled(disc)
+    .then(untouched)
+    .then(() => update());
+  if (!rated(s)) {
+    holds.delete(s.id);
     return;
   }
-  // On the home page: with everything rated the card animates out first
-  const li = el.closest('.pend'),
-    gone = li && rated();
-  if (gone) li.classList.add('leaving');
-  settled(gone ? li : el).then(() => afterRating(msg, undo));
+  const mine = ++lastHold;
+  holds.set(s.id, mine);
+  setTimeout(() => untouched().then(() => holds.get(s.id) === mine && finish(s.id, inSheet)), HOLD);
 }
-function afterRating(msg, undo) {
-  update();
-  toast(msg, undo);
+function finish(sid, inSheet) {
+  holds.delete(sid);
+  const s = getServing(sid);
+  if (!s || !rated(s)) return; // undone in the meantime, or given another pet
+  if (inSheet) {
+    // not while something is typed there or the sheet has moved on
+    const busy = document.activeElement?.matches('input, textarea') && dlg.contains(document.activeElement);
+    if (sheet?.kind === 'serving' && sheet.id === sid && !sheet.step && !busy && !viewerOpen()) closeSheet();
+    return;
+  }
+  const li = document.querySelector(`.pend[data-id="${sid}"]`),
+    gone = () => {
+      homeView.held.delete(sid);
+      update();
+    };
+  if (!li) return gone();
+  li.classList.add('leaving');
+  settled(li).then(gone);
 }
 
 /* „Speichern“ while naming, from three places: a meal gets its variety, „Neues Futter“ serves it straight

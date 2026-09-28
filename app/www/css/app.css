@@ -642,13 +642,15 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-3h);
 }
 /* Rating slider (views/parts.js, ui/slider.js): the variety's scale as one track from the best level to the worst in
-   their colours, a stop for each. Above it one row: the two ends of the scale before a rating, then the name of the
-   level the thumb stands on. The thumb is a disc as large as a small tap target, ringed in the level's colour and
-   carrying its icon. The whole bar takes the finger; the stops are the levels' buttons, which only the keyboard and a
-   screen reader use. */
+   their colours, a stop for each. Before a rating the two ends of the scale stand close under the track, in the
+   bar's lower edge, so the slider is no taller than its bar; once the meal holds a level, the thumb stands on it and
+   the level's name and what the bowl looks like stand under the bar. While a finger is on the track, a label above
+   the thumb says the same of the level under it. The thumb is a disc as large as a small tap target, ringed in the
+   level's colour and carrying its icon. The whole bar takes the finger; the stops are the levels' buttons, which only
+   the keyboard and a screen reader use. */
 .slider {
   --thumb: var(--tap-s); /* a stop's centre runs from half of it to the other end less half of it */
-  container-type: inline-size; /* the thumb goes its way in the slider's width, cqw */
+  container-type: inline-size; /* the thumb and its label go their way in the slider's width, cqw */
 }
 .slider-bar {
   position: relative;
@@ -704,26 +706,59 @@ dialog.sheet.page .sheet-body {
 .slider.unset .slider-thumb {
   display: none;
 }
-/* Above the track, in one place: the ends of the scale, or the name of the level */
-.slider-say {
-  display: grid;
-  min-height: var(--icon-s);
+.slider-bar > .ends {
+  position: absolute;
+  inset: auto 0 0;
+  pointer-events: none;
 }
-.slider-say > * {
-  grid-area: 1 / 1;
-  align-self: end;
+.slider:not(.unset) .slider-bar > .ends {
+  opacity: 0;
+} /* the thumb has come */
+/* A level in words: its name in Faustina, what the bowl looks like under it */
+.slider-say,
+.slider-tip {
   margin: 0;
+}
+.slider-name,
+.slider-say small,
+.slider-tip small {
+  display: block;
 }
 .slider-name {
   font: var(--type-subheading);
 }
-.slider.unset .slider-name,
-.slider:not(.unset) .slider-say .ends {
-  visibility: hidden;
+.slider-say small,
+.slider-tip small {
+  font: var(--type-small);
 }
-.slider.unset .slider-say .ends {
-  transform: translateY(var(--space-2));
-} /* without a thumb the ends sit closer to the track they name */
+.slider-say {
+  margin-top: var(--space-1);
+}
+.slider-say small {
+  color: var(--muted);
+}
+/* The label above the thumb, over whatever lies above the slider and never beyond its ends */
+.slider-tip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: var(--z-raise);
+  display: none;
+  width: max-content;
+  max-width: 100%;
+  padding: var(--inset-compact);
+  border-radius: var(--radius-m);
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow-high);
+  transform: translateX(
+    clamp(0%, var(--thumb) / 2 + (100cqw - var(--thumb)) * var(--at) / (var(--n) - 1) - 50%, 100cqw - 100%)
+  );
+  pointer-events: none;
+}
+.slider.pointing .slider-tip {
+  display: block;
+}
 /* The two ends of a scale, under the slider and under the counters */
 .ends {
   display: flex;
@@ -1449,7 +1484,6 @@ dialog.sheet.page .sheet-body {
   gap: var(--space-2);
   font: var(--type-small-strong);
   color: var(--muted);
-  margin-bottom: var(--space-2);
 }
 .ins li {
   font: var(--type-body);
@@ -1743,14 +1777,15 @@ dialog.sheet.page .sheet-body {
   min-width: 0;
   margin-bottom: 0;
 }
+/* Several pets: each name right above its slider, whose thumb has room under it, and more room between pets */
+.pet-rate > .pet-label {
+  margin-top: var(--space-3);
+}
 .pet-rate + .pet-rate {
   margin-top: var(--space-3);
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
-}
-.slider-say {
-  margin-top: var(--space-2);
 }
 
 /* Hint, Letzte Woche, Einkaufen, Erkenntnisse */
@@ -2112,12 +2147,16 @@ dialog.sheet {
 dialog.sheet.dragging {
   transition: none;
 } /* the finger leads */
-.slider-thumb {
+.slider-thumb,
+.slider-tip {
   transition: transform var(--dur-step) var(--ease-out);
-} /* the rating slider's thumb glides from stop to stop */
+} /* the rating slider's thumb glides from stop to stop, and its label with it */
 .slider-thumb > i {
   transition: var(--state);
 } /* its ring and icon take the level's colour on the way */
+.slider-bar > .ends {
+  transition: opacity var(--dur-fade) var(--ease-out);
+} /* the ends of the scale make way for the thumb */
 /* Press */
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
@@ -2247,6 +2286,12 @@ html.step-back::view-transition-new(page) {
 .fab.filled {
   animation: pop var(--dur-step) var(--ease-spring);
 }
+.slider.pointing .slider-tip {
+  animation: fadeIn var(--dur-fade) var(--ease-out);
+} /* the label above the thumb appears where the finger is */
+.slider-say.picked {
+  animation: appear var(--dur-step) var(--ease-out);
+} /* the level just rated, in words under the track */
 .fab .fill {
   transform: scaleY(0);
   opacity: 0;
