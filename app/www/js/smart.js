@@ -30,7 +30,8 @@ export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` 
 const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) || [])[0];
 
 /* Sum over ratings. All weights shrink at the same rate, so points / weights does not depend on when it is
-   computed: a sum holds until one of its meals changes. list: the ratings themselves, in no particular order. */
+   computed: a sum holds until one of its meals changes. list: the ratings themselves, in no particular order, kept
+   in the sums per variety and pet only. */
 const emptySum = () => ({n: 0, points: 0, weights: 0, counts: {}, list: []}); // counts: only levels that actually occur
 function addRating(sum, x) {
   const w = Math.pow(2, (x.t - WEIGHT_ZERO) / HALF_LIFE);
@@ -45,14 +46,16 @@ function addSum(sum, other) {
   sum.points += other.points;
   sum.weights += other.weights;
   for (const r in other.counts) sum.counts[r] = (sum.counts[r] || 0) + other.counts[r];
-  for (const x of other.list) sum.list.push(x);
   return sum;
 }
 /* The ratings of some varieties within the filter as their keys, oldest first: what a strip of dots shows (strip()
    in views/parts.js). Sorted only when asked for, since only the rows on screen need it. */
 export const ratingsIn = (m, ids) =>
   ids
-    .flatMap(id => m.byId.get(id)?.sum.list || [])
+    .flatMap(id => {
+      const pets = m.byId.get(id)?.pets || {};
+      return m.pet ? pets[m.pet]?.list || [] : Object.values(pets).flatMap(x => x.list);
+    })
     .sort((a, b) => a.t - b.t)
     .map(x => x.r);
 /* How often ratings went down well (from GOOD points) and how often they were left (under NO) */
@@ -72,6 +75,7 @@ function statOf(sum) {
     score,
     pct,
     counts: sum.counts,
+    list: sum.list,
     verdict:
       sum.n >= 3 && good * 3 >= sum.n * 2
         ? 'nachkaufen'
@@ -121,7 +125,7 @@ function houseVerdict(pets) {
 /* Model  = {pet, sorts, byId, rated, hints, repeats}
    Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
             the filter: n, score, pct, verdict, counts, yes, no}
-   Stat  = {n, score, pct, verdict, counts}
+   Stat  = {n, score, pct, verdict, counts, list: the ratings, per pet only}
    repeats: per pet in the filter, how its meals went after the same variety and after another one (repeatsOf()) */
 export function analyze(db, prefs, now, sums = tally(db, now)) {
   const petIds = db.pets.map(p => p.id);
@@ -167,11 +171,11 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
   };
 }
 
-/* „Vorlieben“: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“). Comparisons by
-   consistency, flavour and brand, each within one food type: a group counts with at least two varieties rated at
-   least twice each, and groups are measured by how often they went down well. Then two habits, „nur die Soße
-   geleckt“ and „erst gierig“, where at least two varieties show it at least half of the time, and whether a pet
-   likes a change. */
+/* „Vorlieben“: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“).
+   Comparisons by consistency, flavour and brand, each within one food type: a group counts with at least two
+   varieties rated at least twice each, and groups are measured by how often they went down well. Then two habits,
+   „nur die Soße geleckt“ and „erst gierig“, where at least two varieties show it at least half of the time, and
+   whether a pet likes a change. */
 const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
 const GAP = 0.3,
@@ -380,12 +384,23 @@ export function report(db, prefs, now = Date.now(), days = 0) {
 }
 
 /* What changed within the last `days` calendar days, within the pet filter: the varieties whose verdict became
-   „Nachkaufen“ or „Nicht mehr kaufen“ in that span, the model at its start against the one now (after, which the
-   caller may already hold). {nachkaufen: [id], nicht: [id]}, the best first and the clearest first */
+   „Nachkaufen“ or „Nicht mehr kaufen“ in that span. The verdict as it stood when the span began comes from the ratings
+   the model holds per pet, those before its first day, and counts like any other.
+   {nachkaufen: [id], nicht: [id]}, the best first and the clearest first. after: the model now, where the caller
+   holds it already. */
 export function changes(db, prefs, now, days, after = analyze(db, prefs, now)) {
-  const before = analyze(db, prefs, addDays(dayStart(now), 1 - days) - 1);
-  const became = verdict =>
-    after.sorts.filter(e => e.verdict === verdict && before.byId.get(e.id)?.verdict !== verdict);
+  const start = addDays(dayStart(now), 1 - days);
+  const earlier = e => {
+    const pets = Object.entries(e.pets)
+      .map(([pid, x]) => {
+        const sum = emptySum();
+        for (const r of x.list) if (r.t < start) addRating(sum, r);
+        return [pid, statOf(sum)];
+      })
+      .filter(([, x]) => x.n);
+    return after.pet ? (pets.find(([pid]) => pid === after.pet)?.[1].verdict ?? 'neu') : houseVerdict(pets).verdict;
+  };
+  const became = verdict => after.sorts.filter(e => e.verdict === verdict && earlier(e) !== verdict);
   return {
     nachkaufen: became('nachkaufen').map(e => e.id),
     nicht: became('nicht')

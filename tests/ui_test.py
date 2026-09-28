@@ -732,6 +732,14 @@ async def test_profile(browser, url):
         await pg.locator('#sheet .likes button, #sheet .likes [data-action]').count() == 0,
         'the rows of a comparison are no buttons: there is nothing behind them yet',
     )
+    newest = await pg.evaluate("""import('./js/derive.js').then(async d => { const s = await import('./js/smart.js'), m = d.model();
+      const g = d.profileModel()[0].groups.find(x => x.key === 'In Soße'), all = s.ratingsIn(m, g.ids).map(s.rateCls);
+      const row = [...document.querySelectorAll('#sheet .likes .row')].find(r => r.querySelector('b').innerText === 'In Soße');
+      return [all.length, [...row.querySelectorAll('.strip i')].map(i => i.className), all.slice(-8), row.querySelector('.strip').firstElementChild.innerText]; })""")
+    check(
+        newest[0] == 10 and newest[1] == newest[2] and newest[3] == '+',
+        f'more than 8 ratings: a „+“ in front, then the newest 8, the newest on the right ({newest})',
+    )
     await shot(pg, 'likes-360')
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
@@ -838,6 +846,49 @@ async def test_profile(browser, url):
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
+
+
+# What does not fit on a page: every element of its cards (those given) whose content is wider than its box, unless it
+# ends in „…“ by design, or that reaches past the right edge, as its class and text; and whether anything scrolls sideways
+NARROW = """sel => { const body = document.getElementById('sheetBody');
+  const wide = [...body.querySelectorAll(sel)].filter(e => e.getClientRects().length && !e.closest('svg') && getComputedStyle(e).display !== 'inline'
+      && ((e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis') || e.getBoundingClientRect().right > innerWidth + 0.5))
+    .map(e => `${e.className}: ${(e.innerText || '').slice(0, 30)}`);
+  return {wide, sideways: document.documentElement.scrollWidth > innerWidth || body.scrollWidth > body.clientWidth}; }"""
+
+
+async def test_narrow(browser, url):
+    print('the new pages at 360 px, light and dark, at the usual and at a large system font')
+    pages = (('report', ['details'], '.review *'), ('shop', ['nicht', 'unklar'], '.card *'), ('profile', [], '.card *'))
+    for scheme in ('light', 'dark'):
+        ctx = await phone(browser, scheme, width=360, height=760)
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.click('[data-action=demo]')
+        await idle(pg)
+        for scale in (1, 1.3):
+            if scale != 1:
+                await pg.evaluate(BIG_TEXT, scale)
+                await idle(pg)
+            seen = {}
+            for kind, folds, sel in pages:
+                await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: '{kind}'}}))")
+                await idle(pg)
+                for key in folds:
+                    await pg.click(f'#sheet [data-action=fold][data-v={key}]')
+                    await idle(pg)
+                seen[kind] = await pg.evaluate(NARROW, sel)
+                await shot(pg, f'narrow-{kind}-{scheme}-{int(scale * 100)}')
+                await pg.click('#sheet [data-action=settings-back]')
+                await idle(pg)
+            home = await pg.evaluate(
+                "[document.documentElement.scrollWidth > innerWidth, [...document.querySelectorAll('#home .card *')].filter(e => e.getBoundingClientRect().right > innerWidth + 0.5).length]"
+            )
+            check(
+                all(not x['wide'] and not x['sideways'] for x in seen.values()) and home == [False, 0],
+                f'{scheme}, {int(scale * 100)} %: „Verlauf“, „Einkaufen“ and „Vorlieben“ unfolded, and the home page: nothing cut off, nothing scrolls sideways ({seen}, {home})',
+            )
+        check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
+        await ctx.close()
 
 
 HOUSE = """([meals]) => import('./js/store.js').then(async s => { const at = t => new Date(t).getTime(), d = s.defaults();
@@ -5307,6 +5358,10 @@ async def test_report(browser, url):
         first['btn'] == [['Details', 'false', True]] and first['rows'] == [],
         f'what changed is folded away under „Details“ at the foot of the card ({first["btn"]})',
     )
+    check(
+        await pg.locator('#sheet .rings button, #sheet .rings [data-action], #sheet .figs button').count() == 0,
+        'the rings and the figures are no buttons',
+    )
     await pg.click('#sheet [data-action=fold][data-v=details]')
     await idle(pg)
     shown = await pg.evaluate(FIRST)
@@ -5523,6 +5578,7 @@ run_tests(
         'cards': test_cards,
         'shop': test_shop,
         'profile': test_profile,
+        'narrow': test_narrow,
         'history': test_home_history,
         'report': test_report,
         'week': test_week,
