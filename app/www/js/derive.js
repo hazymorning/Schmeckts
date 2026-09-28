@@ -1,7 +1,7 @@
 /* Everything derived from the data: lookups, open meals, suggestions while feeding and the evaluation model
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
-import {PENDING_WINDOW} from './config.js';
+import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
 import {analyze, changes, report, shopGroups, tally} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
@@ -94,16 +94,19 @@ export function quickProducts(limit = Infinity) {
     .sort((a, b) => (last.get(b.id) || 0) - (last.get(a.id) || 0) || (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, limit);
 }
-/* The shopping list as shareable text, matching the pet filter: „Nachkaufen“ (including „Gemischt“ with „für …“ and
-   the manual `immer`), „Nicht kaufen“ („Nicht mehr kaufen“ and the manual `nicht`). „Geht so“, „Noch zu wenig
-   bewertet“ and empty groups are left out. */
+/* The shopping list as shareable text, matching the pet filter: what to buy again („Nachkaufen“ including „Gemischt“
+   with „nur für …“ and the manual `immer`), one block per food type with the type's name above it, the best first.
+   Nothing that is not to be bought. */
 export function shoppingList() {
   const m = model(),
     g = shopGroups(m),
     full = p => [p.brand, p.variety].filter(Boolean).join(' ') || pname(p);
-  const line = e => `- ${full(e.product)}${!e.kaufen && e.choice === 'gemischt' ? ` (für ${petNames(e.yes)})` : ''}`;
-  const part = (title, list) => (list.length ? `\n\n${title}\n${list.map(line).join('\n')}` : '');
-  const title = `Einkaufen für ${petNames(m.pet ? [m.pet] : db.pets.map(p => p.id))}`;
-  return {title, text: title + part('Nachkaufen', g.nachkaufen) + part('Nicht kaufen', g.nicht)};
+  const line = e =>
+    `- ${full(e.product)}${!e.kaufen && e.choice === 'gemischt' ? ` (nur für ${petNames(e.yes)})` : ''}`;
+  const title = `Einkaufen für ${petNames(m.pet ? [m.pet] : db.pets.map(p => p.id))}`,
+    blocks = TYPES.map(t => [t, g.nachkaufen.filter(e => typeOf(e.product) === t)])
+      .filter(([, list]) => list.length)
+      .map(([t, list]) => `${t}\n${list.map(line).join('\n')}`);
+  return {title, text: [title, ...blocks].join('\n\n')};
 }
 export const byMe = () => (prefs.name ? {by: prefs.name} : {});

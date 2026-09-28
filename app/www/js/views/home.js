@@ -8,7 +8,7 @@ import {icon, sketch} from '../icons.js';
 import {RATINGS, TEXTURES, TYPES} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {getPet, getProduct, model, pendingServings, petNames, pname, servingPets} from '../derive.js';
+import {getPet, getProduct, model, pendingServings, pname, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
@@ -23,6 +23,7 @@ import {
   nameBlock,
   photoThumb,
   rateSlider,
+  shopRow,
   syncChip,
   thumbOf,
   times,
@@ -140,7 +141,7 @@ function homeHTML() {
     html +=
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
-      card('shop', 'Einkaufen', shopCard(m)) +
+      `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2>${shopHTML(m)}</section>` +
       (ins ? card('ins', 'Erkenntnisse', ins) : '');
   }
   return html;
@@ -276,42 +277,21 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
-/* Einkaufen: what to buy again and what no longer, each variety with what its ratings say in words (evidenceOf()),
-   never a percentage. Folded up, up to 3 to buy again (including „Gemischt“, „nur für …“) and up to 2 no longer
-   bought; unfolded, every variety, „Geht so“ and „Noch zu wenig bewertet“ too, and „Als Liste teilen“. While
-   nothing is to be bought or dropped yet, the rest shows at once. A manual setting decides the group and shows the
-   pin (shopGroups() in smart.js). */
-const SHOP = [
-  ['nachkaufen', 'Nachkaufen', 3],
-  ['nicht', 'Nicht mehr kaufen', 2],
-  ['geht', 'Geht so', 0],
-  ['neu', 'Noch zu wenig bewertet', 0],
-];
-function shopRow(e) {
-  const p = e.product,
-    said = !e.kaufen && e.choice === 'gemischt' ? `nur für ${petNames(e.yes)}` : lower(whyOf(e)),
-    sub = cap([p.variety ? p.brand : '', said].filter(Boolean).join(', '));
-  return `<li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}
-    <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(sub)}</small></span>
-    ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
-}
-function shopCard(m) {
-  const g = shopGroups(m),
-    clear = g.nachkaufen.length + g.nicht.length,
-    open = !!homeView.open.shop || !clear;
-  if (!clear && !g.geht.length && !g.neu.length)
-    return {
-      body: '<p class="hint card-line">Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.</p>',
-      more: false,
-    };
-  const body =
-    SHOP.map(([k, title, max]) => {
-      const list = open ? g[k] : g[k].slice(0, max);
-      return list.length
-        ? `<h3 class="label grp">${title}</h3><ul class="list shop">${list.map(shopRow).join('')}</ul>`
-        : '';
-    }).join('') + (open && clear ? '<button class="card-btn" data-action="share-list">Als Liste teilen</button>' : '');
-  return {body, more: clear > 0 && (g.geht.length + g.neu.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2)};
+/* Einkaufen: the first three to buy again, the best first, each with its ratings as a strip, and the way to the whole
+   list on its page (shopGroups() in smart.js). Nothing rated yet: one line and no way on. */
+const SHOP_SHOWN = 3;
+function shopHTML(m) {
+  const g = shopGroups(m);
+  if (!g.nachkaufen.length && !g.nicht.length && !g.geht.length && !g.neu.length)
+    return '<p class="hint card-line">Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.</p>';
+  return `${
+    g.nachkaufen.length
+      ? `<ul class="list shop">${g.nachkaufen
+          .slice(0, SHOP_SHOWN)
+          .map(e => shopRow(m, e))
+          .join('')}</ul>`
+      : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>'
+  }<button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button>`;
 }
 
 /* Erkenntnisse (insights() in smart.js): what holds across varieties, the strongest first, each a sentence and under
@@ -351,7 +331,7 @@ function insightCard(m) {
     more: m.insights.length > 1,
   };
 }
-const CARDS = {shop: shopCard, ins: insightCard};
+const CARDS = {ins: insightCard};
 
 /* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while
    nothing has been served today, each day whole. One pass over the calendar's two weeks, newest first, which stops

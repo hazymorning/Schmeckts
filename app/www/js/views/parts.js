@@ -6,7 +6,7 @@ import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db, queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {GOOD, NO, rateCls, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, NO, rateCls, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {saidHTML, sliderCls, thumbHTML} from '../ui/slider.js';
@@ -217,6 +217,18 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
       .join('')}</ol></div>`,
     )
     .join('');
+}
+
+/* A variety to buy, on „Einkaufen“ and in its card on the home page: the thumbnail, the variety and under it the
+   brand, for „Gemischt“ the pets it is for, its ratings as a strip and the pin where it was set by hand. A tap opens
+   the food sheet, which tells the ratings in words. e: a variety of the model m */
+export function shopRow(m, e) {
+  const p = e.product,
+    mixed = !e.kaufen && e.choice === 'gemischt' ? `nur für ${petNames(e.yes)}` : '',
+    sub = cap([p.variety ? p.brand : '', mixed].filter(Boolean).join(', '));
+  return `<li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}
+    <span class="t-main"><b>${esc(pname(p))}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${strip(ratingsIn(m, [e.id]))}
+    ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 
 /* Sync status in words, for the settings and the notice at the top */

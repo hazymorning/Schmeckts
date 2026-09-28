@@ -477,6 +477,18 @@ RINGS = """() => { const c = document.querySelector('#sheet .review'), mid = e =
     under: figs.length === rings.length && figs.every((f, i) => Math.abs(mid(f) - mid(rings[i])) < 0.5)}; }"""
 
 
+# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them, each
+# dot the size of the calendar's, each in its rating's colour]
+STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i.style.color = `var(--${c.slice(2)})`; document.body.append(i);
+    const v = getComputedStyle(i).color; i.remove(); return v; };
+  const box = e => { const r = e.getBoundingClientRect(); return `${r.width}x${r.height}`; }, cal = box(document.querySelector('.cal .dots i:not(.open)'));
+  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')];
+    return [s.getAttribute('role') === 'img' && !!s.getAttribute('aria-label'),
+      dots.length <= 8 && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
+      dots.every(d => box(d) === cal),
+      dots.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
+
+
 async def test_rules(browser, url):
     print('design rules in every view')
     pictures = make_pictures()
@@ -515,7 +527,6 @@ async def test_rules(browser, url):
         check(vs == 'normal', f'body: no font-variation-settings, Faustina has no axis of its own ({vs})')
         await pg.click('[data-action=demo]')
         await idle(pg)
-        await pg.click('[data-action=expand][data-v=shop]')
         await pg.click('[data-action=expand][data-v=ins]')
         await idle(pg)
         await scan()  # Startseite mit allem
@@ -537,6 +548,19 @@ async def test_rules(browser, url):
             and layout['gaps'] == [14] * 5,
             f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
+        await pg.click('[data-sec=shop] [data-action=open-shop]')
+        await idle(pg)
+        for key in ('nicht', 'unklar'):
+            await pg.click(f'#sheet [data-action=fold][data-v={key}]')
+            await idle(pg)
+        await scan()  # „Einkaufen“ with everything folded open
+        strips = await pg.evaluate(STRIPS)
+        check(
+            len(strips) >= 8 and all(x == [True, True, True, True] for x in strips),
+            f'„Einkaufen“ ({scheme}): every strip says in words what it shows, at most 8 dots, each the size of a calendar dot and in its rating’s colour ({len(strips)} strips)',
+        )
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
         await pg.click('[data-action=open-settings]')
         await idle(pg)
         await scan()

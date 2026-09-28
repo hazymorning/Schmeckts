@@ -1664,7 +1664,7 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-1);
   color: var(--ink);
 }
-/* Cards with „Alle anzeigen“ (Einkaufen, Erkenntnisse): the content eases open and the button is .card-btn */
+/* What folds open under a .card-btn (Erkenntnisse, and the parts of a page): the content eases open */
 .card-body {
   display: flow-root;
 } /* the children's margins count towards the height, so the animation does not jump */
@@ -1740,7 +1740,7 @@ dialog.sheet.page .sheet-body {
 .why {
   margin: var(--space-hair) 0 0;
 }
-/* What the ratings say stands in full, under a variety's name and under an insight, never cut off */
+/* What stands under a variety's name stands in full, as does what an insight rests on, never cut off */
 .shop .t-main small {
   white-space: normal;
 }
@@ -1838,8 +1838,8 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-/* „Verlauf“: cards on the page ground, as far apart as the ones on the home page */
-dialog.sheet.page[data-kind="report"] .page-title {
+/* „Verlauf“ and „Einkaufen“: cards on the page ground, as far apart as the ones on the home page */
+dialog.sheet.page:is([data-kind="report"], [data-kind="shop"]) .page-title {
   margin-bottom: var(--space-3h);
 }
 .btn-col {
@@ -1984,7 +1984,8 @@ dialog.sheet.page[data-kind="report"] .page-title {
 .review .fill {
   display: none;
 }
-.review .told {
+/* A part of a page folded open: its rows start under a line, as every row after them does */
+.fold > .list {
   border-top: var(--divider);
 }
 .photo-hint {

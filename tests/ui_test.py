@@ -91,12 +91,15 @@ async def test_tour(browser, url, scheme='light'):
     check(
         await pg.locator('.cal').count() == 1
         and await pg.locator('[data-sec=hist] .tl-day').count() >= 1
-        and await pg.locator('[data-sec=shop] .bar').count() == 0,
-        'the history visible at once, shopping folded up',
+        and await pg.locator('[data-sec=shop] .shop li').count() == 3,
+        'the history visible at once, three varieties to buy again',
     )
-    await pg.click('[data-action=expand][data-v=shop]')
+    await pg.click('[data-sec=shop] [data-action=open-shop]')
     await idle(pg)
-    check(await pg.locator('[data-sec=shop] .shop li').count() > 5, 'shopping unfolded: every variety')
+    check(await pg.locator('#sheet .shop li').count() == 3, '„Einkaufsliste öffnen“: the page, with what stays in the bowl folded away')
+    await shot(pg, f'{scheme}-shopping')
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
     await pg.click('[data-action=expand][data-v=ins]')
     await idle(pg)
     current = await pg.evaluate(CURRENT)
@@ -293,16 +296,31 @@ async def test_buying(browser, url):
       s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
     lachs = await state(pg, "db.products.find(p => p.variety === 'Lachs in Soße').id")
-    where = f"""c => [...c.querySelectorAll('.shop')].map(u => [u.previousElementSibling.innerText, (b => b ? b.querySelector('.t-main small').innerText : null)(u.querySelector('[data-id="{lachs}"]'))]).filter(x => x[1] !== null)"""
-    house = await pg.eval_on_selector('[data-sec=shop]', where)
+    held = f"""() => [...document.querySelectorAll('#sheet .sheet-body > .card')].map(c => [c.querySelector('h2').innerText,
+      (b => b ? b.querySelector('.t-main small').innerText : null)(c.querySelector('[data-id="{lachs}"]'))]).filter(x => x[1] !== null)"""
+
+    async def where():  # the card of „Einkaufen“ that holds Lachs, with what stands under its name, and the page's title
+        await pg.click('[data-sec=shop] [data-action=open-shop]')
+        await idle(pg)
+        for key in ('nicht', 'unklar'):
+            if await pg.locator(f'#sheet [data-action=fold][data-v={key}]').count():
+                await pg.click(f'#sheet [data-action=fold][data-v={key}]')
+                await idle(pg)
+        out = [await pg.evaluate(held), await pg.inner_text('#sheet .page-title')]
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+        return out
+
+    house = await where()
     await pg.click('[data-action=filter][data-id=tigerpet01]')
     await idle(pg)
-    tiger = await pg.eval_on_selector('[data-sec=shop]', where)
+    tiger = await where()
     await pg.click('[data-action=filter][data-id=all]')
     await idle(pg)
     check(
-        house == [['Nachkaufen', 'Sheba, nur für Mau']] and tiger == [['Nicht mehr kaufen', 'Sheba, beide Male kaum angerührt']],
-        f'shopping: „Gemischt“ sits under „Nachkaufen“ with „nur für Mau“, and with the Tiger filter that pet\u2019s verdict applies, with its ratings in words ({house}, {tiger})',
+        house == [[['Nachkaufen', 'Sheba, nur für Mau']], 'Einkaufen für alle Tiere']
+        and tiger == [[['Lieber nicht', 'Sheba']], 'Einkaufen für Tiger'],
+        f'shopping: „Gemischt“ sits under „Nachkaufen“ with „nur für Mau“, and with the Tiger filter that pet\u2019s verdict applies ({house}, {tiger})',
     )
     await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{lachs}'}}))")
     await idle(pg)
@@ -345,7 +363,7 @@ async def test_buying(browser, url):
 
 
 async def test_cards(browser, url):
-    print('home page: hint, shopping and insights with „Alle anzeigen“, the history always open')
+    print('home page: the hint, the insights with „Alle anzeigen“, the history always open')
     ctx = await phone(browser, touch=True, motion=True)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]')
@@ -360,111 +378,24 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
         f'history: the calendar and the meals of the current day ({len(shown)})',
     )
-    # Shopping folded up: up to 3 to buy again, below them up to 2 no longer bought, each with what its ratings say
-    # in words, whole and without a percentage
-    groups = """Promise.all([import('./js/derive.js'), import('./js/smart.js')]).then(([d, s]) => { const m = d.model(), g = s.shopGroups(m), ids = l => l.map(e => e.id);
-      return {ja: ids(g.nachkaufen), nein: ids(g.nicht), geht: ids(g.geht), neu: ids(g.neu), ins: m.insights.length}; })"""
-    SHOP = """c => ({grp: [...c.querySelectorAll('.grp')].map(g => [g.innerText]),
-      ids: [...c.querySelectorAll('.shop')].map(u => [...u.querySelectorAll('[data-action=open-product]')].map(b => b.dataset.id)),
-      said: [...c.querySelectorAll('.shop .t-main small')].map(e => [e.innerText, e.scrollWidth <= e.clientWidth + 1]), rows: c.querySelectorAll('.shop li').length,
-      btn: [...c.querySelectorAll('.card-btn[data-action=expand]')].map(b => [b.innerText, b.dataset.action, b === c.lastElementChild, b.getAttribute('aria-expanded')])})"""
-
-    def worded(shop):  # every row with its words, whole and without a percentage
-        return len(shop['said']) == shop['rows'] and all(t and ok and '%' not in t for t, ok in shop['said'])
-
-    m = await pg.evaluate(groups)
-    shop = await pg.eval_on_selector('[data-sec=shop]', SHOP)
-    parts = [(t_, ids) for t_, ids in (('Nachkaufen', m['ja'][:3]), ('Nicht mehr kaufen', m['nein'][:2])) if ids]
-    check(
-        shop['ids'] == [ids for _, ids in parts]
-        and [g[0] for g in shop['grp']] == [t_ for t_, _ in parts]
-        and worded(shop)
-        and shop['btn'] == [['Alle anzeigen', 'expand', True, 'false']],
-        f'shopping folded up: up to 3 to buy again, up to 2 no longer, each with its ratings in words, „Alle anzeigen“ at the end ({shop["ids"]}, {shop["said"]})',
-    )
-    # Keyboard: Enter eases it open (--dur-step), the focus stays on the button, space folds it shut
-    await pg.focus('[data-sec=shop] [data-action=expand]')
-    await pg.keyboard.press('Enter')
-    anim = await pg.eval_on_selector(
-        '[data-sec=shop] .card-body',
-        'b => [b.classList.contains("animating"), b.style.height !== "", b.style.transition, getComputedStyle(b).transitionDuration, getComputedStyle(b).transitionTimingFunction]',
-    )
-    check(
-        anim[0] and anim[1] and anim[2] == '' and anim[3] == '0.3s' and anim[4] == 'cubic-bezier(0.22, 1, 0.36, 1)',
-        f'the card eases open ({anim[2:]})',
-    )
-    await idle(pg)
-    shop = await pg.eval_on_selector('[data-sec=shop]', SHOP)
-    parts = [
-        (t_, ids)
-        for t_, ids in (('Nachkaufen', m['ja']), ('Nicht mehr kaufen', m['nein']), ('Geht so', m['geht']), ('Noch zu wenig bewertet', m['neu']))
-        if ids
-    ]
-    said = dict(
-        await pg.eval_on_selector_all(
-            '[data-sec=shop] .shop .t-main', 'l => l.map(e => [e.querySelector("b").innerText, e.querySelector("small").innerText])'
-        )
-    )
-    check(
-        said
-        == {
-            'Rind in Gelee': 'Felix, alle 3 Mal gut gefressen',
-            'Huhn in Gelee': 'Felix, alle 3 Mal gut gefressen',
-            'Lachs in Soße': 'Sheba, 3 von 4 Mal gut gefressen',
-            'Rind Pastete': 'Gourmet, 2 von 3 Mal kaum angerührt',
-            'Thunfisch in Soße': 'Whiskas, 2 von 3 Mal nur die Soße geleckt',
-            'Geflügel in Soße': 'Kitekat, 2 von 3 Mal nur die Soße geleckt',
-            'Käse': 'Dreamies, beide Male sofort verputzt',
-            'Pute Pastete': 'Animonda Carny, einmal später leer, einmal halb gegessen',
-        },
-        f'every variety of the sample says in words what its ratings were ({said})',
-    )
-    check(
-        shop['ids'] == [ids for _, ids in parts]
-        and [g[0] for g in shop['grp']] == [t_ for t_, _ in parts]
-        and 'Noch zu wenig bewertet' in [t_ for t_, _ in parts]
-        and worded(shop)
-        and shop['btn'] == [['Weniger anzeigen', 'expand', True, 'true']]
-        and await pg.evaluate('document.activeElement.dataset.v') == 'shop'
-        and await pg.eval_on_selector('[data-sec=shop] .card-body', 'b => b.style.height === "" && !b.classList.contains("animating")'),
-        f'unfolded: every variety under Nachkaufen, Nicht mehr kaufen, Geht so, Noch zu wenig bewertet, each in words, „Weniger anzeigen“, and the focus stays ({[g[0] for g in shop["grp"]]})',
-    )
-    await pg.keyboard.press(' ')
-    await idle(pg)
-    check(
-        await pg.inner_text('[data-sec=shop] [data-action=expand]') == 'Alle anzeigen'
-        and await pg.locator('[data-action=share-list]').count() == 0
-        and await pg.locator('[data-sec=shop] .grp').count() == 2,
-        'space folds it shut again',
-    )
+    total = await pg.evaluate("import('./js/derive.js').then(d => d.model().insights.length)")
     ins = await pg.eval_on_selector(
         '[data-sec=ins]', 'c => [c.querySelectorAll(".ins li").length, [...c.querySelectorAll(".card-btn")].map(b => b.innerText)]'
     )
     check(
-        m['ins'] > 1 and ins == [1, ['Alle anzeigen']],
-        f'insights folded up: the most important one, with „Alle anzeigen“ below ({ins}, {m["ins"]} in total)',
+        total > 1 and ins == [1, ['Alle anzeigen']],
+        f'insights folded up: the most important one, with „Alle anzeigen“ below ({ins}, {total} in total)',
     )
     await pg.tap('[data-sec=ins] [data-action=expand]')
     await idle(pg)
     check(
-        await pg.locator('[data-sec=ins] .ins li').count() == m['ins']
+        await pg.locator('[data-sec=ins] .ins li').count() == total
         and await pg.inner_text('[data-sec=ins] [data-action=expand]') == 'Weniger anzeigen',
         'a tap shows every insight',
     )
     await pg.reload()
     await started(pg)
-    check(
-        await pg.locator('[data-sec=ins] .ins li').count() == 1 and await pg.locator('[data-sec=shop] .grp').count() == 2,
-        'after a restart everything is folded up',
-    )
-    await pg.emulate_media(reduced_motion='reduce')
-    await pg.click('[data-sec=shop] [data-action=expand]')
-    await idle(pg)
-    check(
-        await pg.locator('[data-sec=shop] .grp').count() == len(parts)
-        and await pg.eval_on_selector('[data-sec=shop] .card-body', 'b => !b.classList.contains("animating") && b.style.height === ""'),
-        'reduced motion: at once, without animation',
-    )
+    check(await pg.locator('[data-sec=ins] .ins li').count() == 1, 'after a restart everything is folded up')
     # Hint: at most one, with a sentence, a reason and its buttons. „Nicht mehr kaufen“ and „Immer kaufen“ set kaufen,
     # „Ausblenden“ is remembered per device.
     HINT = """c => ({title: c.querySelector('h2').innerText, btns: [...c.querySelectorAll('.btn-row button')].map(b => b.innerText),
@@ -498,36 +429,11 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hint]').count() == 0,
         f'hint: always the one with the highest precedence, with its buttons; once settled or hidden the next one follows ({seen})',
     )
-    pins = await pg.eval_on_selector_all('[data-sec=shop] .shop button', 'l => l.filter(b => b.querySelector(".pin")).map(b => b.dataset.id)')
-    check(
-        len(pins) == 2 and set(pins) == set(await state(pg, 'db.products.filter(p => p.kaufen).map(p => p.id)')),
-        f'a manual setting: the pin on the variety ({len(pins)})',
-    )
-    # Nothing to buy or drop yet: what was rated shows at once, under „Noch zu wenig bewertet“; nothing rated at all:
-    # one line. No card without an insight, no hint card without a hint.
+    # One rating: no card without an insight, no hint card without a hint
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
       s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
-    one = await pg.eval_on_selector('[data-sec=shop]', SHOP)
-    check(
-        [g[0] for g in one['grp']] == ['Noch zu wenig bewertet']
-        and one['said'] == [[one['said'][0][0], True]]
-        and one['said'][0][0].endswith(', einmal später leer')
-        and one['btn'] == []
-        and await pg.locator('[data-sec=ins], [data-sec=hint]').count() == 0,
-        f'one rating: the variety under „Noch zu wenig bewertet“ at once, no „Alle anzeigen“, no insight, no hint ({one["said"]})',
-    )
-    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = null; s.save();
-      return import('./js/views/home.js').then(h => h.renderHome()); })""")
-    await idle(pg)
-    empty = await pg.eval_on_selector(
-        '[data-sec=shop]',
-        'c => [c.querySelector(".card-body > .card-line").innerText, c.querySelectorAll(".shop, .card-btn, .card-body > :not(.card-line)").length]',
-    )
-    check(
-        empty == ['Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.', 0],
-        f'nothing rated: only the one line ({empty[0]})',
-    )
+    check(await pg.locator('[data-sec=ins], [data-sec=hint]').count() == 0, 'one rating: no insight and no hint')
     # Calendar: a tap on a day before the day before yesterday shows the older days and jumps to them
     old = await pg.evaluate("""(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 2);
       const b = [...document.querySelectorAll('.cal .day.has')].find(x => new Date(x.dataset.day + 'T12:00').getTime() < d.getTime()); return b && b.dataset.day; })()""")
@@ -539,6 +445,183 @@ async def test_cards(browser, url):
         f'a tap in the calendar on an older day: it appears in the history and is jumped to, without a glow ({old}, {top})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+
+# „Einkaufen“ on the home page: the varieties in its rows, how many strips they carry, its one line, and its buttons as
+# [text, action, class, with an icon, the last thing in the card]
+SHOP_HOME = """() => { const c = document.querySelector('[data-sec=shop]');
+  return {rows: [...c.querySelectorAll('.shop .row')].map(r => r.dataset.id), strips: c.querySelectorAll('.shop .row .strip').length,
+    line: c.querySelector('.card-line')?.innerText ?? null,
+    btns: [...c.querySelectorAll('button:not(.row)')].map(b => [b.innerText.trim(), b.dataset.action, b.className, !!b.querySelector('svg'), b === c.lastElementChild])}; }"""
+
+# The „Einkaufen“ page, per card: its heading, its own line, the food types with the varieties under each, every row
+# as [name, what stands under it, the dots of its strip, what the strip says, the pin], and its buttons as [text,
+# action, expanded, with an icon]
+SHOP_PAGE = """() => [...document.querySelectorAll('#sheet .sheet-body > .card')].map(c => { const text = e => (e ? e.innerText.replace(/\\s+/g, ' ').trim() : null);
+  return {head: text(c.querySelector('h2')), say: text(c.querySelector('.say')), line: text(c.querySelector('.hint')),
+    groups: [...c.querySelectorAll('.grp')].map(g => [g.innerText, [...g.nextElementSibling.querySelectorAll('.row')].map(r => r.dataset.id)]),
+    rows: [...c.querySelectorAll('.shop .row')].map(r => [text(r.querySelector('.t-main b')), text(r.querySelector('.t-main small')),
+      r.querySelectorAll('.strip i').length, r.querySelector('.strip')?.getAttribute('aria-label') ?? null, !!r.querySelector('.pin')]),
+    btns: [...c.querySelectorAll('.btn, .card-btn')].map(b => [b.innerText.trim(), b.dataset.action, b.getAttribute('aria-expanded'), !!b.querySelector('svg')])}; })"""
+
+# The varieties of the model by where they stand in „Einkaufen“
+SHOP_GROUPS = """import('./js/derive.js').then(async d => { const s = await import('./js/smart.js'), m = d.model(), g = s.shopGroups(m), ids = l => l.map(e => e.id);
+  return {ja: ids(g.nachkaufen), nein: ids(g.nicht), unklar: [...ids(g.geht), ...ids(g.neu)]}; })"""
+
+
+async def test_shop(browser, url):
+    print('„Einkaufen“: three rows on the home page, and the page with the food types, the folds and the list to share')
+    ctx = await phone(browser, motion=True, permissions=['clipboard-read', 'clipboard-write'])
+    pg, errors = await open_page(ctx, url)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    g = await pg.evaluate(SHOP_GROUPS)
+    home = await pg.evaluate(SHOP_HOME)
+    check(
+        home['rows'] == g['ja'][:3]
+        and home['strips'] == 3
+        and home['line'] is None
+        and home['btns'] == [['Einkaufsliste öffnen', 'open-shop', 'card-btn', True, True]]
+        and await pg.locator('#home [data-action=share-list], #home [data-action=expand][data-v=shop]').count() == 0,
+        f'home page: the first three to buy again, each with its strip, and „Einkaufsliste öffnen“ with the chevron; no fold and no sharing ({home})',
+    )
+    await pg.click('[data-sec=shop] [data-action=open-shop]')
+    await idle(pg)
+    page = await pg.evaluate(PAGE)
+    cards = await pg.evaluate(SHOP_PAGE)
+    names = {
+        'Rind in Gelee': ['Felix', 3, 'Alle 3 Mal gut gefressen'],
+        'Huhn in Gelee': ['Felix', 3, 'Alle 3 Mal gut gefressen'],
+        'Lachs in Soße': ['Sheba', 4, '3 von 4 Mal gut gefressen'],
+        'Rind Pastete': ['Gourmet', 3, '2 von 3 Mal kaum angerührt'],
+        'Thunfisch in Soße': ['Whiskas', 3, '2 von 3 Mal nur die Soße geleckt'],
+        'Geflügel in Soße': ['Kitekat', 3, '2 von 3 Mal nur die Soße geleckt'],
+        'Käse': ['Dreamies', 2, 'Beide Male sofort verputzt'],
+        'Pute Pastete': ['Animonda Carny', 2, 'Einmal später leer, einmal halb gegessen'],
+    }
+    ids = await pg.evaluate('import("./js/store.js").then(s => Object.fromEntries(s.db.products.map(p => [p.id, p.variety])))')
+
+    def rows(key):  # the rows of a group as SHOP_PAGE reads them, none set by hand
+        return [[ids[i], *names[ids[i]], False] for i in g[key]]
+
+    check(
+        page[:3] == ['Einkaufen', True, True]
+        and cards
+        == [
+            {
+                'head': 'Nachkaufen',
+                'say': None,
+                'line': None,
+                'groups': [['Nassfutter', g['ja']]],
+                'rows': rows('ja'),
+                'btns': [['Als Liste teilen', 'share-list', None, True]],
+            },
+            {
+                'head': 'Lieber nicht',
+                'say': '3 Sorten bleiben meist stehen.',
+                'line': None,
+                'groups': [],
+                'rows': [],
+                'btns': [['Anzeigen', 'fold', 'false', False]],
+            },
+            {
+                'head': 'Noch unklar',
+                'say': '2 Sorten sind noch unklar.',
+                'line': None,
+                'groups': [],
+                'rows': [],
+                'btns': [['Anzeigen', 'fold', 'false', False]],
+            },
+        ],
+        f'a page of three cards: to buy again by food type, best first, each variety with its brand and its strip and „Als Liste teilen“ at the end; the rest folded to a line each ({page}, {cards})',
+    )
+    # Keyboard: Enter eases the fold open (--dur-step), the focus stays on the button, space folds it shut
+    await pg.focus('#sheet [data-action=fold][data-v=nicht]')
+    await pg.keyboard.press('Enter')
+    anim = await pg.eval_on_selector(
+        '#fold-nicht',
+        'b => [b.classList.contains("animating"), getComputedStyle(b).transitionDuration, getComputedStyle(b).transitionTimingFunction]',
+    )
+    await idle(pg)
+    open_ = (await pg.evaluate(SHOP_PAGE))[1]
+    focus = await pg.evaluate('document.activeElement.dataset.v')
+    check(
+        anim == [True, '0.3s', 'cubic-bezier(0.22, 1, 0.36, 1)']
+        and open_['rows'] == rows('nein')
+        and open_['btns'] == [['Weniger', 'fold', 'true', False]]
+        and focus == 'nicht',
+        f'„Lieber nicht“ eases open: the clearest first, each with its strip, „Weniger“, and the focus stays ({anim}, {open_["rows"]}, {focus})',
+    )
+    await pg.keyboard.press(' ')
+    await idle(pg)
+    await pg.click('#sheet [data-action=fold][data-v=unklar]')
+    await idle(pg)
+    after = await pg.evaluate(SHOP_PAGE)
+    check(
+        after[1]['rows'] == [] and after[1]['btns'] == [['Anzeigen', 'fold', 'false', False]] and after[2]['rows'] == rows('unklar'),
+        f'space folds it shut again, and „Noch unklar“ opens the same way ({after[2]["rows"]})',
+    )
+    # Sharing: only what to buy again, by food type
+    await pg.click('#sheet [data-action=share-list]')
+    await idle(pg)
+    shared = await pg.evaluate('navigator.clipboard.readText()')
+    want = 'Einkaufen für Mau\n\nNassfutter\n' + '\n'.join(f'- {names[ids[i]][0]} {ids[i]}' for i in g['ja'])
+    check(
+        shared == want and 'Liste kopiert' in await pg.inner_text('#toast') and 'Nicht' not in shared,
+        f'„Als Liste teilen“: only what to buy again, under its food type; without a share menu to the clipboard ({shared!r})',
+    )
+    # Set by hand: a food type of its own, the pin, and one fewer to decide
+    await pg.evaluate("""import('./js/store.js').then(async s => { s.db.products.find(p => p.variety === 'Käse').kaufen = 'immer'; s.save();
+      (await import('./js/ui/sheet.js')).renderSheet(); })""")
+    await idle(pg)
+    kept = await pg.evaluate(SHOP_PAGE)
+    kaese = next(i for i, v in ids.items() if v == 'Käse')
+    check(
+        kept[0]['groups'] == [['Nassfutter', g['ja']], ['Snack', [kaese]]]
+        and kept[0]['rows'][-1] == ['Käse', 'Dreamies', 2, 'Beide Male sofort verputzt', True]
+        and kept[2]['say'] == '1 Sorte ist noch unklar.'
+        and kept[2]['rows'] == [['Pute Pastete', 'Animonda Carny', 2, 'Einmal später leer, einmal halb gegessen', False]],
+        f'„Immer kaufen“ set by hand: under its own food type with the pin, and the open fold stays open ({kept[0]["groups"]}, {kept[2]})',
+    )
+    await pg.click(f'#sheet [data-action=open-product][data-id="{kaese}"]')
+    await idle(pg)
+    check(
+        await pg.evaluate("document.getElementById('sheet').dataset.kind") == 'product' and await pg.inner_text('#sheet .sh-head h2') == 'Käse',
+        'a row opens the food sheet, which tells the ratings in words',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    # One rating: nothing to buy yet, which the home page and the page say; nothing rated: the home page's one line
+    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
+      s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
+    await idle(pg)
+    one = await pg.evaluate(SHOP_HOME)
+    await pg.click('[data-sec=shop] [data-action=open-shop]')
+    await idle(pg)
+    few = await pg.evaluate(SHOP_PAGE)
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = null; s.save();
+      return import('./js/views/home.js').then(h => h.renderHome()); })""")
+    await idle(pg)
+    none = await pg.evaluate(SHOP_HOME)
+    check(
+        one['line'] == 'Noch nichts zum Nachkaufen.'
+        and one['btns'] == [['Einkaufsliste öffnen', 'open-shop', 'card-btn', True, True]]
+        and [(c['head'], c['say'] or c['line']) for c in few]
+        == [('Nachkaufen', 'Noch nichts zum Nachkaufen.'), ('Noch unklar', '1 Sorte ist noch unklar.')]
+        and await pg.evaluate("document.querySelector('#home [data-sec=shop]') && 1") == 1
+        and none
+        == {
+            'rows': [],
+            'strips': 0,
+            'line': 'Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.',
+            'btns': [],
+        },
+        f'one rating: nothing to buy yet, and no card for what stays in the bowl; nothing rated: one line and no way on ({one}, {few}, {none})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
 
@@ -661,40 +744,42 @@ async def test_week(browser, url):
     await pg.evaluate("""import('./js/store.js').then(async s => { for (let i = 0; i < 5; i++) s.db.servings.unshift({id: 'neuewoche' + i, productId: 'lachs000001', servedAt: new Date(2026, 5, 9 + i, 8).getTime(), note: '', by: 'Anna', pets: {minka00001: {r: 'top', at: 1}}});
       s.save(); (await import('./js/views/home.js')).renderHome(); })""")
     await idle(pg)
-    # Sharing the shopping list: unfolded via „Weniger anzeigen“, the text matching the pet filter
+    # Sharing the shopping list: only on its page, what to buy again by food type, matching the pet filter
     await pg.click('[data-action=filter][data-id=all]')
     await idle(pg)
-    check(await pg.locator('[data-action=share-list]').count() == 0, '„Als Liste teilen“ is absent from the folded card')
-    await pg.click('[data-action=expand][data-v=shop]')
+    check(await pg.locator('#home [data-action=share-list]').count() == 0, '„Als Liste teilen“ is not on the home page')
+    await pg.click('[data-sec=shop] [data-action=open-shop]')
     await idle(pg)
     await shot(pg, 'shopping-share')
-    await pg.click('[data-action=share-list]')
+    await pg.click('#sheet [data-action=share-list]')
     await idle(pg)
     house = await pg.evaluate('navigator.clipboard.readText()')
     toast = await pg.inner_text('#toast')
-    want = 'Einkaufen für Minka und Tiger\n\nNachkaufen\n- Sheba Lachs in Soße\n- Animonda Pute\n- Miamor Ente\n- Felix Huhn in Gelee (für Minka)\n\nNicht kaufen\n- Gourmet Rind Pastete\n- Dreamies Käse'
+    want = 'Einkaufen für Minka und Tiger\n\nNassfutter\n- Sheba Lachs in Soße\n- Animonda Pute\n- Miamor Ente\n- Felix Huhn in Gelee (nur für Minka)'
     check(
         house == want and 'Liste kopiert' in toast,
-        f'the household list: „Nachkaufen“ with „Gemischt“ (für …) and `immer`, „Nicht kaufen“ with `nicht`, without „Geht so“ and „Noch zu wenig bewertet“; without a share menu it goes to the clipboard with a toast ({house!r})',
+        f'the household list: what to buy again with „Gemischt“ (nur für …) and `immer` under its food type, nothing else; without a share menu it goes to the clipboard with a toast ({house!r})',
     )
     lists = await pg.evaluate("""import('./js/store.js').then(async s => { const d = await import('./js/derive.js'), out = [];
       for (const p of ['minka00001', 'tiger00001']) { s.prefs.activePet = p; out.push(d.shoppingList().text); } s.prefs.activePet = 'all'; return out; })""")
     check(
         lists
         == [
-            'Einkaufen für Minka\n\nNachkaufen\n- Sheba Lachs in Soße\n- Animonda Pute\n- Felix Huhn in Gelee\n- Miamor Ente\n\nNicht kaufen\n- Dreamies Käse',
-            'Einkaufen für Tiger\n\nNachkaufen\n- Miamor Ente\n\nNicht kaufen\n- Felix Huhn in Gelee\n- Gourmet Rind Pastete\n- Dreamies Käse',
+            'Einkaufen für Minka\n\nNassfutter\n- Sheba Lachs in Soße\n- Animonda Pute\n- Felix Huhn in Gelee\n- Miamor Ente',
+            'Einkaufen für Tiger\n\nNassfutter\n- Miamor Ente',
         ],
-        f'the list with a pet filter: that pet\u2019s verdicts, and empty groups are left out ({lists})',
+        f'the list with a pet filter: that pet\u2019s verdicts ({lists})',
     )
     await pg.evaluate('navigator.share = o => { window.__shared = o; return Promise.resolve(); }')
-    await pg.click('[data-action=share-list]')
+    await pg.click('#sheet [data-action=share-list]')
     await idle(pg)
     shared = await pg.evaluate('window.__shared')
     check(
         shared and shared['text'] == want and shared['title'] == 'Einkaufen für Minka und Tiger',
         'in the browser with a share menu: navigator.share gets the title and the text',
     )
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
     # The „Appetit“ hint in the hint card
     await pg.clock.set_fixed_time('2026-06-09T10:00:00+02:00')
     low = [['lachs', {'M': 'top'}, f'2026-05-{25 + i}T08:00', 'Anna'] for i in range(7)] + [
@@ -5223,6 +5308,7 @@ run_tests(
         'flow': test_flow,
         'buying': test_buying,
         'cards': test_cards,
+        'shop': test_shop,
         'history': test_home_history,
         'report': test_report,
         'week': test_week,

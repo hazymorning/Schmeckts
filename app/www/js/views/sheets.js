@@ -12,6 +12,7 @@ import {
   getPet,
   getProduct,
   getServing,
+  model,
   petNames,
   pname,
   productsByCode,
@@ -20,7 +21,7 @@ import {
   servingsInFilter,
   sortOf,
 } from '../derive.js';
-import {MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {MIN_RATED, rateCls, scoreCls, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -41,6 +42,7 @@ import {
   resultBadges,
   scaleEnds,
   segmented,
+  shopRow,
   thumbOf,
   verdictLabel,
 } from './parts.js';
@@ -366,7 +368,7 @@ const figures = r =>
 const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
 const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
-const toldList = rows => `<ul class="list told">${rows.join('')}</ul>`;
+const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
 const named = id => `<b>${esc(pname(getProduct(id)))}</b>`;
 /* What changed, folded away under „Details“: the varieties new to „Nachkaufen“ and to „Nicht mehr kaufen“ and the
    meals not rated yet within the 30 days, and where several people fed in the last 7 days, how often each did */
@@ -388,26 +390,36 @@ function details(m) {
   return rows;
 }
 
-/* A part of a page that folds open under a .card-btn and shut again (foldPart()): nothing without rows */
-const foldBox = (key, label, rows) => {
-  if (!rows.length) return '';
-  const open = !!sheet.open?.[key];
-  return `<div class="card-body" id="fold-${key}">${open ? toldList(rows) : ''}</div>
-    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${open ? 'Weniger' : label}</button>`;
+/* The parts of a page that fold open under a .card-btn and shut again (foldPart()), each with the word on its button
+   and what it holds; nothing of it where it would hold nothing */
+const shopList = (m, list) =>
+  list.length ? `<ul class="list shop">${list.map(e => shopRow(m, e)).join('')}</ul>` : '';
+const unclear = g => [...g.geht, ...g.neu];
+const FOLDS = {
+  details: {label: 'Details', inner: () => toldList(details(reportModel()))},
+  nicht: {label: 'Anzeigen', inner: () => shopList(model(), shopGroups(model()).nicht)},
+  unklar: {label: 'Anzeigen', inner: () => shopList(model(), unclear(shopGroups(model())))},
 };
-const FOLDS = {details: {label: 'Details', rows: () => details(reportModel())}};
+function foldBox(key) {
+  const inner = FOLDS[key].inner(),
+    open = !!sheet.open?.[key];
+  if (!inner) return '';
+  return `<div class="card-body fold" id="fold-${key}">${open ? inner : ''}</div>
+    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${open ? 'Weniger' : FOLDS[key].label}</button>`;
+}
+/* „für Mau“ after the title of a page, as the pet filter stands; nothing with one pet */
+const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 
 function viewReport() {
   const m = reportModel(),
     month = m.spans[1],
     pet = month.pet,
     all = servingsInFilter();
-  const who = db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '';
   histDays = dayGroups(all);
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
-  return `${head('Verlauf' + who)}
+  return `${head('Verlauf' + forWhom(pet))}
     <section class="card review"><h2>Wie läuft’s?</h2><div class="rings">${m.spans.map(ring).join('')}</div>
-    ${figures(month)}${foldBox('details', FOLDS.details.label, details(m))}</section>
+    ${figures(month)}${foldBox('details')}</section>
     <section class="card days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
       histDays.length
@@ -426,12 +438,38 @@ export function foldPart(key) {
   const open = !sheet.open?.[key],
     h0 = body.offsetHeight;
   sheet.open = {...sheet.open, [key]: open};
-  body.innerHTML = open ? toldList(f.rows()) : '';
+  body.innerHTML = open ? f.inner() : '';
   btn.textContent = open ? 'Weniger' : f.label;
   btn.setAttribute('aria-expanded', String(open));
   slideHeight(body, h0);
   drawn = VIEWS[sheet.kind](); // what is on the page now, so a redraw with nothing new leaves it alone
 }
+/* „Einkaufen“: a page of up to three cards within the pet filter (shopGroups() in smart.js). What to buy again, by food
+   type and the best first, each variety with its ratings as a strip, and the list to share; then, folded away to a
+   line each, what mostly stays in the bowl, the clearest first, and what is not clear yet. A manual setting decides
+   where a variety stands and shows the pin. */
+const sorts = (n, one, many) => (n === 1 ? `1 Sorte ${one}` : `${n} Sorten ${many}`);
+function viewShop() {
+  const m = model(),
+    g = shopGroups(m),
+    types = TYPES.map(t => [t, g.nachkaufen.filter(e => typeOf(e.product) === t)]).filter(([, l]) => l.length),
+    open = unclear(g).length;
+  const buy = types.length
+    ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('') +
+      `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Als Liste teilen</button></div>`
+    : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>';
+  return `${head('Einkaufen' + forWhom(m.pet))}
+    <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
+      g.nicht.length
+        ? `<section class="card"><h2>Lieber nicht</h2><p class="say card-line">${sorts(g.nicht.length, 'bleibt', 'bleiben')} meist stehen.</p>${foldBox('nicht')}</section>`
+        : ''
+    }${
+      open
+        ? `<section class="card"><h2>Noch unklar</h2><p class="say card-line">${sorts(open, 'ist', 'sind')} noch unklar.</p>${foldBox('unklar')}</section>`
+        : ''
+    }`;
+}
+
 /* A day tapped in the calendar of this page: the list grows until that day is drawn and a page of days under it
    as well, because only then can the day reach the top of the screen. */
 export function jumpToDay(key) {
@@ -520,6 +558,7 @@ const VIEWS = {
   // The pet editor is a page of the settings when it is reached from there, and the same view serves it
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
+  shop: viewShop,
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
    away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.

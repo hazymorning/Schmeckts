@@ -145,6 +145,9 @@ const ACTIONS = {
   'open-report'(el) {
     openSheet(reportState(el.dataset.v || null));
   }, // data-v: the day it opens at
+  'open-shop'() {
+    openSheet({kind: 'shop'});
+  },
   'open-server'() {
     openSheet({kind: 'settings', page: 'house'});
   },
