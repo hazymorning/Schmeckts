@@ -314,158 +314,6 @@ test('feeding times: from 14 days, treats excluded, from 4 days on; reminder 45 
   assert.deepEqual(feedSlots(household(['A'], ['nass'], meals.slice(0, 6)), now), []);
 });
 
-const insights = db =>
-  model(db).insights.map(i => (i.sorts ? [i.kind, i.sorts] : [i.kind, i.type, i.best.key, i.worst.key]));
-
-test('insights: groups of two varieties rated twice each, far apart, every variety of one above every one of the other', () => {
-  const sort = (id, brand, name) => ({id, brand, variety: name});
-  const four = [
-    sort('a', 'Sheba', 'Lachs in Soße'),
-    sort('b', 'Sheba', 'Huhn in Soße'),
-    sort('c', 'Felix', 'Lachs in Gelee'),
-    sort('d', 'Felix', 'Huhn in Gelee'),
-  ];
-  const db = household(['A'], four, [
-    ...rate('a', 'A', [T, T]),
-    ...rate('b', 'A', [T, G]),
-    ...rate('c', 'A', [X, X]),
-    ...rate('d', 'A', [S, X]),
-  ]);
-  assert.deepEqual(
-    insights(db),
-    [['konsistenz', 'Nassfutter', 'In Soße', 'In Gelee']],
-    'the brands compare the same varieties as the consistencies and are left out; the flavours are level',
-  );
-  const i = model(db).insights[0];
-  assert.deepEqual([i.best.good, i.best.n, i.worst.good, i.worst.n], [4, 4, 0, 4]);
-  assert.deepEqual(
-    insights(household(['A'], [four[0], four[2]], [...rate('a', 'A', [T, T]), ...rate('c', 'A', [X, X])])),
-    [],
-    'one variety a group: that is a verdict, not an insight',
-  );
-  assert.deepEqual(
-    insights(
-      household(['A'], four, [
-        ...rate('a', 'A', [T, T, T, T]),
-        ...rate('b', 'A', [X, X]),
-        ...rate('c', 'A', [X, X]),
-        ...rate('d', 'A', [G, X]),
-      ]),
-    ),
-    [],
-    'far enough apart on the whole, but a sauce variety left behind a jelly one',
-  );
-  assert.deepEqual(
-    insights(
-      household(['A'], four, [
-        ...rate('a', 'A', [T]),
-        ...rate('b', 'A', [T, G]),
-        ...rate('c', 'A', [X, X]),
-        ...rate('d', 'A', [S, X]),
-      ]),
-    ),
-    [],
-    'a variety rated once does not count, so its group is too small',
-  );
-  assert.deepEqual(model(household(['A'], ['a'], rate('a', 'A', [T, T]))).insights, []);
-});
-
-test('insights: „nur die Soße“ and „erst gierig“ from two varieties where it happened at least half of the time', () => {
-  const E = 'eager';
-  const db = household(
-    ['A'],
-    ['a', 'b', 'c', 'd'],
-    [...rate('a', 'A', [S, S, T]), ...rate('b', 'A', [S, G]), ...rate('c', 'A', [S]), ...rate('d', 'A', [E, E, T])],
-  );
-  assert.deepEqual(
-    insights(db),
-    [
-      [
-        'sosse',
-        [
-          {id: 'a', k: 2, n: 3},
-          {id: 'b', k: 1, n: 2},
-        ],
-      ],
-    ],
-    'c rated once does not count; „erst gierig“ with one variety is no habit',
-  );
-  const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, E])]);
-  assert.deepEqual(
-    insights(both).map(x => x[0]),
-    ['sosse', 'eager'],
-  );
-});
-
-test('insights: comparisons within one food type only, and the insight names it', () => {
-  const sort = (id, brand, type) => ({id, brand, variety: 'Huhn', type});
-  const mixed = household(
-    ['A'],
-    [
-      sort('n1', 'Sheba', 'Nassfutter'),
-      sort('n2', 'Sheba', 'Nassfutter'),
-      sort('t1', 'Felix', 'Trockenfutter'),
-      sort('t2', 'Felix', 'Trockenfutter'),
-    ],
-    [
-      ...rate('n1', 'A', [T, T]),
-      ...rate('n2', 'A', [T, T]),
-      ...rate('t1', 'A', ['liegen', 'liegen']),
-      ...rate('t2', 'A', ['liegen', 'liegen']),
-    ],
-  );
-  assert.deepEqual(model(mixed).insights, []);
-  const dry = household(
-    ['A'],
-    [
-      sort('t1', 'Felix', 'Trockenfutter'),
-      sort('t2', 'Felix', 'Trockenfutter'),
-      sort('t3', 'Josera', 'Trockenfutter'),
-      sort('t4', 'Josera', 'Trockenfutter'),
-    ],
-    [
-      ...rate('t1', 'A', ['liegen', 'wenig']),
-      ...rate('t2', 'A', ['liegen', 'normal']),
-      ...rate('t3', 'A', ['gern', 'gern']),
-      ...rate('t4', 'A', ['gern', 'normal']),
-    ],
-  );
-  assert.deepEqual(insights(dry), [['marke', 'Trockenfutter', 'Josera', 'Felix']]);
-});
-
-test('consistency insights: the texture field, the keywords only when it is missing, kept apart for wet food and treats', () => {
-  const db = household(
-    ['A'],
-    [
-      {id: 'n1', variety: 'Lachs in Soße', texture: 'gelee'},
-      {id: 'n2', variety: 'Huhn in Gelee'},
-      {id: 'n3', variety: 'Rind Pastete'},
-      {id: 'n4', variety: 'Pute', texture: 'pastete'},
-      {id: 's1', type: 'Snack', variety: 'Knusperkissen'},
-      {id: 's2', type: 'Snack', variety: 'Knusprige Taler'},
-      {id: 's3', type: 'Snack', variety: 'Happen', texture: 'creme'},
-      {id: 's4', type: 'Snack', variety: 'Snack in Soße', texture: 'creme'},
-    ],
-    [
-      ...rate('n1', 'A', [T, T]),
-      ...rate('n2', 'A', [T, G]),
-      ...rate('n3', 'A', [M, M]),
-      ...rate('n4', 'A', [X, M]),
-      ...rate('s1', 'A', ['unberuehrt', 'unberuehrt']),
-      ...rate('s2', 'A', ['angeknabbert', 'unberuehrt']),
-      ...rate('s3', 'A', ['verputzt', 'verputzt']),
-      ...rate('s4', 'A', ['verputzt', 'spaeter']),
-    ],
-  );
-  assert.deepEqual(
-    insights(db).filter(i => i[0] === 'konsistenz'),
-    [
-      ['konsistenz', 'Nassfutter', 'In Gelee', 'Pastete'],
-      ['konsistenz', 'Snack', 'Creme', 'Knusprig'],
-    ],
-  );
-});
-
 /* The profile as [dimension, type, [[group, good, of], …] best first, clear] */
 const profiled = (db, prefs) =>
   profile(model(db, prefs)).map(d => [d.kind, d.type, d.groups.map(g => [g.key, g.good, g.n]), d.clear]);
@@ -614,6 +462,75 @@ test('profile: within one food type, with the pet filter, and every group’s ra
       ['liegen', 'wenig', 'liegen', 'normal'],
     ],
     'the ratings of a group oldest first, only those within the filter',
+  );
+});
+
+test('profile: comparisons within one food type only', () => {
+  const sort = (id, brand, type) => ({id, brand, variety: 'Huhn', type});
+  const mixed = household(
+    ['A'],
+    [
+      sort('n1', 'Sheba', 'Nassfutter'),
+      sort('n2', 'Sheba', 'Nassfutter'),
+      sort('t1', 'Felix', 'Trockenfutter'),
+      sort('t2', 'Felix', 'Trockenfutter'),
+    ],
+    [
+      ...rate('n1', 'A', [T, T]),
+      ...rate('n2', 'A', [T, T]),
+      ...rate('t1', 'A', ['liegen', 'liegen']),
+      ...rate('t2', 'A', ['liegen', 'liegen']),
+    ],
+  );
+  assert.deepEqual(profiled(mixed), [], 'a brand of wet food and one of dry food are no comparison');
+});
+
+test('profile by consistency: the texture field, the keywords only when it is missing, apart for wet food and treats', () => {
+  const db = household(
+    ['A'],
+    [
+      {id: 'n1', variety: 'Lachs in Soße', texture: 'gelee'},
+      {id: 'n2', variety: 'Huhn in Gelee'},
+      {id: 'n3', variety: 'Rind Pastete'},
+      {id: 'n4', variety: 'Pute', texture: 'pastete'},
+      {id: 's1', type: 'Snack', variety: 'Knusperkissen'},
+      {id: 's2', type: 'Snack', variety: 'Knusprige Taler'},
+      {id: 's3', type: 'Snack', variety: 'Happen', texture: 'creme'},
+      {id: 's4', type: 'Snack', variety: 'Snack in Soße', texture: 'creme'},
+    ],
+    [
+      ...rate('n1', 'A', [T, T]),
+      ...rate('n2', 'A', [T, G]),
+      ...rate('n3', 'A', [M, M]),
+      ...rate('n4', 'A', [X, M]),
+      ...rate('s1', 'A', ['unberuehrt', 'unberuehrt']),
+      ...rate('s2', 'A', ['angeknabbert', 'unberuehrt']),
+      ...rate('s3', 'A', ['verputzt', 'verputzt']),
+      ...rate('s4', 'A', ['verputzt', 'spaeter']),
+    ],
+  );
+  assert.deepEqual(
+    profiled(db).filter(d => d[0] === 'konsistenz'),
+    [
+      [
+        'konsistenz',
+        'Nassfutter',
+        [
+          ['In Gelee', 4, 4],
+          ['Pastete', 0, 4],
+        ],
+        true,
+      ],
+      [
+        'konsistenz',
+        'Snack',
+        [
+          ['Creme', 4, 4],
+          ['Knusprig', 0, 4],
+        ],
+        true,
+      ],
+    ],
   );
 });
 

@@ -85,7 +85,7 @@ async def test_tour(browser, url, scheme='light'):
     heads = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.classList.contains("card") ? s.querySelector("h2").innerText : "-")')
     hint = [h for h in heads if h in ('Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     check(
-        heads == ['Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Einkaufen', 'Erkenntnisse'] and len(hint) == 1,
+        heads == ['Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Einkaufen', 'Vorlieben'] and len(hint) == 1,
         f'cards in a fixed order, the overview first: {heads}',
     )
     check(
@@ -100,7 +100,11 @@ async def test_tour(browser, url, scheme='light'):
     await shot(pg, f'{scheme}-shopping')
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
-    await pg.click('[data-action=expand][data-v=ins]')
+    await pg.click('[data-sec=profile] [data-action=open-profile]')
+    await idle(pg)
+    check(await pg.locator('#sheet .likes li').count() >= 4, '„Alle Vorlieben“: the page with every comparison')
+    await shot(pg, f'{scheme}-likes')
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     current = await pg.evaluate(CURRENT)
     shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
@@ -363,7 +367,7 @@ async def test_buying(browser, url):
 
 
 async def test_cards(browser, url):
-    print('home page: the hint, the insights with „Alle anzeigen“, the history always open')
+    print('home page: the hint, and the history always open')
     ctx = await phone(browser, touch=True, motion=True)
     pg, errors = await open_page(ctx, url)
     await pg.click('[data-action=demo]')
@@ -378,24 +382,6 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
         f'history: the calendar and the meals of the current day ({len(shown)})',
     )
-    total = await pg.evaluate("import('./js/derive.js').then(d => d.model().insights.length)")
-    ins = await pg.eval_on_selector(
-        '[data-sec=ins]', 'c => [c.querySelectorAll(".ins li").length, [...c.querySelectorAll(".card-btn")].map(b => b.innerText)]'
-    )
-    check(
-        total > 1 and ins == [1, ['Alle anzeigen']],
-        f'insights folded up: the most important one, with „Alle anzeigen“ below ({ins}, {total} in total)',
-    )
-    await pg.tap('[data-sec=ins] [data-action=expand]')
-    await idle(pg)
-    check(
-        await pg.locator('[data-sec=ins] .ins li').count() == total
-        and await pg.inner_text('[data-sec=ins] [data-action=expand]') == 'Weniger anzeigen',
-        'a tap shows every insight',
-    )
-    await pg.reload()
-    await started(pg)
-    check(await pg.locator('[data-sec=ins] .ins li').count() == 1, 'after a restart everything is folded up')
     # Hint: at most one, with a sentence, a reason and its buttons. „Nicht mehr kaufen“ and „Immer kaufen“ set kaufen,
     # „Ausblenden“ is remembered per device.
     HINT = """c => ({title: c.querySelector('h2').innerText, btns: [...c.querySelectorAll('.btn-row button')].map(b => b.innerText),
@@ -433,7 +419,7 @@ async def test_cards(browser, url):
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
       s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
-    check(await pg.locator('[data-sec=ins], [data-sec=hint]').count() == 0, 'one rating: no insight and no hint')
+    check(await pg.locator('[data-sec=profile], [data-sec=hint]').count() == 0, 'one rating: nothing yet of what the pet likes, and no hint')
     # Calendar: a tap on a day before the day before yesterday shows the older days and jumps to them
     old = await pg.evaluate("""(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 2);
       const b = [...document.querySelectorAll('.cal .day.has')].find(x => new Date(x.dataset.day + 'T12:00').getTime() < d.getTime()); return b && b.dataset.day; })()""")
@@ -620,6 +606,208 @@ async def test_shop(browser, url):
             'btns': [],
         },
         f'one rating: nothing to buy yet, and no card for what stays in the bowl; nothing rated: one line and no way on ({one}, {few}, {none})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+# The „Vorlieben“ page, per card: its heading, its one line, every comparison with its groups as [name, what stands
+# under it, the dots of its strip, whether a „+“ leads them, what the strip says, „deutlich“], and the told lines as
+# [what leads them, the sentence, what it rests on]
+LIKES_PAGE = """() => [...document.querySelectorAll('#sheet .sheet-body > .card')].map(c => { const text = e => (e ? e.innerText.replace(/\\s+/g, ' ').trim() : null);
+  return {head: text(c.querySelector('h2')), line: text(c.querySelector('.hint.card-line')),
+    dims: [...c.querySelectorAll('.grp')].map(g => [g.innerText, [...g.nextElementSibling.querySelectorAll('.row')].map(r => [text(r.querySelector('.t-main b')),
+      text(r.querySelector('.t-main small')), r.querySelectorAll('.strip i').length, !!r.querySelector('.strip b'), r.querySelector('.strip')?.getAttribute('aria-label') ?? null,
+      text(r.querySelector('.badge'))])]),
+    told: [...c.querySelectorAll('.told li')].map(li => { const why = li.querySelector('.why');
+      return [li.firstElementChild.matches('.av') ? 'av' : li.querySelector('.lead svg') ? 'icon' : '?',
+        [...why.parentElement.childNodes].filter(n => n !== why).map(n => n.textContent).join('').replace(/\\s+/g, ' ').trim(), text(why)]; })}; })"""
+
+# „Vorlieben“ on the home page: its comparison's name, its rows as on the page, its told lines, its buttons
+LIKES_HOME = """() => { const c = document.querySelector('[data-sec=profile]'); if (!c) return null; const text = e => e.innerText.replace(/\\s+/g, ' ').trim();
+  return {label: [...c.querySelectorAll('.grp')].map(text), rows: [...c.querySelectorAll('.likes .row')].map(r => [text(r.querySelector('.t-main b')), text(r.querySelector('.t-main small')),
+      r.querySelector('.badge') ? text(r.querySelector('.badge')) : null, r.querySelectorAll('.strip i').length]),
+    told: [...c.querySelectorAll('.told li')].map(li => [li.firstElementChild.matches('.av') ? 'av' : 'icon', text(li.querySelector('span:last-child')).split('. ')[0]]),
+    btns: [...c.querySelectorAll('button')].map(b => [text(b), b.dataset.action, b.className, !!b.querySelector('svg'), b === c.lastElementChild])}; }"""
+
+# Two pets with a habit each and nothing to compare: the same brand and one variety per flavour. Their meals one a day,
+# oldest first, as [variety, rating]: Minka leaves a variety served again, Tiger likes it better
+LIKES_HOUSE = """([minka, tiger]) => import('./js/store.js').then(async s => { const d = s.defaults(), day = 864e5, now = Date.now();
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}, {id: 'tiger00001', name: 'Tiger', species: 'Katze', createdAt: 2}];
+  d.products = [['x', 'Lachs'], ['y', 'Huhn']].map(([id, variety]) => ({id: 'sorte' + id + '0001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  const meals = (pet, list, later) => list.map(([sort, r], i) => ({id: pet.slice(0, 5) + 'meal' + String(i).padStart(4, '0'), productId: 'sorte' + sort + '0001', note: '',
+    servedAt: now - (list.length - i) * day + later, pets: {[pet]: {r, at: now}}}));
+  d.servings = [...meals('minka00001', minka, 0), ...meals('tiger00001', tiger, 36e5)].sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+
+def runs(*groups):
+    """Meals in runs of one variety, oldest first: (variety, rating, …) each, the runs taking turns between two"""
+    return [[sort, r] for sort, *rs in groups for r in rs]
+
+
+async def test_profile(browser, url):
+    print('„Vorlieben“: the clearest two rows on the home page, and the page with every comparison and the habits')
+    ctx = await phone(browser, width=360, height=800)
+    pg, errors = await open_page(ctx, url)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    home = await pg.evaluate(LIKES_HOME)
+    check(
+        home
+        == {
+            'label': ['Konsistenz'],
+            'rows': [['In Gelee', 'Alle 6 Mal gut gefressen', 'deutlich', 6], ['Pastete', '1 von 5 Mal gut gefressen', 'deutlich', 5]],
+            'told': [],
+            'btns': [['Alle Vorlieben', 'open-profile', 'card-btn', True, True]],
+        },
+        f'home page: the two ends of the clearest comparison under its name, both „deutlich“, and „Alle Vorlieben“ with the chevron ({home})',
+    )
+    await pg.click('[data-sec=profile] [data-action=open-profile]')
+    await idle(pg)
+    page, cards = await pg.evaluate(PAGE), await pg.evaluate(LIKES_PAGE)
+    mixed = 'Mal so, mal so: '
+    check(
+        page[:3] == ['Vorlieben', True, True]
+        and [c['head'] for c in cards] == ['Was ankommt', 'Gewohnheiten']
+        and cards[0]['line'] is None
+        and cards[0]['dims']
+        == [
+            [
+                'Konsistenz',
+                [
+                    ['In Gelee', 'Alle 6 Mal gut gefressen', 6, False, 'Alle 6 Mal gut gefressen', 'deutlich'],
+                    ['In Soße', '4 von 10 Mal gut gefressen', 8, True, mixed + '4× gut gefressen, 4× nur die Soße geleckt, 2× halb gegessen', None],
+                    ['Pastete', '1 von 5 Mal gut gefressen', 5, False, mixed + '2× kaum angerührt, 2× halb gegessen, 1× später leer', 'deutlich'],
+                ],
+            ],
+            [
+                'Geschmack',
+                [
+                    ['Huhn', '4 von 6 Mal gut gefressen', 6, False, '4 von 6 Mal gut gefressen', None],
+                    ['Rind', '3 von 6 Mal gut gefressen', 6, False, mixed + '3× gut gefressen, 2× kaum angerührt, 1× halb gegessen', None],
+                ],
+            ],
+        ],
+        f'the page: each comparison under its name, its groups ranked with how often they went down well and the strip of their ratings, the ends of a clear one „deutlich“ ({page}, {cards[0]})',
+    )
+    check(
+        cards[1]['told'][0]
+        == [
+            'icon',
+            'Bei Geflügel in Soße und Thunfisch in Soße wird oft nur die Soße geleckt.',
+            'Geflügel in Soße 2 von 3 Mal, Thunfisch in Soße 2 von 3 Mal',
+        ]
+        and all(t[1].startswith(('Mag Abwechslung', 'Gewohnheitstier')) for t in cards[1]['told'][1:]),
+        f'„Gewohnheiten“: the sauce licked off, told as before ({cards[1]["told"]})',
+    )
+    check(
+        await pg.locator('#sheet .likes button, #sheet .likes [data-action]').count() == 0,
+        'the rows of a comparison are no buttons: there is nothing behind them yet',
+    )
+    await shot(pg, 'likes-360')
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+
+    # Abwechslung, per pet with its picture under „Alle“, and nothing to compare: the home page shows the habits
+    minka = runs(
+        ('x', 'top', 'top'),
+        ('y', 'top', 'top'),
+        ('x', 'top', 'top'),
+        ('y', 'top', 'schlecht'),
+        ('x', 'top', 'schlecht'),
+        ('y', 'top', 'schlecht'),
+        ('x', 'top', 'schlecht'),
+        ('y', 'schlecht', 'schlecht'),
+        ('x', 'top'),
+        ('y', 'top'),
+        ('x', 'top'),
+        ('y', 'schlecht'),
+        ('x', 'top'),
+        ('y', 'schlecht'),
+        ('x', 'top'),
+    )
+    tiger = runs(
+        ('x', 'schlecht', 'top'),
+        ('y', 'schlecht', 'top'),
+        ('x', 'schlecht', 'top'),
+        ('y', 'top', 'top'),
+        ('x', 'schlecht', 'top'),
+        ('y', 'schlecht', 'top'),
+        ('x', 'top', 'schlecht'),
+        ('y', 'schlecht', 'top'),
+    )
+    await pg.evaluate(LIKES_HOUSE, [minka, tiger])
+    await idle(pg)
+    home = await pg.evaluate(LIKES_HOME)
+    await pg.click('[data-sec=profile] [data-action=open-profile]')
+    await idle(pg)
+    both = await pg.evaluate(LIKES_PAGE)
+    title = await pg.inner_text('#sheet .page-title')
+    check(
+        home['label'] == []
+        and home['rows'] == []
+        and home['told']
+        == [
+            ['av', 'Minka mag Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig'],
+            ['av', 'Tiger ist ein Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an'],
+        ]
+        and title == 'Vorlieben für alle Tiere'
+        and both[0]
+        == {'head': 'Was ankommt', 'line': 'Noch zu wenig bewertet. Nach ein paar Wochen steht hier, was dein Tier mag.', 'dims': [], 'told': []}
+        and both[1]['told']
+        == [
+            [
+                'av',
+                'Minka mag Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig.',
+                'Nach derselben Sorte 3 von 8 Mal gut gefressen, sonst 12 von 15',
+            ],
+            [
+                'av',
+                'Tiger ist ein Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an.',
+                'Nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8',
+            ],
+        ],
+        f'Abwechslung: one line per pet with its picture, either way; with nothing to compare, the home page shows the habits ({home}, {title}, {both})',
+    )
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('[data-action=filter][data-id=tiger00001]')
+    await idle(pg)
+    await pg.click('[data-sec=profile] [data-action=open-profile]')
+    await idle(pg)
+    tiger_only = await pg.evaluate(LIKES_PAGE)
+    title = await pg.inner_text('#sheet .page-title')
+    check(
+        title == 'Vorlieben für Tiger'
+        and tiger_only[1]['told']
+        == [
+            [
+                'icon',
+                'Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an.',
+                'Nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8',
+            ]
+        ],
+        f'with Tiger chosen: only Tiger, with the icon instead of a picture ({title}, {tiger_only[1]["told"]})',
+    )
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('[data-action=filter][data-id=all]')
+    await idle(pg)
+
+    # Nothing rated: no card on the home page, and the page says so
+    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.save();
+      return import('./js/views/home.js').then(h => h.renderHome()); })""")
+    await idle(pg)
+    gone = await pg.evaluate(LIKES_HOME)
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'profile'}))")
+    await idle(pg)
+    empty = await pg.evaluate(LIKES_PAGE)
+    check(
+        gone is None
+        and empty
+        == [{'head': 'Was ankommt', 'line': 'Noch zu wenig bewertet. Nach ein paar Wochen steht hier, was dein Tier mag.', 'dims': [], 'told': []}],
+        f'nothing rated: no card on the home page, and the page says what it will hold ({empty})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
@@ -1907,8 +2095,8 @@ async def test_petbar(browser, url):
       .map(e => e.matches('header') ? 'header' : e.id === 'pets' ? 'pets' : e.querySelector('h2')?.innerText ?? e.tagName)""")
     hint = [x for x in order if x in ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     check(
-        order == ['header', 'Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Einkaufen', 'Erkenntnisse'] and len(hint) == 1,
-        f'one pet: no pet bar; overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Erkenntnisse“ ({order})',
+        order == ['header', 'Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Einkaufen', 'Vorlieben'] and len(hint) == 1,
+        f'one pet: no pet bar; overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Vorlieben“ ({order})',
     )
     check(await pg.locator('#pets').is_hidden() and await pg.locator('#pets *').count() == 0, 'with one pet there is no filter')
     await shot(pg, 'home-one-pet')
@@ -1938,9 +2126,7 @@ async def test_petbar(browser, url):
     await ctx.close()
 
 
-SERVER_WORDS = re.compile(
-    r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn(en|t)\b'
-)  # nowhere to be seen in mode `lokal` („Erkenntnisse“ is fine)
+SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn(en|t)\b')  # nowhere to be seen in mode `lokal`
 
 
 PRIVACY = [
@@ -5309,6 +5495,7 @@ run_tests(
         'buying': test_buying,
         'cards': test_cards,
         'shop': test_shop,
+        'profile': test_profile,
         'history': test_home_history,
         'report': test_report,
         'week': test_week,

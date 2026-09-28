@@ -2,13 +2,13 @@
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {settled, slideHeight} from '../motion.js';
-import {andList, cap, esc} from '../text.js';
+import {cap, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
-import {RATINGS, TEXTURES, TYPES} from '../config.js';
+import {RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {getPet, getProduct, model, pendingServings, pname, servingPets} from '../derive.js';
+import {getPet, getProduct, habitsModel, model, pendingServings, pname, profileModel, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
@@ -19,6 +19,8 @@ import {
   dayBlocks,
   dayGroups,
   evidenceOf,
+  habitRow,
+  likesList,
   lower,
   nameBlock,
   photoThumb,
@@ -27,6 +29,7 @@ import {
   syncChip,
   thumbOf,
   times,
+  toldList,
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
@@ -63,7 +66,7 @@ export function scrollTop() {
 }
 
 // fresh: id of the meal just served, which slides in on the next draw
-// open: unfolded cards, lasts until the app restarts
+// open: the overview unfolded, which lasts until the app restarts
 // held: meals rated in „Wie war’s?“ that stay there a moment longer (logic/editing.js), each with the pets rated there
 export const homeView = {fresh: null, open: {}, held: new Map()};
 
@@ -136,14 +139,12 @@ function homeHTML() {
   let html = banner + (m ? overviewHTML(m, homeView.open.overview) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
-  else {
-    const ins = insightCard(m);
+  else
     html +=
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
       `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2>${shopHTML(m)}</section>` +
-      (ins ? card('ins', 'Erkenntnisse', ins) : '');
-  }
+      likesHTML(m);
   return html;
 }
 
@@ -176,7 +177,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
   <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
-  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und erste Erkenntnisse.</p></li></ol></section>`;
+  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und unter „Vorlieben“, was dein Tier mag.</p></li></ol></section>`;
 
 /* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. */
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
@@ -207,34 +208,6 @@ function pendingHTML(list) {
   );
 }
 
-/* A card with „Alle anzeigen“: the essentials folded up, everything unfolded */
-function card(key, title, {body, more, foot = ''}) {
-  const open = !!homeView.open[key];
-  return `<section class="card" data-sec="${key}" style="view-transition-name:sec-${key}"><h2>${title}</h2>
-    <div class="card-body" id="sec-${key}">${body}</div>${
-      more
-        ? `<button class="card-btn" data-action="expand" data-v="${key}"
-      aria-expanded="${open}" aria-controls="sec-${key}">${open ? 'Weniger anzeigen' : 'Alle anzeigen'}</button>`
-        : ''
-    }${foot}</section>`;
-}
-/* Folding open or shut: swap the content, and the card eases open or shut (--dur-step, --ease-out), instantly
-   under reduced motion. Without redrawing the page, so the button stays put (focus when using the keyboard).
-   Nothing is stored. */
-export function expandCard(key) {
-  if (!CARDS[key]) return;
-  homeView.open[key] = !homeView.open[key];
-  const sec = $(`[data-sec="${key}"]`),
-    content = CARDS[key](model());
-  if (!sec || !content) return update();
-  const body = $('.card-body', sec),
-    btn = $('[data-action=expand]', sec),
-    h0 = body.offsetHeight;
-  body.innerHTML = content.body;
-  btn.textContent = homeView.open[key] ? 'Weniger anzeigen' : 'Alle anzeigen';
-  btn.setAttribute('aria-expanded', String(homeView.open[key]));
-  slideHeight(body, h0);
-}
 /* Hint: the one with the highest precedence (a sentence, a reason, the buttons) */
 const HINT_TITLES = {
   appetit: 'Appetit',
@@ -294,44 +267,20 @@ function shopHTML(m) {
   }<button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button>`;
 }
 
-/* Erkenntnisse (insights() in smart.js): what holds across varieties, the strongest first, each a sentence and under
-   it in words what it rests on; the strongest one folded up, all of them unfolded, and no card without one. */
-const INSIGHT = {konsistenz: 'layers', geschmack: 'fish', marke: 'award', sosse: 'drop', eager: 'r_eager'};
-const COMPARED = {konsistenz: 'Bei der Konsistenz', geschmack: 'Beim Geschmack', marke: 'Bei den Marken'};
-function insightHTML(i, m) {
-  const name = id => pname(m.byId.get(id).product);
-  if (i.kind === 'sosse' || i.kind === 'eager') {
-    const names = andList(i.sorts.map(x => `<b>${esc(name(x.id))}</b>`));
-    return [
-      i.kind === 'sosse'
-        ? `Bei ${names} wird oft nur die Soße geleckt.`
-        : `Bei ${names} geht es oft gierig los, dann bleibt der Rest stehen.`,
-      cap(i.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', ')),
-    ];
-  }
-  const what =
-    i.kind === 'konsistenz' && i.type !== TYPES[0]
-      ? `Bei der ${TEXTURES[i.type].title}` // „Snack-Art“ already names the type
-      : COMPARED[i.kind] + (i.type === TYPES[0] ? '' : ` (${i.type})`);
-  return [
-    `${what} liegt <b>${esc(i.best.key)}</b> vorn, <b>${esc(i.worst.key)}</b> hinten.`,
-    `${i.best.key} ${times(i.best.good, i.best.n)} gut gefressen, ${i.worst.key} ${times(i.worst.good, i.worst.n)}`,
-  ];
+/* Vorlieben: the two clearest rows of the profile, which are the ends of its clearest comparison („deutlich“ first,
+   then the largest gap) under its name; while there is no comparison yet, up to two habits instead. Then the way to
+   the page. No card while the page would be empty (profileModel() in derive.js). */
+const LIKES_SHOWN = 2;
+function likesHTML(m) {
+  const d = [...profileModel()].sort((a, b) => b.clear - a.clear || b.gap - a.gap)[0],
+    habits = d ? [] : habitsModel();
+  if (!d && !habits.length) return '';
+  return `<section class="card" data-sec="profile" style="view-transition-name:sec-profile"><h2>Vorlieben</h2>${
+    d
+      ? likesList(m, {...d, groups: [d.groups[0], d.groups.at(-1)]})
+      : toldList(habits.slice(0, LIKES_SHOWN).map(h => habitRow(h, db.pets.length > 1 && !m.pet)))
+  }<button class="card-btn" data-action="open-profile">Alle Vorlieben${icon('chevron')}</button></section>`;
 }
-function insightCard(m) {
-  if (!m.insights.length) return null;
-  const list = homeView.open.ins ? m.insights : m.insights.slice(0, 1);
-  return {
-    body: `<ul class="list ins">${list
-      .map(i => {
-        const [say, why] = insightHTML(i, m);
-        return `<li class="row"><span class="lead">${icon(INSIGHT[i.kind])}</span><span>${say}<small class="hint why">${esc(why)}</small></span></li>`;
-      })
-      .join('')}</ul>`,
-    more: m.insights.length > 1,
-  };
-}
-const CARDS = {ins: insightCard};
 
 /* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while
    nothing has been served today, each day whole. One pass over the calendar's two weeks, newest first, which stops

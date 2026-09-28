@@ -8,7 +8,7 @@ const HALF_LIFE = 90 * DAY;
 const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // reference time of the weights, irrelevant to the score
 export const GOOD = 70; // from this many points a rating, a variety or a share counts as going down well
 export const NO = 40; // under this many a rating counts as left, and a variety as not going down well
-export const MIN_RATED = 3; // from this many ratings within the filter there are insights and an evaluation
+export const MIN_RATED = 3; // from this many ratings in its span a ring of „Verlauf“ shows a share
 const APPETITE = {recent: 72 * 36e5, usual: 30 * DAY, minRecent: 3, minUsual: 8, minSorts: 2, drop: 30, below: 50};
 export const VERDICTS = {
   nachkaufen: 'Nachkaufen',
@@ -118,7 +118,7 @@ function houseVerdict(pets) {
   return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : rest};
 }
 
-/* Model  = {pet, sorts, byId, rated, insights, hints, repeats}
+/* Model  = {pet, sorts, byId, rated, hints, repeats}
    Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
             the filter: n, score, pct, verdict, counts, yes, no}
    Stat  = {n, score, pct, verdict, counts}
@@ -160,7 +160,6 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     sorts,
     byId,
     rated: sorts.reduce((a, e) => a + e.n, 0),
-    insights: insights(sorts),
     hints: hints(sorts, appetite(db, pet ? [pet] : petIds, now), pet, prefs),
     get repeats() {
       return (repeats ||= repeatsOf(db, pet ? [pet] : petIds, now));
@@ -168,13 +167,11 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
   };
 }
 
-/* Insights: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“).
-   Comparisons by consistency, flavour and brand, each within one food type: a group counts with at least two
-   varieties rated at least twice each, and groups are measured by how often they went down well. The best and the
-   weakest group make an insight when that share is at least 30 points apart and every variety of the one did
-   better than every variety of the other, so a single variety cannot carry it; two comparisons over the same
-   varieties are one, consistency before flavour before brand. The strongest come first. Then two habits, „nur die
-   Soße geleckt“ and „erst gierig“, where at least two varieties show it at least half of the time. */
+/* „Vorlieben“: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“). Comparisons by
+   consistency, flavour and brand, each within one food type: a group counts with at least two varieties rated at
+   least twice each, and groups are measured by how often they went down well. Then two habits, „nur die Soße
+   geleckt“ and „erst gierig“, where at least two varieties show it at least half of the time, and whether a pet
+   likes a change. */
 const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
 const GAP = 0.3,
@@ -185,27 +182,15 @@ const DIMENSIONS = [
   ['marke', p => p.brand],
 ];
 const HABITS = ['sosse', 'eager']; // levels that say how a variety is eaten
-function insights(sorts) {
-  if (sorts.reduce((a, e) => a + e.n, 0) < MIN_RATED) return [];
-  const out = [],
-    seen = new Set();
-  for (const {kind, type, groups, gap, clear} of dimensions(sorts)) {
-    const best = groups[0],
-      worst = groups.at(-1),
-      same = [...best.ids].sort() + '|' + [...worst.ids].sort();
-    if (!clear || seen.has(same)) continue;
-    seen.add(same);
-    out.push({kind, type, best, worst, gap});
-  }
-  out.sort((a, b) => b.gap - a.gap);
-  return [...out, ...habits({sorts})];
-}
 
-/* Every comparison there is, per food type and dimension: the groups ranked by how often they went down well, the
-   best first, and whether its two ends are clear. A dimension counts with at least two groups. */
-function dimensions(sorts) {
+/* The profile: per food type the dimensions in a fixed order (consistency or treat type, flavour, brand), each with
+   its groups ranked by how often they went down well, the best first, from two groups on. A dimension is clear
+   („deutlich“) where its best and its weakest group lie at least GAP apart and every variety of the one did better
+   than every variety of the other, so no single variety can carry it.
+   [{kind, type, groups: [{key, ids, n, good, share, low, high}], gap, clear}] */
+export function profile(m) {
   const out = [],
-    rated = sorts.filter(e => e.n >= TWO);
+    rated = m.sorts.filter(e => e.n >= TWO);
   for (const type of TYPES) {
     const mine = rated.filter(e => typeOf(e.product) === type);
     for (const [kind, keyOf] of DIMENSIONS) {
@@ -235,13 +220,6 @@ function groupOf(key, l) {
     shares = l.map(e => goodOf(e.counts) / e.n);
   return {key, ids: l.map(e => e.id), n, good, share: good / n, low: Math.min(...shares), high: Math.max(...shares)};
 }
-
-/* „Vorlieben“: what the pets in the filter like, as a profile that stays put. Per food type the dimensions in a fixed
-   order (consistency or treat type, flavour, brand), each with its groups ranked. A dimension is clear („deutlich“)
-   where its best and its weakest group lie at least GAP apart and every variety of the one did better than every
-   variety of the other, so no single variety can carry it.
-   [{kind, type, groups: [{key, ids, n, good, share, low, high}], gap, clear}] */
-export const profile = m => dimensions(m.sorts);
 
 /* How varieties are eaten: „nur die Soße geleckt“ and „erst gierig“ where at least two varieties rated at least twice
    show it at least half of the time, naming up to three, the most pronounced first. [{kind, sorts: [{id, k, n}]}] */

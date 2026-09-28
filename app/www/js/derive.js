@@ -2,7 +2,7 @@
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
-import {analyze, changes, report, shopGroups, tally} from './smart.js';
+import {analyze, changes, habits, profile, report, shopGroups, tally, variety as change} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -49,6 +49,14 @@ export const reportModel = () =>
     spans: SPANS.map(days => report(db, prefs, now, days)),
     changes: changes(db, prefs, now, SPANS[1], model()),
   }));
+/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits with Abwechslung last,
+   which the home page asks for only while there is nothing to compare (it reads every meal) */
+export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
+export const habitsModel = () =>
+  cached('habits', [prefs.activePet], () => {
+    const m = model();
+    return [...habits(m), ...change(m)];
+  });
 export const sortOf = id => model().byId.get(id);
 export function pendingServings() {
   const cut = Date.now() - PENDING_WINDOW;

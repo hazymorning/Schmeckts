@@ -14,7 +14,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {expandCard, toggleOverview, update} from './views/home.js';
+import {toggleOverview, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
@@ -147,6 +147,9 @@ const ACTIONS = {
   }, // data-v: the day it opens at
   'open-shop'() {
     openSheet({kind: 'shop'});
+  },
+  'open-profile'() {
+    openSheet({kind: 'profile'});
   },
   'open-server'() {
     openSheet({kind: 'settings', page: 'house'});
@@ -404,10 +407,6 @@ const ACTIONS = {
   }, // exactly what the other device is missing
   demo() {
     loadDemo();
-  },
-  expand(el) {
-    haptic('select');
-    expandCard(el.dataset.v);
   },
   fold(el) {
     haptic('select');

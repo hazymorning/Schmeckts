@@ -1,8 +1,9 @@
-/* Recurring building blocks of the views: avatars, thumbnails, the rating slider, sync status. */
-import {cap, esc} from '../text.js';
+/* Recurring building blocks of the views: avatars, thumbnails, the rating slider, the strip of rating dots, the rows of
+   „Einkaufen“ and „Vorlieben“, lines told in a card, sync status. */
+import {andList, cap, esc} from '../text.js';
 import {ago, dayKey, dayLabel, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
-import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
+import {RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
@@ -230,6 +231,54 @@ export function shopRow(m, e) {
     <span class="t-main"><b>${esc(pname(p))}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${strip(ratingsIn(m, [e.id]))}
     ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
+
+/* A line of a card, told like the rest of the app: a plain icon, one in a rating's colour or the pet's picture, a
+   sentence with what it is about in bold, and under it in words what it rests on */
+export const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
+export const told = (pic, say, why = '') =>
+  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
+export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
+
+/* The name of a comparison of „Vorlieben“, with the food type in brackets except for wet food: „Konsistenz“,
+   „Geschmack (Trockenfutter)“, „Marke“, and for treats „Snack-Art“, which names the type already */
+const DIMENSION = {konsistenz: 'Konsistenz', geschmack: 'Geschmack', marke: 'Marke'};
+const dimName = d =>
+  d.kind === 'konsistenz' && d.type !== TYPES[0]
+    ? TEXTURES[d.type].title
+    : DIMENSION[d.kind] + (d.type === TYPES[0] ? '' : ` (${d.type})`);
+/* A habit of „Vorlieben“ as a told line: how varieties are eaten, the varieties in bold and how often under them; or
+   whether a pet likes a change, with the pet's picture and name where several pets are shown at once */
+const upTo = (k, n) => (k < n ? `${k} von ${n}` : `alle ${n}`);
+export function habitRow(h, several) {
+  const name = id => pname(getProduct(id));
+  if (h.kind === 'sosse' || h.kind === 'eager')
+    return told(
+      lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
+      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'geht es oft gierig los, dann bleibt der Rest stehen'}.`,
+      cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', ')),
+    );
+  const pet = several ? getPet(h.pet) : null,
+    who = pet ? `<b>${esc(pet.name)}</b> ` : '';
+  return told(
+    pet ? avatar(pet, 's') : lead('repeat'),
+    h.kind === 'abwechslung'
+      ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig.`
+      : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte hintereinander kommt besser an.`,
+    `Nach derselben Sorte ${times(h.same.good, h.same.n)} gut gefressen, sonst ${upTo(h.other.good, h.other.n)}`,
+  );
+}
+/* A group of „Vorlieben“, on its page and in its card on the home page: the group, how often it went down well in
+   words, the strip of its ratings, and „deutlich“ where it is an end of a clear comparison. Not a button: there is
+   nothing behind it yet. g: a group of profile() in smart.js within the model m */
+const groupRow = (m, g, clear) =>
+  `<li class="row"><span class="t-main"><span class="t-top"><b>${esc(g.key)}</b>${clear ? '<span class="badge">deutlich</span>' : ''}</span>
+    <small>${cap(`${times(g.good, g.n)} gut gefressen`)}</small></span>${strip(ratingsIn(m, g.ids))}</li>`;
+
+/* A comparison of „Vorlieben“ under its name, its groups ranked, the two ends marked where it is clear */
+export const likesList = (m, d) =>
+  `<h3 class="label grp">${dimName(d)}</h3><ul class="list likes">${d.groups
+    .map((g, i) => groupRow(m, g, d.clear && (i === 0 || i === d.groups.length - 1)))
+    .join('')}</ul>`;
 
 /* Sync status in words, for the settings and the notice at the top */
 const waitingText = n => (n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '');

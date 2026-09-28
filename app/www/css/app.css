@@ -1447,7 +1447,6 @@ dialog.sheet.page .sheet-body {
   font: var(--type-small-strong);
   color: var(--muted);
 }
-.ins li,
 .told li {
   font: var(--type-body);
 }
@@ -1664,7 +1663,7 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-1);
   color: var(--ink);
 }
-/* What folds open under a .card-btn (Erkenntnisse, and the parts of a page): the content eases open */
+/* What folds open under a .card-btn, a part of a page: the content eases open */
 .card-body {
   display: flow-root;
 } /* the children's margins count towards the height, so the animation does not jump */
@@ -1736,17 +1735,27 @@ dialog.sheet.page .sheet-body {
   margin-bottom: var(--space-2);
 }
 
-/* Hint, Einkaufen, Erkenntnisse, and the lines of a card on „Verlauf“ */
+/* Hint, Einkaufen, Vorlieben, and the lines told in a card */
 .why {
   margin: var(--space-hair) 0 0;
 }
-/* What stands under a variety's name stands in full, as does what an insight rests on, never cut off */
-.shop .t-main small {
+/* What stands under a variety's or a group's name stands in full, as does what a told line rests on, never cut off */
+.shop .t-main small,
+.likes .t-main small {
   white-space: normal;
 }
-.ins .why,
 .told .why {
   display: block;
+}
+/* A group of „Vorlieben“: its name, and „deutlich“ beside it where it is an end of a clear comparison */
+.t-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.t-top > b {
+  min-width: 0;
 }
 .btn-row {
   display: flex;
@@ -1767,7 +1776,6 @@ dialog.sheet.page .sheet-body {
   color: var(--muted);
 }
 .steps li,
-.ins li,
 .told li {
   align-items: flex-start;
 }
@@ -1838,8 +1846,8 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-/* „Verlauf“ and „Einkaufen“: cards on the page ground, as far apart as the ones on the home page */
-dialog.sheet.page:is([data-kind="report"], [data-kind="shop"]) .page-title {
+/* „Verlauf“, „Einkaufen“ and „Vorlieben“: cards on the page ground, as far apart as the ones on the home page */
+dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profile"]) .page-title {
   margin-bottom: var(--space-3h);
 }
 .btn-col {

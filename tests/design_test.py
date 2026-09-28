@@ -477,6 +477,9 @@ RINGS = """() => { const c = document.querySelector('#sheet .review'), mid = e =
     under: figs.length === rings.length && figs.every((f, i) => Math.abs(mid(f) - mid(rings[i])) < 0.5)}; }"""
 
 
+HINTS = ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')
+
+
 # Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them, each
 # dot the size of the calendar's, each in its rating's colour]
 STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i.style.color = `var(--${c.slice(2)})`; document.body.append(i);
@@ -527,8 +530,6 @@ async def test_rules(browser, url):
         check(vs == 'normal', f'body: no font-variation-settings, Faustina has no axis of its own ({vs})')
         await pg.click('[data-action=demo]')
         await idle(pg)
-        await pg.click('[data-action=expand][data-v=ins]')
-        await idle(pg)
         await scan()  # Startseite mit allem
         layout = await pg.evaluate("""(() => { const app = getComputedStyle(document.querySelector('.app')), probe = document.createElement('i');
           probe.style.cssText = 'background:var(--surface);color:var(--ink)'; document.body.append(probe); const p = getComputedStyle(probe);
@@ -548,6 +549,16 @@ async def test_rules(browser, url):
             and layout['gaps'] == [14] * 5,
             f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
+        order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
+        check(
+            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Einkaufen', 'Vorlieben'],
+            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
+        )
+        await pg.click('[data-sec=profile] [data-action=open-profile]')
+        await idle(pg)
+        await scan()  # „Vorlieben“
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
         await pg.click('[data-sec=shop] [data-action=open-shop]')
         await idle(pg)
         for key in ('nicht', 'unklar'):

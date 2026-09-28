@@ -12,7 +12,9 @@ import {
   getPet,
   getProduct,
   getServing,
+  habitsModel,
   model,
+  profileModel,
   petNames,
   pname,
   productsByCode,
@@ -43,6 +45,11 @@ import {
   scaleEnds,
   segmented,
   shopRow,
+  habitRow,
+  lead,
+  likesList,
+  told,
+  toldList,
   thumbOf,
   verdictLabel,
 } from './parts.js';
@@ -363,12 +370,6 @@ const figures = r =>
     ${figure('layers', r.count.sorts, r.count.sorts === 1 ? 'Sorte' : 'Sorten')}
     ${figure('calendar', r.count.days, r.count.span === 1 ? 'Tag' : 'Tagen', `von ${r.count.span}`)}</ul>`;
 
-/* A line of a card, told like the rest of the app: a plain icon, one in a rating's colour or the pet's picture, a
-   sentence with what it is about in bold, and under it in words what it rests on */
-const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
-const told = (pic, say, why = '') =>
-  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
-const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
 const named = id => `<b>${esc(pname(getProduct(id)))}</b>`;
 /* What changed, folded away under „Details“: the varieties new to „Nachkaufen“ and to „Nicht mehr kaufen“ and the
    meals not rated yet within the 30 days, and where several people fed in the last 7 days, how often each did */
@@ -470,6 +471,26 @@ function viewShop() {
     }`;
 }
 
+/* „Vorlieben“: a page of two cards within the pet filter (profileModel() in derive.js). What goes down well, each
+   comparison under its name with its groups ranked (likesList()); then the habits. Without any comparison yet, a
+   sentence that says so. */
+function viewProfile() {
+  const m = model(),
+    dims = profileModel(),
+    habits = habitsModel(),
+    several = db.pets.length > 1 && !m.pet;
+  return `${head('Vorlieben' + forWhom(m.pet))}
+    <section class="card"><h2>Was ankommt</h2>${
+      dims.length
+        ? dims.map(d => likesList(m, d)).join('')
+        : '<p class="hint card-line">Noch zu wenig bewertet. Nach ein paar Wochen steht hier, was dein Tier mag.</p>'
+    }</section>${
+      habits.length
+        ? `<section class="card"><h2>Gewohnheiten</h2>${toldList(habits.map(h => habitRow(h, several)))}</section>`
+        : ''
+    }`;
+}
+
 /* A day tapped in the calendar of this page: the list grows until that day is drawn and a page of days under it
    as well, because only then can the day reach the top of the screen. */
 export function jumpToDay(key) {
@@ -559,6 +580,7 @@ const VIEWS = {
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
   shop: viewShop,
+  profile: viewProfile,
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
    away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.
