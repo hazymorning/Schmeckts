@@ -1,10 +1,14 @@
 /* The large packaging photo of a variety, on this phone only (PROJECT.md, „Data and sync protocol“): one file per
-   variety in private storage, the first photo this phone took of it. Written once when a meal gets its variety and
-   never on saving, so db.json stays small; never synced and not in a backup or an exchange file. In the browser
-   nothing is kept, and only a meal that has no variety yet can show its photo large. */
+   variety in private storage, the first photo this phone took of it or fetched. Written once when a meal gets its
+   variety and never on saving, so db.json stays small; never synced and not in a backup or an exchange file. In a
+   household the phone that took it hands it to the server as well (sharePhotos() in logic/products.js), and any other
+   phone fetches a variety marked sharedPhoto from there the first time someone opens it. In the browser nothing is
+   kept: only a meal that has no variety yet can show its photo large, or a variety the household server holds. */
 import {Native} from './native.js';
 import {report} from './report.js';
 import {memPhotos} from './images.js';
+import {request} from './api.js';
+import {isConnected} from './sync.js';
 
 const FS = Native?.Filesystem,
   DIR = 'DATA',
@@ -24,25 +28,45 @@ if (FS)
     // no folder yet: nothing has been kept so far
   }
 
-/* Whether a large photo can be shown: the variety's file, or while a meal has no variety its own photo */
-export const hasPhoto = (s, p) => (p ? kept.has(p.id) : !!s && (memPhotos.has(s.id) || !!s.photo));
+/* Whether a large photo can be shown: the variety's file, the household server's while connected, or while a meal
+   has no variety its own photo */
+export const hasPhoto = (s, p) =>
+  p ? kept.has(p.id) || (!!p.sharedPhoto && isConnected()) : !!s && (memPhotos.has(s.id) || !!s.photo);
 
-/* The photo as a data URL, or null when there is none (any more) */
+/* The photo as a data URL, or null when there is none (any more). One only the household server holds is fetched and
+   kept on this phone from then on; a server that cannot be reached throws its ServerError. */
 export async function photoSrc(s, p) {
   if (!p) {
     const b64 = s && memPhotos.get(s.id);
     return b64 ? 'data:image/jpeg;base64,' + b64 : s?.photo || null;
   }
-  if (!FS || !kept.has(p.id)) return null;
-  await writing.get(p.id);
+  let b64 = await photoData(p.id);
+  if (!b64 && p.sharedPhoto && isConnected()) {
+    b64 = await request('GET', '/api/photo/' + p.id, {timeout: 10e3}).then(
+      x => x.image || null,
+      e => {
+        if (e.status === 404) return null; // the server has none
+        throw e;
+      },
+    );
+    if (b64) keepPhoto(p.id, b64);
+  }
+  return b64 ? 'data:image/jpeg;base64,' + b64 : null;
+}
+
+/* The photo this phone keeps of a variety, as base64, or null. A file that cannot be read goes. */
+export async function photoData(pid) {
+  if (!FS || !kept.has(pid)) return null;
+  await writing.get(pid);
   try {
-    return 'data:image/jpeg;base64,' + (await FS.readFile({path: file(p.id), directory: DIR})).data;
+    return (await FS.readFile({path: file(pid), directory: DIR})).data;
   } catch (e) {
-    kept.delete(p.id);
     report('reading the packaging photo', e);
+    forgetPhoto(pid);
     return null;
   }
 }
+export const keptPhoto = pid => kept.has(pid);
 
 /* Kept and origin change at once, the file follows: a view drawn right after already offers the photo, and
    photoSrc() waits for the file */
@@ -54,7 +78,8 @@ function track(pid, w) {
 }
 
 /* A meal (sid) gets its variety: its photo becomes the variety's, unless the variety has one already. b64 without
-   the data URL prefix: the large photo from memory, or the meal's smaller one after a restart. */
+   the data URL prefix: the large photo from memory, the meal's smaller one after a restart, or the one fetched from
+   the household server (without sid). */
 export function keepPhoto(pid, b64, sid) {
   if (!FS || !pid || !b64 || kept.has(pid)) return;
   kept.add(pid);
@@ -91,9 +116,9 @@ export function passPhoto(from, into) {
   );
 }
 
-/* A variety's photo goes: it is gone, or its file could not be read */
+/* A variety's photo goes from this phone: it is gone, or its file could not be read */
 export function forgetPhoto(pid) {
-  if (!FS) return;
+  if (!FS || !kept.has(pid)) return;
   kept.delete(pid);
   origin.delete(pid);
   FS.deleteFile({path: file(pid), directory: DIR}).catch(e => report('deleting the packaging photo', e));

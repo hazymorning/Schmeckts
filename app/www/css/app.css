@@ -1152,6 +1152,9 @@ dialog.sheet.page .sheet-body {
 .photo-btn:has(> .name-photo) {
   border-radius: var(--radius-l);
 }
+.photo-btn[aria-busy="true"] {
+  opacity: var(--busy);
+} /* its photo is on the way from the household server */
 /* The overview's picture: one pet, or two overlapping */
 .ov-pic {
   position: relative;

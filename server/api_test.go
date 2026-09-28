@@ -27,7 +27,11 @@ func newTestAPI(t *testing.T, anthropic string) *API {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := NewAPI(s, NewConfigHolder(dir), OpenBarcodes(dir))
+	photos, err := OpenPhotos(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := NewAPI(s, NewConfigHolder(dir), OpenBarcodes(dir), photos)
 	a.now = func() time.Time { return now }
 	return a
 }
@@ -336,5 +340,55 @@ func TestFedSince(t *testing.T) {
 	}
 	if s, _, _ := call(a, "GET", "/api/fed?since=1", "", nil); s != 401 {
 		t.Fatalf("without a code: %d", s)
+	}
+}
+
+func TestPhotos(t *testing.T) {
+	a := newTestAPI(t, "")
+	ms := now.UnixMilli()
+	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
+		chg("change-lachs", "products", "lachs001", clock(ms, 0, "anna"), map[string]any{"variety": "Lachs", "_del": false}),
+		chg("change-rind", "products", "rind0001", clock(ms, 0, "anna"), map[string]any{"variety": "Rind", "_del": true}),
+	}})
+	photo := func(b ...byte) map[string]string {
+		return map[string]string{"image": base64.StdEncoding.EncodeToString(append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, b...))}
+	}
+	if s, _, _ := call(a, "GET", "/api/photo/lachs001", testCode, nil); s != 404 {
+		t.Fatalf("no photo yet: %d, expected 404", s)
+	}
+	if s, out, _ := call(a, "POST", "/api/photo/lachs001", testCode, photo(1)); s != 200 || out["ok"] != true {
+		t.Fatalf("keeping the photo: %d %v", s, out)
+	}
+	if s, _, _ := call(a, "POST", "/api/photo/lachs001", testCode, photo(2)); s != 200 {
+		t.Fatalf("a second photo is no error: %d", s)
+	}
+	if s, out, _ := call(a, "GET", "/api/photo/lachs001", testCode, nil); s != 200 || out["image"] != photo(1)["image"] {
+		t.Fatalf("the first photo stays: %d %v", s, out)
+	}
+	for _, c := range []struct {
+		path string
+		body any
+		want int
+	}{
+		{"/api/photo/rind0001", photo(1), 404},                               // a deleted variety
+		{"/api/photo/unbekannt", photo(1), 404},                              // one the server does not know
+		{"/api/photo/x", photo(1), 400},                                      // no variety's id
+		{"/api/photo/lachs001", map[string]string{"image": "aGFsbG8="}, 400}, // no JPEG
+		{"/api/photo/lachs001", map[string]string{"image": "%%%"}, 400},      // no base64
+		{"/api/photo/lachs001", photo(make([]byte, maxPhotoBytes)...), 413},  // too large
+	} {
+		if s, _, _ := call(a, "POST", c.path, testCode, c.body); s != c.want {
+			t.Errorf("POST %s: %d, expected %d", c.path, s, c.want)
+		}
+	}
+	if s, _, _ := call(a, "GET", "/api/photo/lachs001", "", nil); s != 401 {
+		t.Fatalf("without a code: %d", s)
+	}
+	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
+		chg("change-lachs-weg", "products", "lachs001", clock(ms+1, 0, "anna"), map[string]any{"_del": true}),
+	}})
+	a.photos.Sweep(a.store.Varieties())
+	if s, _, _ := call(a, "GET", "/api/photo/lachs001", testCode, nil); s != 404 {
+		t.Fatalf("a variety that is gone takes its photo along: %d", s)
 	}
 }

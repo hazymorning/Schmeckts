@@ -371,6 +371,27 @@ func (s *Store) Products(limit int) []string {
 	return names
 }
 
+// Variety says whether a food variety is there, not deleted.
+func (s *Store) Variety(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec := s.st.Records["products"][id]
+	return rec != nil && string(rec.F["_del"].V) != "true"
+}
+
+// Varieties are the food varieties that are there, deleted ones left out.
+func (s *Store) Varieties() map[string]bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]bool{}
+	for id, rec := range s.st.Records["products"] {
+		if string(rec.F["_del"].V) != "true" {
+			out[id] = true
+		}
+	}
+	return out
+}
+
 // LastMeal is the newest meal served at or after since, treats left out: its time in ms and who served it, 0 and ""
 // without one. A meal whose variety is unknown or gone counts, as it does in the app.
 func (s *Store) LastMeal(since int64) (at int64, by string) {

@@ -21,7 +21,7 @@ import './ui/slider.js'; // the rating slider under a finger, registers itself
 import {retryWaiting, settleNamed} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
-import {followPhotos, tidyPhotos} from './logic/products.js';
+import {followPhotos, sharePhotos, tidyPhotos} from './logic/products.js';
 import {openLink} from './actions.js'; // also registers clicks and input
 import {report} from './report.js';
 
@@ -46,7 +46,10 @@ syncHooks.status = () => {
   renderSyncChip();
   paintHouse();
 }; // the box in the settings only changes on new content
-syncHooks.reachable = () => retryWaiting(); // recognise waiting photos as soon as the server is reachable
+syncHooks.reachable = () => {
+  retryWaiting(); // recognise waiting photos as soon as the server is reachable
+  sharePhotos(); // and hand it the packaging photos it does not have yet
+};
 diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportieren.');
 try {
   startSync();

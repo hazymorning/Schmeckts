@@ -2,7 +2,8 @@
 
 Den Server brauchst du nur, wenn mehrere Menschen dasselbe Fütterungstagebuch führen wollen. Er ist ein kleines
 Programm für einen Rechner, der bei euch zu Hause läuft, und dafür reicht schon ein Mini-PC. Er verwaltet die
-gemeinsamen Daten, gibt Packungsfotos zur Erkennung weiter und schlägt Barcodes nach. Vor einer Erinnerung ans
+gemeinsamen Daten, hebt die Packungsfotos für alle Handys auf, gibt sie zur Erkennung weiter und schlägt Barcodes
+nach. Vor einer Erinnerung ans
 Füttern fragen die Handys bei ihm nach, ob schon jemand gefüttert hat. Die gespeicherten Daten bleiben dabei bei
 euch, nach draußen gehen nur die Packungsfotos und die Barcode-Anfragen. [Die App](../README.md) läuft aber auch
 ohne ihn.
@@ -71,7 +72,7 @@ dort „Code prüfen“, und du tippst den neuen Code einfach dort ein.
 
 ## Gut zu wissen
 
-- **Backups:** Der Server legt täglich ein Backup an und behält die letzten 30 davon, zu finden unter `/var/lib/schmeckts/backups`.
+- **Backups:** Der Server legt täglich ein Backup an und behält die letzten 30 davon, zu finden unter `/var/lib/schmeckts/backups`. Die Packungsfotos liegen daneben unter `/var/lib/schmeckts/photos` und gehören nicht zum Backup.
 - **Updates:** Doppelklicke einfach wieder auf die neue .deb-Datei, oder nimm im Terminal `sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb`. Daten, Code und API-Schlüssel bleiben dabei erhalten.
 - **Übersicht im Terminal:** `sudo schmeckts-server overview`.
 - **Läuft er noch?** Mit `systemctl status schmeckts` siehst du den Zustand und mit `journalctl -u schmeckts -e` die letzten Meldungen.

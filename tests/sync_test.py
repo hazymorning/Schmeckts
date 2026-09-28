@@ -464,6 +464,37 @@ async def main():
                 await until(b, "db.products.some(p => p.variety === 'Lachs in Soße') && db.servings[0].productId", 6),
                 'the recognised food arrives at the other phone',
             )
+            # The packaging photo for every phone: A took it and hands it to the server, the variety carries the mark,
+            # and B, which holds no file of its own, opens it from there
+            pid = await state(a, "db.products.find(p => p.variety === 'Lachs in Soße').id")
+            on_server = srv.dir / 'photos' / f'{pid}.jpg'
+            await expect(
+                await until(b, f"!!db.products.find(p => p.id === '{pid}')?.sharedPhoto", 10)
+                and on_server.read_bytes() == base64.b64decode(await a.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')")),
+                'phone A hands the photo it took to the server, and the variety says so on every phone',
+            )
+            await close_sheet(b)
+            thumb = f'#home [data-action=view-photo][data-p="{pid}"]'
+            await b.wait_for_selector(thumb)
+            await b.click(thumb)
+            await b.wait_for_selector('#viewer[open]')
+            await idle(b)
+            await expect(
+                await b.evaluate("document.querySelector('#viewer img').naturalWidth") == 480,
+                'phone B, which did not take the photo, opens it large from the server',
+            )
+            await b.click('#viewer')
+            await idle(b)
+            on_server.unlink()
+            await b.click(thumb)
+            await expect(
+                await until(b, f"!db.products.find(p => p.id === '{pid}').sharedPhoto", 6) and 'nicht mehr da' in await b.inner_text('#toast'),
+                'a photo the server has lost: said so, and the mark goes',
+            )
+            await expect(
+                await until(b, f"!!db.products.find(p => p.id === '{pid}').sharedPhoto", 15) and on_server.exists(),
+                'phone A, which still holds it, hands it over anew',
+            )
             soup = "db.products.some(p => p.variety === 'Lachs in Soße' && p.texture === 'sosse')"
             await expect(
                 await state(a, soup) and await until(b, soup, 6) and any(r.get('texture') == 'sosse' for r in srv.records()['products'].values()),

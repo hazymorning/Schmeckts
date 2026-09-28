@@ -143,7 +143,7 @@ func TestBarcodeInvalidAndRateLimit(t *testing.T) {
 func TestInfoAnnouncesBarcode(t *testing.T) {
 	_, out, _ := call(newTestAPI(t, ""), "GET", "/api/info", "", nil)
 	f, _ := out["features"].([]any)
-	if len(f) != 2 || f[0] != "barcode" || f[1] != "fed" {
+	if len(f) != 3 || f[0] != "barcode" || f[1] != "fed" || f[2] != "photo" {
 		t.Fatalf("features = %v", out["features"])
 	}
 }

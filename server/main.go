@@ -80,16 +80,21 @@ func serve(dir string) error {
 	if err != nil {
 		return because("Datenbestand nicht lesbar", err)
 	}
+	photos, err := OpenPhotos(dir)
+	if err != nil {
+		return because("Ordner für die Packungsfotos nicht anlegbar", err)
+	}
 	cfg := NewConfigHolder(dir)
-	api := NewAPI(store, cfg, OpenBarcodes(dir))
+	api := NewAPI(store, cfg, OpenBarcodes(dir), photos)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	go func() { // daily backup, checked once an hour
+	go func() { // daily backup, checked once an hour, and the photos of varieties that are gone go
 		for {
 			if err := store.Backup(time.Now()); err != nil {
 				log.Printf("backup failed: %v", err)
 			}
+			photos.Sweep(store.Varieties())
 			select {
 			case <-ctx.Done():
 				return
