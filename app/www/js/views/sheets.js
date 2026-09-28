@@ -2,8 +2,9 @@
    the profile picture) and evaluation. The settings are a page and live in views/settings.js; the pet editor is
    one of its pages as well, drawn by the same view. */
 import {$, reduceMotion} from '../dom.js';
+import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
-import {addDays, toLocalInput, weekRange, weekStart, when} from '../dates.js';
+import {addDays, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -11,7 +12,9 @@ import {
   getPet,
   getProduct,
   getServing,
-  lastWeek,
+  habitsModel,
+  model,
+  profileModel,
   petNames,
   pname,
   productsByCode,
@@ -20,7 +23,7 @@ import {
   servingsInFilter,
   sortOf,
 } from '../derive.js';
-import {GOOD, MIN_RATED, rateCls, scoreCls, VERDICTS} from '../smart.js';
+import {MIN_RATED, rateCls, ratingsIn, scoreCls, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -41,10 +44,15 @@ import {
   resultBadges,
   scaleEnds,
   segmented,
+  shopRow,
+  strip,
+  habitRow,
+  lead,
+  likesList,
+  told,
+  toldList,
   thumbOf,
-  times,
   verdictLabel,
-  whyOf,
 } from './parts.js';
 import {paintHouse, viewSettings} from './settings.js';
 
@@ -314,6 +322,7 @@ function viewProduct() {
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
     ${productCard(p, ss.length)}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
+    ${strip(ratingsIn(model(), [p.id]))}
     ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}
     ${kaufenHTML(e)}
     ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}
@@ -322,132 +331,168 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* „Verlauf“: a page of two cards. The first looks back: the last 30 days with the ring, the figures and the best and
-   weakest variety, and under them the week before this one; the card under it holds the calendar and every meal
-   there has ever been.
-   sheet.at: the id of the day it opens at, coming from a calendar */
+/* „Verlauf“: a page of two cards. The first says how it goes: a ring for each of the last 7, 30 and 90 days, the
+   figures of the 30 days under them, and folded away what changed; the card under it holds the calendar and every
+   meal there has ever been.
+   sheet.at: the id of the day it opens at, coming from a calendar; sheet.open: its parts folded open (foldPart()) */
 export const reportState = at => ({kind: 'report', at});
 
-const REPORT_DAYS = 30; // what is evaluated; the list itself always shows the whole history
-
-/* The ring: how many of the ratings in the span were good ones (from 70 points, as everywhere else). 104px
-   across, the arc a dashed circle whose gap shrinks to the share. Under MIN_RATED ratings it shows the bare
-   track and says so instead of a number. */
-const RING = 104,
-  RING_STROKE = 10;
+/* A ring: how many of the ratings in its span were good ones (from 70 points, as everywhere else). 72px across, the
+   arc a dashed circle whose gap shrinks to the share. Under MIN_RATED ratings it shows the bare track and says so
+   instead of a number. Under it the span and the ratings it rests on; the ring says all of it in one sentence. */
+const RING = 72,
+  RING_STROKE = 8;
 const RING_R = (RING - RING_STROKE) / 2;
 const RING_LEN = 2 * Math.PI * RING_R;
-function ring(m) {
-  const enough = m.liked.rated >= MIN_RATED;
-  const pct = m.liked.pct;
+function ring(r) {
+  const {good, pct, rated} = r.liked,
+    enough = rated >= MIN_RATED,
+    span = `${r.days} Tage`;
   const label = enough
-    ? `${pct} Prozent der bewerteten Mahlzeiten kamen gut an.`
-    : `Noch zu wenig bewertet: ${m.liked.rated} von ${MIN_RATED} Bewertungen.`;
+    ? `Letzte ${span}: ${pct} Prozent der bewerteten Mahlzeiten kamen gut an, ${good} von ${rated}.`
+    : `Letzte ${span}: noch zu wenig bewertet, ${rated} von ${MIN_RATED} Bewertungen.`;
   const arc = enough
     ? `<circle class="ring-fill ${scoreCls(pct)}" cx="${RING / 2}" cy="${RING / 2}" r="${RING_R}"
         style="--len:${RING_LEN.toFixed(1)};--part:${((RING_LEN * pct) / 100).toFixed(1)}"/>`
     : '';
-  return `<div class="ring" role="img" aria-label="${esc(label)}">
+  return `<div class="period"><div class="ring" role="img" aria-label="${esc(label)}">
     <svg viewBox="0 0 ${RING} ${RING}" aria-hidden="true">
       <circle class="ring-track" cx="${RING / 2}" cy="${RING / 2}" r="${RING_R}"/>${arc}</svg>
-    <span class="ring-mid"><b class="pct">${enough ? `${pct}<small>%</small>` : '–'}</b>
-      <span>${enough ? 'kam gut an' : 'Noch zu wenig bewertet'}</span></span></div>`;
+    <span class="ring-mid"><b class="pct">${enough ? `${pct}<small>%</small>` : '–'}</b></span></div>
+    <b aria-hidden="true">${span}</b><small aria-hidden="true">${enough ? `${good} von ${rated} gut` : 'Noch zu wenig'}</small></div>`;
 }
 
-/* Beside the ring: meals, varieties and the days fed on, each with a small icon */
-const figRow = (ic, text) => `<li>${icon(ic)}<span>${text}</span></li>`;
-const figures = m =>
-  `<ul class="figs">${figRow('bowl', `<b>${m.count.meals}</b> ${m.count.meals === 1 ? 'Mahlzeit' : 'Mahlzeiten'}`)}
-    ${figRow('layers', `<b>${m.count.sorts}</b> ${m.count.sorts === 1 ? 'Sorte' : 'Sorten'}`)}
-    ${figRow('calendar', `an <b>${m.count.days}</b> von ${m.count.span} ${m.count.span === 1 ? 'Tag' : 'Tagen'}`)}</ul>`;
+/* Under the rings, in their columns: meals, varieties and the days fed on within the 30 days, each figure with a small
+   icon and the word under it. „von 30“ is set small beside its figure, as the ring sets its „%“, or a third of the
+   card would not hold it at 360px; with a larger system font it goes under the figure. */
+const figure = (ic, n, word, of = '') =>
+  `<li><span>${icon(ic)}<b>${n}${of ? `<wbr><small> ${of}</small>` : ''}</b></span><small>${word}</small></li>`;
+const figures = r =>
+  `<ul class="figs">${figure('bowl', r.count.meals, r.count.meals === 1 ? 'Mahlzeit' : 'Mahlzeiten')}
+    ${figure('layers', r.count.sorts, r.count.sorts === 1 ? 'Sorte' : 'Sorten')}
+    ${figure('calendar', r.count.days, r.count.span === 1 ? 'Tag' : 'Tagen', `von ${r.count.span}`)}</ul>`;
 
-/* A line of the first card, told like an insight: a plain icon, one in a rating's colour or the pet's picture, a
-   sentence with what it is about in bold, and under it in words what it rests on */
-const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
-const told = (pic, say, why = '') =>
-  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
 const named = id => `<b>${esc(pname(getProduct(id)))}</b>`;
-/* Under the figures: the variety that goes down best, named only from GOOD points on, and the weakest one, each with
-   what its ratings say. The rating's icon carries their colour. */
-function glance(m) {
-  const best =
-    m.best && m.best.pct >= GOOD
-      ? told(lead('r_top', 'top'), `Am besten kommt ${named(m.best.product.id)} an.`, cap(evidenceOf(m.best)))
-      : '';
-  const worst = m.worst
-    ? told(
-        lead('r_schlecht', 'schlecht'),
-        `Am ehesten übrig bleibt ${named(m.worst.product.id)}.`,
-        cap(evidenceOf(m.worst)),
-      )
-    : '';
-  return `<div class="glance">${ring(m)}${figures(m)}</div>
-    ${best || worst ? `<ul class="list tops">${best}${worst}</ul>` : ''}`;
-}
-/* Under the 30 days the week before this one, under a line of its own like a day of the history: what was served and
-   how it went, each pet's favourite of the week, the varieties that became favourites and, where several people
-   feed, who fed most. Nothing without a meal that week. */
-const some = (n, one, many) => (n === 1 ? one : `${n} ${many}`); // „eine Mahlzeit“, „5 Mahlzeiten“
-function lastWeekHTML(w) {
-  if (!w.list.length) return '';
-  const snacks = w.list.filter(s => typeOf(getProduct(s.productId)) === 'Snack').length,
-    meals = w.list.length - snacks,
-    fed = [meals && some(meals, 'eine Mahlzeit', 'Mahlzeiten'), snacks && some(snacks, 'ein Snack', 'Snacks')]
-      .filter(Boolean)
-      .map((t, i) => `<b>${i ? t : cap(t)}</b>`),
-    how = w.n ? cap(`${times(w.good, w.n)} gut gefressen`) : 'Noch nichts bewertet';
-  const lines = [
-    told(
-      lead('bowl'),
-      `${andList(fed)}${w.sorts ? ` aus <b>${some(w.sorts, 'einer Sorte', 'Sorten')}</b>` : ''}.`,
-      w.n && w.open ? `${how}, ${w.open} noch nicht bewertet` : how,
-    ),
-    ...w.best.map(b =>
-      told(
-        avatar(getPet(b.pet), 's'),
-        `${esc(getPet(b.pet).name)} mochte am liebsten ${named(b.id)}.`,
-        cap(evidenceOf(b)),
-      ),
-    ),
-  ];
-  const fresh = w.favorites.slice(0, 3);
-  if (fresh.length)
-    lines.push(
-      told(
-        lead('award'),
-        `${fresh.length > 1 ? 'Neue Lieblinge' : 'Neuer Liebling'}: ${andList(fresh.map(named))}.`,
-        fresh.length > 1 ? '' : cap(whyOf(sortOf(fresh[0]))),
-      ),
+/* What changed, folded away under „Details“: the varieties new to „Nachkaufen“ and to „Nicht mehr kaufen“ and the
+   meals not rated yet within the 30 days, and where several people fed in the last 7 days, how often each did */
+function details(m) {
+  const [week, month] = m.spans,
+    {nachkaufen, nicht} = m.changes,
+    rows = [];
+  if (nachkaufen.length) rows.push(told(lead('award'), `Neu bei Nachkaufen: ${andList(nachkaufen.map(named))}.`));
+  if (nicht.length)
+    rows.push(told(lead('r_schlecht', 'schlecht'), `Neu bei Nicht mehr kaufen: ${andList(nicht.map(named))}.`));
+  if (month.open)
+    rows.push(
+      told(lead('bowl'), `<b>${month.open} ${month.open === 1 ? 'Mahlzeit' : 'Mahlzeiten'}</b> noch nicht bewertet.`),
     );
-  const f = w.feeders;
-  if (f.length > 1) {
-    const tie = f[0].n === f[1].n;
-    lines.push(
-      told(
-        lead('trophy'),
-        tie ? 'Unentschieden im Fütter-Duell.' : `<b>${esc(f[0].name)}</b> hat das Fütter-Duell gewonnen.`,
-        f.map(x => `${x.name} ${x.n}×`).join(', '),
-      ),
+  if (week.feeders.length > 1)
+    rows.push(
+      told(lead('trophy'), `Fütter-Duell: ${week.feeders.map(f => `<b>${esc(f.name)}</b> ${f.n}×`).join(', ')}.`),
     );
-  }
-  return `<h3 class="tl-date"><b>Letzte Woche</b><span>${weekRange(w.start)}</span></h3><ul class="list">${lines.join('')}</ul>`;
+  return rows;
 }
+
+/* The parts of a page that fold open under a .card-btn and shut again (foldPart()), each with the word on its button
+   and what it holds; nothing of it where it would hold nothing */
+const shopList = (m, list) =>
+  list.length ? `<ul class="list shop">${list.map(e => shopRow(m, e)).join('')}</ul>` : '';
+const unclear = g => [...g.geht, ...g.neu];
+const FOLDS = {
+  details: {label: 'Details', inner: () => toldList(details(reportModel()))},
+  nicht: {label: 'Anzeigen', inner: () => shopList(model(), shopGroups(model()).nicht)},
+  unklar: {label: 'Anzeigen', inner: () => shopList(model(), unclear(shopGroups(model())))},
+};
+function foldBox(key) {
+  const inner = FOLDS[key].inner(),
+    open = !!sheet.open?.[key];
+  if (!inner) return '';
+  return `<div class="card-body fold" id="fold-${key}">${open ? inner : ''}</div>
+    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${open ? 'Weniger' : FOLDS[key].label}</button>`;
+}
+/* „für Mau“ after the title of a page, as the pet filter stands; nothing with one pet */
+const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 
 function viewReport() {
-  const m = reportModel(REPORT_DAYS),
+  const m = reportModel(),
+    month = m.spans[1],
+    pet = month.pet,
     all = servingsInFilter();
-  const who = db.pets.length > 1 ? ` für ${m.pet ? esc(getPet(m.pet).name) : 'alle Tiere'}` : '';
   histDays = dayGroups(all);
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
-  return `${head('Verlauf' + who)}
-    <section class="card review"><h2>Die letzten ${REPORT_DAYS} Tage</h2>${glance(m)}${lastWeekHTML(lastWeek())}</section>
+  return `${head('Verlauf' + forWhom(pet))}
+    <section class="card review"><h2>Wie läuft’s?</h2><div class="rings">${m.spans.map(ring).join('')}</div>
+    ${figures(month)}${foldBox('details')}</section>
     <section class="card days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
       histDays.length
-        ? `<div id="histBox">${histHTML(m, 0, upto)}</div>`
+        ? `<div id="histBox">${histHTML(pet, 0, upto)}</div>`
         : `<p class="hint empty"><span>Noch nichts serviert.</span></p>`
     }</section>`;
 }
+/* Folding a part of the page open or shut, kept while the page is open (sheet.open): only that part is swapped and
+   eases to its new height (--dur-step, --ease-out), at once under reduced motion, so the rest of the page and the
+   button stay where they are. */
+export function foldPart(key) {
+  const f = FOLDS[key],
+    body = $('#fold-' + key, sheetBody),
+    btn = $(`[data-action=fold][data-v="${key}"]`, sheetBody);
+  if (!f || !body || !btn) return;
+  const open = !sheet.open?.[key],
+    h0 = body.offsetHeight;
+  sheet.open = {...sheet.open, [key]: open};
+  body.innerHTML = open ? f.inner() : '';
+  btn.textContent = open ? 'Weniger' : f.label;
+  btn.setAttribute('aria-expanded', String(open));
+  slideHeight(body, h0);
+  drawn = VIEWS[sheet.kind](); // what is on the page now, so a redraw with nothing new leaves it alone
+}
+/* „Einkaufen“: a page of up to three cards within the pet filter (shopGroups() in smart.js). What to buy again, by food
+   type and the best first, each variety with its ratings as a strip, and the list to share; then, folded away to a
+   line each, what mostly stays in the bowl, the clearest first, and what is not clear yet. A manual setting decides
+   where a variety stands and shows the pin. */
+const sorts = (n, one, many) => (n === 1 ? `1 Sorte ${one}` : `${n} Sorten ${many}`);
+function viewShop() {
+  const m = model(),
+    g = shopGroups(m),
+    types = TYPES.map(t => [t, g.nachkaufen.filter(e => typeOf(e.product) === t)]).filter(([, l]) => l.length),
+    open = unclear(g).length;
+  const buy = types.length
+    ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('') +
+      `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Als Liste teilen</button></div>`
+    : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>';
+  return `${head('Einkaufen' + forWhom(m.pet))}
+    <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
+      g.nicht.length
+        ? `<section class="card"><h2>Lieber nicht</h2><p class="say card-line">${sorts(g.nicht.length, 'bleibt', 'bleiben')} meist stehen.</p>${foldBox('nicht')}</section>`
+        : ''
+    }${
+      open
+        ? `<section class="card"><h2>Noch unklar</h2><p class="say card-line">${sorts(open, 'ist', 'sind')} noch unklar.</p>${foldBox('unklar')}</section>`
+        : ''
+    }`;
+}
+
+/* „Vorlieben“: a page of two cards within the pet filter (profileModel() in derive.js). What goes down well, each
+   comparison under its name with its groups ranked (likesList()); then the habits. Without any comparison yet, a
+   sentence that says so. */
+function viewProfile() {
+  const m = model(),
+    dims = profileModel(),
+    habits = habitsModel(),
+    several = db.pets.length > 1 && !m.pet;
+  return `${head('Vorlieben' + forWhom(m.pet))}
+    <section class="card"><h2>Was ankommt</h2>${
+      dims.length
+        ? dims.map(d => likesList(m, d)).join('')
+        : '<p class="hint card-line">Noch zu wenig bewertet. Nach ein paar Wochen steht hier, was dein Tier mag.</p>'
+    }</section>${
+      habits.length
+        ? `<section class="card"><h2>Gewohnheiten</h2>${toldList(habits.map(h => habitRow(h, several)))}</section>`
+        : ''
+    }`;
+}
+
 /* A day tapped in the calendar of this page: the list grows until that day is drawn and a page of days under it
    as well, because only then can the day reach the top of the screen. */
 export function jumpToDay(key) {
@@ -455,9 +500,9 @@ export function jumpToDay(key) {
   if (at < 0) return;
   const box = $('#histBox');
   if (box) {
-    const m = reportModel(REPORT_DAYS);
+    const pet = reportModel().spans[0].pet;
     while (box.children.length < histDays.length && box.children.length <= at + HIST_PAGE)
-      box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
+      box.insertAdjacentHTML('beforeend', histHTML(pet, box.children.length, box.children.length + HIST_PAGE));
     watchDays();
   }
   $('#d-' + key, sheetBody)?.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start'});
@@ -467,19 +512,19 @@ export function jumpToDay(key) {
    appended below. How many are already there is what the box says, so a redraw cannot get it out of step. */
 const HIST_PAGE = 10;
 let histDays = [];
-const histHTML = (m, from, to) =>
-  dayBlocks(histDays.slice(from, to), {multiHouse: db.pets.length > 1 && !m.pet, anchors: true});
+const histHTML = (pet, from, to) =>
+  dayBlocks(histDays.slice(from, to), {multiHouse: db.pets.length > 1 && !pet, anchors: true});
 /* Appends pages as long as less than a screen is left below: while scrolling, and once after drawing, in the frame
    after it so that the page is on screen first. */
 function growHistory() {
   const box = $('#histBox');
   if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
-  const m = reportModel(REPORT_DAYS);
+  const pet = reportModel().spans[0].pet;
   while (
     box.children.length < histDays.length &&
     sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800
   )
-    box.insertAdjacentHTML('beforeend', histHTML(m, box.children.length, box.children.length + HIST_PAGE));
+    box.insertAdjacentHTML('beforeend', histHTML(pet, box.children.length, box.children.length + HIST_PAGE));
   watchDays();
 }
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
@@ -536,6 +581,8 @@ const VIEWS = {
   // The pet editor is a page of the settings when it is reached from there, and the same view serves it
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
+  shop: viewShop,
+  profile: viewProfile,
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
    away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.

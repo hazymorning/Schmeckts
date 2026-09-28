@@ -2,13 +2,13 @@
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {settled, slideHeight} from '../motion.js';
-import {andList, cap, esc} from '../text.js';
+import {cap, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
-import {RATINGS, TEXTURES, TYPES} from '../config.js';
+import {RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {getPet, getProduct, model, pendingServings, petNames, pname, servingPets} from '../derive.js';
+import {getPet, getProduct, habitsModel, model, pendingServings, pname, profileModel, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
@@ -19,13 +19,17 @@ import {
   dayBlocks,
   dayGroups,
   evidenceOf,
+  habitRow,
+  likesList,
   lower,
   nameBlock,
   photoThumb,
   rateSlider,
+  shopRow,
   syncChip,
   thumbOf,
   times,
+  toldList,
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
@@ -62,7 +66,7 @@ export function scrollTop() {
 }
 
 // fresh: id of the meal just served, which slides in on the next draw
-// open: unfolded cards, lasts until the app restarts
+// open: the overview unfolded, which lasts until the app restarts
 // held: meals rated in „Wie war’s?“ that stay there a moment longer (logic/editing.js), each with the pets rated there
 export const homeView = {fresh: null, open: {}, held: new Map()};
 
@@ -135,14 +139,12 @@ function homeHTML() {
   let html = banner + (m ? overviewHTML(m, homeView.open.overview) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
-  else {
-    const ins = insightCard(m);
+  else
     html +=
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
-      card('shop', 'Einkaufen', shopCard(m)) +
-      (ins ? card('ins', 'Erkenntnisse', ins) : '');
-  }
+      `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2>${shopHTML(m)}</section>` +
+      likesHTML(m);
   return html;
 }
 
@@ -175,7 +177,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
   <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
-  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und erste Erkenntnisse.</p></li></ol></section>`;
+  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und unter „Vorlieben“, was dein Tier mag.</p></li></ol></section>`;
 
 /* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. */
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
@@ -206,34 +208,6 @@ function pendingHTML(list) {
   );
 }
 
-/* A card with „Alle anzeigen“: the essentials folded up, everything unfolded */
-function card(key, title, {body, more, foot = ''}) {
-  const open = !!homeView.open[key];
-  return `<section class="card" data-sec="${key}" style="view-transition-name:sec-${key}"><h2>${title}</h2>
-    <div class="card-body" id="sec-${key}">${body}</div>${
-      more
-        ? `<button class="card-btn" data-action="expand" data-v="${key}"
-      aria-expanded="${open}" aria-controls="sec-${key}">${open ? 'Weniger anzeigen' : 'Alle anzeigen'}</button>`
-        : ''
-    }${foot}</section>`;
-}
-/* Folding open or shut: swap the content, and the card eases open or shut (--dur-step, --ease-out), instantly
-   under reduced motion. Without redrawing the page, so the button stays put (focus when using the keyboard).
-   Nothing is stored. */
-export function expandCard(key) {
-  if (!CARDS[key]) return;
-  homeView.open[key] = !homeView.open[key];
-  const sec = $(`[data-sec="${key}"]`),
-    content = CARDS[key](model());
-  if (!sec || !content) return update();
-  const body = $('.card-body', sec),
-    btn = $('[data-action=expand]', sec),
-    h0 = body.offsetHeight;
-  body.innerHTML = content.body;
-  btn.textContent = homeView.open[key] ? 'Weniger anzeigen' : 'Alle anzeigen';
-  btn.setAttribute('aria-expanded', String(homeView.open[key]));
-  slideHeight(body, h0);
-}
 /* Hint: the one with the highest precedence (a sentence, a reason, the buttons) */
 const HINT_TITLES = {
   appetit: 'Appetit',
@@ -276,82 +250,37 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
-/* Einkaufen: what to buy again and what no longer, each variety with what its ratings say in words (evidenceOf()),
-   never a percentage. Folded up, up to 3 to buy again (including „Gemischt“, „nur für …“) and up to 2 no longer
-   bought; unfolded, every variety, „Geht so“ and „Noch zu wenig bewertet“ too, and „Als Liste teilen“. While
-   nothing is to be bought or dropped yet, the rest shows at once. A manual setting decides the group and shows the
-   pin (shopGroups() in smart.js). */
-const SHOP = [
-  ['nachkaufen', 'Nachkaufen', 3],
-  ['nicht', 'Nicht mehr kaufen', 2],
-  ['geht', 'Geht so', 0],
-  ['neu', 'Noch zu wenig bewertet', 0],
-];
-function shopRow(e) {
-  const p = e.product,
-    said = !e.kaufen && e.choice === 'gemischt' ? `nur für ${petNames(e.yes)}` : lower(whyOf(e)),
-    sub = cap([p.variety ? p.brand : '', said].filter(Boolean).join(', '));
-  return `<li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}
-    <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(sub)}</small></span>
-    ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
-}
-function shopCard(m) {
-  const g = shopGroups(m),
-    clear = g.nachkaufen.length + g.nicht.length,
-    open = !!homeView.open.shop || !clear;
-  if (!clear && !g.geht.length && !g.neu.length)
-    return {
-      body: '<p class="hint card-line">Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.</p>',
-      more: false,
-    };
-  const body =
-    SHOP.map(([k, title, max]) => {
-      const list = open ? g[k] : g[k].slice(0, max);
-      return list.length
-        ? `<h3 class="label grp">${title}</h3><ul class="list shop">${list.map(shopRow).join('')}</ul>`
-        : '';
-    }).join('') + (open && clear ? '<button class="card-btn" data-action="share-list">Als Liste teilen</button>' : '');
-  return {body, more: clear > 0 && (g.geht.length + g.neu.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2)};
+/* Einkaufen: the first three to buy again, the best first, each with its ratings as a strip, and the way to the whole
+   list on its page (shopGroups() in smart.js). Nothing rated yet: one line and no way on. */
+const SHOP_SHOWN = 3;
+function shopHTML(m) {
+  const g = shopGroups(m);
+  if (!g.nachkaufen.length && !g.nicht.length && !g.geht.length && !g.neu.length)
+    return '<p class="hint card-line">Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.</p>';
+  return `${
+    g.nachkaufen.length
+      ? `<ul class="list shop">${g.nachkaufen
+          .slice(0, SHOP_SHOWN)
+          .map(e => shopRow(m, e))
+          .join('')}</ul>`
+      : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>'
+  }<button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button>`;
 }
 
-/* Erkenntnisse (insights() in smart.js): what holds across varieties, the strongest first, each a sentence and under
-   it in words what it rests on; the strongest one folded up, all of them unfolded, and no card without one. */
-const INSIGHT = {konsistenz: 'layers', geschmack: 'fish', marke: 'award', sosse: 'drop', eager: 'r_eager'};
-const COMPARED = {konsistenz: 'Bei der Konsistenz', geschmack: 'Beim Geschmack', marke: 'Bei den Marken'};
-function insightHTML(i, m) {
-  const name = id => pname(m.byId.get(id).product);
-  if (i.kind === 'sosse' || i.kind === 'eager') {
-    const names = andList(i.sorts.map(x => `<b>${esc(name(x.id))}</b>`));
-    return [
-      i.kind === 'sosse'
-        ? `Bei ${names} wird oft nur die Soße geleckt.`
-        : `Bei ${names} geht es oft gierig los, dann bleibt der Rest stehen.`,
-      cap(i.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', ')),
-    ];
-  }
-  const what =
-    i.kind === 'konsistenz' && i.type !== TYPES[0]
-      ? `Bei der ${TEXTURES[i.type].title}` // „Snack-Art“ already names the type
-      : COMPARED[i.kind] + (i.type === TYPES[0] ? '' : ` (${i.type})`);
-  return [
-    `${what} liegt <b>${esc(i.best.key)}</b> vorn, <b>${esc(i.worst.key)}</b> hinten.`,
-    `${i.best.key} ${times(i.best.good, i.best.n)} gut gefressen, ${i.worst.key} ${times(i.worst.good, i.worst.n)}`,
-  ];
+/* Vorlieben: the two clearest rows of the profile, which are the ends of its clearest comparison („deutlich“ first,
+   then the largest gap) under its name; while there is no comparison yet, up to two habits instead. Then the way to
+   the page. No card while the page would be empty (profileModel() in derive.js). */
+const LIKES_SHOWN = 2;
+function likesHTML(m) {
+  const d = [...profileModel()].sort((a, b) => b.clear - a.clear || b.gap - a.gap)[0],
+    habits = d ? [] : habitsModel();
+  if (!d && !habits.length) return '';
+  return `<section class="card" data-sec="profile" style="view-transition-name:sec-profile"><h2>Vorlieben</h2>${
+    d
+      ? likesList(m, {...d, groups: [d.groups[0], d.groups.at(-1)]})
+      : toldList(habits.slice(0, LIKES_SHOWN).map(h => habitRow(h, db.pets.length > 1 && !m.pet)))
+  }<button class="card-btn" data-action="open-profile">Alle Vorlieben${icon('chevron')}</button></section>`;
 }
-function insightCard(m) {
-  if (!m.insights.length) return null;
-  const list = homeView.open.ins ? m.insights : m.insights.slice(0, 1);
-  return {
-    body: `<ul class="list ins">${list
-      .map(i => {
-        const [say, why] = insightHTML(i, m);
-        return `<li class="row"><span class="lead">${icon(INSIGHT[i.kind])}</span><span>${say}<small class="hint why">${esc(why)}</small></span></li>`;
-      })
-      .join('')}</ul>`,
-    more: m.insights.length > 1,
-  };
-}
-const CARDS = {shop: shopCard, ins: insightCard};
 
 /* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while
    nothing has been served today, each day whole. One pass over the calendar's two weeks, newest first, which stops

@@ -140,8 +140,8 @@ export async function importData(file) {
 }
 const demoId = () => DEMO + uid();
 /* One sample pet with eight varieties and their ratings, two people, and the usual feeding times. The data is made
-   up, but it has to look like a phone in use so that „Einkaufen“ has all three groups and the insights are not
-   empty: two varieties in jelly against two pâtés, and two in sauce where only the sauce gets licked. */
+   up, but it has to look like a phone in use so that „Einkaufen“ has all three cards and „Vorlieben“ is not empty:
+   two varieties in jelly against two pâtés, and two in sauce where only the sauce gets licked. */
 const DEMO_PLAN = [
   ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
   ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],

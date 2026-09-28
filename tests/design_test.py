@@ -406,7 +406,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .slider-name, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .figs b, .cnt b, .slider-name, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -429,7 +429,7 @@ INSETS = {
     '.seg': '4px',
     '.seg button': '8px 6px',
 }
-FIGURES_JS = '.num, .tl-time, .pct, .cnt b, .day .dn, .steps .n, .field.code'
+FIGURES_JS = '.num, .tl-time, .pct, .figs b, .cnt b, .day .dn, .steps .n, .field.code'
 
 
 SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), met = new Set();
@@ -466,6 +466,30 @@ SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), me
     met.add(sel);
     if (getComputedStyle(b).padding !== pad) bad.push(`inset ${sel} ${getComputedStyle(b).padding}`); }
   return {bad: [...new Set(bad)], seen: [...seen], met: [...met]}; }"""
+
+
+# The first card of „Verlauf“: the rings' sizes, whether they stand in one row, and whether every figure stands centred
+# under its ring
+RINGS = """() => { const c = document.querySelector('#sheet .review'), mid = e => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
+  const rings = [...c.querySelectorAll('.rings .ring')], figs = [...c.querySelectorAll('.figs li')];
+  return {rings: rings.map(r => [Math.round(r.getBoundingClientRect().width), Math.round(r.getBoundingClientRect().height)]),
+    row: rings.every(r => Math.abs(r.getBoundingClientRect().top - rings[0].getBoundingClientRect().top) < 0.5),
+    under: figs.length === rings.length && figs.every((f, i) => Math.abs(mid(f) - mid(rings[i])) < 0.5)}; }"""
+
+
+HINTS = ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')
+
+
+# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them, each
+# dot the size of the calendar's, each in its rating's colour]
+STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i.style.color = `var(--${c.slice(2)})`; document.body.append(i);
+    const v = getComputedStyle(i).color; i.remove(); return v; };
+  const box = e => { const r = e.getBoundingClientRect(); return `${r.width}x${r.height}`; }, cal = box(document.querySelector('.cal .dots i:not(.open)'));
+  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')];
+    return [s.getAttribute('role') === 'img' && !!s.getAttribute('aria-label'),
+      dots.length <= 8 && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
+      dots.every(d => box(d) === cal),
+      dots.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
 
 
 async def test_rules(browser, url):
@@ -506,9 +530,6 @@ async def test_rules(browser, url):
         check(vs == 'normal', f'body: no font-variation-settings, Faustina has no axis of its own ({vs})')
         await pg.click('[data-action=demo]')
         await idle(pg)
-        await pg.click('[data-action=expand][data-v=shop]')
-        await pg.click('[data-action=expand][data-v=ins]')
-        await idle(pg)
         await scan()  # Startseite mit allem
         layout = await pg.evaluate("""(() => { const app = getComputedStyle(document.querySelector('.app')), probe = document.createElement('i');
           probe.style.cssText = 'background:var(--surface);color:var(--ink)'; document.body.append(probe); const p = getComputedStyle(probe);
@@ -528,6 +549,29 @@ async def test_rules(browser, url):
             and layout['gaps'] == [14] * 5,
             f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
+        order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
+        check(
+            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Einkaufen', 'Vorlieben'],
+            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
+        )
+        await pg.click('[data-sec=profile] [data-action=open-profile]')
+        await idle(pg)
+        await scan()  # „Vorlieben“
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
+        await pg.click('[data-sec=shop] [data-action=open-shop]')
+        await idle(pg)
+        for key in ('nicht', 'unklar'):
+            await pg.click(f'#sheet [data-action=fold][data-v={key}]')
+            await idle(pg)
+        await scan()  # „Einkaufen“ with everything folded open
+        strips = await pg.evaluate(STRIPS)
+        check(
+            len(strips) >= 8 and all(x == [True, True, True, True] for x in strips),
+            f'„Einkaufen“ ({scheme}): every strip says in words what it shows, at most 8 dots, each the size of a calendar dot and in its rating’s colour ({len(strips)} strips)',
+        )
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
         await pg.click('[data-action=open-settings]')
         await idle(pg)
         await scan()
@@ -597,6 +641,14 @@ async def test_rules(browser, url):
         await pg.click('[data-sec=hist] [data-action=open-report]')
         await idle(pg)
         await scan()  # „Verlauf“
+        glance = await pg.evaluate(RINGS)
+        check(
+            glance == {'rings': [[72, 72]] * 3, 'row': True, 'under': True},
+            f'„Verlauf“ ({scheme}): three rings of 72px side by side, every figure centred under its ring ({glance})',
+        )
+        await pg.click('#sheet [data-action=fold][data-v=details]')
+        await idle(pg)
+        await scan()  # with „Details“ open
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
         await pg.click('.pend .slider-track button', force=True)  # the level's button takes no pointer: the click lands on the track there
@@ -870,7 +922,7 @@ TYPE_SCALE = ({'12', '14', '16', '21', '30'}, {'1.1', '1.25', '1.4', '1.5'}, {'4
 # Figures take table figures in the very rule that sets their font, because the font shorthand resets them
 FIGURES = {
     '.pct',
-    '.ring-mid .pct',
+    '.figs b',
     '.cnt b',
     '.tl-time',
     '.day .dn',
@@ -888,7 +940,6 @@ TYPE_ALLOWED = {
     ('.field.code', 'text-transform', 'uppercase'): 'the household code',
     ('.field.code::placeholder', 'letter-spacing', 'normal'): 'the placeholder is a sentence',
     ('.field.code::placeholder', 'text-transform', 'none'): 'the placeholder is a sentence',
-    ('.pct small', 'letter-spacing', 'normal'): 'the Figtree % sign does not take the title’s tracking it inherits in the ring',
     ('.tl-note', 'font-style', 'italic'): 'a note in the timeline is the one quoted text',
 }
 
@@ -1123,9 +1174,8 @@ GEOMETRY_ALLOWED = {
     '.sw': 'the switch track, 46 by 28',
     '.sw::after': 'its knob, 22, 3 from the edge',
     '[aria-checked="true"] > .sw::after': 'its travel, 18',
-    '.ring': 'the evaluation’s ring, 104; views/sheets.js draws it at that size',
-    '.ring circle': 'its 10px stroke, the same in views/sheets.js',
-    '.ring-mid > span': 'the caption wraps inside the ring, 76 wide',
+    '.ring': 'the rings on „Verlauf“, 72; views/sheets.js draws them at that size',
+    '.ring circle': 'their 8px stroke, the same in views/sheets.js',
     '.shutter': 'the camera’s shutter, 78',
     '.crop': 'the crop stage, at most 340',
     '.toast': 'a toast is never wider than 520px',
@@ -1364,6 +1414,40 @@ def test_motion_js():
     check(not bad, f'no duration, curve or transition of its own in js/ ({len(bad)}: {bad})')
 
 
+def test_strip():
+    """The rating strip is a variant of the calendar's dots, not a recipe of its own (PROJECT.md, "Recipes").
+
+    It sits under the dots in the Recipes section and says only that it never shrinks, so its dots, their size and
+    colours and the „+“ are the calendar's; a screen only places it."""
+    decls = app_decls()
+    own = [(sec, p, v) for sec, sel, p, v in decls if sel == '.dots.strip']
+    elsewhere = [f'{sel} {p}:{v}' for sec, sel, p, v in decls if 'strip' in sel and sel != '.dots.strip' and (sec != 'Views' or p not in PLACING)]
+    order = [sel for sec, sel, p, v in decls if sec == 'Recipes' and sel.startswith('.dots')]
+    js = (WWW / 'js/views/parts.js').read_text(encoding='utf-8')
+    check(
+        own == [('Recipes', 'flex', 'none')] and not elsewhere and order[-1] == '.dots.strip' and 'class="dots strip"' in js,
+        f'the strip: the calendar’s dots as a variant under their recipe, nothing of its own but that it never shrinks ({own}, {elsewhere})',
+    )
+    check(
+        re.search(r'\bconst STRIP = 8\b', js) and "'<b>+</b>'" in js and 'role="img" aria-label=' in js,
+        'at most 8 dots, the „+“ in front of them where there are more, and what they say in words as the label',
+    )
+
+
+def test_rings():
+    """„Verlauf“ at a glance: the three rings in a grid of three equal columns, and the figures in that same grid, so every
+    figure stands under its ring at any width; the ring's size and stroke are listed in GEOMETRY_ALLOWED."""
+    grid = {(p, v) for sec, sel, p, v in app_decls() if sec == 'Views' and sel == '.rings, .figs'}
+    check(
+        {('display', 'grid'), ('grid-template-columns', 'repeat(3,minmax(0,1fr))')} <= grid,
+        f'the rings and the figures under them share one grid of three equal columns ({sorted(grid)})',
+    )
+
+
+# What a screen may set on a recipe it places (PROJECT.md, "Where styles live")
+PLACING = ('display', 'gap', 'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'flex', 'order', 'align-self', 'justify-self')
+
+
 def test_ratings():
     """The server's overview labels every level of RATINGS, with the app's wording.
 
@@ -1424,6 +1508,8 @@ async def test_files(browser, url):
     test_layers_lines_sizes()
     test_boxes()
     test_motion_js()
+    test_strip()
+    test_rings()
     test_ratings()
     test_isolated_tests()
     test_prompt()

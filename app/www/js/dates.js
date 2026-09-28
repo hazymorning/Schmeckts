@@ -22,15 +22,6 @@ export const addDays = (t, n) => {
   return d.getTime();
 }; // calendar days, across daylight saving changes too
 export const weekStart = t => addDays(dayStart(t), -((new Date(t).getDay() + 6) % 7)); // Monday 00:00 local time
-/* A calendar week from its Monday, in words: „22.–28. September“, across two months „29. Sept. – 5. Okt.“ */
-export function weekRange(start) {
-  const a = new Date(start),
-    b = new Date(addDays(start, 6));
-  if (a.getMonth() === b.getMonth())
-    return `${a.getDate()}.–${b.toLocaleDateString('de-DE', {day: 'numeric', month: 'long'})}`;
-  const short = d => d.toLocaleDateString('de-DE', {day: 'numeric', month: 'short'});
-  return `${short(a)} – ${short(b)}`;
-}
 export const toLocalInput = t => `${dayKey(t)}T${timeStr(t)}`;
 export function dayLabel(t) {
   const n = daysAgo(t);

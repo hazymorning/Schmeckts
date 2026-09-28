@@ -1,9 +1,8 @@
 /* Everything derived from the data: lookups, open meals, suggestions while feeding and the evaluation model
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
-import {addDays, weekStart} from './dates.js';
-import {PENDING_WINDOW} from './config.js';
-import {analyze, report, shopGroups, tally, week as weekOf} from './smart.js';
+import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
+import {analyze, changes, habits, profile, report, shopGroups, tally, variety as change} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -21,13 +20,11 @@ export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) 
 export const servingsInFilter = () => db.servings.filter(s => servingPets(s).length);
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
 
-/* The evaluation model and the last week, recomputed only when the data, the pet filter, the hidden hints or the
-   hour change (windows such as the 72 hours for appetite). The sums per variety stay put while that happens and only
-   varieties with changed meals are recomputed; the week stands until a meal up to its end changes or the filter
-   does. */
+/* The evaluation model, recomputed only when the data, the pet filter, the hidden hints or the hour change (windows
+   such as the 72 hours for appetite). The sums per variety stay put while that happens and only varieties with
+   changed meals are recomputed. */
 const cache = {};
-let sums = null,
-  week = null;
+let sums = null;
 function cached(name, parts, fn) {
   const now = Date.now(),
     key = [revision, Math.floor(now / 36e5), ...parts].join('|');
@@ -41,20 +38,25 @@ function refresh(now) {
   const stale = takeStale();
   if (!sums || !stale.sorts || now >= sums.next) sums = tally(db, now);
   else if (stale.sorts.size) tally(db, now, stale.sorts, sums);
-  if (stale.since < week?.end) week = null;
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-/* The calendar week before this one, on „Verlauf“ under the last 30 days */
-export const lastWeek = () =>
-  cached('week', [prefs.activePet], now => {
-    const start = addDays(weekStart(now), -7);
-    if (week?.start !== start || week.filter !== prefs.activePet)
-      week = {...weekOf(db, prefs, start), filter: prefs.activePet};
-    return week;
+/* „Verlauf“, only when it opens: the last 7, 30 and 90 days as one entry, and what changed within the 30 days, against
+   the model as it stands */
+const SPANS = [7, 30, 90];
+export const reportModel = () =>
+  cached('report', [prefs.activePet], now => ({
+    spans: SPANS.map(days => report(db, prefs, now, days)),
+    changes: changes(db, prefs, now, SPANS[1], model()),
+  }));
+/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits with Abwechslung last,
+   which the home page asks for only while there is nothing to compare (it reads every meal) */
+export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
+export const habitsModel = () =>
+  cached('habits', [prefs.activePet], () => {
+    const m = model();
+    return [...habits(m), ...change(m)];
   });
-// Only when the evaluation opens, and per span of days (0 = everything), which the page chooses
-export const reportModel = days => cached('report', [prefs.activePet, days], now => report(db, prefs, now, days));
 export const sortOf = id => model().byId.get(id);
 export function pendingServings() {
   const cut = Date.now() - PENDING_WINDOW;
@@ -100,16 +102,19 @@ export function quickProducts(limit = Infinity) {
     .sort((a, b) => (last.get(b.id) || 0) - (last.get(a.id) || 0) || (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, limit);
 }
-/* The shopping list as shareable text, matching the pet filter: „Nachkaufen“ (including „Gemischt“ with „für …“ and
-   the manual `immer`), „Nicht kaufen“ („Nicht mehr kaufen“ and the manual `nicht`). „Geht so“, „Noch zu wenig
-   bewertet“ and empty groups are left out. */
+/* The shopping list as shareable text, matching the pet filter: what to buy again („Nachkaufen“ including „Gemischt“
+   with „nur für …“ and the manual `immer`), one block per food type with the type's name above it, the best first.
+   Nothing that is not to be bought. */
 export function shoppingList() {
   const m = model(),
     g = shopGroups(m),
     full = p => [p.brand, p.variety].filter(Boolean).join(' ') || pname(p);
-  const line = e => `- ${full(e.product)}${!e.kaufen && e.choice === 'gemischt' ? ` (für ${petNames(e.yes)})` : ''}`;
-  const part = (title, list) => (list.length ? `\n\n${title}\n${list.map(line).join('\n')}` : '');
-  const title = `Einkaufen für ${petNames(m.pet ? [m.pet] : db.pets.map(p => p.id))}`;
-  return {title, text: title + part('Nachkaufen', g.nachkaufen) + part('Nicht kaufen', g.nicht)};
+  const line = e =>
+    `- ${full(e.product)}${!e.kaufen && e.choice === 'gemischt' ? ` (nur für ${petNames(e.yes)})` : ''}`;
+  const title = `Einkaufen für ${petNames(m.pet ? [m.pet] : db.pets.map(p => p.id))}`,
+    blocks = TYPES.map(t => [t, g.nachkaufen.filter(e => typeOf(e.product) === t)])
+      .filter(([, list]) => list.length)
+      .map(([t, list]) => `${t}\n${list.map(line).join('\n')}`);
+  return {title, text: [title, ...blocks].join('\n\n')};
 }
 export const byMe = () => (prefs.name ? {by: prefs.name} : {});

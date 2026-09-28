@@ -99,24 +99,19 @@ export let loadError = null; // stored data present but unreadable: nothing is w
 export let dbFound = false; // db.json was there and read: only then may what is missing from it be tidied away
 let snap = Object.fromEntries(COLLECTIONS.map(c => [c, new Map()]));
 
-/* For the evaluation (derive.js): varieties whose meals have changed (null: all), and the earliest serving time
-   affected. meals: the meal before and after the change */
-const allStale = () => ({sorts: null, since: -Infinity});
+/* For the evaluation (derive.js): varieties whose meals have changed (null: all). meals: the meal before and after
+   the change */
+const allStale = () => ({sorts: null});
 let stale = allStale();
 export function takeStale() {
   const taken = stale;
-  stale = {sorts: new Set(), since: Infinity};
+  stale = {sorts: new Set()};
   return taken;
 }
 function markStale(c, ...meals) {
   if (c === 'pets') stale = allStale();
-  if (c === 'products') stale.since = -Infinity;
   if (c !== 'servings' || !stale.sorts) return;
-  for (const m of meals)
-    if (m) {
-      stale.sorts.add(m.productId);
-      stale.since = Math.min(stale.since, m.servedAt);
-    }
+  for (const m of meals) if (m) stale.sorts.add(m.productId);
 }
 
 /* Saving to disk */
@@ -237,10 +232,7 @@ export function savePrefs() {
   persist('prefs');
 }
 
-const mealOf = fields => ({
-  productId: JSON.parse(fields.productId ?? 'null'),
-  servedAt: JSON.parse(fields.servedAt ?? '0'),
-});
+const mealOf = fields => ({productId: JSON.parse(fields.productId ?? 'null')});
 function diff() {
   const out = [];
   for (const c of COLLECTIONS) {
