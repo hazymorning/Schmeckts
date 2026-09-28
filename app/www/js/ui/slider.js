@@ -1,9 +1,9 @@
 /* The rating slider (rateSlider() in views/parts.js) under a finger, the way a slider in a scrolling list behaves on
-   Android. A tap rates the level under it. Moved sideways first, the finger slides: the level it stands on floats
-   above it, with a light tick at every level it passes, and letting go rates that one. Moved up or down first, it is
-   the page scrolling and nothing happens, and a touch that only stops the page scrolling is no tap. A mouse slides as
-   soon as it is pressed. The levels' buttons lie on the track and take no touches: they are how the keyboard and a
-   screen reader rate, and every rating runs through them (data-action="rate").
+   Android. A tap rates the level under it. Moved sideways first, the finger slides: the thumb goes from stop to stop
+   with a light tick, the level's name standing above the track, and letting go rates that one. Moved up or down
+   first, it is the page scrolling and nothing happens, and a touch that only stops the page scrolling is no tap. A
+   mouse slides as soon as it is pressed. The levels' buttons lie on the track and take no touches: they are how the
+   keyboard and a screen reader rate, and every rating runs through them (data-action="rate").
    Registers itself as it loads. */
 import {haptic} from '../native.js';
 import {icon} from '../icons.js';
@@ -15,22 +15,23 @@ const SETTLE = 150; // ms after the page last scrolled in which a touch only sto
 let press = null, // {slider, id, x, y, at: the level's button while it slides}
   scrolled = -Infinity;
 
-/* A level as the slider names it, above a sliding finger and under the thumb */
-export const levelHTML = r => (r ? icon('r_' + r) + RATINGS[r].label : '');
-/* The slider's class: the level's colour, without a thumb unless the level is on this scale, and while it slides */
-export const sliderCls = (r, scale, sliding = false) =>
-  `slider${r ? ' ' + rateCls(r) : ''}${scale.includes(r) ? '' : ' unset'}${sliding ? ' sliding' : ''}`;
+/* The thumb carries the level's icon, the row above the track its name */
+export const thumbHTML = r => (r ? icon('r_' + r) : '');
+export const nameOf = r => (r ? RATINGS[r].label : '');
+/* The slider's class: the level's colour, and neither thumb nor name unless the level is on this scale */
+export const sliderCls = (r, scale) => `slider${r ? ' ' + rateCls(r) : ''}${scale.includes(r) ? '' : ' unset'}`;
 
 const stops = slider => [...slider.querySelectorAll('.slider-bar button')];
-/* Puts the thumb on level r and names it, or with null on what the meal holds; returns the name under the thumb */
-export function showLevel(slider, r, sliding = false) {
+/* Puts the thumb on level r and names it, or with null on what the meal holds; returns the thumb's disc */
+export function showLevel(slider, r) {
   const scale = stops(slider).map(b => b.dataset.r),
-    name = slider.querySelector('.slider-held > span');
+    disc = slider.querySelector('.slider-thumb > i');
   r ??= slider.dataset.r || null;
-  slider.className = sliderCls(r, scale, sliding);
+  slider.className = sliderCls(r, scale);
   if (scale.includes(r)) slider.style.setProperty('--at', scale.indexOf(r));
-  slider.querySelector('.slider-tip').innerHTML = name.innerHTML = levelHTML(r);
-  return name;
+  slider.querySelector('.slider-name').textContent = nameOf(r);
+  disc.innerHTML = thumbHTML(r);
+  return disc;
 }
 
 function nearest(slider, x) {
@@ -44,7 +45,7 @@ function slide(x) {
   const at = nearest(press.slider, x);
   if (at === press.at) return;
   press.at = at;
-  showLevel(press.slider, at.dataset.r, true);
+  showLevel(press.slider, at.dataset.r);
   haptic('select'); // a detent at every level
 }
 

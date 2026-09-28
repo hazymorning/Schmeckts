@@ -540,25 +540,23 @@ def house_meals():
 
 
 # The rating slider as the page shows it: its stops (level, name, centre from the bar's start, size, pressed), the bar
-# and the track (height, distance from the bar's ends), the stop the thumb stands on (None without a thumb), the height
-# of the whole, and what stands under the track: the ends (text, distance from the track's end) or the name of the level
-# (text, icon, distance from either end of the track, from the thumb's centre). The level above a sliding finger, and
-# whether the page stays within the screen.
+# and the track (height, distance from the bar's ends), the thumb (the stop it stands on, None without one, its size and
+# whether it carries an icon), the height of the whole, and what stands above the track: the ends (text, distance from
+# the track's end) or the level's name. And whether the page stays within the screen.
 SLIDER = """slider => { const bar = slider.querySelector('.slider-bar'), b = bar.getBoundingClientRect(), t = slider.querySelector('.slider-track').getBoundingClientRect(),
     thumb = slider.querySelector('.slider-thumb'), on = getComputedStyle(thumb).display !== 'none',
     shown = e => getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility === 'visible';
   const stops = [...bar.querySelectorAll('button')].map(e => { const r = e.getBoundingClientRect();
     return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: Math.round((r.left + r.width / 2 - b.left) * 10) / 10, w: r.width, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true'}; });
-  const x = on && new DOMMatrix(getComputedStyle(thumb).transform).m41 + parseFloat(getComputedStyle(slider).getPropertyValue('--thumb')) / 2;
-  const held = slider.querySelector('.slider-held'), h = held.firstElementChild.getBoundingClientRect(), tip = slider.querySelector('.slider-tip');
+  const x = on && new DOMMatrix(getComputedStyle(thumb).transform).m41 + thumb.offsetWidth / 2, name = slider.querySelector('.slider-name');
   return {stops, bar: [Math.round(b.width), Math.round(b.height)], track: [Math.round(t.height), Math.round(t.left - b.left), Math.round(b.right - t.right)],
-    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, height: Math.round(slider.getBoundingClientRect().height),
+    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, disc: on ? [thumb.offsetWidth, !!thumb.querySelector('svg path')] : null,
+    height: Math.round(slider.getBoundingClientRect().height),
     ends: shown(slider.querySelector('.ends')) ? [...slider.querySelectorAll('.ends span')].map((e, i) => { const r = e.getBoundingClientRect(); return [e.innerText, Math.round(i ? t.right - r.right : r.left - t.left)]; }) : null,
-    held: shown(held) ? [held.innerText, !!held.querySelector('svg path'), Math.round(h.left - t.left), Math.round(t.right - h.right), Math.round((h.left + h.right) / 2 - b.left - x)] : null,
-    tip: shown(tip) ? tip.innerText : null, page: document.documentElement.scrollWidth <= innerWidth}; }"""
+    name: shown(name) ? name.innerText : null, page: document.documentElement.scrollWidth <= innerWidth}; }"""
 
 
-def even(stops, thumb=28):
+def even(stops, thumb=44):
     """The stops from half a thumb in at either end, equally far apart and at least a small tap target apart"""
     gaps = [b['x'] - a['x'] for a, b in zip(stops, stops[1:])]
     return max(gaps) - min(gaps) < 0.6 and min(gaps) >= 44 and stops[0]['x'] == thumb / 2
@@ -589,17 +587,16 @@ async def test_week(browser, url):
         check(
             [[x['r'], x['label']] for x in b['stops']] == levels
             and even(b['stops'])
-            and b['stops'][-1]['x'] == b['bar'][0] - 14
+            and b['stops'][-1]['x'] == b['bar'][0] - 22
             and all(x['w'] == 44 and x['h'] == 48 and not x['pressed'] for x in b['stops'])
             and b['bar'][1] == 48
-            and b['track'] == [8, 0, 0]
+            and b['track'] == [12, 0, 0]
             and b['thumb'] is None
-            and b['held'] is None
-            and b['tip'] is None
+            and b['name'] is None
             and b['ends'] == [['Sofort leer', 0], ['Kaum angerührt', 0]]
-            and b['height'] == 60
+            and b['height'] == 76
             and b['page'],
-            f'{where}: six stops on one track in the scale\u2019s order, {b["stops"][1]["x"] - b["stops"][0]["x"]} px apart, no thumb yet, the ends under it, {b["height"]} px tall in all, nothing wider than 360 px ({b["ends"]})',
+            f'{where}: six stops on one track in the scale\u2019s order, {b["stops"][1]["x"] - b["stops"][0]["x"]} px apart, no thumb yet, the ends above it, {b["height"]} px tall in all, nothing wider than 360 px ({b["ends"]})',
         )
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
@@ -783,7 +780,7 @@ async def test_scales(browser, url):
     badge = await pg.evaluate(
         "[document.querySelector('#sheet .pet-rate > .badge')?.innerText.trim(), !!document.querySelector('#sheet .pet-rate > .badge svg')]"
     )
-    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['held'], [x[0] for x in b['ends']]]
+    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['name'], [x[0] for x in b['ends']]]
     check(
         old == [['Später leer', True], 4, [], None, None, ['Gern gefressen', 'Liegen gelassen']],
         f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, and none of the four is chosen ({old})',
@@ -823,10 +820,10 @@ async def test_scales(browser, url):
     await pg.click('.tl-item[data-id=meal000002]')
     await idle(pg)
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
-    now = [b['held'] and b['held'][:2] + [b['held'][3]], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['ends'], b['page']]
+    now = [b['name'], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['disc'], b['ends'], b['page']]
     check(
-        r == 'liegen' and now == [['Liegen gelassen', True, 0], ['liegen'], 3, None, True],
-        f'one tap on a level replaces the old one: the thumb on its stop, at the end of the track, and its name under it in place of the ends, flush with the track, without pushing the page wider ({r}, {now})',
+        r == 'liegen' and now == ['Liegen gelassen', ['liegen'], 3, [44, True], None, True],
+        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, and its name above the track in place of the ends, without pushing the page wider ({r}, {now})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
@@ -849,14 +846,13 @@ async def test_slide(browser, url):
       document.addEventListener('click', e => { const b = e.target.closest('.slider-bar button'); if (b) window.__rated.push(b.dataset.r); }); }"""
     )
     STOPS = 'l => l.map(b => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })'
-    # The level above the finger (None when there is none) and whether the thumb shows
-    SHOWN = """() => { const s = document.querySelector('.pend .slider'), tip = s.querySelector('.slider-tip');
-      return [getComputedStyle(tip).display !== 'none' ? tip.innerText : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none']; }"""
-    # While it slides: the level above the thumb, clear of it and within the track's width, and nothing under the track
-    ABOVE = """() => { const s = document.querySelector('.pend .slider'), tip = s.querySelector('.slider-tip').getBoundingClientRect(),
-        thumb = s.querySelector('.slider-thumb').getBoundingClientRect(), t = s.querySelector('.slider-track').getBoundingClientRect(),
-        hidden = e => getComputedStyle(e).visibility === 'hidden';
-      return [tip.bottom <= thumb.top, tip.left >= t.left - .5 && tip.right <= t.right + .5, hidden(s.querySelector('.ends')) && hidden(s.querySelector('.slider-held'))]; }"""
+    # The level's name above the track (None while the ends stand there) and whether the thumb shows
+    SHOWN = """() => { const s = document.querySelector('.pend .slider'), name = s.querySelector('.slider-name');
+      return [getComputedStyle(name).visibility === 'visible' ? name.innerText : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none']; }"""
+    # While it slides: the thumb carries the level's icon, and its name stands above the thumb, clear of it
+    ABOVE = """() => { const s = document.querySelector('.pend .slider'), name = s.querySelector('.slider-name').getBoundingClientRect(),
+        thumb = s.querySelector('.slider-thumb');
+      return [!!thumb.querySelector('svg path'), name.bottom <= thumb.getBoundingClientRect().top + .5, getComputedStyle(s.querySelector('.ends')).visibility === 'hidden']; }"""
     ASKING = [None, False]
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     clicks = '(() => { const r = [window.__rated, window.__buzz]; window.__rated = []; window.__buzz = []; return r; })()'
@@ -885,7 +881,7 @@ async def test_slide(browser, url):
     after = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span')]
     check(
         down == ASKING and moved == [['Erst gierig', True], [True, True, True], None],
-        f'the finger down changes nothing; sliding sideways puts the thumb on the stop and names the level above it, and rates nothing yet ({down}, {moved})',
+        f'the finger down changes nothing; sliding sideways puts the thumb with the level\u2019s icon on the stop and names the level above the track, and rates nothing yet ({down}, {moved})',
     )
     check(
         after == ['eager', [['eager'], [8, 8, 8, 8, 16]], 'Erst gierig gespeichert'],
@@ -967,8 +963,8 @@ async def test_slide(browser, url):
     await pg.wait_for_timeout(200)  # the page has just scrolled to the meal, and a touch that soon would only stop it
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
     check(
-        b['thumb'] == 2 and b['held'] and b['held'][:2] == ['Halb gegessen', True] and abs(b['held'][4]) <= 1 and b['ends'] is None,
-        f'the level a meal holds: the thumb on its stop and its name centred under it, in place of the ends ({b["thumb"]}, {b["held"]})',
+        b['thumb'] == 2 and b['disc'] == [44, True] and b['name'] == 'Halb gegessen' and b['ends'] is None,
+        f'the level a meal holds: the thumb on its stop with the level\u2019s icon, and its name above the track in place of the ends ({b["thumb"]}, {b["name"]})',
     )
     at = await pg.eval_on_selector_all('#sheet .slider-bar button', STOPS)
     await touch('touchStart', *at[2])

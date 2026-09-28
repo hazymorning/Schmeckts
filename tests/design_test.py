@@ -95,14 +95,14 @@ async def test_palette(browser, url):
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
         check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
-        # The rating slider in the rating colours: its track from stop to stop, the thumb's ring and the level's icon
+        # The rating slider in the rating colours: its track from stop to stop, the thumb's ring and the icon it carries
         track, shown = await pg.evaluate(
             """() => import('./js/ui/slider.js').then(async m => { const s = document.querySelector('.pend .slider'), shown = [];
           const track = getComputedStyle(s.querySelector('.slider-track')).backgroundImage.match(/rgba?\\([^)]*\\)/g);
           for (const r of ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht']) {
             m.showLevel(s, r);
             await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))); // the ring's colour eases over
-            shown.push([getComputedStyle(s.querySelector('.slider-held .ic')).color, getComputedStyle(s.querySelector('.slider-thumb')).borderTopColor]); }
+            shown.push([getComputedStyle(s.querySelector('.slider-thumb .ic')).color, getComputedStyle(s.querySelector('.slider-thumb > i')).borderTopColor]); }
           m.showLevel(s, null); return [track, shown]; })"""
         )
         tones = ('--good', '--good', '--mid', '--mid', '--sauce', '--bad')
@@ -404,7 +404,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .cnt b, .slider-name, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -606,7 +606,7 @@ async def test_rules(browser, url):
         await scan()  # a toast with „Rückgängig“
         await pg.click('.tl [data-action=open-serving]')
         await idle(pg)
-        await scan()  # the meal just rated: its level under the thumb
+        await scan()  # the meal just rated: its level's name above the slider
         await pg.click('[data-action=close]')
         await idle(pg)
         await pg.click('[data-action=open-settings]')
@@ -634,7 +634,10 @@ async def test_rules(browser, url):
             not bad,
             f'Figtree everywhere and Faustina only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
         )
-        check(seen == set(FAUSTINA.split(', ')), f'Faustina on the wordmark, headings, day lines, percentages, counters, initials ({sorted(seen)})')
+        check(
+            seen == set(FAUSTINA.split(', ')),
+            f'Faustina on the wordmark, headings, day lines, percentages, counters, the level on the rating slider, initials ({sorted(seen)})',
+        )
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
 
@@ -1130,9 +1133,9 @@ GEOMETRY_ALLOWED = {
     '.shutter': 'the camera’s shutter, 78',
     '.crop': 'the crop stage, at most 340',
     '.toast': 'a toast is never wider than 520px',
-    '.slider-track': 'the rating slider\u2019s track, 8px thick',
+    '.slider-track': 'the rating slider\u2019s track, 12px thick',
     '.slider-bar button::before': 'a stop on it, 4px',
-    '.slider-say': 'the row under it is as tall without a level as with one and its small icon',
+    '.slider-say': 'the row above it is as tall with the ends of the scale as with the name of a level',
 }
 ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
 
