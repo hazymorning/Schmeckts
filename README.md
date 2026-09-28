@@ -38,9 +38,9 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
 
 ## Was die App sonst noch kann
 
-- Die Einkaufsliste sortiert sich von allein: Was gut ankommt, landet bei *Nachkaufen*, was meistens übrig bleibt, bei *Nicht mehr kaufen*. Du kannst Sorten auch selbst verschieben und die Liste verschicken, zum Beispiel an jemanden, der gerade einkaufen ist.
-- Du siehst, welche Marke am besten ankommt und ob dein Tier lieber Pastete oder Stückchen frisst, lieber Huhn oder Fisch. Bleibt eine Sorte immer wieder stehen oder frisst ein Tier auffällig wenig, sagt die App Bescheid.
-- Im Verlauf stehen alle Mahlzeiten, und du siehst, wie viele davon in den letzten 7 oder 30 Tagen gut ankamen.
+- Unter *Einkaufen* steht, was gut ankommt und nachgekauft werden kann, nach Futterart sortiert, und neben jeder Sorte ihre letzten Bewertungen als Punkte. Was meistens übrig bleibt, steht zugeklappt unter *Lieber nicht*. Du kannst Sorten auch selbst verschieben. Die Liste zum Verschicken enthält nur, was nachgekauft werden soll, zum Beispiel für jemanden, der gerade einkaufen ist.
+- Unter *Vorlieben* siehst du der Reihe nach, welche Marken, Konsistenzen und Geschmacksrichtungen am besten ankommen, also ob dein Tier lieber Pastete oder Soße frisst, lieber Huhn oder Fisch. Dort steht auch, ob es Abwechslung mag oder dieselbe Sorte gern zweimal hintereinander frisst. Bleibt eine Sorte immer wieder stehen oder frisst ein Tier auffällig wenig, sagt die App Bescheid.
+- Im Verlauf stehen alle Mahlzeiten, und du siehst, wie viele davon in den letzten 7, 30 und 90 Tagen gut ankamen. Unter *Details* steht, was sich in den letzten 30 Tagen geändert hat, zum Beispiel welche Sorten neu bei *Nachkaufen* sind.
 - Wenn du willst, erinnert dich die App daran, in den Napf zu schauen, oder meldet sich, wenn normalerweise Fütterzeit ist. Beides ist erst mal aus.
 - Du kannst mehrere Tiere anlegen, auch Hunde, Kaninchen oder Vögel. Jedes wird für sich ausgewertet.
 - Mit einem Backup nimmst du alles aufs neue Handy mit.
