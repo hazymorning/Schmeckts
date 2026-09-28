@@ -442,7 +442,7 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hint]').count() == 0,
         f'hint: always the one with the highest precedence, with its buttons; once settled or hidden the next one follows ({seen})',
     )
-    # One rating: no card without an insight, no hint card without a hint
+    # One rating: no „Vorlieben“ card while its page would be empty, no hint card without a hint
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
       s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
