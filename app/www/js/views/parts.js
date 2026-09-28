@@ -1,12 +1,12 @@
 /* Recurring building blocks of the views: avatars, thumbnails, the rating slider, sync status. */
-import {esc} from '../text.js';
+import {cap, esc} from '../text.js';
 import {ago, dayKey, dayLabel, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db, queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {rateCls, rateTone, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, NO, rateCls, rateTone, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {saidHTML, sliderCls, thumbHTML} from '../ui/slider.js';
@@ -233,8 +233,48 @@ export function syncChip() {
   return null;
 }
 
-/* A short reason for a verdict, e.g. „4× bewertet, zuletzt Gut“ */
-export const reasonOf = x => (x.n ? `${x.n}× bewertet, zuletzt ${RATINGS[x.last.r].label}` : 'noch nicht bewertet');
+/* „k von n Mal“ as people say it: „einmal“, „beide Male“, „alle 3 Mal“, „2 von 3 Mal“ */
+export const times = (k, n) =>
+  n === 1 ? 'einmal' : k < n ? `${k} von ${n} Mal` : n === 2 ? 'beide Male' : `alle ${n} Mal`;
+/* What the ratings of a variety say, in words and never as a percentage, so that its verdict explains itself:
+   „Alle 3 Mal sofort leer“, „Einmal später leer, einmal halb gegessen“, „4 von 5 Mal gut gefressen“, „2 von 3 Mal
+   nur die Soße geleckt“, „Mal so, mal so: 2× gut gefressen, 2× kaum gefressen“. The ratings fall on a side, good
+   (from GOOD points), poor (under NO) or in between; the side most of them are on is named, with its level where
+   only one level makes it up. x: {n, counts} */
+const SIDES = [
+  [v => v >= GOOD, 'gut gefressen'],
+  [v => v < NO, 'kaum gefressen'],
+  [v => v >= NO && v < GOOD, 'nur zum Teil gefressen'],
+];
+export function evidenceOf(x) {
+  if (!x.n) return 'Noch nicht bewertet';
+  const levels = Object.keys(x.counts).sort((a, b) => RATINGS[b].score - RATINGS[a].score);
+  if (levels.length === 1) return cap(`${times(x.n, x.n)} ${RATINGS[levels[0]].said}`);
+  if (x.n === 2) return `Einmal ${RATINGS[levels[0]].said}, einmal ${RATINGS[levels[1]].said}`;
+  const sides = SIDES.map(([on, word]) => {
+    const l = levels.filter(r => on(RATINGS[r].score));
+    return {k: l.reduce((a, r) => a + x.counts[r], 0), said: l.length === 1 ? RATINGS[l[0]].said : word};
+  })
+    .filter(side => side.k)
+    .sort((a, b) => b.k - a.k);
+  if (sides[0].k * 2 > x.n) return cap(`${times(sides[0].k, x.n)} ${sides[0].said}`);
+  return `Mal so, mal so: ${sides.map(side => `${side.k}× ${side.said}`).join(', ')}`;
+}
+/* The same after a comma: „Felix, alle 3 Mal gut gefressen“ */
+export const lower = t => t.charAt(0).toLowerCase() + t.slice(1);
+/* The words under a variety's verdict. In a household whose verdict rests on some of the pets only, it says theirs,
+   „Bei Minka alle 3 Mal gut gefressen“, since the others' ratings did not decide it; otherwise what all its ratings
+   in the pet filter say. e: a variety of the model */
+export function whyOf(e) {
+  const by = e.verdict === 'nachkaufen' ? e.yes : e.verdict === 'nicht' ? e.no : [];
+  if (!by.length || by.length === Object.keys(e.pets).length) return evidenceOf(e);
+  const x = {n: 0, counts: {}};
+  for (const id of by) {
+    x.n += e.pets[id].n;
+    for (const [r, k] of Object.entries(e.pets[id].counts)) x.counts[r] = (x.counts[r] || 0) + k;
+  }
+  return `Bei ${petNames(by)} ${lower(evidenceOf(x))}`;
+}
 /* A variety's verdict as text; in a household „Gemischt“ with the pets' names,
    e.g. „Gemischt: Minka ja, Tiger nein“ */
 export const verdictLabel = x =>

@@ -1282,22 +1282,6 @@ dialog.sheet.page .sheet-body {
   background: linear-gradient(90deg, var(--surface-2) 20%, var(--line) 45%, var(--surface-2) 70%);
   background-size: 220% 100%;
 }
-.meter {
-  display: block;
-  height: 6px;
-  margin-top: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--surface-2);
-  overflow: hidden;
-}
-.meter i {
-  display: block;
-  width: var(--w);
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  transform-origin: left center;
-}
 
 /* Figures: tabular in the same rule as their font, after it, because the font shorthand resets it */
 .pct {
@@ -1317,15 +1301,6 @@ dialog.sheet.page .sheet-body {
   font: var(--type-title);
   letter-spacing: var(--track-title);
   font-variant-numeric: tabular-nums;
-}
-.share {
-  font: var(--type-body-strong);
-  font-variant-numeric: tabular-nums;
-}
-.pp .share {
-  min-width: var(--col-figure);
-  text-align: right;
-  color: var(--ink);
 }
 
 /* Components */
@@ -1644,10 +1619,6 @@ dialog.sheet.page .sheet-body {
   object-fit: cover;
   border-radius: var(--radius-l);
 }
-.pp .pp-name {
-  min-width: 64px;
-  font: var(--type-small-strong);
-}
 .cta .ic {
   width: var(--icon-l);
   height: var(--icon-l);
@@ -1720,9 +1691,6 @@ dialog.sheet.page .sheet-body {
 .card-line {
   margin: 0 0 var(--space-2h);
 }
-.card-line + .taste {
-  margin-top: var(--space-5); /* 20 to the taste line; alone, the line ends 10 above the card's foot */
-}
 .empty {
   display: flex;
   align-items: center;
@@ -1792,6 +1760,13 @@ dialog.sheet.page .sheet-body {
 .why {
   margin: var(--space-hair) 0 0;
 }
+/* What the ratings say stands in full, under a variety's name and under an insight, never cut off */
+.shop .t-main small {
+  white-space: normal;
+}
+.ins .why {
+  display: block;
+}
 .btn-row {
   display: flex;
   flex-wrap: wrap;
@@ -1819,10 +1794,6 @@ dialog.sheet.page .sheet-body {
   flex: 0 0 auto;
   margin-top: var(--space-hair);
   color: var(--muted);
-}
-/* Einkaufen, footer „Geschmack bekannt“: text with a bar below it */
-.taste {
-  margin: var(--space-2h) 0 var(--space-3);
 }
 .grp {
   margin: var(--space-2) 0 0;
@@ -1996,10 +1967,6 @@ dialog.sheet.page[data-kind="report"] .page-title {
 .tally {
   margin: var(--space-2h) 0 var(--space-1);
 }
-.pp .meter {
-  flex: 1;
-  margin: 0;
-}
 .verdict {
   margin-top: var(--space-2h);
 }
@@ -2031,9 +1998,6 @@ dialog.sheet.page[data-kind="report"] .page-title {
 }
 .rank .t-main b {
   white-space: normal;
-}
-.rank .share {
-  flex: 0 0 auto;
 }
 .photo-hint {
   display: block;

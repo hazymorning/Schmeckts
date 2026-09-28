@@ -302,8 +302,8 @@ async def test_buying(browser, url):
     await pg.click('[data-action=filter][data-id=all]')
     await idle(pg)
     check(
-        house == [['Nachkaufen', 'Sheba, für Mau']] and tiger == [['Nicht mehr kaufen', 'Sheba']],
-        f'shopping: „Gemischt“ sits under „Nachkaufen“ with „für Mau“, and with the Tiger filter that pet\u2019s verdict applies ({house}, {tiger})',
+        house == [['Nachkaufen', 'Sheba, nur für Mau']] and tiger == [['Nicht mehr kaufen', 'Sheba, beide Male kaum angerührt']],
+        f'shopping: „Gemischt“ sits under „Nachkaufen“ with „nur für Mau“, and with the Tiger filter that pet\u2019s verdict applies, with its ratings in words ({house}, {tiger})',
     )
     await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{lachs}'}}))")
     await idle(pg)
@@ -314,11 +314,9 @@ async def test_buying(browser, url):
     )
     check(
         seg == [['Automatisch', 'true'], ['Immer kaufen', 'false'], ['Nicht kaufen', 'false']]
-        and lines[0] == 'Gemischt: Mau ja, Tiger nein'
-        and lines[1].startswith('Mau: Nachkaufen')
-        and '4× bewertet, zuletzt' in lines[1]
-        and lines[2] == 'Tiger: Nicht mehr kaufen 2× bewertet, zuletzt Kaum angerührt',
-        f'food sheet „Kaufen“: Automatisch · Immer kaufen · Nicht kaufen, the verdict below, one line per pet ({lines})',
+        and lines
+        == ['Gemischt: Mau ja, Tiger nein', 'Mau: Nachkaufen 3 von 4 Mal gut gefressen', 'Tiger: Nicht mehr kaufen Beide Male kaum angerührt'],
+        f'food sheet „Kaufen“: Automatisch · Immer kaufen · Nicht kaufen, the verdict below, one line per pet with its ratings in words ({lines})',
     )
     await shot(pg, 'food-buying')
     await pg.click('#sheet [data-action=buy][data-v=nicht]')
@@ -363,23 +361,27 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
         f'history: the calendar and the meals of the current day ({len(shown)})',
     )
-    # Shopping folded up: up to 3 to buy again, below them up to 2 no longer bought
-    groups = """import('./js/derive.js').then(d => { const m = d.model(), g = e => e.choice === 'gemischt' ? 'nachkaufen' : e.choice, shown = m.sorts.filter(e => e.n || e.kaufen);
-      return {ja: shown.filter(e => g(e) === 'nachkaufen').map(e => e.id), offen: shown.filter(e => g(e) === 'beobachten').map(e => e.id),
-              nein: shown.filter(e => g(e) === 'nicht').map(e => e.id), ins: m.insights.length}; })"""
+    # Shopping folded up: up to 3 to buy again, below them up to 2 no longer bought, each with what its ratings say
+    # in words, whole and without a percentage
+    groups = """Promise.all([import('./js/derive.js'), import('./js/smart.js')]).then(([d, s]) => { const m = d.model(), g = s.shopGroups(m), ids = l => l.map(e => e.id);
+      return {ja: ids(g.nachkaufen), nein: ids(g.nicht), geht: ids(g.geht), neu: ids(g.neu), ins: m.insights.length}; })"""
     SHOP = """c => ({grp: [...c.querySelectorAll('.grp')].map(g => [g.innerText]),
       ids: [...c.querySelectorAll('.shop')].map(u => [...u.querySelectorAll('[data-action=open-product]')].map(b => b.dataset.id)),
-      bars: c.querySelectorAll('.shop .bar').length, rows: c.querySelectorAll('.shop li').length,
+      said: [...c.querySelectorAll('.shop .t-main small')].map(e => [e.innerText, e.scrollWidth <= e.clientWidth + 1]), rows: c.querySelectorAll('.shop li').length,
       btn: [...c.querySelectorAll('.card-btn[data-action=expand]')].map(b => [b.innerText, b.dataset.action, b === c.lastElementChild, b.getAttribute('aria-expanded')])})"""
+
+    def worded(shop):  # every row with its words, whole and without a percentage
+        return len(shop['said']) == shop['rows'] and all(t and ok and '%' not in t for t, ok in shop['said'])
+
     m = await pg.evaluate(groups)
     shop = await pg.eval_on_selector('[data-sec=shop]', SHOP)
     parts = [(t_, ids) for t_, ids in (('Nachkaufen', m['ja'][:3]), ('Nicht mehr kaufen', m['nein'][:2])) if ids]
     check(
         shop['ids'] == [ids for _, ids in parts]
         and [g[0] for g in shop['grp']] == [t_ for t_, _ in parts]
-        and shop['bars'] == 0
+        and worded(shop)
         and shop['btn'] == [['Alle anzeigen', 'expand', True, 'false']],
-        f'shopping folded up: up to 3 to buy again, up to 2 no longer, „Alle anzeigen“ at the end ({shop["ids"]})',
+        f'shopping folded up: up to 3 to buy again, up to 2 no longer, each with its ratings in words, „Alle anzeigen“ at the end ({shop["ids"]}, {shop["said"]})',
     )
     # Keyboard: Enter eases it open (--dur-step), the focus stays on the button, space folds it shut
     await pg.focus('[data-sec=shop] [data-action=expand]')
@@ -394,22 +396,46 @@ async def test_cards(browser, url):
     )
     await idle(pg)
     shop = await pg.eval_on_selector('[data-sec=shop]', SHOP)
-    parts = [(t_, ids) for t_, ids in (('Nachkaufen', m['ja']), ('Beobachten', m['offen']), ('Nicht mehr kaufen', m['nein'])) if ids]
+    parts = [
+        (t_, ids)
+        for t_, ids in (('Nachkaufen', m['ja']), ('Nicht mehr kaufen', m['nein']), ('Geht so', m['geht']), ('Noch zu wenig bewertet', m['neu']))
+        if ids
+    ]
+    said = dict(
+        await pg.eval_on_selector_all(
+            '[data-sec=shop] .shop .t-main', 'l => l.map(e => [e.querySelector("b").innerText, e.querySelector("small").innerText])'
+        )
+    )
+    check(
+        said
+        == {
+            'Rind in Gelee': 'Felix, alle 3 Mal gut gefressen',
+            'Huhn in Gelee': 'Felix, alle 3 Mal gut gefressen',
+            'Lachs in Soße': 'Sheba, 3 von 4 Mal gut gefressen',
+            'Rind Pastete': 'Gourmet, 2 von 3 Mal kaum angerührt',
+            'Thunfisch in Soße': 'Whiskas, 2 von 3 Mal nur die Soße geleckt',
+            'Geflügel in Soße': 'Kitekat, 2 von 3 Mal nur die Soße geleckt',
+            'Käse': 'Dreamies, beide Male sofort verputzt',
+            'Pute Pastete': 'Animonda Carny, einmal später leer, einmal halb gegessen',
+        },
+        f'every variety of the sample says in words what its ratings were ({said})',
+    )
     check(
         shop['ids'] == [ids for _, ids in parts]
         and [g[0] for g in shop['grp']] == [t_ for t_, _ in parts]
-        and shop['bars'] == shop['rows']
+        and 'Noch zu wenig bewertet' in [t_ for t_, _ in parts]
+        and worded(shop)
         and shop['btn'] == [['Weniger anzeigen', 'expand', True, 'true']]
         and await pg.evaluate('document.activeElement.dataset.v') == 'shop'
         and await pg.eval_on_selector('[data-sec=shop] .card-body', 'b => b.style.height === "" && !b.classList.contains("animating")'),
-        f'unfolded: every variety under Nachkaufen, Beobachten, Nicht mehr kaufen, with score bars, „Weniger anzeigen“, and the focus stays ({[g[0] for g in shop["grp"]]})',
+        f'unfolded: every variety under Nachkaufen, Nicht mehr kaufen, Geht so, Noch zu wenig bewertet, each in words, „Weniger anzeigen“, and the focus stays ({[g[0] for g in shop["grp"]]})',
     )
     await pg.keyboard.press(' ')
     await idle(pg)
     check(
         await pg.inner_text('[data-sec=shop] [data-action=expand]') == 'Alle anzeigen'
         and await pg.locator('[data-action=share-list]').count() == 0
-        and await pg.locator('[data-sec=shop] .bar').count() == 0,
+        and await pg.locator('[data-sec=shop] .grp').count() == 2,
         'space folds it shut again',
     )
     ins = await pg.eval_on_selector(
@@ -429,14 +455,14 @@ async def test_cards(browser, url):
     await pg.reload()
     await started(pg)
     check(
-        await pg.locator('[data-sec=ins] .ins li').count() == 1 and await pg.locator('[data-sec=shop] .bar').count() == 0,
+        await pg.locator('[data-sec=ins] .ins li').count() == 1 and await pg.locator('[data-sec=shop] .grp').count() == 2,
         'after a restart everything is folded up',
     )
     await pg.emulate_media(reduced_motion='reduce')
     await pg.click('[data-sec=shop] [data-action=expand]')
     await idle(pg)
     check(
-        await pg.locator('[data-sec=shop] .bar').count() > 0
+        await pg.locator('[data-sec=shop] .grp').count() == len(parts)
         and await pg.eval_on_selector('[data-sec=shop] .card-body', 'b => !b.classList.contains("animating") && b.style.height === ""'),
         'reduced motion: at once, without animation',
     )
@@ -478,18 +504,30 @@ async def test_cards(browser, url):
         len(pins) == 2 and set(pins) == set(await state(pg, 'db.products.filter(p => p.kaufen).map(p => p.id)')),
         f'a manual setting: the pin on the variety ({len(pins)})',
     )
-    # Empty state: no verdict and no insight yet
+    # Nothing to buy or drop yet: what was rated shows at once, under „Noch zu wenig bewertet“; nothing rated at all:
+    # one line. No card without an insight, no hint card without a hint.
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
       s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
+    one = await pg.eval_on_selector('[data-sec=shop]', SHOP)
+    check(
+        [g[0] for g in one['grp']] == ['Noch zu wenig bewertet']
+        and one['said'] == [[one['said'][0][0], True]]
+        and one['said'][0][0].endswith(', einmal später leer')
+        and one['btn'] == []
+        and await pg.locator('[data-sec=ins], [data-sec=hint]').count() == 0,
+        f'one rating: the variety under „Noch zu wenig bewertet“ at once, no „Alle anzeigen“, no insight, no hint ({one["said"]})',
+    )
+    await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = null; s.save();
+      return import('./js/views/home.js').then(h => h.renderHome()); })""")
+    await idle(pg)
     empty = await pg.eval_on_selector(
         '[data-sec=shop]',
-        'c => [c.querySelector(".card-body > .card-line").innerText, c.querySelectorAll(".shop, .card-btn, .card-body > :not(.card-line, .taste)").length]',
+        'c => [c.querySelector(".card-body > .card-line").innerText, c.querySelectorAll(".shop, .card-btn, .card-body > :not(.card-line)").length]',
     )
     check(
-        empty == ['Noch zu wenig Bewertungen. Nach ein paar Mahlzeiten siehst du hier, was ankommt.', 0]
-        and await pg.locator('[data-sec=ins], [data-sec=hint]').count() == 0,
-        f'no verdict yet: only the one line, no card without an insight, no hint card without a hint ({empty[0]})',
+        empty == ['Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.', 0],
+        f'nothing rated: only the one line ({empty[0]})',
     )
     # Calendar: a tap on a day before the day before yesterday shows the older days and jumps to them
     old = await pg.evaluate("""(() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 2);
@@ -566,7 +604,7 @@ def even(stops, thumb=44):
 
 
 async def test_week(browser, url):
-    print('home page: the rating slider, „Letzte Woche“, „Geschmack bekannt“, sharing the list, appetite')
+    print('home page: the rating slider, „Letzte Woche“, sharing the list, appetite')
     ctx = await phone(browser, motion=True, width=360, height=800, timezone_id='Europe/Berlin', permissions=['clipboard-read', 'clipboard-write'])
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T10:00:00+02:00')
@@ -658,22 +696,6 @@ async def test_week(browser, url):
         closed == [0, '2026-06-01', 0, 1],
         f'the device remembers „Schließen“ for that week, across a restart too; the next week shows up again ({closed})',
     )
-    # „Geschmack bekannt“ as the footer of the „Einkaufen“ card
-    TASTE = """c => { const t = c.querySelector('.taste'), m = t.querySelector('.meter');
-      return {text: t.firstChild.textContent.trim(), share: m.querySelector('i').getBoundingClientRect().width / m.getBoundingClientRect().width}; }"""
-    t = await pg.eval_on_selector('[data-sec=shop]', TASTE)
-    check(
-        t['text'] == 'Geschmack eurer Tiere: 5 von 8 Sorten bekannt' and abs(t['share'] - 0.625) < 0.01,
-        f'„Geschmack bekannt“ for the household, with the bar showing the share ({t})',
-    )
-    await pg.click('[data-action=filter][data-id=minka00001]')
-    await idle(pg)
-    t = await pg.eval_on_selector('[data-sec=shop]', TASTE)
-    check(t['text'] == 'Minkas Geschmack: 3 von 5 Sorten bekannt', f'„Geschmack bekannt“ with the pet filter ({t["text"]})')
-    await shot(pg, 'taste-known')
-    names = await pg.evaluate("""import('./js/store.js').then(async s => { const h = await import('./js/views/home.js'), out = [];
-      for (const n of ['Max', 'Minka']) { s.db.pets[0].name = n; s.save(); h.renderHome(); out.push(document.querySelector('.taste').firstChild.textContent.split(':')[0]); } return out; })""")
-    check(names == ['Max’ Geschmack', 'Minkas Geschmack'], f'the genitive of the pet\u2019s name ({names})')
     # Sharing the shopping list: unfolded via „Weniger anzeigen“, the text matching the pet filter
     await pg.click('[data-action=filter][data-id=all]')
     await idle(pg)
@@ -685,10 +707,10 @@ async def test_week(browser, url):
     await idle(pg)
     house = await pg.evaluate('navigator.clipboard.readText()')
     toast = await pg.inner_text('#toast')
-    want = 'Einkaufen für Minka und Tiger\n\nNachkaufen\n- Sheba Lachs in Soße\n- Animonda Pute\n- Miamor Ente\n- Felix Huhn in Gelee (für Minka)\n\nNicht kaufen\n- Dreamies Käse\n- Gourmet Rind Pastete'
+    want = 'Einkaufen für Minka und Tiger\n\nNachkaufen\n- Sheba Lachs in Soße\n- Animonda Pute\n- Miamor Ente\n- Felix Huhn in Gelee (für Minka)\n\nNicht kaufen\n- Gourmet Rind Pastete\n- Dreamies Käse'
     check(
         house == want and 'Liste kopiert' in toast,
-        f'the household list: „Nachkaufen“ with „Gemischt“ (für …) and `immer`, „Nicht kaufen“ with `nicht`, without „Beobachten“; without a share menu it goes to the clipboard with a toast ({house!r})',
+        f'the household list: „Nachkaufen“ with „Gemischt“ (für …) and `immer`, „Nicht kaufen“ with `nicht`, without „Geht so“ and „Noch zu wenig bewertet“; without a share menu it goes to the clipboard with a toast ({house!r})',
     )
     lists = await pg.evaluate("""import('./js/store.js').then(async s => { const d = await import('./js/derive.js'), out = [];
       for (const p of ['minka00001', 'tiger00001']) { s.prefs.activePet = p; out.push(d.shoppingList().text); } s.prefs.activePet = 'all'; return out; })""")
@@ -726,7 +748,7 @@ async def test_week(browser, url):
         == {
             'title': 'Appetit',
             'say': 'Minka frisst seit ein paar Tagen schlechter als sonst.',
-            'why': 'Die letzten 3 Bewertungen im Schnitt 27 %, sonst 100 %.',
+            'why': 'Zuletzt 0 von 3 Mal gut gefressen, in den 30 Tagen davor alle 8 Mal.',
             'btns': [['Ausblenden', 'btn soft', 'appetit:minka00001:2026-06-09']],
         },
         f'the „Appetit“ hint has the highest precedence: a sentence, a reason, only „Ausblenden“ ({h})',
@@ -4945,10 +4967,8 @@ DENSE = """() => import('./js/store.js').then(async s => { const d = s.defaults(
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 # Best and weakest: the icon carries the rating's colour, the percentage is the plain figure in --ink
-TOPS = """() => { const ink = getComputedStyle(document.querySelector('#sheet .card h2')).color;
-  return [...document.querySelectorAll('#sheet .rank')].map(t => { const share = t.querySelector('.share'), s = getComputedStyle(share);
-    return [t.querySelector('b').innerText, t.querySelector('small').innerText, share.innerText, s.fontVariantNumeric,
-      s.color === ink, s.fontFamily.split(',')[0].replace(/"/g, ''), Math.round(t.querySelector('.ic').getBoundingClientRect().width)]; }); }"""
+TOPS = """() => [...document.querySelectorAll('#sheet .rank')].map(t => [t.querySelector('b').innerText, t.querySelector('small').innerText,
+  !t.querySelector('.share'), Math.round(t.querySelector('.ic').getBoundingClientRect().width)])"""
 
 
 async def test_report(browser, url):
@@ -5002,10 +5022,12 @@ async def test_report(browser, url):
     )
     tops = await pg.evaluate(TOPS)
     check(
-        [t[1] for t in tops] == ['kommt am besten an', 'bleibt am ehesten übrig']
-        and tops[0][0] != tops[1][0]
-        and all(t[2].endswith(' %') and t[3] == 'tabular-nums' and t[4] and t[5] == 'Figtree' and t[6] == 24 for t in tops),
-        f'best and weakest under the figures, the percentage the plain figure in --ink ({tops})',
+        tops
+        == [
+            ['Pute', 'Kommt am besten an: alle 3 Mal gut gefressen', True, 24],
+            ['Rind Pastete', 'Bleibt am ehesten übrig: beide Male kaum angerührt', True, 24],
+        ],
+        f'best and weakest under the figures, each with its ratings in words and no percentage ({tops})',
     )
     first = await pg.locator('#sheet .tl-item').count()
     for _ in range(10):
@@ -5055,8 +5077,8 @@ async def test_report(browser, url):
     await idle(pg)
     weak = await pg.evaluate(TOPS)
     check(
-        [t[1] for t in weak] == ['bleibt am ehesten übrig'],
-        f'a variety under 70 % is not named the best one, only the weakest stays ({[t[1:3] for t in weak]})',
+        [t[1] for t in weak] == ['Bleibt am ehesten übrig: beide Male halb gegessen'],
+        f'a variety under 70 points is not named the best one, only the weakest stays ({[t[1] for t in weak]})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()

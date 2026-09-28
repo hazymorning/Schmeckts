@@ -32,11 +32,12 @@ import {
   closeBtn,
   dayBlocks,
   dayGroups,
+  evidenceOf,
   head,
+  lower,
   nameBlock,
   photoThumb,
   rateSlider,
-  reasonOf,
   resultBadges,
   scaleEnds,
   segmented,
@@ -184,6 +185,14 @@ export function renderSuggestions() {
    sheet.code: the scanned code currently in play (the choice, or the photo button takes it over) */
 const SUGGEST = 3,
   HITS = 8;
+/* How a variety goes down, in a word, beside its name while choosing: the verdict within the pet filter */
+const ACCEPTED = {
+  nachkaufen: 'kommt gut an',
+  gemischt: 'kommt gemischt an',
+  geht: 'geht so',
+  neu: 'noch zu wenig bewertet',
+  nicht: 'kommt nicht gut an',
+};
 const CTA = {
   barcode: `<button class="box cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
   foto: `<button class="box cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`,
@@ -192,7 +201,9 @@ function serveRows(prods, code = '') {
   return prods
     .map(p => {
       const e = sortOf(p.id);
-      const meta = [p.variety ? p.brand : '', e?.n ? `${e.pct} %` : 'noch nicht bewertet'].filter(Boolean).join(', ');
+      const meta = [p.variety ? p.brand : '', e?.n ? ACCEPTED[e.verdict] : 'noch nicht bewertet']
+        .filter(Boolean)
+        .join(', ');
       return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
         ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>
         <span class="link">Servieren</span></button></li>`;
@@ -244,7 +255,7 @@ function hitList(text, words) {
 }
 
 /* Food sheet, section „Kaufen“: the manual setting (Automatisch, Immer kaufen, Nicht kaufen), below it the computed
-   verdict with a short reason, and one line per pet where there are several */
+   verdict with what the ratings say in words, and one line per pet where there are several */
 const KAUFEN = [
   ['auto', 'Automatisch'],
   ['immer', 'Immer kaufen'],
@@ -252,12 +263,12 @@ const KAUFEN = [
 ];
 const verdictPetRow = (pet, x) =>
   `<div class="row verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
-    <small>${esc(reasonOf(x))}</small></span></div>`;
+    <small>${esc(evidenceOf(x))}</small></span></div>`;
 function kaufenHTML(e) {
   const pets = db.pets.length > 1 ? db.pets.filter(pet => e.pets[pet.id]) : [];
   return `<span class="label">Kaufen</span>
     ${segmented('buy', KAUFEN, e.kaufen || 'auto')}
-    <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(reasonOf(e.house))}</span>`}</p>
+    <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(evidenceOf(e.house))}</span>`}</p>
     ${pets.map(pet => verdictPetRow(pet, e.pets[pet.id])).join('')}</div>`;
 }
 
@@ -275,9 +286,6 @@ const countsRow = (levels, counts) =>
         `<span class="cnt ${rateCls(r)}" role="img" aria-label="${RATINGS[r].label}: ${counts[r] || 0}">${icon('r_' + r)}<b>${counts[r] || 0}</b></span>`,
     )
     .join('')}</div>${scaleEnds(levels)}</div>`;
-const petBar = (pet, x) =>
-  `<div class="row pp ${scoreCls(x.score)}">${avatar(pet, 's')}<span class="pp-name">${esc(pet.name)}</span>
-    <span class="meter bar"><i style="--w:${Math.max(4, x.pct)}%"></i></span><b class="share">${x.pct} %</b></div>`;
 const mealRow = s =>
   `<li><button class="row" data-action="open-serving" data-id="${s.id}"><span class="t-main">
     <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s)}</button></li>`;
@@ -299,8 +307,6 @@ function viewProduct() {
     counts = e.house.counts;
   const scale = scaleOf(p),
     levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // other levels that occur come after them
-  const perPet =
-    db.pets.length > 1 ? db.pets.map(pet => (e.pets[pet.id] ? petBar(pet, e.pets[pet.id]) : '')).join('') : '';
   const codes = Object.keys(p.codes || {}).sort();
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
@@ -308,7 +314,6 @@ function viewProduct() {
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
     ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}
     ${kaufenHTML(e)}
-    ${perPet ? `<span class="label">Pro Tier</span>${perPet}` : ''}
     ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}
     ${codes.length ? `<span class="label">Barcodes</span><ul class="list plist">${codes.map(barcodeRow).join('')}</ul>` : ''}
     <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Heute servieren</button>
@@ -353,13 +358,13 @@ const figures = m =>
     ${figRow('layers', `<b>${m.count.sorts}</b> ${m.count.sorts === 1 ? 'Sorte' : 'Sorten'}`)}
     ${figRow('calendar', `an <b>${m.count.days}</b> von ${m.count.span} ${m.count.span === 1 ? 'Tag' : 'Tagen'}`)}</ul>`;
 
-/* Under the figures: the variety that goes down best, named only from GOOD points on, and the weakest one. The
-   percentage is the plain figure here, so that the only colour in the card is the rating's icon. */
+/* Under the figures: the variety that goes down best, named only from GOOD points on, and the weakest one, each with
+   what its ratings say in words. The rating's icon is the only colour in the card. */
 const rankRow = (x, r, text) =>
-  `<div class="row rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(text)}</small></span><b class="share">${x.pct} %</b></div>`;
+  `<div class="row rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(`${text}: ${lower(evidenceOf(x))}`)}</small></span></div>`;
 function glance(m) {
-  const best = m.best && m.best.pct >= GOOD ? rankRow(m.best, 'top', 'kommt am besten an') : '';
-  const worst = m.worst ? rankRow(m.worst, 'schlecht', 'bleibt am ehesten übrig') : '';
+  const best = m.best && m.best.pct >= GOOD ? rankRow(m.best, 'top', 'Kommt am besten an') : '';
+  const worst = m.worst ? rankRow(m.worst, 'schlecht', 'Bleibt am ehesten übrig') : '';
   return `<div class="glance">${ring(m)}${figures(m)}</div>
     ${best || worst ? `<div class="tops">${best}${worst}</div>` : ''}`;
 }

@@ -139,12 +139,15 @@ export async function importData(file) {
   }
 }
 const demoId = () => DEMO + uid();
-/* One sample pet with six varieties and their ratings, two people, and the usual feeding times. The data is made
-   up, but it has to look like a phone in use so that the evaluation and the insights are not empty. */
+/* One sample pet with eight varieties and their ratings, two people, and the usual feeding times. The data is made
+   up, but it has to look like a phone in use so that „Einkaufen“ has all three groups and the insights are not
+   empty: two varieties in jelly against two pâtés, and two in sauce where only the sauce gets licked. */
 const DEMO_PLAN = [
   ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
   ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],
+  ['Felix', 'Rind in Gelee', 'Nassfutter', ['top', 'gut', 'top']],
   ['Whiskas', 'Thunfisch in Soße', 'Nassfutter', ['sosse', 'sosse', 'mittel']],
+  ['Kitekat', 'Geflügel in Soße', 'Nassfutter', ['sosse', 'gut', 'sosse']],
   ['Gourmet', 'Rind Pastete', 'Nassfutter', ['schlecht', 'schlecht', 'mittel']],
   ['Animonda Carny', 'Pute Pastete', 'Nassfutter', ['mittel', 'gut']],
   ['Dreamies', 'Käse', 'Snack', ['verputzt', 'verputzt']],
@@ -177,7 +180,7 @@ function demoMeals(pet) {
   for (const [brand, variety, type, ratings] of DEMO_PLAN) {
     const p = newProduct({brand, variety, type, animal: 'Katze'}, demoId());
     p.lastPets = [pet.id];
-    byBrand[brand] = p;
+    byBrand[brand] ??= p; // the first of a brand, Felix: Huhn in Gelee
     for (const r of ratings)
       made.push({id: demoId(), productId: p.id, servedAt: 0, pets: {[pet.id]: {r, at: null}}, note: ''});
   }

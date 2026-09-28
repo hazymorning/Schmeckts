@@ -2,14 +2,14 @@
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {settled, slideHeight} from '../motion.js';
-import {andList, esc} from '../text.js';
+import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {RATINGS, TEXTURES, TYPES} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {getPet, getProduct, lastWeek, model, pendingServings, petNames, pname, servingPets} from '../derive.js';
-import {hintKey, scoreCls, shopGroups} from '../smart.js';
+import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
 import {viewerOpen} from '../ui/viewer.js';
@@ -18,12 +18,15 @@ import {
   calendarHTML,
   dayBlocks,
   dayGroups,
+  evidenceOf,
+  lower,
   nameBlock,
   photoThumb,
   rateSlider,
-  reasonOf,
   syncChip,
   thumbOf,
+  times,
+  whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
 import {overviewHTML} from './overview.js';
@@ -253,22 +256,22 @@ function hintHTML(m) {
   if (h.kind === 'appetit') {
     [say, why, btns] = [
       `${esc(pet.name)} frisst seit ein paar Tagen schlechter als sonst.`,
-      `Die letzten ${h.n} Bewertungen im Schnitt ${h.recent} %, sonst ${h.usual} %.`,
+      `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.`,
       hide,
     ];
   } else if (h.kind === 'sosse') {
     const x = e.pets[h.pet];
     [say, why, btns] = [
       `${esc(pet.name)} frisst bei ${name} meist nur die Soße.`,
-      `${x.counts.sosse} von ${x.n} Bewertungen „${RATINGS.sosse.label}“`,
+      cap(`${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}`),
       hide,
     ];
   } else {
-    why = (pet ? pet.name + ': ' : '') + `${reasonOf(e)}, Wertung ${e.pct} %`;
+    why = pet ? `${pet.name}: ${lower(evidenceOf(e))}` : whyOf(e);
     [say, btns] =
       h.kind === 'stop'
         ? [`${name} kommt nicht gut an.`, set('nicht', 'Nicht mehr kaufen') + hide]
-        : [`${name} kommt richtig gut an.`, set('immer', 'Immer kaufen') + hide];
+        : [`${name} kommt gut an.`, set('immer', 'Immer kaufen') + hide];
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
@@ -277,12 +280,12 @@ function hintHTML(m) {
 /* Letzte Woche: the previous week from review() in smart.js; the device remembers „Schließen“ */
 function duelText(feeders) {
   // the most first; when several are level it reads „Gleichstand“
-  const times = x => `${esc(x.name)} ${x.n}×`,
+  const fed = x => `${esc(x.name)} ${x.n}×`,
     lead = feeders.filter(x => x.n === feeders[0].n);
-  if (lead.length < 2) return `Gefüttert: ${feeders.map(times).join(', ')}`;
+  if (lead.length < 2) return `Gefüttert: ${feeders.map(fed).join(', ')}`;
   return [
     `Gleichstand: ${esc(andList(lead.map(x => x.name)))} je ${lead[0].n}×`,
-    ...feeders.slice(lead.length).map(times),
+    ...feeders.slice(lead.length).map(fed),
   ].join(', ');
 }
 function weekHTML(w) {
@@ -298,76 +301,78 @@ function weekHTML(w) {
     <div class="week">${lines.join('')}</div><button class="card-btn" data-action="close-week" data-v="${dayKey(w.start)}">Schließen</button></section>`;
 }
 
-/* Einkaufen: folded up, up to 3 varieties to buy again (including „Gemischt“, with „für …“) and up to 2 no
-   longer bought; unfolded, every variety in three groups with score bars. A manual setting decides the group
-   and shows the pin (groups: shopGroups() in smart.js). Footer „Geschmack bekannt“ from 3 varieties on, with
-   „Als Liste teilen“ below it when unfolded. */
+/* Einkaufen: what to buy again and what no longer, each variety with what its ratings say in words (evidenceOf()),
+   never a percentage. Folded up, up to 3 to buy again (including „Gemischt“, „nur für …“) and up to 2 no longer
+   bought; unfolded, every variety, „Geht so“ and „Noch zu wenig bewertet“ too, and „Als Liste teilen“. While
+   nothing is to be bought or dropped yet, the rest shows at once. A manual setting decides the group and shows the
+   pin (shopGroups() in smart.js). */
 const SHOP = [
   ['nachkaufen', 'Nachkaufen', 3],
-  ['beobachten', 'Beobachten', 0],
   ['nicht', 'Nicht mehr kaufen', 2],
+  ['geht', 'Geht so', 0],
+  ['neu', 'Noch zu wenig bewertet', 0],
 ];
-const genitive = name => name + (/[sßxz]$/i.test(name) ? '’' : 's');
-function tasteHTML(m) {
-  const {known, total} = m.taste,
-    pet = getPet(m.pet) || (db.pets.length === 1 ? db.pets[0] : null);
-  if (total < 3) return '';
-  return `<p class="hint taste">${pet ? esc(genitive(pet.name)) + ' Geschmack' : 'Geschmack eurer Tiere'}: ${known} von ${total} Sorten bekannt<span class="meter"><i style="--w:${Math.round((known / total) * 100)}%"></i></span></p>`;
-}
-function shopRow(e, bars) {
+function shopRow(e) {
   const p = e.product,
-    cls = scoreCls(e.score);
-  const sub = [p.variety ? p.brand : '', !e.kaufen && e.choice === 'gemischt' ? `für ${petNames(e.yes)}` : '']
-    .filter(Boolean)
-    .join(', ');
+    said = !e.kaufen && e.choice === 'gemischt' ? `nur für ${petNames(e.yes)}` : lower(whyOf(e)),
+    sub = cap([p.variety ? p.brand : '', said].filter(Boolean).join(', '));
   return `<li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}
-    <span class="t-main"><b>${esc(pname(p))}</b>${sub ? `<small>${esc(sub)}</small>` : ''}${bars ? `<span class="meter bar ${cls}"><i style="--w:${Math.max(4, e.pct)}%"></i></span>` : ''}</span>
-    ${e.kaufen ? `<span class="pin" title="Eigene Einstellung">${icon('pin')}</span>` : ''}${e.n ? `<span class="pct">${e.pct}<small>%</small></span>` : ''}</button></li>`;
+    <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(sub)}</small></span>
+    ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 function shopCard(m) {
   const g = shopGroups(m),
-    open = !!homeView.open.shop;
-  if (!g.nachkaufen.length && !g.nicht.length)
+    clear = g.nachkaufen.length + g.nicht.length,
+    open = !!homeView.open.shop || !clear;
+  if (!clear && !g.geht.length && !g.neu.length)
     return {
-      body:
-        '<p class="hint card-line">Noch zu wenig Bewertungen. Nach ein paar Mahlzeiten siehst du hier, was ankommt.</p>' +
-        tasteHTML(m),
+      body: '<p class="hint card-line">Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.</p>',
       more: false,
     };
   const body =
     SHOP.map(([k, title, max]) => {
       const list = open ? g[k] : g[k].slice(0, max);
       return list.length
-        ? `<h3 class="label grp">${title}</h3><ul class="list shop">${list.map(e => shopRow(e, open)).join('')}</ul>`
+        ? `<h3 class="label grp">${title}</h3><ul class="list shop">${list.map(shopRow).join('')}</ul>`
         : '';
-    }).join('') +
-    tasteHTML(m) +
-    (open ? '<button class="card-btn" data-action="share-list">Als Liste teilen</button>' : '');
-  return {body, more: g.beobachten.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2};
+    }).join('') + (open && clear ? '<button class="card-btn" data-action="share-list">Als Liste teilen</button>' : '');
+  return {body, more: clear > 0 && (g.geht.length + g.neu.length > 0 || g.nachkaufen.length > 3 || g.nicht.length > 2)};
 }
 
-/* Erkenntnisse: the most important one folded up, all of them unfolded; no card without an insight. */
-const INSIGHT = {
-  marke: ['award', 'Marke'],
-  konsistenz: ['layers', 'Konsistenz'],
-  geschmack: ['fish', 'Geschmack'],
-  sosse: ['drop'],
-  eager: ['r_eager'],
-};
+/* Erkenntnisse (insights() in smart.js): what holds across varieties, the strongest first, each a sentence and under
+   it in words what it rests on; the strongest one folded up, all of them unfolded, and no card without one. */
+const INSIGHT = {konsistenz: 'layers', geschmack: 'fish', marke: 'award', sosse: 'drop', eager: 'r_eager'};
+const COMPARED = {konsistenz: 'Bei der Konsistenz', geschmack: 'Beim Geschmack', marke: 'Bei den Marken'};
 function insightHTML(i, m) {
-  // one sentence, emphasis in <b>
-  const sort = () => `<b>${esc(pname(m.byId.get(i.id).product))}</b>`;
-  if (i.kind === 'sosse') return `Bei ${sort()} wird meist nur die Soße geschleckt.`;
-  if (i.kind === 'eager') return `Bei ${sort()} geht es meist gierig los, dann bleibt der Rest stehen.`;
-  const label =
-    i.kind === 'konsistenz' ? TEXTURES[i.type].title : INSIGHT[i.kind][1] + (i.type === TYPES[0] ? '' : ` (${i.type})`); // „Snack-Art“ already names the type
-  return `${label}: <b>${esc(i.best.key)}</b> kommt am besten an (${i.best.pct} %), <b>${esc(i.worst.key)}</b> am wenigsten (${i.worst.pct} %).`;
+  const name = id => pname(m.byId.get(id).product);
+  if (i.kind === 'sosse' || i.kind === 'eager') {
+    const names = andList(i.sorts.map(x => `<b>${esc(name(x.id))}</b>`));
+    return [
+      i.kind === 'sosse'
+        ? `Bei ${names} wird oft nur die Soße geleckt.`
+        : `Bei ${names} geht es oft gierig los, dann bleibt der Rest stehen.`,
+      cap(i.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', ')),
+    ];
+  }
+  const what =
+    i.kind === 'konsistenz' && i.type !== TYPES[0]
+      ? `Bei der ${TEXTURES[i.type].title}` // „Snack-Art“ already names the type
+      : COMPARED[i.kind] + (i.type === TYPES[0] ? '' : ` (${i.type})`);
+  return [
+    `${what} liegt <b>${esc(i.best.key)}</b> vorn, <b>${esc(i.worst.key)}</b> hinten.`,
+    `${i.best.key} ${times(i.best.good, i.best.n)} gut gefressen, ${i.worst.key} ${times(i.worst.good, i.worst.n)}`,
+  ];
 }
 function insightCard(m) {
   if (!m.insights.length) return null;
   const list = homeView.open.ins ? m.insights : m.insights.slice(0, 1);
   return {
-    body: `<ul class="list ins">${list.map(i => `<li class="row"><span class="lead">${icon(INSIGHT[i.kind][0])}</span><span>${insightHTML(i, m)}</span></li>`).join('')}</ul>`,
+    body: `<ul class="list ins">${list
+      .map(i => {
+        const [say, why] = insightHTML(i, m);
+        return `<li class="row"><span class="lead">${icon(INSIGHT[i.kind])}</span><span>${say}<small class="hint why">${esc(why)}</small></span></li>`;
+      })
+      .join('')}</ul>`,
     more: m.insights.length > 1,
   };
 }

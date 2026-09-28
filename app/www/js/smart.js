@@ -7,14 +7,14 @@ const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
 const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // reference time of the weights, irrelevant to the score
 export const GOOD = 70; // from this many points a rating, a variety or a share counts as going down well
-const NO = 40;
+export const NO = 40; // under this many a rating counts as left, and a variety as not going down well
 export const MIN_RATED = 3; // from this many ratings within the filter there are insights and an evaluation
 const APPETITE = {recent: 72 * 36e5, usual: 30 * DAY, minRecent: 3, minUsual: 8, minSorts: 2, drop: 30, below: 50};
-const TASTE_SPAN = 180 * DAY;
 export const VERDICTS = {
   nachkaufen: 'Nachkaufen',
   gemischt: 'Gemischt',
-  beobachten: 'Beobachten',
+  geht: 'Geht so',
+  neu: 'Noch zu wenig bewertet',
   nicht: 'Nicht mehr kaufen',
 };
 const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
@@ -48,16 +48,32 @@ function addSum(sum, other) {
   if (other.last && (!sum.last || other.last.t > sum.last.t)) sum.last = other.last;
   return sum;
 }
+/* How often ratings went down well (from GOOD points) and how often they were left (under NO) */
+const countOf = (counts, on) => Object.entries(counts).reduce((a, [r, k]) => a + (on(RATINGS[r].score) ? k : 0), 0);
+export const goodOf = counts => countOf(counts, v => v >= GOOD);
+export const poorOf = counts => countOf(counts, v => v < NO);
+/* The score orders varieties; the verdict counts ratings, as the words that explain it do (evidenceOf() in
+   views/parts.js): „Nachkaufen“ from 3 ratings with at least two thirds of them good, „Nicht mehr kaufen“ from 2
+   with more than half of them left, „Geht so“ from 3 otherwise, and below that „Noch zu wenig bewertet“. */
 function statOf(sum) {
   const score = sum.n ? +(sum.points / sum.weights).toFixed(6) : 0,
-    pct = Math.round(score); // rounded against the noise of the weights
+    pct = Math.round(score), // rounded against the noise of the weights
+    good = goodOf(sum.counts),
+    poor = poorOf(sum.counts);
   return {
     n: sum.n,
     score,
     pct,
     counts: sum.counts,
     last: sum.last,
-    verdict: sum.n >= 3 && pct >= GOOD ? 'nachkaufen' : sum.n >= 2 && pct < NO ? 'nicht' : 'beobachten',
+    verdict:
+      sum.n >= 3 && good * 3 >= sum.n * 2
+        ? 'nachkaufen'
+        : sum.n >= 2 && poor * 2 > sum.n
+          ? 'nicht'
+          : sum.n >= 3
+            ? 'geht'
+            : 'neu',
   };
 }
 
@@ -92,10 +108,11 @@ export function tally(db, now, only, sums = {bySort: new Map()}) {
 function houseVerdict(pets) {
   const yes = pets.filter(([, x]) => x.verdict === 'nachkaufen').map(([id]) => id);
   const no = pets.filter(([, x]) => x.verdict === 'nicht').map(([id]) => id);
-  return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : 'beobachten'};
+  const rest = pets.some(([, x]) => x.verdict === 'geht') ? 'geht' : 'neu';
+  return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : rest};
 }
 
-/* Model  = {pet, sorts, byId, rated, insights, hints, tastes, taste}
+/* Model  = {pet, sorts, byId, rated, insights, hints}
    Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
             the filter: n, score, pct, verdict, counts, last, yes, no}
    Stat  = {n, score, pct, verdict, counts, last: {pid, r, t, id}} */
@@ -130,9 +147,7 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
       };
     })
     .sort((a, b) => b.score - a.score || b.n - a.n);
-  const byId = new Map(sorts.map(e => [e.id, e])),
-    tastes = tastesOf(db, byId, now);
-  const total = k => petIds.reduce((a, pid) => a + tastes[pid][k], 0);
+  const byId = new Map(sorts.map(e => [e.id, e]));
   return {
     pet,
     sorts,
@@ -140,63 +155,70 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     rated: sorts.reduce((a, e) => a + e.n, 0),
     insights: insights(sorts),
     hints: hints(sorts, appetite(db, pet ? [pet] : petIds, now), pet, prefs),
-    tastes,
-    taste: pet ? tastes[pet] : {known: total('known'), total: total('total')},
   };
 }
 
-/* „Geschmack bekannt“ per pet: of the varieties from the last 180 days, those count as known that it has rated at
-   least 3 times, or at least twice at a score below 40 */
-function tastesOf(db, byId, now) {
-  const out = Object.fromEntries(db.pets.map(p => [p.id, {known: 0, total: 0}])),
-    seen = new Set();
-  for (const s of db.servings) {
-    if (s.servedAt > now || s.servedAt <= now - TASTE_SPAN) continue;
-    const e = byId.get(s.productId);
-    if (!e) continue;
-    for (const pid of Object.keys(s.pets || {})) {
-      const key = pid + '|' + e.id,
-        x = e.pets[pid];
-      if (!out[pid] || seen.has(key)) continue;
-      seen.add(key);
-      out[pid].total++;
-      if (x && (x.n >= 3 || (x.n >= 2 && x.pct < NO))) out[pid].known++;
-    }
-  }
-  return out;
-}
-
-/* Comparisons by brand, consistency and flavour, each within one food type only, plus „meist nur die Soße“ and
-   „erst gierig“. No statements about buying */
+/* Insights: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“).
+   Comparisons by consistency, flavour and brand, each within one food type: a group counts with at least two
+   varieties rated at least twice each, and groups are measured by how often they went down well. The best and the
+   weakest group make an insight when that share is at least 30 points apart and every variety of the one did
+   better than every variety of the other, so a single variety cannot carry it; two comparisons over the same
+   varieties are one, consistency before flavour before brand. The strongest come first. Then two habits, „nur die
+   Soße geleckt“ and „erst gierig“, where at least two varieties show it at least half of the time. */
 const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
-const PATTERNS = ['sosse', 'eager']; // levels that say how a variety is eaten, each an insight of its own
+const GAP = 0.3,
+  TWO = 2; // varieties in a group, ratings of a variety
+const DIMENSIONS = [
+  ['konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]], // the field, falling back to the keywords only when it is missing
+  ['geschmack', p => keywordOf(FLAVORS, p.variety)],
+  ['marke', p => p.brand],
+];
+const HABITS = ['sosse', 'eager']; // levels that say how a variety is eaten
 function insights(sorts) {
   if (sorts.reduce((a, e) => a + e.n, 0) < MIN_RATED) return [];
-  const out = [];
+  const out = [],
+    seen = new Set(),
+    rated = sorts.filter(e => e.n >= TWO);
   for (const type of TYPES) {
-    const mine = sorts.filter(e => e.n && typeOf(e.product) === type);
-    const compare = (kind, keyOf) => {
+    const mine = rated.filter(e => typeOf(e.product) === type);
+    for (const [kind, keyOf] of DIMENSIONS) {
       const groups = new Map();
       for (const e of mine) {
         const k = keyOf(e.product);
-        if (k) groups.set(k, addSum(groups.get(k) || emptySum(), e.sum));
+        if (k) groups.set(k, [...(groups.get(k) || []), e]);
       }
       const ranked = [...groups]
-        .map(([key, sum]) => ({key, ...statOf(sum)}))
-        .filter(x => x.n >= 2)
-        .sort((a, b) => b.score - a.score);
-      if (ranked.length >= 2) out.push({kind, type, best: ranked[0], worst: ranked.at(-1)});
-    };
-    compare('marke', p => p.brand);
-    compare('konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]); // the field, falling back to the keywords only when it is missing
-    compare('geschmack', p => keywordOf(FLAVORS, p.variety));
+        .filter(([, l]) => l.length >= TWO)
+        .map(([key, l]) => {
+          const n = l.reduce((a, e) => a + e.n, 0),
+            good = l.reduce((a, e) => a + goodOf(e.counts), 0),
+            shares = l.map(e => goodOf(e.counts) / e.n);
+          return {
+            key,
+            ids: l.map(e => e.id).sort(),
+            n,
+            good,
+            share: good / n,
+            low: Math.min(...shares),
+            high: Math.max(...shares),
+          };
+        })
+        .sort((a, b) => b.share - a.share);
+      const best = ranked[0],
+        worst = ranked.at(-1);
+      if (ranked.length < 2 || best.share - worst.share < GAP || best.low <= worst.high) continue;
+      const same = best.ids + '|' + worst.ids;
+      if (seen.has(same)) continue;
+      seen.add(same);
+      out.push({kind, type, best, worst, gap: best.share - worst.share});
+    }
   }
-  for (const kind of PATTERNS)
-    sorts
-      .filter(e => e.n >= 2 && shareOf(e, kind) >= 0.5)
-      .slice(0, 2)
-      .forEach(e => out.push({kind, id: e.id}));
+  out.sort((a, b) => b.gap - a.gap);
+  for (const kind of HABITS) {
+    const l = rated.filter(e => shareOf(e, kind) >= 0.5).sort((a, b) => shareOf(b, kind) - shareOf(a, kind));
+    if (l.length >= TWO) out.push({kind, sorts: l.slice(0, 3).map(e => ({id: e.id, k: e.counts[kind], n: e.n}))});
+  }
   return out;
 }
 
@@ -211,7 +233,8 @@ function appetite(db, petIds, now) {
       db.servings.filter(s => s.servedAt <= now && s.servedAt > cut - A.usual),
     ),
   ];
-  const avg = l => Math.round(l.reduce((a, x) => a + RATINGS[x.r].score, 0) / l.length);
+  const avg = l => Math.round(l.reduce((a, x) => a + RATINGS[x.r].score, 0) / l.length),
+    good = l => l.filter(x => RATINGS[x.r].score >= GOOD).length;
   for (const pid of petIds) {
     const mine = span.filter(x => x.pid === pid),
       win = mine.filter(x => x.t > cut),
@@ -229,6 +252,9 @@ function appetite(db, petIds, now) {
         kind: 'appetit',
         pet: pid,
         n: win.length,
+        good: good(win),
+        before: base.length,
+        goodBefore: good(base),
         recent,
         usual,
         day: dayKey(Math.max(...win.map(x => x.t))),
@@ -310,11 +336,16 @@ function spanDays(meals, now, days) {
   return Math.round((dayStart(now) - dayStart(first)) / DAY) + 1;
 }
 
-/* Groups for „Einkaufen“ and the shopping list: „Gemischt“ counts towards buying again, the manual setting decides
-   the group, and varieties without a rating in the filter only show up with a manual setting */
+/* Groups for „Einkaufen“ and the shopping list: „Nachkaufen“ (with „Gemischt“), best first, „Nicht mehr kaufen“,
+   the clearest first, „Geht so“ and „Noch zu wenig bewertet“. The manual setting decides the group, and varieties
+   without a rating in the filter only show up with one. */
 export function shopGroups(m) {
-  const g = {nachkaufen: [], beobachten: [], nicht: []};
-  for (const e of m.sorts) if (e.n || e.kaufen) g[e.choice === 'gemischt' ? 'nachkaufen' : e.choice].push(e);
+  const g = {nachkaufen: [], nicht: [], geht: [], neu: []};
+  for (const e of m.sorts)
+    if (e.choice === 'nachkaufen' || e.choice === 'gemischt') g.nachkaufen.push(e);
+    else if (e.choice === 'nicht') g.nicht.push(e);
+    else if (e.n) g[e.choice].push(e);
+  g.nicht.sort((a, b) => a.score - b.score || b.n - a.n);
   return g;
 }
 
