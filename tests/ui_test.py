@@ -540,25 +540,23 @@ def house_meals():
 
 
 # The rating slider as the page shows it: its stops (level, name, centre from the bar's start, size, pressed), the bar
-# and the track (height, distance from the bar's ends), the stop the thumb stands on (None without a thumb), the height
-# of the whole, and what stands under the track: the ends (text, distance from the track's end) or the name of the level
-# (text, icon, distance from either end of the track, from the thumb's centre). The level above a sliding finger, and
-# whether the page stays within the screen.
+# and the track (height, distance from the bar's ends), the thumb (the stop it stands on, None without one, its size and
+# whether it carries an icon), the height of the whole, and what stands above the track: the ends (text, distance from
+# the track's end) or the level's name. And whether the page stays within the screen.
 SLIDER = """slider => { const bar = slider.querySelector('.slider-bar'), b = bar.getBoundingClientRect(), t = slider.querySelector('.slider-track').getBoundingClientRect(),
     thumb = slider.querySelector('.slider-thumb'), on = getComputedStyle(thumb).display !== 'none',
     shown = e => getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility === 'visible';
   const stops = [...bar.querySelectorAll('button')].map(e => { const r = e.getBoundingClientRect();
     return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: Math.round((r.left + r.width / 2 - b.left) * 10) / 10, w: r.width, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true'}; });
-  const x = on && new DOMMatrix(getComputedStyle(thumb).transform).m41 + parseFloat(getComputedStyle(slider).getPropertyValue('--thumb')) / 2;
-  const held = slider.querySelector('.slider-held'), h = held.firstElementChild.getBoundingClientRect(), tip = slider.querySelector('.slider-tip');
+  const x = on && new DOMMatrix(getComputedStyle(thumb).transform).m41 + thumb.offsetWidth / 2, name = slider.querySelector('.slider-name');
   return {stops, bar: [Math.round(b.width), Math.round(b.height)], track: [Math.round(t.height), Math.round(t.left - b.left), Math.round(b.right - t.right)],
-    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, height: Math.round(slider.getBoundingClientRect().height),
+    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, disc: on ? [thumb.offsetWidth, !!thumb.querySelector('svg path')] : null,
+    height: Math.round(slider.getBoundingClientRect().height),
     ends: shown(slider.querySelector('.ends')) ? [...slider.querySelectorAll('.ends span')].map((e, i) => { const r = e.getBoundingClientRect(); return [e.innerText, Math.round(i ? t.right - r.right : r.left - t.left)]; }) : null,
-    held: shown(held) ? [held.innerText, !!held.querySelector('svg path'), Math.round(h.left - t.left), Math.round(t.right - h.right), Math.round((h.left + h.right) / 2 - b.left - x)] : null,
-    tip: shown(tip) ? tip.innerText : null, page: document.documentElement.scrollWidth <= innerWidth}; }"""
+    name: shown(name) ? name.innerText : null, page: document.documentElement.scrollWidth <= innerWidth}; }"""
 
 
-def even(stops, thumb=28):
+def even(stops, thumb=44):
     """The stops from half a thumb in at either end, equally far apart and at least a small tap target apart"""
     gaps = [b['x'] - a['x'] for a, b in zip(stops, stops[1:])]
     return max(gaps) - min(gaps) < 0.6 and min(gaps) >= 44 and stops[0]['x'] == thumb / 2
@@ -589,17 +587,16 @@ async def test_week(browser, url):
         check(
             [[x['r'], x['label']] for x in b['stops']] == levels
             and even(b['stops'])
-            and b['stops'][-1]['x'] == b['bar'][0] - 14
+            and b['stops'][-1]['x'] == b['bar'][0] - 22
             and all(x['w'] == 44 and x['h'] == 48 and not x['pressed'] for x in b['stops'])
             and b['bar'][1] == 48
-            and b['track'] == [8, 0, 0]
+            and b['track'] == [12, 0, 0]
             and b['thumb'] is None
-            and b['held'] is None
-            and b['tip'] is None
+            and b['name'] is None
             and b['ends'] == [['Sofort leer', 0], ['Kaum angerührt', 0]]
-            and b['height'] == 60
+            and b['height'] == 76
             and b['page'],
-            f'{where}: six stops on one track in the scale\u2019s order, {b["stops"][1]["x"] - b["stops"][0]["x"]} px apart, no thumb yet, the ends under it, {b["height"]} px tall in all, nothing wider than 360 px ({b["ends"]})',
+            f'{where}: six stops on one track in the scale\u2019s order, {b["stops"][1]["x"] - b["stops"][0]["x"]} px apart, no thumb yet, the ends above it, {b["height"]} px tall in all, nothing wider than 360 px ({b["ends"]})',
         )
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
@@ -783,7 +780,7 @@ async def test_scales(browser, url):
     badge = await pg.evaluate(
         "[document.querySelector('#sheet .pet-rate > .badge')?.innerText.trim(), !!document.querySelector('#sheet .pet-rate > .badge svg')]"
     )
-    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['held'], [x[0] for x in b['ends']]]
+    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['name'], [x[0] for x in b['ends']]]
     check(
         old == [['Später leer', True], 4, [], None, None, ['Gern gefressen', 'Liegen gelassen']],
         f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, and none of the four is chosen ({old})',
@@ -823,10 +820,10 @@ async def test_scales(browser, url):
     await pg.click('.tl-item[data-id=meal000002]')
     await idle(pg)
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
-    now = [b['held'] and b['held'][:2] + [b['held'][3]], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['ends'], b['page']]
+    now = [b['name'], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['disc'], b['ends'], b['page']]
     check(
-        r == 'liegen' and now == [['Liegen gelassen', True, 0], ['liegen'], 3, None, True],
-        f'one tap on a level replaces the old one: the thumb on its stop, at the end of the track, and its name under it in place of the ends, flush with the track, without pushing the page wider ({r}, {now})',
+        r == 'liegen' and now == ['Liegen gelassen', ['liegen'], 3, [44, True], None, True],
+        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, and its name above the track in place of the ends, without pushing the page wider ({r}, {now})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
@@ -849,14 +846,13 @@ async def test_slide(browser, url):
       document.addEventListener('click', e => { const b = e.target.closest('.slider-bar button'); if (b) window.__rated.push(b.dataset.r); }); }"""
     )
     STOPS = 'l => l.map(b => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })'
-    # The level above the finger (None when there is none) and whether the thumb shows
-    SHOWN = """() => { const s = document.querySelector('.pend .slider'), tip = s.querySelector('.slider-tip');
-      return [getComputedStyle(tip).display !== 'none' ? tip.innerText : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none']; }"""
-    # While it slides: the level above the thumb, clear of it and within the track's width, and nothing under the track
-    ABOVE = """() => { const s = document.querySelector('.pend .slider'), tip = s.querySelector('.slider-tip').getBoundingClientRect(),
-        thumb = s.querySelector('.slider-thumb').getBoundingClientRect(), t = s.querySelector('.slider-track').getBoundingClientRect(),
-        hidden = e => getComputedStyle(e).visibility === 'hidden';
-      return [tip.bottom <= thumb.top, tip.left >= t.left - .5 && tip.right <= t.right + .5, hidden(s.querySelector('.ends')) && hidden(s.querySelector('.slider-held'))]; }"""
+    # The level's name above the track (None while the ends stand there) and whether the thumb shows
+    SHOWN = """() => { const s = document.querySelector('.pend .slider'), name = s.querySelector('.slider-name');
+      return [getComputedStyle(name).visibility === 'visible' ? name.innerText : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none']; }"""
+    # While it slides: the thumb carries the level's icon, and its name stands above the thumb, clear of it
+    ABOVE = """() => { const s = document.querySelector('.pend .slider'), name = s.querySelector('.slider-name').getBoundingClientRect(),
+        thumb = s.querySelector('.slider-thumb');
+      return [!!thumb.querySelector('svg path'), name.bottom <= thumb.getBoundingClientRect().top + .5, getComputedStyle(s.querySelector('.ends')).visibility === 'hidden']; }"""
     ASKING = [None, False]
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     clicks = '(() => { const r = [window.__rated, window.__buzz]; window.__rated = []; window.__buzz = []; return r; })()'
@@ -885,7 +881,7 @@ async def test_slide(browser, url):
     after = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span')]
     check(
         down == ASKING and moved == [['Erst gierig', True], [True, True, True], None],
-        f'the finger down changes nothing; sliding sideways puts the thumb on the stop and names the level above it, and rates nothing yet ({down}, {moved})',
+        f'the finger down changes nothing; sliding sideways puts the thumb with the level\u2019s icon on the stop and names the level above the track, and rates nothing yet ({down}, {moved})',
     )
     check(
         after == ['eager', [['eager'], [8, 8, 8, 8, 16]], 'Erst gierig gespeichert'],
@@ -967,8 +963,8 @@ async def test_slide(browser, url):
     await pg.wait_for_timeout(200)  # the page has just scrolled to the meal, and a touch that soon would only stop it
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
     check(
-        b['thumb'] == 2 and b['held'] and b['held'][:2] == ['Halb gegessen', True] and abs(b['held'][4]) <= 1 and b['ends'] is None,
-        f'the level a meal holds: the thumb on its stop and its name centred under it, in place of the ends ({b["thumb"]}, {b["held"]})',
+        b['thumb'] == 2 and b['disc'] == [44, True] and b['name'] == 'Halb gegessen' and b['ends'] is None,
+        f'the level a meal holds: the thumb on its stop with the level\u2019s icon, and its name above the track in place of the ends ({b["thumb"]}, {b["name"]})',
     )
     at = await pg.eval_on_selector_all('#sheet .slider-bar button', STOPS)
     await touch('touchStart', *at[2])
@@ -1136,7 +1132,9 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print('overview: a low card with picture, name and a glance at the day, never a rating; two lines and unfolding; counting in the history')
+    print(
+        'overview: a low card with picture, name and a few sentences about the day, never a rating; two lines and unfolding; counting in the history'
+    )
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
@@ -1148,7 +1146,7 @@ async def test_overview(browser, url):
         text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
         dots: ps.webkitLineClamp === '2' && ps.display !== 'block', tap: [c.dataset.action ?? null, c.getAttribute('aria-expanded')], wide: document.documentElement.scrollWidth > innerWidth}; }"""
     c = await pg.evaluate(CARD)
-    text = 'Heute 1 Mahlzeit und 1 Snack, zuletzt vor 1 Std. Es gab einen Snack: Käse. ' + await pg.evaluate(FACT, 'Katze')
+    text = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse. ' + await pg.evaluate(FACT, 'Katze')
     check(
         c
         == {
@@ -1158,14 +1156,14 @@ async def test_overview(browser, url):
             'sameFont': True,
             'pic': ['BUTTON', 1, 72, True],
             'text': text,
-            'bold': ['1 Mahlzeit', '1 Snack', 'vor 1 Std.', 'Käse'],
+            'bold': ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
             'lines': 2,
             'cut': True,
             'dots': True,
             'tap': ['toggle-overview', 'false'],
             'wide': False,
         },
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, today\u2019s meals and the last one in bold, what it was, something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
     )
     await shot(pg, 'overview-360')
     await pg.evaluate("window.__card = document.querySelector('.overview')")
@@ -1223,17 +1221,17 @@ async def test_overview(browser, url):
         == [
             'Minka und Tiger',
             ['SPAN', 2],
-            'Heute 2 Mahlzeiten und 1 Snack, zuletzt vor 5 Min. Minka und Tiger bekamen Lachs. Die nächste Mahlzeit gibt es morgen, meist gegen 10 Uhr. '
-            + general,
-            ['2 Mahlzeiten', '1 Snack', 'vor 5 Min.', 'Lachs', '10 Uhr'],
+            'Minka und Tiger haben vor 5 Minuten Lachs bekommen. Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr. ' + general,
+            ['5 Minuten', 'Lachs', '10 Uhr'],
         ]
         and house['height'] == 108
         and house['dots'],
-        f'under „Alle“ with several pets: the meals of all of them, who had the last one, the usual time tomorrow once today\u2019s is served, and for a cat and a dog something about any animal ({house["text"]})',
+        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and for a cat and a dog something about any animal ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Heute 1 Mahlzeit, zuletzt vor 5 Min. Es gab Lachs. ' + dog]
-        and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']] == ['Noch nichts serviert.', False, [None, None], 108],
+        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Tiger hat vor 5 Minuten Lachs bekommen. ' + dog]
+        and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']]
+        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, [None, None], 108],
         f'the overview follows the filter; without a meal there is nothing to unfold ({tiger["text"]} / {kiwi["text"]})',
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
@@ -1251,34 +1249,56 @@ async def test_overview(browser, url):
       s.prefs.code = ''; h.renderHome();
       return [alone, house]; })""")
     check(
-        'Anna' not in by[0] and by[1].startswith('Heute 2 Mahlzeiten und 1 Snack, zuletzt vor 5 Min. von Anna. '),
+        'Anna' not in by[0] and by[1].startswith('Anna hat Minka und Tiger vor 5 Minuten Lachs gegeben. '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
     # The line that changes from day to day: what is only true today first, the rest taking turns over five days
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
-      const last = s.db.servings.find(x => x.pets.minka00001), code = s.prefs.code;
-      const g = {last, meals: 2, snacks: 4, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], streak: 12, premiere: null,
-        idea: {id: 'rind00001', days: 12}, next: {at: 1110}, milestone: {n: 100, left: 40}};
+      const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
+      const g = {last, meals: 2, snacks: 1, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], week: {meals: 12, sorts: 4}, streak: 12,
+        premiere: null, idea: {id: 'rind00001', days: 12}, next: {at: 1110}, milestone: {n: 100, left: 40}};
       s.prefs.code = 'K7PM-3QXD';
       const text = (x, at = now) => o.overviewText(x, pets, at).replace(/<[^>]+>/g, '');
-      const days = [0, 1, 2, 3, 4].map(i => text(g, now + i * 864e5).split('. ').slice(-2).join('. '));
-      const first = [{premiere: 'lachs00001'}, {milestone: {n: 100, left: 3}}, {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}]
-        .map(x => text({...g, ...x}));
-      s.prefs.code = code; return [days, first]; })"""
-    days, first = await pg.evaluate(LINES)
+      const days = [0, 1, 2, 3, 4].map(i => text({...g, last: {...last, servedAt: last.servedAt + i * 864e5}}, now + i * 864e5));
+      const first = [{premiere: 'lachs00001'}, {premiere: 'rind00001'}, {milestone: {n: 100, left: 3}}, {snacks: 4}, {next: {at: 1110, due: true}},
+        {next: {at: 435, tomorrow: true}}].map(x => text({...g, ...x}));
+      s.prefs.code = code; return [days, first, o.FACTS.Katze]; })"""
+    days, first, cats = await pg.evaluate(LINES)
     turns = [
-        'Beim Füttern liegt diese Woche Anna vorn, 6 zu 4.',
-        'Seit 12 Tagen jeden Tag eingetragen.',
+        'Im Fütter-Duell dieser Woche führt Anna mit 6 zu 4. Jonas, da geht noch was!',
+        'Seit 12 Tagen lückenlos eingetragen. Dafür hättet eigentlich ihr ein Leckerli verdient.',
         'Wie wär’s mal wieder mit Rind? Das gab es seit 12 Tagen nicht.',
-        'Schon 4 Snacks heute. Wer kann da schon nein sagen?',
+        'Diese Woche standen schon 12 Mahlzeiten aus 4 Sorten auf dem Speiseplan.',
     ]
     check(
-        all(any(d.endswith(t) for d in days) for t in turns)
-        and first[0].endswith('Heute zum ersten Mal: Lachs.')
-        and first[1].endswith('Noch 3× füttern bis zum 100. Mal.')
-        and 'Um diese Zeit gibt es sonst Futter. ' in first[2]
-        and 'Die nächste Mahlzeit gibt es morgen, meist gegen 7:15 Uhr. ' in first[3],
-        f'the last line: a first time or a milestone close by when there is one, otherwise the duel, the streak, an idea and the treats take turns with something about the animal ({days}, {first})',
+        all(
+            d.startswith('Heute gab es schon zwei Mahlzeiten und einen Snack, zuletzt um ')
+            and ' Lachs von Anna. Abendessen gibt es meist gegen 18:30 Uhr. ' in d
+            for d in days
+        )
+        and all(any(d.endswith(t) for d in days) for t in turns)
+        and any(d.endswith(f) for d in days for f in cats),
+        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, the streak, an idea, the week and something about the animal take turns ({days})',
+    )
+    check(
+        first[0].endswith('Das gab es heute zum ersten Mal. Mutig!')
+        and first[1].endswith('Heute zum ersten Mal im Napf: Rind. Mutig!')
+        and first[2].endswith('Noch 3× füttern bis zum 100. Mal. Fast schon ein Jubiläum.')
+        and 'zwei Mahlzeiten und vier Snacks' in first[3]
+        and first[3].endswith('Bei so vielen Snacks: Minka hat euch ganz schön im Griff.')
+        and first[4].startswith('Futterzeit! Zuletzt gab es um ')
+        and any(
+            f'Minka {t}' in first[4]
+            for t in ('wartet bestimmt schon neben dem Napf.', 'übt schon mal den vorwurfsvollen Blick.', 'hat die Uhr bestimmt schon im Blick.')
+        )
+        and any(
+            t in first[5]
+            for t in (
+                'Für heute ist alles serviert, Frühstück gibt es morgen meist gegen 7:15 Uhr.',
+                'Feierabend für heute: Frühstück gibt es morgen meist gegen 7:15 Uhr.',
+            )
+        ),
+        f'what is only true today comes first: a first time, a milestone close by, a lot of treats; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()

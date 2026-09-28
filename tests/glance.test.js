@@ -48,6 +48,26 @@ test('today: meals and treats of the pets shown, the last one up to now, who fed
   assert.deepEqual(pick(glance(household([], []), ['A'], NOW)), [undefined, 0, 0, []]);
 });
 
+test('the week: its meals from Monday on, treats left out, and how many varieties they were', () => {
+  const db = household(
+    ['nass', 'trocken', snack],
+    [
+      ['nass', 'A', '10 07:10', ''],
+      ['trocken', 'A', '09 18:00', ''],
+      ['snack', 'A', '09 11:00', ''],
+      ['nass', 'A', '08 07:00', ''], // Monday
+      ['nass', 'A', '07 18:00', ''], // Sunday, the week before
+    ],
+  );
+  assert.deepEqual(
+    [glance(db, ['A'], NOW).week, glance(db, ['B'], NOW).week],
+    [
+      {meals: 3, sorts: 2},
+      {meals: 0, sorts: 0},
+    ],
+  );
+});
+
 test('no rating reaches the overview: the glance is the same whatever the meals were rated', () => {
   const meals = [
     ['nass', 'A', '10 07:10', 'Anna', 'top'],
@@ -139,7 +159,9 @@ test('the next usual meal: later today, due while nothing has been served for it
 });
 
 test('the next milestone: the meals left to it, none past the last one', () => {
-  const meals = n => ({servings: Array.from({length: n}, (_, i) => ({id: 'm' + i}))});
+  const meals = n => ({
+    servings: Array.from({length: n}, (_, i) => ({id: 'm' + i})),
+  });
   assert.deepEqual(
     [nextMilestone(meals(47)), nextMilestone(meals(50)), nextMilestone(meals(1000))],
     [{n: 50, left: 3}, {n: 100, left: 50}, null],
