@@ -6,7 +6,7 @@ import {RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db, queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {GOOD, NO, rateCls, rateTone, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, NO, rateCls, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {saidHTML, sliderCls, thumbHTML} from '../ui/slider.js';
@@ -44,31 +44,32 @@ export function nameBlock(s, p, inSheet = false) {
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
-/* The rating slider: the variety's scale on one track from the best level to the worst, in the levels' colours, with
-   a stop for each. Before a rating the two ends of the scale are named under the track; once the meal holds a level,
-   the thumb stands on it with its icon, and under the track stand its name and what the bowl looks like. While a
-   finger is on the track, a label above the thumb says the same of the level under it (ui/slider.js). A level stored
-   from another scale (the type has changed) stands above the slider as a badge until one of its own replaces it. The
-   stops are the levels' buttons, for the keyboard and a screen reader. */
-export const scaleEnds = (levels, hidden = false) =>
-  `<p class="ends"${hidden ? ' aria-hidden="true"' : ''}><span>${RATINGS[levels[0]].label}</span><span>${RATINGS[levels.at(-1)].label}</span></p>`;
+/* The rating slider: the variety's scale as one track from the best level to the worst, a button for each with its
+   icon in its colour, and under each the level in one word. Once the meal holds a level, the thumb stands on it,
+   ringed in its colour, and under the words stand its name and what the bowl looks like. While a finger is on the
+   slider, the thumb lifts onto the level under it and the words under the track say that one (ui/slider.js). A level
+   stored from another scale (the type has changed) stands above the slider as a badge until one of its own replaces
+   it. The buttons are for the keyboard and a screen reader. */
 export function rateSlider(s, pid) {
   const scale = scaleOf(getProduct(s.productId)),
     cur = rOf(s.pets[pid]),
+    at = scale.indexOf(cur),
     pet = db.pets.length > 1 ? getPet(pid) : null;
-  const colours = scale
-      .map((r, i) => `var(--${rateTone(r)}) calc(var(--thumb) / 2 + (100% - var(--thumb)) * ${i / (scale.length - 1)})`)
-      .join(', '),
-    stops = scale
+  const stops = scale
       .map(
-        (r, i) =>
-          `<button style="--i:${i}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}. ${RATINGS[r].note}"></button>`,
+        r =>
+          `<button class="${rateCls(r)}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}. ${RATINGS[r].note}">${icon('r_' + r)}</button>`,
       )
+      .join(''),
+    words = scale
+      .map((r, i) => `<span class="${rateCls(r)}${i === at ? ' on' : ''}">${RATINGS[r].short}</span>`)
       .join('');
-  const at = scale.includes(cur) ? `;--at:${scale.indexOf(cur)}` : '';
-  return `${cur && !scale.includes(cur) ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
-    <div class="slider-bar"><span class="slider-track" style="--stops:${colours}"></span>${scaleEnds(scale, true)}${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span><p class="slider-tip" aria-hidden="true"></p></div>${saidHTML(cur, scale)}</div>`;
+  return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
+    <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div><div class="slider-say">${saidHTML(cur, scale)}</div></div>`;
 }
+/* The two ends of a scale, under the counters of the food sheet */
+export const scaleEnds = levels =>
+  `<p class="ends"><span>${RATINGS[levels[0]].label}</span><span>${RATINGS[levels.at(-1)].label}</span></p>`;
 export function resultBadges(s, compact = false) {
   const ids = servingPets(s);
   if (ids.length === 1) {

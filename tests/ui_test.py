@@ -577,30 +577,37 @@ def house_meals():
     )
 
 
-# The rating slider as the page shows it: its stops (level, what a screen reader hears, centre from the bar's start,
-# size, pressed), the bar and the track (height, distance from the bar's ends), the thumb (the stop it stands on, None
-# without one, its size and whether it carries an icon), the height of the whole, the ends of the scale while they
-# show (text, distance from the track's end), how close they sit under the track and how far above the slider's foot,
-# the level in words under the track, the label above the thumb, and whether the page stays within the screen.
-SLIDER = """slider => { const bar = slider.querySelector('.slider-bar'), b = bar.getBoundingClientRect(), t = slider.querySelector('.slider-track').getBoundingClientRect(),
-    thumb = slider.querySelector('.slider-thumb'), on = getComputedStyle(thumb).display !== 'none', ends = slider.querySelector('.slider-bar > .ends'),
-    say = slider.querySelector('.slider-say'), tip = slider.querySelector('.slider-tip'), words = e => [e.querySelector('.slider-name').innerText, e.querySelector('small').innerText];
-  const stops = [...bar.querySelectorAll('button')].map(e => { const r = e.getBoundingClientRect();
-    return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: Math.round((r.left + r.width / 2 - b.left) * 10) / 10, w: r.width, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true'}; });
-  const x = on && new DOMMatrix(getComputedStyle(thumb).transform).m41 + thumb.offsetWidth / 2, e = ends.getBoundingClientRect(), s = slider.getBoundingClientRect();
-  return {stops, bar: [Math.round(b.width), Math.round(b.height)], track: [Math.round(t.height), Math.round(t.left - b.left), Math.round(b.right - t.right)],
-    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, disc: on ? [thumb.offsetWidth, !!thumb.querySelector('svg path')] : null,
-    height: Math.round(s.height),
-    ends: getComputedStyle(ends).opacity === '1' ? [...ends.querySelectorAll('span')].map((e, i) => { const r = e.getBoundingClientRect(); return [e.innerText, Math.round(i ? t.right - r.right : r.left - t.left)]; }) : null,
-    under: [Math.round(e.top - t.bottom), Math.round(s.bottom - e.bottom)],
-    said: say ? words(say) : null, tip: getComputedStyle(tip).display !== 'none' ? words(tip) : null,
-    page: document.documentElement.scrollWidth <= innerWidth}; }"""
+# The rating slider as the page shows it: its stops (level, what a screen reader hears, centre from the track's start,
+# size, pressed, the level's icon and its colour), the words under them (text, centre, whether it is the one in colour,
+# whether it fits its column), the track (width, height), the thumb (the stop it stands on, None without one, its
+# size, whether it carries an icon and whether it is lifted), the level in words under the track, the height of the
+# whole and whether the page stays within the screen.
+SLIDER = """slider => { const t = slider.querySelector('.slider-track').getBoundingClientRect(), thumb = slider.querySelector('.slider-thumb'),
+    on = getComputedStyle(thumb).display !== 'none', say = slider.querySelector('.slider-say > p'), mid = r => Math.round((r.left + r.width / 2 - t.left) * 10) / 10;
+  const stops = [...slider.querySelectorAll('.slider-track button')].map(e => { const r = e.getBoundingClientRect();
+    return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: mid(r), w: Math.round(r.width * 10) / 10, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true',
+      icon: !!e.querySelector('svg path'), colour: getComputedStyle(e).color}; });
+  const words = [...slider.querySelectorAll('.slider-names > span')].map(e => { const r = e.getBoundingClientRect();
+    return {text: e.innerText, x: mid(r), on: e.classList.contains('on'), colour: getComputedStyle(e).color, fits: e.scrollWidth <= Math.ceil(r.width)}; });
+  const d = thumb.getBoundingClientRect(), x = on && mid(d);
+  return {stops, words, track: [Math.round(t.width), Math.round(t.height)],
+    thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, disc: on ? [d.width, !!thumb.querySelector('svg path')] : null,
+    lifted: slider.classList.contains('pointing'), said: say ? [say.querySelector('.slider-name').innerText, say.querySelector('small').innerText] : null,
+    height: Math.round(slider.getBoundingClientRect().height), page: document.documentElement.scrollWidth <= innerWidth}; }"""
 
 
-def even(stops, thumb=44):
-    """The stops from half a thumb in at either end, equally far apart and at least a small tap target apart"""
-    gaps = [b['x'] - a['x'] for a, b in zip(stops, stops[1:])]
-    return max(gaps) - min(gaps) < 0.6 and min(gaps) >= 44 and stops[0]['x'] == thumb / 2
+def even(b):
+    """The stops side by side on the track, as wide as each other and at least a small tap target, and every word
+    centred under its stop, fitting its column"""
+    stops, words = b['stops'], b['words']
+    gaps = [y['x'] - x['x'] for x, y in zip(stops, stops[1:])]
+    return (
+        max(gaps) - min(gaps) < 0.6
+        and min(x['w'] for x in stops) >= 44
+        and all(x['h'] == 44 for x in stops)
+        and len(words) == len(stops)
+        and all(abs(w['x'] - x['x']) < 1 and w['fits'] for w, x in zip(words, stops))
+    )
 
 
 async def test_week(browser, url):
@@ -610,10 +617,10 @@ async def test_week(browser, url):
     await pg.clock.set_fixed_time('2026-06-09T10:00:00+02:00')
     await pg.click('[data-action=demo]')
     await idle(pg)
-    # The rating slider at 360 px, in the card and in the sheet: the six levels as stops on one track in the scale's
-    # order, far enough apart for a finger, each with its name and what the bowl looks like for a screen reader; before
-    # a rating no thumb and no words under it, only the ends of the scale, close under the track and in the bar's
-    # lower edge, so the slider is no taller than its bar
+    # The rating slider at 360 px, in the card and in the sheet: the six levels as buttons side by side on one track in
+    # the scale's order, each with its icon in its colour and at least a small tap target, the level in one word
+    # centred under each, and for a screen reader its name and what the bowl looks like; before a rating no thumb and
+    # no words under the track, so the slider is only the track and the row of words
     levels = [
         ['top', 'Sofort leer. Napf blitzblank'],
         ['gut', 'Später leer. Nach und nach aufgegessen'],
@@ -629,17 +636,15 @@ async def test_week(browser, url):
         b = await pg.eval_on_selector(sel, SLIDER)
         check(
             [[x['r'], x['label']] for x in b['stops']] == levels
-            and even(b['stops'])
-            and b['stops'][-1]['x'] == b['bar'][0] - 22
-            and all(x['w'] == 44 and x['h'] == 48 and not x['pressed'] for x in b['stops'])
-            and b['bar'][1] == 48
-            and b['track'] == [12, 0, 0]
-            and [b['thumb'], b['said'], b['tip']] == [None, None, None]
-            and b['ends'] == [['Sofort leer', 0], ['Kaum angerührt', 0]]
-            and b['under'] == [3, 0]
-            and b['height'] == 48
+            and [w['text'] for w in b['words']] == ['Leer', 'Später', 'Halb', 'Gierig', 'Soße', 'Voll']
+            and even(b)
+            and all(x['icon'] and not x['pressed'] for x in b['stops'])
+            and not any(w['on'] for w in b['words'])
+            and b['track'][1] == 52
+            and [b['thumb'], b['said']] == [None, None]
+            and b['height'] == 52 + 6 + 15
             and b['page'],
-            f'{where}: six stops on one track in the scale\u2019s order, {b["stops"][1]["x"] - b["stops"][0]["x"]} px apart, no thumb yet, the ends {b["under"][0]} px under the track, {b["height"]} px tall in all, nothing wider than 360 px ({b["ends"]})',
+            f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word under each, no thumb yet, {b["height"]} px tall in all, nothing wider than 360 px',
         )
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
@@ -774,7 +779,7 @@ SCALES_DB = """() => import('./js/store.js').then(async s => { const d = s.defau
 
 
 async def test_scales(browser, url):
-    print('rating per food type: the variety\u2019s scale, four stops at 360 px, a foreign level stays visible, counters in the food sheet')
+    print('rating per food type: the variety\u2019s scale, four levels at 360 px, a foreign level stays visible, counters in the food sheet')
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-10T23:30:00+02:00')  # all six meals on one day, so the home page shows them
@@ -794,14 +799,12 @@ async def test_scales(browser, url):
             ['unberuehrt', 'Nicht angerührt. Nicht mal probiert'],
         ],
     }
+    words = {'Trockenfutter': ['Gern', 'Normal', 'Wenig', 'Voll'], 'Snack': ['Verputzt', 'Später', 'Geknabbert', 'Unberührt']}
     for i, (kind, levels) in enumerate(want.items()):
         b = await pg.locator('.pend .slider').nth(i).evaluate(SLIDER)
         check(
-            [[x['r'], x['label']] for x in b['stops']] == levels
-            and even(b['stops'])
-            and b['ends'] == [[levels[0][1].split('.')[0], 0], [levels[-1][1].split('.')[0], 0]]
-            and b['page'],
-            f'{kind}: four stops of its own scale, far apart, its ends under them, nothing clipped at 360 px ({b["ends"]})',
+            [[x['r'], x['label']] for x in b['stops']] == levels and [w['text'] for w in b['words']] == words[kind] and even(b) and b['page'],
+            f'{kind}: four levels of its own scale side by side, a word under each that fits its column, nothing clipped at 360 px ({[w["text"] for w in b["words"]]})',
         )
     await shot(pg, 'rating-scales-360')
     # A stored level from another scale: a badge above the slider with its own wording and icon, no thumb, none of the
@@ -812,9 +815,9 @@ async def test_scales(browser, url):
     badge = await pg.evaluate(
         "[document.querySelector('#sheet .pet-rate > .badge')?.innerText.trim(), !!document.querySelector('#sheet .pet-rate > .badge svg')]"
     )
-    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['said'], [x[0] for x in b['ends']]]
+    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['said'], [w['text'] for w in b['words'] if w['on']]]
     check(
-        old == [['Später leer', True], 4, [], None, None, ['Gern gefressen', 'Liegen gelassen']],
+        old == [['Später leer', True], 4, [], None, None, []],
         f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, and none of the four is chosen ({old})',
     )
     card = await pg.evaluate("[...document.querySelectorAll('#sheet .prod-card small, #sheet .prod-card b')].map(e => e.innerText)")
@@ -850,10 +853,10 @@ async def test_scales(browser, url):
     await idle(pg)
     r = await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r")
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
-    now = [b['said'], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['disc'], b['ends'], b['page']]
+    now = [b['said'], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['disc'], [w['text'] for w in b['words'] if w['on']], b['page']]
     check(
-        r == 'liegen' and now == [['Liegen gelassen', 'Kaum etwas angerührt'], ['liegen'], 3, [44, True], None, True],
-        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, and under the track its name and what the bowl looks like in place of the ends, without pushing the page wider ({r}, {now})',
+        r == 'liegen' and now == [['Liegen gelassen', 'Kaum etwas angerührt'], ['liegen'], 3, [44, True], ['Voll'], True],
+        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, its word in its colour, and under the track its name and what the bowl looks like, without pushing the page wider ({r}, {now})',
     )
     check(await until(pg, "!document.getElementById('sheet').open", 5), 'with every pet rated the sheet closes a moment later')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -862,7 +865,7 @@ async def test_scales(browser, url):
 
 async def test_slide(browser, url):
     print(
-        'the rating slider under a finger: a resting finger or a slide shows the level above the thumb, letting go rates it, the meal stays a moment to be put right, scrolling rates nothing'
+        'the rating slider under a finger: a resting finger or a slide lifts the thumb onto a level and says it under the track, letting go rates it, the meal stays a moment to be put right, scrolling rates nothing'
     )
     ctx = await phone(browser, touch=True, width=360, height=800)
     pg, errors = await open_page(ctx, url)
@@ -876,25 +879,26 @@ async def test_slide(browser, url):
     # Every click that reaches a level (exactly one per rating) and every vibration (8 ms a tick, 16 ms a rating)
     await pg.evaluate(
         """() => { window.__rated = []; window.__buzz = []; Object.defineProperty(navigator, 'vibrate', {value: ms => window.__buzz.push(ms)});
-      document.addEventListener('click', e => { const b = e.target.closest('.slider-bar button'); if (b) window.__rated.push(b.dataset.r); }); }"""
+      document.addEventListener('click', e => { const b = e.target.closest('.slider-track button'); if (b) window.__rated.push(b.dataset.r); }); }"""
     )
     STOPS = 'l => l.map(b => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })'
-    # What the slider in the card shows: the label above the thumb, whether the thumb shows, the level in words under
-    # the track; None without the card
+    # What the slider in the card shows: the level in words under the track while a finger (or the keyboard) is on it,
+    # whether the thumb shows, and the level in words while nothing is on it; None without the card
     SHOWN = """() => { const s = document.querySelector(`.pend[data-id="${window.__open}"] .slider`); if (!s) return null;
-      const tip = s.querySelector('.slider-tip'), say = s.querySelector('.slider-say'), words = e => [e.querySelector('.slider-name').innerText, e.querySelector('small').innerText];
-      return [getComputedStyle(tip).display !== 'none' ? words(tip) : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none', say ? words(say) : null]; }"""
-    # The label stands above the thumb, clear of it, inside the slider's width; the thumb carries the level's icon
-    ABOVE = """() => { const s = document.querySelector('.pend .slider'), box = s.getBoundingClientRect(), tip = s.querySelector('.slider-tip').getBoundingClientRect(),
-        thumb = s.querySelector('.slider-thumb'), t = thumb.getBoundingClientRect();
-      return [!!thumb.querySelector('svg path'), tip.bottom <= t.top - 8, tip.left >= box.left - .5 && tip.right <= box.right + .5]; }"""
+      const say = s.querySelector('.slider-say > p'), words = say && [say.querySelector('.slider-name').innerText, say.querySelector('small').innerText], up = s.classList.contains('pointing');
+      return [up ? words : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none', up ? null : words]; }"""
+    # Under the finger the thumb carries the level's icon and floats, with the shadow of what floats, and the level's
+    # word under the track is the one in colour
+    ABOVE = """() => { const s = document.querySelector('.pend .slider'), thumb = s.querySelector('.slider-thumb');
+      return [!!thumb.querySelector('svg path'), getComputedStyle(thumb.firstElementChild).boxShadow.includes('34px'),
+        [...s.querySelectorAll('.slider-names > .on')].map(w => w.innerText)]; }"""
     ASKING = [None, False, None]
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     CARD = 'document.querySelectorAll(`.pend[data-id="${window.__open}"]`).length'
     clicks = '(() => { const r = [window.__rated, window.__buzz]; window.__rated = []; window.__buzz = []; return r; })()'
 
     async def stops():
-        return await pg.eval_on_selector_all('.pend .slider-bar button', STOPS)
+        return await pg.eval_on_selector_all('.pend .slider-track button', STOPS)
 
     async def reopen():  # the meal open again, as it was before any rating
         await pg.evaluate(
@@ -907,8 +911,9 @@ async def test_slide(browser, url):
         return await until(pg, f'{CARD} === 0', 5)
 
     await pg.evaluate("import('./js/derive.js').then(d => { window.__open = d.pendingServings()[0].id; })")
-    # A finger that rests on the track: nothing at first, then after a moment the thumb stands under it and the label
-    # above the thumb names the level and says what the bowl looks like, with a light tick; letting go rates it
+    # A finger that rests on the track: nothing at first, then after a moment the thumb lifts onto the level under it
+    # and the words under the track name the level and say what the bowl looks like, with a light tick; letting go
+    # rates it
     at = await stops()
     await touch('touchStart', *at[1])
     down = await pg.evaluate(SHOWN)
@@ -919,12 +924,12 @@ async def test_slide(browser, url):
     await idle(pg)
     tap = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span'), await pg.evaluate(SHOWN)]
     check(
-        down == ASKING and rest == [[['Später leer', 'Nach und nach aufgegessen'], True, None], [True, True, True], None],
-        f'a finger resting on the track: nothing at first, then the thumb under it and above the thumb the level\u2019s name and what the bowl looks like, nothing rated yet ({down}, {rest})',
+        down == ASKING and rest == [[['Später leer', 'Nach und nach aufgegessen'], True, None], [True, True, ['Später']], None],
+        f'a finger resting on the track: nothing at first, then the thumb lifted under it, its word in colour and under the track the level\u2019s name and what the bowl looks like, nothing rated yet ({down}, {rest})',
     )
     check(
         tap == ['gut', [['gut'], [8, 16]], 'Später leer gespeichert', [None, True, ['Später leer', 'Nach und nach aufgegessen']]],
-        f'letting go rates that level once; the toast says so at once, and the card stays with the level\u2019s name and what the bowl looks like under the track ({tap})',
+        f'letting go rates that level once; the toast says so at once, and the card stays with the thumb set down and the level\u2019s name and what the bowl looks like under the track ({tap})',
     )
     await shot(pg, 'rating-rated-360')
     # Put right while the card stays: another slide rates again, and the moment starts over
@@ -959,8 +964,8 @@ async def test_slide(browser, url):
     await idle(pg)
     after = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span')]
     check(
-        moved == [[['Erst gierig', 'Dann stehen gelassen'], True, None], [True, True, True], None],
-        f'sliding sideways puts the thumb with the level\u2019s icon on the stop and says the level above it, and rates nothing yet ({moved})',
+        moved == [[['Erst gierig', 'Dann stehen gelassen'], True, None], [True, True, ['Gierig']], None],
+        f'sliding sideways puts the lifted thumb with the level\u2019s icon on the level and says it under the track, and rates nothing yet ({moved})',
     )
     check(
         after == ['eager', [['eager'], [8, 8, 8, 8, 16]], 'Erst gierig gespeichert'],
@@ -1003,7 +1008,7 @@ async def test_slide(browser, url):
     cancelled = [sliding, await pg.evaluate(SHOWN), await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(
         cancelled == [[['Erst gierig', 'Dann stehen gelassen'], True, None], ASKING, None, []],
-        f'a cancelled slide goes back to the ends of the scale and rates nothing ({cancelled})',
+        f'a cancelled slide takes the thumb and the words away again and rates nothing ({cancelled})',
     )
     # Redrawn under the finger (a change from another phone): nothing is rated
     await touch('touchStart', *(await stops())[1])
@@ -1023,7 +1028,7 @@ async def test_slide(browser, url):
     await touch('touchEnd')
     held += [(await pg.evaluate(clicks))[0], await gone()]
     check(
-        held == ['mittel', [['Halb gegessen', 'Die Hälfte blieb übrig'], True, ['Halb gegessen', 'Die Hälfte blieb übrig']], ['mittel'], True],
+        held == ['mittel', [['Halb gegessen', 'Die Hälfte blieb übrig'], True, None], ['mittel'], True],
         f'a finger that stays on the card keeps it there past its moment, and it folds away once the finger lifts ({held})',
     )
     await reopen()
@@ -1037,7 +1042,7 @@ async def test_slide(browser, url):
     mouse = [await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(mouse == ['sosse', ['sosse']], f'with the mouse: pressed on one level, let go on the next, that one is rated ({mouse})')
     await reopen()
-    # The keyboard: a level is a button like any other, and the one it is on shows its label
+    # The keyboard: a level is a button like any other, and the one it is on lifts the thumb and shows its words
     await pg.focus('.pend .slider-bar [data-r=gut]')
     await pg.keyboard.press('Tab')
     focused = await pg.evaluate(SHOWN)
@@ -1046,7 +1051,7 @@ async def test_slide(browser, url):
     keys = [focused, await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(
         keys == [[['Halb gegessen', 'Die Hälfte blieb übrig'], True, None], 'mittel', ['mittel']],
-        f'the level the keyboard is on shows its label, and Enter rates it ({keys})',
+        f'the level the keyboard is on lifts the thumb and shows its words, and Enter rates it ({keys})',
     )
     # In the sheet the rated meal holds its level: a tap on it changes nothing, a tap on another rates that one, and
     # the sheet closes a moment later
@@ -1057,10 +1062,14 @@ async def test_slide(browser, url):
     await pg.wait_for_timeout(200)  # the page has just scrolled to the meal, and a touch that soon would only stop it
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
     check(
-        b['thumb'] == 2 and b['disc'] == [44, True] and b['said'] == ['Halb gegessen', 'Die Hälfte blieb übrig'] and b['ends'] is None,
-        f'the level a meal holds: the thumb on its stop with the level\u2019s icon, and under the track its name and what the bowl looks like in place of the ends ({b["thumb"]}, {b["said"]})',
+        b['thumb'] == 2
+        and b['disc'] == [44, True]
+        and not b['lifted']
+        and b['said'] == ['Halb gegessen', 'Die Hälfte blieb übrig']
+        and [w['text'] for w in b['words'] if w['on']] == ['Halb'],
+        f'the level a meal holds: the thumb on its stop with the level\u2019s icon, its word in colour, and under the track its name and what the bowl looks like ({b["thumb"]}, {b["said"]})',
     )
-    at = await pg.eval_on_selector_all('#sheet .slider-bar button', STOPS)
+    at = await pg.eval_on_selector_all('#sheet .slider-track button', STOPS)
     await touch('touchStart', *at[2])
     await touch('touchEnd')
     await idle(pg)
@@ -1577,7 +1586,7 @@ async def test_reminders(browser, url):
     await debounced(pg)
     opened = await pg.evaluate("import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.kind, m.sheet?.id])")
     check(
-        opened == [True, 'serving', s['id']] and await pg.locator('#sheet .slider-bar button').count() == 6 * len(s['pets']),
+        opened == [True, 'serving', s['id']] and await pg.locator('#sheet .slider-track button').count() == 6 * len(s['pets']),
         f'a tap on the notification opens that meal\u2019s sheet for rating ({opened[1]})',
     )
     # Rating: only once every pet is rated is it cancelled

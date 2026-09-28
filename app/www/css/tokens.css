@@ -69,7 +69,7 @@
   --type-small: 400 14px/1.4 var(--font-ui); /* secondary text: a row's second line, hints, notes, the toast, day numbers */
   --type-small-strong: 600 14px/1.4 var(--font-ui); /* labels and small controls: field labels, chips, segments, text buttons, times */
   --type-caption: 400 12px/1.25 var(--font-ui); /* under a figure or a picture: a rating's second line, pet names, units */
-  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays */
+  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays, the levels' words on the rating slider */
   --weight-strong: 600; /* b and strong inside running text */
   --track-title: -0.015em; /* only with --type-title: Faustina runs narrow at that size */
   --track-code: 0.14em; /* only in the household code field */
@@ -100,11 +100,11 @@
 
   /* Sizes */
   --icon-s: 20px; /* inside controls, rows, fields and badges; chevrons; the spinner */
-  --icon: 24px; /* on its own: icon buttons, a row's leading icon, the feeding button, the level in the rating slider's thumb */
+  --icon: 24px; /* on its own: icon buttons, a row's leading icon, the feeding button, the levels on the rating slider and in its thumb */
   --icon-l: 32px; /* a rating shown as the content: counters, the two feeding choices */
   --icon-stroke: 1.8; /* the icon set's line, for icons at 20 and 24px and the sketches */
   --icon-stroke-l: 1.4; /* icons at 32px, and the placeholder in a picture from --pic-xxl up */
-  --tap-s: 44px; /* one choice among several side by side: chip, segment, a stop and the thumb of the rating slider, the toast’s action, a field in a row */
+  --tap-s: 44px; /* one choice among several side by side: chip, segment, a level and the thumb of the rating slider, the toast’s action, a field in a row */
   --tap: 48px; /* the smallest tap target: icon buttons, rows, text buttons */
   --control: 52px; /* a button or a field, the toast */
   --control-l: 56px; /* the feeding button; a settings row */
@@ -156,7 +156,7 @@
   --backdrop: light-dark(#25261f66, #1b1c17b3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
   --shadow-low: 0 1px 4px light-dark(#25261f1a, #1b1c174d); /* resting lift: the chosen segment, the welcome picture, the rating slider's thumb */
   --shadow-high:
-    0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759); /* what floats: sheet, feeding button, toast */
+    0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759); /* what floats: sheet, feeding button, toast, the rating slider's thumb under a finger */
 }
 :root[data-theme="light"] {
   color-scheme: light;

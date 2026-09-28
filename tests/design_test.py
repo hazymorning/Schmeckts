@@ -95,22 +95,24 @@ async def test_palette(browser, url):
         low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
         check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
-        # The rating slider in the rating colours: its track from stop to stop, the thumb's ring and the icon it carries
-        track, shown = await pg.evaluate(
+        # The rating slider in the rating colours: every level's icon on the track, and for the level shown the thumb's
+        # ring, the icon it carries and the level's word under the track
+        stops, shown = await pg.evaluate(
             """() => import('./js/ui/slider.js').then(async m => { const s = document.querySelector('.pend .slider'), shown = [];
-          const track = getComputedStyle(s.querySelector('.slider-track')).backgroundImage.match(/rgba?\\([^)]*\\)/g);
+          const stops = [...s.querySelectorAll('.slider-track button')].map(b => getComputedStyle(b.querySelector('.ic')).color);
           for (const r of ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht']) {
             m.showLevel(s, r);
-            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))); // the ring's colour eases over
-            shown.push([getComputedStyle(s.querySelector('.slider-thumb .ic')).color, getComputedStyle(s.querySelector('.slider-thumb > i')).borderTopColor]); }
-          m.showLevel(s, null); return [track, shown]; })"""
+            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))); // the colours ease over
+            shown.push([getComputedStyle(s.querySelector('.slider-thumb .ic')).color, getComputedStyle(s.querySelector('.slider-thumb > i')).borderTopColor,
+              getComputedStyle(s.querySelector('.slider-names > .on')).color]); }
+          m.showLevel(s, null); return [stops, shown]; })"""
         )
         tones = ('--good', '--good', '--mid', '--mid', '--sauce', '--bad')
         check(
-            len(track) == 6
-            and all(near(g, PALETTE[r][k], 1) for g, r in zip(track, tones))
-            and all(near(icon, PALETTE[r][k], 1) and near(ring, PALETTE[r][k], 1) for (icon, ring), r in zip(shown, tones)),
-            f'the rating slider in the rating colours, track, thumb and level: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
+            len(stops) == 6
+            and all(near(c, PALETTE[r][k], 1) for c, r in zip(stops, tones))
+            and all(all(near(c, PALETTE[r][k], 1) for c in cs) for cs, r in zip(shown, tones)),
+            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
@@ -386,12 +388,12 @@ def test_rules_static():
         frames and not loud,
         f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}',
     )
-    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask, the
-    # loading shimmer and the rating slider's track, a mask only in the mood picture
+    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask and the
+    # loading shimmer, a mask only in the mood picture
     shades = sorted({(sel, p) for sel, decls in css_rules(css['app.css']) for p, v in decls if 'gradient' in v or 'mask' in p})
     check(
-        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background'), ('.slider-track', 'background')],
-        f'no fade at an edge: gradients only in .mood, .skel and the rating slider\u2019s track, a mask only in .mood ({shades})',
+        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background')],
+        f'no fade at an edge: gradients only in .mood and .skel, a mask only in .mood ({shades})',
     )
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
     ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
@@ -600,13 +602,13 @@ async def test_rules(browser, url):
         await scan()  # „Verlauf“
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
-        await pg.click('.pend .slider-bar button', force=True)  # the level's button takes no pointer: the click lands on the track there
+        await pg.click('.pend .slider-track button', force=True)  # the level's button takes no pointer: the click lands on the track there
         await pg.wait_for_selector('#toast [data-action=undo]')
         await idle(pg)
         await scan()  # a toast with „Rückgängig“
         await pg.click('.tl [data-action=open-serving]')
         await idle(pg)
-        await scan()  # the meal just rated: its level's name above the slider
+        await scan()  # the meal just rated: its level's name under the slider
         await pg.click('[data-action=close]')
         await idle(pg)
         await pg.click('[data-action=open-settings]')
@@ -1130,8 +1132,6 @@ GEOMETRY_ALLOWED = {
     '.shutter': 'the camera’s shutter, 78',
     '.crop': 'the crop stage, at most 340',
     '.toast': 'a toast is never wider than 520px',
-    '.slider-track': 'the rating slider\u2019s track, 12px thick',
-    '.slider-bar button::before': 'a stop on it, 4px',
 }
 ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
 
@@ -1211,7 +1211,7 @@ PADDING = {
     '.seg button': 'var(--space-2) var(--space-1h)',
     '.link': 'var(--space-3) 0',
     '.day': 'var(--space-1) 0 var(--space-2)',
-    '.slider-tip': 'var(--inset-compact)',
+    '.slider-track': 'var(--space-1)',
     '.toast': 'var(--space-2) var(--space-2) var(--space-2) var(--gutter)',
     '.toast.plain': 'var(--gutter)',
     '.head': '0 var(--gutter)',
@@ -1374,7 +1374,7 @@ def test_ratings():
     apart: the overview would otherwise print "offen" for a level that does have a rating."""
     config = (WWW / 'js/config.js').read_text(encoding='utf-8')
     block = re.search(r'export const RATINGS = \{(.*?)\n\};', config, re.S)
-    app = dict(re.findall(r"(\w+):\s*\{label:\s*'([^']+)'", block.group(1) if block else ''))
+    app = dict(re.findall(r"(\w+):\s*\{\s*label:\s*'([^']+)'", block.group(1) if block else ''))
     go = (ROOT / 'server/overview.go').read_text(encoding='utf-8')
     names = re.search(r'var ratingNames = map\[string\]string\{(.*?)\n\}', go, re.S)
     server = dict(re.findall(r'"(\w+)":\s*"([^"]+)"', names.group(1) if names else ''))
