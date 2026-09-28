@@ -10,12 +10,15 @@ package main
 //   POST /api/recognize             recognise a packaging photo: {"image":"<base64>"}
 //   GET  /api/barcode/<code>        look food up by EAN: {"found", "brand", "variety", "type", "animal"}
 //   GET  /api/fed?since=<ms>        whether a meal has been served since then: {"fed", "at", "by"}
+//   POST /api/photo/<variety>       keep a variety's packaging photo: {"image":"<base64 JPEG>"}; the first one stays
+//   GET  /api/photo/<variety>       that photo: {"image"}
 //
 // Reachable from private networks only (home network, WireGuard) and only with the household
 // code, as "Authorization: Bearer <code>" or, for /api/events, as ?code=.
 // Error messages are German, like the app.
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,6 +51,7 @@ type API struct {
 	store    *Store
 	cfg      *ConfigHolder
 	barcodes *Barcodes
+	photos   *Photos
 	now      func() time.Time
 
 	mu         sync.Mutex
@@ -81,8 +85,8 @@ func (b *bucket) take(now time.Time) bool {
 	return true
 }
 
-func NewAPI(store *Store, cfg *ConfigHolder, barcodes *Barcodes) *API {
-	return &API{store: store, cfg: cfg, barcodes: barcodes, now: time.Now, fails: map[string][]time.Time{},
+func NewAPI(store *Store, cfg *ConfigHolder, barcodes *Barcodes, photos *Photos) *API {
+	return &API{store: store, cfg: cfg, barcodes: barcodes, photos: photos, now: time.Now, fails: map[string][]time.Time{},
 		subs:       map[chan struct{}]struct{}{},
 		recognizes: newBucket(recognizeBurst, recognizeEvery),
 		lookups:    newBucket(barcodeBurst, barcodeEvery)}
@@ -104,6 +108,8 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /api/recognize", a.auth(a.recognize))
 	mux.HandleFunc("GET /api/barcode/{code}", a.auth(a.barcode))
 	mux.HandleFunc("GET /api/fed", a.auth(a.fed))
+	mux.HandleFunc("POST /api/photo/{id}", a.auth(a.putPhoto))
+	mux.HandleFunc("GET /api/photo/{id}", a.auth(a.getPhoto))
 	return a.guard(mux)
 }
 
@@ -203,7 +209,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	epoch, seq := a.store.Seq()
 	out := map[string]any{"app": "schmeckts", "version": version, "protocol": protocolVersion,
 		"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "recognition": a.cfg.Get().APIKey != "",
-		"features": []string{"barcode", "fed"}}
+		"features": []string{"barcode", "fed", "photo"}}
 	if givenCode(r) != "" {
 		status, msg := a.checkCode(r)
 		out["auth"] = status == http.StatusOK
@@ -380,4 +386,51 @@ func (a *API) fed(w http.ResponseWriter, r *http.Request) {
 	}
 	at, by := a.store.LastMeal(since)
 	writeJSON(w, http.StatusOK, map[string]any{"fed": at > 0, "at": at, "by": by})
+}
+
+// putPhoto keeps the packaging photo of a variety the server knows, sent by the phone that took it. The first one a
+// variety gets stays, so a second phone sending its own changes nothing.
+func (a *API) putPhoto(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		Image string `json:"image"`
+	}
+	if !recordIDRe.MatchString(id) || json.NewDecoder(r.Body).Decode(&body) != nil {
+		fail(w, http.StatusBadRequest, "Ungültige Anfrage.")
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(body.Image)
+	if err != nil || !isJPEG(data) {
+		fail(w, http.StatusBadRequest, "Kein Foto in der Anfrage.")
+		return
+	}
+	if len(data) > maxPhotoBytes {
+		fail(w, http.StatusRequestEntityTooLarge, "Das Foto ist zu groß.")
+		return
+	}
+	if !a.store.Variety(id) {
+		fail(w, http.StatusNotFound, "Diese Sorte gibt es auf dem Server nicht.")
+		return
+	}
+	if err := a.photos.Put(id, data); err != nil {
+		log.Printf("Foto speichern fehlgeschlagen: %v", err)
+		fail(w, http.StatusInternalServerError, "Der Server konnte das Foto nicht speichern.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// getPhoto hands a variety's packaging photo to a phone that does not have it.
+func (a *API) getPhoto(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !recordIDRe.MatchString(id) {
+		fail(w, http.StatusBadRequest, "Ungültige Anfrage.")
+		return
+	}
+	data, err := a.photos.Get(id)
+	if err != nil {
+		fail(w, http.StatusNotFound, "Für diese Sorte liegt kein Foto auf dem Server.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"image": base64.StdEncoding.EncodeToString(data)})
 }

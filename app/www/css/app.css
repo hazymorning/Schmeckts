@@ -107,7 +107,6 @@ strong {
 .search .ic,
 .pick .ic,
 .figs .ic,
-.duel .ic,
 .pin .ic,
 .cam-badge .ic {
   width: var(--icon-s);
@@ -464,7 +463,7 @@ dialog.sheet.page .sheet-body {
 .days .tl-date.stuck::after {
   opacity: 1;
 }
-#sheet.scrolled:has(.tl-date.stuck) .head::after {
+#sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   opacity: 0;
 } /* the day line under it draws the line */
 
@@ -641,56 +640,54 @@ dialog.sheet.page .sheet-body {
   font: var(--type-small);
   margin: 0 0 var(--space-3h);
 }
-/* Rating slider (views/parts.js, ui/slider.js): the variety's scale as one track from the best level to the worst in
-   their colours, a stop for each. Before a rating the two ends of the scale stand close under the track, in the
-   bar's lower edge, so the slider is no taller than its bar; once the meal holds a level, the thumb stands on it and
-   the level's name and what the bowl looks like stand under the bar. While a finger is on the track, a label above
-   the thumb says the same of the level under it. The thumb is a disc as large as a small tap target, ringed in the
-   level's colour and carrying its icon. The whole bar takes the finger; the stops are the levels' buttons, which only
-   the keyboard and a screen reader use. */
+/* Rating slider (views/parts.js, ui/slider.js): the variety's scale as one track, a pill with a button for each
+   level from the best to the worst, its icon in its colour, and under each the level in one word. Once the meal
+   holds a level, the thumb stands on it: a disc as large as a small tap target, ringed in the level's colour and
+   carrying its icon, with the level's word under it in that colour and, under the words, the level's name and what
+   the bowl looks like. While a finger is on the slider the thumb lifts onto the level under it, and the words under
+   the track say that one. The whole bar, the track and the words under it, takes the finger; the buttons are for
+   the keyboard and a screen reader. */
 .slider {
-  --thumb: var(--tap-s); /* a stop's centre runs from half of it to the other end less half of it */
-  container-type: inline-size; /* the thumb and its label go their way in the slider's width, cqw */
+  --thumb: var(--tap-s);
+  --stop: calc(
+    (100cqw - 2 * var(--space-1) - (var(--n) - 1) * var(--space-hair)) / var(--n)
+  ); /* a level's width on the track */
+  container-type: inline-size; /* the thumb goes its way in the slider's width, cqw */
 }
 .slider-bar {
-  position: relative;
-  height: var(--tap);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1h);
   cursor: pointer;
   touch-action: pan-y; /* up and down the page scrolls; sideways the finger slides */
 }
 .slider-track {
-  position: absolute;
-  inset: 50% 0 auto;
-  height: 12px;
-  transform: translateY(-50%);
+  position: relative;
+  display: flex;
+  gap: var(--space-hair);
+  padding: var(--space-1);
   border-radius: var(--radius-full);
-  background: linear-gradient(to right, var(--stops));
+  background: var(--surface-2);
 }
-.slider-bar button {
-  position: absolute;
-  inset: 0 auto;
-  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--i) / (var(--n) - 1));
-  width: var(--tap-s);
-  transform: translateX(-50%);
+.slider-track button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--tap-s);
   display: grid;
   place-items: center;
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-full);
+  color: var(--c);
   pointer-events: none; /* the finger belongs to the bar */
-}
-.slider-bar button::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--surface);
 }
 .slider-thumb {
   position: absolute;
-  top: calc(50% - var(--thumb) / 2);
+  top: var(--space-1);
   left: 0;
   width: var(--thumb);
   height: var(--thumb);
-  transform: translateX(calc((100cqw - var(--thumb)) * var(--at) / (var(--n) - 1)));
+  transform: translateX(
+    calc(var(--space-1) + var(--at) * (var(--stop) + var(--space-hair)) + (var(--stop) - var(--thumb)) / 2)
+  );
   pointer-events: none;
 }
 .slider-thumb > i {
@@ -703,63 +700,44 @@ dialog.sheet.page .sheet-body {
   box-shadow: var(--shadow-low);
   color: var(--c);
 }
+.slider.pointing .slider-thumb > i {
+  box-shadow: var(--shadow-high);
+} /* lifted under the finger */
 .slider.unset .slider-thumb {
   display: none;
 }
-.slider-bar > .ends {
-  position: absolute;
-  inset: auto 0 0;
-  pointer-events: none;
+.slider-names {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  gap: var(--space-hair);
+  margin: 0 var(--space-1);
+  font: var(--type-caption-strong);
+  color: var(--muted);
+  text-align: center;
 }
-.slider:not(.unset) .slider-bar > .ends {
-  opacity: 0;
-} /* the thumb has come */
-/* A level in words: its name in Faustina, what the bowl looks like under it */
-.slider-say,
-.slider-tip {
-  margin: 0;
+.slider-names > .on {
+  color: var(--c);
+}
+/* A level in words, under the track: its name in Faustina, what the bowl looks like under it. The box is always
+   there, so the room the words take can ease open and shut. */
+.slider-say {
+  display: flow-root;
+}
+.slider-say > p {
+  margin: var(--space-2h) 0 0;
 }
 .slider-name,
-.slider-say small,
-.slider-tip small {
+.slider-say small {
   display: block;
 }
 .slider-name {
   font: var(--type-subheading);
 }
-.slider-say small,
-.slider-tip small {
-  font: var(--type-small);
-}
-.slider-say {
-  margin-top: var(--space-1);
-}
 .slider-say small {
+  font: var(--type-small);
   color: var(--muted);
 }
-/* The label above the thumb, over whatever lies above the slider and never beyond its ends */
-.slider-tip {
-  position: absolute;
-  bottom: calc(100% + var(--space-2));
-  left: 0;
-  z-index: var(--z-raise);
-  display: none;
-  width: max-content;
-  max-width: 100%;
-  padding: var(--inset-compact);
-  border-radius: var(--radius-m);
-  background: var(--ink);
-  color: var(--bg);
-  box-shadow: var(--shadow-high);
-  transform: translateX(
-    clamp(0%, var(--thumb) / 2 + (100cqw - var(--thumb)) * var(--at) / (var(--n) - 1) - 50%, 100cqw - 100%)
-  );
-  pointer-events: none;
-}
-.slider.pointing .slider-tip {
-  display: block;
-}
-/* The two ends of a scale, under the slider and under the counters */
+/* The two ends of a scale, under the counters */
 .ends {
   display: flex;
   justify-content: space-between;
@@ -1174,6 +1152,9 @@ dialog.sheet.page .sheet-body {
 .photo-btn:has(> .name-photo) {
   border-radius: var(--radius-l);
 }
+.photo-btn[aria-busy="true"] {
+  opacity: var(--busy);
+} /* its photo is on the way from the household server */
 /* The overview's picture: one pet, or two overlapping */
 .ov-pic {
   position: relative;
@@ -1460,7 +1441,8 @@ dialog.sheet.page .sheet-body {
   font: var(--type-small-strong);
   color: var(--muted);
 }
-.ins li {
+.ins li,
+.review li {
   font: var(--type-body);
 }
 /* Food sheet, „Kaufen“: the computed verdict with a short reason, one row per pet where there are several */
@@ -1737,7 +1719,7 @@ dialog.sheet.page .sheet-body {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-3h);
 }
 /* With a large photo on this phone the thumbnail is a button of its own beside the head */
 .pend-top > .pend-head {
@@ -1745,12 +1727,12 @@ dialog.sheet.page .sheet-body {
   min-width: 0;
   margin-bottom: 0;
 }
-/* Several pets: each name right above its slider, whose thumb has room under it, and more room between pets */
+/* Several pets: each name right above its slider, and more room between pets */
 .pet-rate > .pet-label {
-  margin-top: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 .pet-rate + .pet-rate {
-  margin-top: var(--space-3);
+  margin-top: var(--space-4h);
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
@@ -1764,7 +1746,8 @@ dialog.sheet.page .sheet-body {
 .shop .t-main small {
   white-space: normal;
 }
-.ins .why {
+.ins .why,
+.review .why {
   display: block;
 }
 .btn-row {
@@ -1778,23 +1761,6 @@ dialog.sheet.page .sheet-body {
   width: auto;
   white-space: nowrap;
 } /* when the text will not fit side by side, each button takes its own row */
-/* Letzte Woche: rows like the sentence in the hint, with a small trophy before the food duel */
-.week {
-  margin-bottom: var(--space-3);
-}
-.week .say + .say {
-  margin-top: var(--space-1h);
-}
-.duel {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-.duel .ic {
-  flex: 0 0 auto;
-  margin-top: var(--space-hair);
-  color: var(--muted);
-}
 .grp {
   margin: var(--space-2) 0 0;
 }
@@ -1803,7 +1769,8 @@ dialog.sheet.page .sheet-body {
   color: var(--muted);
 }
 .steps li,
-.ins li {
+.ins li,
+.review li {
   align-items: flex-start;
 }
 
@@ -1992,12 +1959,17 @@ dialog.sheet.page[data-kind="report"] .page-title {
 .figs b {
   color: var(--ink);
 }
-.rank > .ic {
-  flex: 0 0 auto;
+/* The first card of „Verlauf“: the best and the weakest variety carry their rating's colour on the icon, the bowls
+   are drawn without their filling, and the last week starts under a line of its own, like a day of the history */
+.lead.tone {
   color: var(--c);
 }
-.rank .t-main b {
-  white-space: normal;
+.review .fill {
+  display: none;
+}
+.review .tl-date {
+  margin: var(--space-2) 0 0;
+  border-top: var(--divider);
 }
 .photo-hint {
   display: block;
@@ -2111,16 +2083,13 @@ dialog.sheet {
 dialog.sheet.dragging {
   transition: none;
 } /* the finger leads */
-.slider-thumb,
-.slider-tip {
+.slider-thumb {
   transition: transform var(--dur-step) var(--ease-out);
-} /* the rating slider's thumb glides from stop to stop, and its label with it */
-.slider-thumb > i {
+} /* the rating slider's thumb glides from level to level */
+.slider-thumb > i,
+.slider-names > span {
   transition: var(--state);
-} /* its ring and icon take the level's colour on the way */
-.slider-bar > .ends {
-  transition: opacity var(--dur-fade) var(--ease-out);
-} /* the ends of the scale make way for the thumb */
+} /* its ring and icon take the level's colour on the way, lift under the finger, and the level's word takes it too */
 /* Press */
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
@@ -2250,12 +2219,9 @@ html.step-back::view-transition-new(page) {
 .fab.filled {
   animation: pop var(--dur-step) var(--ease-spring);
 }
-.slider.pointing .slider-tip {
-  animation: fadeIn var(--dur-fade) var(--ease-out);
-} /* the label above the thumb appears where the finger is */
-.slider-say.picked {
+.slider-say > .picked {
   animation: appear var(--dur-step) var(--ease-out);
-} /* the level just rated, in words under the track */
+} /* the level in words, coming where there were none or with a rating */
 .fab .fill {
   transform: scaleY(0);
   opacity: 0;

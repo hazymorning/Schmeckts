@@ -8,7 +8,10 @@ import {setAside} from '../disk.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {memPhotos} from '../images.js';
-import {keepPhoto, passPhoto, photoFrom, sweepPhotos} from '../photos.js';
+import {keepPhoto, keptPhoto, passPhoto, photoData, photoFrom, sweepPhotos} from '../photos.js';
+import {request} from '../api.js';
+import {serverCan} from '../sync.js';
+import {report} from '../report.js';
 import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 
@@ -127,6 +130,46 @@ export function followPhotos() {
     if (was && s.productId && was !== s.productId && !getProduct(was)) passPhoto(was, s.productId);
   }
   owners = new Map(db.servings.map(s => [s.id, s.productId]));
+}
+
+/* In a household every variety whose large photo lies on this phone and not yet on the server goes there, one after
+   the other, whenever the server has just been reached. The mark on the variety then tells the other phones they can
+   fetch it. A server that cannot keep photos (before 1.3.0) is left alone, and one it refused is not sent again while
+   the app runs. */
+let sharing = false;
+const refused = new Set();
+export async function sharePhotos() {
+  if (sharing || !(await serverCan('photo'))) return;
+  sharing = true;
+  try {
+    for (const {id} of db.products.filter(x => !x.sharedPhoto && keptPhoto(x.id) && !refused.has(x.id))) {
+      const image = await photoData(id);
+      if (!image) continue;
+      try {
+        await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
+      } catch (e) {
+        if (e.kind !== 'bad') throw e;
+        refused.add(id); // no JPEG, too large, or a variety the server does not know
+        continue;
+      }
+      const p = getProduct(id);
+      if (p && !p.sharedPhoto) {
+        p.sharedPhoto = true;
+        save();
+      }
+    }
+  } catch (e) {
+    if (e.kind !== 'offline') report('handing a photo to the server', e); // offline: the next time the server is reached
+  } finally {
+    sharing = false;
+  }
+}
+/* The household server has no photo for a variety marked as having one: the mark goes, so no phone offers it any
+   more, and a phone that still holds the photo hands it over anew */
+export function unsharePhoto(p) {
+  if (!p.sharedPhoto) return;
+  delete p.sharedPhoto;
+  save();
 }
 
 /* At start: the photos of varieties that are gone (deleted here or elsewhere) go too. Not while the stored data

@@ -99,7 +99,7 @@ Dann funktioniert alles außer dem Barcode-Scanner. Der kommt von Google und bra
 
 Am einfachsten tauscht ihr eure Einträge über *Änderungen teilen* aus. Die App packt alles Neue in eine Datei, die ihr euch per Messenger oder Kabel schickt und auf dem anderen Handy einlest. Dafür braucht niemand ein Konto, und in der Datei stehen nur Tiere, Sorten und Mahlzeiten.
 
-Bequemer im Alltag ist ein kleiner Server bei euch zu Hause, zum Beispiel auf einem Mini-PC. Die Handys gleichen sich dann von selbst ab, sobald sie im WLAN sind, und eure Daten liegen auf eurem eigenen Rechner. Mit Server kann die App außerdem Marke und Sorte direkt am Foto erkennen, statt nur den Text zu lesen, und unbekannte Barcodes selbst nachschlagen. Und die Erinnerung ans Füttern meldet sich nicht, wenn schon jemand anderes gefüttert hat.
+Bequemer im Alltag ist ein kleiner Server bei euch zu Hause, zum Beispiel auf einem Mini-PC. Die Handys gleichen sich dann von selbst ab, sobald sie im WLAN sind, und eure Daten liegen auf eurem eigenen Rechner. Mit Server kann die App außerdem Marke und Sorte direkt am Foto erkennen, statt nur den Text zu lesen, und unbekannte Barcodes selbst nachschlagen. Die Packungsfotos kann dann auch jedes Handy groß ansehen, nicht nur das, mit dem sie gemacht wurden. Und die Erinnerung ans Füttern meldet sich nicht, wenn schon jemand anderes gefüttert hat.
 
 Den Server müsst ihr allerdings selbst einrichten, er gehört nicht zur App. Code und Anleitung liegen im Ordner [`server`](server/).
 

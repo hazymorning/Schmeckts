@@ -1,8 +1,9 @@
 /* Everything derived from the data: lookups, open meals, suggestions while feeding and the evaluation model
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
+import {addDays, weekStart} from './dates.js';
 import {PENDING_WINDOW} from './config.js';
-import {analyze, report, review, shopGroups, tally} from './smart.js';
+import {analyze, report, shopGroups, tally, week as weekOf} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -20,10 +21,10 @@ export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) 
 export const servingsInFilter = () => db.servings.filter(s => servingPets(s).length);
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
 
-/* The evaluation model and the weekly review, recomputed only when the data, the pet filter, the hidden hints, the
-   closed week or the hour change (windows such as the 72 hours for appetite). The sums per variety stay put while
-   that happens and only varieties with changed meals are recomputed; the week stands until a meal up to its end
-   changes. */
+/* The evaluation model and the last week, recomputed only when the data, the pet filter, the hidden hints or the
+   hour change (windows such as the 72 hours for appetite). The sums per variety stay put while that happens and only
+   varieties with changed meals are recomputed; the week stands until a meal up to its end changes or the filter
+   does. */
 const cache = {};
 let sums = null,
   week = null;
@@ -44,7 +45,14 @@ function refresh(now) {
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-export const lastWeek = () => cached('week', [prefs.closedWeek], now => (week = review(db, prefs, now, week)));
+/* The calendar week before this one, on „Verlauf“ under the last 30 days */
+export const lastWeek = () =>
+  cached('week', [prefs.activePet], now => {
+    const start = addDays(weekStart(now), -7);
+    if (week?.start !== start || week.filter !== prefs.activePet)
+      week = {...weekOf(db, prefs, start), filter: prefs.activePet};
+    return week;
+  });
 // Only when the evaluation opens, and per span of days (0 = everything), which the page chooses
 export const reportModel = days => cached('report', [prefs.activePet, days], now => report(db, prefs, now, days));
 export const sortOf = id => model().byId.get(id);

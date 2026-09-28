@@ -1,11 +1,11 @@
 /* The rating slider (rateSlider() in views/parts.js) under a finger, the way a slider in a scrolling list behaves on
-   Android. A finger that rests on the track for a moment, or moves sideways on it, puts the thumb on the level under
-   it, and a label above the thumb names that level and says what the bowl looks like; sliding goes from stop to stop
+   Android. A finger that rests on it for a moment, or moves sideways on it, lifts the thumb onto the level under it,
+   and the words under the track name that level and say what the bowl looks like; sliding goes from level to level
    with a light tick, and letting go rates the level the thumb stands on. A quick tap rates the level under it. Moved
    up or down first, it is the page scrolling and nothing happens, and a touch that only stops the page scrolling is
-   no tap. A mouse slides as soon as it is pressed, and a level the keyboard is on shows the same label. The levels'
-   buttons lie on the track and take no touches: they are how the keyboard and a screen reader rate, and every rating
-   runs through them (data-action="rate").
+   no tap. A mouse slides as soon as it is pressed, and a level the keyboard is on shows the same. The levels'
+   buttons take no touches of their own: they are how the keyboard and a screen reader rate, and every rating runs
+   through them (data-action="rate").
    Registers itself as it loads. */
 import {haptic} from '../native.js';
 import {icon} from '../icons.js';
@@ -23,43 +23,49 @@ const lifted = []; // what waits for the finger to leave, untouched()
 /* The thumb carries the level's icon */
 export const thumbHTML = r => (r ? icon('r_' + r) : '');
 /* A level in words: its name and what the bowl looks like */
-export const levelHTML = r => `<b class="slider-name">${RATINGS[r].label}</b><small>${RATINGS[r].note}</small>`;
+export const levelHTML = r =>
+  `<p data-r="${r}"><b class="slider-name">${RATINGS[r].label}</b><small>${RATINGS[r].note}</small></p>`;
 /* Under the track, once the meal holds a level of this scale: that level in words */
-export const saidHTML = (r, scale) => (scale.includes(r) ? `<p class="slider-say">${levelHTML(r)}</p>` : '');
-/* The slider's class: the level's colour, no thumb unless the level is on this scale, and the label above the thumb
-   while a finger or the keyboard is on a level */
+export const saidHTML = (r, scale) => (scale.includes(r) ? levelHTML(r) : '');
+/* The slider's class: the level's colour, no thumb unless the level is on this scale, and the thumb lifted while a
+   finger or the keyboard is on a level */
 export const sliderCls = (r, scale, pointing = false) =>
   `slider${r ? ' ' + rateCls(r) : ''}${scale.includes(r) ? '' : ' unset'}${pointing ? ' pointing' : ''}`;
 
-const stops = slider => [...slider.querySelectorAll('.slider-bar button')];
-/* Puts the thumb on level r and names it above the thumb. With null the thumb goes back to what the meal holds and
-   the label goes, unless the keyboard is on a level. */
+const stops = slider => [...slider.querySelectorAll('.slider-track button')];
+/* The words under the track say level r, or nothing, and the room they take eases open and shut. Words that come
+   where there were none, or with a rating, rise into place; while a finger slides they simply change. */
+function say(slider, r, rated = false) {
+  const box = slider.querySelector('.slider-say'),
+    was = box.firstElementChild?.dataset.r || null;
+  if (was === r) return;
+  const h0 = box.offsetHeight;
+  box.innerHTML = r ? levelHTML(r) : '';
+  if (r && (!was || rated)) box.firstElementChild.classList.add('picked');
+  box.style.height = ''; // an easing still under way ends where it stands, and this one starts from there
+  slideHeight(box, h0);
+}
+/* Puts the thumb on level r, lifted, and says it under the track. With null the thumb goes back to what the meal
+   holds and the words with it, unless the keyboard is on a level. */
 export function showLevel(slider, r) {
   const scale = stops(slider).map(b => b.dataset.r),
-    on = r || slider.querySelector('.slider-bar button:focus-visible')?.dataset.r,
-    shown = on || slider.dataset.r || null;
+    on = r || slider.querySelector('.slider-track button:focus-visible')?.dataset.r,
+    shown = on || slider.dataset.r || null,
+    at = scale.indexOf(shown);
   slider.className = sliderCls(shown, scale, !!on);
-  if (scale.includes(shown)) slider.style.setProperty('--at', scale.indexOf(shown));
+  if (at >= 0) slider.style.setProperty('--at', at);
   slider.querySelector('.slider-thumb > i').innerHTML = thumbHTML(shown);
-  if (on) slider.querySelector('.slider-tip').innerHTML = levelHTML(on);
+  slider.querySelectorAll('.slider-names > span').forEach((word, i) => word.classList.toggle('on', i === at));
+  say(slider, at >= 0 ? shown : null);
 }
-/* After a rating: the meal holds level r now. The thumb stands on it and pops, and the words under the track say it,
-   easing in where the ends of the scale stood. Returns the thumb's disc, whose pop the caller waits for. */
+/* After a rating: the meal holds level r now. The thumb stands on it and pops, and the words under the track say it.
+   Returns the thumb's disc, whose pop the caller waits for. */
 export function setLevel(slider, r) {
-  const scale = stops(slider).map(b => b.dataset.r),
-    disc = slider.querySelector('.slider-thumb > i'),
-    old = slider.querySelector('.slider-say'),
-    h0 = old ? old.offsetHeight : 0;
+  const disc = slider.querySelector('.slider-thumb > i');
   slider.dataset.r = r;
   for (const b of stops(slider)) b.setAttribute('aria-pressed', String(b.dataset.r === r));
+  say(slider, r, true);
   showLevel(slider, null);
-  old?.remove();
-  slider.insertAdjacentHTML('beforeend', saidHTML(r, scale));
-  const say = slider.querySelector('.slider-say');
-  if (say) {
-    say.classList.add('picked');
-    slideHeight(say, h0);
-  }
   disc.classList.remove('picked');
   void disc.offsetWidth; // the pop starts again on a second rating
   disc.classList.add('picked');
@@ -114,7 +120,7 @@ addEventListener('pointerup', e => {
   end();
   if (!at.isConnected) return; // drawn anew in the meantime (a change from another phone): nothing to rate
   if (at.getAttribute('aria-pressed') !== 'true') at.click(); // not the level the meal already holds
-  showLevel(slider, null); // the label goes, the thumb stands on what the meal holds now
+  showLevel(slider, null); // the thumb settles on what the meal holds now
 });
 addEventListener('pointercancel', e => {
   if (press?.id !== e.pointerId) return;
@@ -122,12 +128,12 @@ addEventListener('pointercancel', e => {
   end();
   if (at) showLevel(slider, null);
 });
-/* The keyboard: the level it is on shows its label, as under a finger */
+/* The keyboard: the level it is on lifts the thumb and shows its words, as under a finger */
 addEventListener('focusin', e => {
-  const b = e.target.closest?.('.slider-bar button');
+  const b = e.target.closest?.('.slider-track button');
   if (b?.matches(':focus-visible')) showLevel(b.closest('.slider'), b.dataset.r);
 });
 addEventListener('focusout', e => {
-  const b = e.target.closest?.('.slider-bar button');
-  if (b) showLevel(b.closest('.slider'), null);
+  const slider = e.target.closest?.('.slider-track button')?.closest('.slider');
+  if (slider && !slider.contains(e.relatedTarget)) showLevel(slider, null); // on to the next level: focusin shows it
 });

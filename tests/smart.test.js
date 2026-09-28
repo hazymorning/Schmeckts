@@ -2,17 +2,7 @@
 process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  analyze,
-  feedReminders,
-  feedSlots,
-  hintKey,
-  milestones,
-  rateCls,
-  report,
-  review,
-  week,
-} from '../app/www/js/smart.js';
+import {analyze, feedReminders, feedSlots, hintKey, milestones, rateCls, report, week} from '../app/www/js/smart.js';
 import {RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
 
 const DAY = 864e5,
@@ -677,13 +667,14 @@ test('evaluation: one variety alone is not both best and worst', () => {
   assert.equal(report(household(['A'], [], []), {activePet: 'all'}).best, null, 'nothing rated: no best either');
 });
 
-test('week: Monday 00:00 to Sunday 24:00, always for the household', () => {
-  const w = week(WEEK, {activePet: 'Tiger'}, at('2026-05-25T00:00'));
-  assert.deepEqual([w.meals, w.rated, w.end], [8, 7, at('2026-06-01T00:00')]);
-  assert.deepEqual(w.best, [
-    {pet: 'Minka', id: 'neu', n: 2, pct: 100},
-    {pet: 'Tiger', id: 'lachs', n: 2, pct: 30},
-  ]);
+test('week: Monday 00:00 to Sunday 24:00, within the pet filter', () => {
+  const w = week(WEEK, {activePet: 'all'}, at('2026-05-25T00:00'));
+  assert.deepEqual([w.list.length, w.sorts, w.n, w.good, w.open, w.end], [8, 4, 9, 5, 1, at('2026-06-01T00:00')]);
+  assert.deepEqual(
+    w.best,
+    [{pet: 'Minka', id: 'neu', n: 2, pct: 100, counts: {top: 2}}],
+    'Tiger liked nothing that week: its best variety went down at 30 points',
+  );
   assert.deepEqual(w.favorites, ['neu']);
   assert.deepEqual(
     w.feeders,
@@ -692,6 +683,24 @@ test('week: Monday 00:00 to Sunday 24:00, always for the household', () => {
       {name: 'Jonas', n: 3},
     ],
     'not counted without a name, ties sorted by name',
+  );
+  const tiger = week(WEEK, {activePet: 'Tiger'}, at('2026-05-25T00:00'));
+  assert.deepEqual(
+    [tiger.list.length, tiger.sorts, tiger.n, tiger.good, tiger.open, tiger.best, tiger.favorites, tiger.feeders],
+    [
+      4,
+      2,
+      4,
+      0,
+      0,
+      [],
+      [],
+      [
+        {name: 'Jonas', n: 2},
+        {name: 'Anna', n: 1},
+      ],
+    ],
+    'with a pet chosen, only its meals and ratings',
   );
 });
 
@@ -705,18 +714,7 @@ test('a week across the daylight saving change ends on Monday 00:00 local time',
     ],
   );
   const w = week(db, {}, at('2026-03-23T00:00'));
-  assert.deepEqual([w.meals, w.end, (w.end - w.start) / 36e5], [1, at('2026-03-30T00:00'), 167]);
-});
-
-test('review: the previous week from Monday to Wednesday, from 5 meals, until it is closed', () => {
-  const shown = (when, prefs = {}) => review(WEEK, prefs, at(when))?.meals ?? null;
-  assert.deepEqual(
-    ['2026-06-01T00:00', '2026-06-03T23:59', '2026-06-04T00:00', '2026-05-31T12:00'].map(t => shown(t)),
-    [8, 8, null, null],
-  );
-  assert.equal(shown('2026-06-02T12:00', {closedWeek: '2026-05-25'}), null);
-  assert.equal(shown('2026-06-02T12:00', {closedWeek: '2026-05-18'}), 8);
-  assert.equal(review(WEEK, {}, at('2026-06-09T12:00')), null, 'nur 2 Mahlzeiten in der Vorwoche');
+  assert.deepEqual([w.list.length, w.end, (w.end - w.start) / 36e5], [1, at('2026-03-30T00:00'), 167]);
 });
 
 test('milestones: total meals and varieties tried', () => {

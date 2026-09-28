@@ -5,9 +5,10 @@ import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
 import {db, prefs, save, savePrefs} from './store.js';
-import {checkServer, disconnect, retrySync, startSession} from './sync.js';
+import {ServerError} from './api.js';
+import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
-import {forgetPhoto, photoSrc} from './photos.js';
+import {forgetPhoto, keptPhoto, photoSrc} from './photos.js';
 import {timing} from './recognize.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
@@ -18,7 +19,7 @@ import {jumpToDay, renderServeHits, renderSuggestions, reportState} from './view
 import {paintHouse} from './views/settings.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
 import {deleteProduct, deleteServing, rate, removeCode, saveName, togglePackLine, useProduct} from './logic/editing.js';
-import {setKaufen, shareShopping, toggleTexture} from './logic/products.js';
+import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
 import {closeCrop, deletePet, editing, openPet, petState, savePet, setPetPhoto} from './logic/pets.js';
@@ -192,12 +193,30 @@ const ACTIONS = {
   rate(el) {
     rate(el);
   },
-  // The packaging photo, large, grown out of its thumbnail. A file that can no longer be read is let go.
+  // The packaging photo, large, grown out of its thumbnail. A file that can no longer be read is let go, and so is
+  // the mark of a variety whose photo the household server does not have; a server out of reach is only named.
   async 'view-photo'(el) {
     const s = getServing(el.dataset.s),
       p = getProduct(el.dataset.p);
-    if ((await openViewer(() => photoSrc(s, p), el)) !== false) return; // open, or already opening
-    if (p) forgetPhoto(p.id);
+    let away = null;
+    if (p && !keptPhoto(p.id)) el.setAttribute('aria-busy', 'true'); // fetched from the household server first
+    const load = () =>
+      photoSrc(s, p)
+        .catch(e => {
+          if (!(e instanceof ServerError)) throw e;
+          away = e;
+          return null;
+        })
+        .finally(() => el.removeAttribute('aria-busy'));
+    if ((await openViewer(load, el)) !== false) return; // open, or already opening
+    if (away)
+      return toast(
+        away.kind === 'offline' ? 'Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar.' : away.message,
+      );
+    if (p) {
+      forgetPhoto(p.id);
+      if (p.sharedPhoto && isConnected()) unsharePhoto(p);
+    }
     toast('Das Foto ist nicht mehr da.');
     if (sheet) renderSheet();
     else update(); // the thumbnail is a plain one again
@@ -291,12 +310,6 @@ const ACTIONS = {
     haptic('select');
     update();
   },
-  'close-week'(el) {
-    prefs.closedWeek = el.dataset.v;
-    savePrefs();
-    haptic('select');
-    update();
-  }, // weekly review, per week and device
   'share-list'() {
     shareShopping();
   },

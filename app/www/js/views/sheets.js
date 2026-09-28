@@ -2,8 +2,8 @@
    the profile picture) and evaluation. The settings are a page and live in views/settings.js; the pet editor is
    one of its pages as well, drawn by the same view. */
 import {$, reduceMotion} from '../dom.js';
-import {cap, esc, norm} from '../text.js';
-import {addDays, toLocalInput, weekStart, when} from '../dates.js';
+import {andList, cap, esc, norm} from '../text.js';
+import {addDays, toLocalInput, weekRange, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -11,6 +11,7 @@ import {
   getPet,
   getProduct,
   getServing,
+  lastWeek,
   petNames,
   pname,
   productsByCode,
@@ -34,7 +35,6 @@ import {
   dayGroups,
   evidenceOf,
   head,
-  lower,
   nameBlock,
   photoThumb,
   rateSlider,
@@ -42,7 +42,9 @@ import {
   scaleEnds,
   segmented,
   thumbOf,
+  times,
   verdictLabel,
+  whyOf,
 } from './parts.js';
 import {paintHouse, viewSettings} from './settings.js';
 
@@ -320,8 +322,9 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* „Verlauf“: a page of two cards. „Die letzten 30 Tage“ holds the ring, the figures and the best and weakest
-   variety; the card under it holds the calendar and every meal there has ever been.
+/* „Verlauf“: a page of two cards. The first looks back: the last 30 days with the ring, the figures and the best and
+   weakest variety, and under them the week before this one; the card under it holds the calendar and every meal
+   there has ever been.
    sheet.at: the id of the day it opens at, coming from a calendar */
 export const reportState = at => ({kind: 'report', at});
 
@@ -358,15 +361,76 @@ const figures = m =>
     ${figRow('layers', `<b>${m.count.sorts}</b> ${m.count.sorts === 1 ? 'Sorte' : 'Sorten'}`)}
     ${figRow('calendar', `an <b>${m.count.days}</b> von ${m.count.span} ${m.count.span === 1 ? 'Tag' : 'Tagen'}`)}</ul>`;
 
+/* A line of the first card, told like an insight: a plain icon, one in a rating's colour or the pet's picture, a
+   sentence with what it is about in bold, and under it in words what it rests on */
+const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
+const told = (pic, say, why = '') =>
+  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
+const named = id => `<b>${esc(pname(getProduct(id)))}</b>`;
 /* Under the figures: the variety that goes down best, named only from GOOD points on, and the weakest one, each with
-   what its ratings say in words. The rating's icon is the only colour in the card. */
-const rankRow = (x, r, text) =>
-  `<div class="row rank ${rateCls(r)}">${icon('r_' + r)}<span class="t-main"><b>${esc(pname(x.product))}</b><small>${esc(`${text}: ${lower(evidenceOf(x))}`)}</small></span></div>`;
+   what its ratings say. The rating's icon carries their colour. */
 function glance(m) {
-  const best = m.best && m.best.pct >= GOOD ? rankRow(m.best, 'top', 'Kommt am besten an') : '';
-  const worst = m.worst ? rankRow(m.worst, 'schlecht', 'Bleibt am ehesten übrig') : '';
+  const best =
+    m.best && m.best.pct >= GOOD
+      ? told(lead('r_top', 'top'), `Am besten kommt ${named(m.best.product.id)} an.`, cap(evidenceOf(m.best)))
+      : '';
+  const worst = m.worst
+    ? told(
+        lead('r_schlecht', 'schlecht'),
+        `Am ehesten übrig bleibt ${named(m.worst.product.id)}.`,
+        cap(evidenceOf(m.worst)),
+      )
+    : '';
   return `<div class="glance">${ring(m)}${figures(m)}</div>
-    ${best || worst ? `<div class="tops">${best}${worst}</div>` : ''}`;
+    ${best || worst ? `<ul class="list tops">${best}${worst}</ul>` : ''}`;
+}
+/* Under the 30 days the week before this one, under a line of its own like a day of the history: what was served and
+   how it went, each pet's favourite of the week, the varieties that became favourites and, where several people
+   feed, who fed most. Nothing without a meal that week. */
+const some = (n, one, many) => (n === 1 ? one : `${n} ${many}`); // „eine Mahlzeit“, „5 Mahlzeiten“
+function lastWeekHTML(w) {
+  if (!w.list.length) return '';
+  const snacks = w.list.filter(s => typeOf(getProduct(s.productId)) === 'Snack').length,
+    meals = w.list.length - snacks,
+    fed = [meals && some(meals, 'eine Mahlzeit', 'Mahlzeiten'), snacks && some(snacks, 'ein Snack', 'Snacks')]
+      .filter(Boolean)
+      .map((t, i) => `<b>${i ? t : cap(t)}</b>`),
+    how = w.n ? cap(`${times(w.good, w.n)} gut gefressen`) : 'Noch nichts bewertet';
+  const lines = [
+    told(
+      lead('bowl'),
+      `${andList(fed)}${w.sorts ? ` aus <b>${some(w.sorts, 'einer Sorte', 'Sorten')}</b>` : ''}.`,
+      w.n && w.open ? `${how}, ${w.open} noch nicht bewertet` : how,
+    ),
+    ...w.best.map(b =>
+      told(
+        avatar(getPet(b.pet), 's'),
+        `${esc(getPet(b.pet).name)} mochte am liebsten ${named(b.id)}.`,
+        cap(evidenceOf(b)),
+      ),
+    ),
+  ];
+  const fresh = w.favorites.slice(0, 3);
+  if (fresh.length)
+    lines.push(
+      told(
+        lead('award'),
+        `${fresh.length > 1 ? 'Neue Lieblinge' : 'Neuer Liebling'}: ${andList(fresh.map(named))}.`,
+        fresh.length > 1 ? '' : cap(whyOf(sortOf(fresh[0]))),
+      ),
+    );
+  const f = w.feeders;
+  if (f.length > 1) {
+    const tie = f[0].n === f[1].n;
+    lines.push(
+      told(
+        lead('trophy'),
+        tie ? 'Unentschieden im Fütter-Duell.' : `<b>${esc(f[0].name)}</b> hat das Fütter-Duell gewonnen.`,
+        f.map(x => `${x.name} ${x.n}×`).join(', '),
+      ),
+    );
+  }
+  return `<h3 class="tl-date"><b>Letzte Woche</b><span>${weekRange(w.start)}</span></h3><ul class="list">${lines.join('')}</ul>`;
 }
 
 function viewReport() {
@@ -376,7 +440,7 @@ function viewReport() {
   histDays = dayGroups(all);
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
   return `${head('Verlauf' + who)}
-    <section class="card"><h2>Die letzten ${REPORT_DAYS} Tage</h2>${glance(m)}</section>
+    <section class="card review"><h2>Die letzten ${REPORT_DAYS} Tage</h2>${glance(m)}${lastWeekHTML(lastWeek())}</section>
     <section class="card days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
       histDays.length
@@ -435,7 +499,7 @@ function watchDays() {
       ),
     {root: sheetBody, rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: [0, 1]},
   );
-  for (const line of sheetBody.querySelectorAll('.tl-date')) stuck.observe(line);
+  for (const line of sheetBody.querySelectorAll('.days .tl-date')) stuck.observe(line);
 }
 
 /* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
