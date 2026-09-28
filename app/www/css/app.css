@@ -1274,14 +1274,20 @@ dialog.sheet.page .sheet-body {
 }
 .pct small {
   font: var(--type-caption);
-  letter-spacing: normal;
   margin-left: var(--space-hair);
 }
 .ring-mid .pct {
   min-width: 0;
-  font: var(--type-title);
-  letter-spacing: var(--track-title);
+}
+.figs b {
+  font: var(--type-heading);
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.figs b small {
+  font: var(--type-caption);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 /* Components */
@@ -1442,7 +1448,7 @@ dialog.sheet.page .sheet-body {
   color: var(--muted);
 }
 .ins li,
-.review li {
+.told li {
   font: var(--type-body);
 }
 /* Food sheet, „Kaufen“: the computed verdict with a short reason, one row per pet where there are several */
@@ -1453,33 +1459,13 @@ dialog.sheet.page .sheet-body {
   column-gap: var(--space-2);
   font: var(--type-small);
 }
-/* Evaluation, at a glance: one ring for the share of servings that went down well, and three figures beside it.
-   The ring carries a sentence in aria-label, so nothing rests on its colour alone. */
-.figs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2h);
-}
-.figs li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2h);
-  font: var(--type-small);
-  color: var(--muted);
-}
-.tops {
-  margin-top: calc(var(--space-3) + var(--space-4)); /* the glance's 12 collapses into this margin, so it holds both */
-  border-top: var(--divider);
-}
+/* „Verlauf“ at a glance: a ring per span for the share of ratings that went down well, the span and what it rests on
+   under it; under the rings the figures of the 30 days, each with a small icon and its word under it. A ring carries a
+   sentence in aria-label, so nothing rests on its colour alone. */
 .ring {
   position: relative;
-  width: 104px;
-  height: 104px;
-  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
   display: grid;
   place-items: center;
 }
@@ -1491,7 +1477,7 @@ dialog.sheet.page .sheet-body {
 }
 .ring circle {
   fill: none;
-  stroke-width: 10px;
+  stroke-width: 8px;
 }
 .ring-track {
   stroke: var(--surface-2);
@@ -1504,10 +1490,18 @@ dialog.sheet.page .sheet-body {
   stroke-dasharray: var(--len);
   stroke-dashoffset: calc(var(--len) - var(--part));
 }
-.ring-mid > span {
+.period > b {
+  font: var(--type-caption-strong);
+}
+.period > small,
+.figs li > small {
   font: var(--type-caption);
   color: var(--muted);
-  max-width: 76px;
+}
+.figs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 .cam-hint {
   position: absolute;
@@ -1742,7 +1736,7 @@ dialog.sheet.page .sheet-body {
   margin-bottom: var(--space-2);
 }
 
-/* Hint, Letzte Woche, Einkaufen, Erkenntnisse */
+/* Hint, Einkaufen, Erkenntnisse, and the lines of a card on „Verlauf“ */
 .why {
   margin: var(--space-hair) 0 0;
 }
@@ -1751,7 +1745,7 @@ dialog.sheet.page .sheet-body {
   white-space: normal;
 }
 .ins .why,
-.review .why {
+.told .why {
   display: block;
 }
 .btn-row {
@@ -1774,7 +1768,7 @@ dialog.sheet.page .sheet-body {
 }
 .steps li,
 .ins li,
-.review li {
+.told li {
   align-items: flex-start;
 }
 
@@ -1944,35 +1938,53 @@ dialog.sheet.page[data-kind="report"] .page-title {
 .verdict p span {
   color: var(--muted);
 }
-.glance {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  margin: var(--space-6) 0 var(--space-3);
-} /* 24 under the heading, whose own 4 collapses into it */
-.ring-mid {
+/* „Verlauf“: the three rings side by side, and under a line the figures in the same three columns, each centred
+   under its ring. 16 under the heading, whose own 4 collapses into it; 10 under the figures, which with the card's 8
+   make the 18 it has at the top. */
+.rings,
+.figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--space-2);
+}
+.rings {
+  margin: var(--space-4) 0 var(--space-4h);
+}
+.figs {
+  margin-bottom: var(--space-2h);
+  border-top: var(--divider);
+}
+.period,
+.figs li {
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: 0;
   text-align: center;
+}
+.period .ring {
+  margin-bottom: var(--space-2);
+}
+.figs li {
+  margin-top: var(--space-3h);
+}
+.figs li > span {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
 }
 .figs .ic {
   color: var(--faint);
-  flex: 0 0 auto;
 }
-.figs b {
-  color: var(--ink);
-}
-/* The first card of „Verlauf“: the best and the weakest variety carry their rating's colour on the icon, the bowls
-   are drawn without their filling, and the last week starts under a line of its own, like a day of the history */
+/* A line of the first card of „Verlauf“: an icon in a rating's colour where it stands for one, and the bowls drawn
+   without their filling */
 .lead.tone {
   color: var(--c);
 }
 .review .fill {
   display: none;
 }
-.review .tl-date {
-  margin: var(--space-2) 0 0;
+.review .told {
   border-top: var(--divider);
 }
 .photo-hint {

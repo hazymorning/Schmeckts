@@ -15,7 +15,6 @@ import {
   ratingsIn,
   report,
   variety,
-  week,
 } from '../app/www/js/smart.js';
 import {RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
 
@@ -991,7 +990,6 @@ test('evaluation: the same ratings and scores as the model, every meal in the fi
     const prefs = {activePet, hiddenHints: []},
       m = model(db, prefs),
       r = report(db, prefs);
-    const ranked = m.sorts.filter(e => e.n >= 2).sort((a, b) => b.score - a.score);
     assert.equal(r.n, m.rated);
     assert.equal(r.pet, activePet === 'all' ? null : activePet);
     assert.deepEqual(
@@ -999,74 +997,50 @@ test('evaluation: the same ratings and scores as the model, every meal in the fi
       db.servings.filter(s => activePet === 'all' || s.pets[activePet]),
       'every meal in the filter, no span',
     );
-    assert.deepEqual(
-      [r.best.product.id, r.best.pct],
-      [ranked[0].product.id, ranked[0].pct],
-      'best variety as in the model',
-    );
-    assert.equal(r.worst.product.id, ranked.at(-1).product.id, 'and the worst one');
     assert.equal(r.count.meals, r.meals.length);
     assert.equal(r.count.sorts, new Set(r.meals.map(s => s.productId)).size);
     assert.ok(r.count.days > 0 && r.count.days <= r.count.meals, 'days fed on, never more than the meals');
   }
 });
 
-test('evaluation: one variety alone is not both best and worst', () => {
-  const db = household(['A'], [{id: 'p1', brand: 'Sheba'}], rate('p1', 'A', [T, G], 10));
-  const r = report(db, {activePet: 'all', hiddenHints: []});
-  assert.equal(r.best.product.id, 'p1');
-  assert.equal(r.worst, null);
-  assert.equal(report(household(['A'], [], []), {activePet: 'all'}).best, null, 'nothing rated: no best either');
-});
-
-test('week: Monday 00:00 to Sunday 24:00, within the pet filter', () => {
-  const w = week(WEEK, {activePet: 'all'}, at('2026-05-25T00:00'));
-  assert.deepEqual([w.list.length, w.sorts, w.n, w.good, w.open, w.end], [8, 4, 9, 5, 1, at('2026-06-01T00:00')]);
+test('evaluation: the meals not rated yet and who fed how often, within the span and the filter', () => {
+  const now = at('2026-06-01T12:00'),
+    r = report(WEEK, {activePet: 'all'}, now, 7);
+  assert.deepEqual([r.count.meals, r.open, r.count.span], [9, 1, 7]);
   assert.deepEqual(
-    w.best,
-    [{pet: 'Minka', id: 'neu', n: 2, pct: 100, counts: {top: 2}}],
-    'Tiger liked nothing that week: its best variety went down at 30 points',
-  );
-  assert.deepEqual(w.favorites, ['neu']);
-  assert.deepEqual(
-    w.feeders,
+    r.feeders,
     [
-      {name: 'Anna', n: 3},
-      {name: 'Jonas', n: 3},
+      {name: 'Jonas', n: 5},
+      {name: 'Anna', n: 2},
     ],
-    'not counted without a name, ties sorted by name',
+    'the most first, a name counted without its spaces, a meal nobody signed not at all',
   );
-  const tiger = week(WEEK, {activePet: 'Tiger'}, at('2026-05-25T00:00'));
+  const tiger = report(WEEK, {activePet: 'Tiger'}, now, 7);
   assert.deepEqual(
-    [tiger.list.length, tiger.sorts, tiger.n, tiger.good, tiger.open, tiger.best, tiger.favorites, tiger.feeders],
+    [tiger.count.meals, tiger.open, tiger.feeders],
     [
       4,
-      2,
-      4,
       0,
-      0,
-      [],
-      [],
       [
         {name: 'Jonas', n: 2},
         {name: 'Anna', n: 1},
       ],
     ],
-    'with a pet chosen, only its meals and ratings',
+    'with a pet chosen, only its meals',
   );
 });
 
-test('a week across the daylight saving change ends on Monday 00:00 local time', () => {
+test('a span across the daylight saving change starts at midnight local time', () => {
   const db = household(
     ['A'],
     ['p1'],
     [
-      ['p1', {A: T}, '2026-03-29T23:30'],
-      ['p1', {A: T}, '2026-03-30T00:00'],
+      ['p1', {A: T}, '2026-03-23T23:30'],
+      ['p1', {A: T}, '2026-03-24T00:00'],
     ],
   );
-  const w = week(db, {}, at('2026-03-23T00:00'));
-  assert.deepEqual([w.list.length, w.end, (w.end - w.start) / 36e5], [1, at('2026-03-30T00:00'), 167]);
+  const r = report(db, {activePet: 'all'}, at('2026-03-30T12:00'), 7);
+  assert.deepEqual([r.count.meals, r.count.days, r.count.span], [1, 1, 7]);
 });
 
 test('milestones: total meals and varieties tried', () => {

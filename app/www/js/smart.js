@@ -31,14 +31,13 @@ const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) ||
 
 /* Sum over ratings. All weights shrink at the same rate, so points / weights does not depend on when it is
    computed: a sum holds until one of its meals changes. list: the ratings themselves, in no particular order. */
-const emptySum = () => ({n: 0, points: 0, weights: 0, counts: {}, last: null, list: []}); // counts: only levels that actually occur
+const emptySum = () => ({n: 0, points: 0, weights: 0, counts: {}, list: []}); // counts: only levels that actually occur
 function addRating(sum, x) {
   const w = Math.pow(2, (x.t - WEIGHT_ZERO) / HALF_LIFE);
   sum.n++;
   sum.points += w * RATINGS[x.r].score;
   sum.weights += w;
   sum.counts[x.r] = (sum.counts[x.r] || 0) + 1;
-  if (!sum.last || x.t > sum.last.t) sum.last = x;
   sum.list.push(x);
 }
 function addSum(sum, other) {
@@ -46,7 +45,6 @@ function addSum(sum, other) {
   sum.points += other.points;
   sum.weights += other.weights;
   for (const r in other.counts) sum.counts[r] = (sum.counts[r] || 0) + other.counts[r];
-  if (other.last && (!sum.last || other.last.t > sum.last.t)) sum.last = other.last;
   for (const x of other.list) sum.list.push(x);
   return sum;
 }
@@ -74,7 +72,6 @@ function statOf(sum) {
     score,
     pct,
     counts: sum.counts,
-    last: sum.last,
     verdict:
       sum.n >= 3 && good * 3 >= sum.n * 2
         ? 'nachkaufen'
@@ -123,8 +120,8 @@ function houseVerdict(pets) {
 
 /* Model  = {pet, sorts, byId, rated, insights, hints, repeats}
    Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
-            the filter: n, score, pct, verdict, counts, last, yes, no}
-   Stat  = {n, score, pct, verdict, counts, last: {pid, r, t, id}}
+            the filter: n, score, pct, verdict, counts, yes, no}
+   Stat  = {n, score, pct, verdict, counts}
    repeats: per pet in the filter, how its meals went after the same variety and after another one (repeatsOf()) */
 export function analyze(db, prefs, now, sums = tally(db, now)) {
   const petIds = db.pets.map(p => p.id);
@@ -150,7 +147,6 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
         pct: eff.pct,
         verdict: eff.verdict,
         counts: eff.counts,
-        last: eff.last,
         yes: pet ? [] : house.yes,
         no: pet ? [] : house.no,
         choice: kaufen === 'immer' ? 'nachkaufen' : kaufen === 'nicht' ? 'nicht' : eff.verdict,
@@ -365,35 +361,29 @@ function hints(sorts, appetites, pet, prefs) {
     .sort((a, b) => HINTS.indexOf(a.kind) - HINTS.indexOf(b.kind) || a.order - b.order);
 }
 
-/* Evaluation page (only computed when it opens), for the pet in the filter or for the whole household and for
-   a span of the last `days` calendar days (0 = everything):
+/* „Verlauf“ (only computed when it opens), for the pet in the filter or for the whole household and for a span of
+   the last `days` calendar days (0 = everything):
      meals            every meal within the filter and the span, newest first
      count            meals, varieties tried, days fed on and how many days the span holds
      liked            of the ratings in the span, how many went down well (from GOOD points), as a percentage
-     best, worst      the variety that goes down best and the one that goes down worst, from MIN_TOP ratings
-   best and worst need two different varieties, otherwise the same one would be both. `liked` counts the same
-   ratings as everything else, so the ring on the page adds no separate figure. */
-const MIN_TOP = 2;
+     open             how many of its meals are not rated yet
+     feeders          meals per person (field by), the most first: [{name, n}]; not counted without a name
+   `liked` counts the same ratings as everything else, so the rings on the page add no separate figure. */
 export function report(db, prefs, now = Date.now(), days = 0) {
   const petIds = db.pets.map(p => p.id);
   const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
   const ids = pet ? [pet] : petIds,
     mine = new Set(ids),
-    products = new Map(db.products.map(p => [p.id, p]));
+    products = new Set(db.products.map(p => p.id));
   const from = days ? addDays(dayStart(now), 1 - days) : -Infinity;
   const meals = db.servings.filter(s => s.servedAt >= from && ids.some(id => s.pets?.[id]));
   const rated = [...ratingsOf(db, meals)].filter(x => mine.has(x.pid));
-  const sums = new Map();
-  for (const x of rated) {
-    if (!products.has(x.id)) continue;
-    if (!sums.has(x.id)) sums.set(x.id, emptySum());
-    addRating(sums.get(x.id), x);
+  const good = rated.filter(x => RATINGS[x.r].score >= GOOD).length,
+    fed = new Map();
+  for (const s of meals) {
+    const name = (s.by || '').trim();
+    if (name) fed.set(name, (fed.get(name) || 0) + 1);
   }
-  const ranked = [...sums]
-    .map(([id, sum]) => ({product: products.get(id), ...statOf(sum)}))
-    .filter(x => x.n >= MIN_TOP)
-    .sort((a, b) => b.score - a.score || b.n - a.n);
-  const good = rated.filter(x => RATINGS[x.r].score >= GOOD).length;
   return {
     pet,
     days,
@@ -406,17 +396,16 @@ export function report(db, prefs, now = Date.now(), days = 0) {
       span: spanDays(meals, now, days),
     },
     liked: {rated: rated.length, good, pct: rated.length ? Math.round((good / rated.length) * 100) : 0},
-    best: ranked[0] || null,
-    worst: ranked.length > 1 ? ranked.at(-1) : null,
+    open: meals.filter(s => !ids.some(id => rOf(s.pets[id]))).length,
+    feeders: [...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de')),
   };
 }
 
 /* What changed within the last `days` calendar days, within the pet filter: the varieties whose verdict became
-   „Nachkaufen“ or „Nicht mehr kaufen“ in that span, the model at its start against the one now.
-   {nachkaufen: [id], nicht: [id]}, the best first and the clearest first */
-export function changes(db, prefs, now, days) {
-  const before = analyze(db, prefs, addDays(dayStart(now), 1 - days) - 1),
-    after = analyze(db, prefs, now);
+   „Nachkaufen“ or „Nicht mehr kaufen“ in that span, the model at its start against the one now (after, which the
+   caller may already hold). {nachkaufen: [id], nicht: [id]}, the best first and the clearest first */
+export function changes(db, prefs, now, days, after = analyze(db, prefs, now)) {
+  const before = analyze(db, prefs, addDays(dayStart(now), 1 - days) - 1);
   const became = verdict =>
     after.sorts.filter(e => e.verdict === verdict && before.byId.get(e.id)?.verdict !== verdict);
   return {
@@ -446,54 +435,6 @@ export function shopGroups(m) {
     else if (e.n) g[e.choice].push(e);
   g.nicht.sort((a, b) => a.score - b.score || b.n - a.n);
   return g;
-}
-
-/* Calendar week from start (Monday 00:00 local time), within the pet filter, for „Verlauf“:
-   list       its meals, newest first
-   sorts      how many varieties were served
-   n, good    how many ratings it holds, and how many of them went down well (from GOOD points)
-   open       how many of its meals are not rated yet
-   best       per pet the variety that went down best that week, from 2 ratings and only from GOOD points:
-              {pet, id, n, pct, counts}
-   favorites  varieties whose verdict is „Nachkaufen“ at the weekend and was not at the start
-   feeders    feedings per person (field by), the most first: {name, n} */
-export function week(db, prefs, start) {
-  const end = addDays(start, 7),
-    before = analyze(db, prefs, start - 1),
-    after = analyze(db, prefs, end - 1),
-    ids = after.pet ? [after.pet] : db.pets.map(p => p.id),
-    mine = new Set(ids);
-  const list = db.servings.filter(s => s.servedAt >= start && s.servedAt < end && ids.some(id => s.pets?.[id]));
-  const ratings = [...ratingsOf(db, list)].filter(x => mine.has(x.pid));
-  const sums = tally({pets: db.pets, servings: list.filter(s => after.byId.has(s.productId))}, end),
-    best = [];
-  for (const pid of ids) {
-    const top = [...sums.bySort]
-      .filter(([, x]) => x[pid])
-      .map(([id, x]) => ({id, ...statOf(x[pid])}))
-      .filter(x => x.n >= 2)
-      .sort((a, b) => b.score - a.score || b.n - a.n || b.last.t - a.last.t)[0];
-    if (top?.pct >= GOOD) best.push({pet: pid, id: top.id, n: top.n, pct: top.pct, counts: top.counts});
-  }
-  const fed = new Map();
-  for (const s of list) {
-    const name = (s.by || '').trim();
-    if (name) fed.set(name, (fed.get(name) || 0) + 1);
-  }
-  return {
-    start,
-    end,
-    list,
-    sorts: new Set(list.map(s => s.productId).filter(id => after.byId.has(id))).size,
-    n: ratings.length,
-    good: ratings.filter(x => RATINGS[x.r].score >= GOOD).length,
-    open: list.filter(s => !ids.some(id => rOf(s.pets[id]))).length,
-    best,
-    favorites: after.sorts
-      .filter(e => e.verdict === 'nachkaufen' && before.byId.get(e.id)?.verdict !== 'nachkaufen')
-      .map(e => e.id),
-    feeders: [...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de')),
-  };
 }
 
 /* The household's usual feeding times from the meals (excluding treats) of the last 14 days: times at most 90
