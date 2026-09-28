@@ -107,7 +107,6 @@ strong {
 .search .ic,
 .pick .ic,
 .figs .ic,
-.duel .ic,
 .pin .ic,
 .cam-badge .ic {
   width: var(--icon-s);
@@ -464,7 +463,7 @@ dialog.sheet.page .sheet-body {
 .days .tl-date.stuck::after {
   opacity: 1;
 }
-#sheet.scrolled:has(.tl-date.stuck) .head::after {
+#sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   opacity: 0;
 } /* the day line under it draws the line */
 
@@ -1439,7 +1438,8 @@ dialog.sheet.page .sheet-body {
   font: var(--type-small-strong);
   color: var(--muted);
 }
-.ins li {
+.ins li,
+.review li {
   font: var(--type-body);
 }
 /* Food sheet, „Kaufen“: the computed verdict with a short reason, one row per pet where there are several */
@@ -1743,7 +1743,8 @@ dialog.sheet.page .sheet-body {
 .shop .t-main small {
   white-space: normal;
 }
-.ins .why {
+.ins .why,
+.review .why {
   display: block;
 }
 .btn-row {
@@ -1757,23 +1758,6 @@ dialog.sheet.page .sheet-body {
   width: auto;
   white-space: nowrap;
 } /* when the text will not fit side by side, each button takes its own row */
-/* Letzte Woche: rows like the sentence in the hint, with a small trophy before the food duel */
-.week {
-  margin-bottom: var(--space-3);
-}
-.week .say + .say {
-  margin-top: var(--space-1h);
-}
-.duel {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-.duel .ic {
-  flex: 0 0 auto;
-  margin-top: var(--space-hair);
-  color: var(--muted);
-}
 .grp {
   margin: var(--space-2) 0 0;
 }
@@ -1782,7 +1766,8 @@ dialog.sheet.page .sheet-body {
   color: var(--muted);
 }
 .steps li,
-.ins li {
+.ins li,
+.review li {
   align-items: flex-start;
 }
 
@@ -1971,12 +1956,17 @@ dialog.sheet.page[data-kind="report"] .page-title {
 .figs b {
   color: var(--ink);
 }
-.rank > .ic {
-  flex: 0 0 auto;
+/* The first card of „Verlauf“: the best and the weakest variety carry their rating's colour on the icon, the bowls
+   are drawn without their filling, and the last week starts under a line of its own, like a day of the history */
+.lead.tone {
   color: var(--c);
 }
-.rank .t-main b {
-  white-space: normal;
+.review .fill {
+  display: none;
+}
+.review .tl-date {
+  margin: var(--space-2) 0 0;
+  border-top: var(--divider);
 }
 .photo-hint {
   display: block;

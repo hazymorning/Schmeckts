@@ -11,7 +11,7 @@ from common import check, fixed_clock, phone, run_tests, started
 
 LIMIT_MS = 40
 REPORT_MS = 150  # the evaluation is only computed and drawn when it opens
-TUESDAY = datetime.datetime(2026, 6, 9, 10)  # on a Tuesday „Letzte Woche“ is on the home page as well
+TUESDAY = datetime.datetime(2026, 6, 9, 10)  # a whole week before it, which „Verlauf“ tells under the 30 days
 BRANDS = ['Sheba', 'Felix', 'Animonda', 'Miamor', 'Gourmet', 'Whiskas', 'Catz', 'MjAMjAM', 'Bozita', 'Almo']
 FLAVORS = ['Lachs', 'Huhn', 'Rind', 'Pute', 'Ente', 'Thunfisch', 'Lamm', 'Kaninchen', 'Wild', 'Forelle', 'Käse', 'Leber', 'Herz', 'Garnele', 'Kalb']
 TEXTURES = ['in Soße', 'in Gelee', 'Pastete', 'Mousse', 'Filets']
@@ -60,7 +60,7 @@ MEASURE = """async () => { const s = await import('./js/store.js'), h = await im
   for (const r of ['top', 'schlecht', 'gut', 'mittel', 'sosse', 'top', 'schlecht', 'gut', 'mittel', 'sosse', 'top']) {
     meal.pets.petminka001 = {r, at: Date.now()};
     const t0 = performance.now(); s.save(); const t1 = performance.now(); h.renderHome(); const t2 = performance.now();
-    out.push([t1 - t0, t2 - t1, !!document.querySelector('[data-sec=week]')]); await new Promise(done => setTimeout(done, 50)); }
+    out.push([t1 - t0, t2 - t1]); await new Promise(done => setTimeout(done, 50)); }
   return out; }"""
 
 # The evaluation is only computed when it opens: save beforehand so that nothing comes from the cache
@@ -70,7 +70,7 @@ OPEN = """async () => { const s = await import('./js/store.js'), sheet = await i
     await sheet.closeSheet(); s.save();
     await new Promise(done => setTimeout(done, 50));
     const t0 = performance.now(); sheet.openSheet(views.reportState(null)); const t1 = performance.now();
-    out.push([t1 - t0, document.querySelectorAll('#sheetBody .tl-day').length]); }
+    out.push([t1 - t0, document.querySelectorAll('#sheetBody .tl-day').length, !!document.querySelector('#sheetBody .review .tl-date')]); }
   await sheet.closeSheet();
   return out; }"""
 
@@ -95,14 +95,14 @@ async def test_rating(browser, url):
         runs = (await pg.evaluate(MEASURE))[2:]
         save, draw = (statistics.median(x[i] for x in runs) for i in (0, 1))
         check(
-            draw < LIMIT_MS and all(x[2] for x in runs),
+            draw < LIMIT_MS,
             f'{years} years ({years * 730} meals): evaluation and redraw {draw:.0f} ms, saving {save:.0f} ms',
         )
         opens = (await pg.evaluate(OPEN))[1:]
         shown = statistics.median(x[0] for x in opens)
         check(
-            shown < REPORT_MS and all(x[1] >= 10 for x in opens),
-            f'{years} years: the history page opens in {shown:.0f} ms (limit {REPORT_MS} ms), {opens[0][1]} days to begin with',
+            shown < REPORT_MS and all(x[1] >= 10 and x[2] for x in opens),
+            f'{years} years: the history page opens in {shown:.0f} ms with the last week (limit {REPORT_MS} ms), {opens[0][1]} days to begin with',
         )
         await ctx.close()
 

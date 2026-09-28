@@ -13,7 +13,6 @@ export const defaults = () => ({version: 3, pets: [], products: [], servings: []
 const defaultPrefs = () => ({
   theme: 'system',
   hiddenHints: [],
-  closedWeek: '',
   milestones: null,
   remind: 0,
   feedRemind: false,
@@ -57,7 +56,7 @@ function tidyPrefs(p) {
   out.feedRemind = out.feedRemind === true; // reminder to feed at the usual times
   delete out.feedStart; // dropped: the feeding sheet always shows both buttons
   out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // pet photos behind the header, on by default ('off': a value from 1.1.0)
-  out.closedWeek = typeof out.closedWeek === 'string' ? out.closedWeek : '';
+  delete out.closedWeek; // dropped: the last week is part of „Verlauf“ now and has nothing to close
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: never set, see load()
   out.lookup = out.lookup === true; // product lookup on the internet, off by default
   out.serverPhoto = out.serverPhoto !== false; // photo recognition through the server, on by default

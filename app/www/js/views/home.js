@@ -8,7 +8,7 @@ import {icon, sketch} from '../icons.js';
 import {RATINGS, TEXTURES, TYPES} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {getPet, getProduct, lastWeek, model, pendingServings, petNames, pname, servingPets} from '../derive.js';
+import {getPet, getProduct, model, pendingServings, petNames, pname, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
@@ -140,7 +140,6 @@ function homeHTML() {
     html +=
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
-      weekHTML(lastWeek()) +
       card('shop', 'Einkaufen', shopCard(m)) +
       (ins ? card('ins', 'Erkenntnisse', ins) : '');
   }
@@ -275,30 +274,6 @@ function hintHTML(m) {
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
-}
-
-/* Letzte Woche: the previous week from review() in smart.js; the device remembers „Schließen“ */
-function duelText(feeders) {
-  // the most first; when several are level it reads „Gleichstand“
-  const fed = x => `${esc(x.name)} ${x.n}×`,
-    lead = feeders.filter(x => x.n === feeders[0].n);
-  if (lead.length < 2) return `Gefüttert: ${feeders.map(fed).join(', ')}`;
-  return [
-    `Gleichstand: ${esc(andList(lead.map(x => x.name)))} je ${lead[0].n}×`,
-    ...feeders.slice(lead.length).map(fed),
-  ].join(', ');
-}
-function weekHTML(w) {
-  if (!w) return '';
-  const sort = id => esc(pname(getProduct(id)));
-  const lines = [
-    `${w.meals}× gefüttert, ${w.rated} bewertet`,
-    ...w.best.slice(0, 3).map(x => `${esc(getPet(x.pet).name)} mochte am liebsten ${sort(x.id)}`),
-    ...w.favorites.slice(0, 2).map(id => `Neuer Liebling: ${sort(id)}`),
-  ].map(t => `<p class="say">${t}</p>`);
-  if (w.feeders.length > 1) lines.push(`<p class="say duel">${icon('trophy')}<span>${duelText(w.feeders)}</span></p>`);
-  return `<section class="card" data-sec="week" style="view-transition-name:sec-week"><h2>Letzte Woche</h2>
-    <div class="week">${lines.join('')}</div><button class="card-btn" data-action="close-week" data-v="${dayKey(w.start)}">Schließen</button></section>`;
 }
 
 /* Einkaufen: what to buy again and what no longer, each variety with what its ratings say in words (evidenceOf()),

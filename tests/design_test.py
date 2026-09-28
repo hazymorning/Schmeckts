@@ -506,9 +506,6 @@ async def test_rules(browser, url):
         check(vs == 'normal', f'body: no font-variation-settings, Faustina has no axis of its own ({vs})')
         await pg.click('[data-action=demo]')
         await idle(pg)
-        if await pg.query_selector('[data-action=close-week]'):  # „Letzte Woche“ only exists Monday to Wednesday
-            await pg.click('[data-action=close-week]')
-            await idle(pg)
         await pg.click('[data-action=expand][data-v=shop]')
         await pg.click('[data-action=expand][data-v=ins]')
         await idle(pg)

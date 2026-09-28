@@ -1,7 +1,7 @@
 /* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
    derive.js. The rules are in PROJECT.md, section "Evaluation". */
 import {FLAVORS, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
-import {addDays, dayKey, dayStart, weekStart} from './dates.js';
+import {addDays, dayKey, dayStart} from './dates.js';
 
 const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
@@ -349,52 +349,52 @@ export function shopGroups(m) {
   return g;
 }
 
-/* Calendar week from start (Monday 00:00 local time), always for the whole household:
-   best       per pet the variety with the best score that week, from 2 ratings: {pet, id, n, pct}
+/* Calendar week from start (Monday 00:00 local time), within the pet filter, for „Verlauf“:
+   list       its meals, newest first
+   sorts      how many varieties were served
+   n, good    how many ratings it holds, and how many of them went down well (from GOOD points)
+   open       how many of its meals are not rated yet
+   best       per pet the variety that went down best that week, from 2 ratings and only from GOOD points:
+              {pet, id, n, pct, counts}
    favorites  varieties whose verdict is „Nachkaufen“ at the weekend and was not at the start
    feeders    feedings per person (field by), the most first: {name, n} */
 export function week(db, prefs, start) {
   const end = addDays(start, 7),
-    house = {...prefs, activePet: 'all'};
-  const before = analyze(db, house, start - 1),
-    after = analyze(db, house, end - 1);
-  const meals = db.servings.filter(s => s.servedAt >= start && s.servedAt < end),
+    before = analyze(db, prefs, start - 1),
+    after = analyze(db, prefs, end - 1),
+    ids = after.pet ? [after.pet] : db.pets.map(p => p.id),
+    mine = new Set(ids);
+  const list = db.servings.filter(s => s.servedAt >= start && s.servedAt < end && ids.some(id => s.pets?.[id]));
+  const ratings = [...ratingsOf(db, list)].filter(x => mine.has(x.pid));
+  const sums = tally({pets: db.pets, servings: list.filter(s => after.byId.has(s.productId))}, end),
     best = [];
-  const sums = tally({pets: db.pets, servings: meals.filter(s => after.byId.has(s.productId))}, end);
-  for (const pet of db.pets) {
+  for (const pid of ids) {
     const top = [...sums.bySort]
-      .filter(([, mine]) => mine[pet.id])
-      .map(([id, mine]) => ({id, ...statOf(mine[pet.id])}))
+      .filter(([, x]) => x[pid])
+      .map(([id, x]) => ({id, ...statOf(x[pid])}))
       .filter(x => x.n >= 2)
       .sort((a, b) => b.score - a.score || b.n - a.n || b.last.t - a.last.t)[0];
-    if (top) best.push({pet: pet.id, id: top.id, n: top.n, pct: top.pct});
+    if (top?.pct >= GOOD) best.push({pet: pid, id: top.id, n: top.n, pct: top.pct, counts: top.counts});
   }
   const fed = new Map();
-  for (const s of meals) {
+  for (const s of list) {
     const name = (s.by || '').trim();
     if (name) fed.set(name, (fed.get(name) || 0) + 1);
   }
   return {
     start,
     end,
-    meals: meals.length,
-    rated: meals.filter(s => !ratingsOf(db, [s]).next().done).length,
+    list,
+    sorts: new Set(list.map(s => s.productId).filter(id => after.byId.has(id))).size,
+    n: ratings.length,
+    good: ratings.filter(x => RATINGS[x.r].score >= GOOD).length,
+    open: list.filter(s => !ids.some(id => rOf(s.pets[id]))).length,
     best,
     favorites: after.sorts
-      .filter(e => e.house.verdict === 'nachkaufen' && before.byId.get(e.id)?.house.verdict !== 'nachkaufen')
+      .filter(e => e.verdict === 'nachkaufen' && before.byId.get(e.id)?.verdict !== 'nachkaufen')
       .map(e => e.id),
     feeders: [...fed].map(([name, n]) => ({name, n})).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'de')),
   };
-}
-
-/* Weekly review: the previous week, visible from Monday 00:00 to Wednesday 23:59, from 5 meals and until it is
-   closed. known: a week already computed, which holds as long as no meal up to its end changes */
-export function review(db, prefs, now, known) {
-  const monday = weekStart(now),
-    start = addDays(monday, -7);
-  if (now >= addDays(monday, 3) || prefs.closedWeek === dayKey(start)) return null;
-  const w = known?.start === start ? known : week(db, prefs, start);
-  return w.meals >= 5 ? w : null;
 }
 
 /* The household's usual feeding times from the meals (excluding treats) of the last 14 days: times at most 90

@@ -291,12 +291,6 @@ const ACTIONS = {
     haptic('select');
     update();
   },
-  'close-week'(el) {
-    prefs.closedWeek = el.dataset.v;
-    savePrefs();
-    haptic('select');
-    update();
-  }, // weekly review, per week and device
   'share-list'() {
     shareShopping();
   },
