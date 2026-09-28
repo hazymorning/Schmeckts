@@ -93,8 +93,8 @@ export function quickProducts(limit = Infinity) {
     .slice(0, limit);
 }
 /* The shopping list as shareable text, matching the pet filter: „Nachkaufen“ (including „Gemischt“ with „für …“ and
-   the manual `immer`), „Nicht kaufen“ („Nicht mehr kaufen“ and the manual `nicht`). „Beobachten“ and empty groups are
-   left out. */
+   the manual `immer`), „Nicht kaufen“ („Nicht mehr kaufen“ and the manual `nicht`). „Geht so“, „Noch zu wenig
+   bewertet“ and empty groups are left out. */
 export function shoppingList() {
   const m = model(),
     g = shopGroups(m),

@@ -642,13 +642,15 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-3h);
 }
 /* Rating slider (views/parts.js, ui/slider.js): the variety's scale as one track from the best level to the worst in
-   their colours, a stop for each. Above it one row: the two ends of the scale before a rating, then the name of the
-   level the thumb stands on. The thumb is a disc as large as a small tap target, ringed in the level's colour and
-   carrying its icon. The whole bar takes the finger; the stops are the levels' buttons, which only the keyboard and a
-   screen reader use. */
+   their colours, a stop for each. Before a rating the two ends of the scale stand close under the track, in the
+   bar's lower edge, so the slider is no taller than its bar; once the meal holds a level, the thumb stands on it and
+   the level's name and what the bowl looks like stand under the bar. While a finger is on the track, a label above
+   the thumb says the same of the level under it. The thumb is a disc as large as a small tap target, ringed in the
+   level's colour and carrying its icon. The whole bar takes the finger; the stops are the levels' buttons, which only
+   the keyboard and a screen reader use. */
 .slider {
   --thumb: var(--tap-s); /* a stop's centre runs from half of it to the other end less half of it */
-  container-type: inline-size; /* the thumb goes its way in the slider's width, cqw */
+  container-type: inline-size; /* the thumb and its label go their way in the slider's width, cqw */
 }
 .slider-bar {
   position: relative;
@@ -704,26 +706,59 @@ dialog.sheet.page .sheet-body {
 .slider.unset .slider-thumb {
   display: none;
 }
-/* Above the track, in one place: the ends of the scale, or the name of the level */
-.slider-say {
-  display: grid;
-  min-height: var(--icon-s);
+.slider-bar > .ends {
+  position: absolute;
+  inset: auto 0 0;
+  pointer-events: none;
 }
-.slider-say > * {
-  grid-area: 1 / 1;
-  align-self: end;
+.slider:not(.unset) .slider-bar > .ends {
+  opacity: 0;
+} /* the thumb has come */
+/* A level in words: its name in Faustina, what the bowl looks like under it */
+.slider-say,
+.slider-tip {
   margin: 0;
+}
+.slider-name,
+.slider-say small,
+.slider-tip small {
+  display: block;
 }
 .slider-name {
   font: var(--type-subheading);
 }
-.slider.unset .slider-name,
-.slider:not(.unset) .slider-say .ends {
-  visibility: hidden;
+.slider-say small,
+.slider-tip small {
+  font: var(--type-small);
 }
-.slider.unset .slider-say .ends {
-  transform: translateY(var(--space-2));
-} /* without a thumb the ends sit closer to the track they name */
+.slider-say {
+  margin-top: var(--space-1);
+}
+.slider-say small {
+  color: var(--muted);
+}
+/* The label above the thumb, over whatever lies above the slider and never beyond its ends */
+.slider-tip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: var(--z-raise);
+  display: none;
+  width: max-content;
+  max-width: 100%;
+  padding: var(--inset-compact);
+  border-radius: var(--radius-m);
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow-high);
+  transform: translateX(
+    clamp(0%, var(--thumb) / 2 + (100cqw - var(--thumb)) * var(--at) / (var(--n) - 1) - 50%, 100cqw - 100%)
+  );
+  pointer-events: none;
+}
+.slider.pointing .slider-tip {
+  display: block;
+}
 /* The two ends of a scale, under the slider and under the counters */
 .ends {
   display: flex;
@@ -1247,22 +1282,6 @@ dialog.sheet.page .sheet-body {
   background: linear-gradient(90deg, var(--surface-2) 20%, var(--line) 45%, var(--surface-2) 70%);
   background-size: 220% 100%;
 }
-.meter {
-  display: block;
-  height: 6px;
-  margin-top: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--surface-2);
-  overflow: hidden;
-}
-.meter i {
-  display: block;
-  width: var(--w);
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  transform-origin: left center;
-}
 
 /* Figures: tabular in the same rule as their font, after it, because the font shorthand resets it */
 .pct {
@@ -1282,15 +1301,6 @@ dialog.sheet.page .sheet-body {
   font: var(--type-title);
   letter-spacing: var(--track-title);
   font-variant-numeric: tabular-nums;
-}
-.share {
-  font: var(--type-body-strong);
-  font-variant-numeric: tabular-nums;
-}
-.pp .share {
-  min-width: var(--col-figure);
-  text-align: right;
-  color: var(--ink);
 }
 
 /* Components */
@@ -1366,25 +1376,36 @@ dialog.sheet.page .sheet-body {
   color: var(--muted);
 }
 /* The two columns before the meal, in em of their own text: with a larger system font they grow with it and
-   the line keeps running through the middle of the dot. */
+   the line keeps running through the middle of the dot. At 14px they are whole pixels, 49 and 28, so the dot's
+   middle falls on a pixel and the line lies exactly on it. Each meal draws its piece of the line, from its top to
+   its dot and from its dot to its foot, a dot sitting in the middle of its meal however tall that is: the line runs
+   from the first dot to the last and no further, and one meal alone has none. */
 .tl {
   list-style: none;
   margin: 0;
   padding: 0;
-  position: relative;
-  --tl-time: 3.3em;
-  --tl-node: 1.8em;
+  --tl-time: 3.5em;
+  --tl-node: 2em;
 }
-.tl::before {
+.tl > li {
+  position: relative;
+}
+.tl > li:not(:first-child)::before,
+.tl > li:not(:last-child)::after {
   content: "";
   position: absolute;
   font: var(--type-small);
-  left: calc(var(--tl-time) + var(--tl-node) / 2);
-  top: calc(var(--space-2h) + var(--pic-m) / 2);
-  bottom: calc(var(--space-2h) + var(--pic-m) / 2);
+  left: calc(var(--tl-time) + var(--tl-node) / 2 - var(--stroke) / 2);
   width: var(--stroke);
-  border-radius: var(--radius-full);
   background: var(--line);
+}
+.tl > li::before {
+  top: 0;
+  bottom: 50%;
+}
+.tl > li::after {
+  top: 50%;
+  bottom: 0;
 }
 .tl-item {
   border-radius: var(--radius-m);
@@ -1438,7 +1459,6 @@ dialog.sheet.page .sheet-body {
   gap: var(--space-2);
   font: var(--type-small-strong);
   color: var(--muted);
-  margin-bottom: var(--space-2);
 }
 .ins li {
   font: var(--type-body);
@@ -1599,10 +1619,6 @@ dialog.sheet.page .sheet-body {
   object-fit: cover;
   border-radius: var(--radius-l);
 }
-.pp .pp-name {
-  min-width: 64px;
-  font: var(--type-small-strong);
-}
 .cta .ic {
   width: var(--icon-l);
   height: var(--icon-l);
@@ -1675,9 +1691,6 @@ dialog.sheet.page .sheet-body {
 .card-line {
   margin: 0 0 var(--space-2h);
 }
-.card-line + .taste {
-  margin-top: var(--space-5); /* 20 to the taste line; alone, the line ends 10 above the card's foot */
-}
 .empty {
   display: flex;
   align-items: center;
@@ -1732,19 +1745,27 @@ dialog.sheet.page .sheet-body {
   min-width: 0;
   margin-bottom: 0;
 }
+/* Several pets: each name right above its slider, whose thumb has room under it, and more room between pets */
+.pet-rate > .pet-label {
+  margin-top: var(--space-3);
+}
 .pet-rate + .pet-rate {
   margin-top: var(--space-3);
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
 }
-.slider-say {
-  margin-top: var(--space-2);
-}
 
 /* Hint, Letzte Woche, Einkaufen, Erkenntnisse */
 .why {
   margin: var(--space-hair) 0 0;
+}
+/* What the ratings say stands in full, under a variety's name and under an insight, never cut off */
+.shop .t-main small {
+  white-space: normal;
+}
+.ins .why {
+  display: block;
 }
 .btn-row {
   display: flex;
@@ -1773,10 +1794,6 @@ dialog.sheet.page .sheet-body {
   flex: 0 0 auto;
   margin-top: var(--space-hair);
   color: var(--muted);
-}
-/* Einkaufen, footer „Geschmack bekannt“: text with a bar below it */
-.taste {
-  margin: var(--space-2h) 0 var(--space-3);
 }
 .grp {
   margin: var(--space-2) 0 0;
@@ -1950,10 +1967,6 @@ dialog.sheet.page[data-kind="report"] .page-title {
 .tally {
   margin: var(--space-2h) 0 var(--space-1);
 }
-.pp .meter {
-  flex: 1;
-  margin: 0;
-}
 .verdict {
   margin-top: var(--space-2h);
 }
@@ -1985,9 +1998,6 @@ dialog.sheet.page[data-kind="report"] .page-title {
 }
 .rank .t-main b {
   white-space: normal;
-}
-.rank .share {
-  flex: 0 0 auto;
 }
 .photo-hint {
   display: block;
@@ -2101,12 +2111,16 @@ dialog.sheet {
 dialog.sheet.dragging {
   transition: none;
 } /* the finger leads */
-.slider-thumb {
+.slider-thumb,
+.slider-tip {
   transition: transform var(--dur-step) var(--ease-out);
-} /* the rating slider's thumb glides from stop to stop */
+} /* the rating slider's thumb glides from stop to stop, and its label with it */
 .slider-thumb > i {
   transition: var(--state);
 } /* its ring and icon take the level's colour on the way */
+.slider-bar > .ends {
+  transition: opacity var(--dur-fade) var(--ease-out);
+} /* the ends of the scale make way for the thumb */
 /* Press */
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
@@ -2236,6 +2250,12 @@ html.step-back::view-transition-new(page) {
 .fab.filled {
   animation: pop var(--dur-step) var(--ease-spring);
 }
+.slider.pointing .slider-tip {
+  animation: fadeIn var(--dur-fade) var(--ease-out);
+} /* the label above the thumb appears where the finger is */
+.slider-say.picked {
+  animation: appear var(--dur-step) var(--ease-out);
+} /* the level just rated, in words under the track */
 .fab .fill {
   transform: scaleY(0);
   opacity: 0;
