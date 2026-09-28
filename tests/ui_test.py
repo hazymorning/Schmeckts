@@ -1132,7 +1132,9 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print('overview: a low card with picture, name and a glance at the day, never a rating; two lines and unfolding; counting in the history')
+    print(
+        'overview: a low card with picture, name and a few sentences about the day, never a rating; two lines and unfolding; counting in the history'
+    )
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
@@ -1144,7 +1146,7 @@ async def test_overview(browser, url):
         text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
         dots: ps.webkitLineClamp === '2' && ps.display !== 'block', tap: [c.dataset.action ?? null, c.getAttribute('aria-expanded')], wide: document.documentElement.scrollWidth > innerWidth}; }"""
     c = await pg.evaluate(CARD)
-    text = 'Heute 1 Mahlzeit und 1 Snack, zuletzt vor 1 Std. Es gab einen Snack: Käse. ' + await pg.evaluate(FACT, 'Katze')
+    text = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse. ' + await pg.evaluate(FACT, 'Katze')
     check(
         c
         == {
@@ -1154,14 +1156,14 @@ async def test_overview(browser, url):
             'sameFont': True,
             'pic': ['BUTTON', 1, 72, True],
             'text': text,
-            'bold': ['1 Mahlzeit', '1 Snack', 'vor 1 Std.', 'Käse'],
+            'bold': ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
             'lines': 2,
             'cut': True,
             'dots': True,
             'tap': ['toggle-overview', 'false'],
             'wide': False,
         },
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, today\u2019s meals and the last one in bold, what it was, something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
     )
     await shot(pg, 'overview-360')
     await pg.evaluate("window.__card = document.querySelector('.overview')")
@@ -1219,17 +1221,17 @@ async def test_overview(browser, url):
         == [
             'Minka und Tiger',
             ['SPAN', 2],
-            'Heute 2 Mahlzeiten und 1 Snack, zuletzt vor 5 Min. Minka und Tiger bekamen Lachs. Die nächste Mahlzeit gibt es morgen, meist gegen 10 Uhr. '
-            + general,
-            ['2 Mahlzeiten', '1 Snack', 'vor 5 Min.', 'Lachs', '10 Uhr'],
+            'Minka und Tiger haben vor 5 Minuten Lachs bekommen. Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr. ' + general,
+            ['5 Minuten', 'Lachs', '10 Uhr'],
         ]
         and house['height'] == 108
         and house['dots'],
-        f'under „Alle“ with several pets: the meals of all of them, who had the last one, the usual time tomorrow once today\u2019s is served, and for a cat and a dog something about any animal ({house["text"]})',
+        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and for a cat and a dog something about any animal ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Heute 1 Mahlzeit, zuletzt vor 5 Min. Es gab Lachs. ' + dog]
-        and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']] == ['Noch nichts serviert.', False, [None, None], 108],
+        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Tiger hat vor 5 Minuten Lachs bekommen. ' + dog]
+        and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']]
+        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, [None, None], 108],
         f'the overview follows the filter; without a meal there is nothing to unfold ({tiger["text"]} / {kiwi["text"]})',
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
@@ -1247,34 +1249,56 @@ async def test_overview(browser, url):
       s.prefs.code = ''; h.renderHome();
       return [alone, house]; })""")
     check(
-        'Anna' not in by[0] and by[1].startswith('Heute 2 Mahlzeiten und 1 Snack, zuletzt vor 5 Min. von Anna. '),
+        'Anna' not in by[0] and by[1].startswith('Anna hat Minka und Tiger vor 5 Minuten Lachs gegeben. '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
     # The line that changes from day to day: what is only true today first, the rest taking turns over five days
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
-      const last = s.db.servings.find(x => x.pets.minka00001), code = s.prefs.code;
-      const g = {last, meals: 2, snacks: 4, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], streak: 12, premiere: null,
-        idea: {id: 'rind00001', days: 12}, next: {at: 1110}, milestone: {n: 100, left: 40}};
+      const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
+      const g = {last, meals: 2, snacks: 1, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], week: {meals: 12, sorts: 4}, streak: 12,
+        premiere: null, idea: {id: 'rind00001', days: 12}, next: {at: 1110}, milestone: {n: 100, left: 40}};
       s.prefs.code = 'K7PM-3QXD';
       const text = (x, at = now) => o.overviewText(x, pets, at).replace(/<[^>]+>/g, '');
-      const days = [0, 1, 2, 3, 4].map(i => text(g, now + i * 864e5).split('. ').slice(-2).join('. '));
-      const first = [{premiere: 'lachs00001'}, {milestone: {n: 100, left: 3}}, {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}]
-        .map(x => text({...g, ...x}));
-      s.prefs.code = code; return [days, first]; })"""
-    days, first = await pg.evaluate(LINES)
+      const days = [0, 1, 2, 3, 4].map(i => text({...g, last: {...last, servedAt: last.servedAt + i * 864e5}}, now + i * 864e5));
+      const first = [{premiere: 'lachs00001'}, {premiere: 'rind00001'}, {milestone: {n: 100, left: 3}}, {snacks: 4}, {next: {at: 1110, due: true}},
+        {next: {at: 435, tomorrow: true}}].map(x => text({...g, ...x}));
+      s.prefs.code = code; return [days, first, o.FACTS.Katze]; })"""
+    days, first, cats = await pg.evaluate(LINES)
     turns = [
-        'Beim Füttern liegt diese Woche Anna vorn, 6 zu 4.',
-        'Seit 12 Tagen jeden Tag eingetragen.',
+        'Im Fütter-Duell dieser Woche führt Anna mit 6 zu 4. Jonas, da geht noch was!',
+        'Seit 12 Tagen lückenlos eingetragen. Dafür hättet eigentlich ihr ein Leckerli verdient.',
         'Wie wär’s mal wieder mit Rind? Das gab es seit 12 Tagen nicht.',
-        'Schon 4 Snacks heute. Wer kann da schon nein sagen?',
+        'Diese Woche standen schon 12 Mahlzeiten aus 4 Sorten auf dem Speiseplan.',
     ]
     check(
-        all(any(d.endswith(t) for d in days) for t in turns)
-        and first[0].endswith('Heute zum ersten Mal: Lachs.')
-        and first[1].endswith('Noch 3× füttern bis zum 100. Mal.')
-        and 'Um diese Zeit gibt es sonst Futter. ' in first[2]
-        and 'Die nächste Mahlzeit gibt es morgen, meist gegen 7:15 Uhr. ' in first[3],
-        f'the last line: a first time or a milestone close by when there is one, otherwise the duel, the streak, an idea and the treats take turns with something about the animal ({days}, {first})',
+        all(
+            d.startswith('Heute gab es schon zwei Mahlzeiten und einen Snack, zuletzt um ')
+            and ' Lachs von Anna. Abendessen gibt es meist gegen 18:30 Uhr. ' in d
+            for d in days
+        )
+        and all(any(d.endswith(t) for d in days) for t in turns)
+        and any(d.endswith(f) for d in days for f in cats),
+        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, the streak, an idea, the week and something about the animal take turns ({days})',
+    )
+    check(
+        first[0].endswith('Das gab es heute zum ersten Mal. Mutig!')
+        and first[1].endswith('Heute zum ersten Mal im Napf: Rind. Mutig!')
+        and first[2].endswith('Noch 3× füttern bis zum 100. Mal. Fast schon ein Jubiläum.')
+        and 'zwei Mahlzeiten und vier Snacks' in first[3]
+        and first[3].endswith('Bei so vielen Snacks: Minka hat euch ganz schön im Griff.')
+        and first[4].startswith('Futterzeit! Zuletzt gab es um ')
+        and any(
+            f'Minka {t}' in first[4]
+            for t in ('wartet bestimmt schon neben dem Napf.', 'übt schon mal den vorwurfsvollen Blick.', 'hat die Uhr bestimmt schon im Blick.')
+        )
+        and any(
+            t in first[5]
+            for t in (
+                'Für heute ist alles serviert, Frühstück gibt es morgen meist gegen 7:15 Uhr.',
+                'Feierabend für heute: Frühstück gibt es morgen meist gegen 7:15 Uhr.',
+            )
+        ),
+        f'what is only true today comes first: a first time, a milestone close by, a lot of treats; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
