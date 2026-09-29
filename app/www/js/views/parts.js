@@ -234,10 +234,11 @@ export function shopRow(m, e) {
 }
 
 /* A line of a card, told like the rest of the app: a plain icon, one in a rating's colour or the pet's picture, a
-   sentence with what it is about in bold, and under it in words what it rests on */
+   sentence with what it is about in bold, and under it in words what it rests on, its figures in bold as well. Both
+   are HTML: whatever came from a person is escaped by the caller. */
 export const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
 export const told = (pic, say, why = '') =>
-  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
+  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
 
 /* The name of a comparison of „Vorlieben“, with the food type in brackets except for wet food: „Konsistenz“,
@@ -248,7 +249,8 @@ const dimName = d =>
     ? TEXTURES[d.type].title
     : DIMENSION[d.kind] + (d.type === TYPES[0] ? '' : ` (${d.type})`);
 /* A habit of „Vorlieben“ as a told line: how varieties are eaten, the varieties in bold and how often under them; or
-   whether a pet likes a change, with the pet's picture and name where several pets are shown at once */
+   whether a pet likes a change, and whether new food goes down well at first or needs a while, each with the pet's
+   picture and name where several pets are shown at once */
 const upTo = (k, n) => (k < n ? `${k} von ${n}` : `alle ${n}`);
 export function habitRow(h, several) {
   const name = id => pname(getProduct(id));
@@ -256,10 +258,18 @@ export function habitRow(h, several) {
     return told(
       lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
       `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'geht es oft gierig los, dann bleibt der Rest stehen'}.`,
-      cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', ')),
+      esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
   const pet = several ? getPet(h.pet) : null,
     who = pet ? `<b>${esc(pet.name)}</b> ` : '';
+  if (h.kind === 'neugier' || h.kind === 'anlauf')
+    return told(
+      pet ? avatar(pet, 's') : lead('sparkle'),
+      h.kind === 'neugier'
+        ? `${who}${pet ? 'ist neugierig' : 'Neugierig'}: Neues kommt erst gut an, dann lässt es nach.`
+        : `${who}${pet ? 'braucht' : 'Braucht'} Anlauf: beim ersten Mal bleibt öfter was übrig als später.`,
+      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach <b>${h.later.good} von ${h.later.n} Mal</b>.`,
+    );
   return told(
     pet ? avatar(pet, 's') : lead('repeat'),
     h.kind === 'abwechslung'

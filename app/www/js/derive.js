@@ -2,7 +2,7 @@
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
-import {analyze, changes, habits, profile, report, shopGroups, tally, variety as change} from './smart.js';
+import {analyze, changes, habits, novelty, profile, report, shopGroups, tally, variety as change} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -49,13 +49,16 @@ export const reportModel = () =>
     spans: SPANS.map(days => report(db, prefs, now, days)),
     changes: changes(db, prefs, now, SPANS[1], model()),
   }));
-/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits with Abwechslung last,
-   which the home page asks for only while there is nothing to compare (it reads every meal) */
+/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits in the order the home
+   page shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating eagerly at first. The home page
+   asks for them only while there is nothing to compare, since Abwechslung reads every meal. */
 export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
 export const habitsModel = () =>
   cached('habits', [prefs.activePet], () => {
-    const m = model();
-    return [...habits(m), ...change(m)];
+    const m = model(),
+      eaten = habits(m),
+      of = kind => eaten.filter(h => h.kind === kind);
+    return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
   });
 export const sortOf = id => model().byId.get(id);
 export function pendingServings() {

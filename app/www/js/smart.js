@@ -154,7 +154,7 @@ function houseVerdict(pets) {
   return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : rest};
 }
 
-/* Model  = {pet, sorts, byId, rated, hints, repeats}
+/* Model  = {pet, pets: the pets in the filter, sorts, byId, rated, hints, repeats}
    Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, choice, plus the values within the
             filter: n, score, pct, verdict, counts, yes, no, and total, every rating within the filter, the window aside}
    Stat  = {n, score, pct, verdict, counts, list: the ratings, window: those the verdict rests on, per pet only}
@@ -192,6 +192,7 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
   let repeats = null; // worked out the first time it is asked for: only „Vorlieben“ reads it
   return {
     pet,
+    pets: pet ? [pet] : petIds,
     sorts,
     byId,
     rated: sorts.reduce((a, e) => a + e.n, 0),
@@ -311,6 +312,38 @@ export function variety(m) {
       far = VARIETY.gap * same.n * other.n;
     if (apart <= -far) out.push({pet, kind: 'abwechslung', same, other});
     else if (apart >= far) out.push({pet, kind: 'gewohnheit', same, other});
+  }
+  return out;
+}
+
+/* Neuheit, per pet in the filter: whether new food goes down well at first and wears off, or needs a while. For every
+   variety that is no treat and the pet rated at least twice, the oldest rating is the first time and the rest come
+   after; over such varieties, how many went down well the first time (from GOOD) against how many of the later
+   ratings did. Every rating counts, older ones than VERDICT_SPAN too: this is about first encounters. From
+   NOVELTY.minSorts varieties and NOVELTY.minLater later ratings; the two shares NOVELTY.gap points apart make a
+   habit: a higher first share is curiosity („neugier“), a lower one a slow start („anlauf“). Whole numbers, as
+   variety() has it. [{pet, kind, first: {n, good}, later: {n, good}}] */
+const NOVELTY = {minSorts: 4, minLater: 8, gap: 30};
+export function novelty(m) {
+  const out = [],
+    good = r => RATINGS[r.r].score >= GOOD;
+  for (const pet of m.pets) {
+    const first = {n: 0, good: 0},
+      later = {n: 0, good: 0};
+    for (const e of m.sorts) {
+      const x = e.pets[pet];
+      if (!x || x.list.length < 2 || typeOf(e.product) === 'Snack') continue;
+      const [head, ...rest] = [...x.list].sort((a, b) => a.t - b.t);
+      first.n++;
+      if (good(head)) first.good++;
+      later.n += rest.length;
+      later.good += rest.filter(good).length;
+    }
+    if (first.n < NOVELTY.minSorts || later.n < NOVELTY.minLater) continue;
+    const apart = 100 * (first.good * later.n - later.good * first.n), // in points, times both counts: exact
+      far = NOVELTY.gap * first.n * later.n;
+    if (apart >= far) out.push({pet, kind: 'neugier', first, later});
+    else if (apart <= -far) out.push({pet, kind: 'anlauf', first, later});
   }
   return out;
 }

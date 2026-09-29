@@ -10,6 +10,7 @@ import {
   habits,
   hintKey,
   milestones,
+  novelty,
   profile,
   rateCls,
   ratingsIn,
@@ -786,6 +787,92 @@ test('Abwechslung: one per pet, and only the pet in the filter', () => {
     ['B', 'gewohnheit', 6, 6, 0, 7],
   ]);
   assert.deepEqual(tried(both, {activePet: 'B'}, ['A', 'B']), [['B', 'gewohnheit', 6, 6, 0, 7]]);
+});
+
+/* First encounters: [variety, first rating, later ratings …] each, the first one the oldest, the later ones spread
+   after it five days apart, all of it `start` days ago */
+const met = (pet, list, start = 100) =>
+  list.flatMap(([sort, ...rs], i) => rs.map((r, j) => [sort, {[pet]: r}, start - j * 5 - i]));
+const novel = (meals, prefs, pets = ['A']) =>
+  novelty(model(household(pets, ['s1', 's2', 's3', 's4', 's5', 's6', {id: 'snack', type: 'Snack'}], meals), prefs)).map(
+    v => [v.pet, v.kind, v.first.good, v.first.n, v.later.good, v.later.n],
+  );
+const CURIOUS = [
+  ['s1', T, X, X, X],
+  ['s2', T, X, X],
+  ['s3', T, T, X, X],
+  ['s4', T, T, X],
+  ['s5', T, T, T],
+  ['s6', X, X, X, X],
+];
+const SLOW = [
+  ['s1', X, T, T, T, T],
+  ['s2', X, T, T, T],
+  ['s3', X, T, T, X],
+  ['s4', T, T, X, X],
+  ['s5', X, T, T, X],
+];
+
+test('Neuheit: new food goes down well at first and wears off, or needs a while, 30 points apart either way', () => {
+  assert.deepEqual(novel(met('A', CURIOUS)), [['A', 'neugier', 5, 6, 4, 15]]);
+  assert.deepEqual(novel(met('A', SLOW)), [['A', 'anlauf', 1, 5, 12, 16]]);
+  assert.deepEqual(novel(met('A', SLOW, 400)), [['A', 'anlauf', 1, 5, 12, 16]], 'every rating counts, however old');
+  assert.deepEqual(
+    novel(met('A', [...SLOW, ['snack', 'unberuehrt', 'verputzt', 'verputzt', 'verputzt', 'verputzt']])),
+    [['A', 'anlauf', 1, 5, 12, 16]],
+    'treats do not count',
+  );
+});
+
+test('Neuheit at the thresholds: four varieties, eight later ratings, exactly 30 points', () => {
+  assert.deepEqual(novel(met('A', CURIOUS.slice(0, 3))), [], 'three varieties are too few');
+  const seven = [
+    ['s1', T, X, X],
+    ['s2', T, X, X],
+    ['s3', T, X, X],
+    ['s4', T, X],
+  ];
+  assert.deepEqual(novel(met('A', seven)), [], 'seven later ratings are too few');
+  assert.deepEqual(
+    novel(met('A', [...seven.slice(0, 3), ['s4', T, X, X]])),
+    [['A', 'neugier', 4, 4, 0, 8]],
+    'eight are enough',
+  );
+  assert.deepEqual(
+    novel(
+      met('A', [
+        ['s1', T, T, T, T],
+        ['s2', T, T, T, X],
+        ['s3', T, T, X],
+        ['s4', T, T, X],
+      ]),
+    ),
+    [['A', 'neugier', 4, 4, 7, 10]],
+    'all four the first time against 7 of 10 later: exactly 30 points',
+  );
+  assert.deepEqual(
+    novel(
+      met('A', [
+        ['s1', T, T, T, T, T],
+        ['s2', T, T, T, T, X],
+        ['s3', T, T, T, X],
+        ['s4', T, T, X, X],
+      ]),
+    ),
+    [],
+    'against 10 of 14 later: 29 points',
+  );
+});
+
+test('Neuheit: one line per pet in the filter, none for a pet with too few varieties', () => {
+  const few = met('B', SLOW.slice(0, 3));
+  assert.deepEqual(novel([...met('A', CURIOUS), ...few], {}, ['A', 'B']), [['A', 'neugier', 5, 6, 4, 15]]);
+  const both = [...met('A', CURIOUS), ...met('B', SLOW)];
+  assert.deepEqual(novel(both, {}, ['A', 'B']), [
+    ['A', 'neugier', 5, 6, 4, 15],
+    ['B', 'anlauf', 1, 5, 12, 16],
+  ]);
+  assert.deepEqual(novel(both, {activePet: 'B'}, ['A', 'B']), [['B', 'anlauf', 1, 5, 12, 16]]);
 });
 
 test('changes: the varieties whose verdict became „Nachkaufen“ or „Nicht mehr kaufen“ within the span', () => {

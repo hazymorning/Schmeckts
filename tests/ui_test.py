@@ -727,6 +727,17 @@ LIKES_HOUSE = """([minka, tiger]) => import('./js/store.js').then(async s => { c
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
+# One pet that met six varieties, the first rating of each the oldest and the later ones five days apart: new food goes
+# down well at first and wears off. One variety per flavour and one brand, so there is nothing to compare.
+NOVELTY_HOUSE = """() => import('./js/store.js').then(async s => { const d = s.defaults(), day = 864e5, hour = 36e5, now = Date.now(), T = 'top', X = 'schlecht';
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  const met = [['Lachs', [T, X, X, X]], ['Huhn', [T, X, X]], ['Rind', [T, T, X, X]], ['Pute', [T, T, X]], ['Ente', [T, T, T]], ['Lamm', [X, X, X, X]]];
+  d.products = met.map(([variety], i) => ({id: 'sorte' + i + '00001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.servings = met.flatMap(([, rs], i) => rs.map((r, j) => ({id: 'meal' + i + j + '00001', productId: 'sorte' + i + '00001', note: '',
+    servedAt: now - (100 - j * 5) * day - i * hour, pets: {minka00001: {r, at: now}}}))).sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+
 def runs(*groups):
     """Meals in runs of one variety, oldest first: (variety, rating, …) each, the runs taking turns between two"""
     return [[sort, r] for sort, *rs in groups for r in rs]
@@ -784,7 +795,7 @@ async def test_profile(browser, url):
             'Bei Geflügel in Soße und Thunfisch in Soße wird oft nur die Soße geleckt.',
             'Geflügel in Soße 2 von 3 Mal, Thunfisch in Soße 2 von 3 Mal',
         ]
-        and all(t[1].startswith(('Mag Abwechslung', 'Gewohnheitstier')) for t in cards[1]['told'][1:]),
+        and all(t[1].startswith(('Mag Abwechslung', 'Gewohnheitstier', 'Neugierig', 'Braucht Anlauf')) for t in cards[1]['told'][1:]),
         f'„Gewohnheiten“: the sauce licked off, told as before ({cards[1]["told"]})',
     )
     check(
@@ -887,6 +898,23 @@ async def test_profile(browser, url):
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     await pg.click('[data-action=filter][data-id=all]')
+    await idle(pg)
+
+    # Neuheit: a pet that finds new food great and lets it stand the next time
+    await pg.evaluate(NOVELTY_HOUSE)
+    await idle(pg)
+    home = await pg.evaluate(LIKES_HOME)
+    await pg.click('[data-sec=profile] [data-action=open-profile]')
+    await idle(pg)
+    novel = await pg.evaluate(LIKES_PAGE)
+    check(
+        home['told'] == [['icon', 'Neugierig: Neues kommt erst gut an, dann lässt es nach']]
+        and novel[1]['told']
+        == [['icon', 'Neugierig: Neues kommt erst gut an, dann lässt es nach.', '5 von 6 Sorten beim ersten Mal gut gefressen, danach 4 von 15 Mal.']]
+        and await pg.eval_on_selector_all('#sheet .told .why b', 'l => l.map(b => b.innerText)') == ['5 von 6 Sorten', '4 von 15 Mal'],
+        f'Neuheit: new food goes down well at first and wears off, told on the home page and on the page with the figures in bold ({home["told"]}, {novel[1]["told"]})',
+    )
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
 
     # Nothing rated: no card on the home page, and the page says so
