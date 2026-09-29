@@ -165,7 +165,7 @@ function homeHTML() {
     html +=
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
-      `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2>${shopHTML(m)}</section>` +
+      shopHTML(m) +
       likesHTML(m);
   return html;
 }
@@ -262,20 +262,18 @@ function hintHTML(m) {
 }
 
 /* Einkaufen: the first three to buy again, the best first, each with its ratings as a strip, and the way to the whole
-   list on its page (shopGroups() in smart.js). Nothing rated yet: one line and no way on. */
+   list on its page (shopGroups() in smart.js). No card while nothing is to be bought again: a shopping list with
+   nothing on it has no use on the home page. */
 const SHOP_SHOWN = 3;
 function shopHTML(m) {
   const g = shopGroups(m);
-  if (!g.nachkaufen.length && !g.nicht.length && !g.geht.length && !g.neu.length)
-    return '<p class="hint card-line">Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.</p>';
-  return `${
-    g.nachkaufen.length
-      ? `<ul class="list shop">${g.nachkaufen
-          .slice(0, SHOP_SHOWN)
-          .map(e => shopRow(m, e))
-          .join('')}</ul>`
-      : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>'
-  }<button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button>`;
+  if (!g.nachkaufen.length) return '';
+  const rows = g.nachkaufen
+    .slice(0, SHOP_SHOWN)
+    .map(e => shopRow(m, e))
+    .join('');
+  return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2><ul class="list shop">${rows}</ul>
+    <button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button></section>`;
 }
 
 /* Vorlieben: the two clearest rows of the profile, which are the ends of its clearest comparison („deutlich“ first,

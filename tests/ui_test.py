@@ -304,7 +304,8 @@ async def test_buying(browser, url):
       (b => b ? b.querySelector('.t-main small').innerText : null)(c.querySelector('[data-id="{lachs}"]'))]).filter(x => x[1] !== null)"""
 
     async def where():  # the card of „Einkaufen“ that holds Lachs, with what stands under its name, and the page's title
-        await pg.click('[data-sec=shop] [data-action=open-shop]')
+        # The page itself: with the Tiger filter nothing is to be bought, so the home page has no card leading there
+        await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'shop'}))")
         await idle(pg)
         for key in ('nicht', 'unklar'):
             if await pg.locator(f'#sheet [data-action=fold][data-v={key}]').count():
@@ -537,11 +538,10 @@ async def test_cards(browser, url):
     await ctx.close()
 
 
-# „Einkaufen“ on the home page: the varieties in its rows, how many strips they carry, its one line, and its buttons as
-# [text, action, class, with an icon, the last thing in the card]
-SHOP_HOME = """() => { const c = document.querySelector('[data-sec=shop]');
+# „Einkaufen“ on the home page: the varieties in its rows, how many strips they carry, and its buttons as [text, action,
+# class, with an icon, the last thing in the card]; None without the card
+SHOP_HOME = """() => { const c = document.querySelector('[data-sec=shop]'); if (!c) return null;
   return {rows: [...c.querySelectorAll('.shop .row')].map(r => r.dataset.id), strips: c.querySelectorAll('.shop .row .strip').length,
-    line: c.querySelector('.card-line')?.innerText ?? null,
     btns: [...c.querySelectorAll('button:not(.row)')].map(b => [b.innerText.trim(), b.dataset.action, b.className, !!b.querySelector('svg'), b === c.lastElementChild])}; }"""
 
 # The „Einkaufen“ page, per card: its heading, its own line, the food types with the varieties under each, every row
@@ -570,7 +570,6 @@ async def test_shop(browser, url):
     check(
         home['rows'] == g['ja'][:3]
         and home['strips'] == 3
-        and home['line'] is None
         and home['btns'] == [['Einkaufsliste öffnen', 'open-shop', 'card-btn', True, True]]
         and await pg.locator('#home [data-action=share-list], #home [data-action=expand][data-v=shop]').count() == 0,
         f'home page: the first three to buy again, each with its strip, and „Einkaufsliste öffnen“ with the chevron; no fold and no sharing ({home})',
@@ -681,12 +680,14 @@ async def test_shop(browser, url):
     )
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
-    # One rating: nothing to buy yet, which the home page and the page say; nothing rated: the home page's one line
+    # One rating: nothing to buy yet, so the home page has no card, while the page still says so; nothing rated: no
+    # card either
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
       s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
     one = await pg.evaluate(SHOP_HOME)
-    await pg.click('[data-sec=shop] [data-action=open-shop]')
+    heads = await pg.eval_on_selector_all('#home > section.card', 'l => l.map(s => s.querySelector("h2").innerText)')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'shop'}))")
     await idle(pg)
     few = await pg.evaluate(SHOP_PAGE)
     await pg.click('#sheet [data-action=settings-back]')
@@ -696,19 +697,13 @@ async def test_shop(browser, url):
     await idle(pg)
     none = await pg.evaluate(SHOP_HOME)
     check(
-        one['line'] == 'Noch nichts zum Nachkaufen.'
-        and one['btns'] == [['Einkaufsliste öffnen', 'open-shop', 'card-btn', True, True]]
+        one is None
+        and 'Einkaufen' not in heads
+        and 'Verlauf' in heads
         and [(c['head'], c['say'] or c['line']) for c in few]
         == [('Nachkaufen', 'Noch nichts zum Nachkaufen.'), ('Noch unklar', '1 Sorte ist noch unklar.')]
-        and await pg.evaluate("document.querySelector('#home [data-sec=shop]') && 1") == 1
-        and none
-        == {
-            'rows': [],
-            'strips': 0,
-            'line': 'Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.',
-            'btns': [],
-        },
-        f'one rating: nothing to buy yet, and no card for what stays in the bowl; nothing rated: one line and no way on ({one}, {few}, {none})',
+        and none is None,
+        f'one rating: nothing to buy yet, so no „Einkaufen“ on the home page while the page says so; nothing rated: no card either ({heads}, {few}, {none})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
