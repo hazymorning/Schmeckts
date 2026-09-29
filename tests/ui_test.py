@@ -3810,7 +3810,9 @@ PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const l = document
 
 
 async def test_product_photo(browser, url):
-    print('„Foto ändern“ in the food sheet: the variety gets a new photo and thumbnail, „Abbrechen“ changes nothing')
+    print(
+        '„Foto ändern“ under the variety\u2019s card, in the food sheet and in the meal\u2019s: a new photo and thumbnail, „Abbrechen“ changes nothing'
+    )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('.welcome [data-action=add-pet]')
@@ -3888,6 +3890,35 @@ async def test_product_photo(browser, url):
         none[:2] == ['Foto hinzufügen', True] and none[4] == '' and added[:2] == ['Foto ändern', True] and added[3] and added[4],
         f'without a photo the link says „Foto hinzufügen“, and afterwards the variety has one ({none}, {added})',
     )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    # The meal's sheet has the same link right under its card, since that is where a meal is opened from the home
+    # page; the photo it takes is the variety's. While naming there is no such link.
+    sid = await state(pg, 'db.servings[0].id')
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'serving', id: '{sid}'}}))")
+    await idle(pg)
+    meal = await pg.evaluate(PRODUCT_PHOTO, pid)
+    where = await pg.evaluate("""() => { const l = document.querySelector('#sheet [data-action=product-photo]');
+      return [document.querySelector('#sheet .sh-head h2').innerText, l.dataset.id, l.previousElementSibling.className, l.nextElementSibling.className]; }""")
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK.read_bytes()).decode()}'")
+    await pg.click('#sheet [data-action=product-photo]')
+    await until(pg, f"(localStorage.getItem('__fs:photos/{pid}.jpg') || '').slice(-32) !== '{after[4]}'")
+    await idle(pg)
+    changed = await pg.evaluate(PRODUCT_PHOTO, pid)
+    check(
+        meal[:2] == ['Foto ändern', True]
+        and where == ['Wie war’s?', pid, 'box prod-card', 'pet-rate']
+        and changed[2] == changed[3] != after[3]
+        and changed[4] != after[4],
+        f'in the meal\u2019s sheet the same link stands right under the card, and the photo it takes is the variety\u2019s ({meal}, {where}, {changed})',
+    )
+    await shot(pg, 'meal-photo-link')
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    naming = await pg.evaluate(
+        "[document.querySelector('#sheet .sh-head h2').innerText, !!document.querySelector('#sheet [data-action=product-photo]')]"
+    )
+    check(naming == ['Futter ändern', False], f'while naming there is no such link ({naming})')
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')

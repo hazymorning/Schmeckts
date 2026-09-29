@@ -264,9 +264,9 @@ const ACTIONS = {
   rephoto() {
     rephoto();
   }, // „Neues Foto“ while naming
-  'product-photo'() {
-    reshootProduct();
-  }, // „Foto ändern“ in the food sheet
+  'product-photo'(el) {
+    reshootProduct(el.dataset.id);
+  }, // „Foto ändern“ under a variety's card
   'use-product'(el) {
     useProduct(el.dataset.id);
   },
@@ -563,7 +563,7 @@ const onFile = (id, fn) =>
   });
 onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, if the photo button takes it over
 onFile('#camInputName', f => replacePhoto(sheet?.id, f)); // „Neues Foto“ in the browser
-onFile('#camInputProduct', f => productPhotoFile(sheet?.id, f)); // „Foto ändern“ in the browser
+onFile('#camInputProduct', productPhotoFile); // „Foto ändern“ in the browser
 onFile('#petPhotoInput', setPetPhoto);
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);

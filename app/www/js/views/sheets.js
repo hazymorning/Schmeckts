@@ -68,6 +68,10 @@ const servingCard = (s, p) => {
     ? `<div class="box prod-card">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="edit-name" aria-label="Futter ändern">${main}</button></div>`
     : `<button class="box prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'xl')}${main}</button>`;
 };
+/* „Foto ändern“ under a variety's card, „Foto hinzufügen“ while it has no photo: in the meal's sheet, where a meal is
+   opened from the home page, and in the food sheet (reshootProduct() in logic/feeding.js) */
+const photoLink = p =>
+  `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen'}</button>`;
 const petRateRow = (s, pid, multi) =>
   `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}
     ${rateSlider(s, pid)}</div>`;
@@ -89,7 +93,7 @@ function viewServing() {
   const ids = Object.keys(s.pets).filter(id => getPet(id));
   const multi = db.pets.length > 1;
   return `<div class="sh-head"><h2>Wie war’s?</h2>${closeBtn}</div>
-    ${servingCard(s, p)}
+    ${servingCard(s, p)}${p ? photoLink(p) : ''}
     ${ids.map(pid => petRateRow(s, pid, multi)).join('')}
     ${multi ? servedForChips(s) : ''}
     <label class="label served" for="f-time"><span>Serviert</span>${s.by ? `<span class="hint">von ${esc(s.by)}</span>` : ''}</label>
@@ -344,7 +348,7 @@ function viewProduct() {
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
     ${productCard(p, ss.length)}
-    <button class="link rephoto" data-action="product-photo">${icon('camera')}${hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen'}</button>
+    ${photoLink(p)}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
     ${strip(ratingsIn(model(), [p.id]))}
     ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}

@@ -1745,9 +1745,10 @@ dialog.sheet.page .sheet-body {
 .pet-rate > .pet-label {
   margin-bottom: var(--space-2);
 }
-.pet-rate + .pet-rate {
+.pet-rate + .pet-rate,
+.rephoto + .pet-rate {
   margin-top: var(--space-4h);
-}
+} /* and under „Foto ändern“ the first slider keeps the card's distance */
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
 }

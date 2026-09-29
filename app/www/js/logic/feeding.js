@@ -109,15 +109,18 @@ export async function shootPhoto(hint, scanCode = '') {
   if (blob) await servePhoto(blob, scanCode);
   return !!blob;
 }
-/* „Foto ändern“ or „Foto hinzufügen“ in the food sheet: the same camera, and the photo becomes the variety's
-   (replaceProductPhoto() in logic/products.js); „Abbrechen“ changes nothing */
-export async function reshootProduct() {
-  const pid = sheet?.kind === 'product' && !sheet.step ? sheet.id : null;
-  if (!pid) return;
+/* „Foto ändern“ or „Foto hinzufügen“ under a variety's card, in the meal's sheet and in the food sheet: the same
+   camera, and the photo becomes the variety's (replaceProductPhoto() in logic/products.js); „Abbrechen“ changes
+   nothing. In the browser the file input takes over, and its photo comes in through productPhotoFile() for the
+   variety the link was tapped for. */
+let shooting = null; // the variety whose photo the file input is to replace
+export async function reshootProduct(pid) {
+  if (!getProduct(pid)) return;
+  shooting = pid;
   const blob = await packagingPhoto('', 'camInputProduct');
-  if (blob) await productPhotoFile(pid, blob);
+  if (blob) await productPhotoFile(blob);
 }
-export async function productPhotoFile(pid, file) {
+export async function productPhotoFile(file, pid = shooting) {
   if (!getProduct(pid) || !file) return;
   let img;
   try {
