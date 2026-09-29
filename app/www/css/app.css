@@ -1734,6 +1734,10 @@ dialog.sheet.page .sheet-body {
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
 }
+/* A meal without a variety: „Eintrag löschen“ under its slider */
+.pend > .btn {
+  margin-top: var(--space-3);
+}
 
 /* Hint, Einkaufen, Vorlieben, and the lines told in a card */
 .why {

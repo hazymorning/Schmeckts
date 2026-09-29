@@ -2975,6 +2975,26 @@ async def test_discard(browser, url):
         f'undo brings the meal back with its photo, still to be named ({back}, {again})',
     )
 
+    # The same button under the slider in „Wie war’s?“ on the home page, for a meal without a variety only
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    CARD_BTN = """() => { const b = document.querySelector('.pend [data-action=delete-serving]'), s = document.querySelector('.pend .slider');
+      return b && [b.innerText.trim(), b.className, b.dataset.id, s && b.getBoundingClientRect().top >= s.getBoundingClientRect().bottom + 8]; }"""
+    card = await pg.evaluate(CARD_BTN)
+    meal = await state(pg, 'db.servings[0].id')
+    await pg.click('.pend [data-action=delete-serving]')
+    await idle(pg)
+    gone = [await state(pg, 'db.servings.length'), await pg.locator('.pend').count(), (await pg.inner_text('#toast')).split('\n')[0]]
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    returned = [await state(pg, 'db.servings.length'), await pg.locator('.pend .slider').count(), await pg.evaluate(CARD_BTN)]
+    check(
+        card == ['Eintrag löschen', 'btn quiet', meal, True] and gone == [0, 0, 'Eintrag gelöscht'] and returned == [1, 1, card],
+        f'on the home page „Eintrag löschen“ stands under the slider of a meal without a variety, deletes it with the same toast, and undo brings it back with its slider ({card}, {gone}, {returned})',
+    )
+    await pg.click('.pend-head')
+    await idle(pg)
+
     # Where there is nothing to delete, or the meal sheet ends with it anyway, naming does not offer it
     await pg.fill('#f-brand', 'Sheba')
     await pg.fill('#f-variety', 'Lachs')
@@ -2982,6 +3002,7 @@ async def test_discard(browser, url):
     await idle(pg)
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
+    named = await pg.locator('.pend [data-action=delete-serving]').count()
     await pg.click('.pend-head')
     await idle(pg)
     await pg.click('#sheet [data-action=edit-name]')
@@ -3006,8 +3027,8 @@ async def test_discard(browser, url):
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(
-        [renamed, typed, product] == [0, 0, 0],
-        f'not while changing a named meal, typing a new one or renaming a variety ({[renamed, typed, product]})',
+        [named, renamed, typed, product] == [0, 0, 0, 0],
+        f'not in the card of a named meal, nor while changing it, typing a new one or renaming a variety ({[named, renamed, typed, product]})',
     )
 
     # The owner's way: an unknown barcode, the photo of the front, then broken off

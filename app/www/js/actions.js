@@ -290,9 +290,9 @@ const ACTIONS = {
   retry() {
     if (sheet?.id) retryNow(sheet.id);
   },
-  'delete-serving'() {
-    deleteServing(sheet.id);
-  },
+  'delete-serving'(el) {
+    deleteServing(el.dataset.id || sheet?.id);
+  }, // from the sheet, or from the meal's card on the home page
   'open-product'(el) {
     openSheet({kind: 'product', id: el.dataset.id});
   },

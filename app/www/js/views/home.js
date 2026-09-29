@@ -18,6 +18,7 @@ import {
   calendarHTML,
   dayBlocks,
   dayGroups,
+  deleteMealBtn,
   evidenceOf,
   habitRow,
   likesList,
@@ -179,7 +180,8 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und unter „Vorlieben“, was dein Tier mag.</p></li></ol></section>`;
 
-/* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. */
+/* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. A
+   meal without a variety (a photo that missed) can be deleted right here, under its slider, as while naming it. */
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
 function pendingHTML(list) {
   const multiHouse = db.pets.length > 1;
@@ -201,7 +203,7 @@ function pendingHTML(list) {
               `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateSlider(s, pid)}</div>`,
           )
           .join('');
-        return `<li class="pend" data-id="${s.id}" style="view-transition-name:sv-${s.id};view-transition-class:${homeView.fresh === s.id ? 'fresh' : 'item'}">${head}${rows}</li>`;
+        return `<li class="pend" data-id="${s.id}" style="view-transition-name:sv-${s.id};view-transition-class:${homeView.fresh === s.id ? 'fresh' : 'item'}">${head}${rows}${p ? '' : deleteMealBtn(s.id)}</li>`;
       })
       .join('') +
     `</ul></section>`

@@ -88,6 +88,10 @@ export function resultBadges(s, compact = false) {
     .join('')}</span>`;
 }
 export const closeBtn = `<button class="icon-btn" data-action="close" aria-label="Schließen">${icon('close')}</button>`;
+/* Deleting a meal that has no variety yet, at the end of „Wie war’s?“, of naming it and under its slider on the home
+   page: one tap, undone from the toast, because arming is only for what cannot be undone */
+export const deleteMealBtn = id =>
+  `<button class="btn quiet" data-action="delete-serving" data-id="${id}">${icon('trash')}Eintrag löschen</button>`;
 /* The head of what is open. A sheet carries its title and the X; a page carries the back arrow on a bar that stays
    at the top, with the title under it in the style of the header. Once that title has gone under the bar, the bar
    shows it small beside the arrow (ui/sheet.js); the h2 stays the heading, so that copy is hidden from a screen
