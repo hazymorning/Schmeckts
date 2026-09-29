@@ -273,9 +273,9 @@ export function habitRow(h, several) {
   return told(
     pet ? avatar(pet, 's') : lead('repeat'),
     h.kind === 'abwechslung'
-      ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig.`
-      : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte hintereinander kommt besser an.`,
-    `Nach derselben Sorte ${times(h.same.good, h.same.n)} gut gefressen, sonst ${upTo(h.other.good, h.other.n)}`,
+      ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.`
+      : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte kurz hintereinander kommt besser an.`,
+    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst <b>${upTo(h.other.good, h.other.n)}</b>.`,
   );
 }
 /* A group of „Vorlieben“, on its page and in its card on the home page: the group, how often it went down well in

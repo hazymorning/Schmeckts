@@ -717,10 +717,10 @@ LIKES_HOME = """() => { const c = document.querySelector('[data-sec=profile]'); 
     btns: [...c.querySelectorAll('button')].map(b => [text(b), b.dataset.action, b.className, !!b.querySelector('svg'), b === c.lastElementChild])}; }"""
 
 # Two pets with a habit each and nothing to compare: the same brand and one variety per flavour. Their meals one a day,
-# oldest first, as [variety, rating]: Minka leaves a variety served again, Tiger likes it better
+# oldest first, as [variety, rating]: Minka leaves a variety served again shortly after, Tiger likes it better
 LIKES_HOUSE = """([minka, tiger]) => import('./js/store.js').then(async s => { const d = s.defaults(), day = 864e5, now = Date.now();
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}, {id: 'tiger00001', name: 'Tiger', species: 'Katze', createdAt: 2}];
-  d.products = [['x', 'Lachs'], ['y', 'Huhn']].map(([id, variety]) => ({id: 'sorte' + id + '0001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.products = [['a', 'Lachs'], ['b', 'Huhn'], ['c', 'Rind'], ['d', 'Pute']].map(([id, variety]) => ({id: 'sorte' + id + '0001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
   const meals = (pet, list, later) => list.map(([sort, r], i) => ({id: pet.slice(0, 5) + 'meal' + String(i).padStart(4, '0'), productId: 'sorte' + sort + '0001', note: '',
     servedAt: now - (list.length - i) * day + later, pets: {[pet]: {r, at: now}}}));
   d.servings = [...meals('minka00001', minka, 0), ...meals('tiger00001', tiger, 36e5)].sort((a, b) => b.servedAt - a.servedAt);
@@ -738,9 +738,10 @@ NOVELTY_HOUSE = """() => import('./js/store.js').then(async s => { const d = s.d
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
-def runs(*groups):
-    """Meals in runs of one variety, oldest first: (variety, rating, …) each, the runs taking turns between two"""
-    return [[sort, r] for sort, *rs in groups for r in rs]
+def turns(*meals):
+    """Meals oldest first, as (variety, rating) each: four varieties taking turns, so that a meal has three others
+    before it, and a variety served again right away, which is shortly after the same one"""
+    return [[sort, r] for sort, r in meals]
 
 
 async def test_profile(browser, url):
@@ -814,33 +815,19 @@ async def test_profile(browser, url):
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
 
-    # Abwechslung, per pet with its picture under „Alle“, and nothing to compare: the home page shows the habits
-    minka = runs(
-        ('x', 'top', 'top'),
-        ('y', 'top', 'top'),
-        ('x', 'top', 'top'),
-        ('y', 'top', 'schlecht'),
-        ('x', 'top', 'schlecht'),
-        ('y', 'top', 'schlecht'),
-        ('x', 'top', 'schlecht'),
-        ('y', 'schlecht', 'schlecht'),
-        ('x', 'top'),
-        ('y', 'top'),
-        ('x', 'top'),
-        ('y', 'schlecht'),
-        ('x', 'top'),
-        ('y', 'schlecht'),
-        ('x', 'top'),
+    # Abwechslung, per pet with its picture under „Alle“, and nothing to compare: the home page shows the habits. Minka:
+    # 15 meals after other varieties, 12 of them good, against 8 shortly after the same one, 3 of them good; and every
+    # variety good the first time, 11 of the 19 later ratings. Tiger the other way round: 2 of 8 against 7 of 8, and
+    # one variety of four good the first time, 8 of 12 later.
+    T, X = 'top', 'schlecht'
+    minka = turns(
+        *[('a', T), ('a', X), ('b', T), ('b', X), ('c', T), ('c', T), ('d', T), ('d', X)],
+        *[('a', X), ('a', T), ('b', T), ('b', X), ('c', T), ('c', T), ('d', T), ('d', X)],
+        *[('a', T), ('b', T), ('c', T), ('d', X), ('a', T), ('b', T), ('c', X)],
     )
-    tiger = runs(
-        ('x', 'schlecht', 'top'),
-        ('y', 'schlecht', 'top'),
-        ('x', 'schlecht', 'top'),
-        ('y', 'top', 'top'),
-        ('x', 'schlecht', 'top'),
-        ('y', 'schlecht', 'top'),
-        ('x', 'top', 'schlecht'),
-        ('y', 'schlecht', 'top'),
+    tiger = turns(
+        *[('a', X), ('a', T), ('b', X), ('b', T), ('c', X), ('c', T), ('d', T), ('d', T)],
+        *[('a', X), ('a', T), ('b', T), ('b', T), ('c', X), ('c', X), ('d', X), ('d', T)],
     )
     await pg.evaluate(LIKES_HOUSE, [minka, tiger])
     await idle(pg)
@@ -854,8 +841,8 @@ async def test_profile(browser, url):
         and home['rows'] == []
         and home['told']
         == [
-            ['av', 'Minka mag Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig'],
-            ['av', 'Tiger ist ein Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an'],
+            ['av', 'Minka mag Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig'],
+            ['av', 'Tiger ist ein Gewohnheitstier: dieselbe Sorte kurz hintereinander kommt besser an'],
         ]
         and title == 'Vorlieben für alle Tiere'
         and both[0]
@@ -864,16 +851,26 @@ async def test_profile(browser, url):
         == [
             [
                 'av',
-                'Minka mag Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig.',
-                'Nach derselben Sorte 3 von 8 Mal gut gefressen, sonst 12 von 15',
+                'Minka mag Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.',
+                'Kurz nach derselben Sorte 3 von 8 Mal gut gefressen, sonst 12 von 15.',
             ],
             [
                 'av',
-                'Tiger ist ein Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an.',
-                'Nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8',
+                'Tiger ist ein Gewohnheitstier: dieselbe Sorte kurz hintereinander kommt besser an.',
+                'Kurz nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8.',
+            ],
+            [
+                'av',
+                'Minka ist neugierig: Neues kommt erst gut an, dann lässt es nach.',
+                '4 von 4 Sorten beim ersten Mal gut gefressen, danach 11 von 19 Mal.',
+            ],
+            [
+                'av',
+                'Tiger braucht Anlauf: beim ersten Mal bleibt öfter was übrig als später.',
+                '1 von 4 Sorten beim ersten Mal gut gefressen, danach 8 von 12 Mal.',
             ],
         ],
-        f'Abwechslung: one line per pet with its picture, either way; with nothing to compare, the home page shows the habits ({home}, {title}, {both})',
+        f'Abwechslung and Neuheit: one line per pet with its picture, either way, in the order the home page shows the first two of; with nothing to compare, the home page shows the habits ({home}, {title}, {both})',
     )
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
@@ -889,9 +886,14 @@ async def test_profile(browser, url):
         == [
             [
                 'icon',
-                'Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an.',
-                'Nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8',
-            ]
+                'Gewohnheitstier: dieselbe Sorte kurz hintereinander kommt besser an.',
+                'Kurz nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8.',
+            ],
+            [
+                'icon',
+                'Braucht Anlauf: beim ersten Mal bleibt öfter was übrig als später.',
+                '1 von 4 Sorten beim ersten Mal gut gefressen, danach 8 von 12 Mal.',
+            ],
         ],
         f'with Tiger chosen: only Tiger, with the icon instead of a picture ({title}, {tiger_only[1]["told"]})',
     )

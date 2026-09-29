@@ -270,38 +270,41 @@ export function habits(m) {
   return out;
 }
 
-/* Abwechslung, per pet: its rated meals that are not treats, split into those that followed the same variety (its
-   meal before, not counting treats, was the same one) and the rest. Only meals up to now, of varieties there are.
-   {[petId]: {same: {n, good}, other: {n, good}}} */
+/* Abwechslung, per pet: its rated meals that are not treats, split into those that came shortly after the same variety
+   (the pet had it within its REPEAT.within meals before, treats left out, a meal of unknown food taking one of the
+   places) and the rest. Only meals up to now, of varieties there are. {[petId]: {same: {n, good}, other: {n, good}}} */
+const REPEAT = {within: 3};
 function repeatsOf(db, petIds, now) {
   const snack = new Set(),
     known = new Set(), // the other varieties
     out = {},
-    next = {}; // per pet its meal after the one at hand, still waiting to learn what came before it
+    before = {}; // per pet the varieties of its last meals, the newest last
   for (const p of db.products) (typeOf(p) === 'Snack' ? snack : known).add(p.id);
-  for (const id of petIds) out[id] = {same: {n: 0, good: 0}, other: {n: 0, good: 0}};
-  const count = (pid, before) => {
-    const meal = next[pid];
-    if (!meal?.r || !known.has(meal.id)) return;
-    const side = out[pid][meal.id === before ? 'same' : 'other'];
-    side.n++;
-    if (RATINGS[meal.r].score >= GOOD) side.good++;
-  };
-  for (const s of db.servings) {
-    // newest first, so the meal before is the next one of the same pet
+  for (const id of petIds) {
+    out[id] = {same: {n: 0, good: 0}, other: {n: 0, good: 0}};
+    before[id] = [];
+  }
+  for (let i = db.servings.length - 1; i >= 0; i--) {
+    // the oldest first, so the meals before a meal have been seen when it comes
+    const s = db.servings[i];
     if (s.servedAt > now || snack.has(s.productId)) continue;
     for (const pid in s.pets) {
       if (!out[pid]) continue;
-      count(pid, s.productId);
-      next[pid] = {id: s.productId, r: rOf(s.pets[pid])};
+      const r = rOf(s.pets[pid]);
+      if (r && known.has(s.productId)) {
+        const side = out[pid][before[pid].includes(s.productId) ? 'same' : 'other'];
+        side.n++;
+        if (RATINGS[r].score >= GOOD) side.good++;
+      }
+      before[pid].push(s.productId || null);
+      if (before[pid].length > REPEAT.within) before[pid].shift();
     }
   }
-  for (const pid in next) count(pid, undefined); // the first meal has none before it
   return out;
 }
-/* Whether a pet likes a change: its meals after the same variety against the rest, both from VARIETY.min ratings.
-   Their shares of good ones VARIETY.gap points apart make a habit: lower after the same variety, it likes a change
-   („abwechslung“); higher, it is a creature of habit („gewohnheit“). One per pet in the filter.
+/* Whether a pet likes a change: its meals shortly after the same variety against the rest, both from VARIETY.min
+   ratings. Their shares of good ones VARIETY.gap points apart make a habit: lower after the same variety, it likes a
+   change („abwechslung“); higher, it is a creature of habit („gewohnheit“). One per pet in the filter.
    [{pet, kind, same: {n, good}, other: {n, good}}] */
 const VARIETY = {min: 6, gap: 25};
 export function variety(m) {
