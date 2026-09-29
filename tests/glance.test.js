@@ -2,9 +2,10 @@
 process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {glance} from '../app/www/js/glance.js';
+import {glance, takeTurn, TURNS} from '../app/www/js/glance.js';
 import {nextMeal, nextMilestone, VERDICTS} from '../app/www/js/smart.js';
 import {RATINGS} from '../app/www/js/config.js';
+import {addDays} from '../app/www/js/dates.js';
 import {FACTS, factsOn, fill, GENERAL, lastSunday, LINES, nthSaturday} from '../app/www/js/views/facts.js';
 
 const at = text => new Date(text).getTime();
@@ -167,6 +168,227 @@ test('the next milestone: the meals left to it, none past the last one', () => {
   assert.deepEqual(
     [nextMilestone(meals(47)), nextMilestone(meals(50)), nextMilestone(meals(1000))],
     [{n: 50, left: 3}, {n: 100, left: 50}, null],
+  );
+});
+
+const pad = n => String(n).padStart(2, '0');
+const meal = (when, by = '') => ['nass', 'A', when, by];
+/* A meal at 08:00 on every day of June from `from` to `to` */
+const daily = (from, to, by = '') => Array.from({length: to - from + 1}, (_, i) => meal(`${pad(from + i)} 08:00`, by));
+
+test('the first meal: when, how many days ago and how many meals since; the varieties tried over the whole diary', () => {
+  const old = at('2025-01-01T08:00'); // beyond the 400 days the glance looks at day by day
+  const db = household(
+    ['nass', 'alt', 'trocken'],
+    [
+      meal('10 08:00'),
+      meal('09 08:00'),
+      ['alt', 'A', old, ''],
+      ['trocken', 'B', '08 08:00', ''],
+      ['weg', 'A', '07 08:00', ''],
+    ],
+  );
+  const g = glance(db, ['A'], NOW);
+  assert.deepEqual([g.first, g.sorts], [{at: old, days: 525, meals: 4}, 2], 'a variety no longer there does not count');
+  assert.deepEqual(
+    [glance(db, ['B'], NOW).first, glance(household([], []), ['A'], NOW).first],
+    [{at: at(day(8, '08:00')), days: 2, meals: 1}, null],
+  );
+});
+
+test('anniversary: the first meal exactly 1, 3, 6 or 12 months back, on the last day of a month where that month has no such day', () => {
+  const since = (first, now = NOW) => glance(household(['nass'], [meal(first), meal(now)]), ['A'], now).anniversary;
+  assert.deepEqual(
+    [
+      '2026-05-10',
+      '2026-03-10',
+      '2025-12-10',
+      '2025-06-10',
+      '2026-05-11',
+      '2026-05-09',
+      '2026-04-10',
+      '2026-06-10',
+    ].map(d => since(at(d + 'T08:00'))),
+    [1, 3, 6, 12, null, null, null, null],
+    'to the day: a day off, two months and today itself are none',
+  );
+  const jan31 = at('2026-01-31T08:00');
+  assert.deepEqual(
+    [since(jan31, at('2026-02-28T12:00')), since(jan31, at('2026-03-03T12:00')), since(jan31, at('2026-03-31T12:00'))],
+    [1, null, null],
+    'January 31 has its month on February 28, not on March 3',
+  );
+});
+
+test('records: today the most meals of any day from 3 on, the streak longer than any before from 7 days on', () => {
+  const rec = list => glance(household(['nass', snack], list), ['A'], NOW).record;
+  const today3 = ['10 06:00', '10 08:00', '10 10:00'].map(t => meal(t)); // up to noon, which is now
+  assert.deepEqual(rec([...today3, meal('09 07:00'), meal('09 18:00')]), {meals: 3, streak: 0});
+  assert.deepEqual(
+    rec([...today3, meal('09 07:00'), meal('09 12:00'), meal('09 18:00')]),
+    {meals: 0, streak: 0},
+    'a day with as many is no record',
+  );
+  assert.deepEqual(
+    rec([...today3.slice(0, 2), ['snack', 'A', '10 19:00', ''], meal('09 07:00')]),
+    {meals: 0, streak: 0},
+    'two meals and a treat are not three meals',
+  );
+  assert.deepEqual(
+    [rec(daily(4, 10)).streak, rec(daily(5, 10)).streak, rec(daily(3, 9)).streak],
+    [7, 0, 0],
+    'seven days up to today; six, or seven up to yesterday, are none',
+  );
+  const may = Array.from({length: 7}, (_, i) => meal(at(`2026-05-${pad(20 + i)}T08:00`))); // seven days once before
+  assert.deepEqual(
+    [rec([...may, ...daily(4, 10)]).streak, rec([...may, ...daily(3, 10)]).streak],
+    [0, 8],
+    'longer than any run before, not as long',
+  );
+});
+
+test("off the usual time: today's last meal 30 to 180 minutes off its slot, earlier negative, or at yesterday's minute", () => {
+  const week = [3, 4, 5, 6, 7, 8, 9].flatMap(d => [meal(`0${d} 07:15`), meal(`0${d} 18:30`)]);
+  const g = (extra, now = NOW) => glance(household(['nass'], [...week, ...extra]), ['A'], now);
+  assert.deepEqual(
+    ['10 07:55', '10 06:35', '10 07:44', '10 10:15', '10 10:16'].map(t => g([meal(t)]).shift),
+    [{at: 435, diff: 40}, {at: 435, diff: -40}, null, {at: 435, diff: 180}, null],
+  );
+  assert.deepEqual(
+    [g([]).shift, g([meal('10 07:15'), meal('10 12:00')]).shift],
+    [null, null],
+    'nothing today, or the last meal beyond the span',
+  );
+  assert.deepEqual(
+    [
+      g([meal('10 07:15')]).sameMinute,
+      g([meal('10 18:30')], at(day(10, '19:00'))).sameMinute,
+      g([meal('10 07:16')]).sameMinute,
+    ],
+    [true, true, false],
+  );
+});
+
+test("a weekday's own time: this weekday's meals in a slot over 8 weeks, from 3 on each side, at least 30 minutes off the other days; a meal at that time is not off", () => {
+  const today = at(day(10, '00:00')); // a Wednesday
+  const weeks = (wed, n = 8) =>
+    Array.from({length: 7 * n}, (_, i) => {
+      const d = addDays(today, -i),
+        time = new Date(d).getDay() === 3 ? wed : '07:00';
+      return time && meal(at(`2026-${pad(new Date(d).getMonth() + 1)}-${pad(new Date(d).getDate())}T${time}`));
+    }).filter(Boolean);
+  const g = list => glance(household(['nass'], list), ['A'], NOW);
+  assert.deepEqual(g(weeks('08:00')).weekday, {at: 420, mine: 480, later: true, weekday: 3});
+  assert.deepEqual(g(weeks('06:15')).weekday, {at: 420, mine: 375, later: false, weekday: 3});
+  assert.deepEqual(
+    [g(weeks('07:20')).weekday, g(weeks('08:00', 2)).weekday, g(weeks(null)).weekday],
+    [null, null, null],
+    '20 minutes are none, two Wednesdays are too few, none without a meal on the day',
+  );
+  assert.deepEqual(
+    [g(weeks('08:00')).shift, g(weeks('07:20')).shift, g([...weeks('08:00').slice(1), meal('10 08:45')]).shift],
+    [null, null, {at: 420, diff: 45}],
+    "today's meal at the weekday's time is not off, one at the usual time neither; 45 minutes past the weekday's time is",
+  );
+});
+
+test('a feeding run: a person feeding day after day up to the last day fed on, from 3 days, with another name where there is one', () => {
+  const by = (d, who) => meal(`${pad(d)} 08:00`, who);
+  const g = list => glance(household(['nass'], list), ['A'], NOW).feedRun;
+  assert.deepEqual(g([by(10, 'Ben'), by(9, 'Ben'), by(8, 'Ben'), by(7, 'Jonas')]), {
+    name: 'Ben',
+    days: 3,
+    other: 'Jonas',
+  });
+  assert.deepEqual(g([by(10, 'Ben'), by(9, 'Ben'), by(8, 'Jonas')]), null, 'two days are no run');
+  assert.deepEqual(g([by(10, 'Ben'), by(9, 'Ben'), by(8, 'Ben')]), {name: 'Ben', days: 3, other: null}, 'nobody else');
+  assert.deepEqual(
+    g([by(9, 'Ben'), by(8, 'Ben'), by(7, 'Ben'), by(6, 'Anna')]),
+    {name: 'Ben', days: 3, other: 'Anna'},
+    'up to yesterday while nothing has been served today',
+  );
+  assert.deepEqual(
+    g([by(10, 'Ben'), by(9, 'Ben'), by(8, 'Ben'), by(9, 'Jonas')]),
+    {name: 'Ben', days: 3, other: 'Jonas'},
+    'someone else feeding in between does not end it',
+  );
+});
+
+test('a look back: the variety served exactly a year ago', () => {
+  const g = list => glance(household(['nass', 'alt'], list), ['A'], NOW).lookback;
+  assert.deepEqual(
+    [
+      g([meal('10 08:00'), ['alt', 'A', at('2025-06-10T19:00'), '']]),
+      g([meal('10 08:00'), ['alt', 'A', at('2025-06-11T08:00'), '']]),
+      g([meal('10 08:00'), ['weg', 'A', at('2025-06-10T08:00'), '']]),
+    ],
+    ['alt', null, null],
+    'to the day, and only a variety still there',
+  );
+});
+
+test('the turn: the same choice all day, then the kinds in their order, none of the last three days, a fact none of the last 60 days; with nothing left the block on the kinds falls first, then the one on the facts', () => {
+  const on = i => NOW + i * 864e5;
+  let m = null;
+  const turns = (kinds, facts, n, from = 0) =>
+    Array.from({length: n}, (_, i) => {
+      const r = takeTurn(kinds, facts, m, on(from + i));
+      m = r.memory;
+      return r.kind === 'fact' ? r.fact : r.kind;
+    });
+  const all = turns(TURNS, ['f1', 'f2'], 11);
+  assert.deepEqual(
+    [all.slice(0, 9), ['f1', 'f2'].includes(all[9]), all[10]],
+    [TURNS.slice(0, 9), true, 'duel'],
+    'every kind gets its day, in the order of TURNS',
+  );
+  assert.deepEqual(m.kinds, ['days', 'fact', 'duel'], 'the memory keeps the last three kinds');
+  const again = takeTurn(TURNS, ['f1', 'f2'], m, on(10));
+  assert.ok(again.kind === 'duel' && again.memory === m, 'the same day, the same choice, the memory untouched');
+  m = null;
+  const four = turns(['duel', 'streak', 'idea', 'week'], [], 8);
+  assert.deepEqual(four, ['duel', 'streak', 'idea', 'week', 'duel', 'streak', 'idea', 'week']);
+  assert.ok(
+    four.every((k, i) => !four.slice(Math.max(0, i - 3), i).includes(k)),
+    'never a kind of the last three days',
+  );
+  m = null;
+  assert.deepEqual(
+    turns(['duel', 'streak'], [], 4),
+    ['duel', 'streak', 'duel', 'streak'],
+    'with two the block on the kinds falls, and still no kind twice in a row',
+  );
+  m = null;
+  assert.deepEqual(turns(['duel'], [], 2), ['duel', 'duel'], 'with one it comes every day');
+  m = null;
+  const facts = turns(['fact'], ['a', 'b', 'c'], 4);
+  assert.deepEqual(
+    [new Set(facts.slice(0, 3)).size, ['a', 'b', 'c'].includes(facts[3]), m.facts.length, m.kinds],
+    [3, true, 4, ['fact', 'fact', 'fact']],
+    'three facts on three days, then the block on the facts falls',
+  );
+  m = null;
+  assert.deepEqual(
+    turns(['fact', 'duel'], ['a'], 4),
+    ['duel', 'a', 'duel', 'duel'],
+    'a fact shown is no fact left: the kind gives way while another one is there',
+  );
+  m = {day: '2026-06-10', kind: 'fact', fact: 'a', kinds: ['fact'], facts: [{id: 'a', day: '2026-06-10'}]};
+  const soon = takeTurn(['fact'], ['a', 'b'], m, on(59)),
+    later = takeTurn(['fact'], ['a', 'b'], m, on(60));
+  assert.deepEqual(
+    [soon.fact, soon.memory.facts.map(f => f.id)],
+    ['b', ['a', 'b']],
+    'a fact of 59 days ago is still held back',
+  );
+  assert.ok(
+    ['a', 'b'].includes(later.fact) && later.memory.facts.every(f => f.day > '2026-06-10'),
+    'after 60 days it is forgotten',
+  );
+  assert.deepEqual(
+    takeTurn([], ['a'], null, NOW),
+    {kind: null, fact: null, memory: {day: '', kind: null, fact: null, kinds: [], facts: []}},
+    'nothing to say',
   );
 });
 
