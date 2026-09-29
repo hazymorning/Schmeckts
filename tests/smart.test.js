@@ -16,7 +16,7 @@ import {
   report,
   variety,
 } from '../app/www/js/smart.js';
-import {RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
+import {flavoursOf, RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
 
 const DAY = 864e5,
   NOW = Date.UTC(2026, 5, 3, 10);
@@ -483,6 +483,50 @@ test('profile: comparisons within one food type only', () => {
     ],
   );
   assert.deepEqual(profiled(mixed), [], 'a brand of wet food and one of dry food are no comparison');
+});
+
+test('flavours: every group a name holds, matched at the start of a word, the general fish only without a particular one', () => {
+  const cases = {
+    'Seelachs in Soße': ['Fisch'],
+    'Wildschwein mit Nachtkerzenöl': ['Wildschwein'],
+    Hirschragout: ['Wild'],
+    'Huhn & Thunfisch': ['Thunfisch', 'Huhn'],
+    'Pferd mit Nachtkerzenöl': ['Pferd'],
+    Rinderherz: ['Rind', 'Herz'],
+    Elemente: [],
+    Herzhaftes: [],
+    'Lachs mit Fischöl': ['Lachs'],
+    'Forelle & Lachs': ['Lachs', 'Fisch'],
+    Hühnerleber: ['Huhn', 'Leber'],
+  };
+  for (const [text, want] of Object.entries(cases)) assert.deepEqual(flavoursOf(text), want, text);
+});
+
+test('profile by flavour: a variety naming two flavours counts in both groups, and the comparison is never clear through it', () => {
+  const db = household(
+    ['A'],
+    [
+      {id: 'a', variety: 'Huhn in Soße'},
+      {id: 'b', variety: 'Thunfisch in Soße'},
+      {id: 'ab', variety: 'Huhn & Thunfisch'},
+    ],
+    [...rate('a', 'A', [T, T]), ...rate('b', 'A', [X, X]), ...rate('ab', 'A', [T, X])],
+  );
+  assert.deepEqual(
+    profiled(db),
+    [
+      [
+        'geschmack',
+        'Nassfutter',
+        [
+          ['Huhn', 3, 4],
+          ['Thunfisch', 1, 4],
+        ],
+        false,
+      ],
+    ],
+    'the mixed variety makes both groups, and standing in both it keeps them from being clearly apart',
+  );
 });
 
 test('profile by consistency: the texture field, the keywords only when it is missing, apart for wet food and treats', () => {

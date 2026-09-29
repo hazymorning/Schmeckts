@@ -1,6 +1,6 @@
 /* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
    derive.js. The rules are in PROJECT.md, section "Evaluation". */
-import {FLAVORS, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
+import {flavoursOf, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
 import {addDays, dayKey, dayStart} from './dates.js';
 
 const DAY = 864e5;
@@ -27,7 +27,6 @@ export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score < NO ? 's
 export const scoreCls = v => 'r-' + toneOf(v);
 export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
-const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) || [])[0];
 
 /* Sum over ratings. All weights shrink at the same rate, so points / weights does not depend on when it is
    computed: a sum holds until one of its meals changes. list: the ratings themselves, in no particular order, kept
@@ -180,29 +179,30 @@ const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
 const GAP = 0.3,
   TWO = 2; // varieties in a group, ratings of a variety
+/* The groups a variety belongs to in each dimension: its consistency (the field, falling back to the keywords only
+   when it is missing), every flavour its name holds, and its brand */
 const DIMENSIONS = [
-  ['konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]], // the field, falling back to the keywords only when it is missing
-  ['geschmack', p => keywordOf(FLAVORS, p.variety)],
-  ['marke', p => p.brand],
+  ['konsistenz', p => [(textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]]],
+  ['geschmack', p => flavoursOf(p.variety)],
+  ['marke', p => [p.brand]],
 ];
 const HABITS = ['sosse', 'eager']; // levels that say how a variety is eaten
 
 /* The profile: per food type the dimensions in a fixed order (consistency or treat type, flavour, brand), each with
    its groups ranked by how often they went down well, the best first, from two groups on. A dimension is clear
    („deutlich“) where its best and its weakest group lie at least GAP apart and every variety of the one did better
-   than every variety of the other, so no single variety can carry it.
+   than every variety of the other, so no single variety can carry it. A variety naming two flavours („Huhn &
+   Thunfisch“) counts in both groups; standing in the best and the weakest at once, it keeps that comparison from
+   being clear, which is meant.
    [{kind, type, groups: [{key, ids, n, good, share, low, high}], gap, clear}] */
 export function profile(m) {
   const out = [],
     rated = m.sorts.filter(e => e.n >= TWO);
   for (const type of TYPES) {
     const mine = rated.filter(e => typeOf(e.product) === type);
-    for (const [kind, keyOf] of DIMENSIONS) {
+    for (const [kind, keysOf] of DIMENSIONS) {
       const groups = new Map();
-      for (const e of mine) {
-        const k = keyOf(e.product);
-        if (k) groups.set(k, [...(groups.get(k) || []), e]);
-      }
+      for (const e of mine) for (const k of keysOf(e.product)) if (k) groups.set(k, [...(groups.get(k) || []), e]);
       const ranked = [...groups]
         .filter(([, l]) => l.length >= TWO)
         .map(([key, l]) => groupOf(key, l))
