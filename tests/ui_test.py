@@ -3609,6 +3609,62 @@ async def test_skeleton(browser, url):
     await ctx.close()
 
 
+# The naming sheet's sentence about the reading, its bold parts, the hint where nothing was read, and the main button
+SAID = """() => { const say = document.querySelector('#sheet .say'), hint = document.querySelector('#sheet .hint.read-note'), btn = document.querySelector('#sheet [data-action=save-name]');
+  return [say?.innerText ?? null, say ? [...say.querySelectorAll('b')].map(b => b.innerText) : null, hint?.innerText ?? null, btn.innerText.trim(), !!btn.querySelector('.ic')]; }"""
+
+
+async def test_reading_said(browser, url):
+    print('the reading stands as a sentence to confirm, and the main button confirms it')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    async def photo(text):
+        await pg.evaluate(f'window.__ocrText = {json.dumps(text)}')
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await until(pg, "db.servings[0]?.status === 'noserver'")
+        await idle(pg)
+        got = await pg.evaluate(SAID)
+        await pg.click('#sheet [data-action=close]')
+        await idle(pg)
+        return got
+
+    both = await photo('Sheba\nLachs in Soße\n85 g')
+    await shot(pg, 'reading-said')
+    brand = await photo('Whiskas\n85 g')
+    variety = await photo('Huhn in Gelee')
+    nothing = await photo('12345\n850 g')
+    check(
+        both == ['Gelesen: Sheba, Lachs in Soße. Passt das?', ['Sheba', 'Lachs in Soße'], None, 'Passt so', True]
+        and brand == ['Gelesen: Whiskas. Passt das?', ['Whiskas'], None, 'Passt so', True]
+        and variety == ['Gelesen: Huhn in Gelee. Passt das?', ['Huhn in Gelee'], None, 'Passt so', True]
+        and nothing == [None, None, 'Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein.', 'Speichern', True],
+        f'brand and variety in bold, one alone without the comma, „Passt so“ while there is a reading; nothing read: a hint and „Speichern“ ({both}, {brand}, {variety}, {nothing})',
+    )
+    # Named, the sentence is gone and the button says „Speichern“ again
+    await pg.click('.pend-head')
+    await idle(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    named = await pg.evaluate(SAID)
+    check(named == [None, None, None, 'Speichern', True], f'„Futter ändern“ for a named meal: no sentence, „Speichern“ ({named})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_known_photo(browser, url):
     print('a photo of a known variety: served without the sheet, and undo takes the recognition back, not the meal')
 
@@ -6151,6 +6207,7 @@ run_tests(
         'pack-lines': test_pack_lines,
         'known-photo': test_known_photo,
         'skeleton': test_skeleton,
+        'reading-said': test_reading_said,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

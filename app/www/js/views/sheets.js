@@ -135,7 +135,14 @@ function viewName() {
         : ''
     }${note}`;
   if (patient) return top + fieldSkeleton + fieldSkeleton; // as tall as label and field, so nothing jumps
-  return `${top}
+  // What the phone read, as a sentence to confirm, or that there was nothing to read
+  const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
+    said = read.length
+      ? `<p class="say read-note">Gelesen: ${read.map(x => `<b>${esc(x)}</b>`).join(', ')}. Passt das?</p>`
+      : serving?.status === 'noserver' && !serving.productId
+        ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein.</p>`
+        : '';
+  return `${top}${said}
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
@@ -144,7 +151,7 @@ function viewName() {
     <span class="label">Art</span>
     <div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>
     ${textureChips(s)}
-    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button>${serving && !serving.productId ? deleteMealBtn(serving.id) : ''}</div>`;
+    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !serving.productId ? deleteMealBtn(serving.id) : ''}</div>`;
 }
 /* A field still to come: a label's line and a field's block, shimmering, no input */
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;

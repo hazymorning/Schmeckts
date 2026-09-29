@@ -1949,6 +1949,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .photo-btn:has(> .name-photo) {
   width: 100%;
 }
+/* Naming: what was read as a sentence, or that nothing was, under the photo */
+.read-note {
+  margin-top: var(--space-3);
+}
 .suggest .label {
   margin: var(--space-4h) 0 var(--space-hair);
 }
