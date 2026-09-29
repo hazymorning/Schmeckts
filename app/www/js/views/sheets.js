@@ -146,8 +146,10 @@ function viewName() {
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
+    <div class="suggest" id="brandChips"></div>
     <label class="label" for="f-variety">Sorte</label>
     <input id="f-variety" class="field" data-field="variety" value="${esc(s.variety)}" placeholder="z. B. Lachs in Soße" autocomplete="off" enterkeyhint="done">
+    <div class="suggest" id="lineChips"></div>
     <span class="label">Art</span>
     <div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>
     ${textureChips(s)}
@@ -162,18 +164,19 @@ function textureChips(x, note = '') {
     ? `<div class="tex"><span class="label">${t.title}</span><div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}</div>`
     : '';
 }
-/* What the phone read off the packaging, as chips: only the phone's own reading has them (recognize.js), they live
-   in memory only, and a tap puts a line into a field or takes it out again. */
-const packChips = serving => {
-  const lines = (serving && memLines.get(serving.id)) || [];
-  if (!lines.length) return '';
-  return `<span class="label">Auf der Packung gelesen</span><div class="chips">${lines
+/* What the phone read off the packaging, as chips under the field each one is for: the brands under „Marke“, the
+   lines under „Sorte“ with their label. Only the phone's own reading has them (recognize.js), they live in memory
+   only. The pressed chip is the one the field holds exactly; a tap sets the field to a chip or, on the pressed one,
+   clears it (logic/editing.js). For a screen reader a chip names its field. */
+const chipsOf = (field, list, value) =>
+  `<div class="chips">${list
     .map(
       l =>
-        `<button class="chip" aria-pressed="${hasLine(sheet.brand, l) || hasLine(sheet.variety, l)}" data-action="pack-line" data-v="${esc(l)}">${esc(l)}</button>`,
+        `<button class="chip" aria-pressed="${hasLine(value, l)}" data-action="pack-line" data-field="${field}" data-v="${esc(l)}" aria-label="${field === 'brand' ? 'Marke' : 'Sorte'}: ${esc(l)}">${esc(l)}</button>`,
     )
     .join('')}</div>`;
-};
+/* The boxes that follow the fields while naming, each drawn on its own so the fields keep their focus: „Meinst du?“
+   or „Schon mal gehabt?“ above the fields, the brands read under „Marke“, the lines read under „Sorte“ */
 export function renderSuggestions() {
   const box = $('#suggest');
   if (!box || !sheet) return;
@@ -198,8 +201,15 @@ export function renderSuggestions() {
         p =>
           `<button class="box sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p, 'm')}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`,
       )
-      .join('') +
-    packChips(serving);
+      .join('');
+  const read = (serving && memLines.get(serving.id)) || {lines: [], brands: []},
+    brands = $('#brandChips'),
+    lines = $('#lineChips');
+  if (brands) brands.innerHTML = read.brands.length ? chipsOf('brand', read.brands, sheet.brand) : '';
+  if (lines)
+    lines.innerHTML = read.lines.length
+      ? `<span class="label">Auf der Packung gelesen</span>${chipsOf('variety', read.lines, sheet.variety)}`
+      : '';
 }
 
 /* Feeding: barcode and photo as equally wide buttons; „Füttern beginnt mit“ hides one of them and the other takes

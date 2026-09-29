@@ -215,7 +215,8 @@ async function recognizeServing(id, sharp = '') {
    error. Sets status and error on the meal, which stay on this phone. */
 function takeResult(s, found, house) {
   const err = found.error;
-  if (found.lines?.length) memLines.set(s.id, found.lines); // what the phone read, as chips while naming
+  if (found.lines?.length || found.brands?.length)
+    memLines.set(s.id, {lines: found.lines || [], brands: found.brands || []}); // what the phone read, as chips while naming
   if (found.products?.length) {
     tries.delete(s.id);
     if (found.source === 'text')

@@ -7,7 +7,16 @@ import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhoto} from './native.js';
 import {cropped, photoOf, readable} from './images.js';
-import {CROP_WIDTH, focusOf, joinReadings, packLines, readPack, SECOND_PASS, SECOND_PASS_MS} from './ocr.js';
+import {
+  CROP_WIDTH,
+  focusOf,
+  joinReadings,
+  packBrands,
+  packLines,
+  readPack,
+  SECOND_PASS,
+  SECOND_PASS_MS,
+} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
@@ -19,7 +28,7 @@ const LOOKING = 'Barcode wird nachgeschlagen …',
   READING = 'Sorte wird erkannt …';
 
 /* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null;
-   the phone's own reading adds the lines it read. */
+   the phone's own reading adds the lines and the brands it read. */
 const STEPS = [
   {
     name: 'codes',
@@ -49,8 +58,8 @@ const STEPS = [
         // one of our own varieties on the packaging: served like a barcode hit, where the phone is the one reading
         known = !photoByServer() && pack.known ? getProduct(pack.known) : null;
       const hit = known ? {products: [known]} : asDetails(pack);
-      // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
-      return hit && {...hit, lines: packLines(read, '', db.products)};
+      // the lines and the brands are offered as chips while naming, tidied the same way, so a chip and the field agree
+      return hit && {...hit, lines: packLines(read, '', db.products), brands: packBrands(read, db.products)};
     },
   },
 ];
@@ -76,7 +85,8 @@ async function readAgain(b64, first) {
 export const photoByServer = () => isConnected() && prefs.serverPhoto;
 
 /* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
-   synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
+   synced. {lines, brands}: while naming, the lines stand as chips under „Sorte“ and the brands under „Marke“
+   (views/sheets.js). */
 export const memLines = new Map();
 /* When the phone began reading a meal's packaging, per meal and in memory (logic/feeding.js keeps it): for
    READ_PATIENCE from then on „Futter benennen“ shows a skeleton in place of the fields, after that the empty fields

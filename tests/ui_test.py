@@ -3722,7 +3722,8 @@ async def test_known_photo(browser, url):
     check(
         meal == [None, 'noserver', True, True, ['Sheba', 'Lachs in Soße']]
         and view[:5] == [True, 'serving', 'name', 'Sheba', 'Lachs in Soße']
-        and chips == [['Sheba', 'true'], ['Lachs in Soße', 'true']]
+        and chips == [['Sheba', 'false'], ['Lachs in Soße', 'true']]
+        and await pg.evaluate(BRAND_CHIPS) == [['Sheba', 'true']]
         and await state(pg, 'db.products.length === 1 && db.servings.length === 2')
         and await pg.evaluate("import('./js/photos.js').then(p => p.keptPhoto('sheba000001'))"),
         f'undo takes the variety off the meal, not the meal: „Futter benennen“ opens with the reading in the fields and the lines read as chips; the variety keeps its photo ({meal}, {view}, {chips})',
@@ -3760,9 +3761,18 @@ async def test_known_photo(browser, url):
 
 
 PACK_TEXT = 'Katzenglück\nZarte Häppchen\nmit Huhn\n4 x 85 g\nZutaten: Fleisch'
-CHIPS = """() => { const box = document.getElementById('suggest'), l = [...box.querySelectorAll('.label')].find(x => x.innerText === 'Auf der Packung gelesen');
-  return l ? [...l.nextElementSibling.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
+# The chips of the lines read under „Sorte“, after their label, and of the brands read under „Marke“: text and
+# whether pressed; None without any
+CHIPS = """() => { const box = document.getElementById('lineChips'), l = box?.querySelector('.label');
+  return l && l.innerText === 'Auf der Packung gelesen' ? [...box.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
+BRAND_CHIPS = """() => { const box = document.getElementById('brandChips');
+  return box?.querySelector('.chip') ? [...box.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
 FIELDS = "[document.getElementById('f-brand').value, document.getElementById('f-variety').value]"
+# Where the chip boxes stand: the brand chips right under „Marke“, the line chips under „Sorte“, each above the next label
+CHIP_PLACES = """() => { const r = s => document.querySelector('#sheet ' + s)?.getBoundingClientRect(), b = r('#brandChips'), l = r('#lineChips');
+  const art = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Art').getBoundingClientRect();
+  return [b.height ? b.top >= r('#f-brand').bottom && b.bottom <= r('label[for=f-variety]').top : null, l.height ? l.top >= r('#f-variety').bottom && l.bottom <= art.top : null,
+    [...document.querySelectorAll('#sheet [data-action=pack-line]')].map(c => c.getAttribute('aria-label'))]; }"""
 
 
 async def test_pack_lines(browser, url):
@@ -3798,35 +3808,73 @@ async def test_pack_lines(browser, url):
     await pg.set_input_files('#camInputSheet', str(PACK))
     await until(pg, '!!db.servings[0]?.guess')
     await idle(pg)
-    chips = await pg.evaluate(CHIPS)
+    chips, brands, places = await pg.evaluate(CHIPS), await pg.evaluate(BRAND_CHIPS), await pg.evaluate(CHIP_PLACES)
     check(
-        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']],
-        f'the lines read appear as chips, and the one already in a field is marked ({chips})',
+        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']]
+        and brands is None
+        and places == [None, True, ['Sorte: Katzenglück', 'Sorte: Zarte Häppchen', 'Sorte: mit Huhn']]
+        and await pg.evaluate(FIELDS) == ['', 'mit Huhn'],
+        f'the lines read stand as chips under „Sorte“, the one the field holds pressed, each named for a screen reader; no brand known, no chip under „Marke“ ({chips}, {brands}, {places})',
     )
     await shot(pg, 'pack-lines')
 
-    # A tap fills the brand, two more make the variety, and a second tap takes a line out again
-    await pg.fill('#f-variety', '')
-    await pg.evaluate("document.getElementById('f-variety').blur()")
-    await pg.evaluate("import('./js/ui/sheet.js').then(m => { m.sheet.lastField = null; m.renderSheet(); })")
+    # A tap sets „Sorte“ to the chip, another replaces it, a tap on the pressed one clears the field, typing
+    # unpresses; the focus stays in the field being typed in all the while
+    await pg.fill('#f-variety', 'Zart')
+    await pg.click('#lineChips .chip:has-text("Zarte Häppchen")')
     await idle(pg)
-    await pg.click('#suggest .chip:has-text("Katzenglück")')
+    one = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS), await pg.evaluate('document.activeElement.id')]
+    await pg.click('#lineChips .chip:has-text("mit Huhn")')
     await idle(pg)
-    brand = await pg.evaluate(FIELDS)
-    await pg.click('#suggest .chip:has-text("Zarte Häppchen")')
+    other = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS)]
+    await pg.click('#lineChips .chip:has-text("mit Huhn")')
     await idle(pg)
-    await pg.click('#suggest .chip:has-text("mit Huhn")')
+    cleared = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS), await pg.evaluate('document.activeElement.id')]
+    await pg.click('#lineChips .chip:has-text("Katzenglück")')
     await idle(pg)
-    both = await pg.evaluate(FIELDS)
-    await pg.click('#suggest .chip:has-text("mit Huhn")')
+    await pg.type('#f-variety', 'x')
     await idle(pg)
+    typed = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS)]
     check(
-        brand == ['Katzenglück', '']
-        and both == ['Katzenglück', 'Zarte Häppchen mit Huhn']
-        and await pg.evaluate(FIELDS) == ['Katzenglück', 'Zarte Häppchen']
-        and await pg.evaluate(CHIPS) == [['Katzenglück', 'true'], ['Zarte Häppchen', 'true'], ['mit Huhn', 'false']],
-        f'one tap fills „Marke“, the next two „Sorte“, and tapping again takes a line out ({brand}, {both})',
+        one == [['', 'Zarte Häppchen'], [['Katzenglück', 'false'], ['Zarte Häppchen', 'true'], ['mit Huhn', 'false']], 'f-variety']
+        and other == [['', 'mit Huhn'], [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']]]
+        and cleared == [['', ''], [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'false']], 'f-variety']
+        and typed == [['', 'Katzenglückx'], [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'false']]],
+        f'a chip sets the field, the next replaces, the pressed one clears, a letter typed unpresses, and the focus stays in the field ({one}, {other}, {cleared}, {typed})',
     )
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
+    # Brands in the text: chips under „Marke“, at most three, in their own spelling, the one in the field pressed
+    await pg.evaluate("window.__ocrText = 'SHEBA\\nFelix\\nWhiskas\\nAnimonda\\nLachs in Soße'")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, 'db.servings[0]?.guess && !db.servings[0].productId')
+    await idle(pg)
+    brands, fields, places = await pg.evaluate(BRAND_CHIPS), await pg.evaluate(FIELDS), await pg.evaluate(CHIP_PLACES)
+    await pg.fill('#f-brand', 'Anim')
+    await pg.click('#brandChips .chip:has-text("Whiskas")')
+    await idle(pg)
+    swapped = [await pg.evaluate(FIELDS), await pg.evaluate(BRAND_CHIPS), await pg.evaluate('document.activeElement.id')]
+    labels = await pg.evaluate("[...document.querySelectorAll('#brandChips .chip')].map(c => c.getAttribute('aria-label'))")
+    check(
+        len(brands) == 3
+        and brands[:2] == [['Animonda', 'true'], ['Whiskas', 'false']]
+        and brands[2][0] in ('Sheba', 'Felix')
+        and fields[0] == 'Animonda'
+        and swapped[0][0] == 'Whiskas'
+        and swapped[1][:2] == [['Animonda', 'false'], ['Whiskas', 'true']]
+        and swapped[2] == 'f-brand'
+        and labels[:2] == ['Marke: Animonda', 'Marke: Whiskas']
+        and places[0] is True,
+        f'the brands read stand as chips right under „Marke“, three at most, spelled as we know them, the one in the field pressed; a tap replaces the field ({brands}, {fields}, {swapped}, {labels}, {places})',
+    )
+    await shot(pg, 'pack-brands')
+    await pg.click('[data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
 
     # The lines are in memory only: they are in neither the data nor the queue, and a restart loses them
     kept = await state(pg, 'JSON.stringify([db, queue])')

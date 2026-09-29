@@ -191,22 +191,30 @@ const holdsKnown = (v, products) => {
    one of the two largest lines: its list holds ordinary words as well („Classic“ of „CLASSIC ADULT“ in small
    print). After that, and in plain text, a brand from the list or of our own varieties before one only Open Pet
    Food Facts knows („Katzenfutter“ is none), then the longest. */
-function pickBrand(page, raw, products) {
+function brandHits(page, raw, products) {
   const flat = ` ${norm(raw)} `;
   const hits = brandsOf(products).filter(b => flat.includes(` ${b.key} `));
   const order = (x, y) => x.vocab - y.vocab || y.key.length - x.key.length;
-  if (!page.geo) return hits.sort(order)[0]?.name || '';
+  if (!page.geo) return hits.sort(order);
   const big = [...page.lines].sort((a, b) => b.h - a.h).slice(0, 2);
   const rank = b => {
     const at = page.lines.filter(l => ` ${norm(l.text)} `.includes(` ${b.key} `));
     return (at.some(l => big.includes(l)) ? 2 : 0) + (at.some(l => l.cy < page.height / 3) ? 1 : 0);
   };
-  return (
-    hits
-      .map(b => ({...b, r: rank(b)}))
-      .filter(b => !b.vocab || b.r >= 2)
-      .sort((x, y) => y.r - x.r || order(x, y))[0]?.name || ''
-  );
+  return hits
+    .map(b => ({...b, r: rank(b)}))
+    .filter(b => !b.vocab || b.r >= 2)
+    .sort((x, y) => y.r - x.r || order(x, y));
+}
+const pickBrand = (page, raw, products) => brandHits(page, raw, products)[0]?.name || '';
+/* The brands read off a packaging, as chips under „Marke“ while naming: the candidates the brand is picked from,
+   the likeliest first, each in its own spelling, at most PACK_BRANDS */
+export const PACK_BRANDS = 3;
+export function packBrands(read, products = []) {
+  const page = pageOf(read, products);
+  return brandHits(page, page.lines.map(l => l.text).join('\n'), products)
+    .slice(0, PACK_BRANDS)
+    .map(b => b.name);
 }
 
 /* Every brand that may be read off a packaging: the list, the brands of our own varieties, then those of Open Pet
@@ -541,15 +549,9 @@ function distance(a, b, max) {
   return prev[b.length];
 }
 
-/* A line read off the packaging inside one of the naming fields, whole and between spaces. That is how a second
-   tap finds it again, and why a field that already says something gets the line appended rather than replaced. */
-const tidy = s =>
-  String(s || '')
-    .replace(/\s+/g, ' ')
-    .trim();
-export const hasLine = (value, line) => ` ${tidy(value)} `.includes(` ${tidy(line)} `);
-export const withLine = (value, line) => (tidy(value) ? `${tidy(value)} ${tidy(line)}` : tidy(line));
-export const withoutLine = (value, line) => tidy(` ${tidy(value)} `.replace(` ${tidy(line)} `, ' '));
+/* Whether a naming field holds exactly a chip's text, case, spacing and accents aside: that chip is pressed, and a
+   tap on it clears the field (logic/editing.js) */
+export const hasLine = (value, line) => norm(value) === norm(line);
 
 function withoutBrand(v, bare) {
   // "Sheba Lachs in Soße" → "Lachs in Soße"
