@@ -3,7 +3,9 @@ process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {glance} from '../app/www/js/glance.js';
-import {nextMeal, nextMilestone} from '../app/www/js/smart.js';
+import {nextMeal, nextMilestone, VERDICTS} from '../app/www/js/smart.js';
+import {RATINGS} from '../app/www/js/config.js';
+import {FACTS, factsOn, fill, GENERAL, lastSunday, LINES, nthSaturday} from '../app/www/js/views/facts.js';
 
 const at = text => new Date(text).getTime();
 const NOW = at('2026-06-10T12:00');
@@ -165,5 +167,90 @@ test('the next milestone: the meals left to it, none past the last one', () => {
   assert.deepEqual(
     [nextMilestone(meals(47)), nextMilestone(meals(50)), nextMilestone(meals(1000))],
     [{n: 50, left: 3}, {n: 100, left: 50}, null],
+  );
+});
+
+/* How many sentences a text has, and whether one of them shouts twice */
+const sentences = t => t.split(/(?<=[.!?])\s+/).filter(Boolean);
+const LEAST = {Katze: 40, Hund: 25, Kaninchen: 12, Vogel: 8, Nager: 8};
+const SEASONAL = 6;
+const DAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+test('the facts: ids and texts unique, at most 160 characters and two sentences, months and days in shape, enough of every kind', () => {
+  const all = [...Object.values(FACTS).flat(), ...GENERAL];
+  assert.equal(new Set(all.map(f => f.id)).size, all.length, 'every id once');
+  assert.equal(new Set(all.map(f => f.text)).size, all.length, 'every text once');
+  for (const f of all) {
+    assert.match(f.id, /^[a-z]+-[a-z0-9-]+$/, f.id);
+    assert.ok(f.text.length <= 160 && sentences(f.text).length <= 2, `${f.id}: ${f.text}`);
+    assert.ok(
+      sentences(f.text).every(x => (x.match(/!/g) || []).length <= 1),
+      `${f.id}: never two exclamation marks in one sentence`,
+    );
+    assert.ok(
+      !f.months || (f.months.length && f.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12)),
+      `${f.id}: months`,
+    );
+    const on = typeof f.day === 'function' ? f.day(2026) : f.day;
+    assert.ok(on === undefined || DAY_RE.test(on), `${f.id}: day ${on}`);
+  }
+  for (const [species, n] of Object.entries(LEAST)) {
+    assert.ok(FACTS[species].length >= n, `${species}: at least ${n} facts`);
+    assert.ok(
+      FACTS[species].filter(f => f.months).length >= SEASONAL,
+      `${species}: at least ${SEASONAL} seasonal ones`,
+    );
+  }
+  assert.ok(GENERAL.length >= 12, 'at least 12 general ones');
+  assert.deepEqual(
+    [lastSunday(2026, 3), lastSunday(2026, 10), nthSaturday(2026, 9, 4), nthSaturday(2025, 9, 4)],
+    ['03-29', '10-25', '09-26', '09-27'],
+    'the clocks change on the last Sunday of March and October, the rabbits have the fourth Saturday of September',
+  );
+  const ids = list => list.map(f => f.id);
+  assert.deepEqual(
+    ids(factsOn('Katze', new Date(2026, 7, 8), true)),
+    ['katze-weltkatzentag'],
+    'a dated fact on its day',
+  );
+  assert.deepEqual(
+    ids(factsOn('Hund', new Date(2026, 9, 25), true)),
+    ['allg-zeitumstellung-herbst'],
+    'the general dated ones reach every species',
+  );
+  assert.deepEqual(ids(factsOn('Hund', new Date(2026, 9, 24), true)), [], 'and not the day before');
+  const july = factsOn('Katze', new Date(2026, 6, 1)),
+    january = factsOn('Katze', new Date(2026, 0, 1));
+  assert.ok(
+    july.every(f => !f.day && (!f.months || f.months.includes(7))) &&
+      ids(july).includes('katze-hitze-1') &&
+      !ids(january).includes('katze-hitze-1'),
+    'the facts of the season, never a dated one among them',
+  );
+  assert.ok(
+    ids(july).some(id => id.startsWith('allg-')),
+    'the general facts stand beside the species\u2019',
+  );
+  assert.ok(
+    ids(factsOn(null, new Date(2026, 6, 1))).every(id => id.startsWith('allg-')),
+    'a mixed household takes the general ones only',
+  );
+});
+
+test('the lines: at least two ways of saying every kind, two sentences at most, and no word of a rating or a verdict in any of them', () => {
+  const phrases = [...Object.values(RATINGS).flatMap(r => [r.label, r.said]), ...Object.values(VERDICTS)].map(w =>
+    w.toLowerCase(),
+  );
+  const loose = /\bliebling|\bam liebsten\b|\bkommt\b|\bbewertet\b|\boffen\b|%/i; // what the overview never says either
+  const texts = [...Object.values(LINES).flat(), ...[...Object.values(FACTS).flat(), ...GENERAL].map(f => f.text)];
+  for (const [kind, list] of Object.entries(LINES)) assert.ok(list.length >= 2, `${kind}: two ways at least`);
+  for (const t of texts) {
+    assert.ok(sentences(t).length <= 2 && sentences(t).every(x => (x.match(/!/g) || []).length <= 1), t);
+    const low = t.toLowerCase();
+    assert.ok(!phrases.some(w => low.includes(w)) && !loose.test(t), `nothing of a rating or a verdict: ${t}`);
+  }
+  assert.equal(
+    fill('In {days} hat {pet} Geburtstag.', {days: '3 Tagen', pet: 'Mau'}),
+    'In 3 Tagen hat Mau Geburtstag.',
   );
 });

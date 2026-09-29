@@ -26,7 +26,7 @@ Two halves, kept apart by folder: everything the app is lives in `app/`, everyth
 1. Foundations: `dom`, `text`, `dates`, `report` (one way to report an error), `native` (Android bridge), `reading` (the plugin's answer as lines with their place and size), `icons`, `config`, `fields`, `clock`, `disk`, `motion`
 2. Data: `store`, `api`, `sync`, `smart`, `glance`, `derive`, `images`, `photos`, `recognize`, `ocr`, `online`
 3. Interface: `ui/theme`, `ui/toast`, `ui/sheet`, `ui/slider`, `ui/crop`, `ui/camera`, `ui/viewer`
-4. Views: `views/parts`, `views/mood`, `views/overview`, `views/home`, `views/sheets`, `views/settings`
+4. Views: `views/parts`, `views/mood`, `views/facts`, `views/overview`, `views/home`, `views/sheets`, `views/settings`
 5. Logic: `logic/products`, `logic/reminders`, `logic/feeding`, `logic/scan`, `logic/editing`, `logic/pets`, `logic/data`, `logic/exchange`
 6. Control: `actions`, `main`
 
