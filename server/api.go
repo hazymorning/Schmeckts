@@ -10,7 +10,7 @@ package main
 //   POST /api/recognize             recognise a packaging photo: {"image":"<base64>"}
 //   GET  /api/barcode/<code>        look food up by EAN: {"found", "brand", "variety", "type", "animal"}
 //   GET  /api/fed?since=<ms>        whether a meal has been served since then: {"fed", "at", "by"}
-//   POST /api/photo/<variety>       keep a variety's packaging photo: {"image":"<base64 JPEG>"}; the first one stays
+//   POST /api/photo/<variety>       keep a variety's packaging photo: {"image":"<base64 JPEG>"}, in place of the one before
 //   GET  /api/photo/<variety>       that photo: {"image"}
 //
 // Reachable from private networks only (home network, WireGuard) and only with the household
@@ -209,7 +209,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	epoch, seq := a.store.Seq()
 	out := map[string]any{"app": "schmeckts", "version": version, "protocol": protocolVersion,
 		"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "recognition": a.cfg.Get().APIKey != "",
-		"features": []string{"barcode", "fed", "photo"}}
+		"features": []string{"barcode", "fed", "photo", "replace"}}
 	if givenCode(r) != "" {
 		status, msg := a.checkCode(r)
 		out["auth"] = status == http.StatusOK
@@ -388,8 +388,9 @@ func (a *API) fed(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"fed": at > 0, "at": at, "by": by})
 }
 
-// putPhoto keeps the packaging photo of a variety the server knows, sent by the phone that took it. The first one a
-// variety gets stays, so a second phone sending its own changes nothing.
+// putPhoto keeps the packaging photo of a variety the server knows, sent by the phone that took it or changed it,
+// in place of the one before. The app sends a photo only where the server has none or where someone changed it
+// („Foto ändern“), never an old one over a newer.
 func (a *API) putPhoto(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {

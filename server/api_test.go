@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -96,6 +97,10 @@ func TestInfo(t *testing.T) {
 	_, out, _ := call(a, "GET", "/api/info", "", nil)
 	if out["app"] != "schmeckts" || out["protocol"] != float64(1) || out["auth"] != nil || out["recognition"] != true {
 		t.Fatalf("without a code: %v", out)
+	}
+	features, _ := out["features"].([]any)
+	if !slices.Contains(features, any("replace")) {
+		t.Fatalf("the features say that a photo can be replaced: %v", out["features"])
 	}
 	_, out, _ = call(a, "GET", "/api/info", testCode, nil)
 	if out["auth"] != true {
@@ -362,8 +367,8 @@ func TestPhotos(t *testing.T) {
 	if s, _, _ := call(a, "POST", "/api/photo/lachs001", testCode, photo(2)); s != 200 {
 		t.Fatalf("a second photo is no error: %d", s)
 	}
-	if s, out, _ := call(a, "GET", "/api/photo/lachs001", testCode, nil); s != 200 || out["image"] != photo(1)["image"] {
-		t.Fatalf("the first photo stays: %d %v", s, out)
+	if s, out, _ := call(a, "GET", "/api/photo/lachs001", testCode, nil); s != 200 || out["image"] != photo(2)["image"] {
+		t.Fatalf("the second photo replaces the first: %d %v", s, out)
 	}
 	for _, c := range []struct {
 		path string

@@ -343,6 +343,7 @@ function viewProduct() {
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
     ${productCard(p, ss.length)}
+    <button class="link rephoto" data-action="product-photo">${icon('camera')}${hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen'}</button>
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
     ${strip(ratingsIn(model(), [p.id]))}
     ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}

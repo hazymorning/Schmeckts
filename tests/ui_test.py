@@ -1539,10 +1539,10 @@ async def test_texture(browser, url):
             'labels': ['In Soße', 'In Gelee', 'Pastete', 'Mousse', 'Fester Block', 'Suppe'],
             'on': [],
             'fits': True,
-            'under': 'box prod-card',
+            'under': 'link rephoto',
             'note': '',
         },
-        f'food sheet, wet food: „Konsistenz“ with six chips under the type, never mandatory, nothing clipped at 360 px ({c})',
+        f'food sheet, wet food: „Konsistenz“ with six chips under the type and its photo link, never mandatory, nothing clipped at 360 px ({c})',
     )
     await pg.click('#sheet [data-action=set-texture][data-v=block]')
     await idle(pg)
@@ -3803,6 +3803,98 @@ async def test_rephoto(browser, url):
         link[:2] == ['Neues Foto', True] and len(recognized) == 2 and recognized[0] != recognized[1],
         f'in a household: „Neues Foto“ while the server has not answered, and the new photo goes to the server as a recognition of its own ({link}, {len(recognized)} photos)',
     )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+# The food sheet's photo link and the variety's photo: the link's text, its icon, the thumbnail's tail in the card and
+# on the variety, and the tail of the large photo this phone keeps
+PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const l = document.querySelector('#sheet [data-action=product-photo]'), p = s.db.products.find(x => x.id === pid);
+  return [l?.innerText.trim() ?? null, !!l?.querySelector('.ic'), document.querySelector('#sheet .prod-card .thumb')?.getAttribute('src')?.slice(-32) ?? null,
+    (p.thumb || '').slice(-32), (localStorage.getItem('__fs:photos/' + pid + '.jpg') || '').slice(-32), p.sharedPhoto ?? null]; })"""
+
+
+async def test_product_photo(browser, url):
+    print('„Foto ändern“ in the food sheet: the variety gets a new photo and thumbnail, „Abbrechen“ changes nothing')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    # A variety with a photo: photographed and named
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = 0")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    pid = await state(pg, 'db.products[0].id')
+
+    async def food_sheet():
+        await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+        await idle(pg)
+
+    await food_sheet()
+    before = await pg.evaluate(PRODUCT_PHOTO, pid)
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK_LARGE.read_bytes()).decode()}'; window.__calls.length = 0")
+    await pg.click('#sheet [data-action=product-photo]')
+    for _ in range(50):  # the file is written after the camera answers
+        after = await pg.evaluate(PRODUCT_PHOTO, pid)
+        if after[4] != before[4]:
+            break
+        await asyncio.sleep(0.1)
+    await idle(pg)
+    after = await pg.evaluate(PRODUCT_PHOTO, pid)
+    cam = await pg.evaluate("window.__calls.filter(c => c[0] === 'capture').map(c => c[1])")
+    check(
+        before[:2] == ['Foto ändern', True]
+        and before[4]
+        and after[:2] == ['Foto ändern', True]
+        and after[2] == after[3] != before[3]
+        and after[4] != before[4]
+        and after[5] is None
+        and cam == [None],
+        f'„Foto ändern“ under the photo: the camera as when feeding; the thumbnail in the sheet and on the variety and the large photo on this phone change, and alone nothing is marked for a server ({before}, {after}, {cam})',
+    )
+    await shot(pg, 'product-photo')
+    await pg.evaluate('window.__photo = null')
+    await pg.click('#sheet [data-action=product-photo]')
+    await idle(pg)
+    check(await pg.evaluate(PRODUCT_PHOTO, pid) == after, '„Abbrechen“ changes nothing')
+    # The large photo opens with the new one
+    await pg.click('#sheet .prod-card [data-action=view-photo]')
+    await pg.wait_for_selector('#viewer[open]')
+    await idle(pg)
+    large = await pg.evaluate("[document.querySelector('#viewer img').naturalWidth, document.querySelector('#viewer img').src.slice(-32)]")
+    await pg.click('#viewer')
+    await idle(pg)
+    check(large == [1100, after[4]], f'the viewer shows the new photo at 1100 px ({large[0]})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    # A variety without a photo offers „Foto hinzufügen“
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => { s.db.products.push({id: 'ohnefoto0001', brand: 'Felix', variety: 'Huhn', type: 'Nassfutter', codes: {}, createdAt: Date.now()}); s.save(); })"
+    )
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'product', id: 'ohnefoto0001'}))")
+    await idle(pg)
+    none = await pg.evaluate(PRODUCT_PHOTO, 'ohnefoto0001')
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK.read_bytes()).decode()}'")
+    await pg.click('#sheet [data-action=product-photo]')
+    await until(pg, "!!db.products.find(x => x.id === 'ohnefoto0001').thumb")
+    await idle(pg)
+    added = await pg.evaluate(PRODUCT_PHOTO, 'ohnefoto0001')
+    check(
+        none[:2] == ['Foto hinzufügen', True] and none[4] == '' and added[:2] == ['Foto ändern', True] and added[3] and added[4],
+        f'without a photo the link says „Foto hinzufügen“, and afterwards the variety has one ({none}, {added})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -6399,6 +6491,7 @@ run_tests(
         'skeleton': test_skeleton,
         'reading-said': test_reading_said,
         'rephoto': test_rephoto,
+        'product-photo': test_product_photo,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

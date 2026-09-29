@@ -30,6 +30,7 @@ const defaultPrefs = () => ({
   codes: {},
   exchange: {},
   overview: {day: '', kind: null, fact: null, kinds: [], facts: []},
+  photoStamps: {},
 });
 export const hooks = {changed() {}, saved() {}}; // main.js sets these: redraw the interface, sync after a save
 
@@ -67,6 +68,12 @@ function tidyPrefs(p) {
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {}; // remembered barcode answers
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with
   out.overview = tidyOverview(out.overview);
+  // the stamp of the packaging photo this phone holds per variety, where a phone replaced it (photos.js)
+  out.photoStamps = Object.fromEntries(
+    Object.entries(out.photoStamps && typeof out.photoStamps === 'object' ? out.photoStamps : {}).filter(
+      ([, v]) => Number.isFinite(v) && v > 0,
+    ),
+  );
   return out;
 }
 /* The overview's memory of its line taking turns (views/overview.js, takeTurn() in glance.js): the day and the choice

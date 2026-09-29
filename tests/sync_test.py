@@ -24,7 +24,24 @@ import threading
 import time
 import urllib.request
 from playwright.async_api import async_playwright
-from common import PACK, ROOT, SAVED, check, failures, idle, make_photo, open_page, phone, real_errors, seeded, serve, started, state, until
+from common import (
+    PACK,
+    PACK_LARGE,
+    ROOT,
+    SAVED,
+    check,
+    failures,
+    idle,
+    make_photo,
+    open_page,
+    phone,
+    real_errors,
+    seeded,
+    serve,
+    started,
+    state,
+    until,
+)
 
 CODE, NEW_CODE = 'K7PM-3QXD', 'W9ZX-4HJT'
 HIT, MISS, C1, C2, OLD = '5901234123457', '4012345000016', '4012345000023', '4012345000030', '4012345000047'  # valid EAN-13
@@ -509,6 +526,59 @@ async def main():
                 await until(b, f"!!db.products.find(p => p.id === '{pid}').sharedPhoto", 15) and on_server.exists(),
                 'phone A, which still holds it, hands it over anew',
             )
+            # „Foto ändern“ on A: the server replaces its photo, the mark carries the stamp, and B, which holds the
+            # old one, fetches the new one the next time someone opens it
+            await a.evaluate(f'window.__photo = {json.dumps(base64.b64encode(PACK_LARGE.read_bytes()).decode())}')
+            await a.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+            await idle(a)
+            await a.click('#sheet [data-action=product-photo]')
+            await expect(
+                await until(a, f"typeof db.products.find(p => p.id === '{pid}').sharedPhoto === 'number' && prefs.photoStamps['{pid}'] > 0", 10)
+                and await until(b, f"typeof db.products.find(p => p.id === '{pid}').sharedPhoto === 'number'", 10)
+                and on_server.read_bytes() == base64.b64decode(await a.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')"))
+                and on_server.stat().st_size != len(PACK.read_bytes()),
+                'phone A changes the photo: the server has the new one, and the mark on every phone carries its stamp',
+            )
+            await close_sheet(a)
+            await b.click(thumb)
+            await b.wait_for_selector('#viewer[open]')
+            await idle(b)
+            width = await b.evaluate("document.querySelector('#viewer img').naturalWidth")
+            await b.click('#viewer')
+            await idle(b)
+            await expect(
+                width == 1100 and await state(b, f"prefs.photoStamps['{pid}'] === db.products.find(p => p.id === '{pid}').sharedPhoto"),
+                f'phone B opens it: the new photo, 1100 px wide, comes from the server and this phone notes its stamp ({width})',
+            )
+
+            # A server without „replace“ (before 1.4.0) keeps its photo: the app says so and marks nothing. Phone A,
+            # which has a camera; the answer of /api/info is thinned out the way an older server gives it.
+            async def no_replace(route):
+                res = await route.fetch()
+                body = await res.json()
+                body['features'] = [f for f in body.get('features', []) if f != 'replace']
+                await route.fulfill(response=res, json=body)
+
+            await ctx_a.route(f'{srv.url}/api/info*', no_replace)
+            await a.evaluate("import('./js/sync.js').then(m => { m.status.features = null; return m.serverCan('replace'); })")
+            await until_sync(a, "status.features && !status.features.includes('replace')", 10)
+            stamp, server_before = await state(a, f"db.products.find(p => p.id === '{pid}').sharedPhoto"), on_server.read_bytes()
+            await a.evaluate(f'window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}')
+            await a.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+            await idle(a)
+            await a.click('#sheet [data-action=product-photo]')
+            await a.wait_for_function("document.querySelector('#toast')?.innerText.includes('behält das alte Foto')", timeout=15000)
+            await idle(a)
+            await expect(
+                await state(a, f"db.products.find(p => p.id === '{pid}').sharedPhoto") == stamp
+                and on_server.read_bytes() == server_before
+                and base64.b64decode(await a.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')")) != server_before,
+                'a server that cannot replace photos: the toast says it keeps the old one, the mark stays as it was, and only this phone has the new photo',
+            )
+            await close_sheet(a)
+            await ctx_a.unroute(f'{srv.url}/api/info*')
+            await a.evaluate("import('./js/sync.js').then(m => { m.status.features = null; return m.serverCan('replace'); })")
+            await until_sync(a, "status.features && status.features.includes('replace')", 10)
             soup = "db.products.some(p => p.variety === 'Lachs in Soße' && p.texture === 'sosse')"
             await expect(
                 await state(a, soup) and await until(b, soup, 6) and any(r.get('texture') == 'sosse' for r in srv.records()['products'].values()),

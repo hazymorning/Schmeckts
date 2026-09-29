@@ -16,7 +16,7 @@ import {toast} from '../ui/toast.js';
 import {closeSheet, dlg, isClosing, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
 import {fabFill, homeView, scrollTop, update} from '../views/home.js';
-import {applyProduct, cleanupProduct, linkProduct} from './products.js';
+import {applyProduct, cleanupProduct, linkProduct, replaceProductPhoto} from './products.js';
 import {planReminder} from './reminders.js';
 
 export function serveProduct(pid, scanCode = '') {
@@ -108,6 +108,28 @@ export async function shootPhoto(hint, scanCode = '') {
   const blob = await packagingPhoto(hint, 'camInputSheet', scanCode);
   if (blob) await servePhoto(blob, scanCode);
   return !!blob;
+}
+/* „Foto ändern“ or „Foto hinzufügen“ in the food sheet: the same camera, and the photo becomes the variety's
+   (replaceProductPhoto() in logic/products.js); „Abbrechen“ changes nothing */
+export async function reshootProduct() {
+  const pid = sheet?.kind === 'product' && !sheet.step ? sheet.id : null;
+  if (!pid) return;
+  const blob = await packagingPhoto('', 'camInputProduct');
+  if (blob) await productPhotoFile(pid, blob);
+}
+export async function productPhotoFile(pid, file) {
+  if (!getProduct(pid) || !file) return;
+  let img;
+  try {
+    img = await fileToImage(file);
+  } catch {
+    // An unreadable file leaves the old photo in place; the toast asks for another one
+    toast('Das Foto ließ sich nicht lesen.');
+    return;
+  }
+  replaceProductPhoto(pid, img);
+  renderSheet();
+  update();
 }
 /* „Neues Foto“ while naming: the same camera, and the photo replaces the meal's; „Abbrechen“ changes nothing */
 export async function rephoto() {
