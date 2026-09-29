@@ -1482,7 +1482,7 @@ def test_rings():
 
 
 def test_overview_card():
-    """The overview shows three lines of its text and unfolds with a tap: the clamp in app.css says three, the Views
+    """The overview shows two lines of its text and unfolds with a tap: the clamp in app.css says two, the Views
     section lets the whole text out for .open and while folding, views/home.js does the folding, and nothing fixes
     the card's height."""
     js = (WWW / 'js/views/home.js').read_text(encoding='utf-8')
@@ -1490,12 +1490,12 @@ def test_overview_card():
     block = {one for _, sel, p, v in app_decls() if p == 'display' and v == 'block' for one in sel.split(', ')}
     fixed = [f'{sel} {p}:{v}' for _, sel, p, v in app_decls() if sel.startswith('.overview') and p in ('height', 'min-height', 'max-height')]
     check(
-        ('.overview p', '3') in clamp
+        ('.overview p', '2') in clamp
         and {'.overview.open p', '.overview p.animating'} <= block
         and 'export function toggleOverview()' in js
         and 'slideHeight(p, h0)' in js
         and not fixed,
-        f'the overview: three lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
+        f'the overview: two lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
     )
 
 
