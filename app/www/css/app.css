@@ -995,14 +995,15 @@ dialog.sheet.page .sheet-body {
   vertical-align: middle;
   margin-right: var(--space-1h);
 } /* a link with an icon in front: „Neues Foto“ */
-/* A text button at the foot of a card, e.g. „Weitere anzeigen“ */
+/* A text button at the foot of a card, e.g. „Weitere anzeigen“: as tall as a settings row, so the line above it
+   and the card's edge below leave it air */
 .card-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
   width: 100%;
-  min-height: var(--tap);
+  min-height: var(--control-l);
   padding: var(--inset-row);
   border-top: var(--divider);
   font: var(--type-small-strong);

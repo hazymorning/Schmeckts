@@ -107,7 +107,7 @@
   --tap-s: 44px; /* one choice among several side by side: chip, segment, a level and the thumb of the rating slider, the toast’s action, a field in a row */
   --tap: 48px; /* the smallest tap target: icon buttons, rows, text buttons */
   --control: 52px; /* a button or a field, the toast */
-  --control-l: 56px; /* the feeding button; a settings row */
+  --control-l: 56px; /* the feeding button; a settings row; a card's text button */
   --bar: 56px; /* a page's bar: the 48px back arrow with --space-1 above and below; the photo viewer's rows. A number, because views/sheets.js reads it through --stick */
   --col-figure: 52px; /* the column a trailing figure takes, so figures line up: percentages, per-pet shares */
   --pic-xs: 24px; /* a picture beside a name: chips, pet labels, minis, verdicts */
