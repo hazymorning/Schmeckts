@@ -1,7 +1,8 @@
 /* The rating slider (rateSlider() in views/parts.js) under a finger, the way a slider in a scrolling list behaves on
-   Android. A finger that rests on it for a moment, or moves sideways on it, lifts the thumb onto the level under it,
-   and the words under the track name that level and say what the bowl looks like; sliding goes from level to level
-   with a light tick, and letting go rates the level the thumb stands on. A quick tap rates the level under it. Moved
+   Android. Under the track stand all the levels in words while none is held, so the one word under each icon is
+   understood. A finger that rests on the track for a moment, or moves sideways on it, lifts the thumb onto the level
+   under it, and the words under the track name that level and say what the bowl looks like; sliding goes from level
+   to level with a light tick, and letting go rates the level the thumb stands on. A quick tap rates the level under it. Moved
    up or down first, it is the page scrolling and nothing happens, and a touch that only stops the page scrolling is
    no tap. A mouse slides as soon as it is pressed, and a level the keyboard is on shows the same. The levels'
    buttons take no touches of their own: they are how the keyboard and a screen reader rate, and every rating runs
@@ -25,22 +26,25 @@ export const thumbHTML = r => (r ? icon('r_' + r) : '');
 /* A level in words: its name and what the bowl looks like */
 export const levelHTML = r =>
   `<p data-r="${r}"><b class="slider-name">${RATINGS[r].label}</b><small>${RATINGS[r].note}</small></p>`;
-/* Under the track, once the meal holds a level of this scale: that level in words */
-export const saidHTML = (r, scale) => (scale.includes(r) ? levelHTML(r) : '');
+/* All the levels of a scale in words, from the best to the worst, while none is held or pointed at */
+export const legendHTML = scale => `<p data-r=""><small>${scale.map(r => RATINGS[r].label).join(', ')}</small></p>`;
+/* Under the track: the level in words once the meal holds one of this scale, the legend before that */
+export const saidHTML = (r, scale) => (scale.includes(r) ? levelHTML(r) : legendHTML(scale));
 /* The slider's class: the level's colour, no thumb unless the level is on this scale, and the thumb lifted while a
    finger or the keyboard is on a level */
 export const sliderCls = (r, scale, pointing = false) =>
   `slider${r ? ' ' + rateCls(r) : ''}${scale.includes(r) ? '' : ' unset'}${pointing ? ' pointing' : ''}`;
 
 const stops = slider => [...slider.querySelectorAll('.slider-track button')];
-/* The words under the track say level r, or nothing, and the room they take eases open and shut. Words that come
-   where there were none, or with a rating, rise into place; while a finger slides they simply change. */
+/* The words under the track say level r, or all the levels, and the room they take eases open and shut. A level's
+   words that come where the legend stood, or with a rating, rise into place; while a finger slides they simply
+   change. */
 function say(slider, r, rated = false) {
   const box = slider.querySelector('.slider-say'),
     was = box.firstElementChild?.dataset.r || null;
   if (was === r) return;
   const h0 = box.offsetHeight;
-  box.innerHTML = r ? levelHTML(r) : '';
+  box.innerHTML = r ? levelHTML(r) : legendHTML(stops(slider).map(b => b.dataset.r));
   if (r && (!was || rated)) box.firstElementChild.classList.add('picked');
   box.style.height = ''; // an easing still under way ends where it stands, and this one starts from there
   slideHeight(box, h0);
