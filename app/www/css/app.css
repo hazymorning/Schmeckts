@@ -272,6 +272,9 @@ body::before {
 .t-main small.warn {
   color: var(--bad);
 }
+.t-main small b {
+  font: var(--type-small-strong);
+} /* a name in a row's second line: „Vermutlich Lachs, tippen zum Bestätigen“ */
 .t-main .num {
   font-variant-numeric: tabular-nums;
 }

@@ -3609,6 +3609,10 @@ async def test_skeleton(browser, url):
     await ctx.close()
 
 
+# The card of the meal on top in „Wie war’s?“: its two lines, the name in bold in the second, whether that line warns, and
+# whether the bold name is set as small as the line
+CARD_SUB = """() => { const e = document.querySelector('.pend-head .t-main'), b = e.querySelector('small b'), st = x => getComputedStyle(x);
+  return [e.innerText.replace(/\\n/g, ' / '), b?.innerText ?? null, !!e.querySelector('.warn'), !b || (st(b).fontSize === st(b.parentNode).fontSize && st(b).fontWeight === '600')]; }"""
 # The naming sheet's sentence about the reading, its bold parts, the hint where nothing was read, and the main button
 SAID = """() => { const say = document.querySelector('#sheet .say'), hint = document.querySelector('#sheet .hint.read-note'), btn = document.querySelector('#sheet [data-action=save-name]');
   return [say?.innerText ?? null, say ? [...say.querySelectorAll('b')].map(b => b.innerText) : null, hint?.innerText ?? null, btn.innerText.trim(), !!btn.querySelector('.ic')]; }"""
@@ -3634,13 +3638,26 @@ async def test_reading_said(browser, url):
         got = await pg.evaluate(SAID)
         await pg.click('#sheet [data-action=close]')
         await idle(pg)
+        cards.append(await pg.evaluate(CARD_SUB))
         return got
 
+    cards = []
     both = await photo('Sheba\nLachs in Soße\n85 g')
     await shot(pg, 'reading-said')
     brand = await photo('Whiskas\n85 g')
     variety = await photo('Huhn in Gelee')
     nothing = await photo('12345\n850 g')
+    check(
+        cards
+        == [
+            ['Unbekanntes Futter / Vermutlich Lachs in Soße, tippen zum Bestätigen', 'Lachs in Soße', False, True],
+            ['Unbekanntes Futter / Vermutlich Whiskas, tippen zum Bestätigen', 'Whiskas', False, True],
+            ['Unbekanntes Futter / Vermutlich Huhn in Gelee, tippen zum Bestätigen', 'Huhn in Gelee', False, True],
+            ['Unbekanntes Futter / Tippen zum Benennen', None, False, True],
+        ],
+        f'the card in „Wie war’s?“ names the guess in bold, the variety or else the brand, in the usual colour and as small as its line; without one as before ({cards})',
+    )
+    await shot(pg, 'guess-card')
     check(
         both == ['Gelesen: Sheba, Lachs in Soße. Passt das?', ['Sheba', 'Lachs in Soße'], None, 'Passt so', True]
         and brand == ['Gelesen: Whiskas. Passt das?', ['Whiskas'], None, 'Passt so', True]

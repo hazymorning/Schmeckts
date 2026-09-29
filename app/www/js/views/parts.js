@@ -34,10 +34,13 @@ export function nameBlock(s, p, inSheet = false) {
     // the server is recognising, or the phone is reading the text
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
   if (!p) {
-    const sub =
-      {waiting: 'Wird erkannt, sobald der Server erreichbar ist', failed: 'Nicht erkannt, tippen zum Benennen'}[
-        s.status
-      ] || 'Tippen zum Benennen';
+    // What the phone read is a guess to confirm, in the usual colour; the server's way keeps its words and tone
+    const read = s.guess?.variety || s.guess?.brand,
+      sub = read
+        ? `Vermutlich <b>${esc(read)}</b>, tippen zum Bestätigen`
+        : {waiting: 'Wird erkannt, sobald der Server erreichbar ist', failed: 'Nicht erkannt, tippen zum Benennen'}[
+            s.status
+          ] || 'Tippen zum Benennen';
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (mode `lokal`): without the error tone
   }
   // In the sheet the exact time is in the „Serviert“ field right below, so the food type goes here instead
