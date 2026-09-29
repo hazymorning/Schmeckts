@@ -709,6 +709,8 @@ dialog.sheet.page .sheet-body {
 .slider.unset .slider-thumb {
   display: none;
 }
+/* Under each level its word and, in smaller print, what the bowl looks like, both centred in the level's column,
+   the long words broken where the column is narrow; the column of the level shown takes the level's colour */
 .slider-names {
   display: grid;
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
@@ -721,24 +723,15 @@ dialog.sheet.page .sheet-body {
 .slider-names > .on {
   color: var(--c);
 }
-/* A level in words, under the track: its name in Faustina, what the bowl looks like under it. The box is always
-   there, so the room the words take can ease open and shut. */
-.slider-say {
-  display: flow-root;
-}
-.slider-say > p {
-  margin: var(--space-2h) 0 0;
-}
-.slider-name,
-.slider-say small {
+.slider-names b,
+.slider-names small {
   display: block;
 }
-.slider-name {
-  font: var(--type-subheading);
-}
-.slider-say small {
-  font: var(--type-small);
-  color: var(--muted);
+.slider-names small {
+  margin-top: var(--space-hair);
+  font: var(--type-caption);
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 /* The two ends of a scale, under the counters */
 .ends {
@@ -2174,7 +2167,7 @@ dialog.sheet.dragging {
 .slider-thumb > i,
 .slider-names > span {
   transition: var(--state);
-} /* its ring and icon take the level's colour on the way, lift under the finger, and the level's word takes it too */
+} /* its ring and icon take the level's colour on the way, lift under the finger, and the level's column takes it too */
 /* Press */
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
@@ -2304,9 +2297,6 @@ html.step-back::view-transition-new(page) {
 .fab.filled {
   animation: pop var(--dur-step) var(--ease-spring);
 }
-.slider-say > .picked {
-  animation: appear var(--dur-step) var(--ease-out);
-} /* the level in words, coming where there were none or with a rating */
 .fab .fill {
   transform: scaleY(0);
   opacity: 0;

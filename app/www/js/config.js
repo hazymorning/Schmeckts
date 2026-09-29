@@ -13,30 +13,31 @@ export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]); // without a known type: wet food
 /* Rating levels of every scale. What is measured is acceptance: score, 0 to 100. The keys live in the data and never
    change; the key alone determines points, wording and icon. short: the level in one word, under its icon on the
-   rating slider. note: what the bowl or the morsel looks like, under the level's name wherever the rating slider
-   names it. said: the level inside a sentence, „2 von 3 Mal nur die Soße geleckt“. */
+   rating slider. note: what the bowl or the morsel looks like, under that word in the level's column, in words
+   short enough for a column of six at 360px. said: the level inside a sentence, „2 von 3 Mal nur die Soße
+   geleckt“. */
 export const RATINGS = {
-  top: {label: 'Sofort leer', short: 'Leer', note: 'Napf blitzblank', said: 'sofort leer', score: 100},
-  gut: {label: 'Später leer', short: 'Später', note: 'Nach und nach aufgegessen', said: 'später leer', score: 80},
-  mittel: {label: 'Halb gegessen', short: 'Halb', note: 'Die Hälfte blieb übrig', said: 'halb gegessen', score: 50},
+  top: {label: 'Sofort leer', short: 'Leer', note: 'Alles sofort weg', said: 'sofort leer', score: 100},
+  gut: {label: 'Später leer', short: 'Später', note: 'Nach und nach leer', said: 'später leer', score: 80},
+  mittel: {label: 'Halb gegessen', short: 'Halb', note: 'Hälfte blieb übrig', said: 'halb gegessen', score: 50},
   eager: {
     label: 'Erst gierig',
     short: 'Gierig',
-    note: 'Dann stehen gelassen',
+    note: 'Viel, dann nichts mehr',
     said: 'erst gierig, dann stehen gelassen',
     score: 40,
   },
   sosse: {
     label: 'Soße geleckt',
     short: 'Soße',
-    note: 'Die Stückchen liegen noch da',
+    note: 'Stücke liegen noch da',
     said: 'nur die Soße geleckt',
     score: 30,
   },
   schlecht: {
     label: 'Kaum angerührt',
     short: 'Voll',
-    note: 'Der Napf ist noch fast voll',
+    note: 'Napf noch fast voll',
     said: 'kaum angerührt',
     score: 0,
   },

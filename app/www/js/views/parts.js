@@ -10,7 +10,7 @@ import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
 import {GOOD, NO, rateCls, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
-import {saidHTML, sliderCls, thumbHTML} from '../ui/slider.js';
+import {sliderCls, thumbHTML} from '../ui/slider.js';
 
 export function avatar(pet, cls = '') {
   if (!pet) return '';
@@ -49,9 +49,9 @@ export function nameBlock(s, p, inSheet = false) {
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
 /* The rating slider: the variety's scale as one track from the best level to the worst, a button for each with its
-   icon in its colour, and under each the level in one word. Once the meal holds a level, the thumb stands on it,
-   ringed in its colour, and under the words stand its name and what the bowl looks like. While a finger is on the
-   slider, the thumb lifts onto the level under it and the words under the track say that one (ui/slider.js). A level
+   icon in its colour, and under each the level in one word with what the bowl looks like under that. Once the meal
+   holds a level, the thumb stands on it, ringed in its colour, and its column takes the colour. While a finger is on
+   the slider, the thumb lifts onto the level under it and that column lights up (ui/slider.js). A level
    stored from another scale (the type has changed) stands above the slider as a badge until one of its own replaces
    it. The buttons are for the keyboard and a screen reader. */
 export function rateSlider(s, pid) {
@@ -66,10 +66,13 @@ export function rateSlider(s, pid) {
       )
       .join(''),
     words = scale
-      .map((r, i) => `<span class="${rateCls(r)}${i === at ? ' on' : ''}">${RATINGS[r].short}</span>`)
+      .map(
+        (r, i) =>
+          `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${RATINGS[r].short}</b><small>${RATINGS[r].note}</small></span>`,
+      )
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
-    <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div><div class="slider-say">${saidHTML(cur, scale)}</div></div>`;
+    <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;
 }
 /* The two ends of a scale, under the counters of the food sheet */
 export const scaleEnds = levels =>

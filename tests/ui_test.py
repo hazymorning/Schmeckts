@@ -1027,23 +1027,22 @@ def house_meals():
 
 
 # The rating slider as the page shows it: its stops (level, what a screen reader hears, centre from the track's start,
-# size, pressed, the level's icon and its colour), the words under them (text, centre, whether it is the one in colour,
-# whether it fits its column), the track (width, height), the thumb (the stop it stands on, None without one, its
-# size, whether it carries an icon and whether it is lifted), the level in words under the track or, without one, the
-# legend of all the levels (its text, its height and its line height), the height of the whole and whether the page
-# stays within the screen.
+# size, pressed, the level's icon and its colour), the columns under them (the word, what the bowl looks like, centre,
+# whether it is the one in colour, whether both texts fit the column), the track (width, height), the thumb (the stop
+# it stands on, None without one, its size, whether it carries an icon and whether it is lifted), the height of the
+# columns, the height of the whole and whether the page stays within the screen.
 SLIDER = """slider => { const t = slider.querySelector('.slider-track').getBoundingClientRect(), thumb = slider.querySelector('.slider-thumb'),
-    on = getComputedStyle(thumb).display !== 'none', say = slider.querySelector('.slider-say > p'), mid = r => Math.round((r.left + r.width / 2 - t.left) * 10) / 10;
+    on = getComputedStyle(thumb).display !== 'none', names = slider.querySelector('.slider-names'), mid = r => Math.round((r.left + r.width / 2 - t.left) * 10) / 10;
   const stops = [...slider.querySelectorAll('.slider-track button')].map(e => { const r = e.getBoundingClientRect();
     return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: mid(r), w: Math.round(r.width * 10) / 10, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true',
       icon: !!e.querySelector('svg path'), colour: getComputedStyle(e).color}; });
   const words = [...slider.querySelectorAll('.slider-names > span')].map(e => { const r = e.getBoundingClientRect();
-    return {text: e.innerText, x: mid(r), on: e.classList.contains('on'), colour: getComputedStyle(e).color, fits: e.scrollWidth <= Math.ceil(r.width)}; });
+    return {text: e.querySelector('b').innerText, note: e.querySelector('small').innerText, x: mid(r), on: e.classList.contains('on'), colour: getComputedStyle(e).color,
+      fits: [e, ...e.children].every(x => x.scrollWidth <= Math.ceil(r.width))}; });
   const d = thumb.getBoundingClientRect(), x = on && mid(d);
   return {stops, words, track: [Math.round(t.width), Math.round(t.height)],
     thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, disc: on ? [d.width, !!thumb.querySelector('svg path')] : null,
-    lifted: slider.classList.contains('pointing'), said: say?.querySelector('.slider-name') ? [say.querySelector('.slider-name').innerText, say.querySelector('small').innerText] : null,
-    legend: say && !say.querySelector('.slider-name') ? [say.innerText, Math.round(say.getBoundingClientRect().height), parseFloat(getComputedStyle(say).lineHeight)] : null,
+    lifted: slider.classList.contains('pointing'), names: Math.round(names.getBoundingClientRect().height),
     height: Math.round(slider.getBoundingClientRect().height), page: document.documentElement.scrollWidth <= innerWidth}; }"""
 
 
@@ -1070,16 +1069,23 @@ async def test_week(browser, url):
     await idle(pg)
     # The rating slider at 360 px, in the card and in the sheet: the six levels as buttons side by side on one track in
     # the scale's order, each with its icon in its colour and at least a small tap target, the level in one word
-    # centred under each, and for a screen reader its name and what the bowl looks like; before a rating no thumb, and
-    # under the words all the levels in words, the legend, on one or two lines
-    legend = 'Sofort leer, Später leer, Halb gegessen, Erst gierig, Soße geleckt, Kaum angerührt'
+    # centred under each with what the bowl looks like under that, and for a screen reader its name and what the
+    # bowl looks like; before a rating no thumb, so the slider is the track and the columns of words
+    notes = [
+        'Alles sofort weg',
+        'Nach und nach leer',
+        'Hälfte blieb übrig',
+        'Viel, dann nichts mehr',
+        'Stücke liegen noch da',
+        'Napf noch fast voll',
+    ]
     levels = [
-        ['top', 'Sofort leer. Napf blitzblank'],
-        ['gut', 'Später leer. Nach und nach aufgegessen'],
-        ['mittel', 'Halb gegessen. Die Hälfte blieb übrig'],
-        ['eager', 'Erst gierig. Dann stehen gelassen'],
-        ['sosse', 'Soße geleckt. Die Stückchen liegen noch da'],
-        ['schlecht', 'Kaum angerührt. Der Napf ist noch fast voll'],
+        ['top', 'Sofort leer. Alles sofort weg'],
+        ['gut', 'Später leer. Nach und nach leer'],
+        ['mittel', 'Halb gegessen. Hälfte blieb übrig'],
+        ['eager', 'Erst gierig. Viel, dann nichts mehr'],
+        ['sosse', 'Soße geleckt. Stücke liegen noch da'],
+        ['schlecht', 'Kaum angerührt. Napf noch fast voll'],
     ]
     for where, sel in (('card „Wie war’s?“', '.pend .slider'), ('sheet', '#sheet .slider')):
         if where == 'sheet':
@@ -1089,15 +1095,16 @@ async def test_week(browser, url):
         check(
             [[x['r'], x['label']] for x in b['stops']] == levels
             and [w['text'] for w in b['words']] == ['Leer', 'Später', 'Halb', 'Gierig', 'Soße', 'Voll']
+            and [w['note'] for w in b['words']] == notes
             and even(b)
             and all(x['icon'] and not x['pressed'] for x in b['stops'])
             and not any(w['on'] for w in b['words'])
             and b['track'][1] == 52
-            and [b['thumb'], b['said'], b['legend'][0]] == [None, None, legend]
-            and 1 <= b['legend'][1] / b['legend'][2] <= 2
-            and b['height'] == 52 + 6 + 15 + 10 + b['legend'][1]
+            and b['thumb'] is None
+            and b['names'] > 15
+            and b['height'] == 52 + 6 + b['names']
             and b['page'],
-            f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word under each, no thumb yet and the legend under the words, {b["height"]} px tall in all, nothing wider than 360 px ({b["legend"]})',
+            f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word and what the bowl looks like under each, no thumb yet, {b["height"]} px tall in all, nothing wider than 360 px',
         )
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
@@ -1236,13 +1243,12 @@ async def test_scales(browser, url):
         len(b['stops']),
         [x['r'] for x in b['stops'] if x['pressed']],
         b['thumb'],
-        b['said'],
-        b['legend'][0],
+        [w['note'] for w in b['words']],
         [w['text'] for w in b['words'] if w['on']],
     ]
     check(
-        old == [['Später leer', True], 4, [], None, None, 'Gern gefressen, Normal gefressen, Wenig gefressen, Liegen gelassen', []],
-        f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, none of the four is chosen, and the legend names the four ({old})',
+        old == [['Später leer', True], 4, [], None, ['Kräftig zugelangt', 'Wie sonst auch', 'Nur ein paar Bröckchen', 'Kaum etwas angerührt'], []],
+        f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, none of the four is chosen, and every column says what the bowl looks like ({old})',
     )
     card = await pg.evaluate("[...document.querySelectorAll('#sheet .prod-card small, #sheet .prod-card b')].map(e => e.innerText)")
     check(
@@ -1278,17 +1284,15 @@ async def test_scales(browser, url):
     r = await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r")
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
     now = [
-        b['said'],
-        b['legend'],
         [x['r'] for x in b['stops'] if x['pressed']],
         b['thumb'],
         b['disc'],
-        [w['text'] for w in b['words'] if w['on']],
+        [[w['text'], w['note']] for w in b['words'] if w['on']],
         b['page'],
     ]
     check(
-        r == 'liegen' and now == [['Liegen gelassen', 'Kaum etwas angerührt'], None, ['liegen'], 3, [44, True], ['Voll'], True],
-        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, its word in its colour, and under the track its name and what the bowl looks like in place of the legend, without pushing the page wider ({r}, {now})',
+        r == 'liegen' and now == [['liegen'], 3, [44, True], [['Voll', 'Kaum etwas angerührt']], True],
+        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, its column in its colour, without pushing the page wider ({r}, {now})',
     )
     check(await until(pg, "!document.getElementById('sheet').open", 5), 'with every pet rated the sheet closes a moment later')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -1314,18 +1318,17 @@ async def test_slide(browser, url):
       document.addEventListener('click', e => { const b = e.target.closest('.slider-track button'); if (b) window.__rated.push(b.dataset.r); }); }"""
     )
     STOPS = 'l => l.map(b => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })'
-    # What the slider in the card shows: the level in words under the track while a finger (or the keyboard) is on it,
-    # whether the thumb shows, the level in words while nothing is on it, and the legend of all the levels while no
-    # level is in words; None without the card
+    # What the slider in the card shows: the lit column's word and what the bowl looks like while a finger (or the
+    # keyboard) is on it, whether the thumb shows, and the lit column while nothing is on it; None without the card
     SHOWN = """() => { const s = document.querySelector(`.pend[data-id="${window.__open}"] .slider`); if (!s) return null;
-      const say = s.querySelector('.slider-say > p'), name = say?.querySelector('.slider-name'), words = name ? [name.innerText, say.querySelector('small').innerText] : null, up = s.classList.contains('pointing');
-      return [up ? words : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none', up ? null : words, name ? null : say.innerText]; }"""
+      const on = s.querySelector('.slider-names > .on'), words = on && [on.querySelector('b').innerText, on.querySelector('small').innerText], up = s.classList.contains('pointing');
+      return [up ? words : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none', up ? null : words]; }"""
     # Under the finger the thumb carries the level's icon and floats, with the shadow of what floats, and the level's
     # word under the track is the one in colour
     ABOVE = """() => { const s = document.querySelector('.pend .slider'), thumb = s.querySelector('.slider-thumb');
       return [!!thumb.querySelector('svg path'), getComputedStyle(thumb.firstElementChild).boxShadow.includes('34px'),
-        [...s.querySelectorAll('.slider-names > .on')].map(w => w.innerText)]; }"""
-    ASKING = [None, False, None, 'Sofort leer, Später leer, Halb gegessen, Erst gierig, Soße geleckt, Kaum angerührt']
+        [...s.querySelectorAll('.slider-names > .on > b')].map(w => w.innerText)]; }"""
+    ASKING = [None, False, None]
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     CARD = 'document.querySelectorAll(`.pend[data-id="${window.__open}"]`).length'
     clicks = '(() => { const r = [window.__rated, window.__buzz]; window.__rated = []; window.__buzz = []; return r; })()'
@@ -1357,12 +1360,12 @@ async def test_slide(browser, url):
     await idle(pg)
     tap = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span'), await pg.evaluate(SHOWN)]
     check(
-        down == ASKING and rest == [[['Später leer', 'Nach und nach aufgegessen'], True, None, None], [True, True, ['Später']], None],
-        f'a finger resting on the track: the legend at first, then the thumb lifted under it, its word in colour and under the track the level\u2019s name and what the bowl looks like in place of the legend, nothing rated yet ({down}, {rest})',
+        down == ASKING and rest == [[['Später', 'Nach und nach leer'], True, None], [True, True, ['Später']], None],
+        f'a finger resting on the track: nothing at first, then the thumb lifted under it and its column in colour, the word and what the bowl looks like, nothing rated yet ({down}, {rest})',
     )
     check(
-        tap == ['gut', [['gut'], [8, 16]], 'Später leer gespeichert', [None, True, ['Später leer', 'Nach und nach aufgegessen'], None]],
-        f'letting go rates that level once; the toast says so at once, and the card stays with the thumb set down and the level\u2019s name and what the bowl looks like under the track ({tap})',
+        tap == ['gut', [['gut'], [8, 16]], 'Später leer gespeichert', [None, True, ['Später', 'Nach und nach leer']]],
+        f'letting go rates that level once; the toast says so at once, and the card stays with the thumb set down and its column lit ({tap})',
     )
     await shot(pg, 'rating-rated-360')
     # Put right while the card stays: another slide rates again, and the moment starts over
@@ -1377,7 +1380,7 @@ async def test_slide(browser, url):
     fixed.append(await pg.evaluate(CARD))
     fixed.append(await gone())
     check(
-        fixed == ['top', ['top'], 'Sofort leer gespeichert', [None, True, ['Sofort leer', 'Napf blitzblank'], None], 1, True],
+        fixed == ['top', ['top'], 'Sofort leer gespeichert', [None, True, ['Leer', 'Alles sofort weg']], 1, True],
         f'while the card stays, a slide puts the rating right; the card waits a moment again and then folds away ({fixed})',
     )
     await pg.click('#toast [data-action=undo]')
@@ -1397,8 +1400,8 @@ async def test_slide(browser, url):
     await idle(pg)
     after = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span')]
     check(
-        moved == [[['Erst gierig', 'Dann stehen gelassen'], True, None, None], [True, True, ['Gierig']], None],
-        f'sliding sideways puts the lifted thumb with the level\u2019s icon on the level and says it under the track, and rates nothing yet ({moved})',
+        moved == [[['Gierig', 'Viel, dann nichts mehr'], True, None], [True, True, ['Gierig']], None],
+        f'sliding sideways puts the lifted thumb with the level\u2019s icon on the level and lights its column, and rates nothing yet ({moved})',
     )
     check(
         after == ['eager', [['eager'], [8, 8, 8, 8, 16]], 'Erst gierig gespeichert'],
@@ -1440,8 +1443,8 @@ async def test_slide(browser, url):
     await idle(pg)
     cancelled = [sliding, await pg.evaluate(SHOWN), await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(
-        cancelled == [[['Erst gierig', 'Dann stehen gelassen'], True, None, None], ASKING, None, []],
-        f'a cancelled slide takes the thumb and the words away again, the legend is back, and nothing is rated ({cancelled})',
+        cancelled == [[['Gierig', 'Viel, dann nichts mehr'], True, None], ASKING, None, []],
+        f'a cancelled slide takes the thumb and the lit column away again and rates nothing ({cancelled})',
     )
     # Redrawn under the finger (a change from another phone): nothing is rated
     await touch('touchStart', *(await stops())[1])
@@ -1461,7 +1464,7 @@ async def test_slide(browser, url):
     await touch('touchEnd')
     held += [(await pg.evaluate(clicks))[0], await gone()]
     check(
-        held == ['mittel', [['Halb gegessen', 'Die Hälfte blieb übrig'], True, None, None], ['mittel'], True],
+        held == ['mittel', [['Halb', 'Hälfte blieb übrig'], True, None], ['mittel'], True],
         f'a finger that stays on the card keeps it there past its moment, and it folds away once the finger lifts ({held})',
     )
     await reopen()
@@ -1483,7 +1486,7 @@ async def test_slide(browser, url):
     await idle(pg)
     keys = [focused, await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(
-        keys == [[['Halb gegessen', 'Die Hälfte blieb übrig'], True, None, None], 'mittel', ['mittel']],
+        keys == [[['Halb', 'Hälfte blieb übrig'], True, None], 'mittel', ['mittel']],
         f'the level the keyboard is on lifts the thumb and shows its words, and Enter rates it ({keys})',
     )
     # In the sheet the rated meal holds its level: a tap on it changes nothing, a tap on another rates that one, and
@@ -1498,9 +1501,8 @@ async def test_slide(browser, url):
         b['thumb'] == 2
         and b['disc'] == [44, True]
         and not b['lifted']
-        and b['said'] == ['Halb gegessen', 'Die Hälfte blieb übrig']
-        and [w['text'] for w in b['words'] if w['on']] == ['Halb'],
-        f'the level a meal holds: the thumb on its stop with the level\u2019s icon, its word in colour, and under the track its name and what the bowl looks like ({b["thumb"]}, {b["said"]})',
+        and [[w['text'], w['note']] for w in b['words'] if w['on']] == [['Halb', 'Hälfte blieb übrig']],
+        f'the level a meal holds: the thumb on its stop with the level\u2019s icon and its column in colour, the word and what the bowl looks like ({b["thumb"]}, {b["words"]})',
     )
     at = await pg.eval_on_selector_all('#sheet .slider-track button', STOPS)
     await touch('touchStart', *at[2])
