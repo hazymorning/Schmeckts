@@ -1,6 +1,7 @@
 /* Serving: a known variety or a photo. In a household the server recognises the photo in the background; in mode
    `lokal` the variety is typed in right away (status noserver). The photo stays on this phone and only the preview
    is synced. */
+import {$} from '../dom.js';
 import {uid} from '../fields.js';
 import {esc} from '../text.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
@@ -10,7 +11,7 @@ import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, 
 import {cropSquare, fileToImage, memPhotos, readable, resize} from '../images.js';
 import {keepPhoto} from '../photos.js';
 import {milestones} from '../smart.js';
-import {identify, memLines, photoByServer} from '../recognize.js';
+import {identify, memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, dlg, isClosing, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
@@ -184,6 +185,13 @@ async function recognizeServing(id, sharp = '') {
   const house = photoByServer(); // the server recognises, otherwise the phone reads the text on the photo itself
   s.status = house ? 'recognizing' : 'reading';
   delete s.error;
+  if (!house) {
+    readingSince.set(id, Date.now());
+    // the naming sheet shows a skeleton for READ_PATIENCE and the empty fields after: redrawn when that is over
+    setTimeout(() => {
+      if (getServing(id)?.status === 'reading') refreshServing(id);
+    }, READ_PATIENCE);
+  }
   save();
   refreshServing(id);
   let found = {source: '', error: null};
@@ -193,6 +201,7 @@ async function recognizeServing(id, sharp = '') {
     report('recognition', e);
   }
   running.delete(id);
+  readingSince.delete(id);
   const cur = getServing(id);
   if (!cur) return;
   if (cur.productId)
@@ -306,15 +315,19 @@ function waitForAnotherTry(s, err) {
       : `${err.message} Die App versucht es später automatisch noch einmal.`;
 }
 
-/* Write the brand and variety that were read into the open naming flow, as long as nothing has been typed there */
+/* What was read goes into the open naming sheet field by field, only where nothing has been typed yet: into the
+   state and into the field on screen, so a finger typing in the other field keeps its place. Type and texture
+   follow only while nothing has been typed at all. */
 function fillName(id, guess) {
-  if (sheet?.kind !== 'serving' || sheet.id !== id || sheet.step !== 'name' || sheet.brand || sheet.variety) return;
-  Object.assign(sheet, {
-    brand: guess.brand || '',
-    variety: guess.variety || '',
-    type: guess.type || sheet.type,
-    texture: guess.texture,
-  });
+  if (sheet?.kind !== 'serving' || sheet.id !== id || sheet.step !== 'name') return;
+  const typed = ['brand', 'variety'].filter(f => String(sheet[f] || '').trim());
+  for (const f of ['brand', 'variety']) {
+    if (typed.includes(f) || !guess[f]) continue;
+    sheet[f] = guess[f];
+    const el = $('#f-' + f);
+    if (el) el.value = guess[f];
+  }
+  if (!typed.length) Object.assign(sheet, {type: guess.type || sheet.type, texture: guess.texture});
 }
 /* What the phone read prefills the form while naming (actions.js) */
 export const guessOf = s => ({

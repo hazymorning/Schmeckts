@@ -3237,16 +3237,19 @@ async def test_discard(browser, url):
     after = await state(pg, f"[db.products.length, db.servings.length, db.products.some(p => p.codes?.['{SHEBA}'])]")
     check(after == before + [False], f'after the scanner too: the meal goes, and no variety got the code ({before}, {after})')
 
-    # Deleted while the phone was still reading the photo: undo reads it again instead of hanging
+    # Deleted while the phone was still reading the photo: undo reads it again instead of hanging. The sheet holds
+    # no button while it reads, so the meal goes from its card on the home page.
     await pg.evaluate('window.__ocrDelay = 1500; window.__ocrDone = 0')
     await pg.click('#fab')
     await idle(pg)
     await pg.set_input_files('#camInputSheet', str(PACK))
     await until(pg, "db.servings[0]?.status === 'reading'")
     reads = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
     was = await pg.evaluate(  # read and tap in one go, so the reading cannot finish in between
         """import('./js/store.js').then(s => { const was = s.db.servings[0].status;
-          document.querySelector('#sheet [data-action=delete-serving]').click(); return was; })"""
+          document.querySelector('.pend [data-action=delete-serving]').click(); return was; })"""
     )
     await pg.wait_for_function('window.__ocrDone >= 1')
     await pg.click('#toast [data-action=undo]')
@@ -3536,6 +3539,74 @@ MEAL = '(s => [s.productId ?? null, s.status ?? null, !!s.photo, !!s.thumb, s.gu
 SHEET_TOAST = """import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.kind ?? null, m.sheet?.step ?? null,
   document.getElementById('f-brand')?.value ?? null, document.getElementById('f-variety')?.value ?? null,
   document.querySelector('#toast span')?.innerText ?? '', !!document.querySelector('#toast [data-action=undo]')])"""
+
+
+# The naming sheet while the packaging is read: the notice, the skeleton, the fields and the buttons
+READING = """() => { const q = s => document.querySelectorAll('#sheet ' + s).length;
+  return {note: document.querySelector('#sheet .note')?.innerText.trim() ?? null, spin: q('.note .spin'), skel: [q('.skel-text'), q('.skel-field')],
+    fields: [document.getElementById('f-brand')?.value ?? null, document.getElementById('f-variety')?.value ?? null],
+    chips: q('.chip'), buttons: q('.btn, .link'), close: q('[data-action=close]'), focus: document.activeElement?.id ?? ''}; }"""
+
+
+async def test_skeleton(browser, url):
+    print('while the phone reads the packaging: a skeleton first, the fields once the reading is there or patience runs out')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    async def photo(delay):
+        await pg.evaluate(f"window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = {delay}")
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await pg.wait_for_selector('#sheet .skel-field')
+
+    await photo(1200)
+    skeleton = await pg.evaluate(READING)
+    check(
+        skeleton
+        == {'note': 'Packung wird gelesen …', 'spin': 1, 'skel': [2, 2], 'fields': [None, None], 'chips': 0, 'buttons': 0, 'close': 1, 'focus': ''},
+        f'the skeleton: the photo, the notice with its spinner, a placeholder per field, no field to type into, no chips, no button but the X ({skeleton})',
+    )
+    await shot(pg, 'naming-skeleton')
+    await until(pg, '!!db.servings[0]?.guess')
+    await idle(pg)
+    read = await pg.evaluate(READING)
+    check(
+        read['skel'] == [0, 0] and read['fields'] == ['Whiskas', 'Rind in Gelee'] and read['note'] is None,
+        f'the reading there: the fields carry it and the skeleton is gone ({read})',
+    )
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
+    # A reading that takes longer than the patience: the empty fields come with a notice, what is typed meanwhile
+    # stays, and the reading fills only the field still empty, without taking the focus
+    await photo(3600)
+    await pg.wait_for_selector('#sheet #f-brand', timeout=4000)
+    waiting = await pg.evaluate(READING)
+    await pg.fill('#f-brand', 'Animonda')
+    await until(pg, '!!db.servings[0]?.guess')
+    await idle(pg)
+    filled = await pg.evaluate(READING)
+    check(
+        waiting['note'] == 'Packung wird noch gelesen …'
+        and waiting['spin'] == 1
+        and waiting['fields'] == ['', '']
+        and waiting['skel'] == [0, 0]
+        and filled['fields'] == ['Animonda', 'Rind in Gelee']
+        and filled['focus'] == 'f-brand'
+        and await state(pg, '(s => [s.status, s.guess.brand])(db.servings[0])') == ['noserver', 'Whiskas'],
+        f'after 2.5 s the empty fields with „Packung wird noch gelesen …“; the brand typed meanwhile stays, the variety is filled in, the focus stays put ({waiting}, {filled})',
+    )
+    await pg.evaluate('window.__ocrDelay = 0')
+    await pg.click('[data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
 
 
 async def test_known_photo(browser, url):
@@ -6079,6 +6150,7 @@ run_tests(
         'discard': test_discard,
         'pack-lines': test_pack_lines,
         'known-photo': test_known_photo,
+        'skeleton': test_skeleton,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

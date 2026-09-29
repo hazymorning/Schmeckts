@@ -1263,6 +1263,20 @@ dialog.sheet.page .sheet-body {
   background: linear-gradient(90deg, var(--surface-2) 20%, var(--line) 45%, var(--surface-2) 70%);
   background-size: 220% 100%;
 }
+/* A field still to come, while the packaging is read (views/sheets.js): a line inside a label, within the label's
+   line box so the label is as tall as one with text, and a block as tall as a field */
+.skel-text {
+  display: inline-block;
+  width: 28%;
+  height: 0.7em;
+  margin: 0;
+  vertical-align: middle;
+}
+.skel-field {
+  height: var(--control);
+  margin: 0;
+  border-radius: var(--radius-m);
+}
 
 /* Figures: tabular in the same rule as their font, after it, because the font shorthand resets it */
 .pct {

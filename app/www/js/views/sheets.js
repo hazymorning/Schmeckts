@@ -26,7 +26,7 @@ import {
 } from '../derive.js';
 import {MIN_RATED, rateCls, ratingsIn, scoreCls, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
-import {memLines, photoByServer} from '../recognize.js';
+import {memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
@@ -111,25 +111,31 @@ function viewName() {
           ? 'Futter ändern'
           : 'Futter benennen';
   const photo = serving && (serving.photo || serving.thumb),
-    large = serving && hasPhoto(serving, null);
+    large = serving && hasPhoto(serving, null),
+    reading = serving?.status === 'reading',
+    // while the phone reads, a skeleton stands in for the fields; once that has taken READ_PATIENCE, the empty fields
+    patient = reading && Date.now() - (readingSince.get(serving.id) || 0) < READ_PATIENCE;
   let note = '';
   const retry = label =>
     serving.photo && photoByServer() ? `<button class="link" data-action="retry">${label}</button>` : '';
-  if (serving?.status === 'reading') note = `<p class="hint note"><span class="spin"></span>Packung wird gelesen …</p>`;
+  if (reading)
+    note = `<p class="hint note"><span class="spin"></span>Packung wird ${patient ? '' : 'noch '}gelesen …</p>`;
   else if (serving?.status === 'recognizing')
     note = `<p class="hint note"><span class="spin"></span>Sorte wird erkannt …</p>`;
   else if (serving?.status === 'waiting')
     note = `<p class="hint note">${esc(serving.error || 'Wird erkannt, sobald der Server erreichbar ist.')} ${retry('Jetzt versuchen')}</p>`;
   else if (serving?.status === 'failed')
     note = `<p class="hint note warn">${esc(serving.error || 'Nicht erkannt.')} ${retry('Nochmal versuchen')}</p>`;
-  return `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
+  const top = `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
     ${
       photo
         ? large
           ? `<button class="photo-btn" data-action="view-photo" data-s="${serving.id}" data-p="" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
           : `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">`
         : ''
-    }${note}
+    }${note}`;
+  if (patient) return top + fieldSkeleton + fieldSkeleton; // as tall as label and field, so nothing jumps
+  return `${top}
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
@@ -140,6 +146,8 @@ function viewName() {
     ${textureChips(s)}
     <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : 'Speichern'}</button>${serving && !serving.productId ? deleteMealBtn(serving.id) : ''}</div>`;
 }
+/* A field still to come: a label's line and a field's block, shimmering, no input */
+const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
 /* Consistency or treat type of variety x (the sheet itself while naming): single choice, for types that have one */
 function textureChips(x, note = '') {
   const t = TEXTURES[typeOf(x)];

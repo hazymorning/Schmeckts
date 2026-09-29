@@ -78,6 +78,11 @@ export const photoByServer = () => isConnected() && prefs.serverPhoto;
 /* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
    synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
 export const memLines = new Map();
+/* When the phone began reading a meal's packaging, per meal and in memory (logic/feeding.js keeps it): for
+   READ_PATIENCE from then on „Futter benennen“ shows a skeleton in place of the fields, after that the empty fields
+   with the notice that the reading is still on, which then fills only what is still empty (views/sheets.js). */
+export const READ_PATIENCE = 2500;
+export const readingSince = new Map();
 
 /* The phone's last reading of a packaging, in memory only like the lines: the plugin's whole answer, the size of the
    photo, how long it took and the meal it belongs to. schmeckts://ocr-dump shares it as a test fixture
