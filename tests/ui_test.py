@@ -1095,7 +1095,7 @@ async def test_week(browser, url):
             and b['track'][1] == 52
             and b['thumb'] is None
             and b['names'] > 15
-            and b['height'] == 52 + 6 + b['names']
+            and b['height'] == 52 + 10 + b['names']
             and b['page'],
             f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word and what the bowl looks like under each, no thumb yet, {b["height"]} px tall in all, nothing wider than 360 px',
         )
