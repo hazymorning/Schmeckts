@@ -1444,6 +1444,19 @@ def test_rings():
     )
 
 
+def test_overview_card():
+    """The overview is as tall as its text, at most four lines: views/home.js drops the last sentences against
+    OVERVIEW_LINES, and the clamp in app.css, only the safety net, says the same four; nothing fixes its height."""
+    js = (WWW / 'js/views/home.js').read_text(encoding='utf-8')
+    lines = re.search(r'\bOVERVIEW_LINES = (\d+)', js)
+    clamp = {(sel, v) for _, sel, p, v in app_decls() if p == '-webkit-line-clamp'}
+    fixed = [f'{sel} {p}:{v}' for _, sel, p, v in app_decls() if sel.startswith('.overview') and p in ('height', 'min-height', 'max-height')]
+    check(
+        lines and ('.overview p', lines[1]) in clamp and 'fitOverview()' in js and not fixed,
+        f'the overview: OVERVIEW_LINES in views/home.js and the clamp in app.css agree on {lines and lines[1]} lines, and no height is fixed ({fixed})',
+    )
+
+
 # What a screen may set on a recipe it places (PROJECT.md, "Where styles live")
 PLACING = ('display', 'gap', 'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'flex', 'order', 'align-self', 'justify-self')
 
@@ -1510,6 +1523,7 @@ async def test_files(browser, url):
     test_motion_js()
     test_strip()
     test_rings()
+    test_overview_card()
     test_ratings()
     test_isolated_tests()
     test_prompt()

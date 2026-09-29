@@ -1645,6 +1645,41 @@ async def test_texture(browser, url):
 
 
 # The overview's line about the animal on the page's today, from the lists in views/overview.js
+# The overview card: its heading, picture, the sentences shown and every sentence there is (all), its lines; tight:
+# the card as tall as its text or its picture
+CARD = """() => Promise.all([import('./js/store.js'), import('./js/views/overview.js'), import('./js/glance.js'), import('./js/derive.js')]).then(([s, o, g, d]) => {
+  const c = document.querySelector('#home > section'), h = c.querySelector('h2'), other = document.querySelector('[data-sec=hist] h2'), pic = c.querySelector('.ov-pic'), p = c.querySelector('p');
+  const font = e => { const st = getComputedStyle(e); return [st.fontFamily, st.fontWeight, st.fontSize].join(); }, r = c.getBoundingClientRect(), a = pic.querySelector('.av').getBoundingClientRect(), ps = getComputedStyle(p);
+  const text = c.querySelector('.ov-text').getBoundingClientRect().height, inner = Math.max(text, 72) + 18 + 10 + 8;
+  const pets = s.prefs.activePet === 'all' ? s.db.pets : s.db.pets.filter(x => x.id === s.prefs.activePet), m = d.model();
+  const full = o.overviewText(g.glance(s.db, pets.map(x => x.id), Date.now(), new Set(m.sorts.filter(e => e.choice === 'nicht').map(e => e.id))), pets, Date.now());
+  const q = document.createElement('p'); q.innerHTML = full;
+  return {first: c.classList.contains('overview'), height: Math.round(r.height), tight: Math.abs(r.height - inner) < 1, title: h.innerText, sameFont: font(h) === font(other),
+    pic: [pic.tagName, pic.querySelectorAll('.av').length, a.width, a.left < h.getBoundingClientRect().left],
+    text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
+    sentences: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), clamp: ps.webkitLineClamp,
+    tap: [c.tagName, c.dataset.action ?? null, c.getAttribute('aria-expanded'), !!c.closest('button')], wide: document.documentElement.scrollWidth > innerWidth}; })"""
+# One pet, a household (the code only in memory) with usual times and a variety with a long name, served today as
+# given ([hour, minute, variety]) by Ben, at the system font scale given. Returns the sentences shown against every
+# sentence there is, whether all of them would fit in four lines, and the variety\u2019s name in the first one.
+LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), o = await import('./js/views/overview.js'), g = await import('./js/glance.js'), h = await import('./js/views/home.js');
+  const at = (days, hh, mm) => { const t = new Date(now); t.setDate(t.getDate() - days); t.setHours(hh, mm, 0, 0); return t.getTime(); };
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  d.products = [['wild', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl', 'Nassfutter'], ['lang', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl und Kürbis', 'Nassfutter'], ['snack', 'Dreamies', 'Käse', 'Snack']]
+    .map(([id, brand, variety, type]) => ({id: id + '000001', brand, variety, type, codes: {}, createdAt: 1}));
+  d.servings = [];
+  for (let i = 1; i <= 8; i++) for (const [hh, mm] of [[7, 15], [18, 30]]) d.servings.push({id: 'meal' + i + hh + '0001', productId: 'wild000001', servedAt: at(i, hh, mm), note: '', by: 'Ben', pets: {minka00001: {r: 'top', at: now}}});
+  today.forEach(([hh, mm, id], i) => d.servings.push({id: 'today' + i + '0001', productId: id + '000001', servedAt: at(0, hh, mm), note: '', by: 'Ben', pets: {minka00001: {r: 'top', at: now}}}));
+  d.servings.sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save();
+  if (!document.getElementById('bigtext')) { const st = document.createElement('style'); st.id = 'bigtext'; document.head.append(st); }
+  document.getElementById('bigtext').textContent = scale === 1 ? '' : `.overview p{font-size:${(14 * scale).toFixed(2)}px !important}`;
+  s.prefs.code = 'K7PM-3QXD'; h.renderHome(true);
+  const p = document.querySelector('.overview p'), lh = parseFloat(getComputedStyle(p).lineHeight);
+  const full = o.overviewText(g.glance(d, ['minka00001'], now, new Set()), d.pets, now), q = p.cloneNode(); q.innerHTML = full; q.style.webkitLineClamp = 'unset'; p.after(q);
+  const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), fits: Math.round(q.scrollHeight / lh) <= 4,
+    lines: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, sort: p.querySelector('.ov-sort').innerText, long: today.at(-1)[2] === 'lang'};
+  q.remove(); s.prefs.code = ''; return out; })"""
 FACT = """kind => import('./js/views/overview.js').then(o => { const l = o.FACTS[kind] || o.GENERAL, d = new Date();
   d.setHours(0, 0, 0, 0); return l[Math.round(d.getTime() / 864e5) % l.length]; })"""
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
@@ -1656,55 +1691,36 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print(
-        'overview: a low card with picture, name and a few sentences about the day, never a rating; two lines and unfolding; counting in the history'
-    )
+    print('overview: a card with picture, name and a few sentences about the day, as tall as its text, never a rating; counting in the history')
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
-    CARD = """() => { const c = document.querySelector('#home > section'), h = c.querySelector('h2'), other = document.querySelector('[data-sec=hist] h2'), pic = c.querySelector('.ov-pic'), p = c.querySelector('p');
-      const font = e => { const s = getComputedStyle(e); return [s.fontFamily, s.fontWeight, s.fontSize].join(); }, r = c.getBoundingClientRect(), a = pic.querySelector('.av').getBoundingClientRect(), ps = getComputedStyle(p);
-      return {first: c.classList.contains('overview'), height: Math.round(r.height), title: h.innerText, sameFont: font(h) === font(other), pic: [pic.tagName, pic.querySelectorAll('.av').length, a.width, a.left < h.getBoundingClientRect().left],
-        text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
-        dots: ps.webkitLineClamp === '2' && ps.display !== 'block', tap: [c.dataset.action ?? null, c.getAttribute('aria-expanded')], wide: document.documentElement.scrollWidth > innerWidth}; }"""
     c = await pg.evaluate(CARD)
-    text = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse. ' + await pg.evaluate(FACT, 'Katze')
+    status = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse.'
+    fact = await pg.evaluate(FACT, 'Katze')
     check(
-        c
-        == {
-            'first': True,
-            'height': 108,
-            'title': 'Minka',
-            'sameFont': True,
-            'pic': ['BUTTON', 1, 72, True],
-            'text': text,
-            'bold': ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
-            'lines': 2,
-            'cut': True,
-            'dots': True,
-            'tap': ['toggle-overview', 'false'],
-            'wide': False,
-        },
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
+        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['cut'], c['clamp'], c['tap'], c['wide'], c['tight']]
+        == [
+            True,
+            'Minka',
+            True,
+            ['BUTTON', 1, 72, True],
+            ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
+            False,
+            '4',
+            ['SECTION', None, None, False],
+            False,
+            True,
+        ]
+        and c['all'] == [status, fact]
+        and c['sentences'] == c['all'][: len(c['sentences'])]
+        and c['text'] == ' '.join(c['sentences'])
+        and 1 <= c['lines'] <= 4,
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; the card as tall as its text, at most four lines, and no button ({c})',
     )
     await shot(pg, 'overview-360')
-    await pg.evaluate("window.__card = document.querySelector('.overview')")
-    await pg.click('.overview p')
-    await idle(pg)
-    o = await pg.evaluate(CARD)
-    await shot(pg, 'overview-open-360')
-    await pg.click('.overview h2')
-    await idle(pg)
-    back = await pg.evaluate(CARD)
-    check(
-        [o['cut'], o['dots'], o['tap'], o['text']] == [False, False, ['toggle-overview', 'true'], text]
-        and o['height'] > 108
-        and back == c
-        and await pg.evaluate("window.__card === document.querySelector('.overview')"),
-        f'a tap on the card shows the whole text, a second folds it away again, both without redrawing the page ({o["height"]} px, {o["lines"]} lines)',
-    )
     day = await pg.evaluate("[document.querySelector('.tl-date span').innerText, document.querySelector('.day.today').getAttribute('aria-label')]")
     check(
         day == ['1 Mahlzeit, 1 Snack', 'Heute, 1 Mahlzeit, 1 Snack'],
@@ -1716,10 +1732,7 @@ async def test_overview(browser, url):
     check(gap == 14, f'14 px from „Verlauf“ to the calendar, 8 more than before ({gap})')
     await pg.click('.ov-pic')
     await idle(pg)
-    check(
-        await pg.input_value('#sheet #f-name') == 'Minka' and await pg.evaluate("!document.querySelector('.overview').classList.contains('open')"),
-        'a tap on the picture opens the pet and unfolds nothing',
-    )
+    check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet')
     await pg.click('[data-action=close]')
     await idle(pg)
     # Several pets: today's meals of all of them, who had the last one, when the next one usually comes
@@ -1741,22 +1754,24 @@ async def test_overview(browser, url):
     kiwi = await pg.evaluate(CARD)
     general, dog = await pg.evaluate(FACT, 'Andere'), await pg.evaluate(FACT, 'Hund')
     check(
-        [house['title'], house['pic'][:2], house['text'], house['bold']]
+        [house['title'], house['pic'][:2], house['all']]
         == [
             'Minka und Tiger',
             ['SPAN', 2],
-            'Minka und Tiger haben vor 5 Minuten Lachs bekommen. Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr. ' + general,
-            ['5 Minuten', 'Lachs', '10 Uhr'],
+            ['Minka und Tiger haben vor 5 Minuten Lachs bekommen.', 'Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr.', general],
         ]
-        and house['height'] == 108
-        and house['dots'],
+        and house['sentences'] == house['all'][: len(house['sentences'])]
+        and house['bold'] == ['5 Minuten', 'Lachs', '10 Uhr'][: len(house['bold'])]
+        and not house['cut']
+        and house['tight'],
         f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and for a cat and a dog something about any animal ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Tiger hat vor 5 Minuten Lachs bekommen. ' + dog]
-        and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']]
-        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, [None, None], 108],
-        f'the overview follows the filter; without a meal there is nothing to unfold ({tiger["text"]} / {kiwi["text"]})',
+        [tiger['title'], tiger['pic'][:2], tiger['all']] == ['Tiger', ['BUTTON', 1], ['Tiger hat vor 5 Minuten Lachs bekommen.', dog]]
+        and tiger['sentences'] == tiger['all'][: len(tiger['sentences'])]
+        and [kiwi['text'], kiwi['cut'], kiwi['sentences'], kiwi['tight']]
+        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.'], True],
+        f'the overview follows the filter; without a meal one sentence ({tiger["text"]} / {kiwi["text"]})',
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
     words = await pg.evaluate("import('./js/config.js').then(c => Object.values(c.RATINGS).map(x => x.label))")
@@ -1826,19 +1841,32 @@ async def test_overview(browser, url):
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
-    # With motion: the text eases open and shut, and nothing is left behind afterwards
-    ctx = await phone(browser, motion=True, width=360, height=800)
+
+    # A long name, a household and usual times: the first sentence stands whole with „von Ben“, and every sentence
+    # that fits in four lines is there, the last ones dropped where they do not; the first alone overflowing, the
+    # variety\u2019s name in it is cut. At the usual and at a large system font.
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
-    await pg.evaluate(OVERVIEW_DB)
-    await idle(pg)
-    SLIDE = """() => new Promise(done => { const c = document.querySelector('.overview'), p = c.querySelector('p'), h = [p.offsetHeight]; c.click();
-      setTimeout(() => h.push(p.getBoundingClientRect().height, p.classList.contains('animating')), 50);
-      setTimeout(() => { h.push(p.offsetHeight, p.classList.contains('animating'), p.style.height, p.style.transition); done(h); }, 450); })"""
-    up, down = await pg.evaluate(SLIDE), await pg.evaluate(SLIDE)
-    check(
-        up[0] < up[1] < up[3] and up[2:] == [True, up[3], False, '', ''] and down[0] > down[1] > down[3] and down[2:] == [True, up[0], False, '', ''],
-        f'unfolding and folding ease through the height, without a redraw; afterwards everything is tidied up ({up[:2] + up[3:4]}, {down[:2] + down[3:4]})',
-    )
+    await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
+    long = [[7, 20, 'snack'], [12, 0, 'wild'], [13, 14, 'lang']]
+    for scale, today in ((1, [[7, 20, 'wild']]), (1.3, [[7, 20, 'wild']]), (1.15, long), (1.3, long)):
+        fit = await pg.evaluate(LONG_DB, [scale, today])
+        await idle(pg)
+        first = fit['shown'][0]
+        name = 'Wildschwein mit Nachtkerzenöl' + (' und Kürbis' if fit['long'] else '')
+        # The clamp, the safety net, may act only once the first sentence stands alone with its name cut
+        check(
+            first.endswith('von Ben.')
+            and (not fit['cut'] or (len(fit['shown']) == 1 and fit['long']))
+            and (fit['lines'] <= 4 or fit['cut'])
+            and first.replace(fit['sort'], '#') == fit['all'][0].replace(name, '#')
+            and fit['shown'][1:] == fit['all'][1 : len(fit['shown'])]
+            and (len(fit['shown']) == len(fit['all']) if fit['fits'] else len(fit['shown']) < len(fit['all']))
+            and (fit['sort'].endswith('…') and len(fit['sort']) <= 24 if fit['long'] else fit['sort'] == 'Wildschwein mit Nachtkerzenöl'),
+            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ in a whole first sentence, {len(fit["shown"])} of {len(fit["all"])} sentences on {fit["lines"]} lines, the name {fit["sort"]!r} ({fit})',
+        )
+        await shot(pg, f'overview-long-{int(scale * 100)}-{len(today)}')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
 

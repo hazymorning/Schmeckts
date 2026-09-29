@@ -5,7 +5,7 @@
    none is left out for being small or slanted.
    Order: put the misread words right, then our own varieties, then a brand (from the list, from one of our own
    varieties or from Open Pet Food Facts), then the most prominent line, with what belongs to it, as the variety. */
-import {norm} from './text.js';
+import {cutName, norm, SMALL} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 import {VOCAB_BRANDS, VOCAB_WORDS} from './vocab.js';
 
@@ -234,8 +234,8 @@ function foodType(raw) {
   return Object.entries(TEXTURES).find(([, t]) => t.items.some(([, , re]) => re.test(raw)))?.[0] || '';
 }
 
-/* Variety: the main line (mainOf()) and what belongs to it, at most MAX_VARIETY characters, joined in the order
-   they stand on the packaging. From the plugin, lines near it join it when they are at least half as tall (the
+/* Variety: the main line (mainOf()) and what belongs to it, at most MAX_VARIETY characters (cutName() in text.js),
+   joined in the order they stand on the packaging. From the plugin, lines near it join it when they are at least half as tall (the
    product line above the flavour) or carry a flavour or a consistency („in Sauce“ below it); the brand does not.
    From plain text the other lines with a keyword join. */
 function pickVariety(page, brand, products) {
@@ -258,7 +258,7 @@ function pickVariety(page, brand, products) {
       if (x.s < 1 || !fits(x)) break;
       take.push(x);
     }
-  return cut(joined(take));
+  return cutName(joined(take), MAX_VARIETY);
 }
 /* The variety's main line: the one whose keywords say most (keywords()), since the largest print on a packaging is
    as often the logo, a product line or a slogan as the flavour. Between lines with the same keywords one in our
@@ -291,19 +291,6 @@ const joined = lines =>
     .sort((a, b) => a.i - b.i)
     .map((l, n) => (n ? l.text.replace(/^\p{L}+/u, w => (SMALL.has(norm(w)) ? w.toLocaleLowerCase('de') : w)) : l.text))
     .join(' ');
-/* At most MAX_VARIETY characters: cut where a part in another language begins („ / “, „ | “), otherwise after a whole
-   word, and without a joining „&“ or „/“ or a small word („in“, „mit“) left at the end */
-function cut(v) {
-  if (v.length <= MAX_VARIETY) return v.trim();
-  const head = v.slice(0, MAX_VARIETY + 1),
-    part = Math.max(head.lastIndexOf(' / '), head.lastIndexOf(' | ')),
-    word = head.lastIndexOf(' ');
-  let out = part > 0 ? head.slice(0, part) : word > 0 ? head.slice(0, word) : v.slice(0, MAX_VARIETY);
-  const loose = /(?:[\s&+/|,·–-]+|\s(\p{L}+))$/u;
-  for (let end; (end = out.match(loose)) && (!end[1] || SMALL.has(norm(end[1])));) out = out.slice(0, end.index);
-  return out.trim();
-}
-
 /* The usable lines of what was read: without quantities, advertising, ingredients and bare numbers, none of them
    twice, in the order they stand on the packaging, each with its size and place. From the plugin also without
    small print and slanted lines unless they hold something we know. A line of three letters or fewer that is no
@@ -399,11 +386,8 @@ const shared = (a, b) =>
   });
 const overlaps = (a, b) => shared(a.box, b.box) > OVERLAP * Math.min(area(a.box), area(b.box));
 
-/* A line has to say something of its own: words like „mit“ alone, and a line that is nothing but promises, are
-   no help while naming and only make the chips longer. */
-const SMALL = new Set(
-  'und oder mit ohne in im am an auf aus bei fur von vor zu zum zur neu the and with for'.split(' '),
-);
+/* A line has to say something of its own: words like „mit“ alone (SMALL in text.js), and a line that is nothing but
+   promises, are no help while naming and only make the chips longer. */
 /* A promise: „ohne“, up to two words, and what is left out („ohne Zusatz von Zucker“, the „tz v“ lost as well), or
    „…frei“. Badges read as one line glue them together („ohne Sojaohne Zucker“), so where „ohne“ and a promise
    follow a letter, they are taken apart first: „Bohne ohne Zucker“ stays what it is. */

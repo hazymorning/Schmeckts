@@ -1431,12 +1431,13 @@ dialog.sheet.page .sheet-body {
 .tl-note {
   font-style: italic;
 }
-/* Overview: two lines ending in „…“ */
+/* Overview: as tall as its text, at most four lines. views/home.js drops the last sentences until it fits
+   (OVERVIEW_LINES, the same four); the clamp is the safety net. */
 .overview p {
   margin: 0;
   font: var(--type-small);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1681,15 +1682,12 @@ dialog.sheet.page .sheet-body {
   color: var(--faint);
 }
 
-/* Overview: a low card (108px), the picture on the left, the name and the essentials on the right in two lines
-   ending in „…“; unfolded (.open) and while folding (.animating) the whole text is there. */
+/* Overview: the picture on the left, the name and a few sentences about the day on the right, the card as tall as
+   they are */
 .overview {
   display: flex;
   align-items: center;
   gap: var(--space-3h);
-}
-.overview[data-action] {
-  cursor: pointer;
 }
 .ov-pic,
 .ov-text {
@@ -1704,10 +1702,6 @@ dialog.sheet.page .sheet-body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.overview.open p,
-.overview p.animating {
-  display: block;
 }
 
 /* Open ratings */

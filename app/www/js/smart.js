@@ -31,8 +31,8 @@ export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
 
 /* Sum over ratings. All weights shrink at the same rate, so points / weights does not depend on when it is
-   computed: a sum holds until one of its meals changes. list: the ratings themselves, in no particular order, kept
-   in the sums per variety and pet only. */
+   computed: a sum holds until one of its meals changes. list: the ratings themselves, the newest first as the meals
+   are kept, in the sums per variety and pet only. */
 const emptySum = () => ({n: 0, points: 0, weights: 0, list: []});
 function addRating(sum, x) {
   const w = Math.pow(2, (x.t - WEIGHT_ZERO) / HALF_LIFE);
@@ -48,13 +48,10 @@ function addSum(sum, other) {
   return sum;
 }
 const scoreOf = sum => (sum.n ? +(sum.points / sum.weights).toFixed(6) : 0);
-/* The ratings a verdict rests on: the newest WINDOW of a pet's ratings of a variety, and of those only the ones
-   younger than VERDICT_SPAN as of now. What a pet did months ago must not outweigh what it does now. */
-const windowOf = (list, now) =>
-  [...list]
-    .sort((a, b) => b.t - a.t)
-    .slice(0, WINDOW)
-    .filter(x => x.t > now - VERDICT_SPAN);
+/* The ratings a verdict rests on: the newest WINDOW of a pet's ratings of a variety (the list holds them newest
+   first), and of those only the ones younger than VERDICT_SPAN as of now. What a pet did months ago must not
+   outweigh what it does now. */
+const windowOf = (list, now) => list.slice(0, WINDOW).filter(x => x.t > now - VERDICT_SPAN);
 const countsOf = list => {
   const counts = {}; // only levels that actually occur
   for (const x of list) counts[x.r] = (counts[x.r] || 0) + 1;

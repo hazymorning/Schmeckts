@@ -225,11 +225,18 @@ export const FLAVORS = [
 ];
 const OWN_FISH = ['Thunfisch', 'Lachs']; // fish with a group of their own
 /* Every flavour group a text names, in the order of FLAVORS. The general fish counts only when no particular one is
-   named: „Lachs mit Fischöl“ is salmon, „Seelachs“ and „Forelle“ are fish. */
+   named: „Lachs mit Fischöl“ is salmon, „Seelachs“ and „Forelle“ are fish. Remembered per text: the evaluation asks
+   for the same variety names on every redraw, and the patterns are not free. */
+const flavoursKnown = new Map();
+const FLAVOURS_REMEMBERED = 2000; // texts remembered at most, then the memory starts over
 export function flavoursOf(text) {
   const t = String(text || '');
+  if (flavoursKnown.has(t)) return flavoursKnown.get(t);
   const hits = FLAVORS.filter(([, re]) => re.test(t)).map(([name]) => name);
-  return hits.filter(name => name !== 'Fisch' || FISH_KINDS.test(t) || !hits.some(x => OWN_FISH.includes(x)));
+  const out = hits.filter(name => name !== 'Fisch' || FISH_KINDS.test(t) || !hits.some(x => OWN_FISH.includes(x)));
+  if (flavoursKnown.size >= FLAVOURS_REMEMBERED) flavoursKnown.clear();
+  flavoursKnown.set(t, out);
+  return out;
 }
 /* Rating reminder in minutes after serving, 0 = off: the REMIND steps, or whole hours of your own from 1 to
    REMIND_MAX_H. tidyRemind turns any stored value into a valid one. */

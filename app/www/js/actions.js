@@ -14,7 +14,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {toggleOverview, update} from './views/home.js';
+import {update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
@@ -412,10 +412,6 @@ const ACTIONS = {
     haptic('select');
     foldPart(el.dataset.v);
   }, // a part of a page, such as „Details“ on „Verlauf“
-  'toggle-overview'() {
-    haptic('select');
-    toggleOverview();
-  }, // the overview's full text and back
   'jump-day'(el) {
     haptic('select');
     if (sheet?.kind === 'report') return jumpToDay(el.dataset.day); // the page's own calendar scrolls within it

@@ -96,7 +96,7 @@ function statusLine(g, pets, now) {
   const last = g.last,
     p = getProduct(last.productId),
     treat = p && typeOf(p) === 'Snack',
-    what = p ? b(esc(pname(p))) : 'unbenanntes Futter',
+    what = p ? `<b class="ov-sort">${esc(pname(p))}</b>` : 'unbenanntes Futter', // the class: fitOverview() in views/home.js may cut it
     server = isConnected() && last.by ? b(esc(last.by)) : '',
     by = server ? ` von ${server}` : '',
     fed = subject(pets.length > 1 ? servingPets(last) : pets.map(x => x.id)),
@@ -208,18 +208,20 @@ function extraLine(g, pets, now, counted) {
     ].filter(Boolean);
   return pick(lines, now);
 }
+/* The sentences, each in a span of its own, so that fitOverview() in views/home.js can drop the last ones where the
+   card's lines run out */
+const line = text => `<span class="ov-line">${text}</span>`;
 export function overviewText(g, pets, now = Date.now()) {
   if (!g.last) {
     const all = subject(pets.map(x => x.id));
-    return `${all.names} ${all.verb('wartet', 'warten')} noch auf die erste Mahlzeit im Tagebuch.`;
+    return line(`${all.names} ${all.verb('wartet', 'warten')} noch auf die erste Mahlzeit im Tagebuch.`);
   }
   const [status, counted] = statusLine(g, pets, now);
-  return [status, outlookLine(g, pets, now), extraLine(g, pets, now, counted)].filter(Boolean).join(' ');
+  return [status, outlookLine(g, pets, now), extraLine(g, pets, now, counted)].filter(Boolean).map(line).join(' ');
 }
 
-/* The card. A tap on the picture opens the pet. Folded up the text is two lines ending in „…“; a tap on the card
-   shows all of it and back again (toggleOverview() in views/home.js). open: unfolded. */
-export function overviewHTML(m, open) {
+/* The card, as tall as its text: a tap on the picture opens the pet, the rest is no button */
+export function overviewHTML(m) {
   const pets = m.pet ? [getPet(m.pet)] : db.pets,
     one = pets.length === 1 ? pets[0] : null;
   const flops = new Set(m.sorts.filter(e => e.choice === 'nicht').map(e => e.id)), // no idea of a variety nobody buys
@@ -235,6 +237,5 @@ export function overviewHTML(m, open) {
         .slice(0, 2)
         .map(p => avatar(p, 'l pair'))
         .join('')}</span>`;
-  const tap = g.last ? ` data-action="toggle-overview" aria-expanded="${!!open}"` : ''; // „Noch nichts serviert.“ is short
-  return `<section class="card overview${open ? ' open' : ''}" data-sec="overview"${tap} style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${overviewText(g, pets)}</p></div></section>`;
+  return `<section class="card overview" data-sec="overview" style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${overviewText(g, pets)}</p></div></section>`;
 }
