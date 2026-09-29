@@ -92,7 +92,7 @@ function viewServing() {
     ${servingCard(s, p)}
     ${ids.map(pid => petRateRow(s, pid, multi)).join('')}
     ${multi ? servedForChips(s) : ''}
-    <label class="label" for="f-time">Serviert${s.by ? ' von ' + esc(s.by) : ''}</label>
+    <label class="label served" for="f-time"><span>Serviert</span>${s.by ? `<span class="hint">von ${esc(s.by)}</span>` : ''}</label>
     <span class="pick"><input id="f-time" class="field" type="datetime-local" data-time="${s.id}" value="${toLocalInput(s.servedAt)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
     <label class="label" for="f-note">Notiz</label>
     <input id="f-note" class="field" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Optional, z. B. neue Packung" autocomplete="off">

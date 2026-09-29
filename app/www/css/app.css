@@ -1917,6 +1917,17 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .prod-card {
   margin-bottom: var(--space-4h);
 }
+/* „Serviert“: the label of the time field, and who served at the right end of the same line, since the name is
+   not for changing and the time is */
+.served {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.served .hint {
+  margin: 0;
+}
 .prod-edit {
   flex: 1;
   min-width: 0;

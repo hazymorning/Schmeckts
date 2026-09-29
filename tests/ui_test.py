@@ -468,6 +468,23 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
         f'history: the calendar and the meals of the current day ({len(shown)})',
     )
+    # „Wie war’s?“: the label „Serviert“ over the time field, and who served at the right end of the same line, small
+    # and muted, since the name is not for changing and the time is
+    await pg.click('.tl [data-action=open-serving]')
+    await idle(pg)
+    label = await pg.eval_on_selector(
+        '#sheet label[for=f-time]',
+        """l => { const [a, b] = l.children, s = getComputedStyle(b), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.append(probe);
+          const muted = getComputedStyle(probe).color; probe.remove(), r = l.getBoundingClientRect();
+          return [a.innerText, b.innerText, getComputedStyle(l).justifyContent, s.fontSize, s.fontWeight, s.color === muted, Math.round(r.right - b.getBoundingClientRect().right),
+            l.nextElementSibling.querySelector('#f-time') !== null]; }""",
+    )
+    check(
+        label[:2] == ['Serviert', 'von Anna'] and label[2:] == ['space-between', '14px', '400', True, 0, True],
+        f'„Wie war’s?“: „Serviert“ over the time field, „von Anna“ small and muted at the right end of the label line ({label})',
+    )
+    await pg.click('[data-action=close]')
+    await idle(pg)
     # Hint: at most one, with a sentence, a reason and its buttons. „Nicht mehr kaufen“ and „Immer kaufen“ set kaufen,
     # „Ausblenden“ is remembered per device.
     HINT = """c => ({title: c.querySelector('h2').innerText, btns: [...c.querySelectorAll('.btn-row button')].map(b => b.innerText),
@@ -3890,7 +3907,7 @@ async def test_mood(browser, url):
         seg2 = await choose(True)
         on = [await state(pg, 'prefs.backdrop'), (await pg.evaluate(MOOD))['hidden']]
         check(
-            seg == ['Profilbild im Hintergrund', 'Blass hinter dem Kopf der Startseite', True, 'switch', 'true']
+            seg == ['Profilbild im Hintergrund', 'Blass oben auf der Startseite', True, 'switch', 'true']
             and seg2[4] == 'false'
             and off == [False, True, True]
             and on == [True, False],
