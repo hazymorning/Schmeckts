@@ -11,7 +11,7 @@ import {db} from '../store.js';
 import {isConnected} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
 import {glance} from '../glance.js';
-import {avatar} from './parts.js';
+import {avatar, since} from './parts.js';
 
 /* Something about the animal, one a day. Only what holds for most of them; "Andere" and mixed households take the
    general ones. */
@@ -103,7 +103,7 @@ function statusLine(g, pets, now) {
     today = last.servedAt >= dayStart(now);
   if (g.next?.due)
     return [
-      `Futterzeit! Zuletzt gab es ${today ? 'um ' + at(last.servedAt) : since(last.servedAt, now)} ${what}${by}.`,
+      `Futterzeit! Zuletzt gab es ${today ? 'um ' + at(last.servedAt) : since(last.servedAt, now, b)} ${what}${by}.`,
     ];
   if (fresh(g, now)) {
     const minutes = Math.round((now - last.servedAt) / 6e4),
@@ -132,13 +132,6 @@ function statusLine(g, pets, now) {
     return [`Zuletzt gab es gestern ${evening}um ${at(last.servedAt)} ${what}${by}.`];
   }
   return [`Das letzte Futter gab es ${b(since(last.servedAt, now))}: ${what}${by}.`];
-}
-/* „gestern um 19:30“, „vorgestern“, „vor 3 Tagen“, „am 3. Juni“ */
-function since(t, now) {
-  if (t >= addDays(dayStart(now), -1)) return `gestern um ${at(t)}`;
-  const days = Math.round((dayStart(now) - dayStart(t)) / 864e5);
-  if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
-  return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
 }
 
 /* The second sentence: whether it is time for the next meal, or when that usually is */

@@ -1899,6 +1899,15 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .serve-list .empty {
   margin: 0;
 }
+/* A variety to serve: the name may take two lines, what is under it stays on one, and the strip at the end never
+   shrinks (its recipe) */
+.plist .t-main b {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 /* The product card. With a large photo on this phone the thumbnail opens it and the rest of the card leads to
    naming */
 .prod-card {

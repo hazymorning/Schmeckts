@@ -5114,7 +5114,7 @@ async def test_settings(browser, url):
 
 
 async def test_suggestions(browser, url):
-    print('feeding: buttons, search field, one list, at most three suggestions and eight hits')
+    print('feeding: buttons, search field, one list, at most five suggestions and eight hits')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [3, 0])
@@ -5138,8 +5138,8 @@ async def test_suggestions(browser, url):
     )
     names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['cta-row', 'search', 'serveList', 'btn'],
-        f'buttons, then the search field, then the list, and „Ohne Foto eintippen“ at the end ({names}, {order})',
+        names == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'] and order == ['cta-row', 'search', 'serveList', 'btn'],
+        f'buttons, then the search field, then the list of the five fed last, and „Ohne Foto eintippen“ at the end ({names}, {order})',
     )
 
     # The search field must not move while typing: its place inside the sheet and its distance to the two
@@ -5189,11 +5189,75 @@ async def test_suggestions(browser, url):
     await idle(pg)
     back = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'],
+        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'],
         f'searching brand and variety together, and an empty field shows the suggestions again ({hit}, {back})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
+
+
+# Six varieties for the quick picker: served today, yesterday, three days ago, twelve and twenty days ago, and one never
+# served, which only the search finds. Each served one with its ratings, the newest at the time given and the older
+# ones a week apart; the one without a rating has an open meal.
+PICKER_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), at = t => new Date(t).getTime(), week = 7 * 864e5;
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  const sorts = [['a', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl und Kürbis', '2026-06-09T13:14', ['top', 'gut']], ['b', 'Sheba', 'Lachs in Soße', '2026-06-08T19:22', ['sosse']],
+    ['c', 'Felix', 'Huhn in Gelee', '2026-06-06T08:00', [null]], ['d', '', 'Rind', '2026-05-28T08:00', ['top']], ['e', 'Miamor', 'Pute', '2026-05-20T08:00', ['schlecht']],
+    ['f', 'Bozita', 'Ente', null, []]];
+  d.products = sorts.map(([id, brand, variety]) => ({id: 'sorte' + id + '0001', brand, variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.servings = sorts.filter(x => x[3]).flatMap(([id, , , when, rs]) => rs.map((r, j) => ({id: 'meal' + id + j + '0001', productId: 'sorte' + id + '0001', note: '',
+    servedAt: at(when) - j * week, pets: {minka00001: {r, at: r ? at(when) : null}}}))).sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+# The rows of the quick picker or the search hits: the name, what stands under it, the dots of the strip, and whether
+# a word for serving is left in the row
+PICKER_ROWS = """() => [...document.querySelectorAll('#serveList .plist .row')].map(r => [r.querySelector('b').innerText, r.querySelector('small').innerText,
+  [...r.querySelectorAll('.strip i')].map(i => i.className), !!r.querySelector('.link')])"""
+
+
+async def test_picker(browser, url):
+    print('the quick picker: brand and when a variety was last served, its strip at the end, five of them, nothing cut off at 360 px')
+    for scheme in ('light', 'dark'):
+        ctx = await phone(browser, scheme, width=360, height=760, timezone_id='Europe/Berlin')
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
+        await pg.evaluate(PICKER_DB)
+        await idle(pg)
+        await pg.click('#fab')
+        await idle(pg)
+        rows = await pg.evaluate(PICKER_ROWS)
+        check(
+            rows
+            == [
+                ['Wildschwein mit Nachtkerzenöl und Kürbis', 'Catz Finefood, heute um 13:14', ['r-good', 'r-good'], False],
+                ['Lachs in Soße', 'Sheba, gestern um 19:22', ['r-sauce'], False],
+                ['Huhn in Gelee', 'Felix, vor 3 Tagen', [], False],
+                ['Rind', 'am 28. Mai', ['r-good'], False],
+                ['Pute', 'Miamor, am 20. Mai', ['r-bad'], False],
+            ],
+            f'{scheme}: the five fed last, each with its brand and when it was last served, its ratings as a strip where it has any, and no word for serving ({rows})',
+        )
+        await pg.fill('#sheet [data-search]', 'Ente')
+        await idle(pg)
+        hit = await pg.evaluate(PICKER_ROWS)
+        check(hit == [['Ente', 'Bozita, noch nie serviert', [], False]], f'a search hit never served says so ({hit})')
+        await pg.fill('#sheet [data-search]', '')
+        await idle(pg)
+        for scale in (1, 1.3):
+            if scale != 1:
+                await pg.evaluate(BIG_TEXT, scale)
+                await idle(pg)
+            fit = await pg.evaluate(NARROW, '.plist *')
+            lines = await pg.eval_on_selector_all(
+                '#serveList .plist .row',
+                'l => l.map(r => [Math.round(r.querySelector("b").getBoundingClientRect().height / parseFloat(getComputedStyle(r.querySelector("b")).lineHeight)), r.querySelector(".strip")?.getBoundingClientRect().width ?? 0])',
+            )
+            check(
+                not fit['wide'] and not fit['sideways'] and lines[0][0] == 2 and all(x[0] <= 2 for x in lines) and lines[0][1] > lines[1][1] > 0,
+                f'{scheme}, {int(scale * 100)} %: nothing cut off at 360 px, the long name on two lines, the strip at the end at its full width ({fit}, {lines})',
+            )
+            await shot(pg, f'picker-{scheme}-{int(scale * 100)}')
+        check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+        await ctx.close()
 
 
 # Meals at given times for the home page's history: pets [id, name], meals [id, time, pet ids, variety]
@@ -5678,6 +5742,7 @@ run_tests(
         'texture': test_texture,
         'feed-routes': test_feed_routes,
         'suggestions': test_suggestions,
+        'picker': test_picker,
         'milestones': test_milestones,
         'reminder': test_reminders,
         'own-interval': test_remind,

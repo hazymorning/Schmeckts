@@ -22,6 +22,7 @@ import {
   reportModel,
   servingsInFilter,
   sortOf,
+  withLast,
 } from '../derive.js';
 import {MIN_RATED, rateCls, ratingsIn, scoreCls, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
@@ -45,6 +46,7 @@ import {
   scaleEnds,
   segmented,
   shopRow,
+  since,
   strip,
   habitRow,
   lead,
@@ -174,7 +176,7 @@ export function renderSuggestions() {
       .filter(p => p.id !== skip && words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
       .slice(0, 4);
   } else if (serving && !serving.productId) {
-    hits = quickProducts(4);
+    hits = quickProducts(4).map(x => x.product);
     title = 'Schon mal gehabt?';
   } // one-tap suggestion
   box.innerHTML =
@@ -193,30 +195,23 @@ export function renderSuggestions() {
    field follows, whose hits (at most HITS) take the place of the suggestions.
    sheet.busy: the notice while scanning,
    sheet.code: the scanned code currently in play (the choice, or the photo button takes it over) */
-const SUGGEST = 3,
+const SUGGEST = 5,
   HITS = 8;
-/* How a variety goes down, in a word, beside its name while choosing: the verdict within the pet filter */
-const ACCEPTED = {
-  nachkaufen: 'kommt gut an',
-  gemischt: 'kommt gemischt an',
-  geht: 'geht so',
-  neu: 'noch zu wenig bewertet',
-  nicht: 'kommt nicht gut an',
-};
 const CTA = {
   barcode: `<button class="box cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
   foto: `<button class="box cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`,
 };
-function serveRows(prods, code = '') {
-  return prods
-    .map(p => {
-      const e = sortOf(p.id);
-      const meta = [p.variety ? p.brand : '', e?.n ? ACCEPTED[e.verdict] : 'noch nicht bewertet']
-        .filter(Boolean)
-        .join(', ');
+/* A variety to serve, the row being the button: the name over up to two lines, under it the brand and when it was
+   last served within the pet filter („Catz Finefood, heute um 13:14“, „noch nie serviert“ for a search hit), and at
+   the end the strip of its ratings, as a row on „Einkaufen“ ends. entries: [{product, at}] (derive.js) */
+function serveRows(entries, code = '') {
+  const now = Date.now(),
+    m = model();
+  return entries
+    .map(({product: p, at}) => {
+      const meta = [p.variety ? p.brand : '', at ? since(at, now) : 'noch nie serviert'].filter(Boolean).join(', ');
       return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
-        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>
-        <span class="link">Servieren</span></button></li>`;
+        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>${strip(ratingsIn(m, [p.id]))}</button></li>`;
     })
     .join('');
 }
@@ -225,7 +220,7 @@ function viewFeed() {
   if (pick.length)
     return `<div class="sh-head"><h2>Welche Sorte?</h2>${closeBtn}</div>
     <p class="hint">Dieser Barcode gehört zu mehreren Sorten.</p>
-    <ul class="list plist">${serveRows(pick, sheet.code)}</ul>`;
+    <ul class="list plist">${serveRows(withLast(pick), sheet.code)}</ul>`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
     <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
@@ -242,9 +237,9 @@ function viewFeed() {
     <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
 }
 /* The varieties most recently served, at most SUGGEST of them */
-const quickList = prods =>
-  prods.length
-    ? `<span class="label">Schon mal gehabt</span><ul class="list plist">${serveRows(prods.slice(0, SUGGEST))}</ul>`
+const quickList = entries =>
+  entries.length
+    ? `<span class="label">Schon mal gehabt</span><ul class="list plist">${serveRows(entries.slice(0, SUGGEST))}</ul>`
     : '';
 /* Search in the feeding sheet: the hits take the place of the suggestions, at most HITS. Only this one box is
    rewritten, so the search field neither moves nor loses the focus; the distances above it hang on .serve. */
@@ -256,7 +251,7 @@ export function renderServeHits(text) {
 }
 function hitList(text, words) {
   const hits = quickProducts()
-    .filter(p => words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
+    .filter(({product: p}) => words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
     .slice(0, HITS);
   if (hits.length) return `<ul class="list plist">${serveRows(hits)}</ul>`;
   const q = esc(text);

@@ -1,7 +1,7 @@
 /* Recurring building blocks of the views: avatars, thumbnails, the rating slider, the strip of rating dots, the rows of
    „Einkaufen“ and „Vorlieben“, lines told in a card, sync status. */
 import {andList, cap, esc} from '../text.js';
-import {ago, dayKey, dayLabel, timeStr} from '../dates.js';
+import {addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, queue} from '../store.js';
@@ -321,6 +321,17 @@ export function syncChip() {
   return null;
 }
 
+/* When something was, as people say it: „heute um 13:14“, „gestern um 19:22“, „vorgestern“, „vor 3 Tagen“, „am 12.
+   September“, the time without a leading zero. mark wraps the time, so the overview can set it in bold. */
+export function since(t, now, mark = x => x) {
+  const day = dayStart(now),
+    clock = () => mark(timeStr(t).replace(/^0(?=\d:)/, ''));
+  if (t >= day) return `heute um ${clock()}`;
+  if (t >= addDays(day, -1)) return `gestern um ${clock()}`;
+  const days = Math.round((day - dayStart(t)) / 864e5);
+  if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
+  return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
+}
 /* „k von n Mal“ as people say it: „einmal“, „beide Male“, „alle 3 Mal“, „2 von 3 Mal“ */
 export const times = (k, n) =>
   n === 1 ? 'einmal' : k < n ? `${k} von ${n} Mal` : n === 2 ? 'beide Male' : `alle ${n} Mal`;

@@ -85,25 +85,35 @@ export function defaultPets(p) {
   return {ids: db.pets.map(x => x.id), auto: true};
 }
 
-/* Quick picker while feeding: most recently served varieties first, leaving out the ones no longer bought (model) */
-export function quickProducts(limit = Infinity) {
+/* When each variety was last served within the pet filter: variety → time, only for varieties served at all */
+function lastServed() {
   const last = new Map();
   for (const s of db.servings) {
     if (!s.productId || last.has(s.productId)) continue;
     if (prefs.activePet !== 'all' && !s.pets[prefs.activePet]) continue;
     last.set(s.productId, s.servedAt);
   }
+  return last;
+}
+/* Varieties with when each was last served within the filter, 0 for one never served: what a row of the quick picker
+   says under the name. [{product, at}] */
+export const withLast = (products, last = lastServed()) => products.map(p => ({product: p, at: last.get(p.id) || 0}));
+/* Quick picker while feeding: most recently served varieties first, leaving out the ones no longer bought (model),
+   each with when it was last served. [{product, at}] */
+export function quickProducts(limit = Infinity) {
+  const last = lastServed();
   const flop = new Set(
     model()
       .sorts.filter(e => e.choice === 'nicht')
       .map(e => e.id),
   );
   const pet = prefs.activePet !== 'all' ? getPet(prefs.activePet) : null;
-  return db.products
+  const products = db.products
     .filter(p => !flop.has(p.id))
     .filter(p => !pet || last.has(p.id) || !p.animal || p.animal === pet.species)
     .sort((a, b) => (last.get(b.id) || 0) - (last.get(a.id) || 0) || (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, limit);
+  return withLast(products, last);
 }
 /* The shopping list as shareable text, matching the pet filter: what to buy again („Nachkaufen“ including „Gemischt“
    with „nur für …“ and the manual `immer`), one block per food type with the type's name above it, the best first.
