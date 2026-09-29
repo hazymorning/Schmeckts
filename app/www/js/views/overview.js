@@ -1,7 +1,7 @@
 /* The overview card at the top of the home page: the pet in the filter, the household under „Alle“, with picture,
    name and a few sentences about the day from glance.js. First when the last meal was, what it was and in a household
    who served it, then whether it is time for the next one or when that usually is, and one line more: what is only
-   true today (a first time, a milestone close by, an anniversary, a record, a meal off its usual time,
+   true today (a birthday, a first time, a milestone close by, an anniversary, a record, a meal off its usual time,
    the treats, a fact bound to the day) or, without any, one of the kinds taking turns by the day (the feeding duel,
    a streak, an idea for a change, a person's feeding run, a weekday's own time, the week so far, a look back, the
    varieties tried, the days in the diary, something about the animal), the wordings in views/facts.js and the
@@ -20,6 +20,7 @@ const FRESH = 60; // minutes after a meal in which it is still news
 const NIGHT = 5; // until this hour it is still night
 const STREAK = 5; // from this many days in a row the streak is worth a line
 const MILESTONE_NEAR = 5; // and a milestone from this many meals before it
+const BIRTHDAY_SOON = 3; // days before a birthday from which it is announced
 const SNACKS = 3; // and the treats of the day from this many on
 const WEEK = {meals: 5, sorts: 2}; // and the week so far from this many meals of this many varieties
 const SORTS = 5; // and the varieties tried from this many
@@ -161,11 +162,18 @@ function outlookLine(g, pets, now) {
   return `${meal || 'Futter'} gibt es meist ${when}.`;
 }
 
-/* The line more, first of all what is only true today, the first that holds: a variety served for the first time, a
-   milestone close by, an anniversary of the first meal, a record, a meal off its usual time or at yesterday's minute,
+/* The line more, first of all what is only true today, the first that holds: a birthday today or within
+   BIRTHDAY_SOON days, a variety served for the first time, a milestone close by, an anniversary of the first meal, a record, a meal off its usual time or at yesterday's minute,
    a lot of treats, a fact bound to the day. counted: the first sentence has already said how many treats there were.
    '' without any. */
 function message(g, pets, now, counted, species) {
+  if (g.birthday && (g.birthday.today || g.birthday.days <= BIRTHDAY_SOON)) {
+    const {today, days, age} = g.birthday,
+      pet = esc(getPet(g.birthday.pet).name);
+    if (today)
+      return age ? say('birthdayAge', now, {pet: b(pet), age: b(age)}) : say('birthdayToday', now, {pet: b(pet)});
+    return days === 1 ? say('birthdayTomorrow', now, {pet}) : say('birthdaySoon', now, {pet, days: b(days + ' Tagen')});
+  }
   if (g.premiere)
     return g.premiere === g.last.productId
       ? say('premiereLast', now)

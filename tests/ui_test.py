@@ -1915,6 +1915,109 @@ async def test_overview(browser, url):
     await ctx.close()
 
 
+# The pet editor with its birthday field: what it holds, whether the sheet is still open, which field has the focus
+# and what the toast says
+BIRTHDAY = """() => ({value: document.querySelector('#f-birthday')?.value ?? null, open: !!document.querySelector('#sheet #f-name'),
+  focus: document.activeElement?.id, toast: document.querySelector('#toast')?.innerText.trim() ?? '', max: document.querySelector('#f-birthday')?.max,
+  pick: !!document.querySelector('#f-birthday')?.closest('.pick')?.querySelector('.ic'), wide: document.documentElement.scrollWidth > innerWidth})"""
+# The overview's sentences for the first pet with the birthday given, all of them, tags stripped
+BIRTHDAY_LINES = """birthday => Promise.all([import('./js/store.js'), import('./js/views/overview.js'), import('./js/glance.js')]).then(([s, o, g]) => {
+  const p = s.db.pets[0]; if (birthday) p.birthday = birthday; else delete p.birthday;
+  const t = document.createElement('p'); t.innerHTML = o.overviewText(g.glance(s.db, [p.id], Date.now(), new Set()), [p], Date.now());
+  return [...t.querySelectorAll('.ov-line')].map(l => l.innerText); })"""
+
+
+async def test_birthday(browser, url):
+    print('the pet\u2019s birthday: a date field in the editor, nothing in the future, and the overview announces the day')
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
+    await pg.evaluate(OVERVIEW_DB)
+    await idle(pg)
+    await settings(pg)
+    await pg.click('#sheet [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Tiger')
+    await pg.fill('#f-birthday', '2027-01-01')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    late = await pg.evaluate(BIRTHDAY)
+    check(
+        late
+        == {
+            'value': '2027-01-01',
+            'open': True,
+            'focus': 'f-birthday',
+            'toast': 'Das Geburtsdatum liegt in der Zukunft.',
+            'max': '2026-06-09',
+            'pick': True,
+            'wide': False,
+        },
+        f'a birthday in the future is refused on saving: the toast says so, the editor stays and the field keeps the focus; the field is a select field with its own arrow, the picker ends today ({late})',
+    )
+    await shot(pg, 'pet-birthday-360')
+    await pg.fill('#f-birthday', '2022-06-12')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    saved = await state(pg, 'db.pets.map(p => [p.name, p.birthday ?? null])')
+    check(saved == [['Minka', None], ['Tiger', '2022-06-12']], f'a date in the past is saved, a pet without one has no field ({saved})')
+    await pg.click('#sheet [data-action=edit-pet]:nth-of-type(2)')
+    await idle(pg)
+    again = await pg.evaluate(BIRTHDAY)
+    check(again['value'] == '2022-06-12' and again['open'], f'opened again the editor shows the birthday ({again})')
+    await pg.fill('#f-birthday', '')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    cleared = await state(pg, "db.pets.map(p => 'birthday' in p)")
+    check(cleared == [False, False], f'cleared, the field goes ({cleared})')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+    # The editor as a page in the dark, with a large system font: the field in one piece
+    ctx = await phone(browser, scheme='dark', width=360, height=800)
+    pg, errors = await open_page(ctx, url, scheme='dark')
+    await pg.evaluate(OVERVIEW_DB)
+    await idle(pg)
+    await pg.evaluate(BIG_TEXT, 1.3)
+    await settings(pg)
+    await pg.click('#sheet [data-action=add-pet]')
+    await idle(pg)
+    big = await pg.evaluate(BIRTHDAY)
+    field = await pg.evaluate(
+        """(() => { const f = document.querySelector('#f-birthday'), l = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Geburtstag');
+          const r = f.getBoundingClientRect(), n = document.querySelector('#f-name').getBoundingClientRect();
+          return [!!l && l.getBoundingClientRect().bottom <= r.top, Math.round(r.height) >= 44, Math.round(r.width) === Math.round(n.width), r.top > n.bottom]; })()"""
+    )
+    check(
+        big['pick'] and not big['wide'] and field == [True, True, True, True],
+        f'in the dark with a large font: the label „Geburtstag“ above the field, the field as wide as the name field and under it, nothing wider than the screen ({field}, {big})',
+    )
+    await shot(pg, 'pet-birthday-dark-big')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+    # The overview: today with the age, tomorrow, in three days, and nothing four days ahead
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
+    await pg.evaluate(OVERVIEW_DB)
+    await idle(pg)
+    said = [(await pg.evaluate(BIRTHDAY_LINES, d))[-1] for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
+    want = [
+        await pg.evaluate(LINE, ['birthdayAge', {'pet': 'Minka', 'age': 4}]),
+        await pg.evaluate(LINE, ['birthdayToday', {'pet': 'Minka'}]),
+        await pg.evaluate(LINE, ['birthdayTomorrow', {'pet': 'Minka'}]),
+        await pg.evaluate(LINE, ['birthdaySoon', {'pet': 'Minka', 'days': '3 Tagen'}]),
+    ]
+    cats = await pg.evaluate(FACTS, 'Katze')
+    check(
+        said[:4] == want and said[4] in cats and said[5] in cats,
+        f'the overview: the birthday with the age, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
+    )
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+
 async def test_milestones(browser, url):
     print('milestones in the toast')
     ctx = await phone(browser)
@@ -5859,6 +5962,7 @@ run_tests(
         'own-interval': test_remind,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
+        'birthday': test_birthday,
         'modes': test_modes,
         'network': test_network,
         'shortcuts': test_shortcuts,

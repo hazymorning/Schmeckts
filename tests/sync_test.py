@@ -431,6 +431,20 @@ async def main():
             )
             await expect(await until(a, "db.pets.some(p => p.name === 'Tiger II')", 8), 'a change from B arrives at A')
 
+            # A birthday is a field like the others, and null takes it off the other phone too
+            await run(a, "db.pets.find(p => p.id === 'lunapet00001').birthday = '2022-03-15'; save();")
+            await expect(
+                await until(b, "db.pets.find(p => p.id === 'lunapet00001')?.birthday === '2022-03-15'", 8)
+                and srv.records()['pets']['lunapet00001'].get('birthday') == '2022-03-15',
+                'a birthday set on A reaches B and the server',
+            )
+            await run(b, "delete db.pets.find(p => p.id === 'lunapet00001').birthday; save();")
+            await expect(
+                await until(a, "!('birthday' in db.pets.find(p => p.id === 'lunapet00001'))", 8)
+                and 'birthday' not in srv.records()['pets']['lunapet00001'],
+                'cleared on B, it is gone on A and on the server',
+            )
+
             # Deleting and undo, lots of changes
             await run(
                 a,

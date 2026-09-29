@@ -15,6 +15,7 @@ const RUN = {least: 3, days: 60}; // a person's feeding run from this many days,
 const WEEKDAY = {weeks: 8, least: 3, apart: 30}; // a weekday's own time: over this many weeks, from this many meals on it, this many minutes off the other days
 const ANNIVERSARY = [1, 3, 6, 12]; // months since the first meal that are worth a word
 const LOOKBACK = 365; // days back: „Heute vor einem Jahr“
+const BIRTHDAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/; // pets[].birthday, anything else is left alone
 /* The kinds of the line taking turns, in their rank (views/overview.js words each), and the memory: the kinds of
    the last three days and the facts of the last sixty are not repeated */
 export const TURNS = ['duel', 'streak', 'idea', 'run', 'weekday', 'week', 'lookback', 'sorts', 'days', 'fact'];
@@ -46,6 +47,28 @@ function longestRun(days, last) {
   }
   return longest;
 }
+/* Midnight of a day of the year `y`, or of the month's last day where it has none: February 29 on the 28th */
+const onDay = (y, month, day) => new Date(y, month - 1, Math.min(day, new Date(y, month, 0).getDate())).getTime();
+/* The next birthday among the pets shown: {pet, today: true, age} on the day, {pet, days} before it, null without
+   one. The age from the year, and null before the first birthday. */
+function nextBirthday(db, shown, now) {
+  const today = dayStart(now),
+    year = new Date(now).getFullYear();
+  let best = null;
+  for (const p of db.pets) {
+    const m = shown.has(p.id) && BIRTHDAY_RE.exec(p.birthday || '');
+    if (!m) continue;
+    const [born, month, day] = m.slice(1).map(Number);
+    let at = onDay(year, month, day);
+    if (at < today) at = onDay(year + 1, month, day);
+    const days = Math.round((at - today) / DAY);
+    if (!best || days < best.days) best = {pet: p.id, days, age: new Date(at).getFullYear() - born};
+  }
+  if (!best) return null;
+  return best.days
+    ? {pet: best.pet, days: best.days}
+    : {pet: best.pet, today: true, age: best.age > 0 ? best.age : null};
+}
 /* The same calendar day `months` months after t, or the month's last day where it has none: {first} in a month */
 function monthsAfter(t, months) {
   const d = new Date(t),
@@ -56,7 +79,7 @@ function monthsAfter(t, months) {
 }
 
 /* {last, meals, snacks, feeders, week, next, streak, premiere, idea, milestone, first, sorts, anniversary, record,
-    shift, sameMinute, feedRun, weekday, lookback}
+    shift, sameMinute, feedRun, weekday, lookback, birthday}
    last        the newest meal of the pets up to now, null without one
    meals       today's meals, snacks today's treats (a treat is not a meal, as in the history)
    feeders     this week's meals per person, the most first: [{name, n}]
@@ -78,7 +101,10 @@ function monthsAfter(t, months) {
    feedRun     a person feeding day after day: {name, days, other: another name of the week or the run, or null}
    weekday     this weekday's own time for a slot, in the median over WEEKDAY.weeks weeks against the other days:
                {at: the slot's minute, mine: this weekday's, later, weekday}, null without one
-   lookback    the variety served exactly LOOKBACK days ago, null without one */
+   lookback    the variety served exactly LOOKBACK days ago, null without one
+   birthday    the next birthday among the pets shown: {pet, today: true, age} on the day (age null before the
+               first one), {pet, days} before it, null without a birthday; February 29 falls on the 28th in a year
+               without it */
 export function glance(db, pets, now, avoid = new Set()) {
   const shown = new Set(pets),
     today = dayStart(now),
@@ -108,6 +134,7 @@ export function glance(db, pets, now, avoid = new Set()) {
       feedRun: null,
       weekday: null,
       lookback: null,
+      birthday: nextBirthday(db, shown, now),
     },
     fed = new Map(),
     sorts = new Set(), // the varieties of this week's meals

@@ -4,7 +4,7 @@
 import {$, reduceMotion} from '../dom.js';
 import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
-import {addDays, toLocalInput, weekStart, when} from '../dates.js';
+import {addDays, dayKey, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -558,6 +558,8 @@ function viewPet() {
     <label class="link photo-hint" for="petPhotoInput">${s.photo ? 'Foto ändern' : 'Foto hinzufügen'}</label>
     <label class="label" for="f-name">Name</label>
     <input id="f-name" class="field" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+    <label class="label" for="f-birthday">Geburtstag</label>
+    <span class="pick"><input id="f-birthday" class="field" type="date" data-field="birthday" value="${esc(s.birthday)}" max="${dayKey(Date.now())}">${icon('chevron')}</span>
     <span class="label">Tierart</span>
     <div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>
     <div class="mt btn-col"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button>

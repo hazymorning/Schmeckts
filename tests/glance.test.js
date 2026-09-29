@@ -327,6 +327,49 @@ test('a look back: the variety served exactly a year ago', () => {
   );
 });
 
+test('a birthday: today with the age, the days to the next one, the nearest with „Alle“; February 29 falls on the 28th', () => {
+  const on = (birthdays, pets, now = NOW) => {
+    const db = household(['nass'], [meal('10 08:00')]);
+    db.pets = Object.entries(birthdays).map(([id, birthday]) => ({id, name: id, ...(birthday && {birthday})}));
+    return glance(db, pets, now).birthday;
+  };
+  assert.deepEqual(
+    [
+      on({A: '2022-06-10'}, ['A']),
+      on({A: '2026-06-10'}, ['A']),
+      on({A: '2022-06-11'}, ['A']),
+      on({A: '2022-06-13'}, ['A']),
+      on({A: '2022-06-09'}, ['A']),
+      on({A: null}, ['A']),
+      on({A: '2022-06-13', B: '2020-06-12'}, ['A', 'B']),
+      on({A: '2022-06-13', B: '2020-06-12'}, ['A']),
+      on({A: 'gestern'}, ['A']),
+    ],
+    [
+      {pet: 'A', today: true, age: 4},
+      {pet: 'A', today: true, age: null},
+      {pet: 'A', days: 1},
+      {pet: 'A', days: 3},
+      {pet: 'A', days: 364},
+      null,
+      {pet: 'B', days: 2},
+      {pet: 'A', days: 3},
+      null,
+    ],
+    'born today no age yet; yesterday is next year; the pet whose birthday comes first; nothing that is no date',
+  );
+  assert.deepEqual(
+    [
+      on({A: '2024-02-29'}, ['A'], at('2026-02-28T12:00')),
+      on({A: '2024-02-29'}, ['A'], at('2026-02-27T12:00')),
+      on({A: '2024-02-29'}, ['A'], at('2026-03-01T12:00')).days,
+      on({A: '2024-02-29'}, ['A'], at('2028-02-29T12:00')),
+      on({A: '2024-02-29'}, ['A'], at('2028-02-28T12:00')),
+    ],
+    [{pet: 'A', today: true, age: 2}, {pet: 'A', days: 1}, 364, {pet: 'A', today: true, age: 4}, {pet: 'A', days: 1}],
+  );
+});
+
 test('the turn: the same choice all day, then the kinds in their order, none of the last three days, a fact none of the last 60 days; with nothing left the block on the kinds falls first, then the one on the facts', () => {
   const on = i => NOW + i * 864e5;
   let m = null;
