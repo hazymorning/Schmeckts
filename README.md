@@ -32,7 +32,7 @@ Zugegeben, das Ganze ist ein ziemliches Nischenproblem. Dafür steckt in der App
 
 Beim Füttern scannst du kurz den Barcode auf der Packung. Wenn die App die Sorte schon kennt, ist die Mahlzeit damit eingetragen.
 
-Ist die Sorte neu oder hat die Packung keinen Barcode, machst du stattdessen ein Foto. Die App liest, was draufsteht, und schlägt dir Marke und Sorte vor. Passt der Vorschlag nicht, suchst du dir aus dem erkannten Text die richtigen Zeilen raus.
+Ist die Sorte neu oder hat die Packung keinen Barcode, machst du stattdessen ein Foto. Die App liest, was draufsteht, und schlägt dir Marke und Sorte vor. Passt der Vorschlag nicht, suchst du dir aus dem erkannten Text die richtigen Zeilen raus. Ist das Foto nichts geworden, machst du einfach ein neues.
 
 Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, zwei Wochen weißt du ziemlich genau, was dein Tier mag.
 

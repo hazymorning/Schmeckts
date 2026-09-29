@@ -995,6 +995,12 @@ dialog.sheet.page .sheet-body {
   padding: var(--space-3) 0;
   margin: calc(-1 * var(--space-3)) 0;
 }
+.link .ic {
+  width: var(--icon-s);
+  height: var(--icon-s);
+  vertical-align: middle;
+  margin-right: var(--space-1h);
+} /* a link with an icon in front: „Neues Foto“ */
 /* A text button at the foot of a card, e.g. „Weitere anzeigen“ */
 .card-btn {
   display: flex;
@@ -1952,9 +1958,13 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .photo-btn:has(> .name-photo) {
   width: 100%;
 }
-/* Naming: what was read as a sentence, or that nothing was, under the photo */
+/* Naming: what was read as a sentence, or that nothing was, under the photo, and „Neues Foto“ right under that */
 .read-note {
   margin-top: var(--space-3);
+}
+.rephoto {
+  display: block;
+  margin-top: var(--space-2);
 }
 .suggest .label {
   margin: var(--space-4h) 0 var(--space-hair);

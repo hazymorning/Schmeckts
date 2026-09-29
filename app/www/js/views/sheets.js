@@ -135,14 +135,19 @@ function viewName() {
         : ''
     }${note}`;
   if (patient) return top + fieldSkeleton + fieldSkeleton; // as tall as label and field, so nothing jumps
-  // What the phone read, as a sentence to confirm, or that there was nothing to read
+  // What the phone read, as a sentence to confirm, or that there was nothing to read; and a new photo, for a meal
+  // still without a variety
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
     said = read.length
       ? `<p class="say read-note">Gelesen: ${read.map(x => `<b>${esc(x)}</b>`).join(', ')}. Passt das?</p>`
       : serving?.status === 'noserver' && !serving.productId
-        ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein.</p>`
+        ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.</p>`
+        : '',
+    again =
+      serving && !serving.productId && photo
+        ? `<button class="link rephoto" data-action="rephoto">${icon('camera')}Neues Foto</button>`
         : '';
-  return `${top}${said}
+  return `${top}${said}${again}
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">

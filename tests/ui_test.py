@@ -3662,7 +3662,7 @@ async def test_reading_said(browser, url):
         both == ['Gelesen: Sheba, Lachs in Soße. Passt das?', ['Sheba', 'Lachs in Soße'], None, 'Passt so', True]
         and brand == ['Gelesen: Whiskas. Passt das?', ['Whiskas'], None, 'Passt so', True]
         and variety == ['Gelesen: Huhn in Gelee. Passt das?', ['Huhn in Gelee'], None, 'Passt so', True]
-        and nothing == [None, None, 'Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein.', 'Speichern', True],
+        and nothing == [None, None, 'Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.', 'Speichern', True],
         f'brand and variety in bold, one alone without the comma, „Passt so“ while there is a reading; nothing read: a hint and „Speichern“ ({both}, {brand}, {variety}, {nothing})',
     )
     # Named, the sentence is gone and the button says „Speichern“ again
@@ -3678,6 +3678,131 @@ async def test_reading_said(browser, url):
     check(named == [None, None, None, 'Speichern', True], f'„Futter ändern“ for a named meal: no sentence, „Speichern“ ({named})')
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+# The meal on top while a new photo is taken: status, the reading, its thumbnail and photo (their tails as identity)
+REPHOTO = """(s => [s.status ?? null, s.guess ? [s.guess.brand, s.guess.variety] : null, (s.thumb || '').slice(-32), (s.photo || '').slice(-32)])(db.servings[0])"""
+REPHOTO_VIEW = """() => { const l = document.querySelector('#sheet .link.rephoto');
+  return [l ? l.innerText.trim() : null, !!l?.querySelector('.ic'), document.querySelector('.pend .thumb')?.getAttribute('src')?.slice(-32) ?? null]; }"""
+
+
+async def test_rephoto(browser, url):
+    print('„Neues Foto“ while naming: the new photo replaces the old and is read anew, a late result of the old reading counts for nothing')
+    recognized = []
+    fail = {'server': False}
+
+    async def srv_route(route, request):  # the household server: recognises the photo, unless told to fail
+        path, now = request.url.split(':8486')[1], int(time.time() * 1000)
+        if path.startswith('/api/recognize'):
+            recognized.append(json.loads(request.post_data or '{}').get('image', '')[-32:])
+            if fail['server']:
+                await route.fulfill(status=503, content_type='application/json', body=json.dumps({'error': 'aus', 'now': now}))
+                return
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/info'):
+            body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': [], 'auth': True, 'now': now}
+        elif path.startswith('/api/changes') and request.method == 'POST':
+            body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])], 'now': now}
+        elif path.startswith('/api/changes'):
+            body = {'epoch': 'test', 'seq': 0, 'records': [], 'now': now}
+        else:
+            body = {'epoch': 'test', 'seq': 0, 'sum': '', 'fields': 0, 'now': now}
+        await route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+    ctx = await phone(browser)
+    await ctx.route(f'{SRV}/**', srv_route)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    small, big = base64.b64encode(PACK.read_bytes()).decode(), base64.b64encode(PACK_LARGE.read_bytes()).decode()
+
+    async def snapshot():
+        return [await state(pg, REPHOTO), await pg.evaluate(FIELDS), await pg.evaluate(CHIPS), await pg.evaluate(REPHOTO_VIEW)]
+
+    async def again(text, photo, delay=0):
+        """„Neues Foto“ with the camera app giving `photo` (None: „Abbrechen“) and the reading answering `text`"""
+        await pg.evaluate(f'window.__ocrText = {json.dumps(text)}; window.__ocrDelay = {delay}; window.__photo = {json.dumps(photo)}')
+        await pg.click('#sheet [data-action=rephoto]')
+
+    # The first photo, read at once
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = 0")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    first = await snapshot()
+    await shot(pg, 'rephoto-link')
+    await pg.evaluate('window.__calls.length = 0')
+    await again('Sheba\nLachs in Soße', big)
+    await until(pg, "db.servings[0]?.guess?.brand === 'Sheba'")
+    await idle(pg)
+    second = await snapshot()
+    cam = await pg.evaluate("window.__calls.filter(c => c[0] === 'capture').map(c => c[1])")
+    check(
+        first[0][:2] == ['noserver', ['Whiskas', 'Rind in Gelee']]
+        and first[1] == ['Whiskas', 'Rind in Gelee']
+        and first[3][:2] == ['Neues Foto', True]
+        and second[0][:2] == ['noserver', ['Sheba', 'Lachs in Soße']]
+        and second[1] == ['Sheba', 'Lachs in Soße']
+        and second[2] != first[2]
+        and second[0][2:] != first[0][2:]
+        and second[3][2] != first[3][2]
+        and second[3][2] == second[0][2]
+        and cam == [None],
+        f'„Neues Foto“ under the photo: the camera as when feeding, and with the new photo the fields, the chips, the thumbnail on the meal and in its card and the photo itself change ({first}, {second}, {cam})',
+    )
+    await again('Animonda\nCarny', None)
+    await idle(pg)
+    check(await snapshot() == second, '„Abbrechen“ changes nothing')
+
+    # A reading that takes long, then a new photo while it runs: the new reading answers, the old result is dropped
+    done = await pg.evaluate('window.__ocrDone || 0')
+    await again('Animonda\nCarny', small, 3000)
+    await pg.wait_for_selector('#sheet .skel-field')
+    await pg.wait_for_selector('#sheet #f-brand', timeout=4000)
+    waiting = [await state(pg, 'db.servings[0].status'), await pg.locator('#sheet [data-action=rephoto]').count()]
+    await again('Felix\nHuhn in Gelee', big)
+    await until(pg, "db.servings[0]?.guess?.brand === 'Felix'")
+    await pg.wait_for_function(f'(window.__ocrDone || 0) >= {done} + 2')
+    await idle(pg)
+    late = await snapshot()
+    check(
+        waiting == ['reading', 1] and late[0][:2] == ['noserver', ['Felix', 'Huhn in Gelee']] and late[1] == ['Felix', 'Huhn in Gelee'],
+        f'the skeleton first, the empty fields with the link once patience runs out; the old reading arriving late changes nothing ({waiting}, {late})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+
+    # In a household the new photo goes to the server as a new recognition
+    await pg.evaluate(
+        f"import('./js/store.js').then(m => {{ m.prefs.server = '{SRV}'; m.prefs.code = 'K7PM-3QXD'; m.prefs.mode = 'haushalt'; m.savePrefs(); }})"
+    )
+    await pg.evaluate("import('./js/sync.js').then(m => m.startSync())")
+    await until(pg, "status.state === 'ok'")
+    fail['server'] = True
+    await pg.evaluate("window.__ocrText = ''; window.__ocrDelay = 0")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'waiting'")
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    link = await pg.evaluate(REPHOTO_VIEW)
+    fail['server'] = False
+    await again('', big)
+    await until(pg, "db.servings[0]?.productId && db.products.some(p => p.variety === 'Gold Pastete')")
+    await idle(pg)
+    check(
+        link[:2] == ['Neues Foto', True] and len(recognized) == 2 and recognized[0] != recognized[1],
+        f'in a household: „Neues Foto“ while the server has not answered, and the new photo goes to the server as a recognition of its own ({link}, {len(recognized)} photos)',
+    )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -6273,6 +6398,7 @@ run_tests(
         'known-photo': test_known_photo,
         'skeleton': test_skeleton,
         'reading-said': test_reading_said,
+        'rephoto': test_rephoto,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

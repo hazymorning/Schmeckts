@@ -79,29 +79,42 @@ function undoServe(id) {
   update();
 }
 
-/* Take a photo of the packaging and serve. Without a camera or the camera permission it goes through the camera app
-   (photo plugin), and through the file input in the browser. Returns true when something was served; after
-   „Abbrechen“ the feeding sheet stays open. */
-export async function shootPhoto(hint, scanCode = '') {
-  let blob = null;
+/* The camera for a packaging: our own, without it or its permission the camera app (photo plugin), and in the
+   browser the file input named, whose photo then comes in through actions.js. hint: what the camera says, the
+   camera app only where one is given (the front after a scan). The photo as a blob, null after „Abbrechen“ or once
+   the file input has taken over. */
+async function packagingPhoto(hint, input, scanCode = '') {
   try {
-    blob = await openCamera(hint || 'Packung fotografieren');
+    return await openCamera(hint || 'Packung fotografieren');
   } catch (e) {
     report('our own camera', e);
     if (!canTakePhoto()) {
       if (scanCode) toast(hint);
-      document.getElementById('camInputSheet').click();
-      return false;
+      document.getElementById(input).click();
+      return null;
     } // browser: the photo button takes over a scanned code
     try {
-      blob = await takePhoto(hint);
+      return await takePhoto(hint);
     } catch (err) {
       if (!/cancelled/.test(String(err?.message)))
         toast('Die Kamera ließ sich nicht öffnen. Ist sie für Schmeckt’s in den Android-Einstellungen erlaubt?');
+      return null;
     }
   }
+}
+/* Take a photo of the packaging and serve. Returns true when something was served; after „Abbrechen“ the feeding
+   sheet stays open. */
+export async function shootPhoto(hint, scanCode = '') {
+  const blob = await packagingPhoto(hint, 'camInputSheet', scanCode);
   if (blob) await servePhoto(blob, scanCode);
   return !!blob;
+}
+/* „Neues Foto“ while naming: the same camera, and the photo replaces the meal's; „Abbrechen“ changes nothing */
+export async function rephoto() {
+  const id = sheet?.kind === 'serving' && sheet.step === 'name' ? sheet.id : null;
+  if (!id) return;
+  const blob = await packagingPhoto('', 'camInputName');
+  if (blob) await replacePhoto(id, blob);
 }
 
 /* Photo: the meal is saved as served at once, recognition then runs in the background.
@@ -158,7 +171,42 @@ export async function servePhoto(file, scanCode = '') {
     .then(sharp => recognizeServing(s.id, sharp));
 }
 
-const running = new Set(); // recognitions in flight
+/* A new photo for a meal still without a variety: shrunk exactly as servePhoto() does, everything the old photo
+   brought goes (the guess, an error, the lines read, the attempts), the open sheet's fields are emptied, and the
+   recognition starts again by mode: the sheet shows the skeleton and then the new reading, or the server's status. */
+export async function replacePhoto(id, file) {
+  const s = getServing(id);
+  if (!s || s.productId || !file) return;
+  let img;
+  try {
+    img = await fileToImage(file);
+  } catch {
+    // An unreadable file leaves the old photo in place; the toast asks for another one
+    toast('Das Foto ließ sich nicht lesen.');
+    return;
+  }
+  running.delete(id); // a run still going for the old photo answers for nothing from here on
+  const full = resize(img, 1100, 0.82);
+  s.photo = resize(img, 480, 0.74);
+  s.thumb = cropSquare(img, 200, 0.76);
+  s.status = photoByServer() ? 'recognizing' : 'noserver';
+  delete s.guess;
+  delete s.error;
+  memPhotos.set(id, full.split(',')[1]);
+  memLines.delete(id);
+  tries.delete(id);
+  if (sheet?.kind === 'serving' && sheet.id === id)
+    Object.assign(sheet, {brand: '', variety: '', type: 'Nassfutter', texture: undefined});
+  save();
+  readable(img)
+    .catch(e => {
+      report('the photo for reading', e);
+      return '';
+    })
+    .then(sharp => recognizeServing(id, sharp));
+}
+
+const running = new Map(); // recognitions in flight: meal → the photo being recognised, so a new photo supersedes
 const tries = new Map(); // meal → {n, next}: attempts, and the earliest next attempt
 const PAUSE = [0, 30e3, 2 * 60e3, 10 * 60e3, 30 * 60e3]; // no automatic attempt after that
 const BUSY_PAUSE = 90e3; // the server's own cost brake lets one photo through every 90 seconds
@@ -170,7 +218,7 @@ export function retryNow(id) {
 
 async function recognizeServing(id, sharp = '') {
   const s = getServing(id);
-  if (!s || running.has(id)) return;
+  if (!s) return;
   const b64 = memPhotos.get(id) || (s.photo || '').split(',')[1];
   if (!b64) {
     if (!s.productId && s.status) {
@@ -181,7 +229,8 @@ async function recognizeServing(id, sharp = '') {
     }
     return;
   }
-  running.add(id);
+  if (running.get(id) === b64) return; // this very photo is being recognised already
+  running.set(id, b64);
   const house = photoByServer(); // the server recognises, otherwise the phone reads the text on the photo itself
   s.status = house ? 'recognizing' : 'reading';
   delete s.error;
@@ -200,6 +249,7 @@ async function recognizeServing(id, sharp = '') {
   } catch (e) {
     report('recognition', e);
   }
+  if (running.get(id) !== b64) return; // a new photo since this began: that run answers, this one counts for nothing
   running.delete(id);
   readingSince.delete(id);
   const cur = getServing(id);
