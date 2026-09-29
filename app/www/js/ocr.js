@@ -82,6 +82,7 @@ export function readPack(read, products = []) {
       type: known.type || '',
       animal: known.animal || '',
       texture: known.texture,
+      ...(known.id ? {known: known.id} : {}), // one of our own varieties: recognize.js serves it like a barcode hit
     };
 
   const brand = pickBrand(page, raw, products);

@@ -11,14 +11,15 @@ import {CROP_WIDTH, focusOf, joinReadings, packLines, readPack, SECOND_PASS, SEC
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
-import {productsByCode} from './derive.js';
+import {getProduct, productsByCode} from './derive.js';
 import {report} from './report.js';
 
 const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'locked']);
 const LOOKING = 'Barcode wird nachgeschlagen …',
   READING = 'Sorte wird erkannt …';
 
-/* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null. */
+/* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null;
+   the phone's own reading adds the lines it read. */
 const STEPS = [
   {
     name: 'codes',
@@ -44,7 +45,10 @@ const STEPS = [
       if (first.raw) last = {meal: o.meal, at: Date.now(), ...first, ...(second ? {second} : {})};
       if (timing.on && o.sharp) await measure(o, first);
       const read = second ? joinReadings(first, second.read, second) : first;
-      const hit = asDetails(readPack(read, db.products));
+      const pack = readPack(read, db.products),
+        // one of our own varieties on the packaging: served like a barcode hit, where the phone is the one reading
+        known = !photoByServer() && pack.known ? getProduct(pack.known) : null;
+      const hit = known ? {products: [known]} : asDetails(pack);
       // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
       return hit && {...hit, lines: packLines(read, '', db.products)};
     },

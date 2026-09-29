@@ -19,20 +19,34 @@ import {norm} from '../app/www/js/text.js';
 import {VOCAB_BRANDS, VOCAB_WORDS} from '../app/www/js/vocab.js';
 
 const VARIETIES = [
-  {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
-  {brand: 'Dreamies', variety: 'Käse', type: 'Snack', animal: 'Katze'},
+  {id: 'shebalachs01', brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
+  {id: 'dreamieskaese', brand: 'Dreamies', variety: 'Käse', type: 'Snack', animal: 'Katze'},
 ];
 
-test('packaging text: our own varieties win, insensitive to case, hyphens and spaces', () => {
+test('packaging text: our own varieties win, insensitive to case, hyphens and spaces, and say which one it is', () => {
   const samples = ['SHEBA\nLACHS IN SOSSE\n85 g', 'sheba lachs-in-soße', 'Sheba\nLachsinSosse\nNEU'];
   for (const text of samples) {
     assert.deepEqual(
       readPack(text, VARIETIES),
-      {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
+      {
+        brand: 'Sheba',
+        variety: 'Lachs in Soße',
+        type: 'Nassfutter',
+        animal: 'Katze',
+        texture: 'sosse',
+        known: 'shebalachs01',
+      },
       text,
     );
   }
-  assert.equal(readPack('Dreamies\nmit Käse', VARIETIES).variety, 'Käse');
+  assert.deepEqual(
+    [readPack('Dreamies\nmit Käse', VARIETIES).variety, readPack('Dreamies\nmit Käse', VARIETIES).known],
+    ['Käse', 'dreamieskaese'],
+  );
+  assert.ok(
+    !('known' in readPack('Sheba\nHuhn in Gelee', VARIETIES)) && !('known' in readPack('Hofmeister\nHuhn in Gelee')),
+    'no known variety without a hit on brand and variety',
+  );
 });
 
 test('packaging text: a brand from the list, nothing invented otherwise', () => {

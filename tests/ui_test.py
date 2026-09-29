@@ -3386,7 +3386,9 @@ async def test_recognize(browser, url):
     kept = await state(pg, 'JSON.stringify([db, prefs, queue])')
     check('Zutaten: Fleisch' not in kept, 'the reading itself lives in memory only: it is in neither the data, the settings nor the queue')
 
-    # A camera's large photo: the phone reads the text at 2400 px, and keeps 1100 and 480 px as before
+    # A camera's large photo: the phone reads the text at 2400 px, and keeps 1100 and 480 px as before. Another
+    # packaging, because the one just named would now be served straight away, its photo kept for the variety.
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
     before = await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading().at)")
     await pg.click('#fab')
     await idle(pg)
@@ -3435,12 +3437,16 @@ async def test_recognize(browser, url):
     )
     await pg.click('[data-action=close]')
     await idle(pg)
-    # The same packaging again: our own variety is recognised, spelled differently too
+    # The same packaging again: our own variety is recognised, spelled differently too, and handed over as the
+    # variety itself, the way a barcode hit is
     await pg.evaluate("window.__ocrText = 'SHEBA  selection-in-sauce mit LACHS 85g'")
     got = await ident(photo='AAA')
     check(
-        got['source'] == 'text' and got['details']['brand'] == 'Sheba' and got['details']['variety'] == 'Selection in Sauce mit Lachs',
-        f'a known variety recognised in the text ({got.get("details")})',
+        got['source'] == 'text'
+        and [p['variety'] for p in got.get('products', [])] == ['Selection in Sauce mit Lachs']
+        and 'details' not in got
+        and got['lines'] == ['Sheba selection-in-sauce mit LACHS'],
+        f'a known variety recognised in the text: the variety itself, with the lines read ({got})',
     )
     await pg.evaluate("window.__ocrText = '12345\\n850 g'")
     got = await ident(photo='AAA')
@@ -3521,6 +3527,108 @@ async def test_recognize(browser, url):
     )
     await setp(code='', server='', lookup=False)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)[:2]}')
+    await ctx.close()
+
+
+# The meal on top: variety, status, what it still carries, and its reading
+MEAL = '(s => [s.productId ?? null, s.status ?? null, !!s.photo, !!s.thumb, s.guess ? [s.guess.brand, s.guess.variety] : null])(db.servings[0])'
+# The sheet and the toast: open, kind and step, the fields, the toast's text and whether it offers undo
+SHEET_TOAST = """import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.kind ?? null, m.sheet?.step ?? null,
+  document.getElementById('f-brand')?.value ?? null, document.getElementById('f-variety')?.value ?? null,
+  document.querySelector('#toast span')?.innerText ?? '', !!document.querySelector('#toast [data-action=undo]')])"""
+
+
+async def test_known_photo(browser, url):
+    print('a photo of a known variety: served without the sheet, and undo takes the recognition back, not the meal')
+
+    async def srv_route(route, request):  # a household server whose photo recognition is switched off on this phone
+        path, now = request.url.split(':8486')[1], int(time.time() * 1000)
+        if path.startswith('/api/info'):
+            body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': [], 'auth': True, 'now': now}
+        elif path.startswith('/api/recognize'):
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/changes') and request.method == 'POST':
+            body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])], 'now': now}
+        elif path.startswith('/api/changes'):
+            body = {'epoch': 'test', 'seq': 0, 'records': [], 'now': now}
+        else:
+            body = {'epoch': 'test', 'seq': 0, 'sum': '', 'fields': 0, 'now': now}
+        await route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+    ctx = await phone(browser)
+    await ctx.route(f'{SRV}/**', srv_route)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    # A variety of our own, served once by hand
+    await pg.evaluate("""import('./js/store.js').then(async s => { const now = Date.now();
+      s.db.products.push({id: 'sheba000001', brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', codes: {}, createdAt: now});
+      s.db.servings.unshift({id: 'first0000001', productId: 'sheba000001', servedAt: now - 864e5, note: '', pets: {[s.db.pets[0].id]: {r: 'top', at: now}}});
+      s.save(); (await import('./js/views/home.js')).renderHome(); })""")
+
+    async def photo(text):
+        await pg.evaluate(f'window.__ocrText = {json.dumps(text)}')
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await until(pg, "db.servings[0]?.productId === 'sheba000001' || db.servings[0]?.status === 'noserver'")
+        await idle(pg)
+        return await state(pg, MEAL), await pg.evaluate(SHEET_TOAST)
+
+    meal, view = await photo('SHEBA\nLachs in Soße\n85 g')
+    kept = await pg.evaluate("import('./js/photos.js').then(p => p.keptPhoto('sheba000001'))")
+    check(
+        meal == ['sheba000001', None, False, False, None]
+        and view == [False, None, None, None, None, 'Lachs in Soße erkannt und serviert', True]
+        and await pg.eval_on_selector('#toast span b', 'b => b.innerText') == 'Lachs in Soße'
+        and kept,
+        f'the packaging of a known variety: served with that variety, no sheet, the toast names it in bold with „Rückgängig“, and the photo is kept for the variety ({meal}, {view})',
+    )
+    await shot(pg, 'known-photo-toast')
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    meal, view = await state(pg, MEAL), await pg.evaluate(SHEET_TOAST)
+    chips = await pg.evaluate(CHIPS)
+    check(
+        meal == [None, 'noserver', True, True, ['Sheba', 'Lachs in Soße']]
+        and view[:5] == [True, 'serving', 'name', 'Sheba', 'Lachs in Soße']
+        and chips == [['Sheba', 'true'], ['Lachs in Soße', 'true']]
+        and await state(pg, 'db.products.length === 1 && db.servings.length === 2')
+        and await pg.evaluate("import('./js/photos.js').then(p => p.keptPhoto('sheba000001'))"),
+        f'undo takes the variety off the meal, not the meal: „Futter benennen“ opens with the reading in the fields and the lines read as chips; the variety keeps its photo ({meal}, {view}, {chips})',
+    )
+    await shot(pg, 'known-photo-undone')
+    await pg.click('#sheet [data-action=delete-serving]')
+    await idle(pg)
+    check(
+        await state(pg, 'db.servings.length === 1 && db.products.length === 1') and not await pg.evaluate("document.getElementById('sheet').open"),
+        '„Eintrag löschen“ there deletes the meal, and the variety stays',
+    )
+
+    # In a household with „Fotos über den Server erkennen“ off the phone reads the packaging itself: the same
+    await pg.evaluate(
+        f"import('./js/store.js').then(m => {{ m.prefs.server = '{SRV}'; m.prefs.code = 'K7PM-3QXD'; m.prefs.mode = 'haushalt'; m.prefs.serverPhoto = false; m.savePrefs(); }})"
+    )
+    await pg.evaluate("import('./js/sync.js').then(m => m.startSync())")
+    await until(pg, "status.state === 'ok'")
+    meal, view = await photo('Sheba\nLachs in Soße')
+    check(
+        meal[:2] == ['sheba000001', None] and view == [False, None, None, None, None, 'Lachs in Soße erkannt und serviert', True],
+        f'in a household with the server photo off: served straight away as well ({meal}, {view})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    check(
+        await state(pg, MEAL) == [None, 'noserver', True, True, ['Sheba', 'Lachs in Soße']]
+        and (await pg.evaluate(SHEET_TOAST))[:3] == [True, 'serving', 'name'],
+        'and undo opens the sheet with the reading there too',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
 
@@ -5970,6 +6078,7 @@ run_tests(
         'recognition': test_recognize,
         'discard': test_discard,
         'pack-lines': test_pack_lines,
+        'known-photo': test_known_photo,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

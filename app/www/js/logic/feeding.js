@@ -2,6 +2,7 @@
    `lokal` the variety is typed in right away (status noserver). The photo stays on this phone and only the preview
    is synced. */
 import {uid} from '../fields.js';
+import {esc} from '../text.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
@@ -11,7 +12,7 @@ import {keepPhoto} from '../photos.js';
 import {milestones} from '../smart.js';
 import {identify, memLines, photoByServer} from '../recognize.js';
 import {toast} from '../ui/toast.js';
-import {closeSheet, dlg, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
+import {closeSheet, dlg, isClosing, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
 import {fabFill, homeView, scrollTop, update} from '../views/home.js';
 import {applyProduct, cleanupProduct, linkProduct} from './products.js';
@@ -205,10 +206,12 @@ async function recognizeServing(id, sharp = '') {
    error. Sets status and error on the meal, which stay on this phone. */
 function takeResult(s, found, house) {
   const err = found.error;
+  if (found.lines?.length) memLines.set(s.id, found.lines); // what the phone read, as chips while naming
   if (found.products?.length) {
-    // the barcode now belongs to a known variety
     tries.delete(s.id);
-    linkProduct(s, found.products[0]);
+    if (found.source === 'text')
+      recognized(s, found.products[0]); // one of our own varieties read off the photo
+    else linkProduct(s, found.products[0]); // the barcode now belongs to a known variety
   } else if (found.details && found.source !== 'text') {
     tries.delete(s.id);
     refinePets(s, findProduct(found.details.brand, found.details.variety), found.details.animal);
@@ -221,7 +224,6 @@ function takeResult(s, found, house) {
     s.guess = found.details;
     s.status = 'noserver';
     delete s.error;
-    if (found.lines?.length) memLines.set(s.id, found.lines);
     fillName(s.id, found.details);
   } else if (!house || err?.kind === 'none') {
     s.status = 'noserver';
@@ -232,6 +234,56 @@ function takeResult(s, found, house) {
     s.status = 'failed';
     s.error = err ? err.message : 'Packung nicht erkannt.';
   }
+}
+
+/* One of our own varieties read off the photo: served like a barcode hit, the naming sheet for this meal closes,
+   and the toast offers to take the recognition back. For that a snapshot of what linking changes is kept as long
+   as the toast stands: the meal's photo, thumbnail and lines, the reading as its guess, and what the variety takes
+   over from the meal. */
+function recognized(s, p) {
+  const was = {
+    photo: s.photo,
+    thumb: s.thumb,
+    guess: {
+      brand: p.brand || '',
+      variety: p.variety || '',
+      type: p.type || '',
+      ...(p.texture ? {texture: p.texture} : {}),
+    },
+    mem: memPhotos.get(s.id),
+    lines: memLines.get(s.id),
+    product: {thumb: p.thumb, lastPets: p.lastPets, code: !s.scanCode || !!p.codes?.[s.scanCode]},
+  };
+  linkProduct(s, p);
+  const naming = sheet?.kind === 'serving' && sheet.id === s.id;
+  (naming ? closeSheet() : Promise.resolve()).then(() =>
+    toast(`<b>${esc(pname(p))}</b> erkannt und serviert`, () => unrecognize(s.id, p.id, was), true),
+  );
+}
+/* Undo of the recognition, not of the meal: the variety comes off again, the meal is as it was before, and „Futter
+   benennen“ opens with the reading in its fields. A photo keepPhoto() wrote for the variety stays: it shows the
+   right packaging. */
+function unrecognize(id, pid, was) {
+  const s = getServing(id),
+    p = getProduct(pid);
+  if (!s || s.productId !== pid) return;
+  s.productId = null;
+  s.status = 'noserver';
+  s.guess = was.guess;
+  if (was.photo) s.photo = was.photo;
+  if (was.thumb) s.thumb = was.thumb;
+  if (was.mem) memPhotos.set(id, was.mem);
+  if (was.lines) memLines.set(id, was.lines);
+  if (p) {
+    if (was.product.thumb) p.thumb = was.product.thumb;
+    else delete p.thumb;
+    if (was.product.lastPets) p.lastPets = was.product.lastPets;
+    else delete p.lastPets;
+    if (!was.product.code) delete p.codes[s.scanCode];
+  }
+  save();
+  update();
+  openSheet({kind: 'serving', id, step: 'name', ...guessOf(s)});
 }
 
 /* An error worth another attempt: the meal gets status 'waiting' and retryWaiting() picks it up again. Once
@@ -329,7 +381,7 @@ export async function retryWaiting() {
 
 function refreshServing(id) {
   update();
-  if (sheet?.kind !== 'serving' || sheet.id !== id) return;
+  if (isClosing() || sheet?.kind !== 'serving' || sheet.id !== id) return; // a sheet on its way out is not redrawn
   const typing =
     document.activeElement && sheetBody.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
   if (sheet.step !== 'name' || !typing) renderSheet();
