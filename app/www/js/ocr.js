@@ -460,7 +460,7 @@ const EN_CLAIMS = /\bsuitable for(?: [\p{L}-]+){0,2}/giu; // „Suitable for ste
 /* The words of badges and slogans, German and English, in the spelling a chip would show: a line made of nothing
    else drops out („Feinere Stückchen mit Taurin“, „Swedish Natural Ingredients“), and a word the phone almost read
    is put right to them like to any other word we know, so that „Aurin“ becomes „Taurin“ and goes with the badge. */
-export const MARKETING = (
+const MARKETING = (
   'Feinere Stückchen Taurin Omega Vitamin Vitamine Vitamins Mineral Mineralien Minerals Mineralstoffe Protein ' +
   'Proteine Proteins Energie Energy Adapted Swedish Sweden Schweden Natural Naturally Ingredients Ingredient ' +
   'Quality Qualität Grain Free Frei Suitable Complete Balanced Premium Recipe Recipes Rezeptur Made Hergestellt ' +

@@ -1,6 +1,6 @@
 /* The rating slider (rateSlider() in views/parts.js) under a finger, the way a slider in a scrolling list behaves on
-   Android. Under each level stand its word and what the bowl looks like, so every level is understood before a
-   rating. A finger that rests on the track for a moment, or moves sideways on it, lifts the thumb onto the level
+   Android. Under each level stands its name in two words, so every level is understood before a rating. A finger
+   that rests on the track for a moment, or moves sideways on it, lifts the thumb onto the level
    under it, whose column takes the level's colour; sliding goes from level to level with a light tick, and letting
    go rates the level the thumb stands on. A quick tap rates the level under it. Moved
    up or down first, it is the page scrolling and nothing happens, and a touch that only stops the page scrolling is
