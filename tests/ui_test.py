@@ -5840,7 +5840,7 @@ async def test_settings(browser, url):
 
 
 async def test_suggestions(browser, url):
-    print('feeding: buttons, search field, one list, at most five suggestions and eight hits')
+    print('feeding: buttons, search field, one list, at most three suggestions and eight hits')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [3, 0])
@@ -5864,8 +5864,8 @@ async def test_suggestions(browser, url):
     )
     names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        names == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'] and order == ['cta-row', 'search', 'serveList', 'btn'],
-        f'buttons, then the search field, then the list of the five fed last, and „Ohne Foto eintippen“ at the end ({names}, {order})',
+        names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['cta-row', 'search', 'serveList', 'btn'],
+        f'buttons, then the search field, then the list of the three fed last, and „Ohne Foto eintippen“ at the end ({names}, {order})',
     )
 
     # The search field must not move while typing: its place inside the sheet and its distance to the two
@@ -5915,7 +5915,7 @@ async def test_suggestions(browser, url):
     await idle(pg)
     back = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'],
+        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'],
         f'searching brand and variety together, and an empty field shows the suggestions again ({hit}, {back})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
@@ -5941,7 +5941,7 @@ PICKER_ROWS = """() => [...document.querySelectorAll('#serveList .plist .row')].
 
 
 async def test_picker(browser, url):
-    print('the quick picker: brand and when a variety was last served, its strip at the end, five of them, nothing cut off at 360 px')
+    print('the quick picker: brand and when a variety was last served, its strip at the end, three of them, nothing cut off at 360 px')
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme, width=360, height=760, timezone_id='Europe/Berlin')
         pg, errors = await open_page(ctx, url, scheme)
@@ -5957,10 +5957,8 @@ async def test_picker(browser, url):
                 ['Wildschwein mit Nachtkerzenöl und Kürbis', 'Catz Finefood, heute um 13:14', ['r-good', 'r-good'], False],
                 ['Lachs in Soße', 'Sheba, gestern um 19:22', ['r-sauce'], False],
                 ['Huhn in Gelee', 'Felix, vor 3 Tagen', [], False],
-                ['Rind', 'am 28. Mai', ['r-good'], False],
-                ['Pute', 'Miamor, am 20. Mai', ['r-bad'], False],
             ],
-            f'{scheme}: the five fed last, each with its brand and when it was last served, its ratings as a strip where it has any, and no word for serving ({rows})',
+            f'{scheme}: the three fed last, each with its brand and when it was last served, its ratings as a strip where it has any, and no word for serving ({rows})',
         )
         await pg.fill('#sheet [data-search]', 'Ente')
         await idle(pg)

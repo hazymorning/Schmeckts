@@ -218,11 +218,12 @@ export function renderSuggestions() {
 }
 
 /* Feeding: barcode and photo as equally wide buttons; „Füttern beginnt mit“ hides one of them and the other takes
-   the full width. Below them the most recently fed varieties, at most SUGGEST; with more known varieties the search
-   field follows, whose hits (at most HITS) take the place of the suggestions.
+   the full width. Below them the most recently fed varieties, at most SUGGEST, since more only distract from the
+   two buttons; with more known varieties the search field follows, whose hits (at most HITS) take the place of the
+   suggestions.
    sheet.busy: the notice while scanning,
    sheet.code: the scanned code currently in play (the choice, or the photo button takes it over) */
-const SUGGEST = 5,
+const SUGGEST = 3,
   HITS = 8;
 const CTA = {
   barcode: `<button class="box cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
