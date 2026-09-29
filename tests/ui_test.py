@@ -3865,7 +3865,7 @@ PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const l = document
 
 async def test_product_photo(browser, url):
     print(
-        '„Foto ändern“ under the variety\u2019s card, in the food sheet and in the meal\u2019s: a new photo and thumbnail, „Abbrechen“ changes nothing'
+        '„Foto ändern“ under the variety\u2019s card, in the food sheet and in the meal\u2019s, and under its photo while naming: a new photo and thumbnail, „Abbrechen“ changes nothing'
     )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
@@ -3947,7 +3947,7 @@ async def test_product_photo(browser, url):
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     # The meal's sheet has the same link right under its card, since that is where a meal is opened from the home
-    # page; the photo it takes is the variety's. While naming there is no such link.
+    # page; the photo it takes is the variety's
     sid = await state(pg, 'db.servings[0].id')
     await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'serving', id: '{sid}'}}))")
     await idle(pg)
@@ -3967,12 +3967,46 @@ async def test_product_photo(browser, url):
         f'in the meal\u2019s sheet the same link stands right under the card, and the photo it takes is the variety\u2019s ({meal}, {where}, {changed})',
     )
     await shot(pg, 'meal-photo-link')
+    # While naming a meal with a variety and while renaming a variety, the sheet shows the variety's photo with the
+    # same link under it; a new photo changes what the sheet shows, and the fields keep what was typed
+    NAMING = """() => { const l = document.querySelector('#sheet [data-action=product-photo]'), img = document.querySelector('#sheet .name-photo');
+      return [document.querySelector('#sheet .sh-head h2').innerText, l?.innerText.trim() ?? null, !!l?.querySelector('.ic'), img?.getAttribute('src')?.slice(-32) ?? null,
+        img?.closest('[data-action=view-photo]')?.dataset.p ?? null, l?.dataset.id ?? null, document.querySelector('#f-brand')?.value ?? null]; }"""
     await pg.click('#sheet [data-action=edit-name]')
     await idle(pg)
-    naming = await pg.evaluate(
-        "[document.querySelector('#sheet .sh-head h2').innerText, !!document.querySelector('#sheet [data-action=product-photo]')]"
+    await pg.fill('#f-brand', 'Whiskas Neu')
+    naming = await pg.evaluate(NAMING)
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK_LARGE.read_bytes()).decode()}'")
+    await pg.click('#sheet [data-action=product-photo]')
+    await until(pg, f"(db.products.find(x => x.id === '{pid}').thumb || '').slice(-32) !== '{changed[3]}'")
+    await idle(pg)
+    renamed = await pg.evaluate(NAMING)
+    thumb = await state(pg, f"db.products.find(x => x.id === '{pid}').thumb.slice(-32)")
+    await shot(pg, 'naming-photo-link')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await food_sheet()
+    await pg.click('#sheet [data-action=rename-product]')
+    await idle(pg)
+    rename = await pg.evaluate(NAMING)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => { s.db.products.push({id: 'ohnebild0001', brand: 'Felix', variety: 'Ente', type: 'Nassfutter', codes: {}, createdAt: Date.now()}); s.save(); })"
     )
-    check(naming == ['Futter ändern', False], f'while naming there is no such link ({naming})')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'product', id: 'ohnebild0001'}))")
+    await idle(pg)
+    await pg.click('#sheet [data-action=rename-product]')
+    await idle(pg)
+    bare = await pg.evaluate(NAMING)
+    check(
+        naming == ['Futter ändern', 'Foto ändern', True, changed[3], pid, pid, 'Whiskas Neu']
+        and renamed == ['Futter ändern', 'Foto ändern', True, thumb, pid, pid, 'Whiskas Neu']
+        and thumb != changed[3]
+        and rename == ['Futter umbenennen', 'Foto ändern', True, thumb, pid, pid, 'Whiskas']
+        and bare == ['Futter umbenennen', 'Foto hinzufügen', True, None, None, 'ohnebild0001', 'Felix'],
+        f'while naming a meal with a variety and while renaming one, the variety\u2019s photo with „Foto ändern“ under it: a new photo changes it in place and the field keeps what was typed; without a photo „Foto hinzufügen“ ({naming}, {renamed}, {rename}, {bare})',
+    )
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
