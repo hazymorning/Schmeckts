@@ -128,22 +128,37 @@ class GoServer:
         self.url = f'http://127.0.0.1:{self.port}'
         self.env = {**os.environ, 'STATE_DIRECTORY': str(self.dir)}
         self.cfg = {'code': CODE, 'apiKey': 'sk-ant-test', 'anthropicUrl': anthropic.url, 'port': self.port}
+        self.started = False
         self.write_config()
 
     def write_config(self):
         (self.dir / 'config.json').write_text(json.dumps(self.cfg))
 
-    def start(self):
-        self.proc = subprocess.Popen([self.binary], env=self.env, stdout=open(self.dir / 'server.log', 'a'), stderr=subprocess.STDOUT)
-        for _ in range(100):
-            try:
-                urllib.request.urlopen(self.url + '/api/info', timeout=1)
-                return
-            except Exception:
-                time.sleep(0.05)
-        raise RuntimeError('server does not start:\n' + (self.dir / 'server.log').read_text())
+    def start(self, tries=5):
+        """Starts the server and waits until it answers. The port was free when it was chosen, but something else
+        may have taken it since (the phones' own connections, another suite on the same machine): then the server
+        gets another one, a few times over, and only at its first start, while nothing holds its address yet."""
+        log = self.dir / 'server.log'
+        for attempt in range(tries):
+            seen = log.stat().st_size if log.exists() else 0
+            self.proc = subprocess.Popen([self.binary], env=self.env, stdout=open(log, 'a'), stderr=subprocess.STDOUT)
+            for _ in range(100):
+                try:
+                    urllib.request.urlopen(self.url + '/api/info', timeout=1)
+                    return
+                except Exception:
+                    time.sleep(0.05)
+            said = log.read_bytes()[seen:].decode('utf-8', 'replace')
+            if 'address already in use' not in said or self.started or attempt == tries - 1:
+                raise RuntimeError('server does not start:\n' + said)
+            self.proc.wait(10)
+            self.port = free_port()
+            self.url = f'http://127.0.0.1:{self.port}'
+            self.cfg['port'] = self.port
+            self.write_config()
 
     def stop(self):
+        self.started = True  # from here on the phones know the address, so a restart keeps it
         self.proc.terminate()
         self.proc.wait(10)
 

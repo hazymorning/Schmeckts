@@ -370,26 +370,45 @@ test('a birthday: today with the age, the days to the next one, the nearest with
   );
 });
 
-test('the turn: the same choice all day, then the kinds in their order, none of the last three days, a fact none of the last 60 days; with nothing left the block on the kinds falls first, then the one on the facts', () => {
-  const on = i => NOW + i * 864e5;
+test('the turn: the same choice all day, then the kinds in their order, none of the last three days, and a fact every day, none of the last 60 days; with nothing left the block falls', () => {
+  const on = i => NOW + i * 864e5,
+    three = ['f1', 'f2', 'f3'];
   let m = null;
   const turns = (kinds, facts, n, from = 0) =>
     Array.from({length: n}, (_, i) => {
       const r = takeTurn(kinds, facts, m, on(from + i));
       m = r.memory;
-      return r.kind === 'fact' ? r.fact : r.kind;
+      return [r.kind, r.fact];
     });
-  const all = turns(TURNS, ['f1', 'f2'], 11);
+  const all = turns(TURNS, three, 10);
   assert.deepEqual(
-    [all.slice(0, 9), ['f1', 'f2'].includes(all[9]), all[10]],
-    [TURNS.slice(0, 9), true, 'duel'],
-    'every kind gets its day, in the order of TURNS',
+    all.map(t => t[0]),
+    [...TURNS, 'duel'],
+    'every kind gets its day, in the order of TURNS, then from the start again',
   );
-  assert.deepEqual(m.kinds, ['days', 'fact', 'duel'], 'the memory keeps the last three kinds');
-  const again = takeTurn(TURNS, ['f1', 'f2'], m, on(10));
-  assert.ok(again.kind === 'duel' && again.memory === m, 'the same day, the same choice, the memory untouched');
+  assert.deepEqual(
+    [new Set(all.slice(0, 3).map(t => t[1])).size, all.every(t => three.includes(t[1]))],
+    [3, true],
+    'a fact every day, three different ones first',
+  );
+  assert.deepEqual(
+    [m.kinds, m.facts.length],
+    [['sorts', 'days', 'duel'], 10],
+    'the memory keeps the last three kinds and every fact shown',
+  );
+  const again = takeTurn(TURNS, three, m, on(9));
+  assert.ok(
+    again.kind === 'duel' && again.fact === all[9][1] && again.memory === m,
+    'the same day, the same choice, the memory untouched',
+  );
+  const changed = takeTurn(['streak', 'week'], three, m, on(9));
+  assert.deepEqual(
+    [changed.kind, changed.fact, changed.memory.kinds, changed.memory.facts.length],
+    ['streak', all[9][1], ['sorts', 'days', 'streak'], 10],
+    'a kind that no longer holds later the same day gives way to the next, the fact stays, and the choice of the morning blocks nothing',
+  );
   m = null;
-  const four = turns(['duel', 'streak', 'idea', 'week'], [], 8);
+  const four = turns(['duel', 'streak', 'idea', 'week'], [], 8).map(t => t[0]);
   assert.deepEqual(four, ['duel', 'streak', 'idea', 'week', 'duel', 'streak', 'idea', 'week']);
   assert.ok(
     four.every((k, i) => !four.slice(Math.max(0, i - 3), i).includes(k)),
@@ -397,28 +416,26 @@ test('the turn: the same choice all day, then the kinds in their order, none of 
   );
   m = null;
   assert.deepEqual(
-    turns(['duel', 'streak'], [], 4),
+    turns(['duel', 'streak'], [], 4).map(t => t[0]),
     ['duel', 'streak', 'duel', 'streak'],
     'with two the block on the kinds falls, and still no kind twice in a row',
   );
   m = null;
-  assert.deepEqual(turns(['duel'], [], 2), ['duel', 'duel'], 'with one it comes every day');
-  m = null;
-  const facts = turns(['fact'], ['a', 'b', 'c'], 4);
   assert.deepEqual(
-    [new Set(facts.slice(0, 3)).size, ['a', 'b', 'c'].includes(facts[3]), m.facts.length, m.kinds],
-    [3, true, 4, ['fact', 'fact', 'fact']],
-    'three facts on three days, then the block on the facts falls',
+    turns(['duel'], [], 2).map(t => t[0]),
+    ['duel', 'duel'],
+    'with one it comes every day',
   );
   m = null;
+  const facts = turns([], ['a', 'b', 'c'], 4).map(t => t[1]);
   assert.deepEqual(
-    turns(['fact', 'duel'], ['a'], 4),
-    ['duel', 'a', 'duel', 'duel'],
-    'a fact shown is no fact left: the kind gives way while another one is there',
+    [new Set(facts.slice(0, 3)).size, ['a', 'b', 'c'].includes(facts[3]), m.facts.length, m.kinds, m.kind],
+    [3, true, 4, [], null],
+    'three facts on three days, then the block on the facts falls; no kind where none holds',
   );
-  m = {day: '2026-06-10', kind: 'fact', fact: 'a', kinds: ['fact'], facts: [{id: 'a', day: '2026-06-10'}]};
-  const soon = takeTurn(['fact'], ['a', 'b'], m, on(59)),
-    later = takeTurn(['fact'], ['a', 'b'], m, on(60));
+  m = {day: '2026-06-10', kind: null, fact: 'a', kinds: [], facts: [{id: 'a', day: '2026-06-10'}]};
+  const soon = takeTurn([], ['a', 'b'], m, on(59)),
+    later = takeTurn([], ['a', 'b'], m, on(60));
   assert.deepEqual(
     [soon.fact, soon.memory.facts.map(f => f.id)],
     ['b', ['a', 'b']],
@@ -428,16 +445,18 @@ test('the turn: the same choice all day, then the kinds in their order, none of 
     ['a', 'b'].includes(later.fact) && later.memory.facts.every(f => f.day > '2026-06-10'),
     'after 60 days it is forgotten',
   );
+  const none = takeTurn([], [], null, NOW);
   assert.deepEqual(
-    takeTurn([], ['a'], null, NOW),
-    {kind: null, fact: null, memory: {day: '', kind: null, fact: null, kinds: [], facts: []}},
+    none,
+    {kind: null, fact: null, memory: {day: '2026-06-10', kind: null, fact: null, kinds: [], facts: []}},
     'nothing to say',
   );
+  assert.equal(takeTurn([], [], none.memory, NOW).memory, none.memory, 'and nothing to remember anew');
 });
 
 /* How many sentences a text has, and whether one of them shouts twice */
 const sentences = t => t.split(/(?<=[.!?])\s+/).filter(Boolean);
-const LEAST = {Katze: 40, Hund: 25, Kaninchen: 12, Vogel: 8, Nager: 8};
+const LEAST = {Katze: 80, Hund: 45, Kaninchen: 25, Vogel: 18, Nager: 18};
 const SEASONAL = 6;
 const DAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
@@ -466,7 +485,7 @@ test('the facts: ids and texts unique, at most 160 characters and two sentences,
       `${species}: at least ${SEASONAL} seasonal ones`,
     );
   }
-  assert.ok(GENERAL.length >= 12, 'at least 12 general ones');
+  assert.ok(GENERAL.length >= 30, 'at least 30 general ones');
   assert.deepEqual(
     [lastSunday(2026, 3), lastSunday(2026, 10), nthSaturday(2026, 9, 4), nthSaturday(2025, 9, 4)],
     ['03-29', '10-25', '09-26', '09-27'],
@@ -502,13 +521,13 @@ test('the facts: ids and texts unique, at most 160 characters and two sentences,
   );
 });
 
-test('the lines: at least two ways of saying every kind, two sentences at most, and no word of a rating or a verdict in any of them', () => {
+test('the lines: at least three ways of saying every kind, two sentences at most, and no word of a rating or a verdict in any of them', () => {
   const phrases = [...Object.values(RATINGS).flatMap(r => [r.label, r.said]), ...Object.values(VERDICTS)].map(w =>
     w.toLowerCase(),
   );
   const loose = /\bliebling|\bam liebsten\b|\bkommt\b|\bbewertet\b|\boffen\b|%/i; // what the overview never says either
   const texts = [...Object.values(LINES).flat(), ...[...Object.values(FACTS).flat(), ...GENERAL].map(f => f.text)];
-  for (const [kind, list] of Object.entries(LINES)) assert.ok(list.length >= 2, `${kind}: two ways at least`);
+  for (const [kind, list] of Object.entries(LINES)) assert.ok(list.length >= 3, `${kind}: three ways at least`);
   for (const t of texts) {
     assert.ok(sentences(t).length <= 2 && sentences(t).every(x => (x.match(/!/g) || []).length <= 1), t);
     const low = t.toLowerCase();

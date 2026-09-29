@@ -14,7 +14,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {update} from './views/home.js';
+import {toggleOverview, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -140,6 +140,10 @@ const ACTIONS = {
   'open-pet'(el) {
     openPet(el.dataset.id);
   }, // from the overview
+  'toggle-overview'() {
+    haptic('select');
+    toggleOverview();
+  }, // the overview's whole text and back
   'open-settings'() {
     openSheet({kind: 'settings'});
   },
@@ -264,9 +268,9 @@ const ACTIONS = {
   rephoto() {
     rephoto();
   }, // „Neues Foto“ while naming
-  'product-photo'() {
-    reshootProduct();
-  }, // „Foto ändern“ in the food sheet
+  'product-photo'(el) {
+    reshootProduct(el.dataset.id);
+  }, // „Foto ändern“ under a variety's card
   'use-product'(el) {
     useProduct(el.dataset.id);
   },
@@ -563,7 +567,7 @@ const onFile = (id, fn) =>
   });
 onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, if the photo button takes it over
 onFile('#camInputName', f => replacePhoto(sheet?.id, f)); // „Neues Foto“ in the browser
-onFile('#camInputProduct', f => productPhotoFile(sheet?.id, f)); // „Foto ändern“ in the browser
+onFile('#camInputProduct', productPhotoFile); // „Foto ändern“ in the browser
 onFile('#petPhotoInput', setPetPhoto);
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);

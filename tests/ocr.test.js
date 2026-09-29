@@ -172,7 +172,7 @@ test('packaging text: a word the phone almost read is put right', () => {
     'Truthahn & Wild an Sauce',
     'a word of our own varieties, two letters wrong',
   );
-  assert.equal(packLines('Aurin\nLachs pur')[0], 'Aurin', 'a word close to nothing we know stays as it was');
+  assert.equal(packLines('Xylob\nLachs pur')[0], 'Xylob', 'a word close to nothing we know stays as it was');
   assert.equal(
     readPack('Sheba\nSelection in Sauce\nmit Lachs').variety,
     'Selection in Sauce mit Lachs',
@@ -268,8 +268,8 @@ test('packaging text: words run together are taken apart, and „Mt“ is „mit
     'so the promise goes',
   );
   assert.equal(
-    cleanText('CHICKEN & TURKEYHuhy'),
-    'Chicken & Turkey Huhn',
+    cleanText('ZARTE HÄPPCHENHuhy'),
+    'Zarte Häppchen Huhn',
     'a shouted word glued to the next, then put right',
   );
   assert.equal(cleanText('Mt Thunfisch'), 'Mit Thunfisch');
@@ -283,8 +283,8 @@ test('packaging text: words run together are taken apart, and „Mt“ is „mit
 
 test('packaging text: a long variety is cut where the next language begins, or after a whole word', () => {
   assert.equal(
-    readPack('Bozita\nChicken & Turkey Huhn & Pute / Kyckling & Kalkon').variety,
-    'Chicken & Turkey Huhn & Pute',
+    readPack('Bozita\nZarte Häppchen mit Huhn & Pute / Kyckling & Kalkon / Kylling & Kalkun').variety,
+    'Zarte Häppchen mit Huhn & Pute',
   );
   assert.equal(
     readPack('Zarte Häppchen mit Huhn und Truthahn in feiner Sauce').variety,
@@ -293,8 +293,99 @@ test('packaging text: a long variety is cut where the next language begins, or a
   );
 });
 
-test('packaging text: a small word opening a later line of the variety is written small', () => {
-  assert.equal(readPack('Sheba\nMIT THUNFISCH & HUHN\nIN SAUCE').variety, 'Mit Thunfisch & Huhn in Sauce');
+test('packaging text: a small word opening a later line of the variety is written small, and one opening the variety goes', () => {
+  assert.equal(readPack('Sheba\nMIT THUNFISCH & HUHN\nIN SAUCE').variety, 'Thunfisch & Huhn in Sauce');
+  assert.equal(
+    readPack('Sheba\nSelection in Sauce\nmit Lachs').variety,
+    'Selection in Sauce mit Lachs',
+    'inside it stays',
+  );
+  assert.deepEqual(
+    packLines('mit Thunfisch & Huhn\nin Sauce'),
+    ['mit Thunfisch & Huhn', 'in Sauce'],
+    'the chips as read',
+  );
+});
+
+test('packaging text: the marks the plugin leaves are put right', () => {
+  assert.equal(cleanText('T Huhn & Lachs'), 'Huhn & Lachs', 'a single letter opening a line is a scrap');
+  assert.equal(cleanText('3 in Sauce'), 'in Sauce', 'a single figure opening a line, a paw print');
+  assert.equal(cleanText('Huhn & Lachs 3'), 'Huhn & Lachs', 'or ending it');
+  assert.equal(cleanText('Zeile a'), 'Zeile a', 'a single letter at the end stays');
+  assert.equal(cleanText('Adult 1+'), 'Adult 1+', 'two marks are no scrap');
+  assert.equal(cleanText('CHICKEN 8& TURKEY'), 'Chicken & Turkey', 'a figure stuck to an „&“');
+  assert.equal(cleanText('SWED1SH'), 'Swedish', 'a figure inside a word is a letter');
+  assert.equal(cleanText('Sterilised wrH'), 'Sterilised', 'a word with a capital inside is a scrap');
+  assert.equal(cleanText('Sterilísedwa'), 'Sterilised', 'a scrap glued to a word we know goes with the mistakes');
+  assert.deepEqual(packLines('+BOZITA\nHuhn'), ['Bozita', 'Huhn'], 'a mark in front of the logo');
+  assert.equal(cleanText('Catz eRoed'), 'Catz');
+  assert.equal(
+    cleanText('GimCat PetBalance MjAMjAM'),
+    'GimCat PetBalance MjAMjAM',
+    'not one that starts with a capital, and not one we know',
+  );
+});
+
+test('packaging text: two words we know run together come apart where one names a brand, a line or a badge', () => {
+  assert.equal(cleanText('Rägoutroyale'), 'Ragout Royale');
+  assert.equal(cleanText('NATURALINGREDIENTS'), 'Natural Ingredients');
+  assert.equal(cleanText('Trockenfutter'), 'Trockenfutter', 'a word we know stays whole');
+  assert.equal(cleanText('Lachsfilet'), 'Lachsfilet', 'and so does one of two ordinary words');
+});
+
+test('packaging text: a lone word two mistakes from a brand of the list is that brand', () => {
+  assert.equal(cleanText('miama'), 'Miamor');
+  assert.equal(readPack('miama\nHuhn in Gelee').brand, 'Miamor');
+  assert.deepEqual(packBrands('miama\nHuhn in Gelee'), ['Miamor'], 'the chip too');
+  assert.equal(cleanText('Katze'), 'Katze', 'a word we know stays');
+  assert.equal(cleanText('miama Royale'), 'miama Royale', 'only a word standing alone');
+  assert.equal(cleanText('Fepox'), 'Fepox', 'not for a brand under six letters');
+});
+
+test('packaging text: of a line in several languages the German part stays', () => {
+  assert.deepEqual(packLines('CHICKEN 8& TURKEY / Huhn & Pute / Kyckling & Kal'), ['Huhn & Pute']);
+  assert.equal(readPack('Bozita\nCHICKEN & TURKEY / Huhn & Pute / Kyckling & Kalkon').variety, 'Huhn & Pute');
+  assert.deepEqual(packLines('Rind / Lamm'), ['Rind / Lamm'], 'two German parts: the line as it is');
+  assert.equal(
+    readPack('Bozita\nSterilised with CHICKEN & TURKEY Huhn & Pute / Kyckling & Kalkon').variety,
+    'Huhn & Pute',
+    'English in front of the German words goes as well',
+  );
+  assert.equal(readPack('Bozita\nSterilised Huhn & Pute').variety, 'Sterilised Huhn & Pute', 'a word of neither stays');
+  assert.deepEqual(packLines('Chicken / Kyckling'), ['Chicken / Kyckling'], 'none: the same');
+});
+
+test('packaging text: a brand named by its product line, or by the first word of its logo', () => {
+  const pink = 'Ragout Royale\nT HUHN & LACHS\nIN SAUCE\nohne Soja ohne Zusatz von Zucker';
+  assert.deepEqual([readPack(pink).brand, readPack(pink).variety], ['Miamor', 'Ragout Royale Huhn & Lachs in Sauce']);
+  assert.deepEqual(packBrands(pink), ['Miamor']);
+  assert.equal(readPack('Carny\nRind & Huhn').brand, 'Animonda');
+  assert.equal(readPack('Sheba\nRagout Royale\nHuhn').brand, 'Sheba', 'a brand read wins over one named by a line');
+  assert.equal(
+    readPack('Catz eRoed\nRind & Ente').brand,
+    'Catz Finefood',
+    'the first word of a logo, the rest a scrap',
+  );
+  assert.equal(readPack('Catz Rind & Ente').brand, '', 'not inside a line of more words');
+  assert.equal(readPack('Happy Birthday\nHuhn').brand, '', 'not an ordinary word');
+  assert.equal(readPack('Dein Bestes\nHuhn').brand, 'Dein Bestes', 'the whole brand as ever');
+});
+
+test('packaging text: badges and slogans say nothing, and what is left out says nothing on its own', () => {
+  assert.deepEqual(
+    packLines(
+      'Feinere Stückchen mit Taurin\nSwedish Natural Ingredients\nSuitable for sterilised\nGrain)\nAdapted Energy\n100 % Animal Protein\nAurin\nHuhn & Pute',
+    ),
+    ['Huhn & Pute'],
+  );
+  assert.deepEqual(packLines('Soja ohne Zusatz Von Zucker\nohne Sojaohne Zusatz von Zu\nHuhn in Sauce'), [
+    'Huhn in Sauce',
+  ]);
+  assert.deepEqual(packLines('Zarte Stückchen in Sauce\nSterilised\nAlmo Nature'), [
+    'Zarte Stückchen in Sauce',
+    'Sterilised',
+    'Almo Nature',
+  ]);
 });
 
 /* The plugin's answer for a few lines, one block each: [text, height, top, options]. The words stand side by side
@@ -350,9 +441,9 @@ test('packaging photos: the lines with their size, place and direction', () => {
 test('packaging photos: a space where the words stand apart, none where they touch', () => {
   const read = plugin([
     ['HUHN &LACHS', 90, 100, {words: [['HUHN'], ['&'], ['LACHS']]}],
-    ['Zusa tz', 30, 300, {words: [['Zusa'], ['tz', {gap: 3}]]}],
+    ['Pas tete', 30, 300, {words: [['Pas'], ['tete', {gap: 3}]]}],
   ]);
-  assert.deepEqual(packLines(read), ['Huhn & Lachs', 'Zusatz']);
+  assert.deepEqual(packLines(read), ['Huhn & Lachs', 'Pastete']);
   const badges = plugin([
     ['Huhn in Gelee', 60, 100],
     ['ohne Sojaohne Zucker', 30, 300, {words: [['ohne'], ['Soja'], ['ohne', {gap: 60}], ['Zucker']]}],
@@ -384,7 +475,7 @@ test('packaging photos: badges, small print and scraps of the picture stay out, 
     ['Auri', 24, 400, {tilt: 0.35}],
     ['mit Lachs', 20, 450, {tilt: 0.4}],
     ['Schonend gegart', 20, 500, {tilt: -0.3}],
-    ['Hergestellt in Europa', 8, 900],
+    ['Abgefüllt in Europa', 8, 900],
     ['Rind', 8, 950],
     ['Leckerer Genuss', 30, 700],
   ]);
@@ -395,8 +486,8 @@ test('packaging photos: badges, small print and scraps of the picture stay out, 
   ]);
   assert.deepEqual(packLines(turned).sort(), ['Feine Filets', 'Huhn in Gelee'], 'a photo taken sideways is no badge');
   assert.deepEqual(
-    packLines('Auri\nHergestellt in Europa'),
-    ['Auri', 'Hergestellt in Europa'],
+    packLines('Auri\nAbgefüllt in Europa'),
+    ['Auri', 'Abgefüllt in Europa'],
     'plain text has no sizes, so nothing goes for being small',
   );
 });
@@ -451,7 +542,7 @@ test('packaging photos: the flavour names the variety, size decides between equa
   ]);
   assert.equal(readPack(long).variety, 'Huhn, Lachs und Forelle mit Gemüse', 'nothing that would make it too long');
   const classic = plugin([
-    ['Catz eRoed', 120, 100],
+    ['Zorv eRoed', 120, 100],
     ['CLASSIC ADULT', 30, 250],
     ['Rind & Ente', 80, 400],
   ]);
@@ -529,6 +620,58 @@ test('packaging photos: the part around the variety is read again, and laid over
     {left: 0, top: 50, right: 800, bottom: 310, scale: 1},
   );
   assert.deepEqual(cut.lines.map(l => l.text).sort(), ['Huhn in Gelee', 'Zusammensetzung Fleisch']);
+});
+
+test('packaging photos: four pouches as 0.15.0 read them, put right', () => {
+  // Miamor in a script logo the plugin could not read, the small „mit“ read as a „T“ half as tall as the flavour
+  const pink = plugin([
+    ['Ragout Royale', 52, 120, {left: 250}],
+    ['T HUHN & LACHS', 90, 200, {words: [['T', {size: 45}], ['HUHN'], ['&'], ['LACHS']]}],
+    ['IN SAUCE', 36, 310, {left: 300}],
+    [
+      'ohne Soja ohne Zusatz von Zucker',
+      18,
+      700,
+      {words: [['ohne'], ['Soja'], ['ohne', {gap: 40}], ['Zusatz'], ['von'], ['Zucker']]},
+    ],
+    ['Feinere Stückchen mit Taurin', 20, 600, {tilt: 0.4}],
+  ]);
+  assert.deepEqual(
+    [readPack(pink).brand, readPack(pink).variety, packLines(pink), packBrands(pink)],
+    ['Miamor', 'Ragout Royale Huhn & Lachs in Sauce', ['Ragout Royale', 'Huhn & Lachs', 'In Sauce'], ['Miamor']],
+  );
+  // The logo read as „miama“, the line as „Ract Rqyale“, a paw print as a „3“
+  const green = plugin([
+    ['miama', 60, 40],
+    ['Ract Rqyale', 40, 120, {left: 250}],
+    ['mit TRUTHAHN & WILD', 90, 200, {words: [['mit', {size: 30}], ['TRUTHAHN'], ['&'], ['WILD']]}],
+    ['3 IN SAUCE', 36, 310, {left: 300}],
+    ['Aurin', 24, 600, {tilt: 0.4}],
+  ]);
+  assert.deepEqual(
+    [readPack(green).brand, readPack(green).variety, packLines(green)],
+    ['Miamor', 'Truthahn & Wild in Sauce', ['Miamor', 'Ract Royale', 'Mit Truthahn & Wild', 'In Sauce']],
+  );
+  // Bozita: three languages in one line, „with“ read as „wrH“, an „8“ stuck to the „&“, badges in English
+  const blue = plugin(
+    [
+      ['Sterilised wrH', 100, 1150],
+      ['CHICKEN 8& TURKEY / Huhn & Pute / Kyckling & Kalkon', 40, 1300],
+      ['SWEDISH NATURAL INGREDIENTS', 30, 1380],
+      ['SUITABLE FOR STERILISED', 24, 1500],
+      ['GRAIN FREE RECIPE', 24, 1560],
+      ['ADAPTED ENERGY LEVEL', 24, 1620],
+      ['100% ANIMAL PROTEIN', 24, 1680],
+      ['BOZITA', 150, 1870],
+      ['SWEDISH NATURAL QUALITY', 110, 2030],
+    ],
+    1800,
+    2400,
+  );
+  assert.deepEqual(
+    [readPack(blue).brand, readPack(blue).variety, packLines(blue)],
+    ['Bozita', 'Sterilised Huhn & Pute', ['Sterilised', 'Huhn & Pute', 'Bozita']],
+  );
 });
 
 test('packaging photos: a line in another language weighs less as the variety, and stays a chip', () => {

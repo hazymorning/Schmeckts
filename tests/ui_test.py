@@ -304,7 +304,8 @@ async def test_buying(browser, url):
       (b => b ? b.querySelector('.t-main small').innerText : null)(c.querySelector('[data-id="{lachs}"]'))]).filter(x => x[1] !== null)"""
 
     async def where():  # the card of „Einkaufen“ that holds Lachs, with what stands under its name, and the page's title
-        await pg.click('[data-sec=shop] [data-action=open-shop]')
+        # The page itself: with the Tiger filter nothing is to be bought, so the home page has no card leading there
+        await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'shop'}))")
         await idle(pg)
         for key in ('nicht', 'unklar'):
             if await pg.locator(f'#sheet [data-action=fold][data-v={key}]').count():
@@ -537,11 +538,10 @@ async def test_cards(browser, url):
     await ctx.close()
 
 
-# „Einkaufen“ on the home page: the varieties in its rows, how many strips they carry, its one line, and its buttons as
-# [text, action, class, with an icon, the last thing in the card]
-SHOP_HOME = """() => { const c = document.querySelector('[data-sec=shop]');
+# „Einkaufen“ on the home page: the varieties in its rows, how many strips they carry, and its buttons as [text, action,
+# class, with an icon, the last thing in the card]; None without the card
+SHOP_HOME = """() => { const c = document.querySelector('[data-sec=shop]'); if (!c) return null;
   return {rows: [...c.querySelectorAll('.shop .row')].map(r => r.dataset.id), strips: c.querySelectorAll('.shop .row .strip').length,
-    line: c.querySelector('.card-line')?.innerText ?? null,
     btns: [...c.querySelectorAll('button:not(.row)')].map(b => [b.innerText.trim(), b.dataset.action, b.className, !!b.querySelector('svg'), b === c.lastElementChild])}; }"""
 
 # The „Einkaufen“ page, per card: its heading, its own line, the food types with the varieties under each, every row
@@ -570,7 +570,6 @@ async def test_shop(browser, url):
     check(
         home['rows'] == g['ja'][:3]
         and home['strips'] == 3
-        and home['line'] is None
         and home['btns'] == [['Einkaufsliste öffnen', 'open-shop', 'card-btn', True, True]]
         and await pg.locator('#home [data-action=share-list], #home [data-action=expand][data-v=shop]').count() == 0,
         f'home page: the first three to buy again, each with its strip, and „Einkaufsliste öffnen“ with the chevron; no fold and no sharing ({home})',
@@ -681,12 +680,14 @@ async def test_shop(browser, url):
     )
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
-    # One rating: nothing to buy yet, which the home page and the page say; nothing rated: the home page's one line
+    # One rating: nothing to buy yet, so the home page has no card, while the page still says so; nothing rated: no
+    # card either
     await pg.evaluate("""import('./js/store.js').then(s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; }); s.db.products.forEach(p => delete p.kaufen);
       s.db.servings[0].pets[Object.keys(s.db.servings[0].pets)[0]].r = 'gut'; s.save(); return import('./js/views/home.js').then(h => h.renderHome()); })""")
     await idle(pg)
     one = await pg.evaluate(SHOP_HOME)
-    await pg.click('[data-sec=shop] [data-action=open-shop]')
+    heads = await pg.eval_on_selector_all('#home > section.card', 'l => l.map(s => s.querySelector("h2").innerText)')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'shop'}))")
     await idle(pg)
     few = await pg.evaluate(SHOP_PAGE)
     await pg.click('#sheet [data-action=settings-back]')
@@ -696,19 +697,13 @@ async def test_shop(browser, url):
     await idle(pg)
     none = await pg.evaluate(SHOP_HOME)
     check(
-        one['line'] == 'Noch nichts zum Nachkaufen.'
-        and one['btns'] == [['Einkaufsliste öffnen', 'open-shop', 'card-btn', True, True]]
+        one is None
+        and 'Einkaufen' not in heads
+        and 'Verlauf' in heads
         and [(c['head'], c['say'] or c['line']) for c in few]
         == [('Nachkaufen', 'Noch nichts zum Nachkaufen.'), ('Noch unklar', '1 Sorte ist noch unklar.')]
-        and await pg.evaluate("document.querySelector('#home [data-sec=shop]') && 1") == 1
-        and none
-        == {
-            'rows': [],
-            'strips': 0,
-            'line': 'Noch nichts bewertet. Nach ein paar Mahlzeiten steht hier, was du nachkaufen kannst und was nicht.',
-            'btns': [],
-        },
-        f'one rating: nothing to buy yet, and no card for what stays in the bowl; nothing rated: one line and no way on ({one}, {few}, {none})',
+        and none is None,
+        f'one rating: nothing to buy yet, so no „Einkaufen“ on the home page while the page says so; nothing rated: no card either ({heads}, {few}, {none})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
@@ -1032,21 +1027,22 @@ def house_meals():
 
 
 # The rating slider as the page shows it: its stops (level, what a screen reader hears, centre from the track's start,
-# size, pressed, the level's icon and its colour), the words under them (text, centre, whether it is the one in colour,
-# whether it fits its column), the track (width, height), the thumb (the stop it stands on, None without one, its
-# size, whether it carries an icon and whether it is lifted), the level in words under the track, the height of the
-# whole and whether the page stays within the screen.
+# size, pressed, the level's icon and its colour), the columns under them (the word, what the bowl looks like, centre,
+# whether it is the one in colour, whether both texts fit the column), the track (width, height), the thumb (the stop
+# it stands on, None without one, its size, whether it carries an icon and whether it is lifted), the height of the
+# columns, the height of the whole and whether the page stays within the screen.
 SLIDER = """slider => { const t = slider.querySelector('.slider-track').getBoundingClientRect(), thumb = slider.querySelector('.slider-thumb'),
-    on = getComputedStyle(thumb).display !== 'none', say = slider.querySelector('.slider-say > p'), mid = r => Math.round((r.left + r.width / 2 - t.left) * 10) / 10;
+    on = getComputedStyle(thumb).display !== 'none', names = slider.querySelector('.slider-names'), mid = r => Math.round((r.left + r.width / 2 - t.left) * 10) / 10;
   const stops = [...slider.querySelectorAll('.slider-track button')].map(e => { const r = e.getBoundingClientRect();
     return {r: e.dataset.r, label: e.getAttribute('aria-label'), x: mid(r), w: Math.round(r.width * 10) / 10, h: r.height, pressed: e.getAttribute('aria-pressed') === 'true',
       icon: !!e.querySelector('svg path'), colour: getComputedStyle(e).color}; });
   const words = [...slider.querySelectorAll('.slider-names > span')].map(e => { const r = e.getBoundingClientRect();
-    return {text: e.innerText, x: mid(r), on: e.classList.contains('on'), colour: getComputedStyle(e).color, fits: e.scrollWidth <= Math.ceil(r.width)}; });
+    return {text: e.querySelector('b').innerText, note: e.querySelector('small').innerText, x: mid(r), on: e.classList.contains('on'), colour: getComputedStyle(e).color,
+      fits: [e, ...e.children].every(x => x.scrollWidth <= Math.ceil(r.width))}; });
   const d = thumb.getBoundingClientRect(), x = on && mid(d);
   return {stops, words, track: [Math.round(t.width), Math.round(t.height)],
     thumb: on ? stops.findIndex(s => Math.abs(s.x - x) < 1) : null, disc: on ? [d.width, !!thumb.querySelector('svg path')] : null,
-    lifted: slider.classList.contains('pointing'), said: say ? [say.querySelector('.slider-name').innerText, say.querySelector('small').innerText] : null,
+    lifted: slider.classList.contains('pointing'), names: Math.round(names.getBoundingClientRect().height),
     height: Math.round(slider.getBoundingClientRect().height), page: document.documentElement.scrollWidth <= innerWidth}; }"""
 
 
@@ -1073,15 +1069,16 @@ async def test_week(browser, url):
     await idle(pg)
     # The rating slider at 360 px, in the card and in the sheet: the six levels as buttons side by side on one track in
     # the scale's order, each with its icon in its colour and at least a small tap target, the level in one word
-    # centred under each, and for a screen reader its name and what the bowl looks like; before a rating no thumb and
-    # no words under the track, so the slider is only the track and the row of words
+    # centred under each with what the bowl looks like under that, and for a screen reader its name and what the
+    # bowl looks like; before a rating no thumb, so the slider is the track and the columns of words
+    seconds = ['leer', 'leer', 'übrig', 'gierig', 'Soße', 'voll']
     levels = [
-        ['top', 'Sofort leer. Napf blitzblank'],
-        ['gut', 'Später leer. Nach und nach aufgegessen'],
-        ['mittel', 'Halb gegessen. Die Hälfte blieb übrig'],
-        ['eager', 'Erst gierig. Dann stehen gelassen'],
-        ['sosse', 'Soße geleckt. Die Stückchen liegen noch da'],
-        ['schlecht', 'Kaum angerührt. Der Napf ist noch fast voll'],
+        ['top', 'Sofort leer'],
+        ['gut', 'Später leer'],
+        ['mittel', 'Halb gegessen'],
+        ['eager', 'Erst gierig'],
+        ['sosse', 'Soße geleckt'],
+        ['schlecht', 'Kaum angerührt'],
     ]
     for where, sel in (('card „Wie war’s?“', '.pend .slider'), ('sheet', '#sheet .slider')):
         if where == 'sheet':
@@ -1090,15 +1087,17 @@ async def test_week(browser, url):
         b = await pg.eval_on_selector(sel, SLIDER)
         check(
             [[x['r'], x['label']] for x in b['stops']] == levels
-            and [w['text'] for w in b['words']] == ['Leer', 'Später', 'Halb', 'Gierig', 'Soße', 'Voll']
+            and [w['text'] for w in b['words']] == ['Alles', 'Später', 'Hälfte', 'Erst', 'Nur', 'Fast']
+            and [w['note'] for w in b['words']] == seconds
             and even(b)
             and all(x['icon'] and not x['pressed'] for x in b['stops'])
             and not any(w['on'] for w in b['words'])
             and b['track'][1] == 52
-            and [b['thumb'], b['said']] == [None, None]
-            and b['height'] == 52 + 6 + 15
+            and b['thumb'] is None
+            and b['names'] > 15
+            and b['height'] == 52 + 6 + b['names']
             and b['page'],
-            f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word under each, no thumb yet, {b["height"]} px tall in all, nothing wider than 360 px',
+            f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word and what the bowl looks like under each, no thumb yet, {b["height"]} px tall in all, nothing wider than 360 px',
         )
     await shot(pg, 'rating-360')
     await pg.click('[data-action=close]')
@@ -1204,19 +1203,19 @@ async def test_scales(browser, url):
     await idle(pg)
     want = {
         'Trockenfutter': [
-            ['gern', 'Gern gefressen. Kräftig zugelangt'],
-            ['normal', 'Normal gefressen. Wie sonst auch'],
-            ['wenig', 'Wenig gefressen. Nur ein paar Bröckchen'],
-            ['liegen', 'Liegen gelassen. Kaum etwas angerührt'],
+            ['gern', 'Gern gefressen'],
+            ['normal', 'Normal gefressen'],
+            ['wenig', 'Wenig gefressen'],
+            ['liegen', 'Liegen gelassen'],
         ],
         'Snack': [
-            ['verputzt', 'Sofort verputzt. Weg in einem Happs'],
-            ['spaeter', 'Später gefressen. Erst beschnuppert'],
-            ['angeknabbert', 'Nur angeknabbert. Ein Rest blieb liegen'],
-            ['unberuehrt', 'Nicht angerührt. Nicht mal probiert'],
+            ['verputzt', 'Sofort verputzt'],
+            ['spaeter', 'Später gefressen'],
+            ['angeknabbert', 'Nur angeknabbert'],
+            ['unberuehrt', 'Nicht angerührt'],
         ],
     }
-    words = {'Trockenfutter': ['Gern', 'Normal', 'Wenig', 'Voll'], 'Snack': ['Verputzt', 'Später', 'Geknabbert', 'Unberührt']}
+    words = {'Trockenfutter': ['Gern', 'Normal', 'Wenig', 'Liegen'], 'Snack': ['Sofort', 'Später', 'Nur', 'Nicht']}
     for i, (kind, levels) in enumerate(want.items()):
         b = await pg.locator('.pend .slider').nth(i).evaluate(SLIDER)
         check(
@@ -1232,10 +1231,17 @@ async def test_scales(browser, url):
     badge = await pg.evaluate(
         "[document.querySelector('#sheet .pet-rate > .badge')?.innerText.trim(), !!document.querySelector('#sheet .pet-rate > .badge svg')]"
     )
-    old = [badge, len(b['stops']), [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['said'], [w['text'] for w in b['words'] if w['on']]]
+    old = [
+        badge,
+        len(b['stops']),
+        [x['r'] for x in b['stops'] if x['pressed']],
+        b['thumb'],
+        [w['note'] for w in b['words']],
+        [w['text'] for w in b['words'] if w['on']],
+    ]
     check(
-        old == [['Später leer', True], 4, [], None, None, []],
-        f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, and none of the four is chosen ({old})',
+        old == [['Später leer', True], 4, [], None, ['gefressen', 'gefressen', 'gefressen', 'gelassen'], []],
+        f'a level outside the scale sits above the slider as a badge with its own wording and icon, without a thumb, none of the four is chosen, and every column ends in the second word of its level ({old})',
     )
     card = await pg.evaluate("[...document.querySelectorAll('#sheet .prod-card small, #sheet .prod-card b')].map(e => e.innerText)")
     check(
@@ -1270,10 +1276,16 @@ async def test_scales(browser, url):
     await idle(pg)
     r = await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r")
     b = await pg.eval_on_selector('#sheet .slider', SLIDER)
-    now = [b['said'], [x['r'] for x in b['stops'] if x['pressed']], b['thumb'], b['disc'], [w['text'] for w in b['words'] if w['on']], b['page']]
+    now = [
+        [x['r'] for x in b['stops'] if x['pressed']],
+        b['thumb'],
+        b['disc'],
+        [[w['text'], w['note']] for w in b['words'] if w['on']],
+        b['page'],
+    ]
     check(
-        r == 'liegen' and now == [['Liegen gelassen', 'Kaum etwas angerührt'], ['liegen'], 3, [44, True], ['Voll'], True],
-        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, its word in its colour, and under the track its name and what the bowl looks like, without pushing the page wider ({r}, {now})',
+        r == 'liegen' and now == [['liegen'], 3, [44, True], [['Liegen', 'gelassen']], True],
+        f'one tap on a level replaces the old one: the thumb on its stop at the end of the track, with the level\u2019s icon, its column in its colour, without pushing the page wider ({r}, {now})',
     )
     check(await until(pg, "!document.getElementById('sheet').open", 5), 'with every pet rated the sheet closes a moment later')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -1299,16 +1311,16 @@ async def test_slide(browser, url):
       document.addEventListener('click', e => { const b = e.target.closest('.slider-track button'); if (b) window.__rated.push(b.dataset.r); }); }"""
     )
     STOPS = 'l => l.map(b => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })'
-    # What the slider in the card shows: the level in words under the track while a finger (or the keyboard) is on it,
-    # whether the thumb shows, and the level in words while nothing is on it; None without the card
+    # What the slider in the card shows: the lit column's word and what the bowl looks like while a finger (or the
+    # keyboard) is on it, whether the thumb shows, and the lit column while nothing is on it; None without the card
     SHOWN = """() => { const s = document.querySelector(`.pend[data-id="${window.__open}"] .slider`); if (!s) return null;
-      const say = s.querySelector('.slider-say > p'), words = say && [say.querySelector('.slider-name').innerText, say.querySelector('small').innerText], up = s.classList.contains('pointing');
+      const on = s.querySelector('.slider-names > .on'), words = on && [on.querySelector('b').innerText, on.querySelector('small').innerText], up = s.classList.contains('pointing');
       return [up ? words : null, getComputedStyle(s.querySelector('.slider-thumb')).display !== 'none', up ? null : words]; }"""
     # Under the finger the thumb carries the level's icon and floats, with the shadow of what floats, and the level's
     # word under the track is the one in colour
     ABOVE = """() => { const s = document.querySelector('.pend .slider'), thumb = s.querySelector('.slider-thumb');
       return [!!thumb.querySelector('svg path'), getComputedStyle(thumb.firstElementChild).boxShadow.includes('34px'),
-        [...s.querySelectorAll('.slider-names > .on')].map(w => w.innerText)]; }"""
+        [...s.querySelectorAll('.slider-names > .on > b')].map(w => w.innerText)]; }"""
     ASKING = [None, False, None]
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     CARD = 'document.querySelectorAll(`.pend[data-id="${window.__open}"]`).length'
@@ -1341,12 +1353,12 @@ async def test_slide(browser, url):
     await idle(pg)
     tap = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span'), await pg.evaluate(SHOWN)]
     check(
-        down == ASKING and rest == [[['Später leer', 'Nach und nach aufgegessen'], True, None], [True, True, ['Später']], None],
-        f'a finger resting on the track: nothing at first, then the thumb lifted under it, its word in colour and under the track the level\u2019s name and what the bowl looks like, nothing rated yet ({down}, {rest})',
+        down == ASKING and rest == [[['Später', 'leer'], True, None], [True, True, ['Später']], None],
+        f'a finger resting on the track: nothing at first, then the thumb lifted under it and its column in colour, the word and what the bowl looks like, nothing rated yet ({down}, {rest})',
     )
     check(
-        tap == ['gut', [['gut'], [8, 16]], 'Später leer gespeichert', [None, True, ['Später leer', 'Nach und nach aufgegessen']]],
-        f'letting go rates that level once; the toast says so at once, and the card stays with the thumb set down and the level\u2019s name and what the bowl looks like under the track ({tap})',
+        tap == ['gut', [['gut'], [8, 16]], 'Später leer gespeichert', [None, True, ['Später', 'leer']]],
+        f'letting go rates that level once; the toast says so at once, and the card stays with the thumb set down and its column lit ({tap})',
     )
     await shot(pg, 'rating-rated-360')
     # Put right while the card stays: another slide rates again, and the moment starts over
@@ -1361,7 +1373,7 @@ async def test_slide(browser, url):
     fixed.append(await pg.evaluate(CARD))
     fixed.append(await gone())
     check(
-        fixed == ['top', ['top'], 'Sofort leer gespeichert', [None, True, ['Sofort leer', 'Napf blitzblank']], 1, True],
+        fixed == ['top', ['top'], 'Sofort leer gespeichert', [None, True, ['Alles', 'leer']], 1, True],
         f'while the card stays, a slide puts the rating right; the card waits a moment again and then folds away ({fixed})',
     )
     await pg.click('#toast [data-action=undo]')
@@ -1381,8 +1393,8 @@ async def test_slide(browser, url):
     await idle(pg)
     after = [await state(pg, RATED), await pg.evaluate(clicks), await pg.inner_text('#toast span')]
     check(
-        moved == [[['Erst gierig', 'Dann stehen gelassen'], True, None], [True, True, ['Gierig']], None],
-        f'sliding sideways puts the lifted thumb with the level\u2019s icon on the level and says it under the track, and rates nothing yet ({moved})',
+        moved == [[['Erst', 'gierig'], True, None], [True, True, ['Erst']], None],
+        f'sliding sideways puts the lifted thumb with the level\u2019s icon on the level and lights its column, and rates nothing yet ({moved})',
     )
     check(
         after == ['eager', [['eager'], [8, 8, 8, 8, 16]], 'Erst gierig gespeichert'],
@@ -1424,8 +1436,8 @@ async def test_slide(browser, url):
     await idle(pg)
     cancelled = [sliding, await pg.evaluate(SHOWN), await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(
-        cancelled == [[['Erst gierig', 'Dann stehen gelassen'], True, None], ASKING, None, []],
-        f'a cancelled slide takes the thumb and the words away again and rates nothing ({cancelled})',
+        cancelled == [[['Erst', 'gierig'], True, None], ASKING, None, []],
+        f'a cancelled slide takes the thumb and the lit column away again and rates nothing ({cancelled})',
     )
     # Redrawn under the finger (a change from another phone): nothing is rated
     await touch('touchStart', *(await stops())[1])
@@ -1445,7 +1457,7 @@ async def test_slide(browser, url):
     await touch('touchEnd')
     held += [(await pg.evaluate(clicks))[0], await gone()]
     check(
-        held == ['mittel', [['Halb gegessen', 'Die Hälfte blieb übrig'], True, None], ['mittel'], True],
+        held == ['mittel', [['Hälfte', 'übrig'], True, None], ['mittel'], True],
         f'a finger that stays on the card keeps it there past its moment, and it folds away once the finger lifts ({held})',
     )
     await reopen()
@@ -1467,7 +1479,7 @@ async def test_slide(browser, url):
     await idle(pg)
     keys = [focused, await state(pg, RATED), (await pg.evaluate(clicks))[0]]
     check(
-        keys == [[['Halb gegessen', 'Die Hälfte blieb übrig'], True, None], 'mittel', ['mittel']],
+        keys == [[['Hälfte', 'übrig'], True, None], 'mittel', ['mittel']],
         f'the level the keyboard is on lifts the thumb and shows its words, and Enter rates it ({keys})',
     )
     # In the sheet the rated meal holds its level: a tap on it changes nothing, a tap on another rates that one, and
@@ -1482,9 +1494,8 @@ async def test_slide(browser, url):
         b['thumb'] == 2
         and b['disc'] == [44, True]
         and not b['lifted']
-        and b['said'] == ['Halb gegessen', 'Die Hälfte blieb übrig']
-        and [w['text'] for w in b['words'] if w['on']] == ['Halb'],
-        f'the level a meal holds: the thumb on its stop with the level\u2019s icon, its word in colour, and under the track its name and what the bowl looks like ({b["thumb"]}, {b["said"]})',
+        and [[w['text'], w['note']] for w in b['words'] if w['on']] == [['Hälfte', 'übrig']],
+        f'the level a meal holds: the thumb on its stop with the level\u2019s icon and its column in colour, the word and what the bowl looks like ({b["thumb"]}, {b["words"]})',
     )
     at = await pg.eval_on_selector_all('#sheet .slider-track button', STOPS)
     await touch('touchStart', *at[2])
@@ -1661,7 +1672,7 @@ CARD = """() => Promise.all([import('./js/store.js'), import('./js/views/overvie
     tap: [c.tagName, c.dataset.action ?? null, c.getAttribute('aria-expanded'), !!c.closest('button')], wide: document.documentElement.scrollWidth > innerWidth}; })"""
 # One pet, a household (the code only in memory) with usual times and a variety with a long name, served today as
 # given ([hour, minute, variety]) by Ben, at the system font scale given. Returns the sentences shown against every
-# sentence there is, whether all of them would fit in four lines, and the variety\u2019s name in the first one.
+# sentence there is, the lines the text takes folded and unfolded, and whether the long name is in play.
 LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), o = await import('./js/views/overview.js'), g = await import('./js/glance.js'), h = await import('./js/views/home.js');
   const at = (days, hh, mm) => { const t = new Date(now); t.setDate(t.getDate() - days); t.setHours(hh, mm, 0, 0); return t.getTime(); };
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
@@ -1674,16 +1685,25 @@ LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const
   s.replaceDb(d); s.save();
   if (!document.getElementById('bigtext')) { const st = document.createElement('style'); st.id = 'bigtext'; document.head.append(st); }
   document.getElementById('bigtext').textContent = scale === 1 ? '' : `.overview p{font-size:${(14 * scale).toFixed(2)}px !important}`;
-  s.prefs.code = 'K7PM-3QXD'; h.renderHome(true);
+  s.prefs.code = 'K7PM-3QXD'; h.renderHome();
   const p = document.querySelector('.overview p'), lh = parseFloat(getComputedStyle(p).lineHeight);
-  const full = o.overviewText(g.glance(d, ['minka00001'], now, new Set()), d.pets, now), q = p.cloneNode(); q.innerHTML = full; q.style.webkitLineClamp = 'unset'; p.after(q);
-  const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), fits: Math.round(q.scrollHeight / lh) <= 4,
-    lines: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, sort: p.querySelector('.ov-sort').innerText, long: today.at(-1)[2] === 'lang'};
-  q.remove(); s.prefs.code = ''; return out; })"""
-# The facts that may come today for a species, as texts, and a kind of line worded as on the day `days` from today
-# with its places filled: what the overview must say, given the values
-FACTS = """species => import('./js/views/facts.js').then(f => f.factsOn(species, new Date()).map(x => x.text))"""
+  const full = o.overviewText(g.glance(d, ['minka00001'], now, new Set()), d.pets, now), q = document.createElement('p'); q.innerHTML = full;
+  const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText),
+    lines: Math.round(p.clientHeight / lh), full: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, long: today.at(-1)[2] === 'lang'};
+  s.prefs.code = ''; return out; })"""
+# The facts that may come on the day `days` from today for a species, as texts, and a kind of line worded as on that
+# day with its places filled: what the overview must say, given the values
+FACTS = """([species, days]) => import('./js/views/facts.js').then(f => f.factsOn(species, new Date(Date.now() + (days || 0) * 864e5)).map(x => x.text))"""
 LINE = """([kind, values, days]) => Promise.all([import('./js/views/facts.js'), import('./js/glance.js')]).then(([f, g]) => f.fill(g.pick(f.LINES[kind], Date.now() + (days || 0) * 864e5), values))"""
+
+
+async def told_facts(pg, species, days=0):
+    """The facts that may come on the day `days` from today for a species, each with the lead-in of that day: what
+    the overview's last sentence may be"""
+    lead = await pg.evaluate(LINE, ['factLead', {'fact': '#'}, days])
+    return [lead.replace('#', f) for f in await pg.evaluate(FACTS, [species, days])]
+
+
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['lachs', 'Lachs', 'Nassfutter'], ['rind', 'Rind', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '00001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
@@ -1693,38 +1713,55 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print('overview: a card with picture, name and a few sentences about the day, as tall as its text, never a rating; counting in the history')
+    print(
+        'overview: a card with picture, name and a text about the day in three lines, unfolding with a tap, never a rating; counting in the history'
+    )
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
+
+    async def line(kind, values, days=0):
+        return await pg.evaluate(LINE, [kind, values, days])
+
     c = await pg.evaluate(CARD)
-    status = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse.'
-    cats = await pg.evaluate(FACTS, 'Katze')
+    status = await line('today', {'so': 'schon', 'both': 'eine Mahlzeit und einen Snack', 'at': '11:00', 'what': 'Käse', 'by': ''})
+    cats = await told_facts(pg, 'Katze')
     check(
-        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['cut'], c['clamp'], c['tap'], c['wide'], c['tight']]
+        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['clamp'], c['lines'], c['cut'], c['tap'], c['wide'], c['tight']]
         == [
             True,
             'Minka',
             True,
             ['BUTTON', 1, 72, True],
             ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
-            False,
-            '4',
-            ['SECTION', None, None, False],
+            '3',
+            3,
+            True,
+            ['SECTION', 'toggle-overview', 'false', False],
             False,
             True,
         ]
-        and c['all'][0] == status
-        and len(c['all']) == 2
-        and c['all'][1] in cats
-        and c['sentences'] == c['all'][: len(c['sentences'])]
-        and c['text'] == ' '.join(c['sentences'])
-        and 1 <= c['lines'] <= 4,
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; the card as tall as its text, at most four lines, and no button ({c})',
+        and c['all'] == [status, c['all'][1]] == c['sentences']
+        and c['all'][1] in cats,
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then a fact about the animal with its lead-in; three lines ending in „…“, and the card is the tap target ({c})',
     )
     await shot(pg, 'overview-360')
+    await pg.evaluate("window.__card = document.querySelector('.overview')")
+    await pg.click('.overview p')
+    await idle(pg)
+    o = await pg.evaluate(CARD)
+    await shot(pg, 'overview-open-360')
+    await pg.click('.overview h2')
+    await idle(pg)
+    back = await pg.evaluate(CARD)
+    check(
+        [o['cut'], o['tap'], o['text'], o['lines'] > 3, o['height'] > c['height'], back == c]
+        == [False, ['SECTION', 'toggle-overview', 'true', False], c['text'], True, True, True]
+        and await pg.evaluate("window.__card === document.querySelector('.overview')"),
+        f'a tap on the card shows the whole text, a second folds it away again, both without redrawing the page ({o["height"]} px, {o["lines"]} lines)',
+    )
     day = await pg.evaluate("[document.querySelector('.tl-date span').innerText, document.querySelector('.day.today').getAttribute('aria-label')]")
     check(
         day == ['1 Mahlzeit, 1 Snack', 'Heute, 1 Mahlzeit, 1 Snack'],
@@ -1736,7 +1773,7 @@ async def test_overview(browser, url):
     check(gap == 14, f'14 px from „Verlauf“ to the calendar, 8 more than before ({gap})')
     await pg.click('.ov-pic')
     await idle(pg)
-    check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet')
+    check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet, not the text')
     await pg.click('[data-action=close]')
     await idle(pg)
     # Several pets: today's meals of all of them, who had the last one, when the next one usually comes
@@ -1756,28 +1793,29 @@ async def test_overview(browser, url):
     )
     await idle(pg)
     kiwi = await pg.evaluate(CARD)
-    dogs, late = await pg.evaluate(FACTS, 'Hund'), await pg.evaluate(LINE, ['later', {'meal': 'Frühstück', 'span': '2 Stunden'}])
+    general, dogs, birds = await told_facts(pg, None), await told_facts(pg, 'Hund'), await told_facts(pg, 'Vogel')
+    fed = {'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'bekommen'}
+    both, one, late = (
+        await line('fresh', {'names': 'Minka und Tiger', 'hat': 'haben', **fed}),
+        await line('fresh', {'names': 'Tiger', 'hat': 'hat', **fed}),
+        await line('later', {'meal': 'Frühstück', 'span': '2 Stunden'}),
+    )
+    digest = await line('digest', {'meal': 'Frühstück', 'when': 'morgen gegen 10 Uhr'})
     check(
-        [house['title'], house['pic'][:2], house['all']]
-        == [
-            'Minka und Tiger',
-            ['SPAN', 2],
-            ['Minka und Tiger haben vor 5 Minuten Lachs bekommen.', 'Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr.', late],
-        ]
-        and house['sentences'] == house['all'][: len(house['sentences'])]
-        and house['bold'] == ['5 Minuten', 'Lachs', '10 Uhr'][: len(house['bold'])]
-        and not house['cut']
+        [house['title'], house['pic'][:2], house['all'][:3], len(house['all'])] == ['Minka und Tiger', ['SPAN', 2], [both, digest, late], 4]
+        and house['all'][3] in general
+        and house['sentences'] == house['all']
+        and house['bold'][:3] == ['5 Minuten', 'Lachs', '10 Uhr']
         and house['tight'],
-        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and the message of the day: that meal came two hours after the usual time ({house["text"]})',
+        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, the message of the day, that meal came two hours after the usual time, and a fact for every animal ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])]
-        == ['Tiger', ['BUTTON', 1], ['Tiger hat vor 5 Minuten Lachs bekommen.'], 2]
+        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])] == ['Tiger', ['BUTTON', 1], [one], 2]
         and tiger['all'][1] in dogs
-        and tiger['sentences'] == tiger['all'][: len(tiger['sentences'])]
-        and [kiwi['text'], kiwi['cut'], kiwi['sentences'], kiwi['tight']]
-        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.'], True],
-        f'the overview follows the filter, with a fact about the dog for the dog; without a meal one sentence ({tiger["text"]} / {kiwi["text"]})',
+        and tiger['sentences'] == tiger['all']
+        and [kiwi['all'][0], len(kiwi['all']), kiwi['tight']] == [await line('firstMeal', {'names': 'Kiwi', 'wartet': 'wartet'}), 2, True]
+        and kiwi['all'][1] in birds,
+        f'the overview follows the filter, with a fact about the dog for the dog; without a meal that it waits for the first one, and a fact about the bird ({tiger["text"]} / {kiwi["text"]})',
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
     words = await pg.evaluate("import('./js/config.js').then(c => Object.values(c.RATINGS).map(x => x.label))")
@@ -1793,12 +1831,14 @@ async def test_overview(browser, url):
       s.prefs.code = 'K7PM-3QXD'; h.renderHome(); const house = text();
       s.prefs.code = ''; h.renderHome();
       return [alone, house]; })""")
+    served = await line('freshHouse', {'server': 'Anna', 'names': 'Minka und Tiger', 'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'gegeben'})
     check(
-        'Anna' not in by[0] and by[1].startswith('Anna hat Minka und Tiger vor 5 Minuten Lachs gegeben. '),
+        'Anna' not in by[0] and by[1].startswith(served + ' '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
-    # The line more: what is only true today first, else the kinds taking turns over five days, with the memory
-    # threaded through; every message, then every kind taking turns, each from a glance holding only it
+    # The line more: what is only true today first, else the kinds taking turns over five days, and a fact every
+    # day, with the memory threaded through; every message, then every kind taking turns, each from a glance holding
+    # only it
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
       const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
       const none = {premiere: null, idea: null, feeders: [], week: {meals: 0, sorts: 0}, streak: 0, first: null, sorts: 0, anniversary: null, record: {meals: 0, streak: 0},
@@ -1812,34 +1852,33 @@ async def test_overview(browser, url):
       const first = [{premiere: 'lachs00001'}, {premiere: 'rind00001'}, {milestone: {n: 100, left: 3}}, {snacks: 4}, {anniversary: 1, first: {at: 0, days: 30, meals: 62}},
         {record: {meals: 0, streak: 23}}, {record: {meals: 4, streak: 0}, meals: 4}, {shift: {at: 435, diff: -40}}, {shift: {at: 1110, diff: 95}}, {sameMinute: true},
         {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}].map(x => one(x));
-      const bare = {...g, ...none}; // nothing but the facts left to take a turn
+      const bare = {...g, ...none}; // nothing but one kind left to take a turn
       const kinds = [{feedRun: {name: 'Ben', days: 5, other: 'Jonas'}}, {feedRun: {name: 'Ben', days: 5, other: null}}, {weekday: {at: 435, mine: 525, later: true, weekday: 6}},
-        {lookback: 'lachs00001'}, {sorts: 14}, {first: {at: 0, days: 43, meals: 100}}, {feeders: [{name: 'Anna', n: 5}, {name: 'Jonas', n: 5}]}].map(x => one(x, bare).at(-1));
+        {lookback: 'lachs00001'}, {sorts: 14}, {first: {at: 0, days: 43, meals: 100}}, {feeders: [{name: 'Anna', n: 5}, {name: 'Jonas', n: 5}]}].map(x => one(x, bare));
       s.prefs.code = code; return [days, first, kinds, memory]; })"""
     days, first, kinds, memory = await pg.evaluate(LINES)
-
-    async def line(kind, values, days=0):
-        return await pg.evaluate(LINE, [kind, values, days])
-
     turns = [
         await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}),
         await line('streak', {'since': '12 Tagen', 'days': '12 Tage', 'you': 'hättet eigentlich ihr'}, 1),
         await line('idea', {'sort': 'Rind', 'days': 12}, 2),
         await line('week', {'meals': '12 Mahlzeiten', 'sorts': '4 Sorten'}, 3),
+        await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}, 4),
+    ]
+    told = [await told_facts(pg, 'Katze', i) for i in range(5)]
+    daily = [
+        [
+            await line('today', {'so': 'schon', 'both': 'zwei Mahlzeiten und einen Snack', 'at': '9:00', 'what': 'Lachs', 'by': ' von Anna'}, i),
+            await line('usual', {'meal': 'Abendessen', 'when': 'gegen 18:30 Uhr'}, i),
+            turns[i],
+        ]
+        for i in range(5)
     ]
     check(
-        all(
-            len(d) == 3
-            and d[0].startswith('Heute gab es schon zwei Mahlzeiten und einen Snack, zuletzt um ')
-            and d[0].endswith(' Lachs von Anna.')
-            and d[1] == 'Abendessen gibt es meist gegen 18:30 Uhr.'
-            for d in days
-        )
-        and [d[2] for d in days[:4]] == turns
-        and days[4][2] in cats
+        all(len(d) == 4 and d[:3] == daily[i] and d[3] in told[i] for i, d in enumerate(days))
+        and len({d[3] for d in days}) == 5
         and [memory['day'], memory['kind'], memory['kinds'], [f['day'] for f in memory['facts']]]
-        == ['2026-06-13', 'fact', ['idea', 'week', 'fact'], ['2026-06-13']],
-        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, the streak, an idea, the week and a fact about the animal take turns, and the memory holds the last three kinds and the fact ({days}, {memory})',
+        == ['2026-06-13', 'duel', ['idea', 'week', 'duel'], [f'2026-06-{9 + i:02d}' for i in range(5)]],
+        f'four sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, one line more and a fact about the animal; over five days the duel, the streak, an idea, the week and the duel again take turns, the fact is another one every day, and the memory holds the last three kinds and every fact ({days}, {memory})',
     )
     messages = [
         await line('premiereLast', {}),
@@ -1854,20 +1893,17 @@ async def test_overview(browser, url):
         await line('sameMinute', {}),
     ]
     check(
-        [f[-1] for f in first[:10]] == messages
+        [f[-2] for f in first[:10]] == messages
+        and all(len(f) == 4 and f[-1] in told[0] for f in first)
         and 'zwei Mahlzeiten und vier Snacks' in first[3][0]
         and 'vier Mahlzeiten' in first[6][0]
-        and first[10][0].startswith('Futterzeit! Zuletzt gab es um ')
-        and any(
-            f'Minka {t}' == first[10][1]
-            for t in ('wartet bestimmt schon neben dem Napf.', 'übt schon mal den vorwurfsvollen Blick.', 'hat die Uhr bestimmt schon im Blick.')
-        )
-        and first[11][1]
-        in (
-            'Für heute ist alles serviert, Frühstück gibt es morgen meist gegen 7:15 Uhr.',
-            'Feierabend für heute: Frühstück gibt es morgen meist gegen 7:15 Uhr.',
-        ),
-        f'what is only true today comes first: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
+        and first[10][:2]
+        == [
+            await line('due', {'when': 'um 9:00', 'what': 'Lachs', 'by': ' von Anna'}),
+            await line('waiting', {'names': 'Minka', 'wartet': 'wartet', 'uebt': 'übt', 'hat': 'hat', 'sitzt': 'sitzt'}),
+        ]
+        and first[11][1] == await line('doneToday', {'meal': 'Frühstück', 'when': 'gegen 7:15 Uhr'}),
+        f'what is only true today comes before the fact: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
     )
     others = [
         await line('feedRun', {'name': 'Ben', 'days': '5 Tage', 'since': '5 Tagen', 'other': 'Jonas'}),
@@ -1875,40 +1911,40 @@ async def test_overview(browser, url):
         await line('weekday', {'weekday': 'Samstags', 'day': 'Samstag', 'meal': 'Frühstück', 'shift': 'später', 'time': '8:45'}),
         await line('lookback', {'sort': 'Lachs'}),
         await line('sorts', {'n': '14 Sorten'}),
-        await line('days', {'since': '43 Tagen', 'days': '43 Tage'}),
+        await line('days', {'since': '43 Tagen', 'days': '43 Tage', 'n': 43}),
         await line('duelTie', {'score': '5 zu 5', 'first': 'Anna', 'second': 'Jonas'}),
     ]
     check(
-        kinds == others,
+        [k[-2] for k in kinds] == others and all(len(k) == 4 and k[-1] in told[0] for k in kinds),
         f'the other kinds taking turns: a person\u2019s feeding run, with or without someone to tease, a weekday\u2019s own time, a look back a year, the varieties tried, the days in the diary and a tied duel ({kinds})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
-    # A long name, a household and usual times: the first sentence stands whole with „von Ben“, and every sentence
-    # that fits in four lines is there, the last ones dropped where they do not; the first alone overflowing, the
-    # variety\u2019s name in it is cut. At the usual and at a large system font.
+    # A long name, a household and usual times, at the usual and at a large system font: nothing is dropped, the
+    # first sentence stands whole with „von Ben“ and the variety\u2019s full name, the text is clamped to three lines,
+    # and a tap unfolds all of it
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
     long = [[7, 20, 'snack'], [12, 0, 'wild'], [13, 14, 'lang']]
-    for scale, today in ((1, [[7, 20, 'wild']]), (1.3, [[7, 20, 'wild']]), (1.15, long), (1.3, long)):
+    for scale, today in ((1, [[7, 20, 'wild']]), (1.3, long)):
         fit = await pg.evaluate(LONG_DB, [scale, today])
         await idle(pg)
-        first = fit['shown'][0]
         name = 'Wildschwein mit Nachtkerzenöl' + (' und Kürbis' if fit['long'] else '')
         record = await line('recordStreak', {'days': '9 Tage'})
-        # The clamp, the safety net, may act only once the first sentence stands alone with its name cut
+        opened = await pg.evaluate(
+            "import('./js/views/home.js').then(h => { h.toggleOverview(); const p = document.querySelector('.overview p'); return [p.scrollHeight > p.clientHeight + 1, getComputedStyle(p).display]; })"
+        )
+        await pg.evaluate("import('./js/views/home.js').then(h => h.toggleOverview())")
         check(
-            first.endswith('von Ben.')
-            and (not fit['cut'] or (len(fit['shown']) == 1 and fit['long']))
-            and (fit['lines'] <= 4 or fit['cut'])
-            and first.replace(fit['sort'], '#') == fit['all'][0].replace(name, '#')
-            and fit['shown'][1:] == fit['all'][1 : len(fit['shown'])]
-            and (len(fit['shown']) == len(fit['all']) if fit['fits'] else len(fit['shown']) < len(fit['all']))
-            and (fit['sort'].endswith('…') and len(fit['sort']) <= 24 if fit['long'] else fit['sort'] == 'Wildschwein mit Nachtkerzenöl')
-            and fit['all'][2] == record,
-            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ in a whole first sentence, {len(fit["shown"])} of {len(fit["all"])} sentences on {fit["lines"]} lines, the name {fit["sort"]!r}, the record streak of nine days as the message ({fit})',
+            fit['shown'] == fit['all']
+            and len(fit['all']) == 4
+            and fit['all'][0].endswith('von Ben.')
+            and name in fit['all'][0]
+            and fit['all'][2] == record
+            and [fit['cut'], fit['lines'], fit['full'] > 3, opened] == [True, 3, True, [False, 'block']],
+            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ and the full name in a whole first sentence, the record streak of nine days as the message, {fit["full"]} lines clamped to three and all of them after a tap ({fit})',
         )
         await shot(pg, f'overview-long-{int(scale * 100)}-{len(today)}')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -2002,16 +2038,21 @@ async def test_birthday(browser, url):
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
-    said = [(await pg.evaluate(BIRTHDAY_LINES, d))[-1] for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
+    lines = [await pg.evaluate(BIRTHDAY_LINES, d) for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
+    said = [x[-2] for x in lines[:4]] + [x[-1] for x in lines[4:]]
     want = [
         await pg.evaluate(LINE, ['birthdayAge', {'pet': 'Minka', 'age': 4}]),
         await pg.evaluate(LINE, ['birthdayToday', {'pet': 'Minka'}]),
         await pg.evaluate(LINE, ['birthdayTomorrow', {'pet': 'Minka'}]),
         await pg.evaluate(LINE, ['birthdaySoon', {'pet': 'Minka', 'days': '3 Tagen'}]),
     ]
-    cats = await pg.evaluate(FACTS, 'Katze')
+    cats = await told_facts(pg, 'Katze')
     check(
-        said[:4] == want and said[4] in cats and said[5] in cats,
+        said[:4] == want
+        and said[4] in cats
+        and said[5] in cats
+        and [len(x) for x in lines] == [3, 3, 3, 3, 2, 2]
+        and all(x[-1] in cats for x in lines),
         f'the overview: the birthday with the age, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -3815,7 +3856,9 @@ PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const l = document
 
 
 async def test_product_photo(browser, url):
-    print('„Foto ändern“ in the food sheet: the variety gets a new photo and thumbnail, „Abbrechen“ changes nothing')
+    print(
+        '„Foto ändern“ under the variety\u2019s card, in the food sheet and in the meal\u2019s: a new photo and thumbnail, „Abbrechen“ changes nothing'
+    )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('.welcome [data-action=add-pet]')
@@ -3893,6 +3936,35 @@ async def test_product_photo(browser, url):
         none[:2] == ['Foto hinzufügen', True] and none[4] == '' and added[:2] == ['Foto ändern', True] and added[3] and added[4],
         f'without a photo the link says „Foto hinzufügen“, and afterwards the variety has one ({none}, {added})',
     )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    # The meal's sheet has the same link right under its card, since that is where a meal is opened from the home
+    # page; the photo it takes is the variety's. While naming there is no such link.
+    sid = await state(pg, 'db.servings[0].id')
+    await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'serving', id: '{sid}'}}))")
+    await idle(pg)
+    meal = await pg.evaluate(PRODUCT_PHOTO, pid)
+    where = await pg.evaluate("""() => { const l = document.querySelector('#sheet [data-action=product-photo]');
+      return [document.querySelector('#sheet .sh-head h2').innerText, l.dataset.id, l.previousElementSibling.className, l.nextElementSibling.className]; }""")
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK.read_bytes()).decode()}'")
+    await pg.click('#sheet [data-action=product-photo]')
+    await until(pg, f"(localStorage.getItem('__fs:photos/{pid}.jpg') || '').slice(-32) !== '{after[4]}'")
+    await idle(pg)
+    changed = await pg.evaluate(PRODUCT_PHOTO, pid)
+    check(
+        meal[:2] == ['Foto ändern', True]
+        and where == ['Wie war’s?', pid, 'box prod-card', 'pet-rate']
+        and changed[2] == changed[3] != after[3]
+        and changed[4] != after[4],
+        f'in the meal\u2019s sheet the same link stands right under the card, and the photo it takes is the variety\u2019s ({meal}, {where}, {changed})',
+    )
+    await shot(pg, 'meal-photo-link')
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    naming = await pg.evaluate(
+        "[document.querySelector('#sheet .sh-head h2').innerText, !!document.querySelector('#sheet [data-action=product-photo]')]"
+    )
+    check(naming == ['Futter ändern', False], f'while naming there is no such link ({naming})')
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
@@ -4044,11 +4116,11 @@ async def test_pack_lines(browser, url):
     await idle(pg)
     chips, brands, places = await pg.evaluate(CHIPS), await pg.evaluate(BRAND_CHIPS), await pg.evaluate(CHIP_PLACES)
     check(
-        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']]
+        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'false']]
         and brands is None
         and places == [None, True, ['Sorte: Katzenglück', 'Sorte: Zarte Häppchen', 'Sorte: mit Huhn']]
-        and await pg.evaluate(FIELDS) == ['', 'mit Huhn'],
-        f'the lines read stand as chips under „Sorte“, the one the field holds pressed, each named for a screen reader; no brand known, no chip under „Marke“ ({chips}, {brands}, {places})',
+        and await pg.evaluate(FIELDS) == ['', 'Huhn'],
+        f'the lines read stand as chips under „Sorte“, each named for a screen reader, none pressed since the field holds the variety without its „mit“; no brand known, no chip under „Marke“ ({chips}, {brands}, {places})',
     )
     await shot(pg, 'pack-lines')
 
@@ -5845,7 +5917,7 @@ async def test_settings(browser, url):
 
 
 async def test_suggestions(browser, url):
-    print('feeding: buttons, search field, one list, at most five suggestions and eight hits')
+    print('feeding: buttons, search field, one list, at most three suggestions and eight hits')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [3, 0])
@@ -5869,8 +5941,8 @@ async def test_suggestions(browser, url):
     )
     names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        names == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'] and order == ['cta-row', 'search', 'serveList', 'btn'],
-        f'buttons, then the search field, then the list of the five fed last, and „Ohne Foto eintippen“ at the end ({names}, {order})',
+        names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['cta-row', 'search', 'serveList', 'btn'],
+        f'buttons, then the search field, then the list of the three fed last, and „Ohne Foto eintippen“ at the end ({names}, {order})',
     )
 
     # The search field must not move while typing: its place inside the sheet and its distance to the two
@@ -5920,7 +5992,7 @@ async def test_suggestions(browser, url):
     await idle(pg)
     back = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'],
+        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'],
         f'searching brand and variety together, and an empty field shows the suggestions again ({hit}, {back})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
@@ -5946,7 +6018,7 @@ PICKER_ROWS = """() => [...document.querySelectorAll('#serveList .plist .row')].
 
 
 async def test_picker(browser, url):
-    print('the quick picker: brand and when a variety was last served, its strip at the end, five of them, nothing cut off at 360 px')
+    print('the quick picker: brand and when a variety was last served, its strip at the end, three of them, nothing cut off at 360 px')
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme, width=360, height=760, timezone_id='Europe/Berlin')
         pg, errors = await open_page(ctx, url, scheme)
@@ -5962,10 +6034,8 @@ async def test_picker(browser, url):
                 ['Wildschwein mit Nachtkerzenöl und Kürbis', 'Catz Finefood, heute um 13:14', ['r-good', 'r-good'], False],
                 ['Lachs in Soße', 'Sheba, gestern um 19:22', ['r-sauce'], False],
                 ['Huhn in Gelee', 'Felix, vor 3 Tagen', [], False],
-                ['Rind', 'am 28. Mai', ['r-good'], False],
-                ['Pute', 'Miamor, am 20. Mai', ['r-bad'], False],
             ],
-            f'{scheme}: the five fed last, each with its brand and when it was last served, its ratings as a strip where it has any, and no word for serving ({rows})',
+            f'{scheme}: the three fed last, each with its brand and when it was last served, its ratings as a strip where it has any, and no word for serving ({rows})',
         )
         await pg.fill('#sheet [data-search]', 'Ente')
         await idle(pg)
