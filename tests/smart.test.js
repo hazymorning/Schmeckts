@@ -159,6 +159,59 @@ test('verdicts count ratings: buy again from 3 with two thirds good, stop buying
   );
 });
 
+test('the verdict rests on the newest eight ratings of the last 180 days, the score still weighs every rating', () => {
+  const stat = (meals, prefs) => {
+    const e = model(household(['A', 'B'], ['p'], meals), prefs).byId.get('p');
+    return [e.n, e.verdict];
+  };
+  assert.deepEqual(
+    stat([...rate('p', 'A', [T, T, T], 200), ...rate('p', 'A', [X, X, X], 2)]),
+    [3, 'nicht'],
+    'three good ones 200 days ago and three left this week: only this week counts',
+  );
+  const year = daily('A', Array(10).fill(['p', T]), 40, 30); // ten good ones, one a month
+  assert.deepEqual(
+    stat([...year, ...daily('A', Array(5).fill(['p', X]), 1)]),
+    [8, 'nicht'],
+    'ten good over the year, then five left in a row: five of the newest eight',
+  );
+  assert.deepEqual(
+    stat([...year, ...daily('A', Array(2).fill(['p', X]), 1)]),
+    [7, 'nachkaufen'],
+    'ten good and two left: two of the seven within the window',
+  );
+  assert.deepEqual(
+    stat(rate('p', 'A', [T, T, T, T], 181)),
+    [0, 'neu'],
+    'ratings older than 180 days alone: too few again',
+  );
+  const old = model(household(['A'], ['p'], rate('p', 'A', [T, T, T, T], 181))).byId.get('p');
+  assert.ok(
+    old.score > 0 && old.total === 4 && old.house.n === 0,
+    'the score and the total still hold the old ratings',
+  );
+  // The household: each pet its own window, the household's counts their sum
+  const house = household(
+    ['A', 'B'],
+    ['p'],
+    [
+      ...daily('A', Array(9).fill(['p', T]), 1),
+      ...daily('B', [...Array(8).fill(['p', X]), ...Array(4).fill(['p', T])], 1),
+    ],
+  );
+  const both = model(house),
+    e = both.byId.get('p');
+  assert.deepEqual(
+    [e.pets.A.n, e.pets.A.verdict, e.pets.B.n, e.pets.B.verdict, e.house.n, e.house.counts, e.verdict, e.total],
+    [8, 'nachkaufen', 8, 'nicht', 16, {top: 8, schlecht: 8}, 'gemischt', 21],
+  );
+  assert.deepEqual(
+    [ratingsIn(both, ['p']).keys.length, ratingsIn(both, ['p']).more, ratingsIn(model(house, {activePet: 'B'}), ['p'])],
+    [16, true, {keys: Array(8).fill(X), more: true}],
+    'a strip shows the windows, and says that older ratings lie beyond',
+  );
+});
+
 test('the weight halves every 90 days', () => {
   const db = household(
     ['A'],
@@ -458,8 +511,8 @@ test('profile: within one food type, with the pet filter, and every group’s ra
   assert.deepEqual(
     profile(minka)[0].groups.map(g => ratingsIn(minka, g.ids)),
     [
-      ['gern', 'gern', 'normal', 'gern'],
-      ['liegen', 'wenig', 'liegen', 'normal'],
+      {keys: ['gern', 'gern', 'normal', 'gern'], more: false},
+      {keys: ['liegen', 'wenig', 'liegen', 'normal'], more: false},
     ],
     'the ratings of a group oldest first, only those within the filter',
   );
@@ -760,6 +813,24 @@ test('changes: the varieties whose verdict became „Nachkaufen“ or „Nicht m
     changes(db, {activePet: 'all'}, NOW, 30),
     {nachkaufen: ['lachs', 'neu'], nicht: ['rind', 'huhn', 'pute']},
     'a longer span reaches further back',
+  );
+});
+
+test('changes: the window and its 180 days are measured from the day the span began', () => {
+  const db = household(
+    ['A'],
+    ['weit', 'nah'],
+    [
+      ...rate('weit', 'A', [T, T, T], 250),
+      ...rate('weit', 'A', [T, T, T], 10),
+      ...rate('nah', 'A', [T, T, T], 200),
+      ...rate('nah', 'A', [T, T, T], 10),
+    ],
+  );
+  assert.deepEqual(
+    changes(db, {activePet: 'all'}, NOW, 30),
+    {nachkaufen: ['weit'], nicht: []},
+    'thirty days ago the old ratings of „weit“ already lay beyond the window, those of „nah“ did not',
   );
 });
 

@@ -393,6 +393,65 @@ async def test_buying(browser, url):
     await ctx.close()
 
 
+# One pet and one variety with twelve ratings over the last twelve days, the oldest five left standing: the verdict
+# rests on the newest eight, which is what the words and the strip say
+def twelve_rated():
+    now = int(time.time() * 1000)
+    levels = ['schlecht'] * 5 + ['gut'] * 3 + ['top'] * 4
+    return {
+        'version': 3,
+        'pets': [{'id': 'lxpet00001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1}],
+        'products': [{'id': 'lxprod0001', 'brand': 'Sheba', 'variety': 'Lachs', 'type': 'Nassfutter', 'codes': {}, 'createdAt': 1}],
+        'servings': [
+            {
+                'id': f'lxserv00{i:02d}',
+                'productId': 'lxprod0001',
+                'servedAt': now - (12 - i) * 864e5,
+                'note': '',
+                'pets': {'lxpet00001': {'r': r, 'at': now}},
+            }
+            for i, r in enumerate(levels)
+        ],
+    }
+
+
+async def test_window(browser, url):
+    print('the verdict rests on the newest eight ratings: the words say „von 8 Mal“ and the strip shows those eight with a „+“')
+    ctx, pg, errors = await seeded(browser, url, {'db': twelve_rated(), 'prefs': {'mode': 'lokal'}})
+    hint = await pg.eval_on_selector(
+        '[data-sec=hint]', 'c => [c.querySelector("h2").innerText, c.querySelector(".say").innerText, c.querySelector(".why").innerText]'
+    )
+    check(
+        hint == ['Neuer Liebling', 'Lachs von Sheba kommt gut an.', '7 von 8 Mal gut gefressen'],
+        f'home page: „Neuer Liebling“ on the newest eight, seven of them good, whatever the five older ones were ({hint})',
+    )
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'product', id: 'lxprod0001'}))")
+    await idle(pg)
+    SHEET = """() => { const s = document.querySelector('#sheet .strip'), v = document.querySelector('#sheet .verdict p');
+      return {plus: s.firstElementChild.tagName === 'B' && s.firstElementChild.innerText, dots: [...s.querySelectorAll('i')].map(i => i.className), label: s.getAttribute('aria-label'),
+        verdict: v.innerText.replace(/\\s+/g, ' ').trim(), counts: [...document.querySelectorAll('#sheet .cnt')].map(c => [c.dataset.r || c.className.split(' ')[1], c.querySelector('b').innerText])}; }"""
+    sheet = await pg.evaluate(SHEET)
+    check(
+        sheet['plus'] == '+'
+        and sheet['dots'] == ['r-bad'] + ['r-good'] * 7
+        and sheet['label'] == '7 von 8 Mal gut gefressen'
+        and sheet['verdict'] == 'Nachkaufen 7 von 8 Mal gut gefressen'
+        and [c[1] for c in sheet['counts']] == ['4', '3', '0', '0', '0', '1'],
+        f'food sheet: the strip shows exactly the eight the verdict rests on, a „+“ says there are older ones, and the words and the counters read the same eight ({sheet})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('[data-sec=shop] [data-action=open-shop]')
+    await idle(pg)
+    row = await pg.eval_on_selector(
+        '#sheet .shop .row',
+        'r => [r.querySelector(".strip b")?.innerText ?? null, r.querySelectorAll(".strip i").length, r.querySelector(".strip").getAttribute("aria-label")]',
+    )
+    check(row == ['+', 8, '7 von 8 Mal gut gefressen'], f'„Einkaufen“: the row\u2019s strip the same ({row})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_cards(browser, url):
     print('home page: the hint, and the history always open')
     ctx = await phone(browser, touch=True, motion=True)
@@ -733,7 +792,7 @@ async def test_profile(browser, url):
         'the rows of a comparison are no buttons: there is nothing behind them yet',
     )
     newest = await pg.evaluate("""import('./js/derive.js').then(async d => { const s = await import('./js/smart.js'), m = d.model();
-      const g = d.profileModel()[0].groups.find(x => x.key === 'In Soße'), all = s.ratingsIn(m, g.ids).map(s.rateCls);
+      const g = d.profileModel()[0].groups.find(x => x.key === 'In Soße'), all = s.ratingsIn(m, g.ids).keys.map(s.rateCls);
       const row = [...document.querySelectorAll('#sheet .likes .row')].find(r => r.querySelector('b').innerText === 'In Soße');
       return [all.length, [...row.querySelectorAll('.strip i')].map(i => i.className), all.slice(-8), row.querySelector('.strip').firstElementChild.innerText]; })""")
     check(
@@ -5575,6 +5634,7 @@ run_tests(
         'tour': test_tour,
         'flow': test_flow,
         'buying': test_buying,
+        'window': test_window,
         'cards': test_cards,
         'shop': test_shop,
         'profile': test_profile,
