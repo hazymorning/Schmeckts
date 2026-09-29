@@ -15,11 +15,7 @@
   <a href="#installieren"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1798bb44-ce7c-4fe1-aa79-b14bd7346e2e"><img src="https://github.com/user-attachments/assets/382cc84e-bfce-4891-86fc-8ddd5056eef1" width="292" alt="Installationsanleitung"></picture></a>
 </p>
 
-Unsere Katze ist, freundlich gesagt, wählerisch. Manche Sorten sind sofort verputzt, an anderen schnuppert sie nur kurz und geht wieder. Wieder andere findet sie erst super und lässt sie beim nächsten Mal plötzlich stehen. Bei Sorten mit Soße leckt sie fast immer nur die Soße auf, und Fisch kommt mal gut an, mal gar nicht. Was gab es eigentlich zuletzt, und welche Sorte von welcher Marke hatte nochmal welche Konsistenz? Hat sie feste Vorlieben, oder will sie einfach möglichst viel Abwechslung?
-
-Das findet man nur heraus, wenn man mitschreibt, und so ist diese App entstanden. Mitschreiben hält man aber nur durch, wenn es kaum Mühe macht, schließlich füttert man mehrmals am Tag. Deshalb war von Anfang an das Wichtigste, dass das Eintragen schnell und vor allem einfach geht.
-
-Zugegeben, das Ganze ist ein ziemliches Nischenproblem. Dafür steckt in der App ganz schön viel Liebe zum Detail. Und weil Katzen bekanntlich großen Wert auf ihre Privatsphäre legen, bleiben alle Einträge auf deinem Handy.
+Unsere Katze ist wählerisch. Manche Sorten sind sofort weg, an anderen schnuppert sie nur kurz, und was sie gestern noch mochte, lässt sie heute stehen. Merken kann sich das niemand, also schreibt die App mit: beim Füttern ein Scan oder ein Foto, später ein Tipp auf den Napf. Nach ein paar Wochen weißt du, was dein Tier wirklich mag. Alles bleibt dabei auf deinem Handy.
 
 <p align="center">
   <picture>
@@ -30,20 +26,18 @@ Zugegeben, das Ganze ist ein ziemliches Nischenproblem. Dafür steckt in der App
 
 ## So geht’s
 
-Beim Füttern scannst du kurz den Barcode auf der Packung. Wenn die App die Sorte schon kennt, ist die Mahlzeit damit eingetragen.
+1. Beim Füttern scannst du den Barcode. Kennt die App die Sorte, ist die Mahlzeit eingetragen.
+2. Bei einer neuen Sorte oder ohne Barcode machst du ein Foto. Die App liest die Packung und schlägt Marke und Sorte vor.
+3. Später tippst du an, wie viel im Napf übrig ist.
 
-Ist die Sorte neu oder hat die Packung keinen Barcode, machst du stattdessen ein Foto. Die App liest, was draufsteht, und schlägt dir Marke und Sorte vor. Passt der Vorschlag nicht, suchst du dir aus dem erkannten Text die richtigen Zeilen raus. Ist das Foto nichts geworden, machst du einfach ein neues.
+## Was noch drin ist
 
-Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, zwei Wochen weißt du ziemlich genau, was dein Tier mag.
-
-## Was die App sonst noch kann
-
-- Unter *Einkaufen* steht, was gut ankommt und nachgekauft werden kann, nach Futterart sortiert, und neben jeder Sorte ihre letzten Bewertungen als Punkte. Was meistens übrig bleibt, steht zugeklappt unter *Lieber nicht*. Du kannst Sorten auch selbst verschieben. Die Liste zum Verschicken enthält nur, was nachgekauft werden soll, zum Beispiel für jemanden, der gerade einkaufen ist.
-- Unter *Vorlieben* siehst du der Reihe nach, welche Marken, Konsistenzen und Geschmacksrichtungen am besten ankommen, also ob dein Tier lieber Pastete oder Soße frisst, lieber Huhn oder Fisch. Dort steht auch, ob es Abwechslung mag oder dieselbe Sorte gern zweimal hintereinander frisst. Bleibt eine Sorte immer wieder stehen oder frisst ein Tier auffällig wenig, sagt die App Bescheid.
-- Im Verlauf stehen alle Mahlzeiten, und du siehst, wie viele davon in den letzten 7, 30 und 90 Tagen gut ankamen. Unter *Details* steht, was sich in den letzten 30 Tagen geändert hat, zum Beispiel welche Sorten neu bei *Nachkaufen* sind.
-- Wenn du willst, erinnert dich die App daran, in den Napf zu schauen, oder meldet sich, wenn normalerweise Fütterzeit ist. Beides ist erst mal aus.
-- Du kannst mehrere Tiere anlegen, auch Hunde, Kaninchen oder Vögel, mit Geburtstag, wenn du magst. Jedes wird für sich ausgewertet.
-- Mit einem Backup nimmst du alles aufs neue Handy mit.
+- *Einkaufen*: was gut ankommt und nachgekauft werden kann, nach Futterart, mit den letzten Bewertungen als Punkte. Die Liste lässt sich verschicken.
+- *Vorlieben*: welche Marken, Konsistenzen und Geschmacksrichtungen am besten ankommen, und ob dein Tier Abwechslung mag.
+- *Verlauf*: alle Mahlzeiten, und wie viele davon in den letzten 7, 30 und 90 Tagen gut ankamen.
+- Erinnerungen ans Bewerten und ans Füttern, beide erst mal aus.
+- Mehrere Tiere, auch Hunde, Kaninchen oder Vögel, jedes für sich ausgewertet.
+- Ein Backup nimmt alles mit aufs neue Handy.
 
 <!-- Der QR-Code springt hierher (…#how-to-install). Nicht löschen. -->
 <a id="how-to-install"></a>
@@ -56,16 +50,16 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/d12e5669-bdf4-4513-805b-bd4b8d16e2eb" width="292" alt="APK herunterladen"></a>
 </p>
 
-1. Tippe auf dem Handy auf den Download-Button. Wenn der Browser fragt, ob du die Datei behalten willst, bestätige das.
-2. Ist der Download fertig, tippe auf *Öffnen*. Falls du das verpasst hast, liegt `schmeckts.apk` in deinen *Downloads*.
-3. Beim ersten Mal fragt Android, ob dein Browser Apps installieren darf. Tippe auf *Einstellungen*, schalte *Aus dieser Quelle zulassen* ein und geh zurück.
-4. Tippe auf *Installieren* und danach auf *Öffnen*.
+1. Tippe auf dem Handy auf den Button. Fragt der Browser, ob du die Datei behalten willst, bestätige das.
+2. Tippe nach dem Download auf *Öffnen*. Sonst liegt `schmeckts.apk` in deinen *Downloads*.
+3. Beim ersten Mal fragt Android, ob dein Browser Apps installieren darf: *Einstellungen*, *Aus dieser Quelle zulassen*, zurück.
+4. *Installieren*, dann *Öffnen*.
 
 <details>
 <summary><b>Play Protect will die App prüfen</b></summary>
 <br>
 
-Weil die App nicht aus dem Play Store kommt, bietet Google Play Protect an, sie zu scannen. Das kannst du zulassen, danach geht die Installation normal weiter.
+Die App kommt nicht aus dem Play Store, deshalb bietet Google an, sie zu scannen. Lass es zu, danach geht es normal weiter.
 
 </details>
 
@@ -73,7 +67,7 @@ Weil die App nicht aus dem Play Store kommt, bietet Google Play Protect an, sie 
 <summary><b>Update installieren</b></summary>
 <br>
 
-Lade die neue Version genauso herunter und installiere sie über die alte. Deine Einträge bleiben erhalten. Deinstalliere die alte Version vorher nicht, sonst sind deine Daten weg.
+Lade die neue Version herunter und installiere sie über die alte. Deine Einträge bleiben. Deinstalliere die alte Version nicht vorher, sonst sind sie weg.
 
 </details>
 
@@ -81,15 +75,15 @@ Lade die neue Version genauso herunter und installiere sie über die alte. Deine
 <summary><b>„App nicht installiert“</b></summary>
 <br>
 
-Das liegt meistens an einer alten Testversion, die noch auf dem Handy ist. Mach in der App unter *Einstellungen* ein Backup, deinstalliere die alte Version, installiere die neue und spiel das Backup wieder ein.
+Meist steckt eine alte Testversion dahinter. Mach unter *Einstellungen* ein Backup, deinstalliere die alte Version, installiere die neue und spiel das Backup wieder ein.
 
 </details>
 
 <details>
-<summary><b>Handy ohne Google-Dienste?</b></summary>
+<summary><b>Handy ohne Google-Dienste</b></summary>
 <br>
 
-Dann funktioniert alles außer dem Barcode-Scanner. Der kommt von Google und braucht die Google-Play-Dienste.
+Alles funktioniert, nur der Barcode-Scanner nicht. Der kommt von Google und braucht die Play-Dienste.
 
 </details>
 
@@ -97,35 +91,37 @@ Dann funktioniert alles außer dem Barcode-Scanner. Der kommt von Google und bra
 
 ## Wenn mehrere Leute füttern
 
-Am einfachsten tauscht ihr eure Einträge über *Änderungen teilen* aus. Die App packt alles Neue in eine Datei, die ihr euch per Messenger oder Kabel schickt und auf dem anderen Handy einlest. Dafür braucht niemand ein Konto, und in der Datei stehen nur Tiere, Sorten und Mahlzeiten.
-
-Bequemer im Alltag ist ein kleiner Server bei euch zu Hause, zum Beispiel auf einem Mini-PC. Die Handys gleichen sich dann von selbst ab, sobald sie im WLAN sind, und eure Daten liegen auf eurem eigenen Rechner. Mit Server kann die App außerdem Marke und Sorte direkt am Foto erkennen, statt nur den Text zu lesen, und unbekannte Barcodes selbst nachschlagen. Die Packungsfotos kann dann auch jedes Handy groß ansehen, nicht nur das, mit dem sie gemacht wurden. Und die Erinnerung ans Füttern meldet sich nicht, wenn schon jemand anderes gefüttert hat.
-
-Den Server müsst ihr allerdings selbst einrichten, er gehört nicht zur App. Code und Anleitung liegen im Ordner [`server`](server/).
+Mit *Änderungen teilen* schickt ihr euch neue Einträge als Datei, per Messenger oder Kabel, ohne Konto. Bequemer ist ein kleiner Server bei euch zu Hause: Die Handys gleichen sich im WLAN von selbst ab, die App erkennt Sorten direkt am Foto und schlägt unbekannte Barcodes nach. Code und Anleitung liegen im Ordner [`server`](server/).
 
 ## Fragen und Fehler
 
-Fragen und Ideen gern in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions). Schreib am besten dazu, welches Handy du hast, welche Android-Version und welche Version der App (die steht ganz unten in den Einstellungen).
-
-Wenn etwas nicht funktioniert und du weißt, wie es dazu kommt, [melde den Fehler bitte hier](https://github.com/hazymorning/Schmeckts/issues/new/choose).
+Fragen und Ideen in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions), Fehler [hier melden](https://github.com/hazymorning/Schmeckts/issues/new/choose). Schreib dazu, welches Handy du hast, welche Android-Version und welche App-Version (steht unten in den Einstellungen).
 
 ## Datenschutz
 
-Alles, was du einträgst, bleibt auf deinem Handy. Die App schickt nichts davon ins Internet, auch nicht an mich, und Werbung oder Tracking gibt es nicht. Selbst die Schrift auf den Packungen liest die App direkt auf dem Handy.
+Alles, was du einträgst, bleibt auf deinem Handy: kein Konto, keine Cloud, keine Werbung, kein Tracking. Auch die Schrift auf den Packungen liest die App selbst.
 
-Eine automatische Cloud-Sicherung gibt es auch nicht. Wenn du ein neues Handy bekommst, mach also vorher in der App ein Backup.
+<details>
+<summary><b>Was trotzdem nach draußen geht</b></summary>
+<br>
 
-Der Barcode-Scanner ist allerdings von Google. Er überträgt nach Googles Angaben Gerätedaten wie das Handymodell, aber keine Bilder. Wenn du die Barcode-Suche einschaltest, fragt die App außerdem bei unbekannten Barcodes in zwei freien Produktdatenbanken nach. Dabei geht nur die Nummer raus.
+Der Barcode-Scanner ist von Google und überträgt nach Googles Angaben Gerätedaten wie das Handymodell, keine Bilder. Schaltest du die Barcode-Suche ein, fragt die App unbekannte Nummern in zwei freien Produktdatenbanken nach, mehr als die Nummer geht dabei nicht raus. Die Kamera nutzt die App nur für Fotos, und nach Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest. Eine Cloud-Sicherung gibt es nicht: Vor einem Handywechsel machst du ein Backup.
 
-Die Kamera nutzt die App nur für Fotos. Nach der Erlaubnis für Benachrichtigungen fragt sie erst, wenn du eine Erinnerung einschaltest.
+</details>
 
 ## Lizenz
 
-Die App ist freie Software unter der [GNU Affero General Public License, Version 3](LICENSE). Copyright © 2026 hazymorning.
+Freie Software unter der [GNU Affero General Public License, Version 3](LICENSE). Copyright © 2026 hazymorning.
 
-Der Name „Schmeckt’s?“, das Logo und das App-Icon fallen nicht unter die Lizenz. Wenn du die App forkst, such dir bitte einen eigenen Namen und ein eigenes Design aus.
+<details>
+<summary><b>Name, Logo und Datenquelle</b></summary>
+<br>
 
-Enthält Informationen aus [Open Pet Food Facts](https://world.openpetfoodfacts.org), die hier unter der [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/) verfügbar gemacht werden. Das ist die Wortliste, mit der die App falsch gelesene Wörter auf Packungen berichtigt (`app/www/js/vocab.js`, mehr dazu in [NOTICE](NOTICE)).
+Der Name „Schmeckt’s?“, das Logo und das App-Icon fallen nicht unter die Lizenz. Ein Fork braucht einen eigenen Namen und ein eigenes Design.
+
+Enthält Informationen aus [Open Pet Food Facts](https://world.openpetfoodfacts.org), die hier unter der [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/) verfügbar gemacht werden: die Wortliste, mit der die App falsch gelesene Wörter berichtigt (`app/www/js/vocab.js`, mehr in [NOTICE](NOTICE)).
+
+</details>
 
 <!-- Wenn das Repo öffentlich ist, können diese Badges oben mit rein. Sie aktualisieren sich von selbst:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=58603F&labelColor=25261F" alt="Neueste Version"></a>
