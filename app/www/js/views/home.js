@@ -1,8 +1,8 @@
 /* Home page: pet bar and cards in a fixed order, the welcome page when there are no pets. Everything evaluated comes
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
-import {settled} from '../motion.js';
-import {cap, cutName, esc} from '../text.js';
+import {settled, slideHeight} from '../motion.js';
+import {cap, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {RATINGS} from '../config.js';
@@ -42,7 +42,7 @@ export function update() {
   const run = () => {
     if (done) return;
     done = true;
-    renderHome(true);
+    renderHome();
   };
   if (!document.startViewTransition || reduceMotion.matches || dlg.open || viewerOpen()) return run();
   try {
@@ -67,8 +67,9 @@ export function scrollTop() {
 }
 
 // fresh: id of the meal just served, which slides in on the next draw
+// open: the overview unfolded, which lasts until the app restarts
 // held: meals rated in „Wie war’s?“ that stay there a moment longer (logic/editing.js), each with the pets rated there
-export const homeView = {fresh: null, held: new Map()};
+export const homeView = {fresh: null, open: {}, held: new Map()};
 
 /* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
    settings. */
@@ -118,35 +119,25 @@ export function renderSyncChip() {
   el.setAttribute('aria-label', `${c.label}, Haushalt in den Einstellungen öffnen`);
 }
 
-/* now: fit the overview's sentences right away rather than in the next frame's own pass, inside a view transition's
-   change, where no frame comes until the change is captured */
-export function renderHome(now = false) {
+export function renderHome() {
   renderPets();
   renderFab();
   renderSyncChip();
   renderMood();
   $('#home').innerHTML = homeHTML();
   homeView.fresh = null;
-  // Before the first frame either way, so nothing moves; in the frame's pass it costs no second layout
-  if (now) fitOverview();
-  else requestAnimationFrame(fitOverview);
 }
-/* The overview's text is as tall as its sentences, up to OVERVIEW_LINES lines: while it overflows and more than one
-   sentence is there, the last one goes, so the first always stays. Where the first alone overflows, the variety's
-   name in it is cut to OVERVIEW_NAME characters, after a whole word and with „…“ (cutName() in text.js), and the
-   sentences are measured once more. The clamp in app.css is only the safety net. */
-const OVERVIEW_LINES = 4;
-const OVERVIEW_NAME = 24;
-export function fitOverview() {
-  const p = $('#home .overview p');
+/* The overview's whole text and back, with a tap on the card: without a redraw, only the class changes, and the
+   height eases as the other cards' folds do */
+export function toggleOverview() {
+  const sec = $('#home .overview'),
+    p = sec && $('p', sec);
   if (!p) return;
-  const over = () => Math.round(p.scrollHeight / parseFloat(getComputedStyle(p).lineHeight)) > OVERVIEW_LINES;
-  while (over() && p.children.length > 1) p.lastElementChild.remove();
-  const name = over() && p.querySelector('.ov-sort');
-  if (name && name.textContent.length > OVERVIEW_NAME) {
-    name.textContent = cutName(name.textContent, OVERVIEW_NAME - 1) + '…';
-    fitOverview();
-  }
+  const open = (homeView.open.overview = !homeView.open.overview),
+    h0 = p.offsetHeight;
+  sec.classList.toggle('open', open);
+  sec.setAttribute('aria-expanded', String(open));
+  slideHeight(p, h0);
 }
 function homeHTML() {
   const banner = loadError
@@ -158,7 +149,7 @@ function homeHTML() {
   const open = new Set(pendingServings()),
     pend = db.servings.filter(s => open.has(s) || (homeView.held.has(s.id) && rateRows(s).length)),
     m = db.servings.length ? model() : null;
-  let html = banner + (m ? overviewHTML(m) : '');
+  let html = banner + (m ? overviewHTML(m, homeView.open.overview) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
   else

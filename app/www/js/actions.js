@@ -14,7 +14,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {update} from './views/home.js';
+import {toggleOverview, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -140,6 +140,10 @@ const ACTIONS = {
   'open-pet'(el) {
     openPet(el.dataset.id);
   }, // from the overview
+  'toggle-overview'() {
+    haptic('select');
+    toggleOverview();
+  }, // the overview's whole text and back
   'open-settings'() {
     openSheet({kind: 'settings'});
   },

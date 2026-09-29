@@ -1677,7 +1677,7 @@ CARD = """() => Promise.all([import('./js/store.js'), import('./js/views/overvie
     tap: [c.tagName, c.dataset.action ?? null, c.getAttribute('aria-expanded'), !!c.closest('button')], wide: document.documentElement.scrollWidth > innerWidth}; })"""
 # One pet, a household (the code only in memory) with usual times and a variety with a long name, served today as
 # given ([hour, minute, variety]) by Ben, at the system font scale given. Returns the sentences shown against every
-# sentence there is, whether all of them would fit in four lines, and the variety\u2019s name in the first one.
+# sentence there is, the lines the text takes folded and unfolded, and whether the long name is in play.
 LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), o = await import('./js/views/overview.js'), g = await import('./js/glance.js'), h = await import('./js/views/home.js');
   const at = (days, hh, mm) => { const t = new Date(now); t.setDate(t.getDate() - days); t.setHours(hh, mm, 0, 0); return t.getTime(); };
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
@@ -1690,16 +1690,25 @@ LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const
   s.replaceDb(d); s.save();
   if (!document.getElementById('bigtext')) { const st = document.createElement('style'); st.id = 'bigtext'; document.head.append(st); }
   document.getElementById('bigtext').textContent = scale === 1 ? '' : `.overview p{font-size:${(14 * scale).toFixed(2)}px !important}`;
-  s.prefs.code = 'K7PM-3QXD'; h.renderHome(true);
+  s.prefs.code = 'K7PM-3QXD'; h.renderHome();
   const p = document.querySelector('.overview p'), lh = parseFloat(getComputedStyle(p).lineHeight);
-  const full = o.overviewText(g.glance(d, ['minka00001'], now, new Set()), d.pets, now), q = p.cloneNode(); q.innerHTML = full; q.style.webkitLineClamp = 'unset'; p.after(q);
-  const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), fits: Math.round(q.scrollHeight / lh) <= 4,
-    lines: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, sort: p.querySelector('.ov-sort').innerText, long: today.at(-1)[2] === 'lang'};
-  q.remove(); s.prefs.code = ''; return out; })"""
-# The facts that may come today for a species, as texts, and a kind of line worded as on the day `days` from today
-# with its places filled: what the overview must say, given the values
-FACTS = """species => import('./js/views/facts.js').then(f => f.factsOn(species, new Date()).map(x => x.text))"""
+  const full = o.overviewText(g.glance(d, ['minka00001'], now, new Set()), d.pets, now), q = document.createElement('p'); q.innerHTML = full;
+  const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText),
+    lines: Math.round(p.clientHeight / lh), full: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, long: today.at(-1)[2] === 'lang'};
+  s.prefs.code = ''; return out; })"""
+# The facts that may come on the day `days` from today for a species, as texts, and a kind of line worded as on that
+# day with its places filled: what the overview must say, given the values
+FACTS = """([species, days]) => import('./js/views/facts.js').then(f => f.factsOn(species, new Date(Date.now() + (days || 0) * 864e5)).map(x => x.text))"""
 LINE = """([kind, values, days]) => Promise.all([import('./js/views/facts.js'), import('./js/glance.js')]).then(([f, g]) => f.fill(g.pick(f.LINES[kind], Date.now() + (days || 0) * 864e5), values))"""
+
+
+async def told_facts(pg, species, days=0):
+    """The facts that may come on the day `days` from today for a species, each with the lead-in of that day: what
+    the overview's last sentence may be"""
+    lead = await pg.evaluate(LINE, ['factLead', {'fact': '#'}, days])
+    return [lead.replace('#', f) for f in await pg.evaluate(FACTS, [species, days])]
+
+
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['lachs', 'Lachs', 'Nassfutter'], ['rind', 'Rind', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '00001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
@@ -1709,38 +1718,55 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print('overview: a card with picture, name and a few sentences about the day, as tall as its text, never a rating; counting in the history')
+    print(
+        'overview: a card with picture, name and a text about the day in three lines, unfolding with a tap, never a rating; counting in the history'
+    )
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
+
+    async def line(kind, values, days=0):
+        return await pg.evaluate(LINE, [kind, values, days])
+
     c = await pg.evaluate(CARD)
-    status = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse.'
-    cats = await pg.evaluate(FACTS, 'Katze')
+    status = await line('today', {'so': 'schon', 'both': 'eine Mahlzeit und einen Snack', 'at': '11:00', 'what': 'Käse', 'by': ''})
+    cats = await told_facts(pg, 'Katze')
     check(
-        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['cut'], c['clamp'], c['tap'], c['wide'], c['tight']]
+        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['clamp'], c['lines'], c['cut'], c['tap'], c['wide'], c['tight']]
         == [
             True,
             'Minka',
             True,
             ['BUTTON', 1, 72, True],
             ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
-            False,
-            '4',
-            ['SECTION', None, None, False],
+            '3',
+            3,
+            True,
+            ['SECTION', 'toggle-overview', 'false', False],
             False,
             True,
         ]
-        and c['all'][0] == status
-        and len(c['all']) == 2
-        and c['all'][1] in cats
-        and c['sentences'] == c['all'][: len(c['sentences'])]
-        and c['text'] == ' '.join(c['sentences'])
-        and 1 <= c['lines'] <= 4,
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; the card as tall as its text, at most four lines, and no button ({c})',
+        and c['all'] == [status, c['all'][1]] == c['sentences']
+        and c['all'][1] in cats,
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then a fact about the animal with its lead-in; three lines ending in „…“, and the card is the tap target ({c})',
     )
     await shot(pg, 'overview-360')
+    await pg.evaluate("window.__card = document.querySelector('.overview')")
+    await pg.click('.overview p')
+    await idle(pg)
+    o = await pg.evaluate(CARD)
+    await shot(pg, 'overview-open-360')
+    await pg.click('.overview h2')
+    await idle(pg)
+    back = await pg.evaluate(CARD)
+    check(
+        [o['cut'], o['tap'], o['text'], o['lines'] > 3, o['height'] > c['height'], back == c]
+        == [False, ['SECTION', 'toggle-overview', 'true', False], c['text'], True, True, True]
+        and await pg.evaluate("window.__card === document.querySelector('.overview')"),
+        f'a tap on the card shows the whole text, a second folds it away again, both without redrawing the page ({o["height"]} px, {o["lines"]} lines)',
+    )
     day = await pg.evaluate("[document.querySelector('.tl-date span').innerText, document.querySelector('.day.today').getAttribute('aria-label')]")
     check(
         day == ['1 Mahlzeit, 1 Snack', 'Heute, 1 Mahlzeit, 1 Snack'],
@@ -1752,7 +1778,7 @@ async def test_overview(browser, url):
     check(gap == 14, f'14 px from „Verlauf“ to the calendar, 8 more than before ({gap})')
     await pg.click('.ov-pic')
     await idle(pg)
-    check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet')
+    check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet, not the text')
     await pg.click('[data-action=close]')
     await idle(pg)
     # Several pets: today's meals of all of them, who had the last one, when the next one usually comes
@@ -1772,28 +1798,29 @@ async def test_overview(browser, url):
     )
     await idle(pg)
     kiwi = await pg.evaluate(CARD)
-    dogs, late = await pg.evaluate(FACTS, 'Hund'), await pg.evaluate(LINE, ['later', {'meal': 'Frühstück', 'span': '2 Stunden'}])
+    general, dogs, birds = await told_facts(pg, None), await told_facts(pg, 'Hund'), await told_facts(pg, 'Vogel')
+    fed = {'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'bekommen'}
+    both, one, late = (
+        await line('fresh', {'names': 'Minka und Tiger', 'hat': 'haben', **fed}),
+        await line('fresh', {'names': 'Tiger', 'hat': 'hat', **fed}),
+        await line('later', {'meal': 'Frühstück', 'span': '2 Stunden'}),
+    )
+    digest = await line('digest', {'meal': 'Frühstück', 'when': 'morgen gegen 10 Uhr'})
     check(
-        [house['title'], house['pic'][:2], house['all']]
-        == [
-            'Minka und Tiger',
-            ['SPAN', 2],
-            ['Minka und Tiger haben vor 5 Minuten Lachs bekommen.', 'Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr.', late],
-        ]
-        and house['sentences'] == house['all'][: len(house['sentences'])]
-        and house['bold'] == ['5 Minuten', 'Lachs', '10 Uhr'][: len(house['bold'])]
-        and not house['cut']
+        [house['title'], house['pic'][:2], house['all'][:3], len(house['all'])] == ['Minka und Tiger', ['SPAN', 2], [both, digest, late], 4]
+        and house['all'][3] in general
+        and house['sentences'] == house['all']
+        and house['bold'][:3] == ['5 Minuten', 'Lachs', '10 Uhr']
         and house['tight'],
-        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and the message of the day: that meal came two hours after the usual time ({house["text"]})',
+        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, the message of the day, that meal came two hours after the usual time, and a fact for every animal ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])]
-        == ['Tiger', ['BUTTON', 1], ['Tiger hat vor 5 Minuten Lachs bekommen.'], 2]
+        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])] == ['Tiger', ['BUTTON', 1], [one], 2]
         and tiger['all'][1] in dogs
-        and tiger['sentences'] == tiger['all'][: len(tiger['sentences'])]
-        and [kiwi['text'], kiwi['cut'], kiwi['sentences'], kiwi['tight']]
-        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.'], True],
-        f'the overview follows the filter, with a fact about the dog for the dog; without a meal one sentence ({tiger["text"]} / {kiwi["text"]})',
+        and tiger['sentences'] == tiger['all']
+        and [kiwi['all'][0], len(kiwi['all']), kiwi['tight']] == [await line('firstMeal', {'names': 'Kiwi', 'wartet': 'wartet'}), 2, True]
+        and kiwi['all'][1] in birds,
+        f'the overview follows the filter, with a fact about the dog for the dog; without a meal that it waits for the first one, and a fact about the bird ({tiger["text"]} / {kiwi["text"]})',
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
     words = await pg.evaluate("import('./js/config.js').then(c => Object.values(c.RATINGS).map(x => x.label))")
@@ -1809,12 +1836,14 @@ async def test_overview(browser, url):
       s.prefs.code = 'K7PM-3QXD'; h.renderHome(); const house = text();
       s.prefs.code = ''; h.renderHome();
       return [alone, house]; })""")
+    served = await line('freshHouse', {'server': 'Anna', 'names': 'Minka und Tiger', 'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'gegeben'})
     check(
-        'Anna' not in by[0] and by[1].startswith('Anna hat Minka und Tiger vor 5 Minuten Lachs gegeben. '),
+        'Anna' not in by[0] and by[1].startswith(served + ' '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
-    # The line more: what is only true today first, else the kinds taking turns over five days, with the memory
-    # threaded through; every message, then every kind taking turns, each from a glance holding only it
+    # The line more: what is only true today first, else the kinds taking turns over five days, and a fact every
+    # day, with the memory threaded through; every message, then every kind taking turns, each from a glance holding
+    # only it
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
       const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
       const none = {premiere: null, idea: null, feeders: [], week: {meals: 0, sorts: 0}, streak: 0, first: null, sorts: 0, anniversary: null, record: {meals: 0, streak: 0},
@@ -1828,34 +1857,33 @@ async def test_overview(browser, url):
       const first = [{premiere: 'lachs00001'}, {premiere: 'rind00001'}, {milestone: {n: 100, left: 3}}, {snacks: 4}, {anniversary: 1, first: {at: 0, days: 30, meals: 62}},
         {record: {meals: 0, streak: 23}}, {record: {meals: 4, streak: 0}, meals: 4}, {shift: {at: 435, diff: -40}}, {shift: {at: 1110, diff: 95}}, {sameMinute: true},
         {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}].map(x => one(x));
-      const bare = {...g, ...none}; // nothing but the facts left to take a turn
+      const bare = {...g, ...none}; // nothing but one kind left to take a turn
       const kinds = [{feedRun: {name: 'Ben', days: 5, other: 'Jonas'}}, {feedRun: {name: 'Ben', days: 5, other: null}}, {weekday: {at: 435, mine: 525, later: true, weekday: 6}},
-        {lookback: 'lachs00001'}, {sorts: 14}, {first: {at: 0, days: 43, meals: 100}}, {feeders: [{name: 'Anna', n: 5}, {name: 'Jonas', n: 5}]}].map(x => one(x, bare).at(-1));
+        {lookback: 'lachs00001'}, {sorts: 14}, {first: {at: 0, days: 43, meals: 100}}, {feeders: [{name: 'Anna', n: 5}, {name: 'Jonas', n: 5}]}].map(x => one(x, bare));
       s.prefs.code = code; return [days, first, kinds, memory]; })"""
     days, first, kinds, memory = await pg.evaluate(LINES)
-
-    async def line(kind, values, days=0):
-        return await pg.evaluate(LINE, [kind, values, days])
-
     turns = [
         await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}),
         await line('streak', {'since': '12 Tagen', 'days': '12 Tage', 'you': 'hättet eigentlich ihr'}, 1),
         await line('idea', {'sort': 'Rind', 'days': 12}, 2),
         await line('week', {'meals': '12 Mahlzeiten', 'sorts': '4 Sorten'}, 3),
+        await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}, 4),
+    ]
+    told = [await told_facts(pg, 'Katze', i) for i in range(5)]
+    daily = [
+        [
+            await line('today', {'so': 'schon', 'both': 'zwei Mahlzeiten und einen Snack', 'at': '9:00', 'what': 'Lachs', 'by': ' von Anna'}, i),
+            await line('usual', {'meal': 'Abendessen', 'when': 'gegen 18:30 Uhr'}, i),
+            turns[i],
+        ]
+        for i in range(5)
     ]
     check(
-        all(
-            len(d) == 3
-            and d[0].startswith('Heute gab es schon zwei Mahlzeiten und einen Snack, zuletzt um ')
-            and d[0].endswith(' Lachs von Anna.')
-            and d[1] == 'Abendessen gibt es meist gegen 18:30 Uhr.'
-            for d in days
-        )
-        and [d[2] for d in days[:4]] == turns
-        and days[4][2] in cats
+        all(len(d) == 4 and d[:3] == daily[i] and d[3] in told[i] for i, d in enumerate(days))
+        and len({d[3] for d in days}) == 5
         and [memory['day'], memory['kind'], memory['kinds'], [f['day'] for f in memory['facts']]]
-        == ['2026-06-13', 'fact', ['idea', 'week', 'fact'], ['2026-06-13']],
-        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, the streak, an idea, the week and a fact about the animal take turns, and the memory holds the last three kinds and the fact ({days}, {memory})',
+        == ['2026-06-13', 'duel', ['idea', 'week', 'duel'], [f'2026-06-{9 + i:02d}' for i in range(5)]],
+        f'four sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, one line more and a fact about the animal; over five days the duel, the streak, an idea, the week and the duel again take turns, the fact is another one every day, and the memory holds the last three kinds and every fact ({days}, {memory})',
     )
     messages = [
         await line('premiereLast', {}),
@@ -1870,20 +1898,17 @@ async def test_overview(browser, url):
         await line('sameMinute', {}),
     ]
     check(
-        [f[-1] for f in first[:10]] == messages
+        [f[-2] for f in first[:10]] == messages
+        and all(len(f) == 4 and f[-1] in told[0] for f in first)
         and 'zwei Mahlzeiten und vier Snacks' in first[3][0]
         and 'vier Mahlzeiten' in first[6][0]
-        and first[10][0].startswith('Futterzeit! Zuletzt gab es um ')
-        and any(
-            f'Minka {t}' == first[10][1]
-            for t in ('wartet bestimmt schon neben dem Napf.', 'übt schon mal den vorwurfsvollen Blick.', 'hat die Uhr bestimmt schon im Blick.')
-        )
-        and first[11][1]
-        in (
-            'Für heute ist alles serviert, Frühstück gibt es morgen meist gegen 7:15 Uhr.',
-            'Feierabend für heute: Frühstück gibt es morgen meist gegen 7:15 Uhr.',
-        ),
-        f'what is only true today comes first: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
+        and first[10][:2]
+        == [
+            await line('due', {'when': 'um 9:00', 'what': 'Lachs', 'by': ' von Anna'}),
+            await line('waiting', {'names': 'Minka', 'wartet': 'wartet', 'uebt': 'übt', 'hat': 'hat', 'sitzt': 'sitzt'}),
+        ]
+        and first[11][1] == await line('doneToday', {'meal': 'Frühstück', 'when': 'gegen 7:15 Uhr'}),
+        f'what is only true today comes before the fact: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
     )
     others = [
         await line('feedRun', {'name': 'Ben', 'days': '5 Tage', 'since': '5 Tagen', 'other': 'Jonas'}),
@@ -1891,40 +1916,40 @@ async def test_overview(browser, url):
         await line('weekday', {'weekday': 'Samstags', 'day': 'Samstag', 'meal': 'Frühstück', 'shift': 'später', 'time': '8:45'}),
         await line('lookback', {'sort': 'Lachs'}),
         await line('sorts', {'n': '14 Sorten'}),
-        await line('days', {'since': '43 Tagen', 'days': '43 Tage'}),
+        await line('days', {'since': '43 Tagen', 'days': '43 Tage', 'n': 43}),
         await line('duelTie', {'score': '5 zu 5', 'first': 'Anna', 'second': 'Jonas'}),
     ]
     check(
-        kinds == others,
+        [k[-2] for k in kinds] == others and all(len(k) == 4 and k[-1] in told[0] for k in kinds),
         f'the other kinds taking turns: a person\u2019s feeding run, with or without someone to tease, a weekday\u2019s own time, a look back a year, the varieties tried, the days in the diary and a tied duel ({kinds})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
-    # A long name, a household and usual times: the first sentence stands whole with „von Ben“, and every sentence
-    # that fits in four lines is there, the last ones dropped where they do not; the first alone overflowing, the
-    # variety\u2019s name in it is cut. At the usual and at a large system font.
+    # A long name, a household and usual times, at the usual and at a large system font: nothing is dropped, the
+    # first sentence stands whole with „von Ben“ and the variety\u2019s full name, the text is clamped to three lines,
+    # and a tap unfolds all of it
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
     long = [[7, 20, 'snack'], [12, 0, 'wild'], [13, 14, 'lang']]
-    for scale, today in ((1, [[7, 20, 'wild']]), (1.3, [[7, 20, 'wild']]), (1.15, long), (1.3, long)):
+    for scale, today in ((1, [[7, 20, 'wild']]), (1.3, long)):
         fit = await pg.evaluate(LONG_DB, [scale, today])
         await idle(pg)
-        first = fit['shown'][0]
         name = 'Wildschwein mit Nachtkerzenöl' + (' und Kürbis' if fit['long'] else '')
         record = await line('recordStreak', {'days': '9 Tage'})
-        # The clamp, the safety net, may act only once the first sentence stands alone with its name cut
+        opened = await pg.evaluate(
+            "import('./js/views/home.js').then(h => { h.toggleOverview(); const p = document.querySelector('.overview p'); return [p.scrollHeight > p.clientHeight + 1, getComputedStyle(p).display]; })"
+        )
+        await pg.evaluate("import('./js/views/home.js').then(h => h.toggleOverview())")
         check(
-            first.endswith('von Ben.')
-            and (not fit['cut'] or (len(fit['shown']) == 1 and fit['long']))
-            and (fit['lines'] <= 4 or fit['cut'])
-            and first.replace(fit['sort'], '#') == fit['all'][0].replace(name, '#')
-            and fit['shown'][1:] == fit['all'][1 : len(fit['shown'])]
-            and (len(fit['shown']) == len(fit['all']) if fit['fits'] else len(fit['shown']) < len(fit['all']))
-            and (fit['sort'].endswith('…') and len(fit['sort']) <= 24 if fit['long'] else fit['sort'] == 'Wildschwein mit Nachtkerzenöl')
-            and fit['all'][2] == record,
-            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ in a whole first sentence, {len(fit["shown"])} of {len(fit["all"])} sentences on {fit["lines"]} lines, the name {fit["sort"]!r}, the record streak of nine days as the message ({fit})',
+            fit['shown'] == fit['all']
+            and len(fit['all']) == 4
+            and fit['all'][0].endswith('von Ben.')
+            and name in fit['all'][0]
+            and fit['all'][2] == record
+            and [fit['cut'], fit['lines'], fit['full'] > 3, opened] == [True, 3, True, [False, 'block']],
+            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ and the full name in a whole first sentence, the record streak of nine days as the message, {fit["full"]} lines clamped to three and all of them after a tap ({fit})',
         )
         await shot(pg, f'overview-long-{int(scale * 100)}-{len(today)}')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -2018,16 +2043,21 @@ async def test_birthday(browser, url):
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
-    said = [(await pg.evaluate(BIRTHDAY_LINES, d))[-1] for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
+    lines = [await pg.evaluate(BIRTHDAY_LINES, d) for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
+    said = [x[-2] for x in lines[:4]] + [x[-1] for x in lines[4:]]
     want = [
         await pg.evaluate(LINE, ['birthdayAge', {'pet': 'Minka', 'age': 4}]),
         await pg.evaluate(LINE, ['birthdayToday', {'pet': 'Minka'}]),
         await pg.evaluate(LINE, ['birthdayTomorrow', {'pet': 'Minka'}]),
         await pg.evaluate(LINE, ['birthdaySoon', {'pet': 'Minka', 'days': '3 Tagen'}]),
     ]
-    cats = await pg.evaluate(FACTS, 'Katze')
+    cats = await told_facts(pg, 'Katze')
     check(
-        said[:4] == want and said[4] in cats and said[5] in cats,
+        said[:4] == want
+        and said[4] in cats
+        and said[5] in cats
+        and [len(x) for x in lines] == [3, 3, 3, 3, 2, 2]
+        and all(x[-1] in cats for x in lines),
         f'the overview: the birthday with the age, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))

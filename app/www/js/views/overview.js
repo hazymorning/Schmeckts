@@ -1,11 +1,13 @@
 /* The overview card at the top of the home page: the pet in the filter, the household under „Alle“, with picture,
-   name and a few sentences about the day from glance.js. First when the last meal was, what it was and in a household
-   who served it, then whether it is time for the next one or when that usually is, and one line more: what is only
-   true today (a birthday, a first time, a milestone close by, an anniversary, a record, a meal off its usual time,
-   the treats, a fact bound to the day) or, without any, one of the kinds taking turns by the day (the feeding duel,
-   a streak, an idea for a change, a person's feeding run, a weekday's own time, the week so far, a look back, the
-   varieties tried, the days in the diary, something about the animal), the wordings in views/facts.js and the
-   memory of what was shown in prefs.overview. Never how a meal went: that is what the cards below it are for. */
+   name and a short text about the day from glance.js, as people talk and with a wink. First when the last meal was,
+   what it was and in a household who served it, then whether it is time for the next one or when that usually is,
+   then one line more: what is only true today (a birthday, a first time, a milestone close by, an anniversary, a
+   record, a meal off its usual time, the treats, a fact bound to the day) or, without any, one of the kinds taking
+   turns by the day (the feeding duel, a streak, an idea for a change, a person's feeding run, a weekday's own time,
+   the week so far, a look back, the varieties tried, the days in the diary), and last a fact of the day about the
+   animal with a lead-in. The wordings are in views/facts.js, each kind with several ways of saying it, one of them
+   picked by the day; the memory of what was shown is in prefs.overview. The card shows three lines and unfolds with
+   a tap (toggleOverview() in views/home.js). Never how a meal went: that is what the cards below it are for. */
 import {esc} from '../text.js';
 import {addDays, dayStart, timeStr} from '../dates.js';
 import {typeOf} from '../config.js';
@@ -66,9 +68,9 @@ function spanOf(min) {
     hours = Math.floor(halves / 2);
   return halves % 2 && HALF[hours] ? `${HALF[hours]} Stunden` : `${Math.round(min / 60)} Stunden`;
 }
-/* The meal a usual time is, where people have a name for it */
+/* The meal a usual time is, where people have a name for it, otherwise „Futter“ */
 const mealAt = min =>
-  min < 630 ? 'Frühstück' : min < 870 ? 'Mittagessen' : min >= 1020 && min < 1290 ? 'Abendessen' : null;
+  min < 630 ? 'Frühstück' : min < 870 ? 'Mittagessen' : min >= 1020 && min < 1290 ? 'Abendessen' : 'Futter';
 const sortName = id => esc(pname(getProduct(id)));
 /* One of the ways of saying a kind of line, the same all day, with its places filled */
 const say = (kind, now, values = {}) => fill(pick(LINES[kind], now), values);
@@ -84,23 +86,30 @@ function statusLine(g, pets, now) {
   const last = g.last,
     p = getProduct(last.productId),
     treat = p && typeOf(p) === 'Snack',
-    what = p ? `<b class="ov-sort">${esc(pname(p))}</b>` : 'unbenanntes Futter', // the class: fitOverview() in views/home.js may cut it
+    what = p ? b(esc(pname(p))) : 'unbenanntes Futter',
     server = isConnected() && last.by ? b(esc(last.by)) : '',
     by = server ? ` von ${server}` : '',
     fed = subject(pets.length > 1 ? servingPets(last) : pets.map(x => x.id)),
-    today = last.servedAt >= dayStart(now);
-  if (g.next?.due)
-    return [
-      `Futterzeit! Zuletzt gab es ${today ? 'um ' + at(last.servedAt) : since(last.servedAt, now, b)} ${what}${by}.`,
-    ];
+    today = last.servedAt >= dayStart(now),
+    time = at(last.servedAt);
+  if (g.next?.due) return [say('due', now, {when: today ? 'um ' + time : since(last.servedAt, now, b), what, by})];
   if (fresh(g, now)) {
     const minutes = Math.round((now - last.servedAt) / 6e4),
       when = minutes < 2 ? 'gerade eben' : `vor ${b(minutes + ' Minuten')}`;
-    if (server) return [`${server} hat ${fed.names} ${when} ${what} ${treat ? 'zugesteckt' : 'gegeben'}.`];
-    return [`${fed.names} ${fed.verb('hat', 'haben')} ${when} ${what} ${treat ? 'genascht' : 'bekommen'}.`];
+    if (server)
+      return [say('freshHouse', now, {server, names: fed.names, when, what, verb: treat ? 'zugesteckt' : 'gegeben'})];
+    return [
+      say('fresh', now, {
+        names: fed.names,
+        hat: fed.verb('hat', 'haben'),
+        when,
+        what,
+        verb: treat ? 'genascht' : 'bekommen',
+      }),
+    ];
   }
   if (today) {
-    if (g.meals + g.snacks === 1) return [`Heute gab es um ${at(last.servedAt)} ${what}${by}.`];
+    if (g.meals + g.snacks === 1) return [say('todayOne', now, {at: time, what, by})];
     const both = [
       g.meals && count(g.meals, 'Mahlzeit', 'Mahlzeiten', 'eine'),
       g.snacks && count(g.snacks, 'Snack', 'Snacks', 'einen'),
@@ -108,18 +117,15 @@ function statusLine(g, pets, now) {
       .filter(Boolean)
       .map(b)
       .join(' und ');
-    return [
-      `Heute gab es ${g.meals ? 'schon' : 'bisher nur'} ${both}, zuletzt um ${at(last.servedAt)} ${what}${by}.`,
-      true,
-    ];
+    return [say('today', now, {so: g.meals ? 'schon' : 'bisher nur', both, at: time, what, by}), true];
   }
   if (last.servedAt >= addDays(dayStart(now), -1)) {
-    if (new Date(now).getHours() >= NIGHT)
-      return [`Heute gab es noch nichts, zuletzt gestern um ${at(last.servedAt)} ${what}${by}.`];
-    const evening = new Date(last.servedAt).getHours() >= 17 ? 'Abend ' : '';
-    return [`Zuletzt gab es gestern ${evening}um ${at(last.servedAt)} ${what}${by}.`];
+    if (new Date(now).getHours() >= NIGHT) return [say('nothingYet', now, {at: time, what, by})];
+    return [
+      say('lastNight', now, {evening: new Date(last.servedAt).getHours() >= 17 ? 'Abend ' : '', at: time, what, by}),
+    ];
   }
-  return [`Das letzte Futter gab es ${b(since(last.servedAt, now))}: ${what}${by}.`];
+  return [say('older', now, {since: b(since(last.servedAt, now)), what, by})];
 }
 
 /* The second sentence: whether it is time for the next meal, or when that usually is */
@@ -128,45 +134,27 @@ function outlookLine(g, pets, now) {
   if (!next) return '';
   if (next.due) {
     const all = subject(pets.map(x => x.id));
-    return pick(
-      [
-        `${all.names} ${all.verb('wartet', 'warten')} bestimmt schon neben dem Napf.`,
-        `${all.names} ${all.verb('übt', 'üben')} schon mal den vorwurfsvollen Blick.`,
-        `${all.names} ${all.verb('hat', 'haben')} die Uhr bestimmt schon im Blick.`,
-      ],
-      now,
-    );
+    return say('waiting', now, {
+      names: all.names,
+      wartet: all.verb('wartet', 'warten'),
+      uebt: all.verb('übt', 'üben'),
+      hat: all.verb('hat', 'haben'),
+      sitzt: all.verb('sitzt', 'sitzen'),
+    });
   }
   const meal = mealAt(next.at),
     when = `gegen ${b(clock(next.at))}`;
-  if (fresh(g, now)) {
-    const then = `${meal || 'Futter'} gibt es ${next.tomorrow ? 'morgen ' : ''}${when}`;
-    return pick([`Jetzt ist erst mal Verdauungsschlaf dran, ${then}.`, `Jetzt wird erst mal verdaut, ${then}.`], now);
-  }
-  if (next.tomorrow)
-    return pick(
-      [
-        `Für heute ist alles serviert, ${meal || 'Futter'} gibt es morgen meist ${when}.`,
-        `Feierabend für heute: ${meal || 'Futter'} gibt es morgen meist ${when}.`,
-      ],
-      now,
-    );
-  if (new Date(now).getHours() < NIGHT)
-    return pick(
-      [
-        `Bis zum ${meal || 'nächsten Futter'} ${when} ist noch Schlafenszeit.`,
-        `Bis zum ${meal || 'nächsten Futter'} ${when} heißt es: weiterschlafen.`,
-      ],
-      now,
-    );
-  return `${meal || 'Futter'} gibt es meist ${when}.`;
+  if (fresh(g, now)) return say('digest', now, {meal, when: (next.tomorrow ? 'morgen ' : '') + when});
+  if (next.tomorrow) return say('doneToday', now, {meal, when});
+  if (new Date(now).getHours() < NIGHT) return say('night', now, {meal, when});
+  return say('usual', now, {meal, when});
 }
 
 /* The line more, first of all what is only true today, the first that holds: a birthday today or within
-   BIRTHDAY_SOON days, a variety served for the first time, a milestone close by, an anniversary of the first meal, a record, a meal off its usual time or at yesterday's minute,
-   a lot of treats, a fact bound to the day. counted: the first sentence has already said how many treats there were.
-   '' without any. */
-function message(g, pets, now, counted, species) {
+   BIRTHDAY_SOON days, a variety served for the first time, a milestone close by, an anniversary of the first meal, a
+   record, a meal off its usual time or at yesterday's minute, a lot of treats. counted: the first sentence has
+   already said how many treats there were. '' without any. */
+function message(g, pets, now, counted) {
   if (g.birthday && (g.birthday.today || g.birthday.days <= BIRTHDAY_SOON)) {
     const {today, days, age} = g.birthday,
       pet = esc(getPet(g.birthday.pet).name);
@@ -187,7 +175,7 @@ function message(g, pets, now, counted, species) {
   if (g.record.meals) return say('recordDay', now, {n: b(g.record.meals + ' Mahlzeiten')});
   if (g.shift)
     return say(g.shift.diff < 0 ? 'earlier' : 'later', now, {
-      meal: mealAt(g.shift.at) || 'Futter',
+      meal: mealAt(g.shift.at),
       span: b(spanOf(Math.abs(g.shift.diff))),
     });
   if (g.sameMinute) return say('sameMinute', now);
@@ -196,107 +184,116 @@ function message(g, pets, now, counted, species) {
       grip = `${all.names} ${all.verb('hat', 'haben')} ${isConnected() ? 'euch' : 'dich'} ganz schön im Griff.`;
     return say(counted ? 'snacksCounted' : 'snacks', now, {n: b(g.snacks + ' Snacks'), grip});
   }
-  return factsOn(species, new Date(now), true)[0]?.text || '';
+  return '';
 }
 
+/* The kinds taking turns, each worded from what glance() found */
+const TURN_LINES = {
+  duel(g, now) {
+    const [first, second] = g.feeders,
+      names = {first: esc(first.name), second: esc(second.name)};
+    return first.n > second.n
+      ? say('duel', now, {...names, first: b(names.first), n: first.n, m: second.n})
+      : say('duelTie', now, {...names, score: b(`${first.n} zu ${second.n}`)});
+  },
+  streak: (g, now, house) =>
+    say('streak', now, {
+      since: b(g.streak + ' Tagen'),
+      days: b(g.streak + ' Tage'),
+      you: house ? 'hättet eigentlich ihr' : 'hättest eigentlich du',
+    }),
+  idea: (g, now) => say('idea', now, {sort: b(sortName(g.idea.id)), days: g.idea.days}),
+  run(g, now) {
+    const {name, days, other} = g.feedRun;
+    return say(other ? 'feedRun' : 'feedRunAlone', now, {
+      name: b(esc(name)),
+      days: b(days + ' Tage'),
+      since: b(days + ' Tagen'),
+      other: esc(other),
+    });
+  },
+  weekday(g, now) {
+    const {weekday, mine, later} = g.weekday;
+    return say('weekday', now, {
+      weekday: WEEKDAYS[weekday] + 's',
+      day: WEEKDAYS[weekday],
+      meal: mealAt(g.weekday.at),
+      shift: later ? 'später' : 'früher',
+      time: b(clockOf(mine)),
+    });
+  },
+  week: (g, now) => say('week', now, {meals: b(g.week.meals + ' Mahlzeiten'), sorts: b(g.week.sorts + ' Sorten')}),
+  lookback: (g, now) => say('lookback', now, {sort: b(sortName(g.lookback))}),
+  sorts: (g, now) => say('sorts', now, {n: b(g.sorts + ' Sorten')}),
+  days: (g, now) =>
+    say('days', now, {since: b(g.first.days + ' Tagen'), days: b(g.first.days + ' Tage'), n: b(g.first.days)}),
+};
 /* The kinds taking turns that hold today, in the order of TURNS in glance.js, and the facts that may come; takeTurn()
-   there picks by the memory. {text, memory} */
-function turn(g, pets, now, species, memory) {
+   there picks by the memory. withKind: no message holds, so a kind may take its turn. facts: the facts of the day,
+   none on a day that has a fact of its own. {kind: its line or '', fact: the fact of the day with its lead-in or '',
+   memory} */
+function turn(g, pets, now, memory, withKind, facts) {
   const house = isConnected(),
-    facts = factsOn(species, new Date(now)),
-    kinds = [
-      house && g.feeders.length > 1 && 'duel',
-      g.streak >= STREAK && 'streak',
-      g.idea && 'idea',
-      house && g.feedRun && 'run',
-      g.weekday && 'weekday',
-      g.week.meals >= WEEK.meals && g.week.sorts >= WEEK.sorts && 'week',
-      g.lookback && 'lookback',
-      g.sorts >= SORTS && 'sorts',
-      g.first?.days >= DAYS && 'days',
-      facts.length && 'fact',
-    ].filter(Boolean);
+    kinds = withKind
+      ? [
+          house && g.feeders.length > 1 && 'duel',
+          g.streak >= STREAK && 'streak',
+          g.idea && 'idea',
+          house && g.feedRun && 'run',
+          g.weekday && 'weekday',
+          g.week.meals >= WEEK.meals && g.week.sorts >= WEEK.sorts && 'week',
+          g.lookback && 'lookback',
+          g.sorts >= SORTS && 'sorts',
+          g.first?.days >= DAYS && 'days',
+        ].filter(Boolean)
+      : [];
   const took = takeTurn(
     kinds,
     facts.map(f => f.id),
     memory,
     now,
   );
-  return {text: took.kind ? turnLine(took, g, now, facts, house) : '', memory: took.memory};
+  return {
+    kind: took.kind ? TURN_LINES[took.kind](g, now, house) : '',
+    fact: took.fact ? say('factLead', now, {fact: facts.find(f => f.id === took.fact).text}) : '',
+    memory: took.memory,
+  };
 }
-function turnLine({kind, fact}, g, now, facts, house) {
-  switch (kind) {
-    case 'duel': {
-      const [first, second] = g.feeders,
-        names = {first: esc(first.name), second: esc(second.name)};
-      return first.n > second.n
-        ? say('duel', now, {...names, first: b(names.first), n: first.n, m: second.n})
-        : say('duelTie', now, {...names, score: b(`${first.n} zu ${second.n}`)});
-    }
-    case 'streak':
-      return say('streak', now, {
-        since: b(g.streak + ' Tagen'),
-        days: b(g.streak + ' Tage'),
-        you: house ? 'hättet eigentlich ihr' : 'hättest eigentlich du',
-      });
-    case 'idea':
-      return say('idea', now, {sort: b(sortName(g.idea.id)), days: g.idea.days});
-    case 'run': {
-      const {name, days, other} = g.feedRun;
-      return say(other ? 'feedRun' : 'feedRunAlone', now, {
-        name: b(esc(name)),
-        days: b(days + ' Tage'),
-        since: b(days + ' Tagen'),
-        other: esc(other),
-      });
-    }
-    case 'weekday': {
-      const {weekday, mine, later} = g.weekday;
-      return say('weekday', now, {
-        weekday: WEEKDAYS[weekday] + 's',
-        day: WEEKDAYS[weekday],
-        meal: mealAt(g.weekday.at) || 'Futter',
-        shift: later ? 'später' : 'früher',
-        time: b(clockOf(mine)),
-      });
-    }
-    case 'week':
-      return say('week', now, {meals: b(g.week.meals + ' Mahlzeiten'), sorts: b(g.week.sorts + ' Sorten')});
-    case 'lookback':
-      return say('lookback', now, {sort: b(sortName(g.lookback))});
-    case 'sorts':
-      return say('sorts', now, {n: b(g.sorts + ' Sorten')});
-    case 'days':
-      return say('days', now, {since: b(g.first.days + ' Tagen'), days: b(g.first.days + ' Tage')});
-    default:
-      return facts.find(f => f.id === fact).text;
-  }
-}
-/* The sentences, each in a span of its own, so that fitOverview() in views/home.js can drop the last ones where the
-   card's lines run out. memory: this phone's prefs.overview; the one given back is the one to keep. {text, memory} */
+/* The sentences, each in a span of its own (layout only), and the memory to keep, this phone's prefs.overview.
+   {text, memory} */
 const line = text => `<span class="ov-line">${text}</span>`;
 export function overviewLines(g, pets, now, memory) {
-  if (!g.last) {
-    const all = subject(pets.map(x => x.id));
-    return {
-      text: line(`${all.names} ${all.verb('wartet', 'warten')} noch auf die erste Mahlzeit im Tagebuch.`),
-      memory,
-    };
-  }
   const kinds = new Set(pets.map(p => p.species)),
     species = kinds.size === 1 ? [...kinds][0] : null,
-    [status, counted] = statusLine(g, pets, now);
-  let more = message(g, pets, now, counted, species),
-    kept = memory;
-  if (!more) ({text: more, memory: kept} = turn(g, pets, now, species, memory));
-  return {text: [status, outlookLine(g, pets, now), more].filter(Boolean).map(line).join(' '), memory: kept};
+    date = new Date(now),
+    dated = factsOn(species, date, true)[0]?.text || '',
+    facts = dated ? [] : factsOn(species, date);
+  if (!g.last) {
+    const all = subject(pets.map(x => x.id)),
+      took = turn(g, pets, now, memory, false, facts);
+    return {
+      text: [say('firstMeal', now, {names: all.names, wartet: all.verb('wartet', 'warten')}), dated, took.fact]
+        .filter(Boolean)
+        .map(line)
+        .join(' '),
+      memory: took.memory,
+    };
+  }
+  const [status, counted] = statusLine(g, pets, now),
+    more = message(g, pets, now, counted) || dated,
+    took = turn(g, pets, now, memory, !more, facts);
+  return {
+    text: [status, outlookLine(g, pets, now), more || took.kind, took.fact].filter(Boolean).map(line).join(' '),
+    memory: took.memory,
+  };
 }
 export const overviewText = (g, pets, now = Date.now(), memory = prefs.overview) =>
   overviewLines(g, pets, now, memory).text;
 
-/* The card, as tall as its text: a tap on the picture opens the pet, the rest is no button. What the line more chose
-   goes into the memory, so it stays the same all day. */
-export function overviewHTML(m) {
+/* The card: a tap on the picture opens the pet, a tap anywhere else unfolds the text and folds it again (open: the
+   state kept in views/home.js). What the line more and the fact of the day chose goes into the memory, so it stays
+   the same all day. */
+export function overviewHTML(m, open) {
   const pets = m.pet ? [getPet(m.pet)] : db.pets,
     one = pets.length === 1 ? pets[0] : null,
     now = Date.now();
@@ -318,5 +315,5 @@ export function overviewHTML(m) {
         .slice(0, 2)
         .map(p => avatar(p, 'l pair'))
         .join('')}</span>`;
-  return `<section class="card overview" data-sec="overview" style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></section>`;
+  return `<section class="card overview${open ? ' open' : ''}" data-sec="overview" data-action="toggle-overview" aria-expanded="${!!open}" style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></section>`;
 }

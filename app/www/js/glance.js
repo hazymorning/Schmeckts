@@ -18,7 +18,7 @@ const LOOKBACK = 365; // days back: „Heute vor einem Jahr“
 const BIRTHDAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/; // pets[].birthday, anything else is left alone
 /* The kinds of the line taking turns, in their rank (views/overview.js words each), and the memory: the kinds of
    the last three days and the facts of the last sixty are not repeated */
-export const TURNS = ['duel', 'streak', 'idea', 'run', 'weekday', 'week', 'lookback', 'sorts', 'days', 'fact'];
+export const TURNS = ['duel', 'streak', 'idea', 'run', 'weekday', 'week', 'lookback', 'sorts', 'days'];
 export const MEMORY = {kinds: 3, facts: 60};
 
 /* One of several ways to say a thing, the same all day */
@@ -243,36 +243,32 @@ export function glance(db, pets, now, avoid = new Set()) {
   return out;
 }
 
-/* Which of the lines taking turns comes today (views/overview.js words it). kinds: the kinds that apply today, in
-   the order of TURNS; facts: the ids of the facts that may come; memory: this phone's (prefs.overview). The same
-   choice all day long; otherwise the turn goes on from the kind of the day before, skipping a kind of the last
-   MEMORY.kinds days and a fact of the last MEMORY.facts days; with nothing left the block on the kinds falls first,
-   then the one on the facts. {kind, fact, memory}, the memory to keep. */
+/* Which of the lines taking turns comes today, and which fact of the day (views/overview.js words them). kinds: the
+   kinds that apply today, in the order of TURNS; facts: the ids of the facts that may come; memory: this phone's
+   (prefs.overview). The same choice all day long while it still applies; otherwise the turn goes on from the kind
+   last chosen, skipping the kinds of the last MEMORY.kinds days, and with nothing left that block falls. The fact is
+   one not shown in the last MEMORY.facts days, and with none left any of them. {kind, fact, memory}: the memory to
+   keep, the one given while nothing changed. */
 export function takeTurn(kinds, facts, memory, now) {
   const day = dayKey(now),
-    m = memory || {day: '', kind: null, fact: null, kinds: [], facts: []};
-  if (m.day === day && m.kind && kinds.includes(m.kind) && (m.kind !== 'fact' || facts.includes(m.fact)))
-    return {kind: m.kind, fact: m.fact, memory: m};
-  const kept = m.facts.filter(f => f.day > dayKey(addDays(now, -MEMORY.facts))),
+    m = memory || {day: '', kind: null, fact: null, kinds: [], facts: []},
+    today = m.day === day,
+    holds = (choice, list) => (choice ? list.includes(choice) : !list.length);
+  if (today && holds(m.kind, kinds) && holds(m.fact, facts)) return {kind: m.kind, fact: m.fact, memory: m};
+  // What today chose earlier goes before choosing anew, so it does not block itself
+  const before = today && m.kind ? m.kinds.slice(0, -1) : m.kinds,
+    kept = m.facts.filter(f => f.day !== day && f.day > dayKey(addDays(now, -MEMORY.facts))),
     shown = new Set(kept.map(f => f.id)),
     fresh = facts.filter(id => !shown.has(id)),
-    start = TURNS.indexOf(m.kind) + 1,
+    start = TURNS.indexOf(before.at(-1)) + 1,
     order = [...kinds].sort(
       (a, b) =>
         ((TURNS.indexOf(a) - start + TURNS.length) % TURNS.length) -
         ((TURNS.indexOf(b) - start + TURNS.length) % TURNS.length),
-    );
-  const open = (blocked, pool) => order.filter(k => !blocked.includes(k) && (k !== 'fact' || pool.length));
-  let pool = fresh,
-    list = open(m.kinds, fresh);
-  if (!list.length) list = open([], fresh);
-  if (!list.length) {
-    pool = facts;
-    list = open([], facts);
-  }
-  if (!list.length) return {kind: null, fact: null, memory: m};
-  const kind = list[0],
-    fact = kind === 'fact' ? pick(pool, now) : null;
+    ),
+    open = order.filter(k => !before.includes(k));
+  const kind = today && kinds.includes(m.kind) ? m.kind : (open[0] ?? order[0] ?? null),
+    fact = today && facts.includes(m.fact) ? m.fact : facts.length ? pick(fresh.length ? fresh : facts, now) : null;
   return {
     kind,
     fact,
@@ -280,7 +276,7 @@ export function takeTurn(kinds, facts, memory, now) {
       day,
       kind,
       fact,
-      kinds: [...m.kinds, kind].slice(-MEMORY.kinds),
+      kinds: kind ? [...before, kind].slice(-MEMORY.kinds) : before,
       facts: fact ? [...kept, {id: fact, day}] : kept,
     },
   };
