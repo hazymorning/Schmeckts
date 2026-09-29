@@ -49,9 +49,9 @@ export function nameBlock(s, p, inSheet = false) {
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
 /* The rating slider: the variety's scale as one track from the best level to the worst, a button for each with its
-   icon in its colour, and under each the level in one word with what the bowl looks like under that. Once the meal
-   holds a level, the thumb stands on it, ringed in its colour, and its column takes the colour. While a finger is on
-   the slider, the thumb lifts onto the level under it and that column lights up (ui/slider.js). A level
+   icon in its colour, and under each the level in two words, one over the other. Once the meal holds a level, the
+   thumb stands on it, ringed in its colour, and its column takes the colour. While a finger is on the slider, the
+   thumb lifts onto the level under it and that column lights up (ui/slider.js). A level
    stored from another scale (the type has changed) stands above the slider as a badge until one of its own replaces
    it. The buttons are for the keyboard and a screen reader. */
 export function rateSlider(s, pid) {
@@ -62,14 +62,14 @@ export function rateSlider(s, pid) {
   const stops = scale
       .map(
         r =>
-          `<button class="${rateCls(r)}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}. ${RATINGS[r].note}">${icon('r_' + r)}</button>`,
+          `<button class="${rateCls(r)}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}">${icon('r_' + r)}</button>`,
       )
       .join(''),
     words = scale
-      .map(
-        (r, i) =>
-          `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${RATINGS[r].short}</b><small>${RATINGS[r].note}</small></span>`,
-      )
+      .map((r, i) => {
+        const [first, second] = RATINGS[r].short.split(' ');
+        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${second}</small></span>`;
+      })
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
     <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;

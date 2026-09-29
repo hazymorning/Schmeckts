@@ -709,8 +709,9 @@ dialog.sheet.page .sheet-body {
 .slider.unset .slider-thumb {
   display: none;
 }
-/* Under each level its word and, in smaller print, what the bowl looks like, both centred in the level's column,
-   the long words broken where the column is narrow; the column of the level shown takes the level's colour */
+/* Under each level its name in two words, the first over the second in smaller print, centred in the level's
+   column and broken only where a large system font makes a word wider than it; the column of the level shown takes
+   the level's colour */
 .slider-names {
   display: grid;
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));

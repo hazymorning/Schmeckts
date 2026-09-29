@@ -12,61 +12,24 @@ export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1))
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]); // without a known type: wet food
 /* Rating levels of every scale. What is measured is acceptance: score, 0 to 100. The keys live in the data and never
-   change; the key alone determines points, wording and icon. short: the level in one word, under its icon on the
-   rating slider. note: what the bowl or the morsel looks like, under that word in the level's column, in words
-   short enough for a column of six at 360px. said: the level inside a sentence, „2 von 3 Mal nur die Soße
-   geleckt“. */
+   change; the key alone determines points, wording and icon. short: the level in two words for its column on the
+   rating slider, the first over the second, each short enough for a column of six at 360px. said: the level inside
+   a sentence, „2 von 3 Mal nur die Soße geleckt“. */
 export const RATINGS = {
-  top: {label: 'Sofort leer', short: 'Leer', note: 'Alles sofort weg', said: 'sofort leer', score: 100},
-  gut: {label: 'Später leer', short: 'Später', note: 'Nach und nach leer', said: 'später leer', score: 80},
-  mittel: {label: 'Halb gegessen', short: 'Halb', note: 'Hälfte blieb übrig', said: 'halb gegessen', score: 50},
-  eager: {
-    label: 'Erst gierig',
-    short: 'Gierig',
-    note: 'Viel, dann nichts mehr',
-    said: 'erst gierig, dann stehen gelassen',
-    score: 40,
-  },
-  sosse: {
-    label: 'Soße geleckt',
-    short: 'Soße',
-    note: 'Stücke liegen noch da',
-    said: 'nur die Soße geleckt',
-    score: 30,
-  },
-  schlecht: {
-    label: 'Kaum angerührt',
-    short: 'Voll',
-    note: 'Napf noch fast voll',
-    said: 'kaum angerührt',
-    score: 0,
-  },
-  gern: {label: 'Gern gefressen', short: 'Gern', note: 'Kräftig zugelangt', said: 'gern gefressen', score: 100},
-  normal: {label: 'Normal gefressen', short: 'Normal', note: 'Wie sonst auch', said: 'normal gefressen', score: 80},
-  wenig: {label: 'Wenig gefressen', short: 'Wenig', note: 'Nur ein paar Bröckchen', said: 'wenig gefressen', score: 35},
-  liegen: {label: 'Liegen gelassen', short: 'Voll', note: 'Kaum etwas angerührt', said: 'liegen gelassen', score: 0},
-  verputzt: {
-    label: 'Sofort verputzt',
-    short: 'Verputzt',
-    note: 'Weg in einem Happs',
-    said: 'sofort verputzt',
-    score: 100,
-  },
-  spaeter: {label: 'Später gefressen', short: 'Später', note: 'Erst beschnuppert', said: 'später gefressen', score: 70},
-  angeknabbert: {
-    label: 'Nur angeknabbert',
-    short: 'Geknabbert',
-    note: 'Ein Rest blieb liegen',
-    said: 'nur angeknabbert',
-    score: 35,
-  },
-  unberuehrt: {
-    label: 'Nicht angerührt',
-    short: 'Unberührt',
-    note: 'Nicht mal probiert',
-    said: 'nicht angerührt',
-    score: 0,
-  },
+  top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100},
+  gut: {label: 'Später leer', short: 'Später leer', said: 'später leer', score: 80},
+  mittel: {label: 'Halb gegessen', short: 'Hälfte übrig', said: 'halb gegessen', score: 50},
+  eager: {label: 'Erst gierig', short: 'Erst gierig', said: 'erst gierig, dann stehen gelassen', score: 40},
+  sosse: {label: 'Soße geleckt', short: 'Nur Soße', said: 'nur die Soße geleckt', score: 30},
+  schlecht: {label: 'Kaum angerührt', short: 'Fast voll', said: 'kaum angerührt', score: 0},
+  gern: {label: 'Gern gefressen', short: 'Gern gefressen', said: 'gern gefressen', score: 100},
+  normal: {label: 'Normal gefressen', short: 'Normal gefressen', said: 'normal gefressen', score: 80},
+  wenig: {label: 'Wenig gefressen', short: 'Wenig gefressen', said: 'wenig gefressen', score: 35},
+  liegen: {label: 'Liegen gelassen', short: 'Liegen gelassen', said: 'liegen gelassen', score: 0},
+  verputzt: {label: 'Sofort verputzt', short: 'Sofort verputzt', said: 'sofort verputzt', score: 100},
+  spaeter: {label: 'Später gefressen', short: 'Später gefressen', said: 'später gefressen', score: 70},
+  angeknabbert: {label: 'Nur angeknabbert', short: 'Nur geknabbert', said: 'nur angeknabbert', score: 35},
+  unberuehrt: {label: 'Nicht angerührt', short: 'Nicht angerührt', said: 'nicht angerührt', score: 0},
 };
 /* Observation scales: what you observe depends on the food type. The mapping is in SCALE_OF. */
 export const SCALES = {
