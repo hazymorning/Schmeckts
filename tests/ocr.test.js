@@ -7,9 +7,12 @@ import {BRANDS} from '../app/www/js/config.js';
 import {
   cleanText,
   focusOf,
+  hasLine,
   joinReadings,
   MAX_VARIETY,
+  PACK_BRANDS,
   PACK_LINES,
+  packBrands,
   packLines,
   readPack,
   SECOND_PASS,
@@ -19,20 +22,34 @@ import {norm} from '../app/www/js/text.js';
 import {VOCAB_BRANDS, VOCAB_WORDS} from '../app/www/js/vocab.js';
 
 const VARIETIES = [
-  {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
-  {brand: 'Dreamies', variety: 'Käse', type: 'Snack', animal: 'Katze'},
+  {id: 'shebalachs01', brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
+  {id: 'dreamieskaese', brand: 'Dreamies', variety: 'Käse', type: 'Snack', animal: 'Katze'},
 ];
 
-test('packaging text: our own varieties win, insensitive to case, hyphens and spaces', () => {
+test('packaging text: our own varieties win, insensitive to case, hyphens and spaces, and say which one it is', () => {
   const samples = ['SHEBA\nLACHS IN SOSSE\n85 g', 'sheba lachs-in-soße', 'Sheba\nLachsinSosse\nNEU'];
   for (const text of samples) {
     assert.deepEqual(
       readPack(text, VARIETIES),
-      {brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
+      {
+        brand: 'Sheba',
+        variety: 'Lachs in Soße',
+        type: 'Nassfutter',
+        animal: 'Katze',
+        texture: 'sosse',
+        known: 'shebalachs01',
+      },
       text,
     );
   }
-  assert.equal(readPack('Dreamies\nmit Käse', VARIETIES).variety, 'Käse');
+  assert.deepEqual(
+    [readPack('Dreamies\nmit Käse', VARIETIES).variety, readPack('Dreamies\nmit Käse', VARIETIES).known],
+    ['Käse', 'dreamieskaese'],
+  );
+  assert.ok(
+    !('known' in readPack('Sheba\nHuhn in Gelee', VARIETIES)) && !('known' in readPack('Hofmeister\nHuhn in Gelee')),
+    'no known variety without a hit on brand and variety',
+  );
 });
 
 test('packaging text: a brand from the list, nothing invented otherwise', () => {
@@ -76,6 +93,22 @@ test('packaging text: with nothing usable everything stays empty', () => {
   for (const text of ['', '   ', '12345\n4008429087455\n850 g', 'NEU\n100 % natürlich']) {
     assert.deepEqual(readPack(text, VARIETIES), {brand: '', variety: '', type: '', animal: ''}, JSON.stringify(text));
   }
+});
+
+test('the brands read, as chips: every brand in the text in its own spelling, the likeliest first, at most three; a chip is pressed on equality only', () => {
+  const brands = packBrands('SHEBA\nLachs in Soße\nFelix\nWhiskas\nAnimonda\n85 g');
+  assert.equal(brands.length, PACK_BRANDS);
+  assert.deepEqual(brands.slice(0, 2), ['Animonda', 'Whiskas'], 'the longest name first, spelled as on the list');
+  assert.ok(['Sheba', 'Felix'].includes(brands[2]));
+  assert.deepEqual(packBrands('KATZENGLÜCK\nZarte Häppchen', [{brand: 'Katzenglück', variety: 'Rind pur'}]), [
+    'Katzenglück',
+  ]);
+  assert.deepEqual(packBrands('Hofmeister\nHuhn in Gelee'), [], 'no brand known, no chip');
+  assert.deepEqual(
+    [hasLine('Lachs in  Soße', 'lachs in soße'), hasLine('Sheba Lachs', 'Lachs'), hasLine('', 'Lachs')],
+    [true, false, false],
+    'the field holds exactly the chip, not a part of it',
+  );
 });
 
 test('packaging text: the brands of our own varieties count as brands too', () => {

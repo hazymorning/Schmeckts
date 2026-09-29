@@ -3,14 +3,14 @@
    recognised variety disappears together with its code. */
 import {uid} from '../fields.js';
 import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
-import {db, dbFound, loadError, save} from '../store.js';
+import {db, dbFound, loadError, prefs, save, savePrefs} from '../store.js';
 import {setAside} from '../disk.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
-import {memPhotos} from '../images.js';
-import {keepPhoto, keptPhoto, passPhoto, photoData, photoFrom, sweepPhotos} from '../photos.js';
+import {cropSquare, memPhotos, resize} from '../images.js';
+import {keepPhoto, keptPhoto, passPhoto, photoData, photoFrom, replacePhotoFile, sweepPhotos} from '../photos.js';
 import {request} from '../api.js';
-import {serverCan} from '../sync.js';
+import {isConnected, serverCan} from '../sync.js';
 import {report} from '../report.js';
 import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
@@ -132,16 +132,54 @@ export function followPhotos() {
   owners = new Map(db.servings.map(s => [s.id, s.productId]));
 }
 
+/* „Foto ändern“ in the food sheet: the variety's large photo on this phone is written anew (1100 px), its thumbnail
+   too (200 px, synced), and in a household the new photo goes to the server through sharePhotos(), which then marks
+   the variety with the photo's stamp so the other phones fetch it anew. Alone (`lokal`) that is all. */
+export function replaceProductPhoto(pid, img) {
+  const p = getProduct(pid);
+  if (!p) return;
+  replacePhotoFile(pid, resize(img, 1100, 0.82).split(',')[1]);
+  p.thumb = cropSquare(img, 200, 0.76);
+  save();
+  if (!isConnected()) return;
+  replacing.set(pid, Date.now());
+  sharePhotos();
+}
+
 /* In a household every variety whose large photo lies on this phone and not yet on the server goes there, one after
    the other, whenever the server has just been reached. The mark on the variety then tells the other phones they can
    fetch it. A server that cannot keep photos (before 1.3.0) is left alone, and one it refused is not sent again while
-   the app runs. */
+   the app runs. A photo replaced here goes the same way, where the server replaces photos (`replace`, from 1.4.0):
+   the mark then carries the new photo's stamp, and this phone's own stamp says it holds that one; an older server
+   keeps its photo, and a toast says so. Never an old photo over a newer one: a variety whose mark is a number is
+   left alone by the first branch. */
 let sharing = false;
-const refused = new Set();
+const refused = new Set(),
+  replacing = new Map(); // variety → the stamp of the photo replaced here, until the server has it
 export async function sharePhotos() {
-  if (sharing || !(await serverCan('photo'))) return;
+  if (sharing) return;
   sharing = true;
   try {
+    for (const [id, stamp] of [...replacing]) {
+      if (!(await serverCan('replace'))) {
+        replacing.delete(id);
+        toast('Der Server behält das alte Foto, bis er aktualisiert ist.');
+        continue;
+      }
+      const image = await photoData(id),
+        p = getProduct(id);
+      if (!image || !p) {
+        replacing.delete(id);
+        continue;
+      }
+      await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
+      replacing.delete(id);
+      p.sharedPhoto = stamp;
+      prefs.photoStamps[id] = stamp;
+      save();
+      savePrefs();
+    }
+    if (!(await serverCan('photo'))) return;
     for (const {id} of db.products.filter(x => !x.sharedPhoto && keptPhoto(x.id) && !refused.has(x.id))) {
       const image = await photoData(id);
       if (!image) continue;

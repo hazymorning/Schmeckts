@@ -32,7 +32,7 @@ Zugegeben, das Ganze ist ein ziemliches Nischenproblem. Dafür steckt in der App
 
 Beim Füttern scannst du kurz den Barcode auf der Packung. Wenn die App die Sorte schon kennt, ist die Mahlzeit damit eingetragen.
 
-Ist die Sorte neu oder hat die Packung keinen Barcode, machst du stattdessen ein Foto. Die App liest, was draufsteht, und schlägt dir Marke und Sorte vor. Passt der Vorschlag nicht, suchst du dir aus dem erkannten Text die richtigen Zeilen raus.
+Ist die Sorte neu oder hat die Packung keinen Barcode, machst du stattdessen ein Foto. Die App liest, was draufsteht, und schlägt dir Marke und Sorte vor. Passt der Vorschlag nicht, suchst du dir aus dem erkannten Text die richtigen Zeilen raus. Ist das Foto nichts geworden, machst du einfach ein neues.
 
 Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, zwei Wochen weißt du ziemlich genau, was dein Tier mag.
 
@@ -42,7 +42,7 @@ Später schaust du in den Napf und tippst an, wie viel noch drin ist. Nach ein, 
 - Unter *Vorlieben* siehst du der Reihe nach, welche Marken, Konsistenzen und Geschmacksrichtungen am besten ankommen, also ob dein Tier lieber Pastete oder Soße frisst, lieber Huhn oder Fisch. Dort steht auch, ob es Abwechslung mag oder dieselbe Sorte gern zweimal hintereinander frisst. Bleibt eine Sorte immer wieder stehen oder frisst ein Tier auffällig wenig, sagt die App Bescheid.
 - Im Verlauf stehen alle Mahlzeiten, und du siehst, wie viele davon in den letzten 7, 30 und 90 Tagen gut ankamen. Unter *Details* steht, was sich in den letzten 30 Tagen geändert hat, zum Beispiel welche Sorten neu bei *Nachkaufen* sind.
 - Wenn du willst, erinnert dich die App daran, in den Napf zu schauen, oder meldet sich, wenn normalerweise Fütterzeit ist. Beides ist erst mal aus.
-- Du kannst mehrere Tiere anlegen, auch Hunde, Kaninchen oder Vögel. Jedes wird für sich ausgewertet.
+- Du kannst mehrere Tiere anlegen, auch Hunde, Kaninchen oder Vögel, mit Geburtstag, wenn du magst. Jedes wird für sich ausgewertet.
 - Mit einem Backup nimmst du alles aufs neue Handy mit.
 
 <!-- Der QR-Code springt hierher (…#how-to-install). Nicht löschen. -->

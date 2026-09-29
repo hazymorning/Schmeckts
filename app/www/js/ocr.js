@@ -5,7 +5,7 @@
    none is left out for being small or slanted.
    Order: put the misread words right, then our own varieties, then a brand (from the list, from one of our own
    varieties or from Open Pet Food Facts), then the most prominent line, with what belongs to it, as the variety. */
-import {norm} from './text.js';
+import {cutName, norm, SMALL} from './text.js';
 import {ANIMAL_WORDS, BRANDS, FLAVORS, TEXTURES, TYPE_WORDS} from './config.js';
 import {VOCAB_BRANDS, VOCAB_WORDS} from './vocab.js';
 
@@ -82,6 +82,7 @@ export function readPack(read, products = []) {
       type: known.type || '',
       animal: known.animal || '',
       texture: known.texture,
+      ...(known.id ? {known: known.id} : {}), // one of our own varieties: recognize.js serves it like a barcode hit
     };
 
   const brand = pickBrand(page, raw, products);
@@ -190,22 +191,30 @@ const holdsKnown = (v, products) => {
    one of the two largest lines: its list holds ordinary words as well („Classic“ of „CLASSIC ADULT“ in small
    print). After that, and in plain text, a brand from the list or of our own varieties before one only Open Pet
    Food Facts knows („Katzenfutter“ is none), then the longest. */
-function pickBrand(page, raw, products) {
+function brandHits(page, raw, products) {
   const flat = ` ${norm(raw)} `;
   const hits = brandsOf(products).filter(b => flat.includes(` ${b.key} `));
   const order = (x, y) => x.vocab - y.vocab || y.key.length - x.key.length;
-  if (!page.geo) return hits.sort(order)[0]?.name || '';
+  if (!page.geo) return hits.sort(order);
   const big = [...page.lines].sort((a, b) => b.h - a.h).slice(0, 2);
   const rank = b => {
     const at = page.lines.filter(l => ` ${norm(l.text)} `.includes(` ${b.key} `));
     return (at.some(l => big.includes(l)) ? 2 : 0) + (at.some(l => l.cy < page.height / 3) ? 1 : 0);
   };
-  return (
-    hits
-      .map(b => ({...b, r: rank(b)}))
-      .filter(b => !b.vocab || b.r >= 2)
-      .sort((x, y) => y.r - x.r || order(x, y))[0]?.name || ''
-  );
+  return hits
+    .map(b => ({...b, r: rank(b)}))
+    .filter(b => !b.vocab || b.r >= 2)
+    .sort((x, y) => y.r - x.r || order(x, y));
+}
+const pickBrand = (page, raw, products) => brandHits(page, raw, products)[0]?.name || '';
+/* The brands read off a packaging, as chips under „Marke“ while naming: the candidates the brand is picked from,
+   the likeliest first, each in its own spelling, at most PACK_BRANDS */
+export const PACK_BRANDS = 3;
+export function packBrands(read, products = []) {
+  const page = pageOf(read, products);
+  return brandHits(page, page.lines.map(l => l.text).join('\n'), products)
+    .slice(0, PACK_BRANDS)
+    .map(b => b.name);
 }
 
 /* Every brand that may be read off a packaging: the list, the brands of our own varieties, then those of Open Pet
@@ -234,8 +243,8 @@ function foodType(raw) {
   return Object.entries(TEXTURES).find(([, t]) => t.items.some(([, , re]) => re.test(raw)))?.[0] || '';
 }
 
-/* Variety: the main line (mainOf()) and what belongs to it, at most MAX_VARIETY characters, joined in the order
-   they stand on the packaging. From the plugin, lines near it join it when they are at least half as tall (the
+/* Variety: the main line (mainOf()) and what belongs to it, at most MAX_VARIETY characters (cutName() in text.js),
+   joined in the order they stand on the packaging. From the plugin, lines near it join it when they are at least half as tall (the
    product line above the flavour) or carry a flavour or a consistency („in Sauce“ below it); the brand does not.
    From plain text the other lines with a keyword join. */
 function pickVariety(page, brand, products) {
@@ -258,7 +267,7 @@ function pickVariety(page, brand, products) {
       if (x.s < 1 || !fits(x)) break;
       take.push(x);
     }
-  return cut(joined(take));
+  return cutName(joined(take), MAX_VARIETY);
 }
 /* The variety's main line: the one whose keywords say most (keywords()), since the largest print on a packaging is
    as often the logo, a product line or a slogan as the flavour. Between lines with the same keywords one in our
@@ -291,19 +300,6 @@ const joined = lines =>
     .sort((a, b) => a.i - b.i)
     .map((l, n) => (n ? l.text.replace(/^\p{L}+/u, w => (SMALL.has(norm(w)) ? w.toLocaleLowerCase('de') : w)) : l.text))
     .join(' ');
-/* At most MAX_VARIETY characters: cut where a part in another language begins („ / “, „ | “), otherwise after a whole
-   word, and without a joining „&“ or „/“ or a small word („in“, „mit“) left at the end */
-function cut(v) {
-  if (v.length <= MAX_VARIETY) return v.trim();
-  const head = v.slice(0, MAX_VARIETY + 1),
-    part = Math.max(head.lastIndexOf(' / '), head.lastIndexOf(' | ')),
-    word = head.lastIndexOf(' ');
-  let out = part > 0 ? head.slice(0, part) : word > 0 ? head.slice(0, word) : v.slice(0, MAX_VARIETY);
-  const loose = /(?:[\s&+/|,·–-]+|\s(\p{L}+))$/u;
-  for (let end; (end = out.match(loose)) && (!end[1] || SMALL.has(norm(end[1])));) out = out.slice(0, end.index);
-  return out.trim();
-}
-
 /* The usable lines of what was read: without quantities, advertising, ingredients and bare numbers, none of them
    twice, in the order they stand on the packaging, each with its size and place. From the plugin also without
    small print and slanted lines unless they hold something we know. A line of three letters or fewer that is no
@@ -399,11 +395,8 @@ const shared = (a, b) =>
   });
 const overlaps = (a, b) => shared(a.box, b.box) > OVERLAP * Math.min(area(a.box), area(b.box));
 
-/* A line has to say something of its own: words like „mit“ alone, and a line that is nothing but promises, are
-   no help while naming and only make the chips longer. */
-const SMALL = new Set(
-  'und oder mit ohne in im am an auf aus bei fur von vor zu zum zur neu the and with for'.split(' '),
-);
+/* A line has to say something of its own: words like „mit“ alone (SMALL in text.js), and a line that is nothing but
+   promises, are no help while naming and only make the chips longer. */
 /* A promise: „ohne“, up to two words, and what is left out („ohne Zusatz von Zucker“, the „tz v“ lost as well), or
    „…frei“. Badges read as one line glue them together („ohne Sojaohne Zucker“), so where „ohne“ and a promise
    follow a letter, they are taken apart first: „Bohne ohne Zucker“ stays what it is. */
@@ -556,15 +549,9 @@ function distance(a, b, max) {
   return prev[b.length];
 }
 
-/* A line read off the packaging inside one of the naming fields, whole and between spaces. That is how a second
-   tap finds it again, and why a field that already says something gets the line appended rather than replaced. */
-const tidy = s =>
-  String(s || '')
-    .replace(/\s+/g, ' ')
-    .trim();
-export const hasLine = (value, line) => ` ${tidy(value)} `.includes(` ${tidy(line)} `);
-export const withLine = (value, line) => (tidy(value) ? `${tidy(value)} ${tidy(line)}` : tidy(line));
-export const withoutLine = (value, line) => tidy(` ${tidy(value)} `.replace(` ${tidy(line)} `, ' '));
+/* Whether a naming field holds exactly a chip's text, case, spacing and accents aside: that chip is pressed, and a
+   tap on it clears the field (logic/editing.js) */
+export const hasLine = (value, line) => norm(value) === norm(line);
 
 function withoutBrand(v, bare) {
   // "Sheba Lachs in Soße" → "Lachs in Soße"

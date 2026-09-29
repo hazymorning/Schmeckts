@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from common import RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
+from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
 
 PALETTE = {
     '--bg': ('#EEEDE7', '#1B1C17'),
@@ -760,6 +760,42 @@ async def test_polish(browser, url):
     await ctx.close()
 
 
+# Label top and field bottom for the two placeholders of the skeleton, and for the two fields after the reading
+SKELETON = """() => { const r = e => e.getBoundingClientRect(), labels = [...document.querySelectorAll('#sheet .label')].filter(l => l.querySelector('.skel-text')),
+  blocks = [...document.querySelectorAll('#sheet .skel-field')];
+  return labels.map((l, i) => [r(l).top, r(blocks[i]).bottom]); }"""
+FIELDS = """() => { const r = s => document.querySelector('#sheet ' + s).getBoundingClientRect();
+  return [['label[for=f-brand]', '#f-brand'], ['label[for=f-variety]', '#f-variety']].map(([l, f]) => [r(l).top, r(f).bottom]); }"""
+
+
+async def test_skeleton(browser, url):
+    print('the naming sheet\u2019s skeleton while the packaging is read: as tall as the fields it stands in for')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = 1500")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await pg.wait_for_selector('#sheet .skel-field')
+    skeleton = await pg.evaluate(SKELETON)
+    await shot(pg, 'skeleton')
+    await pg.wait_for_selector('#sheet #f-brand')
+    await idle(pg)
+    fields = await pg.evaluate(FIELDS)
+    heights = [[round(b - t, 2) for t, b in skeleton], [round(b - t, 2) for t, b in fields]]
+    check(
+        len(skeleton) == 2 and heights[0] == heights[1],
+        f'two placeholders, each from the label\u2019s top to the field\u2019s bottom exactly as tall as label and field after the reading ({heights})',
+    )
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+
 def test_pack():
     """The sources in two files: unpacked together they make up the same working tree again"""
     sys.path.insert(0, str(ROOT / 'scripts'))
@@ -1344,6 +1380,7 @@ TIMERS_ALLOWED = {
     ('ui/slider.js', '100'): 'a finger resting on the rating slider is answered after Android’s tap timeout',
     ('logic/data.js', '2000'): 'the download has started before its address is revoked',
     ('logic/exchange.js', '2000'): 'the download has started before its address is revoked',
+    ('logic/feeding.js', 'READ_PATIENCE'): 'the naming sheet shows a skeleton for that long while the packaging is read, then the empty fields',
 }
 
 
@@ -1444,6 +1481,19 @@ def test_rings():
     )
 
 
+def test_overview_card():
+    """The overview is as tall as its text, at most four lines: views/home.js drops the last sentences against
+    OVERVIEW_LINES, and the clamp in app.css, only the safety net, says the same four; nothing fixes its height."""
+    js = (WWW / 'js/views/home.js').read_text(encoding='utf-8')
+    lines = re.search(r'\bOVERVIEW_LINES = (\d+)', js)
+    clamp = {(sel, v) for _, sel, p, v in app_decls() if p == '-webkit-line-clamp'}
+    fixed = [f'{sel} {p}:{v}' for _, sel, p, v in app_decls() if sel.startswith('.overview') and p in ('height', 'min-height', 'max-height')]
+    check(
+        lines and ('.overview p', lines[1]) in clamp and 'fitOverview()' in js and not fixed,
+        f'the overview: OVERVIEW_LINES in views/home.js and the clamp in app.css agree on {lines and lines[1]} lines, and no height is fixed ({fixed})',
+    )
+
+
 # What a screen may set on a recipe it places (PROJECT.md, "Where styles live")
 PLACING = ('display', 'gap', 'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'flex', 'order', 'align-self', 'justify-self')
 
@@ -1510,6 +1560,7 @@ async def test_files(browser, url):
     test_motion_js()
     test_strip()
     test_rings()
+    test_overview_card()
     test_ratings()
     test_isolated_tests()
     test_prompt()
@@ -1517,4 +1568,7 @@ async def test_files(browser, url):
     test_version_code()
 
 
-run_tests({'files': test_files, 'palette': test_palette, 'logo': test_logo, 'views': test_rules, 'polish': test_polish}, camera=('views',))
+run_tests(
+    {'files': test_files, 'palette': test_palette, 'logo': test_logo, 'views': test_rules, 'polish': test_polish, 'skeleton': test_skeleton},
+    camera=('views',),
+)

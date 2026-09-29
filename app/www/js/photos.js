@@ -1,13 +1,16 @@
 /* The large packaging photo of a variety, on this phone only (PROJECT.md, „Data and sync protocol“): one file per
-   variety in private storage, the first photo this phone took of it or fetched. Written once when a meal gets its
-   variety and never on saving, so db.json stays small; never synced and not in a backup or an exchange file. In a
-   household the phone that took it hands it to the server as well (sharePhotos() in logic/products.js), and any other
-   phone fetches a variety marked sharedPhoto from there the first time someone opens it. In the browser nothing is
-   kept: only a meal that has no variety yet can show its photo large, or a variety the household server holds. */
+   variety in private storage, the first photo this phone took of it or fetched, or the one „Foto ändern“ put in its
+   place. Written when a meal gets its variety or the photo is changed and never on saving, so db.json stays small;
+   never synced and not in a backup or an exchange file. In a household the phone that took it hands it to the
+   server as well (sharePhotos() in logic/products.js), and any other phone fetches a variety marked sharedPhoto
+   from there the first time someone opens it, and again once the server's is newer than the one it holds
+   (prefs.photoStamps). In the browser nothing is kept: only a meal that has no variety yet can show its photo
+   large, or a variety the household server holds. */
 import {Native} from './native.js';
 import {report} from './report.js';
 import {memPhotos} from './images.js';
 import {request} from './api.js';
+import {prefs, savePrefs} from './store.js';
 import {isConnected} from './sync.js';
 
 const FS = Native?.Filesystem,
@@ -33,23 +36,39 @@ if (FS)
 export const hasPhoto = (s, p) =>
   p ? kept.has(p.id) || (!!p.sharedPhoto && isConnected()) : !!s && (memPhotos.has(s.id) || !!s.photo);
 
+/* The stamp of the photo the household server holds, where a phone replaced it (sharedPhoto a number, PROJECT.md,
+   „Data and sync protocol“); 0 for the first photo a variety got, marked true */
+const serverStamp = p => (typeof p.sharedPhoto === 'number' ? p.sharedPhoto : 0);
 /* The photo as a data URL, or null when there is none (any more). One only the household server holds is fetched and
-   kept on this phone from then on; a server that cannot be reached throws its ServerError. */
-export async function photoSrc(s, p) {
+   kept on this phone from then on, and so is one the server holds newer than this phone's (prefs.photoStamps); a
+   server that cannot be reached throws its ServerError, unless an older photo is here, which is shown then and
+   `stale` told of the error. */
+export async function photoSrc(s, p, stale = () => {}) {
   if (!p) {
     const b64 = s && memPhotos.get(s.id);
     return b64 ? 'data:image/jpeg;base64,' + b64 : s?.photo || null;
   }
   let b64 = await photoData(p.id);
-  if (!b64 && p.sharedPhoto && isConnected()) {
-    b64 = await request('GET', '/api/photo/' + p.id, {timeout: 10e3}).then(
-      x => x.image || null,
-      e => {
-        if (e.status === 404) return null; // the server has none
-        throw e;
-      },
-    );
-    if (b64) keepPhoto(p.id, b64);
+  const stamp = serverStamp(p);
+  if ((!b64 || stamp > (prefs.photoStamps[p.id] || 0)) && p.sharedPhoto && isConnected()) {
+    let fresh = null;
+    try {
+      fresh = await request('GET', '/api/photo/' + p.id, {timeout: 10e3}).then(x => x.image || null);
+    } catch (e) {
+      if (e.status !== 404) {
+        if (!b64) throw e;
+        stale(e); // the old one stands in
+      } // 404: the server has none
+    }
+    if (fresh) {
+      if (b64) replacePhotoFile(p.id, fresh);
+      else keepPhoto(p.id, fresh);
+      b64 = fresh;
+      if (stamp) {
+        prefs.photoStamps[p.id] = stamp;
+        savePrefs();
+      }
+    }
   }
   return b64 ? 'data:image/jpeg;base64,' + b64 : null;
 }
@@ -93,6 +112,23 @@ export function keepPhoto(pid, b64, sid) {
   );
 }
 
+/* A variety's photo written anew („Foto ändern“, or one newer from the household server): the file is replaced,
+   kept from now on, and came from no meal */
+export function replacePhotoFile(pid, b64) {
+  if (!FS || !pid || !b64) return;
+  kept.add(pid);
+  origin.delete(pid);
+  track(
+    pid,
+    Promise.resolve(writing.get(pid))
+      .then(() => FS.writeFile({path: file(pid), data: b64, directory: DIR, recursive: true}))
+      .catch(e => {
+        kept.delete(pid);
+        report('replacing the packaging photo', e);
+      }),
+  );
+}
+
 /* The meal a variety's photo came from, if that happened since the app started */
 export const photoFrom = pid => origin.get(pid);
 
@@ -124,7 +160,11 @@ export function forgetPhoto(pid) {
   FS.deleteFile({path: file(pid), directory: DIR}).catch(e => report('deleting the packaging photo', e));
 }
 
-/* Every photo whose variety is not in `keep` goes */
+/* Every photo whose variety is not in `keep` goes, and so does the stamp of the photo held for it */
 export function sweepPhotos(keep) {
   for (const id of [...kept]) if (!keep.has(id)) forgetPhoto(id);
+  const gone = Object.keys(prefs.photoStamps).filter(id => !keep.has(id));
+  if (!gone.length) return;
+  for (const id of gone) delete prefs.photoStamps[id];
+  savePrefs();
 }

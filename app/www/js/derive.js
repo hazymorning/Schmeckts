@@ -2,7 +2,7 @@
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
-import {analyze, changes, habits, profile, report, shopGroups, tally, variety as change} from './smart.js';
+import {analyze, changes, habits, novelty, profile, report, shopGroups, tally, variety as change} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -49,13 +49,16 @@ export const reportModel = () =>
     spans: SPANS.map(days => report(db, prefs, now, days)),
     changes: changes(db, prefs, now, SPANS[1], model()),
   }));
-/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits with Abwechslung last,
-   which the home page asks for only while there is nothing to compare (it reads every meal) */
+/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits in the order the home
+   page shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating eagerly at first. The home page
+   asks for them only while there is nothing to compare, since Abwechslung reads every meal. */
 export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
 export const habitsModel = () =>
   cached('habits', [prefs.activePet], () => {
-    const m = model();
-    return [...habits(m), ...change(m)];
+    const m = model(),
+      eaten = habits(m),
+      of = kind => eaten.filter(h => h.kind === kind);
+    return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
   });
 export const sortOf = id => model().byId.get(id);
 export function pendingServings() {
@@ -82,25 +85,35 @@ export function defaultPets(p) {
   return {ids: db.pets.map(x => x.id), auto: true};
 }
 
-/* Quick picker while feeding: most recently served varieties first, leaving out the ones no longer bought (model) */
-export function quickProducts(limit = Infinity) {
+/* When each variety was last served within the pet filter: variety → time, only for varieties served at all */
+function lastServed() {
   const last = new Map();
   for (const s of db.servings) {
     if (!s.productId || last.has(s.productId)) continue;
     if (prefs.activePet !== 'all' && !s.pets[prefs.activePet]) continue;
     last.set(s.productId, s.servedAt);
   }
+  return last;
+}
+/* Varieties with when each was last served within the filter, 0 for one never served: what a row of the quick picker
+   says under the name. [{product, at}] */
+export const withLast = (products, last = lastServed()) => products.map(p => ({product: p, at: last.get(p.id) || 0}));
+/* Quick picker while feeding: most recently served varieties first, leaving out the ones no longer bought (model),
+   each with when it was last served. [{product, at}] */
+export function quickProducts(limit = Infinity) {
+  const last = lastServed();
   const flop = new Set(
     model()
       .sorts.filter(e => e.choice === 'nicht')
       .map(e => e.id),
   );
   const pet = prefs.activePet !== 'all' ? getPet(prefs.activePet) : null;
-  return db.products
+  const products = db.products
     .filter(p => !flop.has(p.id))
     .filter(p => !pet || last.has(p.id) || !p.animal || p.animal === pet.species)
     .sort((a, b) => (last.get(b.id) || 0) - (last.get(a.id) || 0) || (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, limit);
+  return withLast(products, last);
 }
 /* The shopping list as shareable text, matching the pet filter: what to buy again („Nachkaufen“ including „Gemischt“
    with „nur für …“ and the manual `immer`), one block per food type with the type's name above it, the best first.

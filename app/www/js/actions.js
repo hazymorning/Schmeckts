@@ -14,11 +14,21 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {toggleOverview, update} from './views/home.js';
+import {update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
-import {guessOf, retryNow, servePhoto, serveProduct, shootPhoto} from './logic/feeding.js';
-import {deleteProduct, deleteServing, rate, removeCode, saveName, togglePackLine, useProduct} from './logic/editing.js';
+import {
+  guessOf,
+  productPhotoFile,
+  replacePhoto,
+  rephoto,
+  reshootProduct,
+  retryNow,
+  servePhoto,
+  serveProduct,
+  shootPhoto,
+} from './logic/feeding.js';
+import {deleteProduct, deleteServing, rate, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
@@ -206,15 +216,21 @@ const ACTIONS = {
       p = getProduct(el.dataset.p);
     let away = null;
     if (p && !keptPhoto(p.id)) el.setAttribute('aria-busy', 'true'); // fetched from the household server first
+    let stale = null; // the server holds a newer photo than this phone, and could not be reached: the old one stands in
     const load = () =>
-      photoSrc(s, p)
+      photoSrc(s, p, e => {
+        stale = e;
+      })
         .catch(e => {
           if (!(e instanceof ServerError)) throw e;
           away = e;
           return null;
         })
         .finally(() => el.removeAttribute('aria-busy'));
-    if ((await openViewer(load, el)) !== false) return; // open, or already opening
+    if ((await openViewer(load, el)) !== false) {
+      if (stale) toast('Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar.');
+      return; // open, or already opening
+    }
     if (away)
       return toast(
         away.kind === 'offline' ? 'Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar.' : away.message,
@@ -245,12 +261,18 @@ const ACTIONS = {
   'save-name'() {
     saveName();
   },
+  rephoto() {
+    rephoto();
+  }, // „Neues Foto“ while naming
+  'product-photo'() {
+    reshootProduct();
+  }, // „Foto ändern“ in the food sheet
   'use-product'(el) {
     useProduct(el.dataset.id);
   },
   'pack-line'(el) {
-    togglePackLine(el.dataset.v);
-  }, // a line read off the packaging, into the active field or out of it again
+    setPackLine(el.dataset.field, el.dataset.v);
+  }, // a chip read off the packaging: its field takes it, or is cleared by the pressed one
   'set-type'(el) {
     sheet.type = el.dataset.v;
     if (!textureOf(sheet, sheet.texture)) delete sheet.texture;
@@ -290,9 +312,9 @@ const ACTIONS = {
   retry() {
     if (sheet?.id) retryNow(sheet.id);
   },
-  'delete-serving'() {
-    deleteServing(sheet.id);
-  },
+  'delete-serving'(el) {
+    deleteServing(el.dataset.id || sheet?.id);
+  }, // from the sheet, or from the meal's card on the home page
   'open-product'(el) {
     openSheet({kind: 'product', id: el.dataset.id});
   },
@@ -412,10 +434,6 @@ const ACTIONS = {
     haptic('select');
     foldPart(el.dataset.v);
   }, // a part of a page, such as „Details“ on „Verlauf“
-  'toggle-overview'() {
-    haptic('select');
-    toggleOverview();
-  }, // the overview's full text and back
   'jump-day'(el) {
     haptic('select');
     if (sheet?.kind === 'report') return jumpToDay(el.dataset.day); // the page's own calendar scrolls within it
@@ -472,9 +490,9 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (el && ACTIONS[el.dataset.action]) ACTIONS[el.dataset.action](el);
 });
-// Which of the two naming fields was touched last: the chips under „Auf der Packung gelesen“ fill that one
-document.addEventListener('focusin', e => {
-  if (sheet && (e.target.id === 'f-brand' || e.target.id === 'f-variety')) sheet.lastField = e.target.dataset.field;
+// A chip read off the packaging takes no focus: the field being typed in keeps it, and its keyboard stays
+document.addEventListener('pointerdown', e => {
+  if (e.target.closest('[data-action=pack-line]')) e.preventDefault();
 });
 let noteTimer = null;
 document.addEventListener('input', e => {
@@ -544,6 +562,8 @@ const onFile = (id, fn) =>
     fn(f);
   });
 onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, if the photo button takes it over
+onFile('#camInputName', f => replacePhoto(sheet?.id, f)); // „Neues Foto“ in the browser
+onFile('#camInputProduct', f => productPhotoFile(sheet?.id, f)); // „Foto ändern“ in the browser
 onFile('#petPhotoInput', setPetPhoto);
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);

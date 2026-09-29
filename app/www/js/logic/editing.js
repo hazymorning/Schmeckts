@@ -2,7 +2,8 @@
 import {haptic} from '../native.js';
 import {RATINGS} from '../config.js';
 import {settled} from '../motion.js';
-import {hasLine, withLine, withoutLine} from '../ocr.js';
+import {$} from '../dom.js';
+import {hasLine} from '../ocr.js';
 import {db, save} from '../store.js';
 import {byMe, findProduct, getPet, getProduct, getServing, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
@@ -10,6 +11,7 @@ import {closeSheet, dlg, renderSheet, sheet} from '../ui/sheet.js';
 import {setLevel, untouched} from '../ui/slider.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {homeView, update} from '../views/home.js';
+import {renderSuggestions} from '../views/sheets.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, retryNow, serveProduct} from './feeding.js';
 
@@ -141,18 +143,16 @@ function backFromNaming() {
   renderSheet();
   update();
 }
-/* A line read off the packaging, tapped: it goes into the field last touched, otherwise into „Marke“ while that is
-   still empty and into „Sorte“ after that. A second tap takes it out again, wherever it ended up. */
-export function togglePackLine(line) {
-  if (!sheet) return;
+/* A chip read off the packaging, tapped: its field takes the chip's text in place of what was there, and a tap on
+   the pressed one, the one the field holds already, clears the field. The field on screen is written, not redrawn,
+   and only the chips are drawn anew, so the focus stays where it was. */
+export function setPackLine(field, line) {
+  if (!sheet || !['brand', 'variety'].includes(field)) return;
   haptic('select');
-  const here = ['brand', 'variety'].find(f => hasLine(sheet[f], line));
-  if (here) sheet[here] = withoutLine(sheet[here], line);
-  else {
-    const f = sheet.lastField || (String(sheet.brand || '').trim() ? 'variety' : 'brand');
-    sheet[f] = withLine(sheet[f], line);
-  }
-  renderSheet();
+  sheet[field] = hasLine(sheet[field], line) ? '' : line;
+  const el = $('#f-' + field);
+  if (el) el.value = sheet[field];
+  renderSuggestions();
 }
 
 export function useProduct(pid) {

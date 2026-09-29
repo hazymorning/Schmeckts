@@ -3,6 +3,7 @@
    history entry of its own, and saving or removing leads back to the overview. */
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
+import {dayKey} from '../dates.js';
 import {haptic} from '../native.js';
 import {db, prefs, save, savePrefs} from '../store.js';
 import {getPet} from '../derive.js';
@@ -18,6 +19,7 @@ export const petState = p => ({
   name: p?.name || '',
   species: p?.species || 'Katze',
   photo: p?.photo || null,
+  birthday: p?.birthday || '',
   step: null,
   cropImg: null,
   crop: null,
@@ -78,9 +80,18 @@ export function savePet() {
     $('#f-name')?.focus();
     return;
   }
-  const isNew = !s.id;
-  if (isNew) db.pets.push({id: uid(), name, species: s.species, photo: s.photo || null, createdAt: Date.now()});
-  else Object.assign(getPet(s.id) || {}, {name, species: s.species, photo: s.photo || null});
+  const birthday = (s.birthday || '').trim(); // „YYYY-MM-DD“ from the date field, so text compares as dates do
+  if (birthday > dayKey(Date.now())) {
+    toast('Das Geburtsdatum liegt in der Zukunft.');
+    $('#f-birthday')?.focus();
+    return;
+  }
+  const isNew = !s.id,
+    p = isNew ? {id: uid(), createdAt: Date.now()} : getPet(s.id) || {};
+  Object.assign(p, {name, species: s.species, photo: s.photo || null});
+  if (birthday) p.birthday = birthday;
+  else delete p.birthday; // absent, and the field goes on the other phones as well
+  if (isNew) db.pets.push(p);
   save();
   haptic('success');
   leave(!isNew ? 'Gespeichert' : db.pets.length === 1 ? `Willkommen, ${name}!` : `${name} ist dabei`);

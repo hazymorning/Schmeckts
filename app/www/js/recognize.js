@@ -7,18 +7,28 @@ import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhoto} from './native.js';
 import {cropped, photoOf, readable} from './images.js';
-import {CROP_WIDTH, focusOf, joinReadings, packLines, readPack, SECOND_PASS, SECOND_PASS_MS} from './ocr.js';
+import {
+  CROP_WIDTH,
+  focusOf,
+  joinReadings,
+  packBrands,
+  packLines,
+  readPack,
+  SECOND_PASS,
+  SECOND_PASS_MS,
+} from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
 import {isConnected, serverCan, status} from './sync.js';
-import {productsByCode} from './derive.js';
+import {getProduct, productsByCode} from './derive.js';
 import {report} from './report.js';
 
 const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'locked']);
 const LOOKING = 'Barcode wird nachgeschlagen …',
   READING = 'Sorte wird erkannt …';
 
-/* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null. */
+/* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null;
+   the phone's own reading adds the lines and the brands it read. */
 const STEPS = [
   {
     name: 'codes',
@@ -44,9 +54,12 @@ const STEPS = [
       if (first.raw) last = {meal: o.meal, at: Date.now(), ...first, ...(second ? {second} : {})};
       if (timing.on && o.sharp) await measure(o, first);
       const read = second ? joinReadings(first, second.read, second) : first;
-      const hit = asDetails(readPack(read, db.products));
-      // the lines are offered as chips while naming, tidied the same way, so a chip and the field agree
-      return hit && {...hit, lines: packLines(read, '', db.products)};
+      const pack = readPack(read, db.products),
+        // one of our own varieties on the packaging: served like a barcode hit, where the phone is the one reading
+        known = !photoByServer() && pack.known ? getProduct(pack.known) : null;
+      const hit = known ? {products: [known]} : asDetails(pack);
+      // the lines and the brands are offered as chips while naming, tidied the same way, so a chip and the field agree
+      return hit && {...hit, lines: packLines(read, '', db.products), brands: packBrands(read, db.products)};
     },
   },
 ];
@@ -72,8 +85,14 @@ async function readAgain(b64, first) {
 export const photoByServer = () => isConnected() && prefs.serverPhoto;
 
 /* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
-   synced. While naming, „Auf der Packung gelesen“ offers these lines as chips (views/sheets.js). */
+   synced. {lines, brands}: while naming, the lines stand as chips under „Sorte“ and the brands under „Marke“
+   (views/sheets.js). */
 export const memLines = new Map();
+/* When the phone began reading a meal's packaging, per meal and in memory (logic/feeding.js keeps it): for
+   READ_PATIENCE from then on „Futter benennen“ shows a skeleton in place of the fields, after that the empty fields
+   with the notice that the reading is still on, which then fills only what is still empty (views/sheets.js). */
+export const READ_PATIENCE = 2500;
+export const readingSince = new Map();
 
 /* The phone's last reading of a packaging, in memory only like the lines: the plugin's whole answer, the size of the
    photo, how long it took and the meal it belongs to. schmeckts://ocr-dump shares it as a test fixture

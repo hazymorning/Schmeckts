@@ -272,6 +272,9 @@ body::before {
 .t-main small.warn {
   color: var(--bad);
 }
+.t-main small b {
+  font: var(--type-small-strong);
+} /* a name in a row's second line: „Vermutlich Lachs, tippen zum Bestätigen“ */
 .t-main .num {
   font-variant-numeric: tabular-nums;
 }
@@ -992,6 +995,12 @@ dialog.sheet.page .sheet-body {
   padding: var(--space-3) 0;
   margin: calc(-1 * var(--space-3)) 0;
 }
+.link .ic {
+  width: var(--icon-s);
+  height: var(--icon-s);
+  vertical-align: middle;
+  margin-right: var(--space-1h);
+} /* a link with an icon in front: „Neues Foto“ */
 /* A text button at the foot of a card, e.g. „Weitere anzeigen“ */
 .card-btn {
   display: flex;
@@ -1263,6 +1272,20 @@ dialog.sheet.page .sheet-body {
   background: linear-gradient(90deg, var(--surface-2) 20%, var(--line) 45%, var(--surface-2) 70%);
   background-size: 220% 100%;
 }
+/* A field still to come, while the packaging is read (views/sheets.js): a line inside a label, within the label's
+   line box so the label is as tall as one with text, and a block as tall as a field */
+.skel-text {
+  display: inline-block;
+  width: 28%;
+  height: 0.7em;
+  margin: 0;
+  vertical-align: middle;
+}
+.skel-field {
+  height: var(--control);
+  margin: 0;
+  border-radius: var(--radius-m);
+}
 
 /* Figures: tabular in the same rule as their font, after it, because the font shorthand resets it */
 .pct {
@@ -1431,12 +1454,13 @@ dialog.sheet.page .sheet-body {
 .tl-note {
   font-style: italic;
 }
-/* Overview: two lines ending in „…“ */
+/* Overview: as tall as its text, at most four lines. views/home.js drops the last sentences until it fits
+   (OVERVIEW_LINES, the same four); the clamp is the safety net. */
 .overview p {
   margin: 0;
   font: var(--type-small);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1681,15 +1705,12 @@ dialog.sheet.page .sheet-body {
   color: var(--faint);
 }
 
-/* Overview: a low card (108px), the picture on the left, the name and the essentials on the right in two lines
-   ending in „…“; unfolded (.open) and while folding (.animating) the whole text is there. */
+/* Overview: the picture on the left, the name and a few sentences about the day on the right, the card as tall as
+   they are */
 .overview {
   display: flex;
   align-items: center;
   gap: var(--space-3h);
-}
-.overview[data-action] {
-  cursor: pointer;
 }
 .ov-pic,
 .ov-text {
@@ -1704,10 +1725,6 @@ dialog.sheet.page .sheet-body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.overview.open p,
-.overview p.animating {
-  display: block;
 }
 
 /* Open ratings */
@@ -1733,6 +1750,10 @@ dialog.sheet.page .sheet-body {
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
+}
+/* A meal without a variety: „Eintrag löschen“ under its slider */
+.pend > .btn {
+  margin-top: var(--space-3);
 }
 
 /* Hint, Einkaufen, Vorlieben, and the lines told in a card */
@@ -1899,10 +1920,30 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .serve-list .empty {
   margin: 0;
 }
+/* A variety to serve: the name may take two lines, what is under it stays on one, and the strip at the end never
+   shrinks (its recipe) */
+.plist .t-main b {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 /* The product card. With a large photo on this phone the thumbnail opens it and the rest of the card leads to
    naming */
 .prod-card {
   margin-bottom: var(--space-4h);
+}
+/* „Serviert“: the label of the time field, and who served at the right end of the same line, since the name is
+   not for changing and the time is */
+.served {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.served .hint {
+  margin: 0;
 }
 .prod-edit {
   flex: 1;
@@ -1916,6 +1957,14 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 }
 .photo-btn:has(> .name-photo) {
   width: 100%;
+}
+/* Naming: what was read as a sentence, or that nothing was, under the photo, and „Neues Foto“ right under that */
+.read-note {
+  margin-top: var(--space-3);
+}
+.rephoto {
+  display: block;
+  margin-top: var(--space-2);
 }
 .suggest .label {
   margin: var(--space-4h) 0 var(--space-hair);

@@ -1,3 +1,11 @@
+schmeckts-server (1.4.0) unstable; urgency=medium
+
+  * A photo sent for a variety replaces the one the server had, so
+    „Foto ändern“ in the app reaches every phone in the household;
+    features in /api/info says so with "replace".
+
+ -- Schmeckts <schmeckts@localhost>  Tue, 29 Sep 2026 20:00:00 +0200
+
 schmeckts-server (1.3.0) unstable; urgency=medium
 
   * New /api/photo: the server keeps the large packaging photo of each

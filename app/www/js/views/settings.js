@@ -81,13 +81,7 @@ function overview() {
       'Darstellung',
       labelRow('auto', 'Farbschema') +
         under(segmented('theme', THEMES, prefs.theme)) +
-        switchRow(
-          'backdrop',
-          'paw',
-          'Profilbild im Hintergrund',
-          'Blass hinter dem Kopf der Startseite',
-          prefs.backdrop,
-        ),
+        switchRow('backdrop', 'paw', 'Profilbild im Hintergrund', 'Blass oben auf der Startseite', prefs.backdrop),
     )}
     ${group(
       'Erinnerungen',

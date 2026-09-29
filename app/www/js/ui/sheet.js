@@ -132,6 +132,7 @@ function slidePage(how, swap) {
     swap();
   }
 }
+export const isClosing = () => !!closing;
 export function closeSheet(fromPop = false) {
   if (closing) return closing;
   if (!dlg.open) return Promise.resolve();

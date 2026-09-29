@@ -1,7 +1,7 @@
 /* Recurring building blocks of the views: avatars, thumbnails, the rating slider, the strip of rating dots, the rows of
    „Einkaufen“ and „Vorlieben“, lines told in a card, sync status. */
 import {andList, cap, esc} from '../text.js';
-import {ago, dayKey, dayLabel, timeStr} from '../dates.js';
+import {addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db, queue} from '../store.js';
@@ -34,10 +34,13 @@ export function nameBlock(s, p, inSheet = false) {
     // the server is recognising, or the phone is reading the text
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
   if (!p) {
-    const sub =
-      {waiting: 'Wird erkannt, sobald der Server erreichbar ist', failed: 'Nicht erkannt, tippen zum Benennen'}[
-        s.status
-      ] || 'Tippen zum Benennen';
+    // What the phone read is a guess to confirm, in the usual colour; the server's way keeps its words and tone
+    const read = s.guess?.variety || s.guess?.brand,
+      sub = read
+        ? `Vermutlich <b>${esc(read)}</b>, tippen zum Bestätigen`
+        : {waiting: 'Wird erkannt, sobald der Server erreichbar ist', failed: 'Nicht erkannt, tippen zum Benennen'}[
+            s.status
+          ] || 'Tippen zum Benennen';
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (mode `lokal`): without the error tone
   }
   // In the sheet the exact time is in the „Serviert“ field right below, so the food type goes here instead
@@ -88,6 +91,10 @@ export function resultBadges(s, compact = false) {
     .join('')}</span>`;
 }
 export const closeBtn = `<button class="icon-btn" data-action="close" aria-label="Schließen">${icon('close')}</button>`;
+/* Deleting a meal that has no variety yet, at the end of „Wie war’s?“, of naming it and under its slider on the home
+   page: one tap, undone from the toast, because arming is only for what cannot be undone */
+export const deleteMealBtn = id =>
+  `<button class="btn quiet" data-action="delete-serving" data-id="${id}">${icon('trash')}Eintrag löschen</button>`;
 /* The head of what is open. A sheet carries its title and the X; a page carries the back arrow on a bar that stays
    at the top, with the title under it in the style of the header. Once that title has gone under the bar, the bar
    shows it small beside the arrow (ui/sheet.js); the h2 stays the heading, so that copy is hidden from a screen
@@ -166,16 +173,17 @@ export function calendarHTML(list) {
   return `<div class="cal">${cells}</div>`;
 }
 /* Ratings as a strip of the calendar's dots, each in its rating's colour, the oldest on the left and the newest on the
-   right: at most STRIP of them, and where there are more a „+“ in front, as the calendar puts it after its dots. What
-   they say in words is its label, so nothing rests on colour. ratings: rating keys, oldest first (ratingsIn() in
-   smart.js). Nothing without a rating. */
+   right: the ratings the verdict rests on, at most STRIP of them, and a „+“ in front where there are more, beyond
+   STRIP or older than the window, as the calendar puts it after its dots. What they say in words is its label, so
+   nothing rests on colour. {keys, more}: the rating keys oldest first and whether older ones lie beyond (ratingsIn()
+   in smart.js). Nothing without a rating. */
 const STRIP = 8;
-export function strip(ratings) {
-  if (!ratings.length) return '';
+export function strip({keys, more}) {
+  if (!keys.length) return '';
   const counts = {};
-  for (const r of ratings) counts[r] = (counts[r] || 0) + 1;
-  const said = evidenceOf({n: ratings.length, counts});
-  return `<span class="dots strip" role="img" aria-label="${esc(said)}">${ratings.length > STRIP ? '<b>+</b>' : ''}${ratings
+  for (const r of keys) counts[r] = (counts[r] || 0) + 1;
+  const said = evidenceOf({n: keys.length, counts});
+  return `<span class="dots strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
     .slice(-STRIP)
     .map(r => `<i class="${rateCls(r)}"></i>`)
     .join('')}</span>`;
@@ -233,10 +241,11 @@ export function shopRow(m, e) {
 }
 
 /* A line of a card, told like the rest of the app: a plain icon, one in a rating's colour or the pet's picture, a
-   sentence with what it is about in bold, and under it in words what it rests on */
+   sentence with what it is about in bold, and under it in words what it rests on, its figures in bold as well. Both
+   are HTML: whatever came from a person is escaped by the caller. */
 export const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
 export const told = (pic, say, why = '') =>
-  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${esc(why)}</small>` : ''}</span></li>`;
+  `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
 
 /* The name of a comparison of „Vorlieben“, with the food type in brackets except for wet food: „Konsistenz“,
@@ -247,7 +256,8 @@ const dimName = d =>
     ? TEXTURES[d.type].title
     : DIMENSION[d.kind] + (d.type === TYPES[0] ? '' : ` (${d.type})`);
 /* A habit of „Vorlieben“ as a told line: how varieties are eaten, the varieties in bold and how often under them; or
-   whether a pet likes a change, with the pet's picture and name where several pets are shown at once */
+   whether a pet likes a change, and whether new food goes down well at first or needs a while, each with the pet's
+   picture and name where several pets are shown at once */
 const upTo = (k, n) => (k < n ? `${k} von ${n}` : `alle ${n}`);
 export function habitRow(h, several) {
   const name = id => pname(getProduct(id));
@@ -255,16 +265,24 @@ export function habitRow(h, several) {
     return told(
       lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
       `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'geht es oft gierig los, dann bleibt der Rest stehen'}.`,
-      cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', ')),
+      esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
   const pet = several ? getPet(h.pet) : null,
     who = pet ? `<b>${esc(pet.name)}</b> ` : '';
+  if (h.kind === 'neugier' || h.kind === 'anlauf')
+    return told(
+      pet ? avatar(pet, 's') : lead('sparkle'),
+      h.kind === 'neugier'
+        ? `${who}${pet ? 'ist neugierig' : 'Neugierig'}: Neues kommt erst gut an, dann lässt es nach.`
+        : `${who}${pet ? 'braucht' : 'Braucht'} Anlauf: beim ersten Mal bleibt öfter was übrig als später.`,
+      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach <b>${h.later.good} von ${h.later.n} Mal</b>.`,
+    );
   return told(
     pet ? avatar(pet, 's') : lead('repeat'),
     h.kind === 'abwechslung'
-      ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig.`
-      : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte hintereinander kommt besser an.`,
-    `Nach derselben Sorte ${times(h.same.good, h.same.n)} gut gefressen, sonst ${upTo(h.other.good, h.other.n)}`,
+      ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.`
+      : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte kurz hintereinander kommt besser an.`,
+    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst <b>${upTo(h.other.good, h.other.n)}</b>.`,
   );
 }
 /* A group of „Vorlieben“, on its page and in its card on the home page: the group, how often it went down well in
@@ -310,6 +328,17 @@ export function syncChip() {
   return null;
 }
 
+/* When something was, as people say it: „heute um 13:14“, „gestern um 19:22“, „vorgestern“, „vor 3 Tagen“, „am 12.
+   September“, the time without a leading zero. mark wraps the time, so the overview can set it in bold. */
+export function since(t, now, mark = x => x) {
+  const day = dayStart(now),
+    clock = () => mark(timeStr(t).replace(/^0(?=\d:)/, ''));
+  if (t >= day) return `heute um ${clock()}`;
+  if (t >= addDays(day, -1)) return `gestern um ${clock()}`;
+  const days = Math.round((day - dayStart(t)) / 864e5);
+  if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
+  return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
+}
 /* „k von n Mal“ as people say it: „einmal“, „beide Male“, „alle 3 Mal“, „2 von 3 Mal“ */
 export const times = (k, n) =>
   n === 1 ? 'einmal' : k < n ? `${k} von ${n} Mal` : n === 2 ? 'beide Male' : `alle ${n} Mal`;

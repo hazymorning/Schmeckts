@@ -190,19 +190,54 @@ export const ANIMAL_WORDS = [
   ['Katze', /katze|kätzchen|kitten|\bcat\b/i],
   ['Hund', /hund|welpe|puppy|\bdog\b/i],
 ];
+/* Flavour groups for „Vorlieben“ (profile() in smart.js) and the keywords of ocr.js. A word matches at its start,
+   after a space, a comma, an „&“ or a „/“ or at the beginning, so „Elemente“ is no duck and „Herzhaftes“ no heart;
+   „Wild“ does not match inside „Wildschwein“, and „Lachs“ not inside „Seelachs“, which is fish. Heart, liver and
+   cheese are what a compound ends in as well („Rinderherz“, „Hühnerleber“, „Frischkäse“). A variety may name
+   several flavours („Huhn & Thunfisch“): flavoursOf() gives every group it names, in this order. */
+const start = words => new RegExp(`(?<!\\p{L})(?:${words})`, 'iu');
+const FISH_KINDS = start(
+  'hering|makrele|sardine|sardelle|seelachs|kabeljau|forelle|weißfisch|seehecht|herring|mackerel|cod(?!\\p{L})|trout|whitefish',
+);
 export const FLAVORS = [
-  ['Thunfisch', /thunfisch|tuna/i],
-  ['Lachs', /lachs|salmon/i],
-  ['Huhn', /huhn|hühn|chicken|geflügel/i],
-  ['Pute', /pute|truthahn|turkey/i],
-  ['Rind', /rind|beef/i],
-  ['Ente', /ente|duck/i],
-  ['Lamm', /lamm|lamb/i],
-  ['Kaninchen', /kaninchen|rabbit/i],
-  ['Wild', /wild|hirsch|reh/i],
-  ['Fisch', /fisch|fish|forelle|kabeljau/i],
+  ['Thunfisch', start('thunfisch|tuna')],
+  ['Lachs', start('lachs|wildlachs|salmon')],
+  ['Huhn', start('huhn|hühn|chicken|geflügel')],
+  ['Pute', start('pute|truthahn|turkey')],
+  ['Rind', start('rind|beef')],
+  ['Ente', start('ente|duck')],
+  ['Lamm', start('lamm|lamb')],
+  ['Kaninchen', start('kaninchen|hase|rabbit')],
+  ['Wild', start('wild(?!schwein|lachs)|hirsch|reh|venison')],
+  ['Wildschwein', start('wildschwein|boar')],
+  ['Schwein', start('schwein|pork')],
+  ['Kalb', start('kalb|veal')],
+  ['Pferd', start('pferd|horse')],
+  ['Ziege', start('ziege|goat')],
+  ['Strauß', start('strauß|strauss|ostrich')],
+  ['Känguru', start('känguru|kangaroo')],
+  ['Büffel', start('büffel|buffalo')],
+  ['Garnele', start('garnele|krabbe|shrimp|prawn')],
+  ['Fisch', new RegExp(`${start('fisch|fish').source}|${FISH_KINDS.source}`, 'iu')],
+  ['Leber', /leber|liver/i],
+  ['Herz', /(?<!\p{L})herz(?!haft)|(?<=\p{L})herz/iu],
   ['Käse', /käse|cheese/i],
 ];
+const OWN_FISH = ['Thunfisch', 'Lachs']; // fish with a group of their own
+/* Every flavour group a text names, in the order of FLAVORS. The general fish counts only when no particular one is
+   named: „Lachs mit Fischöl“ is salmon, „Seelachs“ and „Forelle“ are fish. Remembered per text: the evaluation asks
+   for the same variety names on every redraw, and the patterns are not free. */
+const flavoursKnown = new Map();
+const FLAVOURS_REMEMBERED = 2000; // texts remembered at most, then the memory starts over
+export function flavoursOf(text) {
+  const t = String(text || '');
+  if (flavoursKnown.has(t)) return flavoursKnown.get(t);
+  const hits = FLAVORS.filter(([, re]) => re.test(t)).map(([name]) => name);
+  const out = hits.filter(name => name !== 'Fisch' || FISH_KINDS.test(t) || !hits.some(x => OWN_FISH.includes(x)));
+  if (flavoursKnown.size >= FLAVOURS_REMEMBERED) flavoursKnown.clear();
+  flavoursKnown.set(t, out);
+  return out;
+}
 /* Rating reminder in minutes after serving, 0 = off: the REMIND steps, or whole hours of your own from 1 to
    REMIND_MAX_H. tidyRemind turns any stored value into a valid one. */
 export const REMIND = [0, 60, 180, 360];

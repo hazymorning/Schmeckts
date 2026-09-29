@@ -5,6 +5,8 @@ import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
 import {report} from './report.js';
 import {tidyRemind} from './config.js';
+import {addDays, dayKey} from './dates.js';
+import {MEMORY} from './glance.js';
 import {milestones} from './smart.js';
 import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validId, valueOf} from './fields.js';
 
@@ -27,6 +29,8 @@ const defaultPrefs = () => ({
   serverPhoto: true,
   codes: {},
   exchange: {},
+  overview: {day: '', kind: null, fact: null, kinds: [], facts: []},
+  photoStamps: {},
 });
 export const hooks = {changed() {}, saved() {}}; // main.js sets these: redraw the interface, sync after a save
 
@@ -63,7 +67,31 @@ function tidyPrefs(p) {
   delete out.aiKey; // dropped: the key for photo recognition lives on the server
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {}; // remembered barcode answers
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with
+  out.overview = tidyOverview(out.overview);
+  // the stamp of the packaging photo this phone holds per variety, where a phone replaced it (photos.js)
+  out.photoStamps = Object.fromEntries(
+    Object.entries(out.photoStamps && typeof out.photoStamps === 'object' ? out.photoStamps : {}).filter(
+      ([, v]) => Number.isFinite(v) && v > 0,
+    ),
+  );
   return out;
+}
+/* The overview's memory of its line taking turns (views/overview.js, takeTurn() in glance.js): the day and the choice
+   of the last drawing, the kinds of the last MEMORY.kinds days and the facts of the last MEMORY.facts days, each with
+   the day it came on; anything older or malformed goes */
+function tidyOverview(o) {
+  const m = o && typeof o === 'object' ? o : {},
+    str = v => (typeof v === 'string' ? v : null),
+    from = dayKey(addDays(Date.now(), -MEMORY.facts));
+  return {
+    day: str(m.day) || '',
+    kind: str(m.kind),
+    fact: str(m.fact),
+    kinds: (Array.isArray(m.kinds) ? m.kinds : []).filter(k => typeof k === 'string').slice(-MEMORY.kinds),
+    facts: (Array.isArray(m.facts) ? m.facts : []).filter(
+      f => f && typeof f.id === 'string' && typeof f.day === 'string' && f.day > from,
+    ),
+  };
 }
 function tidyState(s) {
   const o = s && typeof s === 'object' ? s : {},

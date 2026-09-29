@@ -393,6 +393,65 @@ async def test_buying(browser, url):
     await ctx.close()
 
 
+# One pet and one variety with twelve ratings over the last twelve days, the oldest five left standing: the verdict
+# rests on the newest eight, which is what the words and the strip say
+def twelve_rated():
+    now = int(time.time() * 1000)
+    levels = ['schlecht'] * 5 + ['gut'] * 3 + ['top'] * 4
+    return {
+        'version': 3,
+        'pets': [{'id': 'lxpet00001', 'name': 'Minka', 'species': 'Katze', 'photo': None, 'createdAt': 1}],
+        'products': [{'id': 'lxprod0001', 'brand': 'Sheba', 'variety': 'Lachs', 'type': 'Nassfutter', 'codes': {}, 'createdAt': 1}],
+        'servings': [
+            {
+                'id': f'lxserv00{i:02d}',
+                'productId': 'lxprod0001',
+                'servedAt': now - (12 - i) * 864e5,
+                'note': '',
+                'pets': {'lxpet00001': {'r': r, 'at': now}},
+            }
+            for i, r in enumerate(levels)
+        ],
+    }
+
+
+async def test_window(browser, url):
+    print('the verdict rests on the newest eight ratings: the words say „von 8 Mal“ and the strip shows those eight with a „+“')
+    ctx, pg, errors = await seeded(browser, url, {'db': twelve_rated(), 'prefs': {'mode': 'lokal'}})
+    hint = await pg.eval_on_selector(
+        '[data-sec=hint]', 'c => [c.querySelector("h2").innerText, c.querySelector(".say").innerText, c.querySelector(".why").innerText]'
+    )
+    check(
+        hint == ['Neuer Liebling', 'Lachs von Sheba kommt gut an.', '7 von 8 Mal gut gefressen'],
+        f'home page: „Neuer Liebling“ on the newest eight, seven of them good, whatever the five older ones were ({hint})',
+    )
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'product', id: 'lxprod0001'}))")
+    await idle(pg)
+    SHEET = """() => { const s = document.querySelector('#sheet .strip'), v = document.querySelector('#sheet .verdict p');
+      return {plus: s.firstElementChild.tagName === 'B' && s.firstElementChild.innerText, dots: [...s.querySelectorAll('i')].map(i => i.className), label: s.getAttribute('aria-label'),
+        verdict: v.innerText.replace(/\\s+/g, ' ').trim(), counts: [...document.querySelectorAll('#sheet .cnt')].map(c => [c.dataset.r || c.className.split(' ')[1], c.querySelector('b').innerText])}; }"""
+    sheet = await pg.evaluate(SHEET)
+    check(
+        sheet['plus'] == '+'
+        and sheet['dots'] == ['r-bad'] + ['r-good'] * 7
+        and sheet['label'] == '7 von 8 Mal gut gefressen'
+        and sheet['verdict'] == 'Nachkaufen 7 von 8 Mal gut gefressen'
+        and [c[1] for c in sheet['counts']] == ['4', '3', '0', '0', '0', '1'],
+        f'food sheet: the strip shows exactly the eight the verdict rests on, a „+“ says there are older ones, and the words and the counters read the same eight ({sheet})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('[data-sec=shop] [data-action=open-shop]')
+    await idle(pg)
+    row = await pg.eval_on_selector(
+        '#sheet .shop .row',
+        'r => [r.querySelector(".strip b")?.innerText ?? null, r.querySelectorAll(".strip i").length, r.querySelector(".strip").getAttribute("aria-label")]',
+    )
+    check(row == ['+', 8, '7 von 8 Mal gut gefressen'], f'„Einkaufen“: the row\u2019s strip the same ({row})')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_cards(browser, url):
     print('home page: the hint, and the history always open')
     ctx = await phone(browser, touch=True, motion=True)
@@ -409,6 +468,23 @@ async def test_cards(browser, url):
         and await pg.locator('[data-sec=hist] .tl-day').count() == 1,
         f'history: the calendar and the meals of the current day ({len(shown)})',
     )
+    # „Wie war’s?“: the label „Serviert“ over the time field, and who served at the right end of the same line, small
+    # and muted, since the name is not for changing and the time is
+    await pg.click('.tl [data-action=open-serving]')
+    await idle(pg)
+    label = await pg.eval_on_selector(
+        '#sheet label[for=f-time]',
+        """l => { const [a, b] = l.children, s = getComputedStyle(b), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.append(probe);
+          const muted = getComputedStyle(probe).color; probe.remove(), r = l.getBoundingClientRect();
+          return [a.innerText, b.innerText, getComputedStyle(l).justifyContent, s.fontSize, s.fontWeight, s.color === muted, Math.round(r.right - b.getBoundingClientRect().right),
+            l.nextElementSibling.querySelector('#f-time') !== null]; }""",
+    )
+    check(
+        label[:2] == ['Serviert', 'von Anna'] and label[2:] == ['space-between', '14px', '400', True, 0, True],
+        f'„Wie war’s?“: „Serviert“ over the time field, „von Anna“ small and muted at the right end of the label line ({label})',
+    )
+    await pg.click('[data-action=close]')
+    await idle(pg)
     # Hint: at most one, with a sentence, a reason and its buttons. „Nicht mehr kaufen“ and „Immer kaufen“ set kaufen,
     # „Ausblenden“ is remembered per device.
     HINT = """c => ({title: c.querySelector('h2').innerText, btns: [...c.querySelectorAll('.btn-row button')].map(b => b.innerText),
@@ -658,19 +734,31 @@ LIKES_HOME = """() => { const c = document.querySelector('[data-sec=profile]'); 
     btns: [...c.querySelectorAll('button')].map(b => [text(b), b.dataset.action, b.className, !!b.querySelector('svg'), b === c.lastElementChild])}; }"""
 
 # Two pets with a habit each and nothing to compare: the same brand and one variety per flavour. Their meals one a day,
-# oldest first, as [variety, rating]: Minka leaves a variety served again, Tiger likes it better
+# oldest first, as [variety, rating]: Minka leaves a variety served again shortly after, Tiger likes it better
 LIKES_HOUSE = """([minka, tiger]) => import('./js/store.js').then(async s => { const d = s.defaults(), day = 864e5, now = Date.now();
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}, {id: 'tiger00001', name: 'Tiger', species: 'Katze', createdAt: 2}];
-  d.products = [['x', 'Lachs'], ['y', 'Huhn']].map(([id, variety]) => ({id: 'sorte' + id + '0001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.products = [['a', 'Lachs'], ['b', 'Huhn'], ['c', 'Rind'], ['d', 'Pute']].map(([id, variety]) => ({id: 'sorte' + id + '0001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
   const meals = (pet, list, later) => list.map(([sort, r], i) => ({id: pet.slice(0, 5) + 'meal' + String(i).padStart(4, '0'), productId: 'sorte' + sort + '0001', note: '',
     servedAt: now - (list.length - i) * day + later, pets: {[pet]: {r, at: now}}}));
   d.servings = [...meals('minka00001', minka, 0), ...meals('tiger00001', tiger, 36e5)].sort((a, b) => b.servedAt - a.servedAt);
   s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
 
 
-def runs(*groups):
-    """Meals in runs of one variety, oldest first: (variety, rating, …) each, the runs taking turns between two"""
-    return [[sort, r] for sort, *rs in groups for r in rs]
+# One pet that met six varieties, the first rating of each the oldest and the later ones five days apart: new food goes
+# down well at first and wears off. One variety per flavour and one brand, so there is nothing to compare.
+NOVELTY_HOUSE = """() => import('./js/store.js').then(async s => { const d = s.defaults(), day = 864e5, hour = 36e5, now = Date.now(), T = 'top', X = 'schlecht';
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  const met = [['Lachs', [T, X, X, X]], ['Huhn', [T, X, X]], ['Rind', [T, T, X, X]], ['Pute', [T, T, X]], ['Ente', [T, T, T]], ['Lamm', [X, X, X, X]]];
+  d.products = met.map(([variety], i) => ({id: 'sorte' + i + '00001', brand: 'Sheba', variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.servings = met.flatMap(([, rs], i) => rs.map((r, j) => ({id: 'meal' + i + j + '00001', productId: 'sorte' + i + '00001', note: '',
+    servedAt: now - (100 - j * 5) * day - i * hour, pets: {minka00001: {r, at: now}}}))).sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+
+def turns(*meals):
+    """Meals oldest first, as (variety, rating) each: four varieties taking turns, so that a meal has three others
+    before it, and a variety served again right away, which is shortly after the same one"""
+    return [[sort, r] for sort, r in meals]
 
 
 async def test_profile(browser, url):
@@ -725,7 +813,7 @@ async def test_profile(browser, url):
             'Bei Geflügel in Soße und Thunfisch in Soße wird oft nur die Soße geleckt.',
             'Geflügel in Soße 2 von 3 Mal, Thunfisch in Soße 2 von 3 Mal',
         ]
-        and all(t[1].startswith(('Mag Abwechslung', 'Gewohnheitstier')) for t in cards[1]['told'][1:]),
+        and all(t[1].startswith(('Mag Abwechslung', 'Gewohnheitstier', 'Neugierig', 'Braucht Anlauf')) for t in cards[1]['told'][1:]),
         f'„Gewohnheiten“: the sauce licked off, told as before ({cards[1]["told"]})',
     )
     check(
@@ -733,7 +821,7 @@ async def test_profile(browser, url):
         'the rows of a comparison are no buttons: there is nothing behind them yet',
     )
     newest = await pg.evaluate("""import('./js/derive.js').then(async d => { const s = await import('./js/smart.js'), m = d.model();
-      const g = d.profileModel()[0].groups.find(x => x.key === 'In Soße'), all = s.ratingsIn(m, g.ids).map(s.rateCls);
+      const g = d.profileModel()[0].groups.find(x => x.key === 'In Soße'), all = s.ratingsIn(m, g.ids).keys.map(s.rateCls);
       const row = [...document.querySelectorAll('#sheet .likes .row')].find(r => r.querySelector('b').innerText === 'In Soße');
       return [all.length, [...row.querySelectorAll('.strip i')].map(i => i.className), all.slice(-8), row.querySelector('.strip').firstElementChild.innerText]; })""")
     check(
@@ -744,33 +832,19 @@ async def test_profile(browser, url):
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
 
-    # Abwechslung, per pet with its picture under „Alle“, and nothing to compare: the home page shows the habits
-    minka = runs(
-        ('x', 'top', 'top'),
-        ('y', 'top', 'top'),
-        ('x', 'top', 'top'),
-        ('y', 'top', 'schlecht'),
-        ('x', 'top', 'schlecht'),
-        ('y', 'top', 'schlecht'),
-        ('x', 'top', 'schlecht'),
-        ('y', 'schlecht', 'schlecht'),
-        ('x', 'top'),
-        ('y', 'top'),
-        ('x', 'top'),
-        ('y', 'schlecht'),
-        ('x', 'top'),
-        ('y', 'schlecht'),
-        ('x', 'top'),
+    # Abwechslung, per pet with its picture under „Alle“, and nothing to compare: the home page shows the habits. Minka:
+    # 15 meals after other varieties, 12 of them good, against 8 shortly after the same one, 3 of them good; and every
+    # variety good the first time, 11 of the 19 later ratings. Tiger the other way round: 2 of 8 against 7 of 8, and
+    # one variety of four good the first time, 8 of 12 later.
+    T, X = 'top', 'schlecht'
+    minka = turns(
+        *[('a', T), ('a', X), ('b', T), ('b', X), ('c', T), ('c', T), ('d', T), ('d', X)],
+        *[('a', X), ('a', T), ('b', T), ('b', X), ('c', T), ('c', T), ('d', T), ('d', X)],
+        *[('a', T), ('b', T), ('c', T), ('d', X), ('a', T), ('b', T), ('c', X)],
     )
-    tiger = runs(
-        ('x', 'schlecht', 'top'),
-        ('y', 'schlecht', 'top'),
-        ('x', 'schlecht', 'top'),
-        ('y', 'top', 'top'),
-        ('x', 'schlecht', 'top'),
-        ('y', 'schlecht', 'top'),
-        ('x', 'top', 'schlecht'),
-        ('y', 'schlecht', 'top'),
+    tiger = turns(
+        *[('a', X), ('a', T), ('b', X), ('b', T), ('c', X), ('c', T), ('d', T), ('d', T)],
+        *[('a', X), ('a', T), ('b', T), ('b', T), ('c', X), ('c', X), ('d', X), ('d', T)],
     )
     await pg.evaluate(LIKES_HOUSE, [minka, tiger])
     await idle(pg)
@@ -784,8 +858,8 @@ async def test_profile(browser, url):
         and home['rows'] == []
         and home['told']
         == [
-            ['av', 'Minka mag Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig'],
-            ['av', 'Tiger ist ein Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an'],
+            ['av', 'Minka mag Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig'],
+            ['av', 'Tiger ist ein Gewohnheitstier: dieselbe Sorte kurz hintereinander kommt besser an'],
         ]
         and title == 'Vorlieben für alle Tiere'
         and both[0]
@@ -794,16 +868,26 @@ async def test_profile(browser, url):
         == [
             [
                 'av',
-                'Minka mag Abwechslung: nach derselben Sorte hintereinander bleibt öfter was übrig.',
-                'Nach derselben Sorte 3 von 8 Mal gut gefressen, sonst 12 von 15',
+                'Minka mag Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.',
+                'Kurz nach derselben Sorte 3 von 8 Mal gut gefressen, sonst 12 von 15.',
             ],
             [
                 'av',
-                'Tiger ist ein Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an.',
-                'Nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8',
+                'Tiger ist ein Gewohnheitstier: dieselbe Sorte kurz hintereinander kommt besser an.',
+                'Kurz nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8.',
+            ],
+            [
+                'av',
+                'Minka ist neugierig: Neues kommt erst gut an, dann lässt es nach.',
+                '4 von 4 Sorten beim ersten Mal gut gefressen, danach 11 von 19 Mal.',
+            ],
+            [
+                'av',
+                'Tiger braucht Anlauf: beim ersten Mal bleibt öfter was übrig als später.',
+                '1 von 4 Sorten beim ersten Mal gut gefressen, danach 8 von 12 Mal.',
             ],
         ],
-        f'Abwechslung: one line per pet with its picture, either way; with nothing to compare, the home page shows the habits ({home}, {title}, {both})',
+        f'Abwechslung and Neuheit: one line per pet with its picture, either way, in the order the home page shows the first two of; with nothing to compare, the home page shows the habits ({home}, {title}, {both})',
     )
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
@@ -819,15 +903,37 @@ async def test_profile(browser, url):
         == [
             [
                 'icon',
-                'Gewohnheitstier: dieselbe Sorte hintereinander kommt besser an.',
-                'Nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8',
-            ]
+                'Gewohnheitstier: dieselbe Sorte kurz hintereinander kommt besser an.',
+                'Kurz nach derselben Sorte 7 von 8 Mal gut gefressen, sonst 2 von 8.',
+            ],
+            [
+                'icon',
+                'Braucht Anlauf: beim ersten Mal bleibt öfter was übrig als später.',
+                '1 von 4 Sorten beim ersten Mal gut gefressen, danach 8 von 12 Mal.',
+            ],
         ],
         f'with Tiger chosen: only Tiger, with the icon instead of a picture ({title}, {tiger_only[1]["told"]})',
     )
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     await pg.click('[data-action=filter][data-id=all]')
+    await idle(pg)
+
+    # Neuheit: a pet that finds new food great and lets it stand the next time
+    await pg.evaluate(NOVELTY_HOUSE)
+    await idle(pg)
+    home = await pg.evaluate(LIKES_HOME)
+    await pg.click('[data-sec=profile] [data-action=open-profile]')
+    await idle(pg)
+    novel = await pg.evaluate(LIKES_PAGE)
+    check(
+        home['told'] == [['icon', 'Neugierig: Neues kommt erst gut an, dann lässt es nach']]
+        and novel[1]['told']
+        == [['icon', 'Neugierig: Neues kommt erst gut an, dann lässt es nach.', '5 von 6 Sorten beim ersten Mal gut gefressen, danach 4 von 15 Mal.']]
+        and await pg.eval_on_selector_all('#sheet .told .why b', 'l => l.map(b => b.innerText)') == ['5 von 6 Sorten', '4 von 15 Mal'],
+        f'Neuheit: new food goes down well at first and wears off, told on the home page and on the page with the figures in bold ({home["told"]}, {novel[1]["told"]})',
+    )
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
 
     # Nothing rated: no card on the home page, and the page says so
@@ -1433,10 +1539,10 @@ async def test_texture(browser, url):
             'labels': ['In Soße', 'In Gelee', 'Pastete', 'Mousse', 'Fester Block', 'Suppe'],
             'on': [],
             'fits': True,
-            'under': 'box prod-card',
+            'under': 'link rephoto',
             'note': '',
         },
-        f'food sheet, wet food: „Konsistenz“ with six chips under the type, never mandatory, nothing clipped at 360 px ({c})',
+        f'food sheet, wet food: „Konsistenz“ with six chips under the type and its photo link, never mandatory, nothing clipped at 360 px ({c})',
     )
     await pg.click('#sheet [data-action=set-texture][data-v=block]')
     await idle(pg)
@@ -1539,8 +1645,45 @@ async def test_texture(browser, url):
 
 
 # The overview's line about the animal on the page's today, from the lists in views/overview.js
-FACT = """kind => import('./js/views/overview.js').then(o => { const l = o.FACTS[kind] || o.GENERAL, d = new Date();
-  d.setHours(0, 0, 0, 0); return l[Math.round(d.getTime() / 864e5) % l.length]; })"""
+# The overview card: its heading, picture, the sentences shown and every sentence there is (all), its lines; tight:
+# the card as tall as its text or its picture
+CARD = """() => Promise.all([import('./js/store.js'), import('./js/views/overview.js'), import('./js/glance.js'), import('./js/derive.js')]).then(([s, o, g, d]) => {
+  const c = document.querySelector('#home > section'), h = c.querySelector('h2'), other = document.querySelector('[data-sec=hist] h2'), pic = c.querySelector('.ov-pic'), p = c.querySelector('p');
+  const font = e => { const st = getComputedStyle(e); return [st.fontFamily, st.fontWeight, st.fontSize].join(); }, r = c.getBoundingClientRect(), a = pic.querySelector('.av').getBoundingClientRect(), ps = getComputedStyle(p);
+  const text = c.querySelector('.ov-text').getBoundingClientRect().height, inner = Math.max(text, 72) + 18 + 10 + 8;
+  const pets = s.prefs.activePet === 'all' ? s.db.pets : s.db.pets.filter(x => x.id === s.prefs.activePet), m = d.model();
+  const full = o.overviewText(g.glance(s.db, pets.map(x => x.id), Date.now(), new Set(m.sorts.filter(e => e.choice === 'nicht').map(e => e.id))), pets, Date.now());
+  const q = document.createElement('p'); q.innerHTML = full;
+  return {first: c.classList.contains('overview'), height: Math.round(r.height), tight: Math.abs(r.height - inner) < 1, title: h.innerText, sameFont: font(h) === font(other),
+    pic: [pic.tagName, pic.querySelectorAll('.av').length, a.width, a.left < h.getBoundingClientRect().left],
+    text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
+    sentences: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), clamp: ps.webkitLineClamp,
+    tap: [c.tagName, c.dataset.action ?? null, c.getAttribute('aria-expanded'), !!c.closest('button')], wide: document.documentElement.scrollWidth > innerWidth}; })"""
+# One pet, a household (the code only in memory) with usual times and a variety with a long name, served today as
+# given ([hour, minute, variety]) by Ben, at the system font scale given. Returns the sentences shown against every
+# sentence there is, whether all of them would fit in four lines, and the variety\u2019s name in the first one.
+LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), o = await import('./js/views/overview.js'), g = await import('./js/glance.js'), h = await import('./js/views/home.js');
+  const at = (days, hh, mm) => { const t = new Date(now); t.setDate(t.getDate() - days); t.setHours(hh, mm, 0, 0); return t.getTime(); };
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  d.products = [['wild', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl', 'Nassfutter'], ['lang', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl und Kürbis', 'Nassfutter'], ['snack', 'Dreamies', 'Käse', 'Snack']]
+    .map(([id, brand, variety, type]) => ({id: id + '000001', brand, variety, type, codes: {}, createdAt: 1}));
+  d.servings = [];
+  for (let i = 1; i <= 8; i++) for (const [hh, mm] of [[7, 15], [18, 30]]) d.servings.push({id: 'meal' + i + hh + '0001', productId: 'wild000001', servedAt: at(i, hh, mm), note: '', by: 'Ben', pets: {minka00001: {r: 'top', at: now}}});
+  today.forEach(([hh, mm, id], i) => d.servings.push({id: 'today' + i + '0001', productId: id + '000001', servedAt: at(0, hh, mm), note: '', by: 'Ben', pets: {minka00001: {r: 'top', at: now}}}));
+  d.servings.sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save();
+  if (!document.getElementById('bigtext')) { const st = document.createElement('style'); st.id = 'bigtext'; document.head.append(st); }
+  document.getElementById('bigtext').textContent = scale === 1 ? '' : `.overview p{font-size:${(14 * scale).toFixed(2)}px !important}`;
+  s.prefs.code = 'K7PM-3QXD'; h.renderHome(true);
+  const p = document.querySelector('.overview p'), lh = parseFloat(getComputedStyle(p).lineHeight);
+  const full = o.overviewText(g.glance(d, ['minka00001'], now, new Set()), d.pets, now), q = p.cloneNode(); q.innerHTML = full; q.style.webkitLineClamp = 'unset'; p.after(q);
+  const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), fits: Math.round(q.scrollHeight / lh) <= 4,
+    lines: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, sort: p.querySelector('.ov-sort').innerText, long: today.at(-1)[2] === 'lang'};
+  q.remove(); s.prefs.code = ''; return out; })"""
+# The facts that may come today for a species, as texts, and a kind of line worded as on the day `days` from today
+# with its places filled: what the overview must say, given the values
+FACTS = """species => import('./js/views/facts.js').then(f => f.factsOn(species, new Date()).map(x => x.text))"""
+LINE = """([kind, values, days]) => Promise.all([import('./js/views/facts.js'), import('./js/glance.js')]).then(([f, g]) => f.fill(g.pick(f.LINES[kind], Date.now() + (days || 0) * 864e5), values))"""
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
   d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
   d.products = [['lachs', 'Lachs', 'Nassfutter'], ['rind', 'Rind', 'Nassfutter'], ['snack', 'Käse', 'Snack']].map(([id, variety, type]) => ({id: id + '00001', brand: 'Sheba', variety, type, codes: {}, createdAt: 1}));
@@ -1550,55 +1693,38 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print(
-        'overview: a low card with picture, name and a few sentences about the day, never a rating; two lines and unfolding; counting in the history'
-    )
+    print('overview: a card with picture, name and a few sentences about the day, as tall as its text, never a rating; counting in the history')
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
-    CARD = """() => { const c = document.querySelector('#home > section'), h = c.querySelector('h2'), other = document.querySelector('[data-sec=hist] h2'), pic = c.querySelector('.ov-pic'), p = c.querySelector('p');
-      const font = e => { const s = getComputedStyle(e); return [s.fontFamily, s.fontWeight, s.fontSize].join(); }, r = c.getBoundingClientRect(), a = pic.querySelector('.av').getBoundingClientRect(), ps = getComputedStyle(p);
-      return {first: c.classList.contains('overview'), height: Math.round(r.height), title: h.innerText, sameFont: font(h) === font(other), pic: [pic.tagName, pic.querySelectorAll('.av').length, a.width, a.left < h.getBoundingClientRect().left],
-        text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
-        dots: ps.webkitLineClamp === '2' && ps.display !== 'block', tap: [c.dataset.action ?? null, c.getAttribute('aria-expanded')], wide: document.documentElement.scrollWidth > innerWidth}; }"""
     c = await pg.evaluate(CARD)
-    text = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse. ' + await pg.evaluate(FACT, 'Katze')
+    status = 'Heute gab es schon eine Mahlzeit und einen Snack, zuletzt um 11:00 Käse.'
+    cats = await pg.evaluate(FACTS, 'Katze')
     check(
-        c
-        == {
-            'first': True,
-            'height': 108,
-            'title': 'Minka',
-            'sameFont': True,
-            'pic': ['BUTTON', 1, 72, True],
-            'text': text,
-            'bold': ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
-            'lines': 2,
-            'cut': True,
-            'dots': True,
-            'tap': ['toggle-overview', 'false'],
-            'wide': False,
-        },
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; never more than two lines (108 px), and longer text ends in „…“ ({c})',
+        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['cut'], c['clamp'], c['tap'], c['wide'], c['tight']]
+        == [
+            True,
+            'Minka',
+            True,
+            ['BUTTON', 1, 72, True],
+            ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
+            False,
+            '4',
+            ['SECTION', None, None, False],
+            False,
+            True,
+        ]
+        and c['all'][0] == status
+        and len(c['all']) == 2
+        and c['all'][1] in cats
+        and c['sentences'] == c['all'][: len(c['sentences'])]
+        and c['text'] == ' '.join(c['sentences'])
+        and 1 <= c['lines'] <= 4,
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then something about the animal; the card as tall as its text, at most four lines, and no button ({c})',
     )
     await shot(pg, 'overview-360')
-    await pg.evaluate("window.__card = document.querySelector('.overview')")
-    await pg.click('.overview p')
-    await idle(pg)
-    o = await pg.evaluate(CARD)
-    await shot(pg, 'overview-open-360')
-    await pg.click('.overview h2')
-    await idle(pg)
-    back = await pg.evaluate(CARD)
-    check(
-        [o['cut'], o['dots'], o['tap'], o['text']] == [False, False, ['toggle-overview', 'true'], text]
-        and o['height'] > 108
-        and back == c
-        and await pg.evaluate("window.__card === document.querySelector('.overview')"),
-        f'a tap on the card shows the whole text, a second folds it away again, both without redrawing the page ({o["height"]} px, {o["lines"]} lines)',
-    )
     day = await pg.evaluate("[document.querySelector('.tl-date span').innerText, document.querySelector('.day.today').getAttribute('aria-label')]")
     check(
         day == ['1 Mahlzeit, 1 Snack', 'Heute, 1 Mahlzeit, 1 Snack'],
@@ -1610,10 +1736,7 @@ async def test_overview(browser, url):
     check(gap == 14, f'14 px from „Verlauf“ to the calendar, 8 more than before ({gap})')
     await pg.click('.ov-pic')
     await idle(pg)
-    check(
-        await pg.input_value('#sheet #f-name') == 'Minka' and await pg.evaluate("!document.querySelector('.overview').classList.contains('open')"),
-        'a tap on the picture opens the pet and unfolds nothing',
-    )
+    check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet')
     await pg.click('[data-action=close]')
     await idle(pg)
     # Several pets: today's meals of all of them, who had the last one, when the next one usually comes
@@ -1633,24 +1756,28 @@ async def test_overview(browser, url):
     )
     await idle(pg)
     kiwi = await pg.evaluate(CARD)
-    general, dog = await pg.evaluate(FACT, 'Andere'), await pg.evaluate(FACT, 'Hund')
+    dogs, late = await pg.evaluate(FACTS, 'Hund'), await pg.evaluate(LINE, ['later', {'meal': 'Frühstück', 'span': '2 Stunden'}])
     check(
-        [house['title'], house['pic'][:2], house['text'], house['bold']]
+        [house['title'], house['pic'][:2], house['all']]
         == [
             'Minka und Tiger',
             ['SPAN', 2],
-            'Minka und Tiger haben vor 5 Minuten Lachs bekommen. Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr. ' + general,
-            ['5 Minuten', 'Lachs', '10 Uhr'],
+            ['Minka und Tiger haben vor 5 Minuten Lachs bekommen.', 'Jetzt wird erst mal verdaut, Frühstück gibt es morgen gegen 10 Uhr.', late],
         ]
-        and house['height'] == 108
-        and house['dots'],
-        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and for a cat and a dog something about any animal ({house["text"]})',
+        and house['sentences'] == house['all'][: len(house['sentences'])]
+        and house['bold'] == ['5 Minuten', 'Lachs', '10 Uhr'][: len(house['bold'])]
+        and not house['cut']
+        and house['tight'],
+        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and the message of the day: that meal came two hours after the usual time ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['text']] == ['Tiger', ['BUTTON', 1], 'Tiger hat vor 5 Minuten Lachs bekommen. ' + dog]
-        and [kiwi['text'], kiwi['cut'], kiwi['tap'], kiwi['height']]
-        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, [None, None], 108],
-        f'the overview follows the filter; without a meal there is nothing to unfold ({tiger["text"]} / {kiwi["text"]})',
+        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])]
+        == ['Tiger', ['BUTTON', 1], ['Tiger hat vor 5 Minuten Lachs bekommen.'], 2]
+        and tiger['all'][1] in dogs
+        and tiger['sentences'] == tiger['all'][: len(tiger['sentences'])]
+        and [kiwi['text'], kiwi['cut'], kiwi['sentences'], kiwi['tight']]
+        == ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.', False, ['Kiwi wartet noch auf die erste Mahlzeit im Tagebuch.'], True],
+        f'the overview follows the filter, with a fact about the dog for the dog; without a meal one sentence ({tiger["text"]} / {kiwi["text"]})',
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
     words = await pg.evaluate("import('./js/config.js').then(c => Object.values(c.RATINGS).map(x => x.label))")
@@ -1670,69 +1797,224 @@ async def test_overview(browser, url):
         'Anna' not in by[0] and by[1].startswith('Anna hat Minka und Tiger vor 5 Minuten Lachs gegeben. '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
-    # The line that changes from day to day: what is only true today first, the rest taking turns over five days
+    # The line more: what is only true today first, else the kinds taking turns over five days, with the memory
+    # threaded through; every message, then every kind taking turns, each from a glance holding only it
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
       const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
-      const g = {last, meals: 2, snacks: 1, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], week: {meals: 12, sorts: 4}, streak: 12,
-        premiere: null, idea: {id: 'rind00001', days: 12}, next: {at: 1110}, milestone: {n: 100, left: 40}};
+      const none = {premiere: null, idea: null, feeders: [], week: {meals: 0, sorts: 0}, streak: 0, first: null, sorts: 0, anniversary: null, record: {meals: 0, streak: 0},
+        shift: null, sameMinute: false, feedRun: null, weekday: null, lookback: null, milestone: {n: 100, left: 40}, next: {at: 1110}};
+      const g = {...none, last, meals: 2, snacks: 1, feeders: [{name: 'Anna', n: 6}, {name: 'Jonas', n: 4}], week: {meals: 12, sorts: 4}, streak: 12, idea: {id: 'rind00001', days: 12}};
+      const lines = t => [...new DOMParser().parseFromString(t, 'text/html').querySelectorAll('.ov-line')].map(x => x.textContent);
       s.prefs.code = 'K7PM-3QXD';
-      const text = (x, at = now) => o.overviewText(x, pets, at).replace(/<[^>]+>/g, '');
-      const days = [0, 1, 2, 3, 4].map(i => text({...g, last: {...last, servedAt: last.servedAt + i * 864e5}}, now + i * 864e5));
-      const first = [{premiere: 'lachs00001'}, {premiere: 'rind00001'}, {milestone: {n: 100, left: 3}}, {snacks: 4}, {next: {at: 1110, due: true}},
-        {next: {at: 435, tomorrow: true}}].map(x => text({...g, ...x}));
-      s.prefs.code = code; return [days, first, o.FACTS.Katze]; })"""
-    days, first, cats = await pg.evaluate(LINES)
+      let memory = null; const days = [];
+      for (let i = 0; i < 5; i++) { const r = o.overviewLines({...g, last: {...last, servedAt: last.servedAt + i * 864e5}}, pets, now + i * 864e5, memory); memory = r.memory; days.push(lines(r.text)); }
+      const one = (x, base = g) => lines(o.overviewLines({...base, ...x}, pets, now, null).text);
+      const first = [{premiere: 'lachs00001'}, {premiere: 'rind00001'}, {milestone: {n: 100, left: 3}}, {snacks: 4}, {anniversary: 1, first: {at: 0, days: 30, meals: 62}},
+        {record: {meals: 0, streak: 23}}, {record: {meals: 4, streak: 0}, meals: 4}, {shift: {at: 435, diff: -40}}, {shift: {at: 1110, diff: 95}}, {sameMinute: true},
+        {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}].map(x => one(x));
+      const bare = {...g, ...none}; // nothing but the facts left to take a turn
+      const kinds = [{feedRun: {name: 'Ben', days: 5, other: 'Jonas'}}, {feedRun: {name: 'Ben', days: 5, other: null}}, {weekday: {at: 435, mine: 525, later: true, weekday: 6}},
+        {lookback: 'lachs00001'}, {sorts: 14}, {first: {at: 0, days: 43, meals: 100}}, {feeders: [{name: 'Anna', n: 5}, {name: 'Jonas', n: 5}]}].map(x => one(x, bare).at(-1));
+      s.prefs.code = code; return [days, first, kinds, memory]; })"""
+    days, first, kinds, memory = await pg.evaluate(LINES)
+
+    async def line(kind, values, days=0):
+        return await pg.evaluate(LINE, [kind, values, days])
+
     turns = [
-        'Im Fütter-Duell dieser Woche führt Anna mit 6 zu 4. Jonas, da geht noch was!',
-        'Seit 12 Tagen lückenlos eingetragen. Dafür hättet eigentlich ihr ein Leckerli verdient.',
-        'Wie wär’s mal wieder mit Rind? Das gab es seit 12 Tagen nicht.',
-        'Diese Woche standen schon 12 Mahlzeiten aus 4 Sorten auf dem Speiseplan.',
+        await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}),
+        await line('streak', {'since': '12 Tagen', 'days': '12 Tage', 'you': 'hättet eigentlich ihr'}, 1),
+        await line('idea', {'sort': 'Rind', 'days': 12}, 2),
+        await line('week', {'meals': '12 Mahlzeiten', 'sorts': '4 Sorten'}, 3),
     ]
     check(
         all(
-            d.startswith('Heute gab es schon zwei Mahlzeiten und einen Snack, zuletzt um ')
-            and ' Lachs von Anna. Abendessen gibt es meist gegen 18:30 Uhr. ' in d
+            len(d) == 3
+            and d[0].startswith('Heute gab es schon zwei Mahlzeiten und einen Snack, zuletzt um ')
+            and d[0].endswith(' Lachs von Anna.')
+            and d[1] == 'Abendessen gibt es meist gegen 18:30 Uhr.'
             for d in days
         )
-        and all(any(d.endswith(t) for d in days) for t in turns)
-        and any(d.endswith(f) for d in days for f in cats),
-        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, the streak, an idea, the week and something about the animal take turns ({days})',
+        and [d[2] for d in days[:4]] == turns
+        and days[4][2] in cats
+        and [memory['day'], memory['kind'], memory['kinds'], [f['day'] for f in memory['facts']]]
+        == ['2026-06-13', 'fact', ['idea', 'week', 'fact'], ['2026-06-13']],
+        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, the streak, an idea, the week and a fact about the animal take turns, and the memory holds the last three kinds and the fact ({days}, {memory})',
     )
+    messages = [
+        await line('premiereLast', {}),
+        await line('premiere', {'sort': 'Rind'}),
+        await line('milestone', {'n': '3×', 'm': '100. Mal'}),
+        await line('snacksCounted', {'grip': 'Minka hat euch ganz schön im Griff.'}),
+        await line('anniversary', {'span': 'einem Monat', 'n': 62}),
+        await line('recordStreak', {'days': '23 Tage'}),
+        await line('recordDay', {'n': '4 Mahlzeiten'}),
+        await line('earlier', {'meal': 'Frühstück', 'span': '40 Minuten'}),
+        await line('later', {'meal': 'Abendessen', 'span': 'eineinhalb Stunden'}),
+        await line('sameMinute', {}),
+    ]
     check(
-        first[0].endswith('Das gab es heute zum ersten Mal. Mutig!')
-        and first[1].endswith('Heute zum ersten Mal im Napf: Rind. Mutig!')
-        and first[2].endswith('Noch 3× füttern bis zum 100. Mal. Fast schon ein Jubiläum.')
-        and 'zwei Mahlzeiten und vier Snacks' in first[3]
-        and first[3].endswith('Bei so vielen Snacks: Minka hat euch ganz schön im Griff.')
-        and first[4].startswith('Futterzeit! Zuletzt gab es um ')
+        [f[-1] for f in first[:10]] == messages
+        and 'zwei Mahlzeiten und vier Snacks' in first[3][0]
+        and 'vier Mahlzeiten' in first[6][0]
+        and first[10][0].startswith('Futterzeit! Zuletzt gab es um ')
         and any(
-            f'Minka {t}' in first[4]
+            f'Minka {t}' == first[10][1]
             for t in ('wartet bestimmt schon neben dem Napf.', 'übt schon mal den vorwurfsvollen Blick.', 'hat die Uhr bestimmt schon im Blick.')
         )
-        and any(
-            t in first[5]
-            for t in (
-                'Für heute ist alles serviert, Frühstück gibt es morgen meist gegen 7:15 Uhr.',
-                'Feierabend für heute: Frühstück gibt es morgen meist gegen 7:15 Uhr.',
-            )
+        and first[11][1]
+        in (
+            'Für heute ist alles serviert, Frühstück gibt es morgen meist gegen 7:15 Uhr.',
+            'Feierabend für heute: Frühstück gibt es morgen meist gegen 7:15 Uhr.',
         ),
-        f'what is only true today comes first: a first time, a milestone close by, a lot of treats; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
+        f'what is only true today comes first: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
+    )
+    others = [
+        await line('feedRun', {'name': 'Ben', 'days': '5 Tage', 'since': '5 Tagen', 'other': 'Jonas'}),
+        await line('feedRunAlone', {'name': 'Ben', 'days': '5 Tage', 'since': '5 Tagen', 'other': ''}),
+        await line('weekday', {'weekday': 'Samstags', 'day': 'Samstag', 'meal': 'Frühstück', 'shift': 'später', 'time': '8:45'}),
+        await line('lookback', {'sort': 'Lachs'}),
+        await line('sorts', {'n': '14 Sorten'}),
+        await line('days', {'since': '43 Tagen', 'days': '43 Tage'}),
+        await line('duelTie', {'score': '5 zu 5', 'first': 'Anna', 'second': 'Jonas'}),
+    ]
+    check(
+        kinds == others,
+        f'the other kinds taking turns: a person\u2019s feeding run, with or without someone to tease, a weekday\u2019s own time, a look back a year, the varieties tried, the days in the diary and a tied duel ({kinds})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
-    # With motion: the text eases open and shut, and nothing is left behind afterwards
-    ctx = await phone(browser, motion=True, width=360, height=800)
+
+    # A long name, a household and usual times: the first sentence stands whole with „von Ben“, and every sentence
+    # that fits in four lines is there, the last ones dropped where they do not; the first alone overflowing, the
+    # variety\u2019s name in it is cut. At the usual and at a large system font.
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
+    long = [[7, 20, 'snack'], [12, 0, 'wild'], [13, 14, 'lang']]
+    for scale, today in ((1, [[7, 20, 'wild']]), (1.3, [[7, 20, 'wild']]), (1.15, long), (1.3, long)):
+        fit = await pg.evaluate(LONG_DB, [scale, today])
+        await idle(pg)
+        first = fit['shown'][0]
+        name = 'Wildschwein mit Nachtkerzenöl' + (' und Kürbis' if fit['long'] else '')
+        record = await line('recordStreak', {'days': '9 Tage'})
+        # The clamp, the safety net, may act only once the first sentence stands alone with its name cut
+        check(
+            first.endswith('von Ben.')
+            and (not fit['cut'] or (len(fit['shown']) == 1 and fit['long']))
+            and (fit['lines'] <= 4 or fit['cut'])
+            and first.replace(fit['sort'], '#') == fit['all'][0].replace(name, '#')
+            and fit['shown'][1:] == fit['all'][1 : len(fit['shown'])]
+            and (len(fit['shown']) == len(fit['all']) if fit['fits'] else len(fit['shown']) < len(fit['all']))
+            and (fit['sort'].endswith('…') and len(fit['sort']) <= 24 if fit['long'] else fit['sort'] == 'Wildschwein mit Nachtkerzenöl')
+            and fit['all'][2] == record,
+            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ in a whole first sentence, {len(fit["shown"])} of {len(fit["all"])} sentences on {fit["lines"]} lines, the name {fit["sort"]!r}, the record streak of nine days as the message ({fit})',
+        )
+        await shot(pg, f'overview-long-{int(scale * 100)}-{len(today)}')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+
+# The pet editor with its birthday field: what it holds, whether the sheet is still open, which field has the focus
+# and what the toast says
+BIRTHDAY = """() => ({value: document.querySelector('#f-birthday')?.value ?? null, open: !!document.querySelector('#sheet #f-name'),
+  focus: document.activeElement?.id, toast: document.querySelector('#toast')?.innerText.trim() ?? '', max: document.querySelector('#f-birthday')?.max,
+  pick: !!document.querySelector('#f-birthday')?.closest('.pick')?.querySelector('.ic'), wide: document.documentElement.scrollWidth > innerWidth})"""
+# The overview's sentences for the first pet with the birthday given, all of them, tags stripped
+BIRTHDAY_LINES = """birthday => Promise.all([import('./js/store.js'), import('./js/views/overview.js'), import('./js/glance.js')]).then(([s, o, g]) => {
+  const p = s.db.pets[0]; if (birthday) p.birthday = birthday; else delete p.birthday;
+  const t = document.createElement('p'); t.innerHTML = o.overviewText(g.glance(s.db, [p.id], Date.now(), new Set()), [p], Date.now());
+  return [...t.querySelectorAll('.ov-line')].map(l => l.innerText); })"""
+
+
+async def test_birthday(browser, url):
+    print('the pet\u2019s birthday: a date field in the editor, nothing in the future, and the overview announces the day')
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
-    SLIDE = """() => new Promise(done => { const c = document.querySelector('.overview'), p = c.querySelector('p'), h = [p.offsetHeight]; c.click();
-      setTimeout(() => h.push(p.getBoundingClientRect().height, p.classList.contains('animating')), 50);
-      setTimeout(() => { h.push(p.offsetHeight, p.classList.contains('animating'), p.style.height, p.style.transition); done(h); }, 450); })"""
-    up, down = await pg.evaluate(SLIDE), await pg.evaluate(SLIDE)
+    await settings(pg)
+    await pg.click('#sheet [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Tiger')
+    await pg.fill('#f-birthday', '2027-01-01')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    late = await pg.evaluate(BIRTHDAY)
     check(
-        up[0] < up[1] < up[3] and up[2:] == [True, up[3], False, '', ''] and down[0] > down[1] > down[3] and down[2:] == [True, up[0], False, '', ''],
-        f'unfolding and folding ease through the height, without a redraw; afterwards everything is tidied up ({up[:2] + up[3:4]}, {down[:2] + down[3:4]})',
+        late
+        == {
+            'value': '2027-01-01',
+            'open': True,
+            'focus': 'f-birthday',
+            'toast': 'Das Geburtsdatum liegt in der Zukunft.',
+            'max': '2026-06-09',
+            'pick': True,
+            'wide': False,
+        },
+        f'a birthday in the future is refused on saving: the toast says so, the editor stays and the field keeps the focus; the field is a select field with its own arrow, the picker ends today ({late})',
     )
+    await shot(pg, 'pet-birthday-360')
+    await pg.fill('#f-birthday', '2022-06-12')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    saved = await state(pg, 'db.pets.map(p => [p.name, p.birthday ?? null])')
+    check(saved == [['Minka', None], ['Tiger', '2022-06-12']], f'a date in the past is saved, a pet without one has no field ({saved})')
+    await pg.click('#sheet [data-action=edit-pet]:nth-of-type(2)')
+    await idle(pg)
+    again = await pg.evaluate(BIRTHDAY)
+    check(again['value'] == '2022-06-12' and again['open'], f'opened again the editor shows the birthday ({again})')
+    await pg.fill('#f-birthday', '')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    cleared = await state(pg, "db.pets.map(p => 'birthday' in p)")
+    check(cleared == [False, False], f'cleared, the field goes ({cleared})')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+    # The editor as a page in the dark, with a large system font: the field in one piece
+    ctx = await phone(browser, scheme='dark', width=360, height=800)
+    pg, errors = await open_page(ctx, url, scheme='dark')
+    await pg.evaluate(OVERVIEW_DB)
+    await idle(pg)
+    await pg.evaluate(BIG_TEXT, 1.3)
+    await settings(pg)
+    await pg.click('#sheet [data-action=add-pet]')
+    await idle(pg)
+    big = await pg.evaluate(BIRTHDAY)
+    field = await pg.evaluate(
+        """(() => { const f = document.querySelector('#f-birthday'), l = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Geburtstag');
+          const r = f.getBoundingClientRect(), n = document.querySelector('#f-name').getBoundingClientRect();
+          return [!!l && l.getBoundingClientRect().bottom <= r.top, Math.round(r.height) >= 44, Math.round(r.width) === Math.round(n.width), r.top > n.bottom]; })()"""
+    )
+    check(
+        big['pick'] and not big['wide'] and field == [True, True, True, True],
+        f'in the dark with a large font: the label „Geburtstag“ above the field, the field as wide as the name field and under it, nothing wider than the screen ({field}, {big})',
+    )
+    await shot(pg, 'pet-birthday-dark-big')
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await ctx.close()
+
+    # The overview: today with the age, tomorrow, in three days, and nothing four days ahead
+    ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
+    await pg.evaluate(OVERVIEW_DB)
+    await idle(pg)
+    said = [(await pg.evaluate(BIRTHDAY_LINES, d))[-1] for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
+    want = [
+        await pg.evaluate(LINE, ['birthdayAge', {'pet': 'Minka', 'age': 4}]),
+        await pg.evaluate(LINE, ['birthdayToday', {'pet': 'Minka'}]),
+        await pg.evaluate(LINE, ['birthdayTomorrow', {'pet': 'Minka'}]),
+        await pg.evaluate(LINE, ['birthdaySoon', {'pet': 'Minka', 'days': '3 Tagen'}]),
+    ]
+    cats = await pg.evaluate(FACTS, 'Katze')
+    check(
+        said[:4] == want and said[4] in cats and said[5] in cats,
+        f'the overview: the birthday with the age, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
+    )
+    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
 
@@ -2886,6 +3168,26 @@ async def test_discard(browser, url):
         f'undo brings the meal back with its photo, still to be named ({back}, {again})',
     )
 
+    # The same button under the slider in „Wie war’s?“ on the home page, for a meal without a variety only
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    CARD_BTN = """() => { const b = document.querySelector('.pend [data-action=delete-serving]'), s = document.querySelector('.pend .slider');
+      return b && [b.innerText.trim(), b.className, b.dataset.id, s && b.getBoundingClientRect().top >= s.getBoundingClientRect().bottom + 8]; }"""
+    card = await pg.evaluate(CARD_BTN)
+    meal = await state(pg, 'db.servings[0].id')
+    await pg.click('.pend [data-action=delete-serving]')
+    await idle(pg)
+    gone = [await state(pg, 'db.servings.length'), await pg.locator('.pend').count(), (await pg.inner_text('#toast')).split('\n')[0]]
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    returned = [await state(pg, 'db.servings.length'), await pg.locator('.pend .slider').count(), await pg.evaluate(CARD_BTN)]
+    check(
+        card == ['Eintrag löschen', 'btn quiet', meal, True] and gone == [0, 0, 'Eintrag gelöscht'] and returned == [1, 1, card],
+        f'on the home page „Eintrag löschen“ stands under the slider of a meal without a variety, deletes it with the same toast, and undo brings it back with its slider ({card}, {gone}, {returned})',
+    )
+    await pg.click('.pend-head')
+    await idle(pg)
+
     # Where there is nothing to delete, or the meal sheet ends with it anyway, naming does not offer it
     await pg.fill('#f-brand', 'Sheba')
     await pg.fill('#f-variety', 'Lachs')
@@ -2893,6 +3195,7 @@ async def test_discard(browser, url):
     await idle(pg)
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
+    named = await pg.locator('.pend [data-action=delete-serving]').count()
     await pg.click('.pend-head')
     await idle(pg)
     await pg.click('#sheet [data-action=edit-name]')
@@ -2917,8 +3220,8 @@ async def test_discard(browser, url):
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(
-        [renamed, typed, product] == [0, 0, 0],
-        f'not while changing a named meal, typing a new one or renaming a variety ({[renamed, typed, product]})',
+        [named, renamed, typed, product] == [0, 0, 0, 0],
+        f'not in the card of a named meal, nor while changing it, typing a new one or renaming a variety ({[named, renamed, typed, product]})',
     )
 
     # The owner's way: an unknown barcode, the photo of the front, then broken off
@@ -2934,16 +3237,19 @@ async def test_discard(browser, url):
     after = await state(pg, f"[db.products.length, db.servings.length, db.products.some(p => p.codes?.['{SHEBA}'])]")
     check(after == before + [False], f'after the scanner too: the meal goes, and no variety got the code ({before}, {after})')
 
-    # Deleted while the phone was still reading the photo: undo reads it again instead of hanging
+    # Deleted while the phone was still reading the photo: undo reads it again instead of hanging. The sheet holds
+    # no button while it reads, so the meal goes from its card on the home page.
     await pg.evaluate('window.__ocrDelay = 1500; window.__ocrDone = 0')
     await pg.click('#fab')
     await idle(pg)
     await pg.set_input_files('#camInputSheet', str(PACK))
     await until(pg, "db.servings[0]?.status === 'reading'")
     reads = await pg.evaluate("window.__calls.filter(c => c[0] === 'processImage').length")
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
     was = await pg.evaluate(  # read and tap in one go, so the reading cannot finish in between
         """import('./js/store.js').then(s => { const was = s.db.servings[0].status;
-          document.querySelector('#sheet [data-action=delete-serving]').click(); return was; })"""
+          document.querySelector('.pend [data-action=delete-serving]').click(); return was; })"""
     )
     await pg.wait_for_function('window.__ocrDone >= 1')
     await pg.click('#toast [data-action=undo]')
@@ -3083,7 +3389,9 @@ async def test_recognize(browser, url):
     kept = await state(pg, 'JSON.stringify([db, prefs, queue])')
     check('Zutaten: Fleisch' not in kept, 'the reading itself lives in memory only: it is in neither the data, the settings nor the queue')
 
-    # A camera's large photo: the phone reads the text at 2400 px, and keeps 1100 and 480 px as before
+    # A camera's large photo: the phone reads the text at 2400 px, and keeps 1100 and 480 px as before. Another
+    # packaging, because the one just named would now be served straight away, its photo kept for the variety.
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
     before = await pg.evaluate("import('./js/recognize.js').then(r => r.lastReading().at)")
     await pg.click('#fab')
     await idle(pg)
@@ -3132,12 +3440,16 @@ async def test_recognize(browser, url):
     )
     await pg.click('[data-action=close]')
     await idle(pg)
-    # The same packaging again: our own variety is recognised, spelled differently too
+    # The same packaging again: our own variety is recognised, spelled differently too, and handed over as the
+    # variety itself, the way a barcode hit is
     await pg.evaluate("window.__ocrText = 'SHEBA  selection-in-sauce mit LACHS 85g'")
     got = await ident(photo='AAA')
     check(
-        got['source'] == 'text' and got['details']['brand'] == 'Sheba' and got['details']['variety'] == 'Selection in Sauce mit Lachs',
-        f'a known variety recognised in the text ({got.get("details")})',
+        got['source'] == 'text'
+        and [p['variety'] for p in got.get('products', [])] == ['Selection in Sauce mit Lachs']
+        and 'details' not in got
+        and got['lines'] == ['Sheba selection-in-sauce mit LACHS'],
+        f'a known variety recognised in the text: the variety itself, with the lines read ({got})',
     )
     await pg.evaluate("window.__ocrText = '12345\\n850 g'")
     got = await ident(photo='AAA')
@@ -3221,10 +3533,480 @@ async def test_recognize(browser, url):
     await ctx.close()
 
 
+# The meal on top: variety, status, what it still carries, and its reading
+MEAL = '(s => [s.productId ?? null, s.status ?? null, !!s.photo, !!s.thumb, s.guess ? [s.guess.brand, s.guess.variety] : null])(db.servings[0])'
+# The sheet and the toast: open, kind and step, the fields, the toast's text and whether it offers undo
+SHEET_TOAST = """import('./js/ui/sheet.js').then(m => [document.getElementById('sheet').open, m.sheet?.kind ?? null, m.sheet?.step ?? null,
+  document.getElementById('f-brand')?.value ?? null, document.getElementById('f-variety')?.value ?? null,
+  document.querySelector('#toast span')?.innerText ?? '', !!document.querySelector('#toast [data-action=undo]')])"""
+
+
+# The naming sheet while the packaging is read: the notice, the skeleton, the fields and the buttons
+READING = """() => { const q = s => document.querySelectorAll('#sheet ' + s).length;
+  return {note: document.querySelector('#sheet .note')?.innerText.trim() ?? null, spin: q('.note .spin'), skel: [q('.skel-text'), q('.skel-field')],
+    fields: [document.getElementById('f-brand')?.value ?? null, document.getElementById('f-variety')?.value ?? null],
+    chips: q('.chip'), buttons: q('.btn, .link'), close: q('[data-action=close]'), focus: document.activeElement?.id ?? ''}; }"""
+
+
+async def test_skeleton(browser, url):
+    print('while the phone reads the packaging: a skeleton first, the fields once the reading is there or patience runs out')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    async def photo(delay):
+        await pg.evaluate(f"window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = {delay}")
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await pg.wait_for_selector('#sheet .skel-field')
+
+    await photo(1200)
+    skeleton = await pg.evaluate(READING)
+    check(
+        skeleton
+        == {'note': 'Packung wird gelesen …', 'spin': 1, 'skel': [2, 2], 'fields': [None, None], 'chips': 0, 'buttons': 0, 'close': 1, 'focus': ''},
+        f'the skeleton: the photo, the notice with its spinner, a placeholder per field, no field to type into, no chips, no button but the X ({skeleton})',
+    )
+    await shot(pg, 'naming-skeleton')
+    await until(pg, '!!db.servings[0]?.guess')
+    await idle(pg)
+    read = await pg.evaluate(READING)
+    check(
+        read['skel'] == [0, 0] and read['fields'] == ['Whiskas', 'Rind in Gelee'] and read['note'] is None,
+        f'the reading there: the fields carry it and the skeleton is gone ({read})',
+    )
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
+    # A reading that takes longer than the patience: the empty fields come with a notice, what is typed meanwhile
+    # stays, and the reading fills only the field still empty, without taking the focus
+    await photo(3600)
+    await pg.wait_for_selector('#sheet #f-brand', timeout=4000)
+    waiting = await pg.evaluate(READING)
+    await pg.fill('#f-brand', 'Animonda')
+    await until(pg, '!!db.servings[0]?.guess')
+    await idle(pg)
+    filled = await pg.evaluate(READING)
+    check(
+        waiting['note'] == 'Packung wird noch gelesen …'
+        and waiting['spin'] == 1
+        and waiting['fields'] == ['', '']
+        and waiting['skel'] == [0, 0]
+        and filled['fields'] == ['Animonda', 'Rind in Gelee']
+        and filled['focus'] == 'f-brand'
+        and await state(pg, '(s => [s.status, s.guess.brand])(db.servings[0])') == ['noserver', 'Whiskas'],
+        f'after 2.5 s the empty fields with „Packung wird noch gelesen …“; the brand typed meanwhile stays, the variety is filled in, the focus stays put ({waiting}, {filled})',
+    )
+    await pg.evaluate('window.__ocrDelay = 0')
+    await pg.click('[data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+# The card of the meal on top in „Wie war’s?“: its two lines, the name in bold in the second, whether that line warns, and
+# whether the bold name is set as small as the line
+CARD_SUB = """() => { const e = document.querySelector('.pend-head .t-main'), b = e.querySelector('small b'), st = x => getComputedStyle(x);
+  return [e.innerText.replace(/\\n/g, ' / '), b?.innerText ?? null, !!e.querySelector('.warn'), !b || (st(b).fontSize === st(b.parentNode).fontSize && st(b).fontWeight === '600')]; }"""
+# The naming sheet's sentence about the reading, its bold parts, the hint where nothing was read, and the main button
+SAID = """() => { const say = document.querySelector('#sheet .say'), hint = document.querySelector('#sheet .hint.read-note'), btn = document.querySelector('#sheet [data-action=save-name]');
+  return [say?.innerText ?? null, say ? [...say.querySelectorAll('b')].map(b => b.innerText) : null, hint?.innerText ?? null, btn.innerText.trim(), !!btn.querySelector('.ic')]; }"""
+
+
+async def test_reading_said(browser, url):
+    print('the reading stands as a sentence to confirm, and the main button confirms it')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+
+    async def photo(text):
+        await pg.evaluate(f'window.__ocrText = {json.dumps(text)}')
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await until(pg, "db.servings[0]?.status === 'noserver'")
+        await idle(pg)
+        got = await pg.evaluate(SAID)
+        await pg.click('#sheet [data-action=close]')
+        await idle(pg)
+        cards.append(await pg.evaluate(CARD_SUB))
+        return got
+
+    cards = []
+    both = await photo('Sheba\nLachs in Soße\n85 g')
+    await shot(pg, 'reading-said')
+    brand = await photo('Whiskas\n85 g')
+    variety = await photo('Huhn in Gelee')
+    nothing = await photo('12345\n850 g')
+    check(
+        cards
+        == [
+            ['Unbekanntes Futter / Vermutlich Lachs in Soße, tippen zum Bestätigen', 'Lachs in Soße', False, True],
+            ['Unbekanntes Futter / Vermutlich Whiskas, tippen zum Bestätigen', 'Whiskas', False, True],
+            ['Unbekanntes Futter / Vermutlich Huhn in Gelee, tippen zum Bestätigen', 'Huhn in Gelee', False, True],
+            ['Unbekanntes Futter / Tippen zum Benennen', None, False, True],
+        ],
+        f'the card in „Wie war’s?“ names the guess in bold, the variety or else the brand, in the usual colour and as small as its line; without one as before ({cards})',
+    )
+    await shot(pg, 'guess-card')
+    check(
+        both == ['Gelesen: Sheba, Lachs in Soße. Passt das?', ['Sheba', 'Lachs in Soße'], None, 'Passt so', True]
+        and brand == ['Gelesen: Whiskas. Passt das?', ['Whiskas'], None, 'Passt so', True]
+        and variety == ['Gelesen: Huhn in Gelee. Passt das?', ['Huhn in Gelee'], None, 'Passt so', True]
+        and nothing == [None, None, 'Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.', 'Speichern', True],
+        f'brand and variety in bold, one alone without the comma, „Passt so“ while there is a reading; nothing read: a hint and „Speichern“ ({both}, {brand}, {variety}, {nothing})',
+    )
+    # Named, the sentence is gone and the button says „Speichern“ again
+    await pg.click('.pend-head')
+    await idle(pg)
+    await pg.fill('#f-brand', 'Sheba')
+    await pg.fill('#f-variety', 'Lachs')
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=edit-name]')
+    await idle(pg)
+    named = await pg.evaluate(SAID)
+    check(named == [None, None, None, 'Speichern', True], f'„Futter ändern“ for a named meal: no sentence, „Speichern“ ({named})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+# The meal on top while a new photo is taken: status, the reading, its thumbnail and photo (their tails as identity)
+REPHOTO = """(s => [s.status ?? null, s.guess ? [s.guess.brand, s.guess.variety] : null, (s.thumb || '').slice(-32), (s.photo || '').slice(-32)])(db.servings[0])"""
+REPHOTO_VIEW = """() => { const l = document.querySelector('#sheet .link.rephoto');
+  return [l ? l.innerText.trim() : null, !!l?.querySelector('.ic'), document.querySelector('.pend .thumb')?.getAttribute('src')?.slice(-32) ?? null]; }"""
+
+
+async def test_rephoto(browser, url):
+    print('„Neues Foto“ while naming: the new photo replaces the old and is read anew, a late result of the old reading counts for nothing')
+    recognized = []
+    fail = {'server': False}
+
+    async def srv_route(route, request):  # the household server: recognises the photo, unless told to fail
+        path, now = request.url.split(':8486')[1], int(time.time() * 1000)
+        if path.startswith('/api/recognize'):
+            recognized.append(json.loads(request.post_data or '{}').get('image', '')[-32:])
+            if fail['server']:
+                await route.fulfill(status=503, content_type='application/json', body=json.dumps({'error': 'aus', 'now': now}))
+                return
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/info'):
+            body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': [], 'auth': True, 'now': now}
+        elif path.startswith('/api/changes') and request.method == 'POST':
+            body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])], 'now': now}
+        elif path.startswith('/api/changes'):
+            body = {'epoch': 'test', 'seq': 0, 'records': [], 'now': now}
+        else:
+            body = {'epoch': 'test', 'seq': 0, 'sum': '', 'fields': 0, 'now': now}
+        await route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+    ctx = await phone(browser)
+    await ctx.route(f'{SRV}/**', srv_route)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    small, big = base64.b64encode(PACK.read_bytes()).decode(), base64.b64encode(PACK_LARGE.read_bytes()).decode()
+
+    async def snapshot():
+        return [await state(pg, REPHOTO), await pg.evaluate(FIELDS), await pg.evaluate(CHIPS), await pg.evaluate(REPHOTO_VIEW)]
+
+    async def again(text, photo, delay=0):
+        """„Neues Foto“ with the camera app giving `photo` (None: „Abbrechen“) and the reading answering `text`"""
+        await pg.evaluate(f'window.__ocrText = {json.dumps(text)}; window.__ocrDelay = {delay}; window.__photo = {json.dumps(photo)}')
+        await pg.click('#sheet [data-action=rephoto]')
+
+    # The first photo, read at once
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = 0")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    first = await snapshot()
+    await shot(pg, 'rephoto-link')
+    await pg.evaluate('window.__calls.length = 0')
+    await again('Sheba\nLachs in Soße', big)
+    await until(pg, "db.servings[0]?.guess?.brand === 'Sheba'")
+    await idle(pg)
+    second = await snapshot()
+    cam = await pg.evaluate("window.__calls.filter(c => c[0] === 'capture').map(c => c[1])")
+    check(
+        first[0][:2] == ['noserver', ['Whiskas', 'Rind in Gelee']]
+        and first[1] == ['Whiskas', 'Rind in Gelee']
+        and first[3][:2] == ['Neues Foto', True]
+        and second[0][:2] == ['noserver', ['Sheba', 'Lachs in Soße']]
+        and second[1] == ['Sheba', 'Lachs in Soße']
+        and second[2] != first[2]
+        and second[0][2:] != first[0][2:]
+        and second[3][2] != first[3][2]
+        and second[3][2] == second[0][2]
+        and cam == [None],
+        f'„Neues Foto“ under the photo: the camera as when feeding, and with the new photo the fields, the chips, the thumbnail on the meal and in its card and the photo itself change ({first}, {second}, {cam})',
+    )
+    await again('Animonda\nCarny', None)
+    await idle(pg)
+    check(await snapshot() == second, '„Abbrechen“ changes nothing')
+
+    # A reading that takes long, then a new photo while it runs: the new reading answers, the old result is dropped
+    done = await pg.evaluate('window.__ocrDone || 0')
+    await again('Animonda\nCarny', small, 3000)
+    await pg.wait_for_selector('#sheet .skel-field')
+    await pg.wait_for_selector('#sheet #f-brand', timeout=4000)
+    waiting = [await state(pg, 'db.servings[0].status'), await pg.locator('#sheet [data-action=rephoto]').count()]
+    await again('Felix\nHuhn in Gelee', big)
+    await until(pg, "db.servings[0]?.guess?.brand === 'Felix'")
+    await pg.wait_for_function(f'(window.__ocrDone || 0) >= {done} + 2')
+    await idle(pg)
+    late = await snapshot()
+    check(
+        waiting == ['reading', 1] and late[0][:2] == ['noserver', ['Felix', 'Huhn in Gelee']] and late[1] == ['Felix', 'Huhn in Gelee'],
+        f'the skeleton first, the empty fields with the link once patience runs out; the old reading arriving late changes nothing ({waiting}, {late})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+
+    # In a household the new photo goes to the server as a new recognition
+    await pg.evaluate(
+        f"import('./js/store.js').then(m => {{ m.prefs.server = '{SRV}'; m.prefs.code = 'K7PM-3QXD'; m.prefs.mode = 'haushalt'; m.savePrefs(); }})"
+    )
+    await pg.evaluate("import('./js/sync.js').then(m => m.startSync())")
+    await until(pg, "status.state === 'ok'")
+    fail['server'] = True
+    await pg.evaluate("window.__ocrText = ''; window.__ocrDelay = 0")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'waiting'")
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
+    link = await pg.evaluate(REPHOTO_VIEW)
+    fail['server'] = False
+    await again('', big)
+    await until(pg, "db.servings[0]?.productId && db.products.some(p => p.variety === 'Gold Pastete')")
+    await idle(pg)
+    check(
+        link[:2] == ['Neues Foto', True] and len(recognized) == 2 and recognized[0] != recognized[1],
+        f'in a household: „Neues Foto“ while the server has not answered, and the new photo goes to the server as a recognition of its own ({link}, {len(recognized)} photos)',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+# The food sheet's photo link and the variety's photo: the link's text, its icon, the thumbnail's tail in the card and
+# on the variety, and the tail of the large photo this phone keeps
+PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const l = document.querySelector('#sheet [data-action=product-photo]'), p = s.db.products.find(x => x.id === pid);
+  return [l?.innerText.trim() ?? null, !!l?.querySelector('.ic'), document.querySelector('#sheet .prod-card .thumb')?.getAttribute('src')?.slice(-32) ?? null,
+    (p.thumb || '').slice(-32), (localStorage.getItem('__fs:photos/' + pid + '.jpg') || '').slice(-32), p.sharedPhoto ?? null]; })"""
+
+
+async def test_product_photo(browser, url):
+    print('„Foto ändern“ in the food sheet: the variety gets a new photo and thumbnail, „Abbrechen“ changes nothing')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    # A variety with a photo: photographed and named
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'; window.__ocrDelay = 0")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, "db.servings[0]?.status === 'noserver'")
+    await idle(pg)
+    await pg.click('[data-action=save-name]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    pid = await state(pg, 'db.products[0].id')
+
+    async def food_sheet():
+        await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+        await idle(pg)
+
+    await food_sheet()
+    before = await pg.evaluate(PRODUCT_PHOTO, pid)
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK_LARGE.read_bytes()).decode()}'; window.__calls.length = 0")
+    await pg.click('#sheet [data-action=product-photo]')
+    for _ in range(50):  # the file is written after the camera answers
+        after = await pg.evaluate(PRODUCT_PHOTO, pid)
+        if after[4] != before[4]:
+            break
+        await asyncio.sleep(0.1)
+    await idle(pg)
+    after = await pg.evaluate(PRODUCT_PHOTO, pid)
+    cam = await pg.evaluate("window.__calls.filter(c => c[0] === 'capture').map(c => c[1])")
+    check(
+        before[:2] == ['Foto ändern', True]
+        and before[4]
+        and after[:2] == ['Foto ändern', True]
+        and after[2] == after[3] != before[3]
+        and after[4] != before[4]
+        and after[5] is None
+        and cam == [None],
+        f'„Foto ändern“ under the photo: the camera as when feeding; the thumbnail in the sheet and on the variety and the large photo on this phone change, and alone nothing is marked for a server ({before}, {after}, {cam})',
+    )
+    await shot(pg, 'product-photo')
+    await pg.evaluate('window.__photo = null')
+    await pg.click('#sheet [data-action=product-photo]')
+    await idle(pg)
+    check(await pg.evaluate(PRODUCT_PHOTO, pid) == after, '„Abbrechen“ changes nothing')
+    # The large photo opens with the new one
+    await pg.click('#sheet .prod-card [data-action=view-photo]')
+    await pg.wait_for_selector('#viewer[open]')
+    await idle(pg)
+    large = await pg.evaluate("[document.querySelector('#viewer img').naturalWidth, document.querySelector('#viewer img').src.slice(-32)]")
+    await pg.click('#viewer')
+    await idle(pg)
+    check(large == [1100, after[4]], f'the viewer shows the new photo at 1100 px ({large[0]})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    # A variety without a photo offers „Foto hinzufügen“
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => { s.db.products.push({id: 'ohnefoto0001', brand: 'Felix', variety: 'Huhn', type: 'Nassfutter', codes: {}, createdAt: Date.now()}); s.save(); })"
+    )
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'product', id: 'ohnefoto0001'}))")
+    await idle(pg)
+    none = await pg.evaluate(PRODUCT_PHOTO, 'ohnefoto0001')
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK.read_bytes()).decode()}'")
+    await pg.click('#sheet [data-action=product-photo]')
+    await until(pg, "!!db.products.find(x => x.id === 'ohnefoto0001').thumb")
+    await idle(pg)
+    added = await pg.evaluate(PRODUCT_PHOTO, 'ohnefoto0001')
+    check(
+        none[:2] == ['Foto hinzufügen', True] and none[4] == '' and added[:2] == ['Foto ändern', True] and added[3] and added[4],
+        f'without a photo the link says „Foto hinzufügen“, and afterwards the variety has one ({none}, {added})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+async def test_known_photo(browser, url):
+    print('a photo of a known variety: served without the sheet, and undo takes the recognition back, not the meal')
+
+    async def srv_route(route, request):  # a household server whose photo recognition is switched off on this phone
+        path, now = request.url.split(':8486')[1], int(time.time() * 1000)
+        if path.startswith('/api/info'):
+            body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': [], 'auth': True, 'now': now}
+        elif path.startswith('/api/recognize'):
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze', 'now': now}
+        elif path.startswith('/api/changes') and request.method == 'POST':
+            body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])], 'now': now}
+        elif path.startswith('/api/changes'):
+            body = {'epoch': 'test', 'seq': 0, 'records': [], 'now': now}
+        else:
+            body = {'epoch': 'test', 'seq': 0, 'sum': '', 'fields': 0, 'now': now}
+        await route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+    ctx = await phone(browser)
+    await ctx.route(f'{SRV}/**', srv_route)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('.welcome [data-action=add-pet]')
+    await idle(pg)
+    await pg.fill('#f-name', 'Minka')
+    await pg.click('[data-action=save-pet]')
+    await idle(pg)
+    # A variety of our own, served once by hand
+    await pg.evaluate("""import('./js/store.js').then(async s => { const now = Date.now();
+      s.db.products.push({id: 'sheba000001', brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', codes: {}, createdAt: now});
+      s.db.servings.unshift({id: 'first0000001', productId: 'sheba000001', servedAt: now - 864e5, note: '', pets: {[s.db.pets[0].id]: {r: 'top', at: now}}});
+      s.save(); (await import('./js/views/home.js')).renderHome(); })""")
+
+    async def photo(text):
+        await pg.evaluate(f'window.__ocrText = {json.dumps(text)}')
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await until(pg, "db.servings[0]?.productId === 'sheba000001' || db.servings[0]?.status === 'noserver'")
+        await idle(pg)
+        return await state(pg, MEAL), await pg.evaluate(SHEET_TOAST)
+
+    meal, view = await photo('SHEBA\nLachs in Soße\n85 g')
+    kept = await pg.evaluate("import('./js/photos.js').then(p => p.keptPhoto('sheba000001'))")
+    check(
+        meal == ['sheba000001', None, False, False, None]
+        and view == [False, None, None, None, None, 'Lachs in Soße erkannt und serviert', True]
+        and await pg.eval_on_selector('#toast span b', 'b => b.innerText') == 'Lachs in Soße'
+        and kept,
+        f'the packaging of a known variety: served with that variety, no sheet, the toast names it in bold with „Rückgängig“, and the photo is kept for the variety ({meal}, {view})',
+    )
+    await shot(pg, 'known-photo-toast')
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    meal, view = await state(pg, MEAL), await pg.evaluate(SHEET_TOAST)
+    chips = await pg.evaluate(CHIPS)
+    check(
+        meal == [None, 'noserver', True, True, ['Sheba', 'Lachs in Soße']]
+        and view[:5] == [True, 'serving', 'name', 'Sheba', 'Lachs in Soße']
+        and chips == [['Sheba', 'false'], ['Lachs in Soße', 'true']]
+        and await pg.evaluate(BRAND_CHIPS) == [['Sheba', 'true']]
+        and await state(pg, 'db.products.length === 1 && db.servings.length === 2')
+        and await pg.evaluate("import('./js/photos.js').then(p => p.keptPhoto('sheba000001'))"),
+        f'undo takes the variety off the meal, not the meal: „Futter benennen“ opens with the reading in the fields and the lines read as chips; the variety keeps its photo ({meal}, {view}, {chips})',
+    )
+    await shot(pg, 'known-photo-undone')
+    await pg.click('#sheet [data-action=delete-serving]')
+    await idle(pg)
+    check(
+        await state(pg, 'db.servings.length === 1 && db.products.length === 1') and not await pg.evaluate("document.getElementById('sheet').open"),
+        '„Eintrag löschen“ there deletes the meal, and the variety stays',
+    )
+
+    # In a household with „Fotos über den Server erkennen“ off the phone reads the packaging itself: the same
+    await pg.evaluate(
+        f"import('./js/store.js').then(m => {{ m.prefs.server = '{SRV}'; m.prefs.code = 'K7PM-3QXD'; m.prefs.mode = 'haushalt'; m.prefs.serverPhoto = false; m.savePrefs(); }})"
+    )
+    await pg.evaluate("import('./js/sync.js').then(m => m.startSync())")
+    await until(pg, "status.state === 'ok'")
+    meal, view = await photo('Sheba\nLachs in Soße')
+    check(
+        meal[:2] == ['sheba000001', None] and view == [False, None, None, None, None, 'Lachs in Soße erkannt und serviert', True],
+        f'in a household with the server photo off: served straight away as well ({meal}, {view})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    check(
+        await state(pg, MEAL) == [None, 'noserver', True, True, ['Sheba', 'Lachs in Soße']]
+        and (await pg.evaluate(SHEET_TOAST))[:3] == [True, 'serving', 'name'],
+        'and undo opens the sheet with the reading there too',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 PACK_TEXT = 'Katzenglück\nZarte Häppchen\nmit Huhn\n4 x 85 g\nZutaten: Fleisch'
-CHIPS = """() => { const box = document.getElementById('suggest'), l = [...box.querySelectorAll('.label')].find(x => x.innerText === 'Auf der Packung gelesen');
-  return l ? [...l.nextElementSibling.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
+# The chips of the lines read under „Sorte“, after their label, and of the brands read under „Marke“: text and
+# whether pressed; None without any
+CHIPS = """() => { const box = document.getElementById('lineChips'), l = box?.querySelector('.label');
+  return l && l.innerText === 'Auf der Packung gelesen' ? [...box.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
+BRAND_CHIPS = """() => { const box = document.getElementById('brandChips');
+  return box?.querySelector('.chip') ? [...box.querySelectorAll('.chip')].map(c => [c.innerText, c.getAttribute('aria-pressed')]) : null; }"""
 FIELDS = "[document.getElementById('f-brand').value, document.getElementById('f-variety').value]"
+# Where the chip boxes stand: the brand chips right under „Marke“, the line chips under „Sorte“, each above the next label
+CHIP_PLACES = """() => { const r = s => document.querySelector('#sheet ' + s)?.getBoundingClientRect(), b = r('#brandChips'), l = r('#lineChips');
+  const art = [...document.querySelectorAll('#sheet .label')].find(x => x.innerText === 'Art').getBoundingClientRect();
+  return [b.height ? b.top >= r('#f-brand').bottom && b.bottom <= r('label[for=f-variety]').top : null, l.height ? l.top >= r('#f-variety').bottom && l.bottom <= art.top : null,
+    [...document.querySelectorAll('#sheet [data-action=pack-line]')].map(c => c.getAttribute('aria-label'))]; }"""
 
 
 async def test_pack_lines(browser, url):
@@ -3260,35 +4042,73 @@ async def test_pack_lines(browser, url):
     await pg.set_input_files('#camInputSheet', str(PACK))
     await until(pg, '!!db.servings[0]?.guess')
     await idle(pg)
-    chips = await pg.evaluate(CHIPS)
+    chips, brands, places = await pg.evaluate(CHIPS), await pg.evaluate(BRAND_CHIPS), await pg.evaluate(CHIP_PLACES)
     check(
-        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']],
-        f'the lines read appear as chips, and the one already in a field is marked ({chips})',
+        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']]
+        and brands is None
+        and places == [None, True, ['Sorte: Katzenglück', 'Sorte: Zarte Häppchen', 'Sorte: mit Huhn']]
+        and await pg.evaluate(FIELDS) == ['', 'mit Huhn'],
+        f'the lines read stand as chips under „Sorte“, the one the field holds pressed, each named for a screen reader; no brand known, no chip under „Marke“ ({chips}, {brands}, {places})',
     )
     await shot(pg, 'pack-lines')
 
-    # A tap fills the brand, two more make the variety, and a second tap takes a line out again
-    await pg.fill('#f-variety', '')
-    await pg.evaluate("document.getElementById('f-variety').blur()")
-    await pg.evaluate("import('./js/ui/sheet.js').then(m => { m.sheet.lastField = null; m.renderSheet(); })")
+    # A tap sets „Sorte“ to the chip, another replaces it, a tap on the pressed one clears the field, typing
+    # unpresses; the focus stays in the field being typed in all the while
+    await pg.fill('#f-variety', 'Zart')
+    await pg.click('#lineChips .chip:has-text("Zarte Häppchen")')
     await idle(pg)
-    await pg.click('#suggest .chip:has-text("Katzenglück")')
+    one = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS), await pg.evaluate('document.activeElement.id')]
+    await pg.click('#lineChips .chip:has-text("mit Huhn")')
     await idle(pg)
-    brand = await pg.evaluate(FIELDS)
-    await pg.click('#suggest .chip:has-text("Zarte Häppchen")')
+    other = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS)]
+    await pg.click('#lineChips .chip:has-text("mit Huhn")')
     await idle(pg)
-    await pg.click('#suggest .chip:has-text("mit Huhn")')
+    cleared = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS), await pg.evaluate('document.activeElement.id')]
+    await pg.click('#lineChips .chip:has-text("Katzenglück")')
     await idle(pg)
-    both = await pg.evaluate(FIELDS)
-    await pg.click('#suggest .chip:has-text("mit Huhn")')
+    await pg.type('#f-variety', 'x')
     await idle(pg)
+    typed = [await pg.evaluate(FIELDS), await pg.evaluate(CHIPS)]
     check(
-        brand == ['Katzenglück', '']
-        and both == ['Katzenglück', 'Zarte Häppchen mit Huhn']
-        and await pg.evaluate(FIELDS) == ['Katzenglück', 'Zarte Häppchen']
-        and await pg.evaluate(CHIPS) == [['Katzenglück', 'true'], ['Zarte Häppchen', 'true'], ['mit Huhn', 'false']],
-        f'one tap fills „Marke“, the next two „Sorte“, and tapping again takes a line out ({brand}, {both})',
+        one == [['', 'Zarte Häppchen'], [['Katzenglück', 'false'], ['Zarte Häppchen', 'true'], ['mit Huhn', 'false']], 'f-variety']
+        and other == [['', 'mit Huhn'], [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']]]
+        and cleared == [['', ''], [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'false']], 'f-variety']
+        and typed == [['', 'Katzenglückx'], [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'false']]],
+        f'a chip sets the field, the next replaces, the pressed one clears, a letter typed unpresses, and the focus stays in the field ({one}, {other}, {cleared}, {typed})',
     )
+    await pg.click('[data-action=close]')
+    await idle(pg)
+
+    # Brands in the text: chips under „Marke“, at most three, in their own spelling, the one in the field pressed
+    await pg.evaluate("window.__ocrText = 'SHEBA\\nFelix\\nWhiskas\\nAnimonda\\nLachs in Soße'")
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.set_input_files('#camInputSheet', str(PACK))
+    await until(pg, 'db.servings[0]?.guess && !db.servings[0].productId')
+    await idle(pg)
+    brands, fields, places = await pg.evaluate(BRAND_CHIPS), await pg.evaluate(FIELDS), await pg.evaluate(CHIP_PLACES)
+    await pg.fill('#f-brand', 'Anim')
+    await pg.click('#brandChips .chip:has-text("Whiskas")')
+    await idle(pg)
+    swapped = [await pg.evaluate(FIELDS), await pg.evaluate(BRAND_CHIPS), await pg.evaluate('document.activeElement.id')]
+    labels = await pg.evaluate("[...document.querySelectorAll('#brandChips .chip')].map(c => c.getAttribute('aria-label'))")
+    check(
+        len(brands) == 3
+        and brands[:2] == [['Animonda', 'true'], ['Whiskas', 'false']]
+        and brands[2][0] in ('Sheba', 'Felix')
+        and fields[0] == 'Animonda'
+        and swapped[0][0] == 'Whiskas'
+        and swapped[1][:2] == [['Animonda', 'false'], ['Whiskas', 'true']]
+        and swapped[2] == 'f-brand'
+        and labels[:2] == ['Marke: Animonda', 'Marke: Whiskas']
+        and places[0] is True,
+        f'the brands read stand as chips right under „Marke“, three at most, spelled as we know them, the one in the field pressed; a tap replaces the field ({brands}, {fields}, {swapped}, {labels}, {places})',
+    )
+    await shot(pg, 'pack-brands')
+    await pg.click('[data-action=close]')
+    await idle(pg)
+    await pg.click('.pend-head')
+    await idle(pg)
 
     # The lines are in memory only: they are in neither the data nor the queue, and a restart loses them
     kept = await state(pg, 'JSON.stringify([db, queue])')
@@ -3780,7 +4600,7 @@ async def test_mood(browser, url):
         seg2 = await choose(True)
         on = [await state(pg, 'prefs.backdrop'), (await pg.evaluate(MOOD))['hidden']]
         check(
-            seg == ['Profilbild im Hintergrund', 'Blass hinter dem Kopf der Startseite', True, 'switch', 'true']
+            seg == ['Profilbild im Hintergrund', 'Blass oben auf der Startseite', True, 'switch', 'true']
             and seg2[4] == 'false'
             and off == [False, True, True]
             and on == [True, False],
@@ -5025,7 +5845,7 @@ async def test_settings(browser, url):
 
 
 async def test_suggestions(browser, url):
-    print('feeding: buttons, search field, one list, at most three suggestions and eight hits')
+    print('feeding: buttons, search field, one list, at most five suggestions and eight hits')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     await pg.evaluate(SORTS, [3, 0])
@@ -5049,8 +5869,8 @@ async def test_suggestions(browser, url):
     )
     names = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        names == ['Sorte 1', 'Sorte 2', 'Sorte 3'] and order == ['cta-row', 'search', 'serveList', 'btn'],
-        f'buttons, then the search field, then the list, and „Ohne Foto eintippen“ at the end ({names}, {order})',
+        names == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'] and order == ['cta-row', 'search', 'serveList', 'btn'],
+        f'buttons, then the search field, then the list of the five fed last, and „Ohne Foto eintippen“ at the end ({names}, {order})',
     )
 
     # The search field must not move while typing: its place inside the sheet and its distance to the two
@@ -5100,11 +5920,75 @@ async def test_suggestions(browser, url):
     await idle(pg)
     back = await pg.eval_on_selector_all('#serveList .plist b', 'l => l.map(x => x.innerText)')
     check(
-        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3'],
+        hit == ['Sorte 11'] and back == ['Sorte 1', 'Sorte 2', 'Sorte 3', 'Sorte 4', 'Sorte 5'],
         f'searching brand and variety together, and an empty field shows the suggestions again ({hit}, {back})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
+
+
+# Six varieties for the quick picker: served today, yesterday, three days ago, twelve and twenty days ago, and one never
+# served, which only the search finds. Each served one with its ratings, the newest at the time given and the older
+# ones a week apart; the one without a rating has an open meal.
+PICKER_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), at = t => new Date(t).getTime(), week = 7 * 864e5;
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  const sorts = [['a', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl und Kürbis', '2026-06-09T13:14', ['top', 'gut']], ['b', 'Sheba', 'Lachs in Soße', '2026-06-08T19:22', ['sosse']],
+    ['c', 'Felix', 'Huhn in Gelee', '2026-06-06T08:00', [null]], ['d', '', 'Rind', '2026-05-28T08:00', ['top']], ['e', 'Miamor', 'Pute', '2026-05-20T08:00', ['schlecht']],
+    ['f', 'Bozita', 'Ente', null, []]];
+  d.products = sorts.map(([id, brand, variety]) => ({id: 'sorte' + id + '0001', brand, variety, type: 'Nassfutter', codes: {}, createdAt: 1}));
+  d.servings = sorts.filter(x => x[3]).flatMap(([id, , , when, rs]) => rs.map((r, j) => ({id: 'meal' + id + j + '0001', productId: 'sorte' + id + '0001', note: '',
+    servedAt: at(when) - j * week, pets: {minka00001: {r, at: r ? at(when) : null}}}))).sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+# The rows of the quick picker or the search hits: the name, what stands under it, the dots of the strip, and whether
+# a word for serving is left in the row
+PICKER_ROWS = """() => [...document.querySelectorAll('#serveList .plist .row')].map(r => [r.querySelector('b').innerText, r.querySelector('small').innerText,
+  [...r.querySelectorAll('.strip i')].map(i => i.className), !!r.querySelector('.link')])"""
+
+
+async def test_picker(browser, url):
+    print('the quick picker: brand and when a variety was last served, its strip at the end, five of them, nothing cut off at 360 px')
+    for scheme in ('light', 'dark'):
+        ctx = await phone(browser, scheme, width=360, height=760, timezone_id='Europe/Berlin')
+        pg, errors = await open_page(ctx, url, scheme)
+        await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
+        await pg.evaluate(PICKER_DB)
+        await idle(pg)
+        await pg.click('#fab')
+        await idle(pg)
+        rows = await pg.evaluate(PICKER_ROWS)
+        check(
+            rows
+            == [
+                ['Wildschwein mit Nachtkerzenöl und Kürbis', 'Catz Finefood, heute um 13:14', ['r-good', 'r-good'], False],
+                ['Lachs in Soße', 'Sheba, gestern um 19:22', ['r-sauce'], False],
+                ['Huhn in Gelee', 'Felix, vor 3 Tagen', [], False],
+                ['Rind', 'am 28. Mai', ['r-good'], False],
+                ['Pute', 'Miamor, am 20. Mai', ['r-bad'], False],
+            ],
+            f'{scheme}: the five fed last, each with its brand and when it was last served, its ratings as a strip where it has any, and no word for serving ({rows})',
+        )
+        await pg.fill('#sheet [data-search]', 'Ente')
+        await idle(pg)
+        hit = await pg.evaluate(PICKER_ROWS)
+        check(hit == [['Ente', 'Bozita, noch nie serviert', [], False]], f'a search hit never served says so ({hit})')
+        await pg.fill('#sheet [data-search]', '')
+        await idle(pg)
+        for scale in (1, 1.3):
+            if scale != 1:
+                await pg.evaluate(BIG_TEXT, scale)
+                await idle(pg)
+            fit = await pg.evaluate(NARROW, '.plist *')
+            lines = await pg.eval_on_selector_all(
+                '#serveList .plist .row',
+                'l => l.map(r => [Math.round(r.querySelector("b").getBoundingClientRect().height / parseFloat(getComputedStyle(r.querySelector("b")).lineHeight)), r.querySelector(".strip")?.getBoundingClientRect().width ?? 0])',
+            )
+            check(
+                not fit['wide'] and not fit['sideways'] and lines[0][0] == 2 and all(x[0] <= 2 for x in lines) and lines[0][1] > lines[1][1] > 0,
+                f'{scheme}, {int(scale * 100)} %: nothing cut off at 360 px, the long name on two lines, the strip at the end at its full width ({fit}, {lines})',
+            )
+            await shot(pg, f'picker-{scheme}-{int(scale * 100)}')
+        check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+        await ctx.close()
 
 
 # Meals at given times for the home page's history: pets [id, name], meals [id, time, pet ids, variety]
@@ -5575,6 +6459,7 @@ run_tests(
         'tour': test_tour,
         'flow': test_flow,
         'buying': test_buying,
+        'window': test_window,
         'cards': test_cards,
         'shop': test_shop,
         'profile': test_profile,
@@ -5588,11 +6473,13 @@ run_tests(
         'texture': test_texture,
         'feed-routes': test_feed_routes,
         'suggestions': test_suggestions,
+        'picker': test_picker,
         'milestones': test_milestones,
         'reminder': test_reminders,
         'own-interval': test_remind,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
+        'birthday': test_birthday,
         'modes': test_modes,
         'network': test_network,
         'shortcuts': test_shortcuts,
@@ -5600,6 +6487,11 @@ run_tests(
         'recognition': test_recognize,
         'discard': test_discard,
         'pack-lines': test_pack_lines,
+        'known-photo': test_known_photo,
+        'skeleton': test_skeleton,
+        'reading-said': test_reading_said,
+        'rephoto': test_rephoto,
+        'product-photo': test_product_photo,
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,

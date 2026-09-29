@@ -1,6 +1,6 @@
 /* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
    derive.js. The rules are in PROJECT.md, section "Evaluation". */
-import {FLAVORS, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
+import {flavoursOf, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
 import {addDays, dayKey, dayStart} from './dates.js';
 
 const DAY = 864e5;
@@ -9,6 +9,8 @@ const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // reference time of the weights, irre
 export const GOOD = 70; // from this many points a rating, a variety or a share counts as going down well
 export const NO = 40; // under this many a rating counts as left, and a variety as not going down well
 export const MIN_RATED = 3; // from this many ratings in its span a ring of „Verlauf“ shows a share
+export const WINDOW = 8; // the newest ratings per variety and pet the verdict rests on
+export const VERDICT_SPAN = 180 * DAY; // ratings older than this do not count for the verdict; they still weigh in the score
 const APPETITE = {recent: 72 * 36e5, usual: 30 * DAY, minRecent: 3, minUsual: 8, minSorts: 2, drop: 30, below: 50};
 export const VERDICTS = {
   nachkaufen: 'Nachkaufen',
@@ -27,63 +29,90 @@ export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score < NO ? 's
 export const scoreCls = v => 'r-' + toneOf(v);
 export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
-const keywordOf = (list, text) => (list.find(([, re]) => re.test(text || '')) || [])[0];
 
 /* Sum over ratings. All weights shrink at the same rate, so points / weights does not depend on when it is
-   computed: a sum holds until one of its meals changes. list: the ratings themselves, in no particular order, kept
-   in the sums per variety and pet only. */
-const emptySum = () => ({n: 0, points: 0, weights: 0, counts: {}, list: []}); // counts: only levels that actually occur
+   computed: a sum holds until one of its meals changes. list: the ratings themselves, the newest first as the meals
+   are kept, in the sums per variety and pet only. */
+const emptySum = () => ({n: 0, points: 0, weights: 0, list: []});
 function addRating(sum, x) {
   const w = Math.pow(2, (x.t - WEIGHT_ZERO) / HALF_LIFE);
   sum.n++;
   sum.points += w * RATINGS[x.r].score;
   sum.weights += w;
-  sum.counts[x.r] = (sum.counts[x.r] || 0) + 1;
   sum.list.push(x);
 }
 function addSum(sum, other) {
   sum.n += other.n;
   sum.points += other.points;
   sum.weights += other.weights;
-  for (const r in other.counts) sum.counts[r] = (sum.counts[r] || 0) + other.counts[r];
   return sum;
 }
-/* The ratings of some varieties within the filter as their keys, oldest first: what a strip of dots shows (strip()
-   in views/parts.js). Sorted only when asked for, since only the rows on screen need it. */
-export const ratingsIn = (m, ids) =>
-  ids
-    .flatMap(id => {
-      const pets = m.byId.get(id)?.pets || {};
-      return m.pet ? pets[m.pet]?.list || [] : Object.values(pets).flatMap(x => x.list);
-    })
-    .sort((a, b) => a.t - b.t)
-    .map(x => x.r);
+const scoreOf = sum => (sum.n ? +(sum.points / sum.weights).toFixed(6) : 0);
+/* The ratings a verdict rests on: the newest WINDOW of a pet's ratings of a variety (the list holds them newest
+   first), and of those only the ones younger than VERDICT_SPAN as of now. What a pet did months ago must not
+   outweigh what it does now. */
+const windowOf = (list, now) => list.slice(0, WINDOW).filter(x => x.t > now - VERDICT_SPAN);
+const countsOf = list => {
+  const counts = {}; // only levels that actually occur
+  for (const x of list) counts[x.r] = (counts[x.r] || 0) + 1;
+  return counts;
+};
+/* The ratings a strip shows for some varieties within the filter (strip() in views/parts.js): with a pet the window
+   its verdicts rest on, with „Alle“ the windows of every pet; keys, the rating keys oldest first, and more, whether
+   ratings lie beyond the windows, which the strip says with a „+“. Sorted only when asked for, since only the rows on
+   screen need it. */
+export function ratingsIn(m, ids) {
+  const stats = ids.flatMap(id => {
+    const pets = m.byId.get(id)?.pets || {};
+    return m.pet ? [pets[m.pet]].filter(Boolean) : Object.values(pets);
+  });
+  return {
+    keys: stats
+      .flatMap(x => x.window)
+      .sort((a, b) => a.t - b.t)
+      .map(x => x.r),
+    more: stats.some(x => x.list.length > x.window.length),
+  };
+}
 /* How often ratings went down well (from GOOD points) and how often they were left (under NO) */
 const countOf = (counts, on) => Object.entries(counts).reduce((a, [r, k]) => a + (on(RATINGS[r].score) ? k : 0), 0);
 export const goodOf = counts => countOf(counts, v => v >= GOOD);
 export const poorOf = counts => countOf(counts, v => v < NO);
-/* The score orders varieties; the verdict counts ratings, as the words that explain it do (evidenceOf() in
-   views/parts.js): „Nachkaufen“ from 3 ratings with at least two thirds of them good, „Nicht mehr kaufen“ from 2
-   with more than half of them left, „Geht so“ from 3 otherwise, and below that „Noch zu wenig bewertet“. */
-function statOf(sum) {
-  const score = sum.n ? +(sum.points / sum.weights).toFixed(6) : 0,
-    pct = Math.round(score), // rounded against the noise of the weights
-    good = goodOf(sum.counts),
-    poor = poorOf(sum.counts);
+/* The score orders varieties; the verdict counts the ratings of the window, as the words that explain it do
+   (evidenceOf() in views/parts.js): „Nachkaufen“ from 3 ratings with at least two thirds of them good, „Nicht mehr
+   kaufen“ from 2 with more than half of them left, „Geht so“ from 3 otherwise, and below that „Noch zu wenig
+   bewertet“. */
+const verdictOf = (n, good, poor) =>
+  n >= 3 && good * 3 >= n * 2 ? 'nachkaufen' : n >= 2 && poor * 2 > n ? 'nicht' : n >= 3 ? 'geht' : 'neu';
+/* A pet's stat of a variety as of now: the score over every rating, weighted; n, counts and the verdict from the
+   window. pct: rounded against the noise of the weights. */
+function statOf(sum, now) {
+  const window = windowOf(sum.list, now),
+    counts = countsOf(window),
+    score = scoreOf(sum);
   return {
-    n: sum.n,
+    n: window.length,
     score,
-    pct,
-    counts: sum.counts,
+    pct: Math.round(score),
+    counts,
     list: sum.list,
-    verdict:
-      sum.n >= 3 && good * 3 >= sum.n * 2
-        ? 'nachkaufen'
-        : sum.n >= 2 && poor * 2 > sum.n
-          ? 'nicht'
-          : sum.n >= 3
-            ? 'geht'
-            : 'neu',
+    window,
+    verdict: verdictOf(window.length, goodOf(counts), poorOf(counts)),
+  };
+}
+/* The household's stat of a variety from its pets' raw sums and stats: the score over every rating of every pet,
+   weighted, and n and counts as the sum of the pets' windows, which the words read; the verdict from the pets'
+   (houseVerdict()) */
+function houseOf(sums, stats) {
+  const all = Object.values(sums).reduce(addSum, emptySum()),
+    score = scoreOf(all),
+    window = Object.values(stats).flatMap(x => x.window);
+  return {
+    n: window.length,
+    score,
+    pct: Math.round(score),
+    counts: countsOf(window),
+    ...houseVerdict(Object.entries(stats)),
   };
 }
 
@@ -122,11 +151,11 @@ function houseVerdict(pets) {
   return {yes, no, verdict: yes.length ? (no.length ? 'gemischt' : 'nachkaufen') : no.length ? 'nicht' : rest};
 }
 
-/* Model  = {pet, sorts, byId, rated, hints, repeats}
-   Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, sum, choice, plus the values within
-            the filter: n, score, pct, verdict, counts, yes, no}
-   Stat  = {n, score, pct, verdict, counts, list: the ratings, per pet only}
-   repeats: per pet in the filter, how its meals went after the same variety and after another one (repeatsOf()) */
+/* Model  = {pet, pets: the pets in the filter, sorts, byId, rated, hints, repeats}
+   Sort  = {id, product, kaufen, pets: {[petId]: Stat}, house: Stat with yes/no, choice, plus the values within the
+            filter: n, score, pct, verdict, counts, yes, no, and total, every rating within the filter, the window aside}
+   Stat  = {n, score, pct, verdict, counts, list: the ratings, window: those the verdict rests on, per pet only}
+   repeats: per pet in the filter, how its meals went shortly after the same variety and otherwise (repeatsOf()) */
 export function analyze(db, prefs, now, sums = tally(db, now)) {
   const petIds = db.pets.map(p => p.id);
   const pet = prefs.activePet && prefs.activePet !== 'all' && petIds.includes(prefs.activePet) ? prefs.activePet : null;
@@ -134,10 +163,9 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     .map(product => {
       const mine = sums.bySort.get(product.id) || {},
         pets = {};
-      for (const pid of petIds) if (mine[pid]) pets[pid] = statOf(mine[pid]);
-      const houseSum = petIds.reduce((sum, pid) => (mine[pid] ? addSum(sum, mine[pid]) : sum), emptySum());
-      const house = Object.assign(statOf(houseSum), houseVerdict(Object.entries(pets)));
-      const eff = pet ? pets[pet] || statOf(emptySum()) : house;
+      for (const pid of petIds) if (mine[pid]) pets[pid] = statOf(mine[pid], now);
+      const house = houseOf(mine, pets);
+      const eff = pet ? pets[pet] || statOf(emptySum(), now) : house;
       const kaufen = product.kaufen === 'immer' || product.kaufen === 'nicht' ? product.kaufen : null;
       return {
         id: product.id,
@@ -145,7 +173,7 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
         kaufen,
         pets,
         house,
-        sum: pet ? mine[pet] || emptySum() : houseSum,
+        total: pet ? mine[pet]?.n || 0 : petIds.reduce((a, pid) => a + (mine[pid]?.n || 0), 0),
         n: eff.n,
         score: eff.score,
         pct: eff.pct,
@@ -161,6 +189,7 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
   let repeats = null; // worked out the first time it is asked for: only „Vorlieben“ reads it
   return {
     pet,
+    pets: pet ? [pet] : petIds,
     sorts,
     byId,
     rated: sorts.reduce((a, e) => a + e.n, 0),
@@ -180,29 +209,30 @@ const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
 const GAP = 0.3,
   TWO = 2; // varieties in a group, ratings of a variety
+/* The groups a variety belongs to in each dimension: its consistency (the field, falling back to the keywords only
+   when it is missing), every flavour its name holds, and its brand */
 const DIMENSIONS = [
-  ['konsistenz', p => (textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]], // the field, falling back to the keywords only when it is missing
-  ['geschmack', p => keywordOf(FLAVORS, p.variety)],
-  ['marke', p => p.brand],
+  ['konsistenz', p => [(textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]]],
+  ['geschmack', p => flavoursOf(p.variety)],
+  ['marke', p => [p.brand]],
 ];
 const HABITS = ['sosse', 'eager']; // levels that say how a variety is eaten
 
 /* The profile: per food type the dimensions in a fixed order (consistency or treat type, flavour, brand), each with
    its groups ranked by how often they went down well, the best first, from two groups on. A dimension is clear
    („deutlich“) where its best and its weakest group lie at least GAP apart and every variety of the one did better
-   than every variety of the other, so no single variety can carry it.
+   than every variety of the other, so no single variety can carry it. A variety naming two flavours („Huhn &
+   Thunfisch“) counts in both groups; standing in the best and the weakest at once, it keeps that comparison from
+   being clear, which is meant.
    [{kind, type, groups: [{key, ids, n, good, share, low, high}], gap, clear}] */
 export function profile(m) {
   const out = [],
     rated = m.sorts.filter(e => e.n >= TWO);
   for (const type of TYPES) {
     const mine = rated.filter(e => typeOf(e.product) === type);
-    for (const [kind, keyOf] of DIMENSIONS) {
+    for (const [kind, keysOf] of DIMENSIONS) {
       const groups = new Map();
-      for (const e of mine) {
-        const k = keyOf(e.product);
-        if (k) groups.set(k, [...(groups.get(k) || []), e]);
-      }
+      for (const e of mine) for (const k of keysOf(e.product)) if (k) groups.set(k, [...(groups.get(k) || []), e]);
       const ranked = [...groups]
         .filter(([, l]) => l.length >= TWO)
         .map(([key, l]) => groupOf(key, l))
@@ -237,38 +267,41 @@ export function habits(m) {
   return out;
 }
 
-/* Abwechslung, per pet: its rated meals that are not treats, split into those that followed the same variety (its
-   meal before, not counting treats, was the same one) and the rest. Only meals up to now, of varieties there are.
-   {[petId]: {same: {n, good}, other: {n, good}}} */
+/* Abwechslung, per pet: its rated meals that are not treats, split into those that came shortly after the same variety
+   (the pet had it within its REPEAT.within meals before, treats left out, a meal of unknown food taking one of the
+   places) and the rest. Only meals up to now, of varieties there are. {[petId]: {same: {n, good}, other: {n, good}}} */
+const REPEAT = {within: 3};
 function repeatsOf(db, petIds, now) {
   const snack = new Set(),
     known = new Set(), // the other varieties
     out = {},
-    next = {}; // per pet its meal after the one at hand, still waiting to learn what came before it
+    before = {}; // per pet the varieties of its last meals, the newest last
   for (const p of db.products) (typeOf(p) === 'Snack' ? snack : known).add(p.id);
-  for (const id of petIds) out[id] = {same: {n: 0, good: 0}, other: {n: 0, good: 0}};
-  const count = (pid, before) => {
-    const meal = next[pid];
-    if (!meal?.r || !known.has(meal.id)) return;
-    const side = out[pid][meal.id === before ? 'same' : 'other'];
-    side.n++;
-    if (RATINGS[meal.r].score >= GOOD) side.good++;
-  };
-  for (const s of db.servings) {
-    // newest first, so the meal before is the next one of the same pet
+  for (const id of petIds) {
+    out[id] = {same: {n: 0, good: 0}, other: {n: 0, good: 0}};
+    before[id] = [];
+  }
+  for (let i = db.servings.length - 1; i >= 0; i--) {
+    // the oldest first, so the meals before a meal have been seen when it comes
+    const s = db.servings[i];
     if (s.servedAt > now || snack.has(s.productId)) continue;
     for (const pid in s.pets) {
       if (!out[pid]) continue;
-      count(pid, s.productId);
-      next[pid] = {id: s.productId, r: rOf(s.pets[pid])};
+      const r = rOf(s.pets[pid]);
+      if (r && known.has(s.productId)) {
+        const side = out[pid][before[pid].includes(s.productId) ? 'same' : 'other'];
+        side.n++;
+        if (RATINGS[r].score >= GOOD) side.good++;
+      }
+      before[pid].push(s.productId || null);
+      if (before[pid].length > REPEAT.within) before[pid].shift();
     }
   }
-  for (const pid in next) count(pid, undefined); // the first meal has none before it
   return out;
 }
-/* Whether a pet likes a change: its meals after the same variety against the rest, both from VARIETY.min ratings.
-   Their shares of good ones VARIETY.gap points apart make a habit: lower after the same variety, it likes a change
-   („abwechslung“); higher, it is a creature of habit („gewohnheit“). One per pet in the filter.
+/* Whether a pet likes a change: its meals shortly after the same variety against the rest, both from VARIETY.min
+   ratings. Their shares of good ones VARIETY.gap points apart make a habit: lower after the same variety, it likes a
+   change („abwechslung“); higher, it is a creature of habit („gewohnheit“). One per pet in the filter.
    [{pet, kind, same: {n, good}, other: {n, good}}] */
 const VARIETY = {min: 6, gap: 25};
 export function variety(m) {
@@ -279,6 +312,38 @@ export function variety(m) {
       far = VARIETY.gap * same.n * other.n;
     if (apart <= -far) out.push({pet, kind: 'abwechslung', same, other});
     else if (apart >= far) out.push({pet, kind: 'gewohnheit', same, other});
+  }
+  return out;
+}
+
+/* Neuheit, per pet in the filter: whether new food goes down well at first and wears off, or needs a while. For every
+   variety that is no treat and the pet rated at least twice, the oldest rating is the first time and the rest come
+   after; over such varieties, how many went down well the first time (from GOOD) against how many of the later
+   ratings did. Every rating counts, older ones than VERDICT_SPAN too: this is about first encounters. From
+   NOVELTY.minSorts varieties and NOVELTY.minLater later ratings; the two shares NOVELTY.gap points apart make a
+   habit: a higher first share is curiosity („neugier“), a lower one a slow start („anlauf“). Whole numbers, as
+   variety() has it. [{pet, kind, first: {n, good}, later: {n, good}}] */
+const NOVELTY = {minSorts: 4, minLater: 8, gap: 30};
+export function novelty(m) {
+  const out = [],
+    good = r => RATINGS[r.r].score >= GOOD;
+  for (const pet of m.pets) {
+    const first = {n: 0, good: 0},
+      later = {n: 0, good: 0};
+    for (const e of m.sorts) {
+      const x = e.pets[pet];
+      if (!x || x.list.length < 2 || typeOf(e.product) === 'Snack') continue;
+      const [head, ...rest] = [...x.list].sort((a, b) => a.t - b.t);
+      first.n++;
+      if (good(head)) first.good++;
+      later.n += rest.length;
+      later.good += rest.filter(good).length;
+    }
+    if (first.n < NOVELTY.minSorts || later.n < NOVELTY.minLater) continue;
+    const apart = 100 * (first.good * later.n - later.good * first.n), // in points, times both counts: exact
+      far = NOVELTY.gap * first.n * later.n;
+    if (apart >= far) out.push({pet, kind: 'neugier', first, later});
+    else if (apart <= -far) out.push({pet, kind: 'anlauf', first, later});
   }
   return out;
 }
@@ -385,9 +450,9 @@ export function report(db, prefs, now = Date.now(), days = 0) {
 
 /* What changed within the last `days` calendar days, within the pet filter: the varieties whose verdict became
    „Nachkaufen“ or „Nicht mehr kaufen“ in that span. The verdict as it stood when the span began comes from the ratings
-   the model holds per pet, those before its first day, and counts like any other.
-   {nachkaufen: [id], nicht: [id]}, the best first and the clearest first. after: the model now, where the caller
-   holds it already. */
+   the model holds per pet, those before its first day, and counts like any other, its window and its span measured
+   from that day. {nachkaufen: [id], nicht: [id]}, the best first and the clearest first. after: the model now, where
+   the caller holds it already. */
 export function changes(db, prefs, now, days, after = analyze(db, prefs, now)) {
   const start = addDays(dayStart(now), 1 - days);
   const earlier = e => {
@@ -395,9 +460,9 @@ export function changes(db, prefs, now, days, after = analyze(db, prefs, now)) {
       .map(([pid, x]) => {
         const sum = emptySum();
         for (const r of x.list) if (r.t < start) addRating(sum, r);
-        return [pid, statOf(sum)];
+        return [pid, statOf(sum, start)];
       })
-      .filter(([, x]) => x.n);
+      .filter(([, x]) => x.list.length);
     return after.pet ? (pets.find(([pid]) => pid === after.pet)?.[1].verdict ?? 'neu') : houseVerdict(pets).verdict;
   };
   const became = verdict => after.sorts.filter(e => e.verdict === verdict && earlier(e) !== verdict);
@@ -419,13 +484,14 @@ function spanDays(meals, now, days) {
 
 /* Groups for „Einkaufen“ and the shopping list: „Nachkaufen“ (with „Gemischt“), best first, „Nicht mehr kaufen“,
    the clearest first, „Geht so“ and „Noch zu wenig bewertet“. The manual setting decides the group, and varieties
-   without a rating in the filter only show up with one. */
+   without a rating in the filter only show up with one; a variety whose ratings are all older than the window stands
+   under „Noch zu wenig bewertet“. */
 export function shopGroups(m) {
   const g = {nachkaufen: [], nicht: [], geht: [], neu: []};
   for (const e of m.sorts)
     if (e.choice === 'nachkaufen' || e.choice === 'gemischt') g.nachkaufen.push(e);
     else if (e.choice === 'nicht') g.nicht.push(e);
-    else if (e.n) g[e.choice].push(e);
+    else if (e.total) g[e.choice].push(e);
   g.nicht.sort((a, b) => a.score - b.score || b.n - a.n);
   return g;
 }
