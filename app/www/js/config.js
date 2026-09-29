@@ -181,6 +181,19 @@ export const BRANDS = [
   'K-Classic',
   'Dein Bestes',
 ];
+/* Product lines that belong to one brand and stand on the front larger than the logo, which a script logo often
+   keeps from being read („Miamor“). Read on a packaging without a brand, the line names the brand (js/ocr.js).
+   Only lines no other brand uses. */
+export const PRODUCT_LINES = [
+  ['Miamor', ['Ragout Royale', 'Feine Filets', 'Feine Beutel', 'Milde Mahlzeit', 'Trinkfein']],
+  ['Animonda', ['Carny', 'Vom Feinsten', 'Rafiné', 'Integra Protect', 'GranCarno']],
+  ['Sheba', ['Selection in Sauce', 'Sauce Spéciale', 'Fresh & Fine', 'Craft Collection', 'Fine Flakes']],
+  ['Felix', ['So gut wie es aussieht', 'Sensations', 'Tasty Shreds']],
+  ['Gourmet', ['Mon Petit', 'Nature’s Creations']],
+  ['Catz Finefood', ['Purrrr']],
+  ['Happy Cat', ['Minkas']],
+  ['Vitakraft', ['Poésie']],
+];
 export const TYPE_WORDS = [
   ['Trockenfutter', /trockenfutter|trockennahrung|kroketten|kibble|dry food/i],
   ['Snack', /snack|leckerli|leckerchen|belohnung|treat/i],

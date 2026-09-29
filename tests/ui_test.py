@@ -4121,11 +4121,11 @@ async def test_pack_lines(browser, url):
     await idle(pg)
     chips, brands, places = await pg.evaluate(CHIPS), await pg.evaluate(BRAND_CHIPS), await pg.evaluate(CHIP_PLACES)
     check(
-        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'true']]
+        chips == [['Katzenglück', 'false'], ['Zarte Häppchen', 'false'], ['mit Huhn', 'false']]
         and brands is None
         and places == [None, True, ['Sorte: Katzenglück', 'Sorte: Zarte Häppchen', 'Sorte: mit Huhn']]
-        and await pg.evaluate(FIELDS) == ['', 'mit Huhn'],
-        f'the lines read stand as chips under „Sorte“, the one the field holds pressed, each named for a screen reader; no brand known, no chip under „Marke“ ({chips}, {brands}, {places})',
+        and await pg.evaluate(FIELDS) == ['', 'Huhn'],
+        f'the lines read stand as chips under „Sorte“, each named for a screen reader, none pressed since the field holds the variety without its „mit“; no brand known, no chip under „Marke“ ({chips}, {brands}, {places})',
     )
     await shot(pg, 'pack-lines')
 
