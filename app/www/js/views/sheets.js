@@ -69,7 +69,8 @@ const servingCard = (s, p) => {
     : `<button class="box prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'xl')}${main}</button>`;
 };
 /* „Foto ändern“ under a variety's card, „Foto hinzufügen“ while it has no photo: in the meal's sheet, where a meal is
-   opened from the home page, and in the food sheet (reshootProduct() in logic/feeding.js) */
+   opened from the home page, in the food sheet, and under the photo while naming or renaming it (reshootProduct()
+   in logic/feeding.js) */
 const photoLink = p =>
   `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen'}</button>`;
 const petRateRow = (s, pid, multi) =>
@@ -105,17 +106,19 @@ function viewServing() {
 
 function viewName() {
   const s = sheet;
-  const serving = s.kind === 'serving' ? getServing(s.id) : null;
+  const serving = s.kind === 'serving' ? getServing(s.id) : null,
+    // the variety renamed, or the meal's: its photo is the one shown and changed here
+    product = s.kind === 'product' ? getProduct(s.id) : getProduct(serving?.productId);
   const title =
     s.kind === 'new'
       ? 'Neues Futter'
       : s.kind === 'product'
         ? 'Futter umbenennen'
-        : serving?.productId
+        : product
           ? 'Futter ändern'
           : 'Futter benennen';
-  const photo = serving && (serving.photo || serving.thumb),
-    large = serving && hasPhoto(serving, null),
+  const photo = product?.thumb || serving?.photo || serving?.thumb,
+    large = hasPhoto(serving, product),
     reading = serving?.status === 'reading',
     // while the phone reads, a skeleton stands in for the fields; once that has taken READ_PATIENCE, the empty fields
     patient = reading && Date.now() - (readingSince.get(serving.id) || 0) < READ_PATIENCE;
@@ -134,23 +137,25 @@ function viewName() {
     ${
       photo
         ? large
-          ? `<button class="photo-btn" data-action="view-photo" data-s="${serving.id}" data-p="" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
+          ? `<button class="photo-btn" data-action="view-photo" data-s="${serving?.id || ''}" data-p="${product?.id || ''}" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
           : `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">`
         : ''
     }${note}`;
   if (patient) return top + fieldSkeleton + fieldSkeleton; // as tall as label and field, so nothing jumps
   // What the phone read, as a sentence to confirm, or that there was nothing to read; and a new photo, for a meal
-  // still without a variety
+  // still without a variety, or the variety's photo to change, as under its card
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
     said = read.length
       ? `<p class="say read-note">Gelesen: ${read.map(x => `<b>${esc(x)}</b>`).join(', ')}. Passt das?</p>`
-      : serving?.status === 'noserver' && !serving.productId
+      : serving?.status === 'noserver' && !product
         ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.</p>`
         : '',
     again =
-      serving && !serving.productId && photo
+      serving && !product && photo
         ? `<button class="link rephoto" data-action="rephoto">${icon('camera')}Neues Foto</button>`
-        : '';
+        : product
+          ? photoLink(product)
+          : '';
   return `${top}${said}${again}
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
@@ -162,7 +167,7 @@ function viewName() {
     <span class="label">Art</span>
     <div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>
     ${textureChips(s)}
-    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !serving.productId ? deleteMealBtn(serving.id) : ''}</div>`;
+    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !product ? deleteMealBtn(serving.id) : ''}</div>`;
 }
 /* A field still to come: a label's line and a field's block, shimmering, no input */
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;

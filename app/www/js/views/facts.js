@@ -1027,7 +1027,7 @@ export const LINES = {
     'Futterzeit! Zuletzt gab es {when} {what}{by}.',
     'Es ist so weit: Futterzeit. Zuletzt gab es {when} {what}{by}.',
     'Die Uhr sagt Futterzeit. Das letzte Mal gab es {when} {what}{by}.',
-    'Futterzeit, laut Tagebuch jedenfalls. Zuletzt stand {when} {what}{by} auf dem Plan.',
+    'Zeit für den Napf. Zuletzt gab es {when} {what}{by}.',
   ],
   freshHouse: [
     '{server} hat {names} {when} {what} {verb}.',
@@ -1041,13 +1041,13 @@ export const LINES = {
   ],
   todayOne: [
     'Heute gab es um {at} {what}{by}.',
-    'Bisher einmal serviert heute, um {at}: {what}{by}.',
+    'Heute erst einmal serviert, um {at}: {what}{by}.',
     'Um {at} gab es heute {what}{by}, seitdem nichts mehr.',
   ],
   today: [
     'Heute gab es {so} {both}, zuletzt um {at} {what}{by}.',
     'Der Tag hat {so} {both} gebracht, zuletzt um {at} {what}{by}.',
-    'Bis jetzt {so} {both} heute. Zuletzt gab es um {at} {what}{by}.',
+    '{names} {hat} heute {so} {both} bekommen, zuletzt um {at} {what}{by}.',
   ],
   nothingYet: [
     'Heute gab es noch nichts, zuletzt gestern um {at} {what}{by}.',
@@ -1127,7 +1127,7 @@ export const LINES = {
   ],
   milestoneNext: [
     'Das nächste Füttern ist das {m}! Fast schon ein Jubiläum.',
-    'Noch einmal füttern, dann steht das {m} Mal im Tagebuch. Jubiläumsstimmung liegt in der Luft.',
+    'Noch einmal füttern, dann steht das {m} Mal im Tagebuch.',
     'Das {m} Mal steht an. Beim nächsten Füttern ist es so weit.',
   ],
   milestone: [
@@ -1138,7 +1138,7 @@ export const LINES = {
   anniversary: [
     'Vor genau {span} ging es hier los. {n} Mahlzeiten seitdem.',
     'Heute vor {span} stand die erste Mahlzeit im Tagebuch. Seitdem sind {n} dazugekommen.',
-    'Seit genau {span} wird hier mitgeschrieben, {n} Mahlzeiten lang. Zeit für ein kleines Jubiläum.',
+    'Seit genau {span} wird hier mitgeschrieben, {n} Mahlzeiten bisher.',
   ],
   recordStreak: [
     '{days} am Stück, so lang war die Serie noch nie.',
@@ -1182,7 +1182,6 @@ export const LINES = {
     'Seit {since} lückenlos eingetragen. Dafür {you} ein Leckerli verdient.',
     'Seit {since} kein Tag ohne Eintrag. Das Tagebuch ist beeindruckt.',
     '{days} in Folge, jeden Tag ein Eintrag. Das nennt man Routine.',
-    'Seit {since} kein Tag ohne Eintrag. Wer hier wen erzogen hat, ist noch nicht entschieden.',
   ],
   idea: [
     'Wie wär’s mal wieder mit {sort}? Das gab es seit {days} Tagen nicht.',
@@ -1229,16 +1228,7 @@ export const LINES = {
     '{days} Tagebuch, und es geht weiter. Jeder Eintrag zählt.',
     'Tag {n} im Tagebuch. Das Tier hat davon nichts gemerkt, du schon.',
   ],
-  factLead: [
-    'Übrigens: {fact}',
-    'Wusstest du? {fact}',
-    'Nebenbei: {fact}',
-    '{fact}',
-    'Kleine Randnotiz: {fact}',
-    'Fürs Protokoll: {fact}',
-    'Und noch was: {fact}',
-    'Aus der Abteilung Tierwissen: {fact}',
-  ],
+  factLead: ['Übrigens: {fact}', 'Wusstest du? {fact}', 'Nebenbei: {fact}', '{fact}'],
 };
 /* A template with its places filled: „{pet}“ becomes what is given for pet, already escaped and set in bold by
    the caller */

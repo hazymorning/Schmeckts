@@ -1095,7 +1095,7 @@ async def test_week(browser, url):
             and b['track'][1] == 52
             and b['thumb'] is None
             and b['names'] > 15
-            and b['height'] == 52 + 6 + b['names']
+            and b['height'] == 52 + 10 + b['names']
             and b['page'],
             f'{where}: six levels side by side on one track in the scale’s order, {b["stops"][0]["w"]} px each, a word and what the bowl looks like under each, no thumb yet, {b["height"]} px tall in all, nothing wider than 360 px',
         )
@@ -1713,9 +1713,7 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 
 async def test_overview(browser, url):
-    print(
-        'overview: a card with picture, name and a text about the day in three lines, unfolding with a tap, never a rating; counting in the history'
-    )
+    print('overview: a card with picture, name and a text about the day in two lines, unfolding with a tap, never a rating; counting in the history')
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T12:00:00+02:00')
@@ -1726,7 +1724,9 @@ async def test_overview(browser, url):
         return await pg.evaluate(LINE, [kind, values, days])
 
     c = await pg.evaluate(CARD)
-    status = await line('today', {'so': 'schon', 'both': 'eine Mahlzeit und einen Snack', 'at': '11:00', 'what': 'Käse', 'by': ''})
+    status = await line(
+        'today', {'so': 'schon', 'both': 'eine Mahlzeit und einen Snack', 'at': '11:00', 'what': 'Käse', 'by': '', 'names': 'Minka', 'hat': 'hat'}
+    )
     cats = await told_facts(pg, 'Katze')
     check(
         [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['clamp'], c['lines'], c['cut'], c['tap'], c['wide'], c['tight']]
@@ -1736,8 +1736,8 @@ async def test_overview(browser, url):
             True,
             ['BUTTON', 1, 72, True],
             ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
-            '3',
-            3,
+            '2',
+            2,
             True,
             ['SECTION', 'toggle-overview', 'false', False],
             False,
@@ -1745,7 +1745,7 @@ async def test_overview(browser, url):
         ]
         and c['all'] == [status, c['all'][1]] == c['sentences']
         and c['all'][1] in cats,
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then a fact about the animal with its lead-in; three lines ending in „…“, and the card is the tap target ({c})',
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then a fact about the animal with its lead-in; two lines ending in „…“, and the card is the tap target ({c})',
     )
     await shot(pg, 'overview-360')
     await pg.evaluate("window.__card = document.querySelector('.overview')")
@@ -1757,7 +1757,7 @@ async def test_overview(browser, url):
     await idle(pg)
     back = await pg.evaluate(CARD)
     check(
-        [o['cut'], o['tap'], o['text'], o['lines'] > 3, o['height'] > c['height'], back == c]
+        [o['cut'], o['tap'], o['text'], o['lines'] > 2, o['height'] > c['height'], back == c]
         == [False, ['SECTION', 'toggle-overview', 'true', False], c['text'], True, True, True]
         and await pg.evaluate("window.__card === document.querySelector('.overview')"),
         f'a tap on the card shows the whole text, a second folds it away again, both without redrawing the page ({o["height"]} px, {o["lines"]} lines)',
@@ -1793,7 +1793,7 @@ async def test_overview(browser, url):
     )
     await idle(pg)
     kiwi = await pg.evaluate(CARD)
-    general, dogs, birds = await told_facts(pg, None), await told_facts(pg, 'Hund'), await told_facts(pg, 'Vogel')
+    dogs, birds = await told_facts(pg, 'Hund'), await told_facts(pg, 'Vogel')
     fed = {'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'bekommen'}
     both, one, late = (
         await line('fresh', {'names': 'Minka und Tiger', 'hat': 'haben', **fed}),
@@ -1802,12 +1802,11 @@ async def test_overview(browser, url):
     )
     digest = await line('digest', {'meal': 'Frühstück', 'when': 'morgen gegen 10 Uhr'})
     check(
-        [house['title'], house['pic'][:2], house['all'][:3], len(house['all'])] == ['Minka und Tiger', ['SPAN', 2], [both, digest, late], 4]
-        and house['all'][3] in general
+        [house['title'], house['pic'][:2], house['all']] == ['Minka und Tiger', ['SPAN', 2], [both, digest, late]]
         and house['sentences'] == house['all']
         and house['bold'][:3] == ['5 Minuten', 'Lachs', '10 Uhr']
         and house['tight'],
-        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, the message of the day, that meal came two hours after the usual time, and a fact for every animal ({house["text"]})',
+        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and the message of the day, that meal came two hours after the usual time, with nothing after it ({house["text"]})',
     )
     check(
         [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])] == ['Tiger', ['BUTTON', 1], [one], 2]
@@ -1836,9 +1835,10 @@ async def test_overview(browser, url):
         'Anna' not in by[0] and by[1].startswith(served + ' '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
-    # The line more: what is only true today first, else the kinds taking turns over five days, and a fact every
-    # day, with the memory threaded through; every message, then every kind taking turns, each from a glance holding
-    # only it
+    # The line more: what is only true today first; else on a day with an odd number one of the kinds taking turns
+    # and on an even one a fact (9 June 2026 is day 20613 since 1970: a kind, the next day a fact), over five days
+    # with the memory threaded through; every message, then every kind taking turns, each from a glance holding
+    # only it, on a kind's day
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
       const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
       const none = {premiere: null, idea: null, feeders: [], week: {meals: 0, sorts: 0}, streak: 0, first: null, sorts: 0, anniversary: null, record: {meals: 0, streak: 0},
@@ -1859,26 +1859,37 @@ async def test_overview(browser, url):
     days, first, kinds, memory = await pg.evaluate(LINES)
     turns = [
         await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}),
-        await line('streak', {'since': '12 Tagen', 'days': '12 Tage', 'you': 'hättet eigentlich ihr'}, 1),
-        await line('idea', {'sort': 'Rind', 'days': 12}, 2),
-        await line('week', {'meals': '12 Mahlzeiten', 'sorts': '4 Sorten'}, 3),
-        await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}, 4),
+        await line('streak', {'since': '12 Tagen', 'days': '12 Tage', 'you': 'hättet eigentlich ihr'}, 2),
+        await line('idea', {'sort': 'Rind', 'days': 12}, 4),
     ]
     told = [await told_facts(pg, 'Katze', i) for i in range(5)]
     daily = [
         [
-            await line('today', {'so': 'schon', 'both': 'zwei Mahlzeiten und einen Snack', 'at': '9:00', 'what': 'Lachs', 'by': ' von Anna'}, i),
+            await line(
+                'today',
+                {
+                    'so': 'schon',
+                    'both': 'zwei Mahlzeiten und einen Snack',
+                    'at': '9:00',
+                    'what': 'Lachs',
+                    'by': ' von Anna',
+                    'names': 'Minka',
+                    'hat': 'hat',
+                },
+                i,
+            ),
             await line('usual', {'meal': 'Abendessen', 'when': 'gegen 18:30 Uhr'}, i),
-            turns[i],
         ]
         for i in range(5)
     ]
     check(
-        all(len(d) == 4 and d[:3] == daily[i] and d[3] in told[i] for i, d in enumerate(days))
-        and len({d[3] for d in days}) == 5
-        and [memory['day'], memory['kind'], memory['kinds'], [f['day'] for f in memory['facts']]]
-        == ['2026-06-13', 'duel', ['idea', 'week', 'duel'], [f'2026-06-{9 + i:02d}' for i in range(5)]],
-        f'four sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, one line more and a fact about the animal; over five days the duel, the streak, an idea, the week and the duel again take turns, the fact is another one every day, and the memory holds the last three kinds and every fact ({days}, {memory})',
+        all(len(d) == 3 and d[:2] == daily[i] for i, d in enumerate(days))
+        and [days[i][2] for i in (0, 2, 4)] == turns
+        and all(days[i][2] in told[i] for i in (1, 3))
+        and days[1][2] != days[3][2]
+        and [memory['day'], memory['kind'], memory['fact'], memory['kinds'], [f['day'] for f in memory['facts']]]
+        == ['2026-06-13', 'idea', None, ['duel', 'streak', 'idea'], ['2026-06-10', '2026-06-12']],
+        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, a fact, the streak, another fact and an idea take turns, and the memory holds the last three kinds and every fact ({days}, {memory})',
     )
     messages = [
         await line('premiereLast', {}),
@@ -1893,8 +1904,9 @@ async def test_overview(browser, url):
         await line('sameMinute', {}),
     ]
     check(
-        [f[-2] for f in first[:10]] == messages
-        and all(len(f) == 4 and f[-1] in told[0] for f in first)
+        [f[-1] for f in first[:10]] == messages
+        and all(len(f) == 3 for f in first)
+        and first[10][2] == first[11][2] == turns[0]
         and 'zwei Mahlzeiten und vier Snacks' in first[3][0]
         and 'vier Mahlzeiten' in first[6][0]
         and first[10][:2]
@@ -1903,7 +1915,7 @@ async def test_overview(browser, url):
             await line('waiting', {'names': 'Minka', 'wartet': 'wartet', 'uebt': 'übt', 'hat': 'hat', 'sitzt': 'sitzt'}),
         ]
         and first[11][1] == await line('doneToday', {'meal': 'Frühstück', 'when': 'gegen 7:15 Uhr'}),
-        f'what is only true today comes before the fact: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
+        f'what is only true today is the line more, with nothing after it: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; without one the duel takes its turn; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
     )
     others = [
         await line('feedRun', {'name': 'Ben', 'days': '5 Tage', 'since': '5 Tagen', 'other': 'Jonas'}),
@@ -1915,14 +1927,14 @@ async def test_overview(browser, url):
         await line('duelTie', {'score': '5 zu 5', 'first': 'Anna', 'second': 'Jonas'}),
     ]
     check(
-        [k[-2] for k in kinds] == others and all(len(k) == 4 and k[-1] in told[0] for k in kinds),
+        [k[-1] for k in kinds] == others and all(len(k) == 3 for k in kinds),
         f'the other kinds taking turns: a person\u2019s feeding run, with or without someone to tease, a weekday\u2019s own time, a look back a year, the varieties tried, the days in the diary and a tied duel ({kinds})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
     # A long name, a household and usual times, at the usual and at a large system font: nothing is dropped, the
-    # first sentence stands whole with „von Ben“ and the variety\u2019s full name, the text is clamped to three lines,
+    # first sentence stands whole with „von Ben“ and the variety\u2019s full name, the text is clamped to two lines,
     # and a tap unfolds all of it
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
@@ -1939,12 +1951,12 @@ async def test_overview(browser, url):
         await pg.evaluate("import('./js/views/home.js').then(h => h.toggleOverview())")
         check(
             fit['shown'] == fit['all']
-            and len(fit['all']) == 4
+            and len(fit['all']) == 3
             and fit['all'][0].endswith('von Ben.')
             and name in fit['all'][0]
             and fit['all'][2] == record
-            and [fit['cut'], fit['lines'], fit['full'] > 3, opened] == [True, 3, True, [False, 'block']],
-            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ and the full name in a whole first sentence, the record streak of nine days as the message, {fit["full"]} lines clamped to three and all of them after a tap ({fit})',
+            and [fit['cut'], fit['lines'], fit['full'] > 2, opened] == [True, 2, True, [False, 'block']],
+            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ and the full name in a whole first sentence, the record streak of nine days as the message, {fit["full"]} lines clamped to two and all of them after a tap ({fit})',
         )
         await shot(pg, f'overview-long-{int(scale * 100)}-{len(today)}')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -2039,7 +2051,7 @@ async def test_birthday(browser, url):
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
     lines = [await pg.evaluate(BIRTHDAY_LINES, d) for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
-    said = [x[-2] for x in lines[:4]] + [x[-1] for x in lines[4:]]
+    said = [x[-1] for x in lines]
     want = [
         await pg.evaluate(LINE, ['birthdayAge', {'pet': 'Minka', 'age': 4}]),
         await pg.evaluate(LINE, ['birthdayToday', {'pet': 'Minka'}]),
@@ -2048,11 +2060,7 @@ async def test_birthday(browser, url):
     ]
     cats = await told_facts(pg, 'Katze')
     check(
-        said[:4] == want
-        and said[4] in cats
-        and said[5] in cats
-        and [len(x) for x in lines] == [3, 3, 3, 3, 2, 2]
-        and all(x[-1] in cats for x in lines),
+        said[:4] == want and said[4] in cats and said[5] in cats and [len(x) for x in lines] == [2] * 6,
         f'the overview: the birthday with the age, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -3857,7 +3865,7 @@ PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const l = document
 
 async def test_product_photo(browser, url):
     print(
-        '„Foto ändern“ under the variety\u2019s card, in the food sheet and in the meal\u2019s: a new photo and thumbnail, „Abbrechen“ changes nothing'
+        '„Foto ändern“ under the variety\u2019s card, in the food sheet and in the meal\u2019s, and under its photo while naming: a new photo and thumbnail, „Abbrechen“ changes nothing'
     )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
@@ -3939,7 +3947,7 @@ async def test_product_photo(browser, url):
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     # The meal's sheet has the same link right under its card, since that is where a meal is opened from the home
-    # page; the photo it takes is the variety's. While naming there is no such link.
+    # page; the photo it takes is the variety's
     sid = await state(pg, 'db.servings[0].id')
     await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'serving', id: '{sid}'}}))")
     await idle(pg)
@@ -3959,12 +3967,46 @@ async def test_product_photo(browser, url):
         f'in the meal\u2019s sheet the same link stands right under the card, and the photo it takes is the variety\u2019s ({meal}, {where}, {changed})',
     )
     await shot(pg, 'meal-photo-link')
+    # While naming a meal with a variety and while renaming a variety, the sheet shows the variety's photo with the
+    # same link under it; a new photo changes what the sheet shows, and the fields keep what was typed
+    NAMING = """() => { const l = document.querySelector('#sheet [data-action=product-photo]'), img = document.querySelector('#sheet .name-photo');
+      return [document.querySelector('#sheet .sh-head h2').innerText, l?.innerText.trim() ?? null, !!l?.querySelector('.ic'), img?.getAttribute('src')?.slice(-32) ?? null,
+        img?.closest('[data-action=view-photo]')?.dataset.p ?? null, l?.dataset.id ?? null, document.querySelector('#f-brand')?.value ?? null]; }"""
     await pg.click('#sheet [data-action=edit-name]')
     await idle(pg)
-    naming = await pg.evaluate(
-        "[document.querySelector('#sheet .sh-head h2').innerText, !!document.querySelector('#sheet [data-action=product-photo]')]"
+    await pg.fill('#f-brand', 'Whiskas Neu')
+    naming = await pg.evaluate(NAMING)
+    await pg.evaluate(f"window.__photo = '{base64.b64encode(PACK_LARGE.read_bytes()).decode()}'")
+    await pg.click('#sheet [data-action=product-photo]')
+    await until(pg, f"(db.products.find(x => x.id === '{pid}').thumb || '').slice(-32) !== '{changed[3]}'")
+    await idle(pg)
+    renamed = await pg.evaluate(NAMING)
+    thumb = await state(pg, f"db.products.find(x => x.id === '{pid}').thumb.slice(-32)")
+    await shot(pg, 'naming-photo-link')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await food_sheet()
+    await pg.click('#sheet [data-action=rename-product]')
+    await idle(pg)
+    rename = await pg.evaluate(NAMING)
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => { s.db.products.push({id: 'ohnebild0001', brand: 'Felix', variety: 'Ente', type: 'Nassfutter', codes: {}, createdAt: Date.now()}); s.save(); })"
     )
-    check(naming == ['Futter ändern', False], f'while naming there is no such link ({naming})')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'product', id: 'ohnebild0001'}))")
+    await idle(pg)
+    await pg.click('#sheet [data-action=rename-product]')
+    await idle(pg)
+    bare = await pg.evaluate(NAMING)
+    check(
+        naming == ['Futter ändern', 'Foto ändern', True, changed[3], pid, pid, 'Whiskas Neu']
+        and renamed == ['Futter ändern', 'Foto ändern', True, thumb, pid, pid, 'Whiskas Neu']
+        and thumb != changed[3]
+        and rename == ['Futter umbenennen', 'Foto ändern', True, thumb, pid, pid, 'Whiskas']
+        and bare == ['Futter umbenennen', 'Foto hinzufügen', True, None, None, 'ohnebild0001', 'Felix'],
+        f'while naming a meal with a variety and while renaming one, the variety\u2019s photo with „Foto ändern“ under it: a new photo changes it in place and the field keeps what was typed; without a photo „Foto hinzufügen“ ({naming}, {renamed}, {rename}, {bare})',
+    )
     await pg.click('#sheet [data-action=close]')
     await idle(pg)
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')

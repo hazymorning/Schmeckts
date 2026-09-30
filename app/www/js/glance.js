@@ -21,8 +21,10 @@ const BIRTHDAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/; // pets[].birthday, anything el
 export const TURNS = ['duel', 'streak', 'idea', 'run', 'weekday', 'week', 'lookback', 'sorts', 'days'];
 export const MEMORY = {kinds: 3, facts: 60};
 
+/* The day as a number, the same all day: what takes turns by the day counts with it */
+export const dayNumber = now => Math.round(dayStart(now) / DAY);
 /* One of several ways to say a thing, the same all day */
-export const pick = (list, now) => list[Math.round(dayStart(now) / DAY) % list.length];
+export const pick = (list, now) => list[dayNumber(now) % list.length];
 
 const median = values => {
   const v = [...values].sort((a, b) => a - b);

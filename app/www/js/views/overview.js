@@ -1,20 +1,21 @@
 /* The overview card at the top of the home page: the pet in the filter, the household under „Alle“, with picture,
-   name and a short text about the day from glance.js, as people talk and with a wink. First when the last meal was,
-   what it was and in a household who served it, then whether it is time for the next one or when that usually is,
-   then one line more: what is only true today (a birthday, a first time, a milestone close by, an anniversary, a
-   record, a meal off its usual time, the treats, a fact bound to the day) or, without any, one of the kinds taking
-   turns by the day (the feeding duel, a streak, an idea for a change, a person's feeding run, a weekday's own time,
-   the week so far, a look back, the varieties tried, the days in the diary), and last a fact of the day about the
-   animal with a lead-in. The wordings are in views/facts.js, each kind with several ways of saying it, one of them
-   picked by the day; the memory of what was shown is in prefs.overview. The card shows three lines and unfolds with
-   a tap (toggleOverview() in views/home.js). Never how a meal went: that is what the cards below it are for. */
+   name and three sentences about the day from glance.js, as people talk and with a wink. First when the last meal
+   was, what it was and in a household who served it, then whether it is time for the next one or when that usually
+   is, then one line more: what is only true today (a birthday, a first time, a milestone close by, an anniversary,
+   a record, a meal off its usual time, the treats, a fact bound to the day) or, without any, every other day a fact
+   about the animal with a lead-in and on the days between one of the kinds taking turns (the feeding duel, a
+   streak, an idea for a change, a person's feeding run, a weekday's own time, the week so far, a look back, the
+   varieties tried, the days in the diary), never both. The wordings are in views/facts.js, each kind with several
+   ways of saying it, one of them picked by the day; the memory of what was shown is in prefs.overview. The card
+   shows two lines and unfolds with a tap (toggleOverview() in views/home.js). Never how a meal went: that is what
+   the cards below it are for. */
 import {esc} from '../text.js';
 import {addDays, dayStart, timeStr} from '../dates.js';
 import {typeOf} from '../config.js';
 import {db, prefs, savePrefs} from '../store.js';
 import {isConnected} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {glance, pick, takeTurn} from '../glance.js';
+import {dayNumber, glance, pick, takeTurn} from '../glance.js';
 import {factsOn, fill, LINES} from './facts.js';
 import {avatar, since} from './parts.js';
 
@@ -117,7 +118,18 @@ function statusLine(g, pets, now) {
       .filter(Boolean)
       .map(b)
       .join(' und ');
-    return [say('today', now, {so: g.meals ? 'schon' : 'bisher nur', both, at: time, what, by}), true];
+    return [
+      say('today', now, {
+        so: g.meals ? 'schon' : 'bisher nur',
+        both,
+        at: time,
+        what,
+        by,
+        names: fed.names,
+        hat: fed.verb('hat', 'haben'),
+      }),
+      true,
+    ];
   }
   if (last.servedAt >= addDays(dayStart(now), -1)) {
     if (new Date(now).getHours() >= NIGHT) return [say('nothingYet', now, {at: time, what, by})];
@@ -228,13 +240,13 @@ const TURN_LINES = {
   days: (g, now) =>
     say('days', now, {since: b(g.first.days + ' Tagen'), days: b(g.first.days + ' Tage'), n: b(g.first.days)}),
 };
-/* The kinds taking turns that hold today, in the order of TURNS in glance.js, and the facts that may come; takeTurn()
-   there picks by the memory. withKind: no message holds, so a kind may take its turn. facts: the facts of the day,
-   none on a day that has a fact of its own. {kind: its line or '', fact: the fact of the day with its lead-in or '',
-   memory} */
-function turn(g, pets, now, memory, withKind, facts) {
+/* The line taking turns: on a day with an even number (dayNumber() in glance.js) a fact about the animal, on the
+   days between one of the kinds that hold today, in the order of TURNS in glance.js, and a fact again where none
+   holds; takeTurn() there picks by the memory. on: no message holds, so the turn is on at all (without a meal no
+   kind holds, so the fact comes). facts: the facts of the day. {text: the line or '', memory} */
+function turn(g, pets, now, memory, on, facts) {
   const house = isConnected(),
-    kinds = withKind
+    kinds = on
       ? [
           house && g.feeders.length > 1 && 'duel',
           g.streak >= STREAK && 'streak',
@@ -246,16 +258,15 @@ function turn(g, pets, now, memory, withKind, facts) {
           g.sorts >= SORTS && 'sorts',
           g.first?.days >= DAYS && 'days',
         ].filter(Boolean)
-      : [];
-  const took = takeTurn(
-    kinds,
-    facts.map(f => f.id),
-    memory,
-    now,
-  );
+      : [],
+    factDay = on && (dayNumber(now) % 2 === 0 || !kinds.length);
+  const took = takeTurn(factDay ? [] : kinds, factDay ? facts.map(f => f.id) : [], memory, now);
   return {
-    kind: took.kind ? TURN_LINES[took.kind](g, now, house) : '',
-    fact: took.fact ? say('factLead', now, {fact: facts.find(f => f.id === took.fact).text}) : '',
+    text: took.kind
+      ? TURN_LINES[took.kind](g, now, house)
+      : took.fact
+        ? say('factLead', now, {fact: facts.find(f => f.id === took.fact).text})
+        : '',
     memory: took.memory,
   };
 }
@@ -267,12 +278,12 @@ export function overviewLines(g, pets, now, memory) {
     species = kinds.size === 1 ? [...kinds][0] : null,
     date = new Date(now),
     dated = factsOn(species, date, true)[0]?.text || '',
-    facts = dated ? [] : factsOn(species, date);
+    facts = factsOn(species, date);
   if (!g.last) {
     const all = subject(pets.map(x => x.id)),
-      took = turn(g, pets, now, memory, false, facts);
+      took = turn(g, pets, now, memory, !dated, facts);
     return {
-      text: [say('firstMeal', now, {names: all.names, wartet: all.verb('wartet', 'warten')}), dated, took.fact]
+      text: [say('firstMeal', now, {names: all.names, wartet: all.verb('wartet', 'warten')}), dated || took.text]
         .filter(Boolean)
         .map(line)
         .join(' '),
@@ -283,7 +294,7 @@ export function overviewLines(g, pets, now, memory) {
     more = message(g, pets, now, counted) || dated,
     took = turn(g, pets, now, memory, !more, facts);
   return {
-    text: [status, outlookLine(g, pets, now), more || took.kind, took.fact].filter(Boolean).map(line).join(' '),
+    text: [status, outlookLine(g, pets, now), more || took.text].filter(Boolean).map(line).join(' '),
     memory: took.memory,
   };
 }
