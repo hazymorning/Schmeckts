@@ -1,8 +1,9 @@
 name: Pull request
 
 # The title and the body of a pull request are not in the repository, so lint.sh never sees them. This holds
-# them to the same rules, and fails when more than one of our own pull requests is open at a time, so they do
-# not pile up for whoever reads them.
+# ours to the same rules, and fails when more than one of our own pull requests is open at a time, so they do
+# not pile up for whoever reads them. Dependabot writes its own title and body (release notes, emoji), which
+# are not ours to hold to anything.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
@@ -19,6 +20,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: The title and the body
+        if: github.event.pull_request.user.type != 'Bot'
         env:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}

@@ -45,7 +45,7 @@
   /* Insets: the padding of each kind of box. A box takes its recipe's inset and nothing else. */
   --inset-card: var(--gutter) var(--gutter) var(--space-2); /* .card: 18 at top and sides, 8 at the foot, where the last row brings its 10 */
   --inset-group: var(--space-1) var(--space-4); /* .group: 4 above and below its rows, 16 at the sides */
-  --inset-row: var(--space-2h) 0; /* .row, .pend, .card-btn: 10 above and below */
+  --inset-row: var(--space-2h) 0; /* .row, .pend, .pole, .card-btn: 10 above and below */
   --inset-box: var(--space-3); /* .box and .banner: 12 all round a filled box */
   --inset-control: var(--space-3) var(--space-4); /* .btn, .field: 12 by 16; the height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* .chip, .field.in-row, the toast's action, .cam-hint: 8 by 16 */
@@ -61,15 +61,15 @@
   --radius-full: 999px; /* pills, lines and bars */
 
   /* Type: five sizes, four leadings, three weights. app.css sets type only as font: var(--type-...). */
-  --type-title: 650 30px/1.1 var(--font-display); /* wordmark, page title, welcome heading, the ring's figure; always with --track-title */
-  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, percentages, counts, initials */
+  --type-title: 650 30px/1.1 var(--font-display); /* wordmark, page title, welcome heading; always with --track-title */
+  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, counts, the places of „Auswertung“, initials */
   --type-subheading: 600 16px/1.25 var(--font-display); /* day lines, initials in small thumbnails, the level's name on the rating slider */
   --type-body: 400 16px/1.5 var(--font-ui); /* running text, fields, a card's own sentence */
   --type-body-strong: 600 16px/1.5 var(--font-ui); /* row titles, button labels, figures in Figtree */
   --type-small: 400 14px/1.4 var(--font-ui); /* secondary text: a row's second line, hints, notes, the toast, day numbers */
   --type-small-strong: 600 14px/1.4 var(--font-ui); /* labels and small controls: field labels, chips, segments, text buttons, times */
   --type-caption: 400 12px/1.25 var(--font-ui); /* under a figure or a picture: a rating's second line, pet names, units */
-  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays, the levels' words on the rating slider */
+  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays, the levels' words on the rating slider, what a column of „Auswertung“ holds, „neu“ */
   --weight-strong: 600; /* b and strong inside running text */
   --track-title: -0.015em; /* only with --type-title: Faustina runs narrow at that size */
   --track-code: 0.14em; /* only in the household code field */
@@ -109,9 +109,8 @@
   --control: 52px; /* a button or a field, the toast */
   --control-l: 56px; /* the feeding button; a settings row; a card's text button */
   --bar: 56px; /* a page's bar: the 48px back arrow with --space-1 above and below; the photo viewer's rows. A number, because views/sheets.js reads it through --stick */
-  --col-figure: 52px; /* the column a trailing figure takes, so figures line up: percentages, per-pet shares */
   --pic-xs: 24px; /* a picture beside a name: chips, pet labels, minis, verdicts */
-  --pic-s: 32px; /* a row's leading column: its icon or avatar, a step's number, a calendar day's number */
+  --pic-s: 32px; /* a row's leading column: its icon or avatar, a step's number, a place, a calendar day's number */
   --pic-m: 40px; /* a small thumbnail: timeline, suggestions, the server's tile, the camera badge */
   --pic-l: 48px; /* a list thumbnail; the overview's two pictures */
   --pic-xl: 56px; /* a picture on its own: the pet bar, the product card, the empty-state sketch */
@@ -166,7 +165,7 @@
   --mood: 0.26; /* light-dark() takes colours only, so the one number that differs by scheme is set here */
 }
 
-/* The motion library: every @keyframes in the app. Movement and opacity only, plus the ring's stroke, the
+/* The motion library: every @keyframes in the app. Movement and opacity only, plus the
    shimmer's gradient and the collapse of a leaving meal. app.css names these and defines none. */
 @keyframes fadeIn {
   from {
@@ -256,11 +255,6 @@
     opacity: 0;
   }
 } /* the bowl in the feeding button */
-@keyframes ringFill {
-  from {
-    stroke-dashoffset: var(--len);
-  }
-} /* the ring draws its share once */
 @keyframes spin {
   to {
     transform: rotate(360deg);

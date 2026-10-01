@@ -85,6 +85,10 @@ strong {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.sk.l {
+  width: var(--pic-l);
+  height: var(--pic-l);
+}
 .sk.xl {
   width: var(--pic-xl);
   height: var(--pic-xl);
@@ -106,7 +110,6 @@ strong {
 .prod-card .edit .ic,
 .search .ic,
 .pick .ic,
-.figs .ic,
 .pin .ic,
 .cam-badge .ic {
   width: var(--icon-s);
@@ -1282,32 +1285,6 @@ dialog.sheet.page .sheet-body {
   border-radius: var(--radius-m);
 }
 
-/* Figures: tabular in the same rule as their font, after it, because the font shorthand resets it */
-.pct {
-  min-width: var(--col-figure);
-  text-align: right;
-  font: var(--type-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-.pct small {
-  font: var(--type-caption);
-  margin-left: var(--space-hair);
-}
-.ring-mid .pct {
-  min-width: 0;
-}
-.figs b {
-  font: var(--type-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-.figs b small {
-  font: var(--type-caption);
-  color: var(--muted);
-  white-space: nowrap;
-}
-
 /* Components */
 /* Verlauf: a two-week calendar, a timeline of the last three days, and older days on request */
 .cal .wd {
@@ -1476,50 +1453,6 @@ dialog.sheet.page .sheet-body {
   column-gap: var(--space-2);
   font: var(--type-small);
 }
-/* „Verlauf“ at a glance: a ring per span for the share of ratings that went down well, the span and what it rests on
-   under it; under the rings the figures of the 30 days, each with a small icon and its word under it. A ring carries a
-   sentence in aria-label, so nothing rests on its colour alone. */
-.ring {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  display: grid;
-  place-items: center;
-}
-.ring svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.ring circle {
-  fill: none;
-  stroke-width: 8px;
-}
-.ring-track {
-  stroke: var(--surface-2);
-}
-.ring-fill {
-  stroke: var(--c);
-  stroke-linecap: round;
-  transform: rotate(-90deg); /* starts at the top */
-  transform-origin: 50% 50%;
-  stroke-dasharray: var(--len);
-  stroke-dashoffset: calc(var(--len) - var(--part));
-}
-.period > b {
-  font: var(--type-caption-strong);
-}
-.period > small,
-.figs li > small {
-  font: var(--type-caption);
-  color: var(--muted);
-}
-.figs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
 .cam-hint {
   position: absolute;
   left: 50%;
@@ -1667,6 +1600,46 @@ dialog.sheet.page .sheet-body {
   flex: none;
 }
 
+/* „Auswertung“ on the home page (views/evaluation.js): the top and the biggest flop side by side, each a column you
+   tap, centred: what it is, the packaging, the name, the brand and the strip. No fill and no frame; a hairline parts
+   the two (Views). A column without a variety is no button and says why. */
+.pole {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: var(--inset-row);
+  text-align: center;
+}
+.pole-role {
+  font: var(--type-caption-strong);
+  color: var(--muted);
+}
+.pole > b {
+  font: var(--type-body-strong);
+  color: var(--ink);
+}
+.pole > small {
+  font: var(--type-small);
+  color: var(--muted);
+}
+/* A place in Top 5 and Flop 5 („Auswertung“): its figure in Faustina in the row's leading column, and under it „neu“
+   where the variety came onto its side within the last 30 days, as a chart marks a new entry */
+.place {
+  flex: 0 0 auto;
+  width: var(--pic-s);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: var(--type-heading);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.place > small {
+  font: var(--type-caption-strong);
+  color: var(--ink);
+}
+
 /* == Views == */
 /* Home: header and cards */
 .brand {
@@ -1802,6 +1775,69 @@ dialog.sheet.page .sheet-body {
 .told li {
   align-items: flex-start;
 }
+/* „Auswertung“ on the home page: top and flop in two equal columns, a hairline between them and the text kept off it;
+   the packaging, the name over at most two lines and the strip a little apart */
+.poles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: var(--space-1) 0 var(--space-hair);
+}
+.pole + .pole {
+  border-left: var(--divider);
+}
+.pole > :is(.pole-role, b, small) {
+  margin: 0 var(--space-2);
+}
+.pole > :is(.thumb, .sk) {
+  margin: var(--space-2) 0;
+}
+.pole > .sk {
+  color: var(--faint);
+}
+.pole > b {
+  text-wrap: balance;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pole > .strip {
+  margin-top: var(--space-2);
+}
+/* the brand on one line, so two long names still keep the card under 300px; the reason of an empty column in full */
+button.pole > small {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pole > small {
+  overflow-wrap: anywhere;
+}
+/* Its page: a variety's name over at most two lines and what its ratings say in full under it; a told line that opens
+   its variety, the words taking the room the strip at its end leaves */
+.ranks .t-main b {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ranks .t-main small {
+  white-space: normal;
+}
+.told button.row {
+  align-items: flex-start;
+}
+.told button.row > .strip {
+  align-self: center;
+}
+.said {
+  flex: 1;
+  min-width: 0;
+}
 
 /* Welcome and first steps */
 .welcome {
@@ -1869,8 +1905,10 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-/* „Verlauf“, „Einkaufen“ and „Vorlieben“: cards on the page ground, as far apart as the ones on the home page */
-dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profile"]) .page-title {
+/* „Verlauf“, „Auswertung“, „Einkaufen“ and „Vorlieben“: cards on the page ground, as far apart as the ones on the home
+   page */
+dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"], [data-kind="profile"])
+  .page-title {
   margin-bottom: var(--space-3h);
 }
 .btn-col {
@@ -2001,52 +2039,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .verdict p span {
   color: var(--muted);
 }
-/* „Verlauf“: the three rings side by side, and under a line the figures in the same three columns, each centred
-   under its ring. 16 under the heading, whose own 4 collapses into it; 10 under the figures, which with the card's 8
-   make the 18 it has at the top. */
-.rings,
-.figs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: var(--space-2);
-}
-.rings {
-  margin: var(--space-4) 0 var(--space-4h);
-}
-.figs {
-  margin-bottom: var(--space-2h);
-  border-top: var(--divider);
-}
-.period,
-.figs li {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-  text-align: center;
-}
-.period .ring {
-  margin-bottom: var(--space-2);
-}
-.figs li {
-  margin-top: var(--space-3h);
-}
-.figs li > span {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-}
-.figs .ic {
-  color: var(--faint);
-}
-/* A line of the first card of „Verlauf“: an icon in a rating's colour where it stands for one, and the bowls drawn
-   without their filling */
-.lead.tone {
-  color: var(--c);
-}
-.review .fill {
-  display: none;
-}
 /* A part of a page folded open: its rows start under a line, as every row after them does */
 .fold > .list {
   border-top: var(--divider);
@@ -2139,6 +2131,7 @@ body,
 .photo-btn,
 .prod-edit,
 .pend-head,
+.pole,
 .day,
 .sw,
 .sw::after,
@@ -2174,7 +2167,19 @@ dialog.sheet.dragging {
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
-:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
+:is(
+  .icon-btn,
+  .chip,
+  .pet,
+  .day.has,
+  button.ov-pic,
+  button.pole,
+  .photo-btn,
+  .pet-photo,
+  .shutter,
+  .sync-chip,
+  .fab
+):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {
@@ -2306,9 +2311,6 @@ html.step-back::view-transition-new(page) {
 .fab.filled .fill {
   animation: bowlFill var(--dur-long) var(--ease-out) both;
 }
-.ring-fill {
-  animation: ringFill var(--dur-step) var(--ease-out) both;
-} /* fills once when the page opens */
 .spin {
   animation: spin var(--dur-long) linear infinite;
 }

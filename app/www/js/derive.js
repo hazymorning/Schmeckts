@@ -2,7 +2,21 @@
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
-import {analyze, changes, habits, novelty, profile, report, shopGroups, tally, variety as change} from './smart.js';
+import {
+  analyze,
+  basis,
+  habits,
+  moves,
+  nextUp,
+  novelty,
+  patterns,
+  profile,
+  ranking,
+  shopGroups,
+  tally,
+  trend,
+  variety as change,
+} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -41,14 +55,6 @@ function refresh(now) {
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-/* „Verlauf“, only when it opens: the last 7, 30 and 90 days as one entry, and what changed within the 30 days, against
-   the model as it stands */
-const SPANS = [7, 30, 90];
-export const reportModel = () =>
-  cached('report', [prefs.activePet], now => ({
-    spans: SPANS.map(days => report(db, prefs, now, days)),
-    changes: changes(db, prefs, now, SPANS[1], model()),
-  }));
 /* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits in the order the home
    page shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating eagerly at first. The home page
    asks for them only while there is nothing to compare, since Abwechslung reads every meal. */
@@ -59,6 +65,27 @@ export const habitsModel = () =>
       eaten = habits(m),
       of = kind => eaten.filter(h => h.kind === kind);
     return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
+  });
+/* „Auswertung“: the sides of the ranked varieties, for its card on the home page and the first cards of its page, and
+   the rest of the page only when it opens: what moved, how it goes per pet, what it depends on, what to serve next,
+   what it rests on, and when each variety was last served within the filter */
+export const rankingModel = () => cached('ranking', [prefs.activePet], now => ranking(model(), now));
+export const evaluationModel = () =>
+  cached('evaluation', [prefs.activePet], now => {
+    const m = model(),
+      r = rankingModel(),
+      last = lastServed(),
+      slow = novelty(m)
+        .filter(h => h.kind === 'anlauf')
+        .map(h => h.pet);
+    return {
+      moves: moves(m, now, r),
+      trend: trend(db, m, now),
+      patterns: patterns(profileModel()),
+      next: nextUp(m, now, r, last, slow),
+      basis: basis(m, r),
+      last,
+    };
   });
 export const sortOf = id => model().byId.get(id);
 export function pendingServings() {
@@ -87,10 +114,11 @@ export function defaultPets(p) {
 
 /* When each variety was last served within the pet filter: variety → time, only for varieties served at all */
 function lastServed() {
-  const last = new Map();
+  const last = new Map(),
+    pet = prefs.activePet !== 'all' && getPet(prefs.activePet) ? prefs.activePet : null; // as the model has it
   for (const s of db.servings) {
     if (!s.productId || last.has(s.productId)) continue;
-    if (prefs.activePet !== 'all' && !s.pets[prefs.activePet]) continue;
+    if (pet && !s.pets[pet]) continue;
     last.set(s.productId, s.servedAt);
   }
   return last;

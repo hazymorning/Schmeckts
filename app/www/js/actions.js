@@ -159,6 +159,13 @@ const ACTIONS = {
   'open-report'(el) {
     openSheet(reportState(el.dataset.v || null));
   }, // data-v: the day it opens at
+  'open-evaluation'() {
+    openSheet({kind: 'evaluation'});
+  },
+  // a page one level below the page that is open, such as „Vorlieben“ from „Auswertung“; back returns to it
+  'open-level'(el) {
+    openPage(el.dataset.v);
+  },
   'open-shop'() {
     openSheet({kind: 'shop'});
   },
@@ -437,7 +444,7 @@ const ACTIONS = {
   fold(el) {
     haptic('select');
     foldPart(el.dataset.v);
-  }, // a part of a page, such as „Details“ on „Verlauf“
+  }, // a part of a page, such as „Lieber nicht“ on „Einkaufen“
   'jump-day'(el) {
     haptic('select');
     if (sheet?.kind === 'report') return jumpToDay(el.dataset.day); // the page's own calendar scrolls within it

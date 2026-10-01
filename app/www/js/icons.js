@@ -15,7 +15,10 @@ const FULL =
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
 const I = {
   r_top: BOWL + HEART,
-  r_gut: BOWL + LATER,
+  // almost empty: a thin rest at the bottom of the bowl
+  r_gut:
+    '<path d="M5.69 15.9h12.62l-.36 1.5a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
+    BOWL,
   r_mittel:
     '<path d="M5.3 14.3h13.4l-.75 3.1a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
     BOWL,
@@ -61,8 +64,6 @@ const I = {
   search: '<circle cx="11" cy="11" r="6.2"/><path d="M19.5 19.5l-3.9-3.9"/>',
   pencil: '<path d="M4.5 19.5h4l10-10a2.83 2.83 0 0 0-4-4l-10 10z"/><path d="M13.5 7l3.5 3.5"/>',
   check: '<path d="M5 12.5l4.3 4.3L19 7.5"/>',
-  trophy:
-    '<path d="M8 4.5h8v4.2a4 4 0 0 1-8 0z"/><path d="M8 6H5.6v1a2.6 2.6 0 0 0 2.6 2.6M16 6h2.4v1a2.6 2.6 0 0 1-2.6 2.6M12 12.7v3.6M8.8 19.5h6.4M9.9 16.3h4.2l.6 3.2H9.3z"/>',
   clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4.3l2.8 1.7"/>',
   phone: '<rect x="7" y="3.5" width="10" height="17" rx="2.4"/><path d="M10.8 17.4h2.4"/>',
   house: '<path d="M4.5 10.6L12 4.5l7.5 6.1v8a1.4 1.4 0 0 1-1.4 1.4h-3.6v-5.4h-5v5.4H5.9a1.4 1.4 0 0 1-1.4-1.4z"/>',
@@ -79,11 +80,12 @@ const I = {
   paw: '<circle cx="6.6" cy="10.4" r="1.7"/><circle cx="10" cy="6.6" r="1.7"/><circle cx="14" cy="6.6" r="1.7"/><circle cx="17.4" cy="10.4" r="1.7"/><path d="M12 12.2c-2.5 0-4.8 2.4-4.8 4.8 0 1.5 1.1 2.5 2.4 2.5.9 0 1.6-.5 2.4-.5s1.5.5 2.4.5c1.3 0 2.4-1 2.4-2.5 0-2.4-2.3-4.8-4.8-4.8z"/>',
   shield: '<path d="M12 3.5l7 2.5v5.3c0 4.4-2.9 7.8-7 9.2-4.1-1.4-7-4.8-7-9.2V6z"/><path d="M9.2 12l2 2 3.6-3.8"/>',
   pin: '<path d="M9.2 3.5h5.6l-.9 5.6 3.1 3.3v1.4H7v-1.4l3.1-3.3z"/><path d="M12 13.8v6.7"/>',
-  award: '<circle cx="12" cy="9.5" r="5.5"/><path d="M8.7 13.9l-1.2 6.6 4.5-2.4 4.5 2.4-1.2-6.6"/>',
-  calendar:
-    '<rect x="3.7" y="5.3" width="16.6" height="14.9" rx="2.6"/><path d="M8.2 3.3v3.7M15.8 3.3v3.7M3.7 10h16.6"/>',
   layers: '<path d="M12 4.5l8 4-8 4-8-4z"/><path d="M4 12.3l8 4 8-4"/><path d="M4 16.1l8 4 8-4"/>',
   fish: '<path d="M21 12c-1.7 3-4.5 5-7.8 5-3.4 0-6.1-2-7.7-5 1.6-3 4.3-5 7.7-5 3.3 0 6.1 2 7.8 5z"/><path d="M5.5 12L2.5 8.8v6.4z"/><path d="M16.6 10.9v.2"/>',
+  // „Auswertung“: what a comparison of brands is about, and which way it is going for a pet or a variety
+  tag: '<path d="M3.8 11.9V5.3c0-.8.7-1.5 1.5-1.5h6.6l8.4 8.4a1.5 1.5 0 0 1 0 2.1l-6.3 6.3a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/>',
+  rise: '<path d="M4 16.5l5-5 3.5 3.5L19.5 8"/><path d="M14.5 8h5v5"/>',
+  fall: '<path d="M4 7.5l5 5 3.5-3.5 7 7"/><path d="M19.5 11v5h-5"/>',
   drop: '<path d="M12 3.8c3.1 3.7 5.6 6.8 5.6 9.9a5.6 5.6 0 0 1-11.2 0c0-3.1 2.5-6.2 5.6-9.9z"/>',
   sun: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3"/>',
   moon: '<path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z"/>',

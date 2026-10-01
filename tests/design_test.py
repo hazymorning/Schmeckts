@@ -112,7 +112,7 @@ async def test_palette(browser, url):
             len(stops) == 6
             and all(near(c, PALETTE[r][k], 1) for c, r in zip(stops, tones))
             and all(all(near(c, PALETTE[r][k], 1) for c in cs) for cs, r in zip(shown, tones)),
-            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
+            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Fast leer“ both --good, „Halb gegessen“ and „Nur anfangs“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
@@ -406,7 +406,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .figs b, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .place, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -416,6 +416,7 @@ INSETS = {
     '.group': '4px 16px',
     '.row': '10px 0px',
     '.pend': '10px 0px',
+    '.pole': '10px 0px',
     '.card-btn': '10px 0px',
     '.box': '12px',
     '.banner': '12px',
@@ -429,7 +430,7 @@ INSETS = {
     '.seg': '4px',
     '.seg button': '8px 6px',
 }
-FIGURES_JS = '.num, .tl-time, .pct, .figs b, .cnt b, .day .dn, .steps .n, .field.code'
+FIGURES_JS = '.num, .tl-time, .cnt b, .place, .day .dn, .steps .n, .field.code'
 
 
 SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), met = new Set();
@@ -468,28 +469,29 @@ SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), me
   return {bad: [...new Set(bad)], seen: [...seen], met: [...met]}; }"""
 
 
-# The first card of „Verlauf“: the rings' sizes, whether they stand in one row, and whether every figure stands centred
-# under its ring
-RINGS = """() => { const c = document.querySelector('#sheet .review'), mid = e => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
-  const rings = [...c.querySelectorAll('.rings .ring')], figs = [...c.querySelectorAll('.figs li')];
-  return {rings: rings.map(r => [Math.round(r.getBoundingClientRect().width), Math.round(r.getBoundingClientRect().height)]),
-    row: rings.every(r => Math.abs(r.getBoundingClientRect().top - rings[0].getBoundingClientRect().top) < 0.5),
-    under: figs.length === rings.length && figs.every((f, i) => Math.abs(mid(f) - mid(rings[i])) < 0.5)}; }"""
-
-
 HINTS = ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')
 
 
-# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them, each
-# dot the size of the calendar's, each in its rating's colour]
+# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them and
+# the hollow ones of the ratings still missing after them, each dot the size of the calendar's, each rated one in its
+# rating's colour]
 STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i.style.color = `var(--${c.slice(2)})`; document.body.append(i);
     const v = getComputedStyle(i).color; i.remove(); return v; };
   const box = e => { const r = e.getBoundingClientRect(); return `${r.width}x${r.height}`; }, cal = box(document.querySelector('.cal .dots i:not(.open)'));
-  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')];
+  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')],
+      rated = dots.filter(d => !d.classList.contains('open')), open = dots.slice(rated.length);
     return [s.getAttribute('role') === 'img' && !!s.getAttribute('aria-label'),
-      dots.length <= 8 && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
+      rated.length <= 8 && open.every(d => d.classList.contains('open')) && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
       dots.every(d => box(d) === cal),
-      dots.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
+      rated.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
+
+# The card „Auswertung“: its height, the two columns' widths, whether the thumbnails stand level, and whether the line
+# between the columns runs exactly between them
+POLES = """() => { const c = document.querySelector('[data-sec=evaluation]'), r = e => e.getBoundingClientRect(),
+    sides = [...c.querySelectorAll('.pole')], pics = sides.map(s => s.querySelector('.thumb, .sk'));
+  return {height: Math.round(r(c).height), widths: sides.map(s => Math.round(r(s).width * 2) / 2),
+    level: Math.abs(r(pics[0]).top - r(pics[1]).top) < 0.5,
+    line: getComputedStyle(sides[1]).borderLeftWidth === '1px' && getComputedStyle(sides[0]).borderLeftWidth === '0px'}; }"""
 
 
 async def test_rules(browser, url):
@@ -543,17 +545,35 @@ async def test_rules(browser, url):
         first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
         check(
             layout['app'] == ['600px', '18px', '18px']
-            and len(layout['cards']) == 6
+            and len(layout['cards']) == 7
             and layout['cards'][0] == first
             and all(c == want for c in layout['cards'][1:])
-            and layout['gaps'] == [14] * 5,
+            and layout['gaps'] == [14] * 6,
             f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
         order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
         check(
-            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Einkaufen', 'Vorlieben'],
-            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
+            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Auswertung', 'Einkaufen', 'Vorlieben'],
+            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Auswertung“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
         )
+        poles = await pg.evaluate(POLES)
+        check(
+            200 <= poles['height'] <= 300 and poles['widths'][0] == poles['widths'][1] and poles['level'] and poles['line'],
+            f'„Auswertung“ ({scheme}): between 200 and 300px tall, top and flop in two equal columns, the packaging level, a hairline between them ({poles})',
+        )
+        await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
+        await idle(pg)
+        await scan()  # „Auswertung“
+        strips = await pg.evaluate(STRIPS)
+        places = await pg.eval_on_selector_all(
+            '#sheet .place', 'l => l.map(p => Math.round(p.getBoundingClientRect().left + p.getBoundingClientRect().width / 2))'
+        )
+        check(
+            len(strips) >= 7 and all(x == [True, True, True, True] for x in strips) and len(places) >= 6 and len(set(places)) == 1,
+            f'„Auswertung“ ({scheme}): every strip as on „Einkaufen“, hollow dots after it for the ratings still missing; the places centred on one line ({len(strips)} strips, {places})',
+        )
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
         await pg.click('[data-sec=profile] [data-action=open-profile]')
         await idle(pg)
         await scan()  # „Vorlieben“
@@ -641,14 +661,6 @@ async def test_rules(browser, url):
         await pg.click('[data-sec=hist] [data-action=open-report]')
         await idle(pg)
         await scan()  # „Verlauf“
-        glance = await pg.evaluate(RINGS)
-        check(
-            glance == {'rings': [[72, 72]] * 3, 'row': True, 'under': True},
-            f'„Verlauf“ ({scheme}): three rings of 72px side by side, every figure centred under its ring ({glance})',
-        )
-        await pg.click('#sheet [data-action=fold][data-v=details]')
-        await idle(pg)
-        await scan()  # with „Details“ open
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
         await pg.click('.pend .slider-track button', force=True)  # the level's button takes no pointer: the click lands on the track there
@@ -687,7 +699,7 @@ async def test_rules(browser, url):
         )
         check(
             seen == set(FAUSTINA.split(', ')),
-            f'Faustina on the wordmark, headings, day lines, percentages, counters, the level on the rating slider, initials ({sorted(seen)})',
+            f'Faustina on the wordmark, headings, day lines, counters, places, the level on the rating slider, initials ({sorted(seen)})',
         )
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()
@@ -957,9 +969,8 @@ TYPE_STYLES = {
 TYPE_SCALE = ({'12', '14', '16', '21', '30'}, {'1.1', '1.25', '1.4', '1.5'}, {'400', '600', '650'})
 # Figures take table figures in the very rule that sets their font, because the font shorthand resets them
 FIGURES = {
-    '.pct',
-    '.figs b',
     '.cnt b',
+    '.place',
     '.tl-time',
     '.day .dn',
     '.day.has .dn',
@@ -968,7 +979,7 @@ FIGURES = {
     '.field.code',
     '.t-main .num',
 }
-FIGURE_SUBJECT = re.compile(r'\.(pct|tl-time|dn|n|num)\b|^b$')
+FIGURE_SUBJECT = re.compile(r'\.(tl-time|dn|n|num|place)\b|^b$')
 # Type set other than through a style, each with its reason
 TYPE_ALLOWED = {
     ('b, strong', 'font-weight', 'var(--weight-strong)'): 'bold in running text is the app’s 600, not the browser’s bolder',
@@ -1053,13 +1064,11 @@ LIBRARY = {
     'leave': 'a rated meal folds away',
     'pop': 'a confirmation',
     'bowlFill': 'the bowl in the feeding button',
-    'ringFill': 'the ring draws its share',
     'spin': 'waiting',
     'shimmer': 'a line still loading',
 }
-# Keyframes move and fade; these three do what their purpose needs besides
+# Keyframes move and fade; these two do what their purpose needs besides
 KEYFRAME_ALLOWED = {
-    'ringFill': {'stroke-dashoffset'},
     'shimmer': {'background-position'},
     'leave': {'max-height', 'padding-top', 'padding-bottom', 'border-top-width'},
 }
@@ -1160,7 +1169,6 @@ SIZES = {
     '--control': '52px',
     '--control-l': '56px',
     '--bar': '56px',
-    '--col-figure': '52px',
     '--pic-xs': '24px',
     '--pic-s': '32px',
     '--pic-m': '40px',
@@ -1210,8 +1218,6 @@ GEOMETRY_ALLOWED = {
     '.sw': 'the switch track, 46 by 28',
     '.sw::after': 'its knob, 22, 3 from the edge',
     '[aria-checked="true"] > .sw::after': 'its travel, 18',
-    '.ring': 'the rings on „Verlauf“, 72; views/sheets.js draws them at that size',
-    '.ring circle': 'their 8px stroke, the same in views/sheets.js',
     '.shutter': 'the camera’s shutter, 78',
     '.crop': 'the crop stage, at most 340',
     '.toast': 'a toast is never wider than 520px',
@@ -1261,13 +1267,6 @@ def test_layers_lines_sizes():
         elif p == 'transform' and not sel.endswith(':active') and re.search(r'scale[XY]?\((?!0\)|1\))', v):
             loose.append(f'{sel} transform:{v} (a scale outside the press and the library)')
     check(not loose, f'layers, lines, rings, shadows, sizes and opacities from tokens.css ({len(loose)} not: {loose[:6]})')
-    ring = {(sel, p): v for _, sel, p, v in app_decls() if (sel, p) in (('.ring', 'width'), ('.ring circle', 'stroke-width'))}
-    js = (WWW / 'js/views/sheets.js').read_text(encoding='utf-8')
-    drawn = [m and m[1] + 'px' for m in (re.search(rf'\b{n} = (\d+)', js) for n in ('RING', 'RING_STROKE'))]
-    check(
-        drawn == [ring.get(('.ring', 'width')), ring.get(('.ring circle', 'stroke-width'))],
-        f'views/sheets.js draws the ring at the size and stroke app.css gives it ({drawn}, {ring})',
-    )
 
 
 # ---------------------------------------------------------------- boxes and sections
@@ -1278,6 +1277,7 @@ PADDING = {
     '.group': 'var(--inset-group)',
     '.row': 'var(--inset-row)',
     '.pend': 'var(--inset-row)',
+    '.pole': 'var(--inset-row)',
     '.card-btn': 'var(--inset-row)',
     '.box': 'var(--inset-box)',
     '.banner': 'var(--inset-box)',
@@ -1471,16 +1471,6 @@ def test_strip():
     )
 
 
-def test_rings():
-    """„Verlauf“ at a glance: the three rings in a grid of three equal columns, and the figures in that same grid, so every
-    figure stands under its ring at any width; the ring's size and stroke are listed in GEOMETRY_ALLOWED."""
-    grid = {(p, v) for sec, sel, p, v in app_decls() if sec == 'Views' and sel == '.rings, .figs'}
-    check(
-        {('display', 'grid'), ('grid-template-columns', 'repeat(3,minmax(0,1fr))')} <= grid,
-        f'the rings and the figures under them share one grid of three equal columns ({sorted(grid)})',
-    )
-
-
 def test_overview_card():
     """The overview shows two lines of its text and unfolds with a tap: the clamp in app.css says two, the Views
     section lets the whole text out for .open and while folding, views/home.js does the folding, and nothing fixes
@@ -1564,7 +1554,6 @@ async def test_files(browser, url):
     test_boxes()
     test_motion_js()
     test_strip()
-    test_rings()
     test_overview_card()
     test_ratings()
     test_isolated_tests()
