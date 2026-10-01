@@ -2,7 +2,7 @@
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
-import {analyze, changes, habits, novelty, profile, report, shopGroups, tally, variety as change} from './smart.js';
+import {analyze, habits, novelty, profile, shopGroups, tally, variety as change} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -41,14 +41,6 @@ function refresh(now) {
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-/* „Verlauf“, only when it opens: the last 7, 30 and 90 days as one entry, and what changed within the 30 days, against
-   the model as it stands */
-const SPANS = [7, 30, 90];
-export const reportModel = () =>
-  cached('report', [prefs.activePet], now => ({
-    spans: SPANS.map(days => report(db, prefs, now, days)),
-    changes: changes(db, prefs, now, SPANS[1], model()),
-  }));
 /* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits in the order the home
    page shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating eagerly at first. The home page
    asks for them only while there is nothing to compare, since Abwechslung reads every meal. */

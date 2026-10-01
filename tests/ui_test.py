@@ -960,7 +960,7 @@ NARROW = """sel => { const body = document.getElementById('sheetBody');
 
 async def test_narrow(browser, url):
     print('the new pages at 360 px, light and dark, at the usual and at a large system font')
-    pages = (('report', ['details'], '.review *'), ('shop', ['nicht', 'unklar'], '.card *'), ('profile', [], '.card *'))
+    pages = (('report', [], '.card *'), ('shop', ['nicht', 'unklar'], '.card *'), ('profile', [], '.card *'))
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme, width=360, height=760)
         pg, errors = await open_page(ctx, url, scheme)
@@ -6254,23 +6254,11 @@ TL_GEOMETRY = """l => { let off = 0, ends = true, fits = true;
   return [Math.round(off * 100) / 100, ends, fits, Math.round(l[0].querySelector('.tl-time').getBoundingClientRect().width)]; }"""
 
 
-# The history page: its two cards, as wide as and as far apart as the ones on the home page
+# The history page: its one card, as wide as the ones on the home page
 REPORT_CARDS = """() => { const l = [...document.querySelectorAll('#sheet .sheet-body > .card')];
-  return {heads: l.map(c => c.querySelector('h2')?.innerText ?? null),
+  return {count: l.length, heads: l.map(c => c.querySelector('h2')?.innerText ?? null),
     box: l.map(c => { const s = getComputedStyle(c); return [s.borderRadius, s.padding, s.boxShadow, s.borderTopWidth].join('|'); }),
-    gaps: l.slice(1).map((c, i) => Math.round(c.getBoundingClientRect().top - l[i].getBoundingClientRect().bottom)),
     side: Math.round(l[0].getBoundingClientRect().left)}; }"""
-
-# The first card of „Verlauf“: per ring its size, what it says in the middle and under it, the sentence it carries, its
-# role and its colour; the figures with the word under each; the buttons at its foot and the lines folded open
-FIRST = """() => { const c = document.querySelector('#sheet .review'), text = e => e.innerText.replace(/\\s+/g, ' ').trim();
-  return {head: c.querySelector('h2').innerText,
-    rings: [...c.querySelectorAll('.period')].map(p => { const r = p.querySelector('.ring');
-      return [Math.round(r.getBoundingClientRect().width), text(r), [...p.children].slice(1).map(text), r.getAttribute('aria-label'),
-        r.getAttribute('role'), r.querySelector('.ring-fill')?.className.baseVal ?? null]; }),
-    figs: [...c.querySelectorAll('.figs li')].map(li => [text(li.querySelector('b')), text(li.querySelector(':scope > small'))]),
-    btn: [...c.querySelectorAll('.card-btn')].map(b => [b.innerText, b.getAttribute('aria-expanded'), b === c.lastElementChild]),
-    rows: [...c.querySelectorAll('.told li')].map(li => [li.querySelector('.lead .ic') ? 'icon' : '?', text(li)])}; }"""
 
 # Words that would name a favourite, which „Verlauf“ no longer does: that is „Einkaufen“ and „Vorlieben“
 FAVOURITE = re.compile(r'Liebling|liebsten|Am besten|Am ehesten|mochte')
@@ -6290,7 +6278,7 @@ DENSE = """() => import('./js/store.js').then(async s => { const d = s.defaults(
 
 
 async def test_report(browser, url):
-    print('the history page: how it goes over 7, 30 and 90 days and the whole history, in two cards')
+    print('the history page: the calendar and the whole history in one card, no evaluation above it')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-12T10:00:00+02:00')  # a few days after the last meal
@@ -6313,91 +6301,18 @@ async def test_report(browser, url):
     )
     cards = await pg.evaluate(REPORT_CARDS)
     check(
-        cards['heads'] == ['Wie läuft’s?', None]
-        and cards['box'] == ['24px|18px 18px 8px|none|0px'] * 2
-        and cards['gaps'] == [14]
-        and cards['side'] == 18,
-        f'two cards on the page ground, exactly as on the home page ({cards})',
-    )
-    first = await pg.evaluate(FIRST)
-    check(
-        first['rings']
-        == [
-            [72, '–', ['7 Tage', 'Noch zu wenig'], 'Letzte 7 Tage: noch zu wenig bewertet, 2 von 3 Bewertungen.', 'img', None],
-            [
-                72,
-                '65%',
-                ['30 Tage', '11 von 17 gut'],
-                'Letzte 30 Tage: 65 Prozent der bewerteten Mahlzeiten kamen gut an, 11 von 17.',
-                'img',
-                'ring-fill r-mid',
-            ],
-            [
-                72,
-                '70%',
-                ['90 Tage', '14 von 20 gut'],
-                'Letzte 90 Tage: 70 Prozent der bewerteten Mahlzeiten kamen gut an, 14 von 20.',
-                'img',
-                'ring-fill r-good',
-            ],
-        ],
-        f'three rings of 72 px for 7, 30 and 90 days: the share in the middle and in its colour, the span and the count under it, all of it as a sentence; under 3 ratings the bare track ({first["rings"]})',
-    )
-    icons = await pg.eval_on_selector_all(
-        '#sheet .figs .ic', 'l => l.map(i => [Math.round(i.getBoundingClientRect().width), i.innerHTML.length > 20])'
+        cards == {'count': 1, 'heads': [None], 'box': ['24px|18px 18px 8px|none|0px'], 'side': 18},
+        f'one card on the page ground, exactly as on the home page, without a heading: the calendar and the list ({cards})',
     )
     check(
-        first['figs'] == [['15', 'Mahlzeiten'], ['6', 'Sorten'], ['14 von 30', 'Tagen']] and icons == [[20, True]] * 3,
-        f'under the rings the 30 days in figures: meals, varieties and the days fed on, each with its small icon ({first["figs"]}, {icons})',
-    )
-    check(
-        first['btn'] == [['Details', 'false', True]] and first['rows'] == [],
-        f'what changed is folded away under „Details“ at the foot of the card ({first["btn"]})',
-    )
-    check(
-        await pg.locator('#sheet .rings button, #sheet .rings [data-action], #sheet .figs button').count() == 0,
-        'the rings and the figures are no buttons',
-    )
-    await pg.click('#sheet [data-action=fold][data-v=details]')
-    await idle(pg)
-    shown = await pg.evaluate(FIRST)
-    focus = await pg.evaluate('document.activeElement.dataset.v')
-    check(
-        shown['rows']
-        == [
-            ['icon', 'Neu bei Nachkaufen: Pute.'],
-            ['icon', 'Neu bei Nicht mehr kaufen: Rind Pastete.'],
-            ['icon', '1 Mahlzeit noch nicht bewertet.'],
-            ['icon', 'Fütter-Duell: Anna 1×, Jonas 1×.'],
-        ]
-        and shown['btn'] == [['Weniger', 'true', True]]
-        and focus == 'details',
-        f'„Details“: new at „Nachkaufen“ and at „Nicht mehr kaufen“ within the 30 days, the meals not rated, the feeding duel of the last 7 days without a meal nobody signed ({shown["rows"]}, {focus})',
+        await pg.locator('#sheet .review, #sheet .ring, #sheet [data-action=fold]').count() == 0,
+        'no rings, no figures and no „Details“ above the list',
     )
     page_text = await pg.inner_text('#sheet')
-    check(not FAVOURITE.search(page_text), f'no favourite named anywhere on the page ({FAVOURITE.findall(page_text)})')
-    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.renderSheet())")
-    await idle(pg)
-    kept = await pg.evaluate(FIRST)
-    await pg.click('#sheet [data-action=fold][data-v=details]')
-    await idle(pg)
-    shut = await pg.evaluate(FIRST)
     check(
-        len(kept['rows']) == 4 and shut['rows'] == [] and shut['btn'] == [['Details', 'false', True]],
-        f'drawn anew the fold stays open while the page is, and „Weniger“ folds it shut ({len(kept["rows"])}, {shut["btn"]})',
+        not FAVOURITE.search(page_text) and '%' not in page_text,
+        f'no favourite named anywhere on the page, and no percentage ({FAVOURITE.findall(page_text)})',
     )
-    # The feeding duel: the most first, and no line while only one person feeds
-    await pg.click('#sheet [data-action=fold][data-v=details]')
-    await idle(pg)
-    duel = []
-    for change in (
-        "s.db.servings.find(x => !x.by && x.servedAt > new Date(2026, 5, 6).getTime()).by = 'Jonas'",
-        "s.db.servings.filter(x => x.servedAt > new Date(2026, 5, 6).getTime()).forEach(x => { x.by = 'Anna'; })",
-    ):
-        await pg.evaluate(f"import('./js/store.js').then(async s => {{ {change}; s.save(); (await import('./js/ui/sheet.js')).renderSheet(); }})")
-        await idle(pg)
-        duel.append([r[1] for r in (await pg.evaluate(FIRST))['rows'] if r[1].startswith('Fütter')])
-    check(duel == [['Fütter-Duell: Jonas 2×, Anna 1×.'], []], f'the feeding duel: the most first, and none with one person feeding ({duel})')
     first = await pg.locator('#sheet .tl-item').count()
     for _ in range(10):
         await pg.eval_on_selector('.sheet-body', 'b => b.scrollTo(0, b.scrollHeight)')
@@ -6405,12 +6320,10 @@ async def test_report(browser, url):
         if await pg.locator('#sheet .tl-item').count() == 18:
             break
     check(
-        first < 18 and await pg.locator('#sheet .tl-item').count() == 18,
-        f'the list holds the whole history, not only the evaluated span ({first} drawn, 18 after scrolling)',
+        await pg.locator('#sheet .tl-item').count() == 18,
+        f'the list holds the whole history ({first} drawn at first, 18 after scrolling)',
     )
     await shot(pg, 'report')
-    calm = await pg.eval_on_selector('#sheet .ring-fill', 'c => getComputedStyle(c).animationDuration')
-    check(float(calm.rstrip('s')) < 0.01, f'under reduced motion the ring does not fill itself ({calm})')
 
     # The list: the day line parks under the bar, the separators run straight, the name may take two lines
     day_line = await pg.eval_on_selector(
@@ -6438,59 +6351,18 @@ async def test_report(browser, url):
     )
     check(stuck == [True, '1', '0'], f'the day line parked under the bar carries the edge’s line, and the bar gives its own up ({stuck})')
 
-    # With the pet filter: that pet's rings and figures, and what changed for it
+    # With the pet filter: that pet's meals only, under its name
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     await pg.click('[data-action=filter][data-id=tiger00001]')
     await idle(pg)
     await pg.click('[data-sec=hist] [data-action=open-report]')
     await idle(pg)
-    await pg.click('#sheet [data-action=fold][data-v=details]')
-    await idle(pg)
-    tiger = await pg.evaluate(FIRST)
-    title = await pg.inner_text('#sheet .page-title')
-    check(
-        [r[1:3] for r in tiger['rings']]
-        == [['–', ['7 Tage', 'Noch zu wenig']], ['29%', ['30 Tage', '2 von 7 gut']], ['29%', ['90 Tage', '2 von 7 gut']]]
-        and tiger['figs'] == [['7', 'Mahlzeiten'], ['3', 'Sorten'], ['7 von 30', 'Tagen']]
-        and tiger['rows'] == [['icon', 'Neu bei Nicht mehr kaufen: Huhn in Gelee und Rind Pastete.']]
-        and title == 'Verlauf für Tiger',
-        f'with Tiger chosen, Tiger’s rings, figures and changes, the clearest first, and no duel where nobody fed Tiger lately ({tiger["rings"]}, {tiger["figs"]}, {tiger["rows"]}, {title})',
-    )
-    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
-    await ctx.close()
-
-    # With movement allowed the ring fills once when the page opens
-    ctx = await phone(browser, motion=True)
-    pg, errors = await open_page(ctx, url)
-    await pg.evaluate(SORTS, [3, 1])
-    await idle(pg)
-    await pg.click('[data-sec=hist] [data-action=open-report]')
-    fills = await pg.eval_on_selector(
-        '#sheet .ring-fill', 'c => { const s = getComputedStyle(c); return [s.animationName, s.animationDuration, s.animationIterationCount]; }'
-    )
-    check(fills == ['ringFill', '0.3s', '1'], f'with movement it fills itself once, in 300 ms ({fills})')
-    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
-    await ctx.close()
-
-    # The ring without enough ratings: the bare track, „–“ and why
-    ctx = await phone(browser)
-    pg, errors = await open_page(ctx, url)
-    await pg.evaluate(SORTS, [2, 1])
-    await pg.evaluate("""import('./js/store.js').then(async s => { s.db.servings.forEach(x => { for (const k in x.pets) x.pets[k].r = null; });
-      s.save(); (await import('./js/views/home.js')).renderHome(); })""")
-    await idle(pg)
-    await pg.click('[data-sec=hist] [data-action=open-report]')
-    await idle(pg)
-    few = (await pg.evaluate(FIRST))['rings']
-    check(
-        few
-        == [
-            [72, '–', [f'{d} Tage', 'Noch zu wenig'], f'Letzte {d} Tage: noch zu wenig bewertet, 0 von 3 Bewertungen.', 'img', None]
-            for d in (7, 30, 90)
-        ],
-        f'nothing rated: the bare track, „–“ and why, in every span ({few})',
-    )
+    for _ in range(10):
+        await pg.eval_on_selector('.sheet-body', 'b => b.scrollTo(0, b.scrollHeight)')
+        await idle(pg)
+    tiger = [await pg.inner_text('#sheet .page-title'), await pg.locator('#sheet .tl-item').count()]
+    check(tiger == ['Verlauf für Tiger', 7], f'with Tiger chosen, Tiger’s meals under „Verlauf für Tiger“ ({tiger})')
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
 
@@ -6502,7 +6374,7 @@ async def test_report(browser, url):
         await idle(pg)
         await pg.click('[data-sec=hist] [data-action=open-report]')
         await idle(pg)
-        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .period, #sheet .period > *, #sheet .figs li, #sheet .figs li > *, #sheet .review li, #sheet .day')]
+        wide = await pg.evaluate("""[...document.querySelectorAll('#sheet .day, #sheet .tl-item')]
           .filter(e => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > innerWidth).map(e => e.innerText)""")
         first = await pg.locator('#sheet .tl-item').count()
         for _ in range(10):

@@ -61,8 +61,8 @@
   --radius-full: 999px; /* pills, lines and bars */
 
   /* Type: five sizes, four leadings, three weights. app.css sets type only as font: var(--type-...). */
-  --type-title: 650 30px/1.1 var(--font-display); /* wordmark, page title, welcome heading, the ring's figure; always with --track-title */
-  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, percentages, counts, initials */
+  --type-title: 650 30px/1.1 var(--font-display); /* wordmark, page title, welcome heading; always with --track-title */
+  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, counts, initials */
   --type-subheading: 600 16px/1.25 var(--font-display); /* day lines, initials in small thumbnails, the level's name on the rating slider */
   --type-body: 400 16px/1.5 var(--font-ui); /* running text, fields, a card's own sentence */
   --type-body-strong: 600 16px/1.5 var(--font-ui); /* row titles, button labels, figures in Figtree */
@@ -109,7 +109,6 @@
   --control: 52px; /* a button or a field, the toast */
   --control-l: 56px; /* the feeding button; a settings row; a card's text button */
   --bar: 56px; /* a page's bar: the 48px back arrow with --space-1 above and below; the photo viewer's rows. A number, because views/sheets.js reads it through --stick */
-  --col-figure: 52px; /* the column a trailing figure takes, so figures line up: percentages, per-pet shares */
   --pic-xs: 24px; /* a picture beside a name: chips, pet labels, minis, verdicts */
   --pic-s: 32px; /* a row's leading column: its icon or avatar, a step's number, a calendar day's number */
   --pic-m: 40px; /* a small thumbnail: timeline, suggestions, the server's tile, the camera badge */
@@ -166,7 +165,7 @@
   --mood: 0.26; /* light-dark() takes colours only, so the one number that differs by scheme is set here */
 }
 
-/* The motion library: every @keyframes in the app. Movement and opacity only, plus the ring's stroke, the
+/* The motion library: every @keyframes in the app. Movement and opacity only, plus the
    shimmer's gradient and the collapse of a leaving meal. app.css names these and defines none. */
 @keyframes fadeIn {
   from {
@@ -256,11 +255,6 @@
     opacity: 0;
   }
 } /* the bowl in the feeding button */
-@keyframes ringFill {
-  from {
-    stroke-dashoffset: var(--len);
-  }
-} /* the ring draws its share once */
 @keyframes spin {
   to {
     transform: rotate(360deg);

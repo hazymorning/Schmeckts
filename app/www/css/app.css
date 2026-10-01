@@ -106,7 +106,6 @@ strong {
 .prod-card .edit .ic,
 .search .ic,
 .pick .ic,
-.figs .ic,
 .pin .ic,
 .cam-badge .ic {
   width: var(--icon-s);
@@ -1282,32 +1281,6 @@ dialog.sheet.page .sheet-body {
   border-radius: var(--radius-m);
 }
 
-/* Figures: tabular in the same rule as their font, after it, because the font shorthand resets it */
-.pct {
-  min-width: var(--col-figure);
-  text-align: right;
-  font: var(--type-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-.pct small {
-  font: var(--type-caption);
-  margin-left: var(--space-hair);
-}
-.ring-mid .pct {
-  min-width: 0;
-}
-.figs b {
-  font: var(--type-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-.figs b small {
-  font: var(--type-caption);
-  color: var(--muted);
-  white-space: nowrap;
-}
-
 /* Components */
 /* Verlauf: a two-week calendar, a timeline of the last three days, and older days on request */
 .cal .wd {
@@ -1475,50 +1448,6 @@ dialog.sheet.page .sheet-body {
   flex-wrap: wrap;
   column-gap: var(--space-2);
   font: var(--type-small);
-}
-/* „Verlauf“ at a glance: a ring per span for the share of ratings that went down well, the span and what it rests on
-   under it; under the rings the figures of the 30 days, each with a small icon and its word under it. A ring carries a
-   sentence in aria-label, so nothing rests on its colour alone. */
-.ring {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  display: grid;
-  place-items: center;
-}
-.ring svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.ring circle {
-  fill: none;
-  stroke-width: 8px;
-}
-.ring-track {
-  stroke: var(--surface-2);
-}
-.ring-fill {
-  stroke: var(--c);
-  stroke-linecap: round;
-  transform: rotate(-90deg); /* starts at the top */
-  transform-origin: 50% 50%;
-  stroke-dasharray: var(--len);
-  stroke-dashoffset: calc(var(--len) - var(--part));
-}
-.period > b {
-  font: var(--type-caption-strong);
-}
-.period > small,
-.figs li > small {
-  font: var(--type-caption);
-  color: var(--muted);
-}
-.figs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 .cam-hint {
   position: absolute;
@@ -2001,51 +1930,9 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profi
 .verdict p span {
   color: var(--muted);
 }
-/* „Verlauf“: the three rings side by side, and under a line the figures in the same three columns, each centred
-   under its ring. 16 under the heading, whose own 4 collapses into it; 10 under the figures, which with the card's 8
-   make the 18 it has at the top. */
-.rings,
-.figs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: var(--space-2);
-}
-.rings {
-  margin: var(--space-4) 0 var(--space-4h);
-}
-.figs {
-  margin-bottom: var(--space-2h);
-  border-top: var(--divider);
-}
-.period,
-.figs li {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-  text-align: center;
-}
-.period .ring {
-  margin-bottom: var(--space-2);
-}
-.figs li {
-  margin-top: var(--space-3h);
-}
-.figs li > span {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-}
-.figs .ic {
-  color: var(--faint);
-}
-/* A line of the first card of „Verlauf“: an icon in a rating's colour where it stands for one, and the bowls drawn
-   without their filling */
+/* A told line whose icon stands for a rating takes that rating's colour */
 .lead.tone {
   color: var(--c);
-}
-.review .fill {
-  display: none;
 }
 /* A part of a page folded open: its rows start under a line, as every row after them does */
 .fold > .list {
@@ -2306,9 +2193,6 @@ html.step-back::view-transition-new(page) {
 .fab.filled .fill {
   animation: bowlFill var(--dur-long) var(--ease-out) both;
 }
-.ring-fill {
-  animation: ringFill var(--dur-step) var(--ease-out) both;
-} /* fills once when the page opens */
 .spin {
   animation: spin var(--dur-long) linear infinite;
 }

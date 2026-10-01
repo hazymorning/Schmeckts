@@ -406,7 +406,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .pct, .figs b, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -429,7 +429,7 @@ INSETS = {
     '.seg': '4px',
     '.seg button': '8px 6px',
 }
-FIGURES_JS = '.num, .tl-time, .pct, .figs b, .cnt b, .day .dn, .steps .n, .field.code'
+FIGURES_JS = '.num, .tl-time, .cnt b, .day .dn, .steps .n, .field.code'
 
 
 SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), met = new Set();
@@ -466,15 +466,6 @@ SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), me
     met.add(sel);
     if (getComputedStyle(b).padding !== pad) bad.push(`inset ${sel} ${getComputedStyle(b).padding}`); }
   return {bad: [...new Set(bad)], seen: [...seen], met: [...met]}; }"""
-
-
-# The first card of „Verlauf“: the rings' sizes, whether they stand in one row, and whether every figure stands centred
-# under its ring
-RINGS = """() => { const c = document.querySelector('#sheet .review'), mid = e => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
-  const rings = [...c.querySelectorAll('.rings .ring')], figs = [...c.querySelectorAll('.figs li')];
-  return {rings: rings.map(r => [Math.round(r.getBoundingClientRect().width), Math.round(r.getBoundingClientRect().height)]),
-    row: rings.every(r => Math.abs(r.getBoundingClientRect().top - rings[0].getBoundingClientRect().top) < 0.5),
-    under: figs.length === rings.length && figs.every((f, i) => Math.abs(mid(f) - mid(rings[i])) < 0.5)}; }"""
 
 
 HINTS = ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')
@@ -641,14 +632,6 @@ async def test_rules(browser, url):
         await pg.click('[data-sec=hist] [data-action=open-report]')
         await idle(pg)
         await scan()  # „Verlauf“
-        glance = await pg.evaluate(RINGS)
-        check(
-            glance == {'rings': [[72, 72]] * 3, 'row': True, 'under': True},
-            f'„Verlauf“ ({scheme}): three rings of 72px side by side, every figure centred under its ring ({glance})',
-        )
-        await pg.click('#sheet [data-action=fold][data-v=details]')
-        await idle(pg)
-        await scan()  # with „Details“ open
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
         await pg.click('.pend .slider-track button', force=True)  # the level's button takes no pointer: the click lands on the track there
@@ -957,8 +940,6 @@ TYPE_STYLES = {
 TYPE_SCALE = ({'12', '14', '16', '21', '30'}, {'1.1', '1.25', '1.4', '1.5'}, {'400', '600', '650'})
 # Figures take table figures in the very rule that sets their font, because the font shorthand resets them
 FIGURES = {
-    '.pct',
-    '.figs b',
     '.cnt b',
     '.tl-time',
     '.day .dn',
@@ -968,7 +949,7 @@ FIGURES = {
     '.field.code',
     '.t-main .num',
 }
-FIGURE_SUBJECT = re.compile(r'\.(pct|tl-time|dn|n|num)\b|^b$')
+FIGURE_SUBJECT = re.compile(r'\.(tl-time|dn|n|num)\b|^b$')
 # Type set other than through a style, each with its reason
 TYPE_ALLOWED = {
     ('b, strong', 'font-weight', 'var(--weight-strong)'): 'bold in running text is the app’s 600, not the browser’s bolder',
@@ -1053,13 +1034,11 @@ LIBRARY = {
     'leave': 'a rated meal folds away',
     'pop': 'a confirmation',
     'bowlFill': 'the bowl in the feeding button',
-    'ringFill': 'the ring draws its share',
     'spin': 'waiting',
     'shimmer': 'a line still loading',
 }
-# Keyframes move and fade; these three do what their purpose needs besides
+# Keyframes move and fade; these two do what their purpose needs besides
 KEYFRAME_ALLOWED = {
-    'ringFill': {'stroke-dashoffset'},
     'shimmer': {'background-position'},
     'leave': {'max-height', 'padding-top', 'padding-bottom', 'border-top-width'},
 }
@@ -1160,7 +1139,6 @@ SIZES = {
     '--control': '52px',
     '--control-l': '56px',
     '--bar': '56px',
-    '--col-figure': '52px',
     '--pic-xs': '24px',
     '--pic-s': '32px',
     '--pic-m': '40px',
@@ -1210,8 +1188,6 @@ GEOMETRY_ALLOWED = {
     '.sw': 'the switch track, 46 by 28',
     '.sw::after': 'its knob, 22, 3 from the edge',
     '[aria-checked="true"] > .sw::after': 'its travel, 18',
-    '.ring': 'the rings on „Verlauf“, 72; views/sheets.js draws them at that size',
-    '.ring circle': 'their 8px stroke, the same in views/sheets.js',
     '.shutter': 'the camera’s shutter, 78',
     '.crop': 'the crop stage, at most 340',
     '.toast': 'a toast is never wider than 520px',
@@ -1261,13 +1237,6 @@ def test_layers_lines_sizes():
         elif p == 'transform' and not sel.endswith(':active') and re.search(r'scale[XY]?\((?!0\)|1\))', v):
             loose.append(f'{sel} transform:{v} (a scale outside the press and the library)')
     check(not loose, f'layers, lines, rings, shadows, sizes and opacities from tokens.css ({len(loose)} not: {loose[:6]})')
-    ring = {(sel, p): v for _, sel, p, v in app_decls() if (sel, p) in (('.ring', 'width'), ('.ring circle', 'stroke-width'))}
-    js = (WWW / 'js/views/sheets.js').read_text(encoding='utf-8')
-    drawn = [m and m[1] + 'px' for m in (re.search(rf'\b{n} = (\d+)', js) for n in ('RING', 'RING_STROKE'))]
-    check(
-        drawn == [ring.get(('.ring', 'width')), ring.get(('.ring circle', 'stroke-width'))],
-        f'views/sheets.js draws the ring at the size and stroke app.css gives it ({drawn}, {ring})',
-    )
 
 
 # ---------------------------------------------------------------- boxes and sections
@@ -1471,16 +1440,6 @@ def test_strip():
     )
 
 
-def test_rings():
-    """„Verlauf“ at a glance: the three rings in a grid of three equal columns, and the figures in that same grid, so every
-    figure stands under its ring at any width; the ring's size and stroke are listed in GEOMETRY_ALLOWED."""
-    grid = {(p, v) for sec, sel, p, v in app_decls() if sec == 'Views' and sel == '.rings, .figs'}
-    check(
-        {('display', 'grid'), ('grid-template-columns', 'repeat(3,minmax(0,1fr))')} <= grid,
-        f'the rings and the figures under them share one grid of three equal columns ({sorted(grid)})',
-    )
-
-
 def test_overview_card():
     """The overview shows two lines of its text and unfolds with a tap: the clamp in app.css says two, the Views
     section lets the whole text out for .open and while folding, views/home.js does the folding, and nothing fixes
@@ -1564,7 +1523,6 @@ async def test_files(browser, url):
     test_boxes()
     test_motion_js()
     test_strip()
-    test_rings()
     test_overview_card()
     test_ratings()
     test_isolated_tests()

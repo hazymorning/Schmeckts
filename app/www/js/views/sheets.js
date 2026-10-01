@@ -3,7 +3,7 @@
    one of its pages as well, drawn by the same view. */
 import {$, reduceMotion} from '../dom.js';
 import {slideHeight} from '../motion.js';
-import {andList, cap, esc, norm} from '../text.js';
+import {cap, esc, norm} from '../text.js';
 import {addDays, dayKey, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
@@ -19,12 +19,11 @@ import {
   pname,
   productsByCode,
   quickProducts,
-  reportModel,
   servingsInFilter,
   sortOf,
   withLast,
 } from '../derive.js';
-import {MIN_RATED, rateCls, ratingsIn, scoreCls, shopGroups, VERDICTS} from '../smart.js';
+import {rateCls, ratingsIn, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -50,9 +49,7 @@ import {
   since,
   strip,
   habitRow,
-  lead,
   likesList,
-  told,
   toldList,
   thumbOf,
   verdictLabel,
@@ -364,67 +361,9 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* „Verlauf“: a page of two cards. The first says how it goes: a ring for each of the last 7, 30 and 90 days, the
-   figures of the 30 days under them, and folded away what changed; the card under it holds the calendar and every
-   meal there has ever been.
-   sheet.at: the id of the day it opens at, coming from a calendar; sheet.open: its parts folded open (foldPart()) */
+/* „Verlauf“: a page of one card, the calendar and under it every meal there has ever been, within the pet filter.
+   sheet.at: the id of the day it opens at, coming from a calendar */
 export const reportState = at => ({kind: 'report', at});
-
-/* A ring: how many of the ratings in its span were good ones (from 70 points, as everywhere else). 72px across, the
-   arc a dashed circle whose gap shrinks to the share. Under MIN_RATED ratings it shows the bare track and says so
-   instead of a number. Under it the span and the ratings it rests on; the ring says all of it in one sentence. */
-const RING = 72,
-  RING_STROKE = 8;
-const RING_R = (RING - RING_STROKE) / 2;
-const RING_LEN = 2 * Math.PI * RING_R;
-function ring(r) {
-  const {good, pct, rated} = r.liked,
-    enough = rated >= MIN_RATED,
-    span = `${r.days} Tage`;
-  const label = enough
-    ? `Letzte ${span}: ${pct} Prozent der bewerteten Mahlzeiten kamen gut an, ${good} von ${rated}.`
-    : `Letzte ${span}: noch zu wenig bewertet, ${rated} von ${MIN_RATED} Bewertungen.`;
-  const arc = enough
-    ? `<circle class="ring-fill ${scoreCls(pct)}" cx="${RING / 2}" cy="${RING / 2}" r="${RING_R}"
-        style="--len:${RING_LEN.toFixed(1)};--part:${((RING_LEN * pct) / 100).toFixed(1)}"/>`
-    : '';
-  return `<div class="period"><div class="ring" role="img" aria-label="${esc(label)}">
-    <svg viewBox="0 0 ${RING} ${RING}" aria-hidden="true">
-      <circle class="ring-track" cx="${RING / 2}" cy="${RING / 2}" r="${RING_R}"/>${arc}</svg>
-    <span class="ring-mid"><b class="pct">${enough ? `${pct}<small>%</small>` : '–'}</b></span></div>
-    <b aria-hidden="true">${span}</b><small aria-hidden="true">${enough ? `${good} von ${rated} gut` : 'Noch zu wenig'}</small></div>`;
-}
-
-/* Under the rings, in their columns: meals, varieties and the days fed on within the 30 days, each figure with a small
-   icon and the word under it. „von 30“ is set small beside its figure, as the ring sets its „%“, or a third of the
-   card would not hold it at 360px; with a larger system font it goes under the figure. */
-const figure = (ic, n, word, of = '') =>
-  `<li><span>${icon(ic)}<b>${n}${of ? `<wbr><small> ${of}</small>` : ''}</b></span><small>${word}</small></li>`;
-const figures = r =>
-  `<ul class="figs">${figure('bowl', r.count.meals, r.count.meals === 1 ? 'Mahlzeit' : 'Mahlzeiten')}
-    ${figure('layers', r.count.sorts, r.count.sorts === 1 ? 'Sorte' : 'Sorten')}
-    ${figure('calendar', r.count.days, r.count.span === 1 ? 'Tag' : 'Tagen', `von ${r.count.span}`)}</ul>`;
-
-const named = id => `<b>${esc(pname(getProduct(id)))}</b>`;
-/* What changed, folded away under „Details“: the varieties new to „Nachkaufen“ and to „Nicht mehr kaufen“ and the
-   meals not rated yet within the 30 days, and where several people fed in the last 7 days, how often each did */
-function details(m) {
-  const [week, month] = m.spans,
-    {nachkaufen, nicht} = m.changes,
-    rows = [];
-  if (nachkaufen.length) rows.push(told(lead('award'), `Neu bei Nachkaufen: ${andList(nachkaufen.map(named))}.`));
-  if (nicht.length)
-    rows.push(told(lead('r_schlecht', 'schlecht'), `Neu bei Nicht mehr kaufen: ${andList(nicht.map(named))}.`));
-  if (month.open)
-    rows.push(
-      told(lead('bowl'), `<b>${month.open} ${month.open === 1 ? 'Mahlzeit' : 'Mahlzeiten'}</b> noch nicht bewertet.`),
-    );
-  if (week.feeders.length > 1)
-    rows.push(
-      told(lead('trophy'), `Fütter-Duell: ${week.feeders.map(f => `<b>${esc(f.name)}</b> ${f.n}×`).join(', ')}.`),
-    );
-  return rows;
-}
 
 /* The parts of a page that fold open under a .card-btn and shut again (foldPart()), each with the word on its button
    and what it holds; nothing of it where it would hold nothing */
@@ -432,7 +371,6 @@ const shopList = (m, list) =>
   list.length ? `<ul class="list shop">${list.map(e => shopRow(m, e)).join('')}</ul>` : '';
 const unclear = g => [...g.geht, ...g.neu];
 const FOLDS = {
-  details: {label: 'Details', inner: () => toldList(details(reportModel()))},
   nicht: {label: 'Anzeigen', inner: () => shopList(model(), shopGroups(model()).nicht)},
   unklar: {label: 'Anzeigen', inner: () => shopList(model(), unclear(shopGroups(model())))},
 };
@@ -447,15 +385,11 @@ function foldBox(key) {
 const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 
 function viewReport() {
-  const m = reportModel(),
-    month = m.spans[1],
-    pet = month.pet,
+  const pet = model().pet,
     all = servingsInFilter();
   histDays = dayGroups(all);
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
   return `${head('Verlauf' + forWhom(pet))}
-    <section class="card review"><h2>Wie läuft’s?</h2><div class="rings">${m.spans.map(ring).join('')}</div>
-    ${figures(month)}${foldBox('details')}</section>
     <section class="card days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
       histDays.length
@@ -533,7 +467,7 @@ export function jumpToDay(key) {
   if (at < 0) return;
   const box = $('#histBox');
   if (box) {
-    const pet = reportModel().spans[0].pet;
+    const pet = model().pet;
     while (box.children.length < histDays.length && box.children.length <= at + HIST_PAGE)
       box.insertAdjacentHTML('beforeend', histHTML(pet, box.children.length, box.children.length + HIST_PAGE));
     watchDays();
@@ -552,7 +486,7 @@ const histHTML = (pet, from, to) =>
 function growHistory() {
   const box = $('#histBox');
   if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
-  const pet = reportModel().spans[0].pet;
+  const pet = model().pet;
   while (
     box.children.length < histDays.length &&
     sheetBody.scrollHeight - sheetBody.scrollTop - sheetBody.clientHeight < 800

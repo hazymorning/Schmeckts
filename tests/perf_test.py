@@ -71,7 +71,7 @@ OPEN = """async () => { const s = await import('./js/store.js'), sheet = await i
     await sheet.closeSheet(); s.save();
     await new Promise(done => setTimeout(done, 50));
     const t0 = performance.now(); sheet.openSheet(views.reportState(null)); const t1 = performance.now();
-    out.push([t1 - t0, document.querySelectorAll('#sheetBody .tl-day').length, document.querySelectorAll('#sheetBody .review .ring').length === 3]); }
+    out.push([t1 - t0, document.querySelectorAll('#sheetBody .tl-day').length, !document.querySelector('#sheetBody .review')]); }
   await sheet.closeSheet();
   return out; }"""
 
@@ -103,7 +103,7 @@ async def test_rating(browser, url):
         shown = statistics.median(x[0] for x in opens)
         check(
             shown < REPORT_MS and all(x[1] >= 10 and x[2] for x in opens),
-            f'{years} years: the history page opens in {shown:.0f} ms with its three rings (limit {REPORT_MS} ms), {opens[0][1]} days to begin with',
+            f'{years} years: the history page opens in {shown:.0f} ms, the calendar and the list only (limit {REPORT_MS} ms), {opens[0][1]} days to begin with',
         )
         await ctx.close()
 
