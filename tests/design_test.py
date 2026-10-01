@@ -699,7 +699,7 @@ async def test_rules(browser, url):
         )
         check(
             seen == set(FAUSTINA.split(', ')),
-            f'Faustina on the wordmark, headings, day lines, percentages, counters, the level on the rating slider, initials ({sorted(seen)})',
+            f'Faustina on the wordmark, headings, day lines, counters, places, the level on the rating slider, initials ({sorted(seen)})',
         )
         check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
         await ctx.close()

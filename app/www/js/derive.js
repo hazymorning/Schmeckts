@@ -83,7 +83,7 @@ export const evaluationModel = () =>
       trend: trend(db, m, now),
       patterns: patterns(profileModel()),
       next: nextUp(m, now, r, last, slow),
-      basis: basis(m),
+      basis: basis(m, r),
       last,
     };
   });
@@ -114,10 +114,11 @@ export function defaultPets(p) {
 
 /* When each variety was last served within the pet filter: variety → time, only for varieties served at all */
 function lastServed() {
-  const last = new Map();
+  const last = new Map(),
+    pet = prefs.activePet !== 'all' && getPet(prefs.activePet) ? prefs.activePet : null; // as the model has it
   for (const s of db.servings) {
     if (!s.productId || last.has(s.productId)) continue;
-    if (prefs.activePet !== 'all' && !s.pets[prefs.activePet]) continue;
+    if (pet && !s.pets[pet]) continue;
     last.set(s.productId, s.servedAt);
   }
   return last;

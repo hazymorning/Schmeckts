@@ -64,8 +64,6 @@ const I = {
   search: '<circle cx="11" cy="11" r="6.2"/><path d="M19.5 19.5l-3.9-3.9"/>',
   pencil: '<path d="M4.5 19.5h4l10-10a2.83 2.83 0 0 0-4-4l-10 10z"/><path d="M13.5 7l3.5 3.5"/>',
   check: '<path d="M5 12.5l4.3 4.3L19 7.5"/>',
-  trophy:
-    '<path d="M8 4.5h8v4.2a4 4 0 0 1-8 0z"/><path d="M8 6H5.6v1a2.6 2.6 0 0 0 2.6 2.6M16 6h2.4v1a2.6 2.6 0 0 1-2.6 2.6M12 12.7v3.6M8.8 19.5h6.4M9.9 16.3h4.2l.6 3.2H9.3z"/>',
   clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4.3l2.8 1.7"/>',
   phone: '<rect x="7" y="3.5" width="10" height="17" rx="2.4"/><path d="M10.8 17.4h2.4"/>',
   house: '<path d="M4.5 10.6L12 4.5l7.5 6.1v8a1.4 1.4 0 0 1-1.4 1.4h-3.6v-5.4h-5v5.4H5.9a1.4 1.4 0 0 1-1.4-1.4z"/>',
@@ -82,9 +80,6 @@ const I = {
   paw: '<circle cx="6.6" cy="10.4" r="1.7"/><circle cx="10" cy="6.6" r="1.7"/><circle cx="14" cy="6.6" r="1.7"/><circle cx="17.4" cy="10.4" r="1.7"/><path d="M12 12.2c-2.5 0-4.8 2.4-4.8 4.8 0 1.5 1.1 2.5 2.4 2.5.9 0 1.6-.5 2.4-.5s1.5.5 2.4.5c1.3 0 2.4-1 2.4-2.5 0-2.4-2.3-4.8-4.8-4.8z"/>',
   shield: '<path d="M12 3.5l7 2.5v5.3c0 4.4-2.9 7.8-7 9.2-4.1-1.4-7-4.8-7-9.2V6z"/><path d="M9.2 12l2 2 3.6-3.8"/>',
   pin: '<path d="M9.2 3.5h5.6l-.9 5.6 3.1 3.3v1.4H7v-1.4l3.1-3.3z"/><path d="M12 13.8v6.7"/>',
-  award: '<circle cx="12" cy="9.5" r="5.5"/><path d="M8.7 13.9l-1.2 6.6 4.5-2.4 4.5 2.4-1.2-6.6"/>',
-  calendar:
-    '<rect x="3.7" y="5.3" width="16.6" height="14.9" rx="2.6"/><path d="M8.2 3.3v3.7M15.8 3.3v3.7M3.7 10h16.6"/>',
   layers: '<path d="M12 4.5l8 4-8 4-8-4z"/><path d="M4 12.3l8 4 8-4"/><path d="M4 16.1l8 4 8-4"/>',
   fish: '<path d="M21 12c-1.7 3-4.5 5-7.8 5-3.4 0-6.1-2-7.7-5 1.6-3 4.3-5 7.7-5 3.3 0 6.1 2 7.8 5z"/><path d="M5.5 12L2.5 8.8v6.4z"/><path d="M16.6 10.9v.2"/>',
   // „Auswertung“: what a comparison of brands is about, and which way it is going for a pet or a variety

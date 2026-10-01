@@ -408,7 +408,8 @@ function hints(sorts, appetites, pet, prefs) {
 }
 
 /* Groups for „Einkaufen“ and the shopping list: „Nachkaufen“ (with „Gemischt“), best first, „Nicht mehr kaufen“,
-   the clearest first, both by likingOf() as on „Auswertung“, „Geht so“ and „Noch zu wenig bewertet“. The manual
+   the clearest first, both by likingOf() as on „Auswertung“ and the verdict's own first, „Geht so“ and „Noch zu wenig
+   bewertet“. The manual
    setting decides the group, and varieties without a rating in the filter only show up with one; a variety whose
    ratings are all older than the window stands under „Noch zu wenig bewertet“. */
 export function shopGroups(m) {
@@ -417,9 +418,10 @@ export function shopGroups(m) {
     if (e.choice === 'nachkaufen' || e.choice === 'gemischt') g.nachkaufen.push(e);
     else if (e.choice === 'nicht') g.nicht.push(e);
     else if (e.total) g[e.choice].push(e);
-  const like = new Map([...g.nachkaufen, ...g.nicht].map(e => [e, likingOf(e)]));
-  g.nachkaufen.sort((a, b) => like.get(b) - like.get(a) || b.n - a.n);
-  g.nicht.sort((a, b) => like.get(a) - like.get(b) || b.n - a.n);
+  const like = new Map([...g.nachkaufen, ...g.nicht].map(e => [e, likingOf(e)])),
+    own = verdict => e => (e.verdict === verdict ? 0 : 1); // the verdict's own before „Gemischt“ and a setting by hand
+  g.nachkaufen.sort((a, b) => own('nachkaufen')(a) - own('nachkaufen')(b) || like.get(b) - like.get(a) || b.n - a.n);
+  g.nicht.sort((a, b) => own('nicht')(a) - own('nicht')(b) || like.get(a) - like.get(b) || b.n - a.n);
   return g;
 }
 
@@ -454,9 +456,11 @@ const sided = (dir, like) => (a, b) =>
   dir * (like.get(b) - like.get(a)) ||
   b.n - a.n ||
   (a.id < b.id ? -1 : 1);
-/* The ranked varieties with a rating in their window, by side: {top, flop, mid, split, thin, settled, flat, trials}.
-   settled counts every variety with a verdict. flat: the varieties differ no more than chance would make them
-   (flatOf()). trials: the thin varieties closest to a verdict (trialsOf()). */
+/* The ranked varieties with a rating in their window, by side: {top, flop, mid, split, thin, settled, rated, stale,
+   flat, trials}. split: the pets disagree, those furthest apart first. settled counts every variety with a verdict,
+   rated every one with a rating within the filter, and stale says that all of their ratings lie beyond the window.
+   flat: the varieties differ no more than chance would make them (flatOf()). trials: the thin varieties closest to a
+   verdict (trialsOf()). */
 export function ranking(m, now) {
   let flat, trials; // worked out the first time they are asked for: the card asks for neither while it has a side
   const like = new Map(),
@@ -467,19 +471,31 @@ export function ranking(m, now) {
       split: [],
       thin: [],
       settled: 0,
+      rated: 0,
+      stale: false,
       get flat() {
-        return (flat ??= flatOf([...r.top, ...r.mid, ...r.flop]));
+        return (flat ??= flatOf([...r.top, ...r.mid, ...r.flop, ...r.split]));
       },
       get trials() {
         return (trials ??= trialsOf(m, now, r.thin, like));
       },
     };
-  for (const e of m.sorts) if (e.n && ranks(e.product)) r[sideOf(e)].push(e);
+  for (const e of m.sorts)
+    if (e.total && ranks(e.product)) {
+      r.rated++;
+      if (e.n) r[sideOf(e)].push(e);
+    }
   for (const e of [...r.top, ...r.flop, ...r.split, ...r.thin]) like.set(e, likingOf(e));
   r.top.sort(sided(1, like));
   r.flop.sort(sided(-1, like));
-  r.split.sort(sided(1, like));
+  // the pets furthest apart first
+  const spread = e => {
+    const l = m.pets.filter(pid => e.pets[pid]?.n).map(pid => likingOf(e.pets[pid]));
+    return Math.max(...l) - Math.min(...l);
+  };
+  r.split.sort((a, b) => spread(b) - spread(a) || sided(1, like)(a, b));
   r.settled = r.top.length + r.flop.length + r.mid.length + r.split.length;
+  r.stale = r.rated > 0 && !r.settled && !r.thin.length;
   return r;
 }
 /* Whether the varieties differ no more than coin flips would make them: the index of dispersion of their shares of
@@ -495,7 +511,7 @@ function flatOf(list) {
 }
 /* Varieties still being tried: thin, first rated within TRIAL.span, at least half of them good so far and not set to
    „nicht“. need: how many more ratings the pet closest to a verdict needs, which is exact, since from three every
-   variety has one. The closest first. [{e, need, pet}] */
+   variety has one. The closest first, all good so far before the rest, then by liking. [{e, need, pet}] */
 const TRIAL = {span: 60 * DAY, need: 3};
 function trialsOf(m, now, thin, like) {
   const out = [];
@@ -506,7 +522,10 @@ function trialsOf(m, now, thin, like) {
     const [pet, x] = mine.reduce((a, b) => (b[1].n > a[1].n ? b : a));
     out.push({e, need: Math.max(1, TRIAL.need - x.n), pet});
   }
-  return out.sort((a, b) => a.need - b.need || like.get(b.e) - like.get(a.e) || (a.e.id < b.e.id ? -1 : 1));
+  const all = t => (goodOf(t.e.counts) === t.e.n ? 0 : 1); // all good so far before the rest
+  return out.sort(
+    (a, b) => a.need - b.need || all(a) - all(b) || like.get(b.e) - like.get(a.e) || (a.e.id < b.e.id ? -1 : 1),
+  );
 }
 
 /* „Wie läuft’s gerade?“, per pet in the filter: its ratings of ranked food in the last 28 days against the 56 days
@@ -519,7 +538,9 @@ function trialsOf(m, now, thin, like) {
    [{pet, kind, dir, recent: {n, good}, before: {n, good}, cause, behind: [id]}] */
 const TREND = {recent: 28 * DAY, before: 56 * DAY, min: 10, calm: 10, clear: 20, z: 2, usual: 6, behind: 2};
 const goodCount = list => ({n: list.length, good: list.filter(x => RATINGS[x.r].score >= GOOD).length});
-const shareGap = (a, b) => 100 * (a.good / a.n - b.good / b.n);
+/* How far apart two shares of good ratings lie, in points times both counts, so a threshold is met exactly: compare
+   it with points * of. */
+const shareGap = (a, b) => ({apart: 100 * (a.good * b.n - b.good * a.n), of: a.n * b.n});
 export function trend(db, m, now) {
   const meal = new Set(db.products.filter(ranks).map(p => p.id)),
     cut = now - TREND.recent,
@@ -538,14 +559,14 @@ export function trend(db, m, now) {
     const now4 = goodCount(recent),
       then = goodCount(before);
     if (now4.n < TREND.min || then.n < TREND.min) continue;
-    const gap = shareGap(now4, then),
+    const {apart, of} = shareGap(now4, then),
       p = (now4.good + then.good) / (now4.n + then.n),
       se = 100 * Math.sqrt(p * (1 - p) * (1 / now4.n + 1 / then.n)),
-      dir = gap < 0 ? -1 : 1,
+      dir = apart < 0 ? -1 : 1,
       kind =
-        Math.abs(gap) < TREND.calm
+        Math.abs(apart) < TREND.calm * of
           ? 'gleich'
-          : Math.abs(gap) >= TREND.clear && Math.abs(gap) >= TREND.z * se
+          : Math.abs(apart) >= TREND.clear * of && Math.abs(apart) >= TREND.z * se * of
             ? 'deutlich'
             : 'etwas';
     out.push({
@@ -565,9 +586,9 @@ function causeOf(recent, before, dir) {
     a = goodCount(recent.filter(x => known.has(x.id))),
     b = goodCount(before.filter(x => known.has(x.id)));
   if (a.n < TREND.usual || b.n < TREND.usual) return {cause: null, behind: []};
-  const gap = shareGap(a, b);
-  if (gap * dir >= TREND.clear) return {cause: 'tier', behind: []};
-  if (Math.abs(gap) >= TREND.calm) return {cause: null, behind: []};
+  const {apart, of} = shareGap(a, b);
+  if (apart * dir >= TREND.clear * of) return {cause: 'tier', behind: []};
+  if (Math.abs(apart) >= TREND.calm * of) return {cause: null, behind: []};
   const fresh = new Map();
   for (const x of recent) if (!old.has(x.id)) fresh.set(x.id, [...(fresh.get(x.id) || []), x]);
   const behind = [...fresh]
@@ -582,12 +603,12 @@ function causeOf(recent, before, dir) {
 /* What moved within the last MOVE.days calendar days: each ranked variety's side as it stood when they began, from the
    ratings before that day with the window and its 180 days measured from then (with „Alle“ the pets' windows and
    their household verdict, as now). A move between top, middle and flop counts only where MOVE.before ratings came
-   before, MOVE.since since, and their shares of good ones lie MOVE.gap apart the way it moved: a variety drifting
+   before, MOVE.since since, and their shares of good ones lie MOVE.gap points apart the way it moved: a variety drifting
    across the line of „Nachkaufen“ on the same ratings is no news. fresh: the tops and flops new on their side, from
    nothing, from thin, from split or by such a move, and only once MOVE.from varieties had settled back then, or in a
    young diary everything would be new. cooled: tops that went down, warmed: what became a top, each with the ratings
    before and since. {fresh: Set, cooled: [{id, before, since}], warmed: [...]} */
-const MOVE = {days: 30, from: 3, before: 3, since: 2, gap: 0.3};
+const MOVE = {days: 30, from: 3, before: 3, since: 2, gap: 30};
 const LEVEL = {flop: 0, mid: 1, top: 2};
 export function moves(m, now, r) {
   const start = addDays(dayStart(now), 1 - MOVE.days),
@@ -619,7 +640,8 @@ export function moves(m, now, r) {
     is in LEVEL &&
     before.n >= MOVE.before &&
     since.n >= MOVE.since &&
-    (goodOf(since.counts) / since.n - goodOf(before.counts) / before.n) * Math.sign(LEVEL[is] - LEVEL[was]) >= MOVE.gap;
+    100 * (goodOf(since.counts) * before.n - goodOf(before.counts) * since.n) * Math.sign(LEVEL[is] - LEVEL[was]) >=
+      MOVE.gap * since.n * before.n;
   for (const x of seen) {
     if (x.was === x.is) continue;
     const real = moved(x);
@@ -631,36 +653,40 @@ export function moves(m, now, r) {
   return out;
 }
 
-/* „Als Nächstes“: what to put in the bowl. missed: varieties whose newest NEXT.newest ratings, however old, say
-   „Nachkaufen“ for a pet and „Nicht mehr kaufen“ for none, not served within the filter for NEXT.away and not set to
-   „nicht“, leaving out the tops shown, the longest gone first, at most NEXT.missed; their window may have emptied
-   meanwhile, which is why they are told here at all. retry: a variety left at its only rating, by the one pet that
-   had it within NEXT.span, where novelty() says that pet needs a while with new food. {missed: [{id, at, n, counts}],
+/* „Als Nächstes“: what to put in the bowl. missed: varieties whose newest NEXT.newest ratings per pet, however old,
+   say „Nachkaufen“ for a pet and „Nicht mehr kaufen“ for none, not served within the filter for NEXT.away, neither
+   set to „nicht“ nor a flop nor „Nicht mehr kaufen“ for a pet now, leaving out the tops shown, the best first, at
+   most NEXT.missed; their window may have emptied meanwhile, which is why they are told here at all. by: the pets
+   that say „Nachkaufen“, whose ratings n and counts are. retry: a variety left at its only rating, by the one pet that had it within NEXT.span,
+   where novelty() says that pet needs a while with new food, at most NEXT.retry. {missed: [{id, at, by, n, counts}],
    retry: [{id, pet}]}. last: when each variety was last served within the filter; slow: the pets that need a while. */
-const NEXT = {newest: 8, away: 42 * DAY, missed: 2, span: 60 * DAY, retry: 1, shown: 5};
+const NEXT = {newest: 8, away: 42 * DAY, missed: 2, span: 60 * DAY, retry: 2, shown: 5};
 export function nextUp(m, now, r, last, slow) {
   const shown = new Set(r.top.slice(0, NEXT.shown).map(e => e.id)),
+    flop = new Set(r.flop.map(e => e.id)),
     missed = [],
     retry = [];
   for (const e of m.sorts) {
-    if (!ranks(e.product) || e.kaufen === 'nicht' || shown.has(e.id)) continue;
+    if (!ranks(e.product) || e.kaufen === 'nicht' || shown.has(e.id) || flop.has(e.id)) continue;
     const mine = m.pets.map(pid => [pid, e.pets[pid]]).filter(([, x]) => x?.list.length);
     if (!mine.length) continue;
     const at = last.get(e.id) || 0,
-      newest = mine.map(([, x]) => {
+      newest = mine.map(([pid, x]) => {
         const l = x.list.slice(0, NEXT.newest),
           counts = countsOf(l);
-        return {n: l.length, counts, verdict: verdictOf(l.length, goodOf(counts), poorOf(counts))};
-      });
+        return {pid, l, verdict: verdictOf(l.length, goodOf(counts), poorOf(counts))};
+      }),
+      yes = newest.filter(x => x.verdict === 'nachkaufen');
+    // not what is left in the bowl now, whatever it was once
     if (
       at &&
       at <= now - NEXT.away &&
-      newest.some(x => x.verdict === 'nachkaufen') &&
+      yes.length &&
+      !mine.some(([, x]) => x.verdict === 'nicht') &&
       !newest.some(x => x.verdict === 'nicht')
     ) {
-      const counts = {};
-      for (const x of newest) for (const [k, v] of Object.entries(x.counts)) counts[k] = (counts[k] || 0) + v;
-      missed.push({id: e.id, at, n: newest.reduce((a, x) => a + x.n, 0), counts});
+      const l = yes.flatMap(x => x.l);
+      missed.push({id: e.id, at, by: yes.map(x => x.pid), n: l.length, counts: countsOf(l)});
     }
     const [pid, x] = mine[0];
     if (
@@ -673,7 +699,7 @@ export function nextUp(m, now, r, last, slow) {
       retry.push({id: e.id, pet: pid, t: x.list[0].t});
   }
   return {
-    missed: missed.sort((a, b) => a.at - b.at).slice(0, NEXT.missed),
+    missed: missed.sort((a, b) => likingOf(b) - likingOf(a) || a.at - b.at).slice(0, NEXT.missed),
     retry: retry
       .sort((a, b) => b.t - a.t)
       .slice(0, NEXT.retry)
@@ -694,21 +720,16 @@ export function patterns(dims) {
     .slice(0, PATTERNS);
 }
 
-/* What „Auswertung“ rests on: the ratings of the ranked varieties' windows within the filter, since when, and the
-   types left out that have ratings within it. {n, first, left: [type]} */
-export function basis(m) {
+/* What the lists of „Auswertung“ rest on: the window's ratings of the settled varieties within the filter, the oldest
+   of them, and the types left out that have ratings within it. {n, first, left: [type]} */
+export function basis(m, r) {
   let n = 0,
     first = Infinity;
-  const left = new Set();
-  for (const e of m.sorts) {
-    if (!e.n) continue;
-    if (!ranks(e.product)) {
-      left.add(typeOf(e.product));
-      continue;
-    }
+  for (const e of [...r.top, ...r.flop, ...r.mid, ...r.split]) {
     n += e.n;
     for (const pid of m.pets) for (const x of e.pets[pid]?.window || []) first = Math.min(first, x.t);
   }
+  const left = new Set(m.sorts.filter(e => e.total && !ranks(e.product)).map(e => typeOf(e.product)));
   return {n, first, left: UNRANKED.filter(t => left.has(t))};
 }
 

@@ -190,7 +190,7 @@ export function strip({keys, more}, open = 0) {
   for (const r of keys) counts[r] = (counts[r] || 0) + 1;
   const said =
     evidenceOf({n: keys.length, counts}) +
-    (open ? `, ${open === 1 ? 'eine Bewertung' : 'zwei Bewertungen'} fehlen noch` : '');
+    (open ? `, noch ${open === 1 ? 'eine Bewertung' : 'zwei Bewertungen'} offen` : '');
   return `<span class="dots strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
     .slice(-STRIP)
     .map(r => `<i class="${rateCls(r)}"></i>`)
@@ -248,10 +248,10 @@ export function shopRow(m, e) {
     ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 
-/* A line of a card, told like the rest of the app: a plain icon, one in a rating's colour or the pet's picture, a
-   sentence with what it is about in bold, and under it in words what it rests on, its figures in bold as well. Both
-   are HTML: whatever came from a person is escaped by the caller. */
-export const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r) : ''}">${icon(ic)}</span>`;
+/* A line of a card, told like the rest of the app: a plain icon or the pet's picture, a sentence with what it is
+   about in bold, and under it in words what it rests on, its figures in bold as well. Both are HTML: whatever came
+   from a person is escaped by the caller. */
+export const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
@@ -354,7 +354,7 @@ export function since(t, now, mark = x => x) {
 export const times = (k, n) =>
   n === 1 ? 'einmal' : k < n ? `${k} von ${n} Mal` : n === 2 ? 'beide Male' : `alle ${n} Mal`;
 /* What the ratings of a variety say, in words and never as a percentage, so that its verdict explains itself:
-   „Alle 3 Mal sofort leer“, „Einmal später leer, einmal halb gegessen“, „4 von 5 Mal gut gefressen“, „2 von 3 Mal
+   „Alle 3 Mal sofort leer“, „Einmal fast leer, einmal halb gegessen“, „4 von 5 Mal gut gefressen“, „2 von 3 Mal
    nur die Soße geleckt“, „Mal so, mal so: 2× gut gefressen, 2× kaum gefressen“. The ratings fall on a side, good
    (from GOOD points), poor (under NO) or in between; the side most of them are on is named, with its level where
    only one level makes it up. x: {n, counts} */

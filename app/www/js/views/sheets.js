@@ -550,7 +550,8 @@ const VIEWS = {
   // The pet editor is a page of the settings when it is reached from there, and the same view serves it
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
-  evaluation: viewEvaluation,
+  // „Vorlieben“ opens as a level of „Auswertung“, so back returns there
+  evaluation: () => (sheet.page === 'profile' ? viewProfile() : viewEvaluation()),
   shop: viewShop,
   profile: viewProfile,
 };

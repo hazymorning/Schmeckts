@@ -115,9 +115,17 @@ test('mixed scales: verdicts and appetite work in points alone, the key counts a
   );
   assert.deepEqual(
     sorts(model(db), e => [e.pct, e.verdict]),
-    {trocken: [72, 'nachkaufen'], gewechselt: [70, 'nachkaufen'], snack: [35, 'neu']},
+    {
+      trocken: [72, 'nachkaufen'],
+      gewechselt: [70, 'nachkaufen'],
+      snack: [35, 'neu'],
+    },
   );
-  assert.deepEqual(model(db).byId.get('gewechselt').counts, {top: 1, normal: 1, sosse: 1});
+  assert.deepEqual(model(db).byId.get('gewechselt').counts, {
+    top: 1,
+    normal: 1,
+    sosse: 1,
+  });
   const usual = daily('A', Array(8).fill(['trocken', 'normal']), 4),
     low = daily(
       'A',
@@ -966,7 +974,12 @@ test('Auswertung: the side comes from the verdict, treats and dry food are left 
 });
 
 test('Auswertung: a side from a verdict, „Geht so“ by its majority and on average less than half eaten', () => {
-  const side = (counts, verdict) => sideOf({n: Object.values(counts).reduce((a, k) => a + k, 0), counts, verdict});
+  const side = (counts, verdict) =>
+    sideOf({
+      n: Object.values(counts).reduce((a, k) => a + k, 0),
+      counts,
+      verdict,
+    });
   assert.deepEqual(
     [
       side({top: 2, schlecht: 1}, 'nachkaufen'),
@@ -1015,7 +1028,43 @@ test('Auswertung: evidence beats luck, the verdict’s own first, and the worst 
       ['long', 'lucky'],
       ['awful', 'poor'],
     ],
-    '„Einkaufen“ in the same order, so its card and the evaluation’s never disagree',
+    '„Einkaufen“ in the same order, so the two never put varieties in a different order',
+  );
+});
+
+test('Einkaufen: the verdict’s own before „Gemischt“ and a setting by hand, then by liking', () => {
+  const db = household(
+    ['Minka', 'Tiger'],
+    ['split', 'both', {id: 'pinned', kaufen: 'immer'}],
+    [
+      ...rate('split', 'Minka', [T, T, T, T, T, T, T, T], 10),
+      ...rate('split', 'Tiger', [X, X, X, X], 10),
+      ...rate('both', 'Minka', [G, G, G], 10),
+      ...rate('both', 'Tiger', [G, G, G], 10),
+      ...rate('pinned', 'Minka', [T, T], 10),
+    ],
+  );
+  assert.deepEqual(
+    shopGroups(model(db)).nachkaufen.map(e => e.id),
+    ['both', 'pinned', 'split'],
+    'the top of the card comes first on „Einkaufen“ as well, though the others go down better',
+  );
+});
+
+test('Auswertung: the varieties rated at all, and whether all of their ratings lie beyond the window', () => {
+  const r = list => {
+    const x = ranking(model(household(['A'], ['p1', 'p2'], list)), NOW);
+    return [x.rated, x.stale];
+  };
+  const old = rate('p1', 'A', [T, T, T], 200);
+  assert.deepEqual(
+    [r([]), r(old), r([...old, ...rate('p2', 'A', [T], 10)]), r([...old, ...rate('p2', 'A', [T, T, T], 10)])],
+    [
+      [0, false],
+      [1, true],
+      [2, false],
+      [2, false],
+    ],
   );
 });
 
@@ -1031,7 +1080,14 @@ test('Auswertung with two pets: „Gemischt“ stands apart, and a pet chosen de
       ...rate('minka', 'Minka', [X, X], 10),
     ],
   );
-  assert.deepEqual(sides(db), {top: ['both'], flop: ['minka'], mid: [], split: ['split'], thin: [], settled: 3});
+  assert.deepEqual(sides(db), {
+    top: ['both'],
+    flop: ['minka'],
+    mid: [],
+    split: ['split'],
+    thin: [],
+    settled: 3,
+  });
   assert.deepEqual(sides(db, {activePet: 'Tiger'}), {
     top: ['both'],
     flop: ['split'],
@@ -1109,6 +1165,21 @@ test('Wie läuft’s gerade: four weeks against the eight before, per pet, a cle
     [['A', 'gleich']],
   );
   assert.deepEqual(run([...good('p1', 9, 1), ...good('snack', 5, 10, 'verputzt')], good('p1', 12, 30)), []);
+  // exactly ten points is no longer the same, whatever the counts
+  const ten = (now, then) =>
+    run(
+      [...good('p1', now, 1), ...good('p2', 10 - now, 11, M)],
+      [...good('p1', then, 30), ...good('p2', 10 - then, 40, M)],
+    ).map(t => t.slice(0, 3))[0];
+  assert.deepEqual(
+    [ten(3, 2), ten(2, 1), ten(8, 7), ten(7, 8)],
+    [
+      ['A', 'etwas', 1],
+      ['A', 'etwas', 1],
+      ['A', 'etwas', 1],
+      ['A', 'etwas', -1],
+    ],
+  );
   // with a pet chosen, only that pet
   const two = [...good('p1', 12, 1), ...daily('B', Array(12).fill(['p1', X]), 1)];
   const before = [...good('p1', 12, 30), ...daily('B', Array(12).fill(['p1', T]), 30)];
@@ -1199,6 +1270,27 @@ test('nextUp: favourites gone for six weeks from their newest ratings however ol
   );
   assert.deepEqual(next(['A']).retry, [{id: 'first', pet: 'A'}]);
   assert.deepEqual(next(['B']).retry, [], 'only where novelty() says the pet needs a while');
+
+  const turned = household(
+    ['A', 'B'],
+    ['flop', 'mixed'],
+    [
+      ...rate('flop', 'A', [T, T, T, T, T, T], 250),
+      ...rate('flop', 'A', [X, X], 50),
+      ...rate('mixed', 'A', [T, T, T], 100),
+      ...rate('mixed', 'B', [T, T, T, T, T, T], 250),
+      ...rate('mixed', 'B', [X, X], 50),
+    ],
+  );
+  const mt = model(turned),
+    rt = ranking(mt, NOW),
+    lt = new Map();
+  for (const s of turned.servings) if (!lt.has(s.productId)) lt.set(s.productId, s.servedAt);
+  assert.deepEqual(
+    [ids(rt.flop), ids(rt.split), nextUp(mt, NOW, rt, lt, []).missed],
+    [['flop'], ['mixed'], []],
+    'a favourite once whose window says „Nicht mehr kaufen“ now, for all or for one pet, is not served again',
+  );
 });
 
 test('patterns: the ranked types, GAP apart, the clear ones first, one per dimension, at most two', () => {
@@ -1229,7 +1321,15 @@ test('basis: the ratings the evaluation rests on, since when, and the types left
       ...rate('snack', 'A', ['verputzt'], 2),
     ],
   );
-  assert.deepEqual(basis(model(db)), {n: 3, first: NOW - 40 * DAY, left: ['Snack']});
+  const m = model(db);
+  assert.deepEqual(basis(m, ranking(m, NOW)), {
+    n: 3,
+    first: NOW - 40 * DAY,
+    left: ['Snack'],
+  });
+  const thin = household(['A'], ['p1', 'p2'], [...rate('p1', 'A', [T, T, T], 3), ...rate('p2', 'A', [T], 1)]),
+    mt = model(thin);
+  assert.equal(basis(mt, ranking(mt, NOW)).n, 3, 'only what the lists rest on, not a variety still being tried');
 });
 
 const USUAL = daily('A', Array(8).fill(['p1', G]), 4),
@@ -1389,7 +1489,11 @@ test('milestones: total meals and varieties tried', () => {
     [null, {A: null}, 1],
     ['weg', {A: null}, 1],
   ]);
-  assert.deepEqual(milestones(db), {meals: 50, sorts: 10, reached: ['meals:50', 'sorts:10']});
+  assert.deepEqual(milestones(db), {
+    meals: 50,
+    sorts: 10,
+    reached: ['meals:50', 'sorts:10'],
+  });
   db.servings.pop();
   assert.deepEqual(milestones(db).reached, ['sorts:10']);
 });

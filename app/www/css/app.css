@@ -1637,6 +1637,7 @@ dialog.sheet.page .sheet-body {
 }
 .place > small {
   font: var(--type-caption-strong);
+  color: var(--ink);
 }
 
 /* == Views == */
@@ -1796,7 +1797,7 @@ dialog.sheet.page .sheet-body {
 .pole > b {
   text-wrap: balance;
   hyphens: auto;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1804,6 +1805,16 @@ dialog.sheet.page .sheet-body {
 }
 .pole > .strip {
   margin-top: var(--space-2);
+}
+/* the brand on one line, so two long names still keep the card under 300px; the reason of an empty column in full */
+button.pole > small {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pole > small {
+  overflow-wrap: anywhere;
 }
 /* Its page: a variety's name over at most two lines and what its ratings say in full under it; a told line that opens
    its variety, the words taking the room the strip at its end leaves */
@@ -2027,10 +2038,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 }
 .verdict p span {
   color: var(--muted);
-}
-/* A told line whose icon stands for a rating takes that rating's colour */
-.lead.tone {
-  color: var(--c);
 }
 /* A part of a page folded open: its rows start under a line, as every row after them does */
 .fold > .list {

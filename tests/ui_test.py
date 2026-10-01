@@ -960,7 +960,7 @@ NARROW = """sel => { const body = document.getElementById('sheetBody');
 
 async def test_narrow(browser, url):
     print('the new pages at 360 px, light and dark, at the usual and at a large system font')
-    pages = (('report', [], '.card *'), ('shop', ['nicht', 'unklar'], '.card *'), ('profile', [], '.card *'))
+    pages = (('report', [], '.card *'), ('evaluation', [], '.card *'), ('shop', ['nicht', 'unklar'], '.card *'), ('profile', [], '.card *'))
     for scheme in ('light', 'dark'):
         ctx = await phone(browser, scheme, width=360, height=760)
         pg, errors = await open_page(ctx, url, scheme)
@@ -986,7 +986,7 @@ async def test_narrow(browser, url):
             )
             check(
                 all(not x['wide'] and not x['sideways'] for x in seen.values()) and home == [False, 0],
-                f'{scheme}, {int(scale * 100)} %: „Verlauf“, „Einkaufen“ and „Vorlieben“ unfolded, and the home page: nothing cut off, nothing scrolls sideways ({seen}, {home})',
+                f'{scheme}, {int(scale * 100)} %: „Verlauf“, „Auswertung“, „Einkaufen“ and „Vorlieben“ unfolded, and the home page: nothing cut off, nothing scrolls sideways ({seen}, {home})',
             )
         check(not real_errors(errors), f'no errors in the console ({scheme}) {real_errors(errors)}')
         await ctx.close()
@@ -6467,10 +6467,29 @@ EVAL_PAGE = """() => { const body = document.getElementById('sheetBody'), text =
   const said = sp => { const c = sp.cloneNode(true); c.querySelector('small')?.remove(); return text(c); };
   return {title: text(body.querySelector('.page-title')),
     cards: [...body.querySelectorAll(':scope > .card')].map(c => ({head: text(c.querySelector('h2')), say: [...c.querySelectorAll(':scope > .say')].map(text),
+      hint: [...c.querySelectorAll(':scope > .hint')].map(text), button: text(c.querySelector('.card-btn')),
       rows: [...c.querySelectorAll('.ranks > li')].map(li => [text(li.querySelector('.place')), text(li.querySelector('.t-main b')), text(li.querySelector('.t-main small'))]),
       told: [...c.querySelectorAll('.told > li')].map(li => { const sp = li.querySelector('.said') || li.querySelector(':scope > span:last-child');
         return [said(sp), text(sp.querySelector('small')), !!li.querySelector('button[data-action=open-product]')]; })})),
     foot: text(body.querySelector('.foot')), all: body.innerText}; }"""
+
+
+THIN = """meals => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now();
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  d.products = [...new Set(meals.map(m => m[0] + '|' + m[1]))].map(x => x.split('|')).map(([id, type]) => ({id: id + '000001', brand: 'Sheba', variety: id === 'lachs' ? 'Lachs in Soße' : 'Käse', type, codes: {}, createdAt: 1}));
+  d.servings = meals.map(([id, , r, days], i) => ({id: 'meal' + i, productId: id + '000001', servedAt: now - (days ?? i + 1) * 864e5, note: '', pets: {minka00001: {r, at: now - (days ?? 0) * 864e5}}}));
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+LONG_NAMES = """() => import('./js/store.js').then(async s => { const d = structuredClone(s.db), p = id => d.products.find(x => x.id === id + '000001');
+  Object.assign(p('gelee'), {brand: 'Catz Finefood Purrrr Selection', variety: 'Wildschwein mit Nachtkerzenöl und Kürbis in Gelee'});
+  Object.assign(p('pastete'), {brand: 'Feinschmeckerkatzenmenümanufaktur', variety: 'Rinderhackfleischpastetenspezialität'});
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+# What in a column of the card reaches beyond it
+POLES_OUT = """() => [...document.querySelectorAll('[data-sec=evaluation] .pole')].flatMap(p => { const b = p.getBoundingClientRect();
+  return [...p.querySelectorAll('*')].filter(e => e.getClientRects().length && !e.closest('svg')).filter(e => { const r = e.getBoundingClientRect();
+    return r.left < b.left - 0.5 || r.right > b.right + 0.5 || e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis'; })
+    .map(e => `${e.className || e.tagName}: ${(e.innerText || '').slice(0, 30)}`); })"""
 
 
 async def test_evaluation(browser, url):
@@ -6515,42 +6534,44 @@ async def test_evaluation(browser, url):
             ['1 neu', 'Rind in Gelee', 'Felix, alle 6 Mal sofort leer'],
             ['2 neu', 'Huhn in Gelee', 'Bozita, alle 3 Mal gut gefressen'],
         ]
-        and cards['Top 2']['say'] == []
+        and [cards['Top 2']['say'], cards['Top 2']['hint']] == [[], ['Nur diese zwei kommen bisher meist gut an.']]
         and cards['Flop 2']['rows']
         == [
             ['1', 'Rind Pastete', 'Gourmet, 2 von 3 Mal kaum angerührt'],
             ['2', 'Thunfisch in Soße', 'Whiskas, alle 3 Mal nur die Soße geleckt'],
         ]
-        and cards['Flop 2']['say'] == ['Nur diese zwei fallen ab, alle anderen kommen besser an.'],
+        and [cards['Flop 2']['say'], cards['Flop 2']['hint']] == [[], ['Nur diese zwei kommen bisher nicht gut an.']],
         f'Top and Flop: places, „neu“ for what came onto its side within 30 days, never padded; no treat, no dry food, and the salmon the cats disagree on in neither list ({cards["Top 2"]}, {cards["Flop 2"]})',
     )
     check(
         cards['Wie läuft’s gerade?']['told']
-        == [['Minka frisst gerade deutlich besser.', 'In den letzten vier Wochen alle 10 Mal gut gefressen, in den acht davor 4 von 10 Mal.', False]],
-        f'how it goes: Minka over four weeks against the eight before, Tiger with too few ratings left out ({cards["Wie läuft’s gerade?"]["told"]})',
+        == [['Minka frisst gerade deutlich besser.', 'In den letzten vier Wochen alle 10 Mal gut gefressen, in den acht davor 4 von 10 Mal.', False]]
+        and cards['Wie läuft’s gerade?']['hint'] == ['Für Tiger reicht es noch nicht für einen Vergleich.'],
+        f'how it goes: Minka over four weeks against the eight before, Tiger named as too few ({cards["Wie läuft’s gerade?"]})',
     )
     check(
-        cards['Geschmackssache']['say'] == ['Hier sind sich Minka und Tiger nicht einig.']
-        and cards['Geschmackssache']['rows'] == [[None, 'Lachs in Soße', 'Sheba, Minka alle 4 Mal sofort leer, Tiger alle 3 Mal kaum angerührt']],
-        f'Geschmackssache: the variety the cats disagree on, with what each of them did ({cards["Geschmackssache"]})',
+        cards['Geschmackssache']['told']
+        == [['Minka mag Lachs in Soße, Tiger nicht.', 'Minka alle 4 Mal sofort leer, Tiger alle 3 Mal kaum angerührt.', True]],
+        f'Geschmackssache: who likes the variety the cats disagree on and who does not, and what each of them did ({cards["Geschmackssache"]})',
     )
     check(
         cards['Worauf es ankommt']['say'] == ['Neues am ehesten in Gelee probieren.']
         and cards['Worauf es ankommt']['told']
-        == [['In Gelee kommt deutlich besser an als in Soße.', 'In Gelee alle 9 Mal gut gefressen, in Soße 4 von 10 Mal.', False]],
-        f'what it depends on: the clear comparison in one sentence, and where to look for something new ({cards["Worauf es ankommt"]})',
+        == [['In Gelee kommt deutlich besser an als in Soße.', 'In Gelee alle 9 Mal gut gefressen, in Soße 4 von 10 Mal.', False]]
+        and cards['Worauf es ankommt']['button'] == 'Alle Vorlieben',
+        f'what it depends on: the clear comparison in one sentence, where to look for something new, and the way to all of them ({cards["Worauf es ankommt"]})',
     )
     check(
         cards['Als Nächstes']['told']
         == [
             ['Ragout Royale gab es seit 10 Monaten nicht mehr.', 'Davor alle 3 Mal sofort leer.', True],
-            ['Wildschwein mit Nachtkerzenöl noch zweimal für Minka servieren, dann steht’s fest.', 'Bisher einmal fast leer.', True],
+            ['Wildschwein mit Nachtkerzenöl noch zweimal für Minka servieren und bewerten, dann steht’s fest.', 'Bisher einmal fast leer.', True],
         ],
         f'what to serve next: a favourite gone for long, a variety two ratings short of a verdict, each opening its food sheet ({cards["Als Nächstes"]["told"]})',
     )
     check(
         page['foot']
-        == 'Aus 23 Bewertungen seit dem 4. Mai. Je Sorte und Tier zählen die neuesten acht aus dem letzten halben Jahr. Snacks und Trockenfutter zählen hier nicht mit.'
+        == 'Die Listen beruhen auf 22 Bewertungen seit dem 4. Mai, je Sorte und Tier auf den neuesten acht aus dem letzten halben Jahr. Snacks und Trockenfutter zählen hier nicht mit.'
         and '%' not in page['all']
         and 'Prozent' not in page['all']
         and 'Käse' not in page['all']
@@ -6559,6 +6580,16 @@ async def test_evaluation(browser, url):
     )
     wide = await pg.evaluate(NARROW, '.card *')
     check(not wide['wide'] and not wide['sideways'], f'nothing cut off at 360 px, nothing scrolls sideways ({wide})')
+    await pg.click('#sheet [data-action=open-level][data-v=profile]')
+    await idle(pg)
+    level = await pg.inner_text('#sheet .page-title')
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    back = await pg.inner_text('#sheet .page-title')
+    check(
+        level == 'Vorlieben für alle Tiere' and back == 'Auswertung für alle Tiere',
+        f'„Alle Vorlieben“ opens „Vorlieben“ as a level of the page, and back returns to it ({level}, {back})',
+    )
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
 
@@ -6579,9 +6610,9 @@ async def test_evaluation(browser, url):
     page = await pg.evaluate(EVAL_PAGE)
     check(
         page['title'] == 'Auswertung für Tiger'
-        and [[c['head'], c['say']] for c in page['cards']] == [['Top', ['Bisher kam keine Sorte meist gut an.']], ['Ein Flop', []]]
+        and [[c['head'], c['say']] for c in page['cards']] == [['Top', ['Bisher kam keine Sorte meist gut an.']], ['Größter Flop', []]]
         and page['foot']
-        == 'Aus 3 Bewertungen seit dem 4. Mai. Je Sorte zählen die neuesten acht aus dem letzten halben Jahr. Trockenfutter zählt hier nicht mit.',
+        == 'Die Listen beruhen auf 3 Bewertungen seit dem 4. Mai, je Sorte auf den neuesten acht aus dem letzten halben Jahr. Trockenfutter zählt hier nicht mit.',
         f'with Tiger chosen, only Tiger’s ratings ({page["title"]}, {[[c["head"], c["say"]] for c in page["cards"]]}, {page["foot"]})',
     )
     await pg.click('#sheet [data-action=settings-back]')
@@ -6592,26 +6623,56 @@ async def test_evaluation(browser, url):
     # Little rated yet: the card names the variety closest to a verdict; with only a treat rated there is no card
     ctx = await phone(browser, width=360, height=780)
     pg, errors = await open_page(ctx, url)
+    T, X = 'top', 'schlecht'
     thin = []
     for meals in (
-        "[['lachs', 'Nassfutter', 'top']]",
-        "[['kaese', 'Snack', 'verputzt'], ['kaese', 'Snack', 'verputzt'], ['kaese', 'Snack', 'verputzt']]",
+        [['lachs', 'Nassfutter', T]],
+        [['lachs', 'Nassfutter', T], ['lachs', 'Nassfutter', 'gut']],
+        [['lachs', 'Nassfutter', T, 200], ['lachs', 'Nassfutter', T, 201], ['lachs', 'Nassfutter', X, 202]],
+        [['kaese', 'Snack', 'verputzt'], ['kaese', 'Snack', 'verputzt'], ['kaese', 'Snack', 'verputzt']],
     ):
-        await pg.evaluate(
-            """meals => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now();
-              d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
-              d.products = [...new Set(meals.map(m => m[0] + '|' + m[1]))].map(x => x.split('|')).map(([id, type]) => ({id: id + '000001', brand: 'Sheba', variety: id === 'lachs' ? 'Lachs in Soße' : 'Käse', type, codes: {}, createdAt: 1}));
-              d.servings = meals.map(([id, , r], i) => ({id: 'meal' + i, productId: id + '000001', servedAt: now - (i + 1) * 864e5, note: '', pets: {minka00001: {r, at: now}}}));
-              s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })""",
-            eval(meals),
-        )
+        await pg.evaluate(THIN, meals)
         await idle(pg)
         thin.append(await pg.evaluate(EVAL_CARD))
+        if len(thin) == 2:
+            await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
+            await idle(pg)
+            strips = await pg.eval_on_selector_all('#sheetBody .told .strip', 'l => l.map(e => e.getAttribute("aria-label"))')
+            await pg.click('#sheet [data-action=settings-back]')
+            await idle(pg)
     check(
         thin[0]['poles'] == []
-        and thin[0]['said'] == ['Noch steht keine Sorte fest.', 'Am weitesten ist Lachs in Soße: noch zweimal servieren, dann steht’s fest.']
-        and thin[1] is None,
-        f'one rating: no columns yet, but which variety is closest and how often it is still to be served; only a treat rated: no card ({thin})',
+        and thin[0]['said']
+        == ['Noch steht keine Sorte fest.', 'Am weitesten ist Lachs in Soße: noch zweimal servieren und bewerten, dann steht’s fest.']
+        and thin[1]['said']
+        == ['Noch steht keine Sorte fest.', 'Am weitesten ist Lachs in Soße: noch einmal servieren und bewerten, dann steht’s fest.']
+        and strips == ['Einmal sofort leer, einmal fast leer, noch eine Bewertung offen']
+        and thin[2]['poles'] == []
+        and thin[2]['said'] == ['Die letzten Bewertungen sind über ein halbes Jahr alt. Nach ein paar neuen steht hier wieder, was ankommt.']
+        and thin[3] is None,
+        f'one rating or two: no columns yet, but which variety is closest and how often it is still to be served, and its strip says in words what is still open; all ratings older than half a year: the card says so; only a treat rated: no card ({thin}, {strips})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # Long names and brands, one of them a single long word: the card stays between 200 and 300 px at 360 px, and
+    # nothing runs out of its column, at a large system font either
+    ctx = await phone(browser, width=360, height=780)
+    pg, errors = await open_page(ctx, url)
+    await pg.evaluate(EVAL)
+    await pg.evaluate(LONG_NAMES)
+    await idle(pg)
+    long = []
+    for scale in (1, 1.3):
+        if scale != 1:
+            await pg.evaluate(BIG_TEXT, scale)
+            await idle(pg)
+        long.append([await pg.evaluate(EVAL_CARD), await pg.evaluate(POLES_OUT)])
+        await pg.locator('[data-sec=evaluation]').scroll_into_view_if_needed()
+        await shot(pg, f'evaluation-long-{int(scale * 100)}')
+    check(
+        all(len(c['poles']) == 2 and not out for c, out in long) and 200 <= long[0][0]['height'] <= 300,
+        f'long names: two columns, 200 to 300 px tall, nothing beyond its column ({[[c["height"], out] for c, out in long]})',
     )
     check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
     await ctx.close()
