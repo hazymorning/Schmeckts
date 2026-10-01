@@ -85,6 +85,10 @@ strong {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.sk.l {
+  width: var(--pic-l);
+  height: var(--pic-l);
+}
 .sk.xl {
   width: var(--pic-xl);
   height: var(--pic-xl);
@@ -1596,6 +1600,45 @@ dialog.sheet.page .sheet-body {
   flex: none;
 }
 
+/* „Auswertung“ on the home page (views/evaluation.js): the top and the biggest flop side by side, each a column you
+   tap, centred: what it is, the packaging, the name, the brand and the strip. No fill and no frame; a hairline parts
+   the two (Views). A column without a variety is no button and says why. */
+.pole {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: var(--inset-row);
+  text-align: center;
+}
+.pole-role {
+  font: var(--type-caption-strong);
+  color: var(--muted);
+}
+.pole > b {
+  font: var(--type-body-strong);
+  color: var(--ink);
+}
+.pole > small {
+  font: var(--type-small);
+  color: var(--muted);
+}
+/* A place in Top 5 and Flop 5 („Auswertung“): its figure in Faustina in the row's leading column, and under it „neu“
+   where the variety came onto its side within the last 30 days, as a chart marks a new entry */
+.place {
+  flex: 0 0 auto;
+  width: var(--pic-s);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: var(--type-heading);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.place > small {
+  font: var(--type-caption-strong);
+}
+
 /* == Views == */
 /* Home: header and cards */
 .brand {
@@ -1731,6 +1774,59 @@ dialog.sheet.page .sheet-body {
 .told li {
   align-items: flex-start;
 }
+/* „Auswertung“ on the home page: top and flop in two equal columns, a hairline between them and the text kept off it;
+   the packaging, the name over at most two lines and the strip a little apart */
+.poles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: var(--space-1) 0 var(--space-hair);
+}
+.pole + .pole {
+  border-left: var(--divider);
+}
+.pole > :is(.pole-role, b, small) {
+  margin: 0 var(--space-2);
+}
+.pole > :is(.thumb, .sk) {
+  margin: var(--space-2) 0;
+}
+.pole > .sk {
+  color: var(--faint);
+}
+.pole > b {
+  text-wrap: balance;
+  hyphens: auto;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pole > .strip {
+  margin-top: var(--space-2);
+}
+/* Its page: a variety's name over at most two lines and what its ratings say in full under it; a told line that opens
+   its variety, the words taking the room the strip at its end leaves */
+.ranks .t-main b {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ranks .t-main small {
+  white-space: normal;
+}
+.told button.row {
+  align-items: flex-start;
+}
+.told button.row > .strip {
+  align-self: center;
+}
+.said {
+  flex: 1;
+  min-width: 0;
+}
 
 /* Welcome and first steps */
 .welcome {
@@ -1798,8 +1894,10 @@ dialog.sheet.page .sheet-body {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-/* „Verlauf“, „Einkaufen“ and „Vorlieben“: cards on the page ground, as far apart as the ones on the home page */
-dialog.sheet.page:is([data-kind="report"], [data-kind="shop"], [data-kind="profile"]) .page-title {
+/* „Verlauf“, „Auswertung“, „Einkaufen“ and „Vorlieben“: cards on the page ground, as far apart as the ones on the home
+   page */
+dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"], [data-kind="profile"])
+  .page-title {
   margin-bottom: var(--space-3h);
 }
 .btn-col {
@@ -2026,6 +2124,7 @@ body,
 .photo-btn,
 .prod-edit,
 .pend-head,
+.pole,
 .day,
 .sw,
 .sw::after,
@@ -2061,7 +2160,19 @@ dialog.sheet.dragging {
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
-:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
+:is(
+  .icon-btn,
+  .chip,
+  .pet,
+  .day.has,
+  button.ov-pic,
+  button.pole,
+  .photo-btn,
+  .pet-photo,
+  .shutter,
+  .sync-chip,
+  .fab
+):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {

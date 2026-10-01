@@ -85,7 +85,7 @@ async def test_tour(browser, url, scheme='light'):
     heads = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.classList.contains("card") ? s.querySelector("h2").innerText : "-")')
     hint = [h for h in heads if h in ('Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     check(
-        heads == ['Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Einkaufen', 'Vorlieben'] and len(hint) == 1,
+        heads == ['Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Auswertung', 'Einkaufen', 'Vorlieben'] and len(hint) == 1,
         f'cards in a fixed order, the overview first: {heads}',
     )
     check(
@@ -1108,7 +1108,7 @@ async def test_week(browser, url):
     heads = await pg.eval_on_selector_all('#home > section.card', 'l => l.map(s => s.querySelector("h2").innerText)')
     hint = [h for h in heads if h in ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     check(
-        len(hint) == 1 and heads[:4] == ['Minka und Tiger'] + hint + ['Verlauf', 'Einkaufen'],
+        len(hint) == 1 and heads[:5] == ['Minka und Tiger'] + hint + ['Verlauf', 'Auswertung', 'Einkaufen'],
         f'no card of its own for the last week on the home page ({heads})',
     )
     await pg.clock.set_fixed_time('2026-06-15T09:00:00+02:00')
@@ -2504,8 +2504,8 @@ async def test_petbar(browser, url):
       .map(e => e.matches('header') ? 'header' : e.id === 'pets' ? 'pets' : e.querySelector('h2')?.innerText ?? e.tagName)""")
     hint = [x for x in order if x in ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')]
     check(
-        order == ['header', 'Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Einkaufen', 'Vorlieben'] and len(hint) == 1,
-        f'one pet: no pet bar; overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Vorlieben“ ({order})',
+        order == ['header', 'Mau', 'Wie war’s?'] + hint + ['Verlauf', 'Auswertung', 'Einkaufen', 'Vorlieben'] and len(hint) == 1,
+        f'one pet: no pet bar; overview, „Wie war’s?“, hint, „Verlauf“, „Auswertung“, „Einkaufen“, „Vorlieben“ ({order})',
     )
     check(await pg.locator('#pets').is_hidden() and await pg.locator('#pets *').count() == 0, 'with one pet there is no filter')
     await shot(pg, 'home-one-pet')
@@ -6435,6 +6435,188 @@ async def test_report(browser, url):
     await ctx.close()
 
 
+# „Auswertung“: two cats over three months, made so that every part of the page has something to say. Minka eats the
+# jelly of the last four weeks every time and left most of the eight weeks before; Tiger hates the salmon Minka loves;
+# one variety has been tried once, one favourite has not been served for ten months, and a treat and dry food are rated
+EVAL = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), DAY = 864e5;
+  d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}, {id: 'tiger00001', name: 'Tiger', species: 'Katze', createdAt: 2}];
+  d.products = [['gelee', 'Felix', 'Rind in Gelee', 'Nassfutter', 'gelee'], ['huhn', 'Bozita', 'Huhn in Gelee', 'Nassfutter', 'gelee'],
+    ['lachs', 'Sheba', 'Lachs in Soße', 'Nassfutter', 'sosse'], ['pastete', 'Gourmet', 'Rind Pastete', 'Nassfutter', 'pastete'],
+    ['sosse', 'Whiskas', 'Thunfisch in Soße', 'Nassfutter', 'sosse'], ['neu', 'Catz Finefood', 'Wildschwein mit Nachtkerzenöl', 'Nassfutter', 'pastete'],
+    ['alt', 'Miamor', 'Ragout Royale', 'Nassfutter', 'sosse'], ['kaese', 'Dreamies', 'Käse', 'Snack', 'knusprig'], ['trocken', 'Josera', 'Catelux', 'Trockenfutter', null]]
+    .map(([id, brand, variety, type, texture]) => ({id: id + '000001', brand, variety, type, ...(texture ? {texture} : {}), codes: {}, createdAt: 1}));
+  const meals = [['gelee', 'M', 'top', [2, 3, 4, 5, 6, 7]], ['huhn', 'M', 'top', [8, 9]], ['huhn', 'M', 'gut', [10]], ['neu', 'M', 'gut', [5.5]],
+    ['pastete', 'M', 'schlecht', [30, 31]], ['pastete', 'M', 'mittel', [32]], ['sosse', 'M', 'sosse', [33, 34, 35]], ['lachs', 'M', 'top', [36, 37, 38, 39]],
+    ['lachs', 'T', 'schlecht', [36.5, 37.5, 38.5]], ['alt', 'M', 'top', [300, 301, 302]], ['kaese', 'M', 'verputzt', [3, 4, 5]], ['trocken', 'T', 'gern', [3, 4, 5]]];
+  d.servings = meals.flatMap(([p, pet, r, days]) => days.map(n => ({p, pet, r, n}))).map((x, i) => ({id: 'meal' + String(i).padStart(6, '0'),
+    productId: x.p + '000001', servedAt: now - x.n * DAY, note: '', pets: {[x.pet === 'M' ? 'minka00001' : 'tiger00001']: {r: x.r, at: now - x.n * DAY + 36e5}}}));
+  d.servings.sort((a, b) => b.servedAt - a.servedAt);
+  s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })"""
+
+# The card: its heading, each column (button or not, its word, the name, the brand, whether it shows the packaging or
+# the sketch, its label for a screen reader), its height, and what it says without columns
+EVAL_CARD = """() => { const c = document.querySelector('[data-sec=evaluation]'), text = e => e?.innerText.replace(/\\s+/g, ' ').trim() ?? null;
+  return c && {head: text(c.querySelector('h2')), height: Math.round(c.getBoundingClientRect().height),
+    poles: [...c.querySelectorAll('.pole')].map(p => [p.tagName, text(p.querySelector('.pole-role')), text(p.querySelector(':scope > b')),
+      text(p.querySelector(':scope > small')), p.querySelector('.thumb') ? 'thumb' : p.querySelector('.sk') ? 'sketch' : null, p.getAttribute('aria-label')]),
+    said: [...c.querySelectorAll(':scope > p')].map(text), button: text(c.querySelector('.card-btn'))}; }"""
+
+# The page: its title, every card with its heading, its sentences, its ranked rows (place with „neu“, name, what is
+# under it) and its told lines (what is said, what it rests on), and the footer
+EVAL_PAGE = """() => { const body = document.getElementById('sheetBody'), text = e => e?.innerText.replace(/\\s+/g, ' ').trim() ?? null;
+  const said = sp => { const c = sp.cloneNode(true); c.querySelector('small')?.remove(); return text(c); };
+  return {title: text(body.querySelector('.page-title')),
+    cards: [...body.querySelectorAll(':scope > .card')].map(c => ({head: text(c.querySelector('h2')), say: [...c.querySelectorAll(':scope > .say')].map(text),
+      rows: [...c.querySelectorAll('.ranks > li')].map(li => [text(li.querySelector('.place')), text(li.querySelector('.t-main b')), text(li.querySelector('.t-main small'))]),
+      told: [...c.querySelectorAll('.told > li')].map(li => { const sp = li.querySelector('.said') || li.querySelector(':scope > span:last-child');
+        return [said(sp), text(sp.querySelector('small')), !!li.querySelector('button[data-action=open-product]')]; })})),
+    foot: text(body.querySelector('.foot')), all: body.innerText}; }"""
+
+
+async def test_evaluation(browser, url):
+    print('„Auswertung“: the top and the biggest flop on the home page, and the page with what the ratings say')
+    ctx = await phone(browser, width=360, height=780, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-12T10:00:00+02:00')
+    await pg.evaluate(EVAL)
+    await idle(pg)
+    order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
+    card = await pg.evaluate(EVAL_CARD)
+    check(order[-4:] == ['Verlauf', 'Auswertung', 'Einkaufen', 'Vorlieben'], f'the card follows „Verlauf“ ({order})')
+    check(
+        card['poles']
+        == [
+            ['BUTTON', 'Top-Futter', 'Rind in Gelee', 'Felix', 'thumb', 'Top-Futter: Rind in Gelee von Felix. Alle 6 Mal sofort leer.'],
+            ['BUTTON', 'Größter Flop', 'Rind Pastete', 'Gourmet', 'thumb', 'Größter Flop: Rind Pastete von Gourmet. 2 von 3 Mal kaum angerührt.'],
+        ]
+        and card['button'] == 'Ganze Auswertung'
+        and 200 <= card['height'] <= 300,
+        f'the card at 360 px: the top and the biggest flop, each with its packaging, name, brand and what its ratings say for a screen reader, between 200 and 300 px tall ({card})',
+    )
+    await pg.click('[data-sec=evaluation] .pole >> nth=0')
+    await idle(pg)
+    sheet = await pg.inner_text('#sheet h2')
+    check(sheet == 'Rind in Gelee', f'a column opens the food sheet of its variety ({sheet})')
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
+    await idle(pg)
+    page = await pg.evaluate(EVAL_PAGE)
+    await shot(pg, 'evaluation')
+    cards = {c['head']: c for c in page['cards']}
+    check(
+        page['title'] == 'Auswertung für alle Tiere'
+        and [c['head'] for c in page['cards']] == ['Top 2', 'Flop 2', 'Wie läuft’s gerade?', 'Geschmackssache', 'Worauf es ankommt', 'Als Nächstes'],
+        f'a page from the side, its cards in their order ({page["title"]}, {[c["head"] for c in page["cards"]]})',
+    )
+    check(
+        cards['Top 2']['rows']
+        == [
+            ['1 neu', 'Rind in Gelee', 'Felix, alle 6 Mal sofort leer'],
+            ['2 neu', 'Huhn in Gelee', 'Bozita, alle 3 Mal gut gefressen'],
+        ]
+        and cards['Top 2']['say'] == []
+        and cards['Flop 2']['rows']
+        == [
+            ['1', 'Rind Pastete', 'Gourmet, 2 von 3 Mal kaum angerührt'],
+            ['2', 'Thunfisch in Soße', 'Whiskas, alle 3 Mal nur die Soße geleckt'],
+        ]
+        and cards['Flop 2']['say'] == ['Nur diese zwei fallen ab, alle anderen kommen besser an.'],
+        f'Top and Flop: places, „neu“ for what came onto its side within 30 days, never padded; no treat, no dry food, and the salmon the cats disagree on in neither list ({cards["Top 2"]}, {cards["Flop 2"]})',
+    )
+    check(
+        cards['Wie läuft’s gerade?']['told']
+        == [['Minka frisst gerade deutlich besser.', 'In den letzten vier Wochen alle 10 Mal gut gefressen, in den acht davor 4 von 10 Mal.', False]],
+        f'how it goes: Minka over four weeks against the eight before, Tiger with too few ratings left out ({cards["Wie läuft’s gerade?"]["told"]})',
+    )
+    check(
+        cards['Geschmackssache']['say'] == ['Hier sind sich Minka und Tiger nicht einig.']
+        and cards['Geschmackssache']['rows'] == [[None, 'Lachs in Soße', 'Sheba, Minka alle 4 Mal sofort leer, Tiger alle 3 Mal kaum angerührt']],
+        f'Geschmackssache: the variety the cats disagree on, with what each of them did ({cards["Geschmackssache"]})',
+    )
+    check(
+        cards['Worauf es ankommt']['say'] == ['Neues am ehesten in Gelee probieren.']
+        and cards['Worauf es ankommt']['told']
+        == [['In Gelee kommt deutlich besser an als in Soße.', 'In Gelee alle 9 Mal gut gefressen, in Soße 4 von 10 Mal.', False]],
+        f'what it depends on: the clear comparison in one sentence, and where to look for something new ({cards["Worauf es ankommt"]})',
+    )
+    check(
+        cards['Als Nächstes']['told']
+        == [
+            ['Ragout Royale gab es seit 10 Monaten nicht mehr.', 'Davor alle 3 Mal sofort leer.', True],
+            ['Wildschwein mit Nachtkerzenöl noch zweimal für Minka servieren, dann steht’s fest.', 'Bisher einmal fast leer.', True],
+        ],
+        f'what to serve next: a favourite gone for long, a variety two ratings short of a verdict, each opening its food sheet ({cards["Als Nächstes"]["told"]})',
+    )
+    check(
+        page['foot']
+        == 'Aus 23 Bewertungen seit dem 4. Mai. Je Sorte und Tier zählen die neuesten acht aus dem letzten halben Jahr. Snacks und Trockenfutter zählen hier nicht mit.'
+        and '%' not in page['all']
+        and 'Prozent' not in page['all']
+        and 'Käse' not in page['all']
+        and 'Catelux' not in page['all'],
+        f'what the page rests on, and nowhere a percentage, a treat or dry food ({page["foot"]})',
+    )
+    wide = await pg.evaluate(NARROW, '.card *')
+    check(not wide['wide'] and not wide['sideways'], f'nothing cut off at 360 px, nothing scrolls sideways ({wide})')
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+
+    # Tiger alone: no top, his one flop, no Geschmackssache, and the card says so in its column
+    await pg.click('[data-action=filter][data-id=tiger00001]')
+    await idle(pg)
+    card = await pg.evaluate(EVAL_CARD)
+    check(
+        card['poles']
+        == [
+            ['DIV', 'Top-Futter', 'Noch keins', 'Bisher kam keine Sorte meist gut an.', 'sketch', None],
+            ['BUTTON', 'Größter Flop', 'Lachs in Soße', 'Sheba', 'thumb', 'Größter Flop: Lachs in Soße von Sheba. Alle 3 Mal kaum angerührt.'],
+        ],
+        f'Tiger alone: the column without a top keeps its word and says why, beside the sketch ({card["poles"]})',
+    )
+    await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
+    await idle(pg)
+    page = await pg.evaluate(EVAL_PAGE)
+    check(
+        page['title'] == 'Auswertung für Tiger'
+        and [[c['head'], c['say']] for c in page['cards']] == [['Top', ['Bisher kam keine Sorte meist gut an.']], ['Ein Flop', []]]
+        and page['foot']
+        == 'Aus 3 Bewertungen seit dem 4. Mai. Je Sorte zählen die neuesten acht aus dem letzten halben Jahr. Trockenfutter zählt hier nicht mit.',
+        f'with Tiger chosen, only Tiger’s ratings ({page["title"]}, {[[c["head"], c["say"]] for c in page["cards"]]}, {page["foot"]})',
+    )
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+    # Little rated yet: the card names the variety closest to a verdict; with only a treat rated there is no card
+    ctx = await phone(browser, width=360, height=780)
+    pg, errors = await open_page(ctx, url)
+    thin = []
+    for meals in (
+        "[['lachs', 'Nassfutter', 'top']]",
+        "[['kaese', 'Snack', 'verputzt'], ['kaese', 'Snack', 'verputzt'], ['kaese', 'Snack', 'verputzt']]",
+    ):
+        await pg.evaluate(
+            """meals => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now();
+              d.pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+              d.products = [...new Set(meals.map(m => m[0] + '|' + m[1]))].map(x => x.split('|')).map(([id, type]) => ({id: id + '000001', brand: 'Sheba', variety: id === 'lachs' ? 'Lachs in Soße' : 'Käse', type, codes: {}, createdAt: 1}));
+              d.servings = meals.map(([id, , r], i) => ({id: 'meal' + i, productId: id + '000001', servedAt: now - (i + 1) * 864e5, note: '', pets: {minka00001: {r, at: now}}}));
+              s.replaceDb(d); s.save(); (await import('./js/views/home.js')).renderHome(); })""",
+            eval(meals),
+        )
+        await idle(pg)
+        thin.append(await pg.evaluate(EVAL_CARD))
+    check(
+        thin[0]['poles'] == []
+        and thin[0]['said'] == ['Noch steht keine Sorte fest.', 'Am weitesten ist Lachs in Soße: noch zweimal servieren, dann steht’s fest.']
+        and thin[1] is None,
+        f'one rating: no columns yet, but which variety is closest and how often it is still to be served; only a treat rated: no card ({thin})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 run_tests(
     {
         'start': test_start,
@@ -6450,6 +6632,7 @@ run_tests(
         'narrow': test_narrow,
         'history': test_home_history,
         'report': test_report,
+        'evaluation': test_evaluation,
         'week': test_week,
         'overview': test_overview,
         'scales': test_scales,

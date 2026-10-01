@@ -2,7 +2,21 @@
    (model(), computed in smart.js). Read only. */
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
-import {analyze, habits, novelty, profile, shopGroups, tally, variety as change} from './smart.js';
+import {
+  analyze,
+  basis,
+  habits,
+  moves,
+  nextUp,
+  novelty,
+  patterns,
+  profile,
+  ranking,
+  shopGroups,
+  tally,
+  trend,
+  variety as change,
+} from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
 export const getPet = id => db.pets.find(p => p.id === id);
@@ -51,6 +65,27 @@ export const habitsModel = () =>
       eaten = habits(m),
       of = kind => eaten.filter(h => h.kind === kind);
     return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
+  });
+/* „Auswertung“: the sides of the ranked varieties, for its card on the home page and the first cards of its page, and
+   the rest of the page only when it opens: what moved, how it goes per pet, what it depends on, what to serve next,
+   what it rests on, and when each variety was last served within the filter */
+export const rankingModel = () => cached('ranking', [prefs.activePet], now => ranking(model(), now));
+export const evaluationModel = () =>
+  cached('evaluation', [prefs.activePet], now => {
+    const m = model(),
+      r = rankingModel(),
+      last = lastServed(),
+      slow = novelty(m)
+        .filter(h => h.kind === 'anlauf')
+        .map(h => h.pet);
+    return {
+      moves: moves(m, now, r),
+      trend: trend(db, m, now),
+      patterns: patterns(profileModel()),
+      next: nextUp(m, now, r, last, slow),
+      basis: basis(m),
+      last,
+    };
   });
 export const sortOf = id => model().byId.get(id);
 export function pendingServings() {

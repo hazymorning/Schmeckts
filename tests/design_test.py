@@ -406,7 +406,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .place, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -416,6 +416,7 @@ INSETS = {
     '.group': '4px 16px',
     '.row': '10px 0px',
     '.pend': '10px 0px',
+    '.pole': '10px 0px',
     '.card-btn': '10px 0px',
     '.box': '12px',
     '.banner': '12px',
@@ -429,7 +430,7 @@ INSETS = {
     '.seg': '4px',
     '.seg button': '8px 6px',
 }
-FIGURES_JS = '.num, .tl-time, .cnt b, .day .dn, .steps .n, .field.code'
+FIGURES_JS = '.num, .tl-time, .cnt b, .place, .day .dn, .steps .n, .field.code'
 
 
 SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), met = new Set();
@@ -471,16 +472,26 @@ SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), me
 HINTS = ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')
 
 
-# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them, each
-# dot the size of the calendar's, each in its rating's colour]
+# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them and
+# the hollow ones of the ratings still missing after them, each dot the size of the calendar's, each rated one in its
+# rating's colour]
 STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i.style.color = `var(--${c.slice(2)})`; document.body.append(i);
     const v = getComputedStyle(i).color; i.remove(); return v; };
   const box = e => { const r = e.getBoundingClientRect(); return `${r.width}x${r.height}`; }, cal = box(document.querySelector('.cal .dots i:not(.open)'));
-  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')];
+  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')],
+      rated = dots.filter(d => !d.classList.contains('open')), open = dots.slice(rated.length);
     return [s.getAttribute('role') === 'img' && !!s.getAttribute('aria-label'),
-      dots.length <= 8 && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
+      rated.length <= 8 && open.every(d => d.classList.contains('open')) && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
       dots.every(d => box(d) === cal),
-      dots.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
+      rated.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
+
+# The card „Auswertung“: its height, the two columns' widths, whether the thumbnails stand level, and whether the line
+# between the columns runs exactly between them
+POLES = """() => { const c = document.querySelector('[data-sec=evaluation]'), r = e => e.getBoundingClientRect(),
+    sides = [...c.querySelectorAll('.pole')], pics = sides.map(s => s.querySelector('.thumb, .sk'));
+  return {height: Math.round(r(c).height), widths: sides.map(s => Math.round(r(s).width * 2) / 2),
+    level: Math.abs(r(pics[0]).top - r(pics[1]).top) < 0.5,
+    line: getComputedStyle(sides[1]).borderLeftWidth === '1px' && getComputedStyle(sides[0]).borderLeftWidth === '0px'}; }"""
 
 
 async def test_rules(browser, url):
@@ -534,17 +545,35 @@ async def test_rules(browser, url):
         first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
         check(
             layout['app'] == ['600px', '18px', '18px']
-            and len(layout['cards']) == 6
+            and len(layout['cards']) == 7
             and layout['cards'][0] == first
             and all(c == want for c in layout['cards'][1:])
-            and layout['gaps'] == [14] * 5,
+            and layout['gaps'] == [14] * 6,
             f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
         order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
         check(
-            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Einkaufen', 'Vorlieben'],
-            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
+            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Auswertung', 'Einkaufen', 'Vorlieben'],
+            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Auswertung“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
         )
+        poles = await pg.evaluate(POLES)
+        check(
+            200 <= poles['height'] <= 300 and poles['widths'][0] == poles['widths'][1] and poles['level'] and poles['line'],
+            f'„Auswertung“ ({scheme}): between 200 and 300px tall, top and flop in two equal columns, the packaging level, a hairline between them ({poles})',
+        )
+        await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
+        await idle(pg)
+        await scan()  # „Auswertung“
+        strips = await pg.evaluate(STRIPS)
+        places = await pg.eval_on_selector_all(
+            '#sheet .place', 'l => l.map(p => Math.round(p.getBoundingClientRect().left + p.getBoundingClientRect().width / 2))'
+        )
+        check(
+            len(strips) >= 7 and all(x == [True, True, True, True] for x in strips) and len(places) >= 6 and len(set(places)) == 1,
+            f'„Auswertung“ ({scheme}): every strip as on „Einkaufen“, hollow dots after it for the ratings still missing; the places centred on one line ({len(strips)} strips, {places})',
+        )
+        await pg.click('#sheet [data-action=settings-back]')
+        await idle(pg)
         await pg.click('[data-sec=profile] [data-action=open-profile]')
         await idle(pg)
         await scan()  # „Vorlieben“
@@ -941,6 +970,7 @@ TYPE_SCALE = ({'12', '14', '16', '21', '30'}, {'1.1', '1.25', '1.4', '1.5'}, {'4
 # Figures take table figures in the very rule that sets their font, because the font shorthand resets them
 FIGURES = {
     '.cnt b',
+    '.place',
     '.tl-time',
     '.day .dn',
     '.day.has .dn',
@@ -949,7 +979,7 @@ FIGURES = {
     '.field.code',
     '.t-main .num',
 }
-FIGURE_SUBJECT = re.compile(r'\.(tl-time|dn|n|num)\b|^b$')
+FIGURE_SUBJECT = re.compile(r'\.(tl-time|dn|n|num|place)\b|^b$')
 # Type set other than through a style, each with its reason
 TYPE_ALLOWED = {
     ('b, strong', 'font-weight', 'var(--weight-strong)'): 'bold in running text is the app’s 600, not the browser’s bolder',
@@ -1247,6 +1277,7 @@ PADDING = {
     '.group': 'var(--inset-group)',
     '.row': 'var(--inset-row)',
     '.pend': 'var(--inset-row)',
+    '.pole': 'var(--inset-row)',
     '.card-btn': 'var(--inset-row)',
     '.box': 'var(--inset-box)',
     '.banner': 'var(--inset-box)',

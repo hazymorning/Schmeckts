@@ -38,6 +38,7 @@ import {
   dayGroups,
   deleteMealBtn,
   evidenceOf,
+  forWhom,
   head,
   nameBlock,
   photoThumb,
@@ -55,6 +56,7 @@ import {
   verdictLabel,
 } from './parts.js';
 import {paintHouse, viewSettings} from './settings.js';
+import {viewEvaluation} from './evaluation.js';
 
 /* The pieces of „Wie war’s?“: the variety as a card that leads to naming, one rating row per pet, and in a
    household the chips that say who was served. */
@@ -381,8 +383,6 @@ function foldBox(key) {
   return `<div class="card-body fold" id="fold-${key}">${open ? inner : ''}</div>
     <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${open ? 'Weniger' : FOLDS[key].label}</button>`;
 }
-/* „für Mau“ after the title of a page, as the pet filter stands; nothing with one pet */
-const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 
 function viewReport() {
   const pet = model().pet,
@@ -550,6 +550,7 @@ const VIEWS = {
   // The pet editor is a page of the settings when it is reached from there, and the same view serves it
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
+  evaluation: viewEvaluation,
   shop: viewShop,
   profile: viewProfile,
 };

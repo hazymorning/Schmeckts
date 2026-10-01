@@ -35,6 +35,7 @@ import {
 } from './parts.js';
 import {renderMood} from './mood.js';
 import {overviewHTML} from './overview.js';
+import {evaluationCard} from './evaluation.js';
 
 /* Redraw the home page, with a smooth view transition where possible */
 export function update() {
@@ -156,6 +157,7 @@ function homeHTML() {
     html +=
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
+      evaluationCard(m) +
       shopHTML(m) +
       likesHTML(m);
   return html;
@@ -178,7 +180,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
   <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
-  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Einkaufen“, was ankommt, und unter „Vorlieben“, was dein Tier mag.</p></li></ol></section>`;
+  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Auswertung“, was ankommt und was stehen bleibt, und unter „Vorlieben“, was dein Tier mag.</p></li></ol></section>`;
 
 /* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. A
    meal without a variety (a photo that missed) can be deleted right here, under its slider, as while naming it. */

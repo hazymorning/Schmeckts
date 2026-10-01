@@ -109,6 +109,8 @@ export const head = (title, back = 'settings-back') =>
     ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span></div>
     <h2 class="page-title">${title}</h2>`
     : `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>`;
+/* „für Mau“ after the title of a page, as the pet filter stands; nothing with one pet */
+export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 /* A segmented control: one equally wide button per option, the current one pressed. An option is
    [value, label] and may carry an icon and an action of its own. „Eigene“ in the rating reminder is one such,
    because it opens a field instead of setting a value. */
@@ -179,17 +181,20 @@ export function calendarHTML(list) {
    right: the ratings the verdict rests on, at most STRIP of them, and a „+“ in front where there are more, beyond
    STRIP or older than the window, as the calendar puts it after its dots. What they say in words is its label, so
    nothing rests on colour. {keys, more}: the rating keys oldest first and whether older ones lie beyond (ratingsIn()
-   in smart.js). Nothing without a rating. */
+   in smart.js). open: the ratings a verdict still lacks, as the calendar's hollow dots after them („Auswertung“).
+   Nothing without a rating. */
 const STRIP = 8;
-export function strip({keys, more}) {
+export function strip({keys, more}, open = 0) {
   if (!keys.length) return '';
   const counts = {};
   for (const r of keys) counts[r] = (counts[r] || 0) + 1;
-  const said = evidenceOf({n: keys.length, counts});
+  const said =
+    evidenceOf({n: keys.length, counts}) +
+    (open ? `, ${open === 1 ? 'eine Bewertung' : 'zwei Bewertungen'} fehlen noch` : '');
   return `<span class="dots strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
     .slice(-STRIP)
     .map(r => `<i class="${rateCls(r)}"></i>`)
-    .join('')}</span>`;
+    .join('')}${'<i class="open"></i>'.repeat(open)}</span>`;
 }
 export function dayGroups(list) {
   const groups = [];
@@ -250,6 +255,9 @@ export const lead = (ic, r = '') => `<span class="lead${r ? ' tone ' + rateCls(r
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
+/* A told line about one variety, which opens its food sheet like a row on „Einkaufen“; end: what closes the row */
+export const toldBtn = (id, pic, say, why = '', end = '') =>
+  `<li><button class="row" data-action="open-product" data-id="${id}">${pic}<span class="said">${say}${why ? `<small class="hint why">${why}</small>` : ''}</span>${end}</button></li>`;
 
 /* The name of a comparison of „Vorlieben“, with the food type in brackets except for wet food: „Konsistenz“,
    „Geschmack (Trockenfutter)“, „Marke“, and for treats „Snack-Art“, which names the type already */

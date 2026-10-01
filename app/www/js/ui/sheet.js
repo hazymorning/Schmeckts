@@ -10,9 +10,9 @@ import {dropViewer} from './viewer.js';
 export const dlg = $('#sheet'),
   sheetBody = $('#sheetBody');
 export let sheet = null; // the state of what is open, null when closed
-/* The settings with everything below them, the history, the shopping list and what the pets like are a page;
-   everything else is a sheet. */
-const PAGES = new Set(['settings', 'report', 'shop', 'profile']);
+/* The settings with everything below them, the history, the evaluation, the shopping list and what the pets like are a
+   page; everything else is a sheet. */
+const PAGES = new Set(['settings', 'report', 'evaluation', 'shop', 'profile']);
 export const isPage = state => PAGES.has(state?.kind);
 let viewKey = '',
   depth = 0, // history entries of our own: one per level

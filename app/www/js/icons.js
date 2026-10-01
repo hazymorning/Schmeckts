@@ -87,6 +87,10 @@ const I = {
     '<rect x="3.7" y="5.3" width="16.6" height="14.9" rx="2.6"/><path d="M8.2 3.3v3.7M15.8 3.3v3.7M3.7 10h16.6"/>',
   layers: '<path d="M12 4.5l8 4-8 4-8-4z"/><path d="M4 12.3l8 4 8-4"/><path d="M4 16.1l8 4 8-4"/>',
   fish: '<path d="M21 12c-1.7 3-4.5 5-7.8 5-3.4 0-6.1-2-7.7-5 1.6-3 4.3-5 7.7-5 3.3 0 6.1 2 7.8 5z"/><path d="M5.5 12L2.5 8.8v6.4z"/><path d="M16.6 10.9v.2"/>',
+  // „Auswertung“: what a comparison of brands is about, and which way it is going for a pet or a variety
+  tag: '<path d="M3.8 11.9V5.3c0-.8.7-1.5 1.5-1.5h6.6l8.4 8.4a1.5 1.5 0 0 1 0 2.1l-6.3 6.3a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/>',
+  rise: '<path d="M4 16.5l5-5 3.5 3.5L19.5 8"/><path d="M14.5 8h5v5"/>',
+  fall: '<path d="M4 7.5l5 5 3.5-3.5 7 7"/><path d="M19.5 11v5h-5"/>',
   drop: '<path d="M12 3.8c3.1 3.7 5.6 6.8 5.6 9.9a5.6 5.6 0 0 1-11.2 0c0-3.1 2.5-6.2 5.6-9.9z"/>',
   sun: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3"/>',
   moon: '<path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z"/>',
