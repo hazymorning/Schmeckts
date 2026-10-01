@@ -267,7 +267,7 @@ export function habitRow(h, several) {
   if (h.kind === 'sosse' || h.kind === 'eager')
     return told(
       lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
-      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'geht es oft gierig los, dann bleibt der Rest stehen'}.`,
+      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur anfangs gefressen, dann bleibt der Rest stehen'}.`,
       esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
   const pet = several ? getPet(h.pet) : null,

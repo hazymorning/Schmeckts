@@ -169,7 +169,7 @@ func TestOverview(t *testing.T) {
 	s.Backup(now)
 	out := Overview(s.st, dir, now)
 	for _, want := range []string{"Tiere         2  Minka, Tiger", "Futter        1  davon 1 mit Barcode", "Mahlzeiten    1",
-		"Sheba Lachs", "Minka: Später leer, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
+		"Sheba Lachs", "Minka: Fast leer, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the overview does not contain %q:\n%s", want, out)
 		}

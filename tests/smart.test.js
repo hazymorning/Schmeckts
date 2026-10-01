@@ -632,7 +632,7 @@ test('profile by consistency: the texture field, the keywords only when it is mi
   );
 });
 
-test('habits: „nur die Soße“ and „erst gierig“ from two varieties where it happened at least half of the time', () => {
+test('habits: „nur die Soße“ and „nur anfangs“ from two varieties where it happened at least half of the time', () => {
   const E = 'eager';
   const db = household(
     ['A'],
@@ -650,7 +650,7 @@ test('habits: „nur die Soße“ and „erst gierig“ from two varieties where
         ],
       },
     ],
-    'c rated once does not count; „erst gierig“ with one variety is no habit',
+    'c rated once does not count; „nur anfangs“ with one variety is no habit',
   );
   const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, E])]);
   assert.deepEqual(

@@ -203,7 +203,7 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
 /* „Vorlieben“: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“).
    Comparisons by consistency, flavour and brand, each within one food type: a group counts with at least two
    varieties rated at least twice each, and groups are measured by how often they went down well. Then two habits,
-   „nur die Soße geleckt“ and „erst gierig“, where at least two varieties show it at least half of the time, and
+   „nur die Soße geleckt“ and „nur anfangs gefressen“, where at least two varieties show it at least half of the time, and
    whether a pet likes a change. */
 const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
@@ -255,7 +255,7 @@ function groupOf(key, l) {
   return {key, ids: l.map(e => e.id), n, good, share: good / n, low: Math.min(...shares), high: Math.max(...shares)};
 }
 
-/* How varieties are eaten: „nur die Soße geleckt“ and „erst gierig“ where at least two varieties rated at least twice
+/* How varieties are eaten: „nur die Soße geleckt“ and „nur anfangs gefressen“ where at least two varieties rated at least twice
    show it at least half of the time, naming up to three, the most pronounced first. [{kind, sorts: [{id, k, n}]}] */
 export function habits(m) {
   const out = [],

@@ -15,7 +15,10 @@ const FULL =
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
 const I = {
   r_top: BOWL + HEART,
-  r_gut: BOWL + LATER,
+  // almost empty: a thin rest at the bottom of the bowl
+  r_gut:
+    '<path d="M5.69 15.9h12.62l-.36 1.5a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
+    BOWL,
   r_mittel:
     '<path d="M5.3 14.3h13.4l-.75 3.1a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
     BOWL,

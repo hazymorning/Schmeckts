@@ -17,11 +17,11 @@ export const typeOf = product => (TYPES.includes(product?.type) ? product.type :
    a sentence, „2 von 3 Mal nur die Soße geleckt“. */
 export const RATINGS = {
   top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100},
-  gut: {label: 'Später leer', short: 'Später leer', said: 'später leer', score: 80},
+  gut: {label: 'Fast leer', short: 'Fast leer', said: 'fast leer', score: 80},
   mittel: {label: 'Halb gegessen', short: 'Hälfte übrig', said: 'halb gegessen', score: 50},
-  eager: {label: 'Erst gierig', short: 'Erst gierig', said: 'erst gierig, dann stehen gelassen', score: 40},
+  eager: {label: 'Nur anfangs', short: 'Nur anfangs', said: 'nur anfangs gefressen', score: 40},
   sosse: {label: 'Soße geleckt', short: 'Nur Soße', said: 'nur die Soße geleckt', score: 30},
-  schlecht: {label: 'Kaum angerührt', short: 'Fast voll', said: 'kaum angerührt', score: 0},
+  schlecht: {label: 'Kaum angerührt', short: 'Fast nix', said: 'kaum angerührt', score: 0},
   gern: {label: 'Gern gefressen', short: 'Gern gefressen', said: 'gern gefressen', score: 100},
   normal: {label: 'Normal gefressen', short: 'Normal gefressen', said: 'normal gefressen', score: 80},
   wenig: {label: 'Wenig gefressen', short: 'Wenig gefressen', said: 'wenig gefressen', score: 35},

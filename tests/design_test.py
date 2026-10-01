@@ -112,7 +112,7 @@ async def test_palette(browser, url):
             len(stops) == 6
             and all(near(c, PALETTE[r][k], 1) for c, r in zip(stops, tones))
             and all(all(near(c, PALETTE[r][k], 1) for c in cs) for cs, r in zip(shown, tones)),
-            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Später leer“ both --good, „Halb gegessen“ and „Erst gierig“ both --mid ({theme})',
+            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Fast leer“ both --good, „Halb gegessen“ and „Nur anfangs“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
