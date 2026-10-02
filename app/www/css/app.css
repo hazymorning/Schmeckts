@@ -701,14 +701,16 @@ dialog.sheet::after {
   position: relative;
   cursor: pointer;
 }
+/* the title keeps its width; a long value such as a date wraps instead */
+.pick-row > .t-main {
+  flex: 1 0 auto;
+}
 .pick-val {
   flex: 0 1 auto;
   min-width: 0;
   font: var(--type-body);
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: right;
 }
 .pick-in {
   position: absolute;
