@@ -129,7 +129,8 @@ export function evaluationCard(m) {
   return `<section class="card" data-sec="evaluation" style="view-transition-name:sec-evaluation">${cardHead('Vorlieben', 'open-evaluation', 'Alle Vorlieben')}${body}</section>`;
 }
 
-// the lists below name the varieties, so this only says how many of all settled ones go down well
+// the lists below name the varieties, so this only says how many of all settled ones go down well; several pets
+// can be told apart only by „Geschmackssache“, so only one pet is called picky or easy to please
 function portraitHTML(m, r) {
   const ids = m.pets,
     several = ids.length > 1,
@@ -138,12 +139,13 @@ function portraitHTML(m, r) {
     k = r.top.length,
     n = r.settled,
     good = (few = '') =>
-      `Von ${n} Sorten ${k > 1 ? 'kommen' : 'kommt'} ${k ? few + (k === 1 ? 'eine' : k) : 'keine'} meist gut an.`,
+      `Von ${n} Sorten ${k > 1 ? 'kommen' : 'kommt'} ${k ? few + (k === 1 ? 'eine' : k) : 'keine'}${several ? ' bei allen' : ''} meist gut an.`,
     said = [];
   if (!k && !r.flop.length) said.push(waiting(m, r));
   else if (n < JUDGE) said.push(`Bisher ${n === 1 ? 'steht erst eine Sorte' : `stehen erst ${n} Sorten`} fest.`);
-  else if (k * 3 >= n * 2) said.push(`${who} ${several ? 'fressen' : 'frisst'} fast alles gern: ${good()}`);
-  else if (k * 3 <= n) said.push(`${who} ${several ? 'sind' : 'ist'} wählerisch: ${good('nur ')}`);
+  else if (several) said.push(good());
+  else if (k * 3 >= n * 2) said.push(`${who} frisst fast alles gern: ${good()}`);
+  else if (k * 3 <= n) said.push(`${who} ist wählerisch: ${good('nur ')}`);
   else said.push(good());
   if (!k && !r.flop.length && !r.settled && !r.stale)
     said.push('Ab drei Bewertungen einer Sorte steht hier, was am besten ankommt und was stehen bleibt.');
