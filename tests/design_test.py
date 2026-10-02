@@ -555,6 +555,17 @@ async def test_rules(browser, url):
             order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Vorlieben', 'Einkaufen'],
             f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Vorlieben“, „Einkaufen“ ({scheme}: {order})',
         )
+        # The text button at a card's foot: --space-3 above its line, whatever the card ends with, then as tall as a row
+        btns = await pg.evaluate(
+            """() => [...document.querySelectorAll('#home .card .card-btn')].map(b => { let el = b.previousElementSibling;
+          while (el && !el.getBoundingClientRect().height) el = el.previousElementSibling;
+          const s = getComputedStyle(b), r = b.getBoundingClientRect();
+          return [b.textContent.trim(), s.marginTop, Math.round(r.top - el.getBoundingClientRect().bottom), Math.round(r.height)]; })"""
+        )
+        check(
+            len(btns) >= 3 and all(m == '12px' and gap >= 12 and h >= 56 for _, m, gap, h in btns),
+            f'card buttons ({scheme}): 12px above the line in the recipe, whatever ends the card, and at least 56px tall ({btns})',
+        )
         sides = await pg.evaluate(SIDES)
         check(
             200 <= sides['height'] <= 300 and sides['rows'] == 2 and sides['same'],

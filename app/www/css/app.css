@@ -999,7 +999,7 @@ dialog.sheet.page .sheet-body {
   margin-right: var(--space-1h);
 } /* a link with an icon in front: „Neues Foto“ */
 /* A text button at the foot of a card, e.g. „Weitere anzeigen“: as tall as a settings row, so the line above it
-   and the card's edge below leave it air */
+   and the card's edge below leave it air, and --space-3 above the line, so what ends the card does not sit on it */
 .card-btn {
   display: flex;
   align-items: center;
@@ -1007,6 +1007,7 @@ dialog.sheet.page .sheet-body {
   gap: var(--space-1);
   width: 100%;
   min-height: var(--control-l);
+  margin-top: var(--space-3);
   padding: var(--inset-row);
   border-top: var(--divider);
   font: var(--type-small-strong);
