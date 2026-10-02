@@ -475,10 +475,10 @@ const LEAST = {Katze: 42, Hund: 30, Kaninchen: 20, Vogel: 18, Nager: 18};
 const PER_MOMENT = {Katze: 6, Hund: 4, Kaninchen: 3, Vogel: 3, Nager: 3};
 const MOMENTS = ['due', 'fresh', 'wait', 'evening', 'night'];
 const SEASONAL = 6;
-const ASIDE = 70; // characters: the second sentence of two lines
+const ASIDE = 56; // characters: with a lead, three lines at 393px
 const DAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-test('the facts: ids and texts unique, at most 70 characters and two sentences, the moments, months and days in shape, enough of every kind', () => {
+test('the facts: ids and texts unique, at most 56 characters and two sentences, the moments, months and days in shape, enough of every kind', () => {
   const all = [...Object.values(FACTS).flat(), ...GENERAL];
   assert.equal(new Set(all.map(f => f.id)).size, all.length, 'every id once');
   assert.equal(new Set(all.map(f => f.text)).size, all.length, 'every text once');
@@ -567,7 +567,7 @@ test('the facts: ids and texts unique, at most 70 characters and two sentences, 
 });
 
 test('the lines: at least three ways of saying every kind, two sentences at most, and no word of a rating or a verdict in any of them', () => {
-  // The first sentence fits two lines at 360px with a usual name and a usual time, the second follows it shortly
+  // With the aside, the card holds three lines at 393px: the lead takes half of it with a usual name and time
   const usual = {
     what: 'Lachs',
     at: '7:10',
@@ -587,9 +587,9 @@ test('the lines: at least three ways of saying every kind, two sentences at most
     evening: 'Abend ',
   };
   for (const [kind, list] of Object.entries(LEADS))
-    for (const t of list) assert.ok(fill(t, usual).length <= 56, `${kind}: ${fill(t, usual)}`);
+    for (const t of list) assert.ok(fill(t, usual).length <= 44, `${kind}: ${fill(t, usual)}`);
   for (const [kind, list] of Object.entries(LINES))
-    for (const t of list) assert.ok(t.replace(/\{\w+\}/g, 'Wort').length <= 70, `${kind}: ${t}`);
+    for (const t of list) assert.ok(t.replace(/\{\w+\}/g, 'Wort').length <= 52, `${kind}: ${t}`);
   const phrases = [...Object.values(RATINGS).flatMap(r => [r.label, r.said]), ...Object.values(VERDICTS)].map(w =>
     w.toLowerCase(),
   );
