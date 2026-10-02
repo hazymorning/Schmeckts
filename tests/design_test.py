@@ -27,7 +27,7 @@ TEXT_PAIRS = (
 )
 ICON_PAIRS = (
     [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')]
-    + [(o, o + '-soft') for o in OBSERVED]
+    + [(o, bg) for o in OBSERVED for bg in ('--bg', '--surface', '--surface-2', o + '-soft')]
     + [('--surface', o) for o in OBSERVED]
 )
 TOKENS = (

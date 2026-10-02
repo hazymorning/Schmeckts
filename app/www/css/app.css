@@ -1232,26 +1232,24 @@ dialog.sheet::after {
   width: var(--pic-xl);
   height: var(--pic-xl);
 }
-/* a chip or picture in its tone's colours: soft ground, coloured icon */
-.toned {
-  background: var(--cs, var(--surface-2));
-}
+/* a chip in its tone: plain like any chip, the icon coloured */
 .toned .ic {
   color: var(--c, var(--muted));
 }
-/* the tone at full strength, so a row of chips reads by colour before the words */
+/* the tone soft, as the circles in the diary; a tap lights it up in full for a moment */
 .disc {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   width: var(--pic-s);
   height: var(--pic-s);
-  margin-left: calc(-1 * var(--space-2h));
+  margin-left: calc(-1 * var(--space-2));
   border-radius: 50%;
-  background: var(--c);
+  background: var(--cs);
+  color: var(--c);
 }
 .toned .disc .ic {
-  color: var(--surface);
+  color: inherit;
 }
 /* chosen: a ring in the tone, quieter than the accent fill */
 .toned[aria-pressed="true"] {
@@ -2416,7 +2414,9 @@ html.step-back::view-transition-new(page) {
   opacity: 0;
 }
 .disc.pop {
-  animation: boing var(--dur-step) var(--ease-spring);
+  animation:
+    boing var(--dur-step) var(--ease-spring),
+    flash var(--dur-long) var(--ease-out);
 }
 .ov-pic.sleepy::after {
   animation: snooze calc(2.5 * var(--dur-long)) var(--ease-out) infinite;
