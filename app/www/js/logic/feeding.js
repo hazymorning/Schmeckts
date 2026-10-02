@@ -13,7 +13,7 @@ import {keepPhoto} from '../photos.js';
 import {milestones} from '../smart.js';
 import {identify, memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {toast} from '../ui/toast.js';
-import {closeSheet, dlg, isClosing, openSheet, renderSheet, sheet, sheetBody} from '../ui/sheet.js';
+import {closeAll, closeSheet, isClosing, openSheet, renderSheet, sheet, topBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
 import {fabFill, homeView, scrollTop, update} from '../views/home.js';
 import {applyProduct, cleanupProduct, linkProduct, replaceProductPhoto} from './products.js';
@@ -176,7 +176,7 @@ export async function servePhoto(file, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  if (dlg.open) await closeSheet();
+  await closeAll(); // serving ends on the home page, where the meal is rated
   update();
   scrollTop();
   if (local) openSheet({kind: 'serving', id: s.id, step: 'name', brand: '', variety: '', type: 'Nassfutter'}); // type the variety in directly
@@ -472,7 +472,7 @@ function refreshServing(id) {
   update();
   if (isClosing() || sheet?.kind !== 'serving' || sheet.id !== id) return; // a sheet on its way out is not redrawn
   const typing =
-    document.activeElement && sheetBody.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+    document.activeElement && topBody().contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
   if (sheet.step !== 'name' || !typing) renderSheet();
 }
 

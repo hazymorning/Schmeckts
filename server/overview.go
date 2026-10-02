@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,6 +107,23 @@ func Overview(st state, dir string, now time.Time) string {
 	fmt.Fprintf(&b, "Tiere       %3d  %s\n", len(petNames), strings.Join(petNames, ", "))
 	fmt.Fprintf(&b, "Futter      %3d  davon %d mit Barcode\n", productCount, len(withCode))
 	fmt.Fprintf(&b, "Mahlzeiten  %3d\n", len(meals))
+	// Collections of newer apps, which the server keeps without knowing what they mean: only how many entries
+	others := []string{}
+	for c := range st.Records {
+		if !slices.Contains(baseColls, c) {
+			others = append(others, c)
+		}
+	}
+	sort.Strings(others)
+	for _, c := range others {
+		n := 0
+		for _, r := range st.Records[c] {
+			if visible(r) {
+				n++
+			}
+		}
+		fmt.Fprintf(&b, "%-11s %3d  Einträge einer neueren App\n", c, n)
+	}
 
 	if len(meals) > 0 {
 		b.WriteString("\nLetzte Mahlzeiten\n")

@@ -9,6 +9,7 @@ import {
   moves,
   nextUp,
   novelty,
+  observed,
   patterns,
   profile,
   ranking,
@@ -22,6 +23,7 @@ import {db, prefs, revision, takeStale} from './store.js';
 export const getPet = id => db.pets.find(p => p.id === id);
 export const getProduct = id => (id ? db.products.find(p => p.id === id) : null);
 export const getServing = id => db.servings.find(s => s.id === id);
+export const getObservation = id => db.observations.find(o => o.id === id);
 export const pname = p => (p ? p.variety || p.brand || 'Unbekannt' : 'Unbekanntes Futter');
 const inFilter = pid => prefs.activePet === 'all' || prefs.activePet === pid;
 export const petMap = ids => Object.fromEntries(ids.map(id => [id, {r: null, at: null}]));
@@ -32,6 +34,24 @@ export const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r &&
 export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) && getPet(pid));
 // Every meal within the pet filter, newest first: what the list on the history page shows, whatever is evaluated
 export const servingsInFilter = () => db.servings.filter(s => servingPets(s).length);
+/* The pets an observation may concern, within the filter; with several it is not clear which of them it was */
+export const observedPets = o => Object.keys(o.pets || {}).filter(pid => inFilter(pid) && getPet(pid));
+export const observationsInFilter = () => db.observations.filter(o => observedPets(o).length);
+/* The diary: meals and observations by time, newest first. Each keeps its own shape; timeOf() reads either. */
+export const timeOf = x => x.servedAt ?? x.at;
+export const isObservation = x => x.servedAt === undefined && typeof x.at === 'number';
+export function diary(servings, observations) {
+  const out = [];
+  let i = 0,
+    j = 0;
+  while (i < servings.length || j < observations.length)
+    out.push(
+      j >= observations.length || (i < servings.length && servings[i].servedAt >= observations[j].at)
+        ? servings[i++]
+        : observations[j++],
+    );
+  return out;
+}
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
 
 /* The evaluation model, recomputed only when the data, the pet filter, the hidden hints or the hour change (windows
@@ -83,6 +103,7 @@ export const evaluationModel = () =>
       trend: trend(db, m, now),
       patterns: patterns(profileModel()),
       next: nextUp(m, now, r, last, slow),
+      observed: observed(db, m.pets, now),
       basis: basis(m, r),
       last,
     };

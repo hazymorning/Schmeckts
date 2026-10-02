@@ -168,11 +168,11 @@ class GoServer:
 
     def records(self):
         """Visible records as in the app: {collection: {id: {field: value}}}, without _del and null."""
-        out = {'pets': {}, 'products': {}, 'servings': {}}
+        out = {'pets': {}, 'products': {}, 'servings': {}, 'observations': {}}
         for x in self.get('/api/changes?since=0')['records']:
             if x['f'].get('_del', {}).get('v') is True:
                 continue
-            out[x['c']][x['r']] = {k: f['v'] for k, f in x['f'].items() if k != '_del' and f['v'] is not None}
+            out.setdefault(x['c'], {})[x['r']] = {k: f['v'] for k, f in x['f'].items() if k != '_del' and f['v'] is not None}
         return out
 
     def restore(self, backup):
@@ -254,6 +254,15 @@ async def connect(pg, code, server, edit=True):
     if await pg.input_value('#f-code') != code:
         await pg.fill('#f-code', code)
     await pg.click('[data-action=connect]')
+
+
+async def open_house(pg):
+    """The settings' page „Haushalt“, from wherever the phone is."""
+    await close_sheet(pg)
+    await pg.click('[data-action=open-settings]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=settings-page][data-v=house]')
+    await idle(pg)
 
 
 async def close_sheet(pg):
@@ -497,6 +506,64 @@ async def main():
             await expect(await until(a, 'queue.length === 0', 15) and len(srv.records()['servings']) >= 620, '620 changes in several batches')
             await run(a, "m.replaceDb({...db, servings: db.servings.filter(s => !s.id.startsWith('massen'))}); save();")
             await expect(await until(b, "!db.servings.some(s => s.id.startsWith('massen')) && db.servings.length > 3", 10), 'and deleted again')
+
+            # Observations: a collection of their own, which the server keeps without knowing it (from 1.5.0); a server
+            # before that would reject it, so the phone holds it back until the server says it can take it
+            print('observations')
+            await run(
+                a,
+                "db.observations.unshift({id: 'beob00000001', kind: 'stink', at: Date.now(), pets: {lxpet00001: true, tigerpet0001: true}, by: 'Anna'}); save();",
+            )
+            await expect(
+                await until(
+                    b, "(o => o && o.kind === 'stink' && o.pets.tigerpet0001 === true)(db.observations.find(o => o.id === 'beob00000001'))", 8
+                )
+                and srv.records()['observations'].get('beob00000001', {}).get('kind') == 'stink',
+                'an observation noted on A reaches the server and B, with both pets it may concern',
+            )
+            posted = []
+
+            async def older_server(route):  # /api/info as a server before 1.5.0 gives it
+                res = await route.fetch()
+                body = await res.json()
+                body['features'] = [f for f in body.get('features', []) if f != 'collections']
+                await route.fulfill(response=res, json=body)
+
+            ctx_a.on('request', lambda r: posted.append(r.post_data or '') if r.method == 'POST' and '/api/changes' in r.url else None)
+            await ctx_a.route(f'{srv.url}/api/info*', older_server)
+            await a.evaluate("import('./js/sync.js').then(m => { m.status.features = null; return m.serverCan('collections'); })")
+            await run(
+                a,
+                "db.observations.unshift({id: 'beob00000002', kind: 'tired', at: Date.now(), pets: {lxpet00001: true}}); db.pets.push({id: 'moglipet0001', name: 'Mogli', species: 'Katze', photo: null, createdAt: Date.now()}); save();",
+            )
+            await expect(
+                await until(b, "db.pets.some(p => p.name === 'Mogli')", 8)
+                and await until(a, "queue.length === 1 && queue[0].c === 'observations'", 8)
+                and 'beob00000002' not in srv.records()['observations']
+                and not any('beob00000002' in body for body in posted),
+                'an older server: the pet goes out, the observation waits on the phone and is never sent',
+            )
+            await a.evaluate("import('./js/sync.js').then(m => m.retrySync())")
+            await until_sync(a, "status.state === 'ok' && !status.busy", 10)
+            await a.evaluate("import('./js/store.js').then(s => { s.state.log.length = 0; })")
+            await a.evaluate("import('./js/sync.js').then(m => m.retrySync())")
+            await until_sync(a, "status.state === 'ok' && !status.busy", 10)
+            log = await state(a, 'state.log.map(l => l.text)')
+            await open_house(a)
+            box = await a.inner_text('#serverBox')
+            await expect(
+                not any('checksum' in t for t in log)
+                and 'Beobachtungen warten auf ein Update des Servers' in box
+                and await a.locator('#syncChip').is_hidden(),
+                f'the checksum leaves out what the server cannot hold, the box says what waits, and nothing at the top nags ({log}, {box!r})',
+            )
+            await close_sheet(a)
+            await ctx_a.unroute(f'{srv.url}/api/info*')
+            await a.evaluate("import('./js/sync.js').then(m => m.retrySync())")
+            await expect(
+                await until(a, 'queue.length === 0', 10) and await until(b, "db.observations.some(o => o.id === 'beob00000002')", 8),
+                'the server updated: what waited goes out and reaches B',
+            )
 
             # Photo recognition through the server
             print('recognition')
@@ -960,7 +1027,7 @@ async def main():
                 await pg.evaluate("import('./js/sync.js').then(m => m.retrySync())")
             await until(a, 'queue.length === 0', 10)
             await until(b, 'queue.length === 0', 10)
-            server = srv.get('/api/checksum')
+            server = srv.get('/api/checksum?c=pets,products,servings,observations')
             sums = [await pg.evaluate("import('./js/store.js').then(m => m.checksum()).then(x => x.sum)") for pg in (a, b)]
             await expect(sums == [server['sum']] * 2, f'checksum: both phones match the server ({server["fields"]} fields)')
             pa, pb, ps = await a.evaluate(PROJECTION), await b.evaluate(PROJECTION), srv.records()

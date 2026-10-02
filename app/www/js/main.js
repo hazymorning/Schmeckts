@@ -11,7 +11,7 @@ import {hooks} from './store.js';
 import {startSync, syncHooks, syncSoon} from './sync.js';
 import {applyTheme} from './ui/theme.js';
 import {toast} from './ui/toast.js';
-import {dlg, renderSheet, sheet, sheetBack, sheetBody} from './ui/sheet.js';
+import {anyOpen, renderSheet, sheet, sheetBack, topBody} from './ui/sheet.js';
 import {closeCamera} from './ui/camera.js';
 import {closeViewer} from './ui/viewer.js';
 import {renderHome, renderSyncChip, update} from './views/home.js';
@@ -34,7 +34,7 @@ hooks.changed = () => {
   settleNamed(false);
   followPhotos();
   update();
-  if (sheet && !typingIn(sheetBody)) renderSheet();
+  if (sheet && !typingIn(topBody())) renderSheet(); // the page under a sheet follows once the sheet has gone
   syncReminders(); // rated or deleted elsewhere: cancel the reminder
 };
 hooks.saved = () => {
@@ -69,7 +69,7 @@ if (Native?.App) {
   // Back: close an open camera, the photo or an open sheet, otherwise send the app to the background (as native apps do)
   Native.App.addListener('backButton', ({canGoBack}) => {
     if (closeCamera() || closeViewer()) return;
-    if (dlg.open) sheetBack();
+    if (anyOpen()) sheetBack();
     else if (canGoBack) history.back();
     else Native.App.minimizeApp();
   });
@@ -90,8 +90,8 @@ markScrolled();
 window.addEventListener('scroll', markScrolled, {passive: true});
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && !dlg.open) renderHome();
+  if (!document.hidden && !anyOpen()) renderHome();
 });
 setInterval(() => {
-  if (!dlg.open && !document.hidden) renderHome();
+  if (!anyOpen() && !document.hidden) renderHome();
 }, 60000);

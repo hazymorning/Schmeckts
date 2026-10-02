@@ -6,7 +6,7 @@ import {glance, takeTurn, TURNS} from '../app/www/js/glance.js';
 import {nextMeal, nextMilestone, VERDICTS} from '../app/www/js/smart.js';
 import {RATINGS} from '../app/www/js/config.js';
 import {addDays} from '../app/www/js/dates.js';
-import {FACTS, factsOn, fill, GENERAL, lastSunday, LINES, nthSaturday} from '../app/www/js/views/facts.js';
+import {FACTS, factsOn, fill, GENERAL, lastSunday, LEADS, LINES, nthSaturday} from '../app/www/js/views/facts.js';
 
 const at = text => new Date(text).getTime();
 const NOW = at('2026-06-10T12:00');
@@ -456,17 +456,25 @@ test('the turn: the same choice all day, then the kinds in their order, none of 
 
 /* How many sentences a text has, and whether one of them shouts twice */
 const sentences = t => t.split(/(?<=[.!?])\s+/).filter(Boolean);
-const LEAST = {Katze: 80, Hund: 45, Kaninchen: 25, Vogel: 18, Nager: 18};
+const LEAST = {Katze: 42, Hund: 30, Kaninchen: 20, Vogel: 18, Nager: 18};
+const PER_MOMENT = {Katze: 6, Hund: 4, Kaninchen: 3, Vogel: 3, Nager: 3};
+const MOMENTS = ['due', 'fresh', 'wait', 'evening', 'night'];
 const SEASONAL = 6;
+const ASIDE = 70; // characters: the second sentence of two lines
 const DAY_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-test('the facts: ids and texts unique, at most 160 characters and two sentences, months and days in shape, enough of every kind', () => {
+test('the facts: ids and texts unique, at most 70 characters and two sentences, the moments, months and days in shape, enough of every kind', () => {
   const all = [...Object.values(FACTS).flat(), ...GENERAL];
   assert.equal(new Set(all.map(f => f.id)).size, all.length, 'every id once');
   assert.equal(new Set(all.map(f => f.text)).size, all.length, 'every text once');
   for (const f of all) {
     assert.match(f.id, /^[a-z]+-[a-z0-9-]+$/, f.id);
-    assert.ok(f.text.length <= 160 && sentences(f.text).length <= 2, `${f.id}: ${f.text}`);
+    assert.ok(f.text.length <= ASIDE && sentences(f.text).length <= 2, `${f.id}: ${f.text}`);
+    assert.ok(
+      !f.when || (f.when.length && !f.day && f.when.every(m => MOMENTS.includes(m))),
+      `${f.id}: the moments it fits, none for a dated one`,
+    );
+    assert.ok(!/übrigens|wusstest du|[\u2013\u2014]/i.test(f.text), `${f.id}: no lead-in and no long dash`);
     assert.ok(
       sentences(f.text).every(x => (x.match(/!/g) || []).length <= 1),
       `${f.id}: never two exclamation marks in one sentence`,
@@ -480,12 +488,19 @@ test('the facts: ids and texts unique, at most 160 characters and two sentences,
   }
   for (const [species, n] of Object.entries(LEAST)) {
     assert.ok(FACTS[species].length >= n, `${species}: at least ${n} facts`);
+    for (const m of MOMENTS)
+      assert.ok(
+        FACTS[species].filter(f => f.when?.includes(m)).length >= PER_MOMENT[species],
+        `${species}: at least ${PER_MOMENT[species]} for the moment ${m}`,
+      );
     assert.ok(
       FACTS[species].filter(f => f.months).length >= SEASONAL,
       `${species}: at least ${SEASONAL} seasonal ones`,
     );
   }
-  assert.ok(GENERAL.length >= 30, 'at least 30 general ones');
+  assert.ok(GENERAL.length >= 22, 'at least 22 general ones');
+  for (const m of MOMENTS)
+    assert.ok(GENERAL.filter(f => f.when?.includes(m)).length >= 3, `general ones: at least 3 for the moment ${m}`);
   assert.deepEqual(
     [lastSunday(2026, 3), lastSunday(2026, 10), nthSaturday(2026, 9, 4), nthSaturday(2025, 9, 4)],
     ['03-29', '10-25', '09-26', '09-27'],
@@ -519,15 +534,58 @@ test('the facts: ids and texts unique, at most 160 characters and two sentences,
     ids(factsOn(null, new Date(2026, 6, 1))).every(id => id.startsWith('allg-')),
     'a mixed household takes the general ones only',
   );
+  const atMoment = moment => factsOn('Katze', new Date(2026, 6, 1), false, moment),
+    fresh = atMoment('fresh'),
+    wait = atMoment('wait'),
+    any = atMoment(null);
+  assert.ok(
+    fresh.length &&
+      fresh.every(f => f.when?.includes('fresh')) &&
+      wait.some(f => f.when) &&
+      wait.some(f => !f.when) &&
+      wait.every(f => !f.when || f.when.includes('wait')) &&
+      any.length &&
+      any.every(f => !f.when) &&
+      [...fresh, ...wait, ...any].every(f => !f.id.startsWith('allg-') || f.when),
+    'an aside for a short moment is made for it; between meals those for any moment come as well; without a moment only those; a species takes only the general ones made for a moment',
+  );
 });
 
 test('the lines: at least three ways of saying every kind, two sentences at most, and no word of a rating or a verdict in any of them', () => {
+  // The first sentence fits two lines at 360px with a usual name and a usual time, the second follows it shortly
+  const usual = {
+    what: 'Lachs',
+    at: '7:10',
+    by: '',
+    for: '',
+    ago: 'vor 20 Minuten',
+    Ago: 'Vor 20 Minuten',
+    meal: 'Abendessen',
+    time: '18:30',
+    so: 'schon',
+    both: 'zwei Mahlzeiten',
+    Names: 'Minka',
+    hat: 'hat',
+    names: 'Minka',
+    wartet: 'wartet',
+    since: 'vor 3 Tagen',
+    evening: 'Abend ',
+  };
+  for (const [kind, list] of Object.entries(LEADS))
+    for (const t of list) assert.ok(fill(t, usual).length <= 56, `${kind}: ${fill(t, usual)}`);
+  for (const [kind, list] of Object.entries(LINES))
+    for (const t of list) assert.ok(t.replace(/\{\w+\}/g, 'Wort').length <= 70, `${kind}: ${t}`);
   const phrases = [...Object.values(RATINGS).flatMap(r => [r.label, r.said]), ...Object.values(VERDICTS)].map(w =>
     w.toLowerCase(),
   );
   const loose = /\bliebling|\bam liebsten\b|\bkommt\b|\bbewertet\b|\boffen\b|%/i; // what the overview never says either
-  const texts = [...Object.values(LINES).flat(), ...[...Object.values(FACTS).flat(), ...GENERAL].map(f => f.text)];
-  for (const [kind, list] of Object.entries(LINES)) assert.ok(list.length >= 3, `${kind}: three ways at least`);
+  const texts = [
+    ...Object.values(LEADS).flat(),
+    ...Object.values(LINES).flat(),
+    ...[...Object.values(FACTS).flat(), ...GENERAL].map(f => f.text),
+  ];
+  for (const [kind, list] of [...Object.entries(LEADS), ...Object.entries(LINES)])
+    assert.ok(list.length >= 3, `${kind}: three ways at least`);
   for (const t of texts) {
     assert.ok(sentences(t).length <= 2 && sentences(t).every(x => (x.match(/!/g) || []).length <= 1), t);
     const low = t.toLowerCase();

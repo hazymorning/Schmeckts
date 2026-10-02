@@ -13,7 +13,10 @@ import {
   milestones,
   moves,
   nextUp,
+  mealsBefore,
   novelty,
+  observed,
+  observedAfter,
   patterns,
   profile,
   ranking,
@@ -1496,4 +1499,101 @@ test('milestones: total meals and varieties tried', () => {
   });
   db.servings.pop();
   assert.deepEqual(milestones(db).reached, ['sorts:10']);
+});
+
+/* Observations: one meal a day at the same hour, so a stink five hours after one falls in that meal's day alone */
+function noted(meals, notes) {
+  const db = household(['A', 'B'], ['lachs', 'huhn', 'rind'], meals);
+  db.observations = notes
+    .map(([kind, daysAgo, pets, hours = 5], i) => ({
+      id: 'obs' + i,
+      kind,
+      at: NOW - daysAgo * DAY + hours * 36e5,
+      pets: Object.fromEntries(pets.map(p => [p, true])),
+    }))
+    .sort((a, b) => b.at - a.at);
+  return db;
+}
+const LACHS_DAYS = [2, 6, 10, 14, 18, 22];
+const OBS_MEALS = Array.from({length: 26}, (_, i) => i + 1).map(d => [
+  LACHS_DAYS.includes(d) ? 'lachs' : d % 2 ? 'huhn' : 'rind',
+  {A: G},
+  d,
+]);
+
+test('observations: how often each kind was noted, and a variety a kind about meals came after clearly more often', () => {
+  const db = noted(OBS_MEALS, [
+    ...[2, 6, 10, 14].map(d => ['stink', d, ['A']]),
+    ['stink', 3, ['A']],
+    ['tired', 3, ['A'], 2],
+    ['tired', 40, ['A']],
+  ]);
+  const o = observed(db, ['A'], NOW);
+  assert.deepEqual(
+    o.kinds.map(k => [k.kind, k.n, k.before]),
+    [
+      ['stink', 5, 0],
+      ['tired', 1, 1],
+    ],
+  );
+  assert.equal(o.kinds[0].last, NOW - 2 * DAY + 5 * 36e5);
+  assert.deepEqual(o.links, [{kind: 'stink', id: 'lachs', after: {n: 6, hit: 4}, other: {n: 20, hit: 1}}]);
+  assert.deepEqual(observedAfter(db, ['A'], NOW, 'lachs'), [{kind: 'stink', n: 6, hit: 4}]);
+  assert.deepEqual(observedAfter(db, ['A'], NOW, 'huhn'), [{kind: 'stink', n: 13, hit: 1}]);
+  assert.deepEqual(
+    mealsBefore(
+      db,
+      db.observations.find(x => x.kind === 'stink'),
+    ).map(s => s.productId),
+    ['lachs'],
+    'a stink is weighed against the meals of its pets within a day before it',
+  );
+  assert.deepEqual(
+    mealsBefore(
+      db,
+      db.observations.find(x => x.kind === 'tired'),
+    ),
+    [],
+    'a tired day against none',
+  );
+  // the ratings stay what they are
+  assert.deepEqual(
+    sorts(model(db), e => e.verdict),
+    sorts(model({...db, observations: []}), e => e.verdict),
+  );
+});
+
+test('observations: only what the data carry, within the pets asked for', () => {
+  const stinks = days => days.map(d => ['stink', d, ['A']]);
+  const links = (notes, meals = OBS_MEALS, pets = ['A']) =>
+    observed(noted(meals, notes), pets, NOW).links.map(l => l.id);
+  assert.deepEqual(links(stinks([2, 6, 10, 14])), ['lachs']);
+  assert.deepEqual(links(stinks([2])), [], 'a single stink after it is chance');
+  assert.deepEqual(links(stinks([2, 6, 3, 5, 7, 9])), [], 'as often after the others: nothing stands out');
+  const few = OBS_MEALS.filter(([sort, , d]) => sort !== 'lachs' || d < 10);
+  assert.deepEqual(links(stinks([2, 6]), few), [], 'two of only two meals of it: too few meals');
+  assert.deepEqual(links(stinks([2, 6, 10, 14]), OBS_MEALS, ['B']), [], 'another pet: its meals and notes alone');
+  assert.deepEqual(
+    links([2, 6, 10, 14].map(d => ['stink', d, ['A', 'B']])),
+    ['lachs'],
+    'not clear which of two it was: it counts for both',
+  );
+  assert.ok(
+    !links(stinks([2, 6, 10, 14]).map(([k, d, p]) => [k, d, p, 30])).includes('lachs'),
+    'more than a day after it: not about that meal, but the next one',
+  );
+  assert.deepEqual(
+    observed({...noted(OBS_MEALS, []), observations: undefined}, ['A'], NOW),
+    {kinds: [], links: []},
+    'data from before observations',
+  );
+});
+
+test('appetite: what was noted about the pet in the same hours comes with the hint', () => {
+  const db = household(['A'], ['p1', 'p2', 'mies'], [...USUAL, ...LOW]);
+  db.observations = [
+    {id: 'o1', kind: 'tired', at: NOW - 36e5, pets: {A: true}},
+    {id: 'o2', kind: 'stink', at: NOW - 10 * DAY, pets: {A: true}},
+  ];
+  assert.deepEqual(model(db).hints[0].seen, ['tired']);
 });

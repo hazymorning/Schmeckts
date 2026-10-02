@@ -5,9 +5,19 @@
    where the buying and serving are. */
 import {andList, cap, esc} from '../text.js';
 import {icon, sketch} from '../icons.js';
-import {TEXTURES} from '../config.js';
+import {observationOf, TEXTURES} from '../config.js';
 import {db} from '../store.js';
-import {evaluationModel, getPet, habitsModel, model, petNames, pname, profileModel, rankingModel} from '../derive.js';
+import {
+  evaluationModel,
+  getPet,
+  getProduct,
+  habitsModel,
+  model,
+  petNames,
+  pname,
+  profileModel,
+  rankingModel,
+} from '../derive.js';
 import {GOOD, goodOf, poorOf, ratingsIn} from '../smart.js';
 import {
   avatar,
@@ -18,6 +28,7 @@ import {
   lead,
   likesList,
   lower,
+  since,
   strip,
   thumbOf,
   times,
@@ -281,6 +292,37 @@ function trendCard(m, x) {
     : '';
 }
 
+/* „Beobachtungen“: what was noted in the last four weeks, each kind with how often and when last, and the varieties a
+   kind came after clearly more often than after the others (observed() in smart.js), each a told line that opens its
+   food sheet. Beside the ratings, never instead of them: a variety keeps its place and its verdict. No card while
+   nothing was noted in the four weeks and nothing stands out. */
+const often = n => (n === 1 ? 'einmal' : `${n}×`);
+function observedCard(x) {
+  const {kinds, links} = x.observed,
+    now = Date.now();
+  if (!kinds.length && !links.length) return '';
+  const rows = [
+    ...kinds.map(k => {
+      const o = observationOf(k.kind);
+      return told(
+        lead(o.icon),
+        `${o.label}, <b>${often(k.n)}</b> in den letzten vier Wochen.`,
+        `Zuletzt ${since(k.last, now)}${k.before ? `, in den acht Wochen davor ${often(k.before)}` : ''}.`,
+      );
+    }),
+    ...links.map(l => {
+      const o = observationOf(l.kind);
+      return toldBtn(
+        l.id,
+        lead(o.icon),
+        `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
+        `${cap(o.after)} nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten, nach den anderen Sorten nach <b>${l.other.hit} von ${l.other.n}</b>.`,
+      );
+    }),
+  ];
+  return card('Beobachtungen', toldList(rows));
+}
+
 /* „Geschmackssache“: with „Alle“, the varieties the pets disagree on, which is why they stand in neither list, the
    pets furthest apart first: who likes it and who does not, led by the picture of the one who does, and what every
    one of them did */
@@ -436,5 +478,5 @@ export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet))}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet))}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
 }

@@ -111,7 +111,7 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     current = await pg.evaluate(CURRENT)
-    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item[data-action=open-serving]', 'l => l.map(b => b.dataset.id)')
     check(shown == current and len(shown) >= 1, f'the history shows the meals of the current day ({len(shown)})')
     await shot(pg, f'{scheme}-unfolded')
     await settings(pg)
@@ -465,7 +465,7 @@ async def test_cards(browser, url):
     await idle(pg)
     # History: the calendar and the meals of the current day
     current = await pg.evaluate(CURRENT)
-    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item[data-action=open-serving]', 'l => l.map(b => b.dataset.id)')
     check(
         await pg.locator('[data-sec=hist] .cal').is_visible()
         and await pg.locator('[data-sec=hist] .tl-node').first.is_visible()
@@ -682,10 +682,14 @@ async def test_shop(browser, url):
     await pg.click(f'#sheet [data-action=open-product][data-id="{kaese}"]')
     await idle(pg)
     check(
-        await pg.evaluate("document.getElementById('sheet').dataset.kind") == 'product' and await pg.inner_text('#sheet .sh-head h2') == 'Käse',
-        'a row opens the food sheet, which tells the ratings in words',
+        await pg.evaluate("[document.getElementById('sheet').dataset.kind, document.getElementById('popup').dataset.kind]") == ['shop', 'product']
+        and await pg.inner_text('#popup .sh-head h2') == 'Käse',
+        'a row opens the food sheet over the page, which tells the ratings in words',
     )
-    await pg.click('#sheet [data-action=close]')
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    check(await pg.evaluate(SHOP_PAGE) == kept, 'closed again: the page as it was, the fold still open')
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     # One rating: nothing to buy yet, so the home page has no card, while the page still says so; nothing rated: no
     # card either
@@ -1716,19 +1720,19 @@ async def test_texture(browser, url):
 
 # The overview's line about the animal on the page's today, from the lists in views/overview.js
 # The overview card: its heading, picture, the sentences shown and every sentence there is (all), its lines; tight:
-# the card as tall as its text or its picture
+# the row on top as tall as its text or its picture, with the distance to the button under it; tap: that row
 CARD = """() => Promise.all([import('./js/store.js'), import('./js/views/overview.js'), import('./js/glance.js'), import('./js/derive.js')]).then(([s, o, g, d]) => {
   const c = document.querySelector('#home > section'), h = c.querySelector('h2'), other = document.querySelector('[data-sec=hist] h2'), pic = c.querySelector('.ov-pic'), p = c.querySelector('p');
   const font = e => { const st = getComputedStyle(e); return [st.fontFamily, st.fontWeight, st.fontSize].join(); }, r = c.getBoundingClientRect(), a = pic.querySelector('.av').getBoundingClientRect(), ps = getComputedStyle(p);
-  const text = c.querySelector('.ov-text').getBoundingClientRect().height, inner = Math.max(text, 72) + 18 + 10 + 8;
+  const text = c.querySelector('.ov-text').getBoundingClientRect().height, inner = Math.max(text, 72) + 10, top = c.querySelector('.ov-top');
   const pets = s.prefs.activePet === 'all' ? s.db.pets : s.db.pets.filter(x => x.id === s.prefs.activePet), m = d.model();
   const full = o.overviewText(g.glance(s.db, pets.map(x => x.id), Date.now(), new Set(m.sorts.filter(e => e.choice === 'nicht').map(e => e.id))), pets, Date.now());
   const q = document.createElement('p'); q.innerHTML = full;
-  return {first: c.classList.contains('overview'), height: Math.round(r.height), tight: Math.abs(r.height - inner) < 1, title: h.innerText, sameFont: font(h) === font(other),
+  return {first: c.classList.contains('overview'), height: Math.round(r.height), tight: Math.abs(top.getBoundingClientRect().height - inner) < 1, title: h.innerText, sameFont: font(h) === font(other),
     pic: [pic.tagName, pic.querySelectorAll('.av').length, a.width, a.left < h.getBoundingClientRect().left],
     text: p.innerText, bold: [...p.querySelectorAll('b')].map(b => b.innerText), lines: Math.round(p.clientHeight / parseFloat(ps.lineHeight) * 10) / 10, cut: p.scrollHeight > p.clientHeight + 1,
     sentences: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText), clamp: ps.webkitLineClamp,
-    tap: [c.tagName, c.dataset.action ?? null, c.getAttribute('aria-expanded'), !!c.closest('button')], wide: document.documentElement.scrollWidth > innerWidth}; })"""
+    tap: [top.tagName, top.dataset.action ?? null, top.getAttribute('aria-expanded'), !!top.closest('button')], wide: document.documentElement.scrollWidth > innerWidth}; })"""
 # One pet, a household (the code only in memory) with usual times and a variety with a long name, served today as
 # given ([hour, minute, variety]) by Ben, at the system font scale given. Returns the sentences shown against every
 # sentence there is, the lines the text takes folded and unfolded, and whether the long name is in play.
@@ -1750,17 +1754,19 @@ LONG_DB = """([scale, today]) => import('./js/store.js').then(async s => { const
   const out = {shown: [...p.querySelectorAll('.ov-line')].map(l => l.innerText), all: [...q.querySelectorAll('.ov-line')].map(l => l.innerText),
     lines: Math.round(p.clientHeight / lh), full: Math.round(p.scrollHeight / lh), cut: p.scrollHeight > p.clientHeight + 1, long: today.at(-1)[2] === 'lang'};
   s.prefs.code = ''; return out; })"""
-# The facts that may come on the day `days` from today for a species, as texts, and a kind of line worded as on that
-# day with its places filled: what the overview must say, given the values
-FACTS = """([species, days]) => import('./js/views/facts.js').then(f => f.factsOn(species, new Date(Date.now() + (days || 0) * 864e5)).map(x => x.text))"""
+# A kind of line worded as on the day `days` from today with its places filled: what the overview must say, given the
+# values
 LINE = """([kind, values, days]) => Promise.all([import('./js/views/facts.js'), import('./js/glance.js')]).then(([f, g]) => f.fill(g.pick(f.LINES[kind], Date.now() + (days || 0) * 864e5), values))"""
+# The first sentence of a moment worded as on that day, with its places filled
+LEAD = """([kind, values, days]) => Promise.all([import('./js/views/facts.js'), import('./js/glance.js')]).then(([f, g]) => f.fill(g.pick(f.LEADS[kind], Date.now() + (days || 0) * 864e5), values))"""
+# The asides about a species that may come on the day `days` from today at a moment (null: only those for any moment)
+ASIDES = """([species, moment, days]) => import('./js/views/facts.js').then(f => f.factsOn(species, new Date(Date.now() + (days || 0) * 864e5), false, moment).map(x => x.text))"""
 
 
-async def told_facts(pg, species, days=0):
-    """The facts that may come on the day `days` from today for a species, each with the lead-in of that day: what
-    the overview's last sentence may be"""
-    lead = await pg.evaluate(LINE, ['factLead', {'fact': '#'}, days])
-    return [lead.replace('#', f) for f in await pg.evaluate(FACTS, [species, days])]
+async def asides(pg, species, moment, days=0):
+    """The asides that may come on the day `days` from today for a species at a moment: what the overview's second
+    sentence may be on a day of an aside"""
+    return await pg.evaluate(ASIDES, [species, moment, days])
 
 
 OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.defaults(), now = Date.now(), H = 36e5;
@@ -1773,7 +1779,7 @@ OVERVIEW_DB = """() => import('./js/store.js').then(async s => { const d = s.def
 
 async def test_overview(browser, url):
     print(
-        'overview: a card with picture, name and a text about the day in three lines, unfolding with a tap, never a rating; counting in the history'
+        'overview: a card with picture, name and two sentences about the day in two lines, unfolding with a tap, never a rating; counting in the history'
     )
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
@@ -1784,29 +1790,31 @@ async def test_overview(browser, url):
     async def line(kind, values, days=0):
         return await pg.evaluate(LINE, [kind, values, days])
 
+    async def lead(kind, values, days=0):
+        return await pg.evaluate(LEAD, [kind, values, days])
+
     c = await pg.evaluate(CARD)
-    status = await line(
-        'today', {'so': 'schon', 'both': 'eine Mahlzeit und einen Snack', 'at': '11:00', 'what': 'Käse', 'by': '', 'names': 'Minka', 'hat': 'hat'}
+    status = await lead(
+        'today', {'so': 'schon', 'both': 'eine Mahlzeit und einen Snack', 'at': '11:00', 'what': 'Käse', 'by': '', 'Names': 'Minka', 'hat': 'hat'}
     )
-    cats = await told_facts(pg, 'Katze')
+    cats = await asides(pg, 'Katze', 'wait')
     check(
-        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:4], c['clamp'], c['lines'], c['cut'], c['tap'], c['wide'], c['tight']]
+        [c['first'], c['title'], c['sameFont'], c['pic'], c['bold'][:2], c['clamp'], c['lines'], c['tap'], c['wide'], c['tight']]
         == [
             True,
             'Minka',
             True,
             ['BUTTON', 1, 72, True],
-            ['eine Mahlzeit', 'einen Snack', '11:00', 'Käse'],
-            '3',
-            3,
-            True,
-            ['SECTION', 'toggle-overview', 'false', False],
+            ['eine Mahlzeit', 'einen Snack'],
+            '2',
+            2,
+            ['DIV', 'toggle-overview', 'false', False],
             False,
             True,
         ]
         and c['all'] == [status, c['all'][1]] == c['sentences']
         and c['all'][1] in cats,
-        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today\u2019s meals, the last one and what it was, the important parts in bold, then a fact about the animal with its lead-in; three lines ending in „…“, and the card is the tap target ({c})',
+        f'the overview sits on top: the name in the heading typeface, the picture on the left at 72 px, one sentence with today’s meals and when the last one was, the important parts in bold, then an aside about the animal that fits between meals, without a lead-in; two lines ending in „…“, and the row on top is the tap target ({c})',
     )
     await shot(pg, 'overview-360')
     await pg.evaluate("window.__card = document.querySelector('.overview')")
@@ -1818,8 +1826,8 @@ async def test_overview(browser, url):
     await idle(pg)
     back = await pg.evaluate(CARD)
     check(
-        [o['cut'], o['tap'], o['text'], o['lines'] > 3, o['height'] > c['height'], back == c]
-        == [False, ['SECTION', 'toggle-overview', 'true', False], c['text'], True, True, True]
+        [o['cut'], o['tap'], o['text'], o['lines'] >= 2, o['height'] >= c['height'], back == c]
+        == [False, ['DIV', 'toggle-overview', 'true', False], c['text'], True, True, True]
         and await pg.evaluate("window.__card === document.querySelector('.overview')"),
         f'a tap on the card shows the whole text, a second folds it away again, both without redrawing the page ({o["height"]} px, {o["lines"]} lines)',
     )
@@ -1837,7 +1845,7 @@ async def test_overview(browser, url):
     check(await pg.input_value('#sheet #f-name') == 'Minka', 'a tap on the picture opens the pet, not the text')
     await pg.click('[data-action=close]')
     await idle(pg)
-    # Several pets: today's meals of all of them, who had the last one, when the next one usually comes
+    # Several pets: who had the last meal and what, and what is only true today after it
     await pg.evaluate("""import('./js/store.js').then(async s => { const now = Date.now(), H = 36e5;
       s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Hund', createdAt: 2});
       s.db.products.push({id: 'pute000001', brand: 'Rinti', variety: 'Pute', type: 'Nassfutter', codes: {}, createdAt: 1});
@@ -1854,28 +1862,35 @@ async def test_overview(browser, url):
     )
     await idle(pg)
     kiwi = await pg.evaluate(CARD)
-    dogs, birds = await told_facts(pg, 'Hund'), await told_facts(pg, 'Vogel')
-    fed = {'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'bekommen'}
-    both, one, late = (
-        await line('fresh', {'names': 'Minka und Tiger', 'hat': 'haben', **fed}),
-        await line('fresh', {'names': 'Tiger', 'hat': 'hat', **fed}),
-        await line('later', {'meal': 'Frühstück', 'span': '2 Stunden'}),
-    )
-    digest = await line('digest', {'meal': 'Frühstück', 'when': 'morgen gegen 10 Uhr'})
+    dogs, birds = await asides(pg, 'Hund', 'fresh'), await asides(pg, 'Vogel', None)
+    fed = {'ago': 'vor 5 Minuten', 'Ago': 'Vor 5 Minuten', 'what': 'Lachs', 'for': '', 'by': ''}
+    both, late = await lead('fresh', fed), await line('later', {'meal': 'Frühstück', 'span': '2 Stunden'})
     check(
-        [house['title'], house['pic'][:2], house['all']] == ['Minka und Tiger', ['SPAN', 2], [both, digest, late]]
+        [house['title'], house['pic'][:2], house['all']] == ['Minka und Tiger', ['SPAN', 2], [both, late]]
         and house['sentences'] == house['all']
-        and house['bold'][:3] == ['5 Minuten', 'Lachs', '10 Uhr']
+        and house['bold'][:2] == ['5 Minuten', 'Lachs']
         and house['tight'],
-        f'under „Alle“ with several pets: who had the last meal and what, when the next one usually comes, tomorrow once today\u2019s are served, and the message of the day, that meal came two hours after the usual time, with nothing after it ({house["text"]})',
+        f'under „Alle“ with several pets: the meal just served for both of them and what it was, and the message of the day, that meal came two hours after the usual time ({house["text"]})',
     )
     check(
-        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])] == ['Tiger', ['BUTTON', 1], [one], 2]
-        and tiger['all'][1] in dogs
+        [tiger['title'], tiger['pic'][:2], tiger['all'][:1], len(tiger['all'])] == ['Tiger', ['BUTTON', 1], [both], 2]
+        and tiger['all'][1] in dogs + [late]
         and tiger['sentences'] == tiger['all']
-        and [kiwi['all'][0], len(kiwi['all']), kiwi['tight']] == [await line('firstMeal', {'names': 'Kiwi', 'wartet': 'wartet'}), 2, True]
+        and [kiwi['all'][0], len(kiwi['all']), kiwi['tight']] == [await lead('none', {'names': 'Kiwi', 'wartet': 'wartet'}), 2, True]
         and kiwi['all'][1] in birds,
-        f'the overview follows the filter, with a fact about the dog for the dog; without a meal that it waits for the first one, and a fact about the bird ({tiger["text"]} / {kiwi["text"]})',
+        f'the overview follows the filter, with an aside about the dog for the dog; without a meal that it waits for the first one, and an aside about the bird that fits any moment ({tiger["text"]} / {kiwi["text"]})',
+    )
+    # Two pets, the meal for one of them: it says whom it was for
+    await pg.evaluate("""import('./js/store.js').then(async s => { s.prefs.activePet = 'all'; s.db.pets = s.db.pets.filter(p => p.id !== 'kiwi000001');
+      s.db.servings[0].pets = {tiger00001: {r: null, at: null}}; s.save(); (await import('./js/views/home.js')).renderHome(); })""")
+    await idle(pg)
+    some = await pg.evaluate(CARD)
+    check(
+        some['all'][0] == await lead('fresh', {**fed, 'for': ' für Tiger'}),
+        f'a meal for one of the pets shown: it says whom it was for ({some["all"][0]})',
+    )
+    await pg.evaluate(
+        "import('./js/store.js').then(async s => { s.db.servings[0].pets = {minka00001: {r: null, at: null}, tiger00001: {r: null, at: null}}; s.save(); })"
     )
     # Never a rating: none of the levels, no favourite, nothing that goes down well or not, no percentage
     words = await pg.evaluate("import('./js/config.js').then(c => Object.values(c.RATINGS).map(x => x.label))")
@@ -1891,14 +1906,14 @@ async def test_overview(browser, url):
       s.prefs.code = 'K7PM-3QXD'; h.renderHome(); const house = text();
       s.prefs.code = ''; h.renderHome();
       return [alone, house]; })""")
-    served = await line('freshHouse', {'server': 'Anna', 'names': 'Minka und Tiger', 'when': 'vor 5 Minuten', 'what': 'Lachs', 'verb': 'gegeben'})
+    served = await lead('fresh', {**fed, 'by': ' von Anna'})
     check(
         'Anna' not in by[0] and by[1].startswith(served + ' '),
         f'in a household the overview says who fed, on your own it does not ({by[1]})',
     )
-    # The line more: what is only true today first; else on a day with an odd number one of the kinds taking turns
-    # and on an even one a fact (9 June 2026 is day 20613 since 1970: a kind, the next day a fact), over five days
-    # with the memory threaded through; every message, then every kind taking turns, each from a glance holding
+    # The second sentence: what is only true today first; else on a day with an odd number one of the kinds taking
+    # turns and on an even one an aside (9 June 2026 is day 20613 since 1970: a kind, the next day an aside), over five
+    # days with the memory threaded through; every message, then every kind taking turns, each from a glance holding
     # only it, on a kind's day
     LINES = """import('./js/store.js').then(async s => { const o = await import('./js/views/overview.js'), now = Date.now(), pets = [s.db.pets[0]];
       const last = {...s.db.servings.find(x => x.pets.minka00001), servedAt: now - 3 * 36e5}, code = s.prefs.code;
@@ -1920,43 +1935,25 @@ async def test_overview(browser, url):
     days, first, kinds, memory = await pg.evaluate(LINES)
     turns = [
         await line('duel', {'first': 'Anna', 'n': 6, 'm': 4, 'second': 'Jonas'}),
-        await line('streak', {'since': '12 Tagen', 'days': '12 Tage', 'you': 'hättet eigentlich ihr'}, 2),
+        await line('streak', {'since': '12 Tagen', 'days': '12 Tage'}, 2),
         await line('idea', {'sort': 'Rind', 'days': 12}, 4),
     ]
-    told = [await told_facts(pg, 'Katze', i) for i in range(5)]
-    daily = [
-        [
-            await line(
-                'today',
-                {
-                    'so': 'schon',
-                    'both': 'zwei Mahlzeiten und einen Snack',
-                    'at': '9:00',
-                    'what': 'Lachs',
-                    'by': ' von Anna',
-                    'names': 'Minka',
-                    'hat': 'hat',
-                },
-                i,
-            ),
-            await line('usual', {'meal': 'Abendessen', 'when': 'gegen 18:30 Uhr'}, i),
-        ]
-        for i in range(5)
-    ]
+    told = [await asides(pg, 'Katze', 'wait', i) for i in range(5)]
+    daily = [await lead('later', {'meal': 'Abendessen', 'time': '18:30', 'at': '9:00', 'by': ' von Anna'}, i) for i in range(5)]
     check(
-        all(len(d) == 3 and d[:2] == daily[i] for i, d in enumerate(days))
-        and [days[i][2] for i in (0, 2, 4)] == turns
-        and all(days[i][2] in told[i] for i in (1, 3))
-        and days[1][2] != days[3][2]
+        all(len(d) == 2 and d[0] == daily[i] for i, d in enumerate(days))
+        and [days[i][1] for i in (0, 2, 4)] == turns
+        and all(days[i][1] in told[i] for i in (1, 3))
+        and days[1][1] != days[3][1]
         and [memory['day'], memory['kind'], memory['fact'], memory['kinds'], [f['day'] for f in memory['facts']]]
         == ['2026-06-13', 'idea', None, ['duel', 'streak', 'idea'], ['2026-06-10', '2026-06-12']],
-        f'three sentences: today\u2019s meals with the last one and who served it, when the next meal usually is, and one line more; over five days the duel, a fact, the streak, another fact and an idea take turns, and the memory holds the last three kinds and every fact ({days}, {memory})',
+        f'two sentences: the next meal with when the last one was and who served it, then one more; over five days the duel, an aside, the streak, another aside and an idea take turns, and the memory holds the last three kinds and every aside ({days}, {memory})',
     )
     messages = [
         await line('premiereLast', {}),
         await line('premiere', {'sort': 'Rind'}),
         await line('milestone', {'n': '3×', 'm': '100. Mal'}),
-        await line('snacksCounted', {'grip': 'Minka hat euch ganz schön im Griff.'}),
+        await line('snacks', {'n': '4 Snacks', 'grip': 'Minka hat euch im Griff.'}),
         await line('anniversary', {'span': 'einem Monat', 'n': 62}),
         await line('recordStreak', {'days': '23 Tage'}),
         await line('recordDay', {'n': '4 Mahlzeiten'}),
@@ -1966,17 +1963,14 @@ async def test_overview(browser, url):
     ]
     check(
         [f[-1] for f in first[:10]] == messages
-        and all(len(f) == 3 for f in first)
-        and first[10][2] == first[11][2] == turns[0]
-        and 'zwei Mahlzeiten und vier Snacks' in first[3][0]
-        and 'vier Mahlzeiten' in first[6][0]
-        and first[10][:2]
+        and all(len(f) == 2 for f in first)
+        and first[10]
         == [
-            await line('due', {'when': 'um 9:00', 'what': 'Lachs', 'by': ' von Anna'}),
+            await lead('due', {'what': 'Lachs', 'at': '9:00', 'by': ' von Anna', 'meal': 'Abendessen'}),
             await line('waiting', {'names': 'Minka', 'wartet': 'wartet', 'uebt': 'übt', 'hat': 'hat', 'sitzt': 'sitzt'}),
         ]
-        and first[11][1] == await line('doneToday', {'meal': 'Frühstück', 'when': 'gegen 7:15 Uhr'}),
-        f'what is only true today is the line more, with nothing after it: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday\u2019s minute; without one the duel takes its turn; at feeding time it says so, and once today\u2019s meals are served it says when tomorrow\u2019s first one is ({first})',
+        and first[11] == [await lead('done', {'at': '9:00', 'by': ' von Anna', 'meal': 'Frühstück', 'time': '7:15'}), turns[0]],
+        f'what is only true today is the second sentence: a first time, a milestone close by, a lot of treats, an anniversary, a record, a meal off its usual time or at yesterday’s minute; at feeding time it says so and the pet waits; once today’s meals are served it says so, and the duel takes its turn ({first})',
     )
     others = [
         await line('feedRun', {'name': 'Ben', 'days': '5 Tage', 'since': '5 Tagen', 'other': 'Jonas'}),
@@ -1988,15 +1982,24 @@ async def test_overview(browser, url):
         await line('duelTie', {'score': '5 zu 5', 'first': 'Anna', 'second': 'Jonas'}),
     ]
     check(
-        [k[-1] for k in kinds] == others and all(len(k) == 3 for k in kinds),
-        f'the other kinds taking turns: a person\u2019s feeding run, with or without someone to tease, a weekday\u2019s own time, a look back a year, the varieties tried, the days in the diary and a tied duel ({kinds})',
+        [k[-1] for k in kinds] == others and all(len(k) == 2 for k in kinds),
+        f'the other kinds taking turns: a person’s feeding run, with or without someone to tease, a weekday’s own time, a look back a year, the varieties tried, the days in the diary and a tied duel ({kinds})',
+    )
+    # The moments of a day and their first sentences: before the first meal, at feeding time, at night
+    moments = await pg.evaluate("""import('./js/views/overview.js').then(o => { const t = h => new Date(`2026-06-09T${h}:00+02:00`).getTime(), last = {servedAt: t('07:20')};
+      return [o.momentOf({last: null}, t('12:00')), o.momentOf({last, next: {at: 1110, due: true}}, t('19:00')), o.momentOf({last: {servedAt: t('07:20') - 864e5}, next: {at: 435, due: true}}, t('07:30')),
+        o.momentOf({last, next: {at: 1110}}, t('07:40')), o.momentOf({last, next: {at: 1110}}, t('10:00')), o.momentOf({last: {servedAt: t('07:20') - 864e5}, next: {at: 435}}, t('06:30')),
+        o.momentOf({last, next: {at: 435, tomorrow: true}}, t('21:00')), o.momentOf({last: {servedAt: t('07:20') - 864e5}, next: {at: 435}}, t('02:00')),
+        o.momentOf({last, next: null}, t('12:00')), o.momentOf({last: {servedAt: t('07:20') - 864e5}, next: null}, t('12:00')), o.momentOf({last: {servedAt: t('07:20') - 3 * 864e5}, next: {at: 435}}, t('12:00'))]; })""")
+    check(
+        moments == ['none', 'due', 'dueFirst', 'fresh', 'later', 'morning', 'done', 'night', 'today', 'yesterday', 'older'],
+        f'the moment of the day picks the first sentence: no meal, feeding time with and without one today, just fed, the next meal later, nothing yet, all served, night, no usual times, yesterday, older ({moments})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
 
-    # A long name, a household and usual times, at the usual and at a large system font: nothing is dropped, the
-    # first sentence stands whole with „von Ben“ and the variety\u2019s full name, the text is clamped to three lines,
-    # and a tap unfolds all of it
+    # A long name, a household and usual times, at the usual and at a large system font: nothing is dropped, the first
+    # sentence names who fed, the record is the second, the text is clamped to two lines, and a tap unfolds all of it
     ctx = await phone(browser, width=360, height=800, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-09T15:00:00+02:00')
@@ -2004,20 +2007,18 @@ async def test_overview(browser, url):
     for scale, today in ((1, [[7, 20, 'wild']]), (1.3, long)):
         fit = await pg.evaluate(LONG_DB, [scale, today])
         await idle(pg)
-        name = 'Wildschwein mit Nachtkerzenöl' + (' und Kürbis' if fit['long'] else '')
-        record = await line('recordStreak', {'days': '9 Tage'})
+        record = await pg.evaluate(LINE, ['recordStreak', {'days': '9 Tage'}, 0])
         opened = await pg.evaluate(
             "import('./js/views/home.js').then(h => { h.toggleOverview(); const p = document.querySelector('.overview p'); return [p.scrollHeight > p.clientHeight + 1, getComputedStyle(p).display]; })"
         )
         await pg.evaluate("import('./js/views/home.js').then(h => h.toggleOverview())")
         check(
             fit['shown'] == fit['all']
-            and len(fit['all']) == 3
+            and len(fit['all']) == 2
             and fit['all'][0].endswith('von Ben.')
-            and name in fit['all'][0]
-            and fit['all'][2] == record
-            and [fit['cut'], fit['lines'], fit['full'] > 3, opened] == [True, 3, True, [False, 'block']],
-            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ and the full name in a whole first sentence, the record streak of nine days as the message, {fit["full"]} lines clamped to three and all of them after a tap ({fit})',
+            and fit['all'][1] == record
+            and [fit['lines'], fit['full'] >= 2, opened] == [2, True, [False, 'block']],
+            f'{int(scale * 100)} %, {len(today)} today: „von Ben“ in the first sentence, the record streak of nine days as the second, {fit["full"]} lines clamped to two and all of them after a tap ({fit})',
         )
         await shot(pg, f'overview-long-{int(scale * 100)}-{len(today)}')
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
@@ -2112,17 +2113,17 @@ async def test_birthday(browser, url):
     await pg.evaluate(OVERVIEW_DB)
     await idle(pg)
     lines = [await pg.evaluate(BIRTHDAY_LINES, d) for d in ('2022-06-09', '2026-06-09', '2022-06-10', '2022-06-12', '2022-06-13', None)]
-    said = [x[-1] for x in lines]
+    said = [x[0] if i < 2 else x[-1] for i, x in enumerate(lines)]  # a birthday today goes first
     want = [
         await pg.evaluate(LINE, ['birthdayAge', {'pet': 'Minka', 'age': 4}]),
         await pg.evaluate(LINE, ['birthdayToday', {'pet': 'Minka'}]),
         await pg.evaluate(LINE, ['birthdayTomorrow', {'pet': 'Minka'}]),
         await pg.evaluate(LINE, ['birthdaySoon', {'pet': 'Minka', 'days': '3 Tagen'}]),
     ]
-    cats = await told_facts(pg, 'Katze')
+    cats = await asides(pg, 'Katze', 'wait')
     check(
         said[:4] == want and said[4] in cats and said[5] in cats and [len(x) for x in lines] == [2] * 6,
-        f'the overview: the birthday with the age, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
+        f'the overview: the birthday with the age before the rest, born this year without, tomorrow, in three days; four days ahead the line is something else ({said})',
     )
     check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
     await ctx.close()
@@ -4673,6 +4674,293 @@ async def test_sheet(browser, url):
     await ctx.close()
 
 
+POPUP = """() => { const d = id => document.getElementById(id);
+  return {page: d('sheet').open ? d('sheet').dataset.kind : null, popup: d('popup').open ? d('popup').dataset.kind : null,
+    title: d('popupBody').querySelector('.sh-head h2')?.textContent ?? null, y: d('sheetBody').scrollTop,
+    locked: document.body.classList.contains('locked'), toast: d('toast').parentNode.id || d('toast').parentNode.tagName}; }"""
+
+
+async def test_popup(browser, url):
+    print('a sheet opened from a page lies over it, and closing it or going back leads to the page as it was')
+    ctx = await phone(browser, motion=True)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await pg.click('[data-action=open-report]')
+    await idle(pg)
+    await pg.evaluate("document.getElementById('sheetBody').scrollTop = 900")
+    await idle(pg)
+    visible = "[...document.querySelectorAll('#sheet .tl-item[data-action=open-serving]')].findIndex(b => { const r = b.getBoundingClientRect(); return r.top > 120 && r.bottom < 700; })"
+    item = pg.locator('#sheet .tl-item[data-action=open-serving]').nth(await pg.evaluate(visible))
+    await item.click()
+    await idle(pg)
+    over = await pg.evaluate(POPUP)
+    check(
+        over['page'] == 'report' and over['popup'] == 'serving' and over['title'] == 'Wie war’s?' and over['y'] == 900,
+        f'a meal tapped in „Verlauf“: its sheet rises over the page, which stays scrolled where it was ({over})',
+    )
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    shut = await pg.evaluate(POPUP)
+    await item.click()
+    await idle(pg)
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await idle(pg)
+    back = await pg.evaluate(POPUP)
+    await item.click()
+    await idle(pg)
+    await pg.go_back()
+    await idle(pg)
+    gesture = await pg.evaluate(POPUP)
+    check(
+        all(x['page'] == 'report' and not x['popup'] and x['y'] == 900 and x['locked'] for x in (shut, back, gesture)),
+        f'the X, Android’s back button and the back gesture each close only the sheet: „Verlauf“ is there as it was ({shut}, {back}, {gesture})',
+    )
+    # Rated over the page: the sheet closes by itself after its moment, and the page shows the rating
+    open_meal = await pg.evaluate("""() => { const b = [...document.querySelectorAll('#sheet .tl-item')].find(b => b.querySelector('.badge')?.textContent.trim() === 'offen');
+      b?.scrollIntoView({block: 'center'}); return b?.dataset.id ?? null; }""")
+    await idle(pg)
+    y = await pg.evaluate("document.getElementById('sheetBody').scrollTop")
+    await pg.click(f'#sheet .tl-item[data-id="{open_meal}"]')
+    await idle(pg)
+    await pg.click('#popup [data-action=rate][data-r=gut]', force=True)
+    await pg.wait_for_function("!document.getElementById('popup').open", timeout=6000)
+    await idle(pg)
+    rated = await pg.evaluate(POPUP)
+    badge = await pg.get_attribute(f'#sheet .tl-item[data-id="{open_meal}"] .badge', 'title')
+    check(
+        rated['page'] == 'report' and not rated['popup'] and rated['y'] == y and badge == 'Fast leer' and rated['toast'] == 'sheet',
+        f'rated over „Verlauf“: the sheet closes by itself, the page shows the rating where it was, and the toast stands on it ({rated}, {badge!r})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    undone = await pg.inner_text(f'#sheet .tl-item[data-id="{open_meal}"] .badge')
+    check(undone.strip() == 'offen', f'„Rückgängig“ on the page takes the rating back there too ({undone!r})')
+    # Deleted over the page: back on it without the meal, and undo brings it back there
+    await pg.click(f'#sheet .tl-item[data-id="{open_meal}"]')
+    await idle(pg)
+    await pg.evaluate("import('./js/logic/editing.js').then(m => m.deleteServing(document.querySelector('#popup [data-action=rate]').dataset.s))")
+    await idle(pg)
+    gone = [await pg.evaluate(POPUP), await pg.locator(f'#sheet .tl-item[data-id="{open_meal}"]').count()]
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    again = await pg.locator(f'#sheet .tl-item[data-id="{open_meal}"]').count()
+    check(
+        gone[0]['page'] == 'report' and not gone[0]['popup'] and gone[1] == 0 and again == 1,
+        f'deleted over „Verlauf“: back on the page without the meal, and „Rückgängig“ puts it back there ({gone}, {again})',
+    )
+    # Served from a page: the meal is to be rated on the home page, so everything closes
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('[data-action=open-evaluation]')
+    await idle(pg)
+    await pg.locator('#sheet [data-action=open-product]').first.click()
+    await idle(pg)
+    product = await pg.evaluate(POPUP)
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    stays = await pg.evaluate(POPUP)
+    await pg.locator('#sheet [data-action=open-product]').first.click()
+    await idle(pg)
+    await pg.click('#popup [data-action=serve]')
+    await idle(pg)
+    served = await pg.evaluate(POPUP)
+    depth = await pg.evaluate('history.state')
+    check(
+        product['page'] == 'evaluation'
+        and product['popup'] == 'product'
+        and stays['page'] == 'evaluation'
+        and not stays['popup']
+        and not served['page']
+        and not served['popup']
+        and not served['locked']
+        and served['toast'] == 'BODY'
+        and not depth,
+        f'„Vorlieben“: a variety opens its food sheet over the page and closes back to it; „Heute servieren“ ends on the home page, with every history entry gone ({product}, {stays}, {served}, {depth})',
+    )
+    # A page asked for while a sheet lies over one takes that sheet away
+    await pg.click('[data-action=open-shop]')
+    await idle(pg)
+    await pg.locator('#sheet [data-action=open-product]').first.click()
+    await idle(pg)
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'settings', page: 'house'}))")
+    await idle(pg)
+    swapped = await pg.evaluate(POPUP)
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    home = await pg.evaluate(POPUP)
+    check(
+        swapped['page'] == 'settings' and not swapped['popup'] and not home['page'] and not home['locked'],
+        f'a page asked for over a sheet on a page: the sheet goes, the page takes the place, and back leads home ({swapped}, {home})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
+OBS = "import('./js/store.js').then(s => s.db.observations.map(o => [o.kind, Object.keys(o.pets).sort(), o.by ?? null]))"
+
+
+async def test_observations(browser, url):
+    print('observations: noted with one tap on the overview, undone, put right and deleted from the diary')
+    ctx = await phone(browser, width=360)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await state(pg, "(prefs.name = 'Anna', true)")
+    before = await pg.evaluate(OBS)
+    card = await pg.evaluate("""() => { const c = document.querySelector('#home .overview'), b = c.querySelector('.card-btn');
+      return [b.textContent, b.getAttribute('aria-expanded'), c.querySelectorAll('.chip').length, getComputedStyle(c.querySelector('p')).webkitLineClamp]; }""")
+    check(
+        card == ['Beobachtung notieren', 'false', 0, '2'],
+        f'the overview: two lines of text and „Beobachtung notieren“ under them, the chips folded away ({card})',
+    )
+    await pg.click('[data-action=observe-open]')
+    await idle(pg)
+    chips = await pg.evaluate(
+        """() => [...document.querySelectorAll('#home .overview .chip')].map(c => [c.textContent.trim(), !!c.querySelector('svg'), Math.round(c.getBoundingClientRect().top)])"""
+    )
+    label = await pg.inner_text('#home .overview .card-btn')
+    check(
+        [c[0] for c in chips] == ['Stunk', 'Hunger', 'Müde']
+        and all(c[1] for c in chips)
+        and len({c[2] for c in chips}) == 1
+        and label == 'Abbrechen',
+        f'a tap folds open a row of chips with icon and word, one row at 360px, and the button says „Abbrechen“ ({chips}, {label})',
+    )
+    await pg.click('[data-action=observe-open]')
+    await idle(pg)
+    shut = [await pg.locator('#home .overview .chip').count(), await pg.inner_text('#home .overview .card-btn'), await pg.evaluate(OBS) == before]
+    check(shut == [0, 'Beobachtung notieren', True], f'„Abbrechen“ folds them shut and notes nothing ({shut})')
+    await pg.click('[data-action=observe-open]')
+    await idle(pg)
+    await pg.click('[data-action=observe][data-v=stink]')
+    await idle(pg)
+    after = await pg.evaluate(OBS)
+    pet = await state(pg, 'db.pets[0].id')
+    toast = await pg.inner_text('#toast')
+    check(
+        after[0] == ['stink', [pet], 'Anna']
+        and len(after) == len(before) + 1
+        and await pg.locator('#home .overview .chip').count() == 0
+        and 'Oha, heftiger Stunk! Ist notiert.' in toast
+        and 'Rückgängig' in toast,
+        f'a chip: saved at once for the pet, by who noted it, the chips fold away, and the toast says so with „Rückgängig“ ({after[0]}, {toast!r})',
+    )
+    row = await pg.evaluate(
+        """() => { const b = document.querySelector('[data-sec=hist] [data-action=open-observation]'); return b && [b.querySelector('b').textContent, b.querySelector('small')?.textContent ?? '', !!b.querySelector('.thumb svg')]; }"""
+    )
+    day = await pg.inner_text('[data-sec=hist] .tl-date span')
+    check(
+        row == ['Heftiger Stunk', 'von Anna', True] and 'Beobachtung' in day,
+        f'it stands in today’s diary on the home page, with its icon and who noted it ({row}, {day})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    check(
+        await pg.evaluate(OBS) == before and await pg.locator('[data-sec=hist] [data-action=open-observation]').count() == 0,
+        '„Rückgängig“ takes it back, from the diary too',
+    )
+    # Put right from the diary: the kind, the time, and deleted with undo
+    await pg.click('[data-action=observe-open]')
+    await idle(pg)
+    await pg.click('[data-action=observe][data-v=hungry]')
+    await idle(pg)
+    await pg.click('[data-sec=hist] [data-action=open-observation]')
+    await idle(pg)
+    sheet = await pg.evaluate("""() => { const b = document.getElementById('sheetBody'); return [b.querySelector('.sh-head h2').textContent,
+      [...b.querySelectorAll('[data-action=set-observation-kind]')].map(c => c.getAttribute('aria-pressed')), !!b.querySelector('#f-obs-time'),
+      b.querySelector('.hint.mt-s')?.textContent ?? '', b.querySelectorAll('[data-action=toggle-observation-pet]').length]; }""")
+    check(
+        sheet[:3] == ['Großer Hunger', ['false', 'true', 'false'], True] and sheet[3].startswith('In den drei Stunden davor') and sheet[4] == 0,
+        f'its sheet: the kind pressed among the same chips, when it was noted, the meals it is weighed against, and no pets with one ({sheet})',
+    )
+    await pg.click('#sheet [data-action=set-observation-kind][data-v=tired]')
+    await idle(pg)
+    title = await pg.inner_text('#sheet .sh-head h2')
+    mine = await pg.evaluate("import('./js/ui/sheet.js').then(m => m.sheet.id)")
+    await pg.fill('#f-obs-time', '2026-01-02T08:30')
+    await pg.dispatch_event('#f-obs-time', 'change')
+    await idle(pg)
+    got = await state(pg, f"(o => [o.kind, o.at, db.observations.at(-1) === o])(db.observations.find(o => o.id === '{mine}'))")
+    check(
+        title == 'Müder Tag' and got == ['tired', await pg.evaluate("new Date('2026-01-02T08:30').getTime()"), True],
+        f'another kind and another time take effect at once, the diary in its order ({title}, {got})',
+    )
+    await pg.click('#sheet [data-action=delete-observation]')
+    await idle(pg)
+    gone = [await pg.evaluate(OBS) == before, await pg.evaluate("document.getElementById('sheet').open")]
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    back = [len(await pg.evaluate(OBS)), await state(pg, f"db.observations.find(o => o.id === '{mine}')?.kind ?? null")]
+    check(
+        gone == [True, False] and back == [len(before) + 1, 'tired'],
+        f'„Eintrag löschen“: gone with one tap, back with „Rückgängig“ ({gone}, {back})',
+    )
+    # From „Verlauf“ it opens over the page; „Vorlieben“ tells what was noted
+    await pg.click('[data-action=open-report]')
+    await idle(pg)
+    await pg.locator('#sheet [data-action=open-observation]').first.click()
+    await idle(pg)
+    over = await pg.evaluate("[document.getElementById('sheet').dataset.kind, document.getElementById('popup').dataset.kind]")
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    check(over == ['report', 'observation'], f'in „Verlauf“ it opens over the page ({over})')
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('[data-action=open-evaluation]')
+    await idle(pg)
+    told = await pg.evaluate("""() => { const c = [...document.querySelectorAll('#sheet .card')].find(c => c.querySelector('h2')?.textContent === 'Beobachtungen');
+      return c ? [...c.querySelectorAll('.told > li')].map(li => li.textContent.replace(/\\s+/g, ' ').trim()) : null; }""")
+    check(
+        told is not None
+        and any(t.startswith('Heftiger Stunk, einmal in den letzten vier Wochen.') for t in told)
+        and any(t.startswith('Müder Tag') for t in told),
+        f'„Vorlieben“: a card „Beobachtungen“ with what was noted in the last four weeks ({told})',
+    )
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    # Several pets: with „Alle“ it is noted for all of them, which means one of them; the sheet can narrow it
+    await pg.evaluate("""import('./js/store.js').then(async s => { s.db.pets.push({id: 'tiger00001', name: 'Tiger', species: 'Katze', photo: null, createdAt: Date.now()}); s.save();
+      (await import('./js/views/home.js')).renderHome(); })""")
+    await idle(pg)
+    await pg.click('[data-action=observe-open]')
+    await idle(pg)
+    await pg.click('[data-action=observe][data-v=stink]')
+    await idle(pg)
+    both = (await pg.evaluate(OBS))[0]
+    toast = await pg.inner_text('#toast')
+    check(
+        both[1] == sorted([pet, 'tiger00001']) and 'für Mau oder Tiger' in toast,
+        f'with „Alle“: noted for every pet, not clear which ({both}, {toast!r})',
+    )
+    await pg.click('[data-sec=hist] [data-action=open-observation]')
+    await idle(pg)
+    unclear = await pg.inner_text('#sheet .hint.mt-s >> nth=-1')
+    await pg.click('#sheet [data-action=toggle-observation-pet][data-id=tiger00001]')
+    await idle(pg)
+    narrowed = (await pg.evaluate(OBS))[0][1]
+    await pg.click(f'#sheet [data-action=toggle-observation-pet][data-id={pet}]')
+    await idle(pg)
+    kept = [(await pg.evaluate(OBS))[0][1], await pg.inner_text('#toast')]
+    check(
+        'offen, wer es war' in unclear and narrowed == [pet] and kept[0] == [pet] and 'Mindestens ein Tier' in kept[1],
+        f'its sheet names it unclear, narrows it to one pet, and keeps at least one ({unclear!r}, {narrowed}, {kept})',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.click('[data-action=filter][data-id=tiger00001]')
+    await idle(pg)
+    await pg.click('[data-action=observe-open]')
+    await idle(pg)
+    await pg.click('[data-action=observe][data-v=hungry]')
+    await idle(pg)
+    check((await pg.evaluate(OBS))[0][:2] == ['hungry', ['tiger00001']], 'with a pet chosen in the pet bar: noted for that pet')
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_mood(browser, url):
     print('the mood picture on the home page: the pet\u2019s profile picture')
     make_pictures()
@@ -6818,6 +7106,8 @@ run_tests(
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,
+        'popup': test_popup,
+        'observations': test_observations,
         'mood': test_mood,
         'camera': test_camera,
         'no-camera': test_no_camera,

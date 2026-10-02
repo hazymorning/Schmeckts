@@ -421,7 +421,8 @@ INSETS = {
     '.banner': '12px',
     '.btn': '12px 16px',
     '.field:not(.in-row, .pick .field, .search .field)': '12px 16px',
-    '.chip': '8px 16px',
+    '.chip:not(.tight)': '8px 16px',
+    '.chip.tight': '8px 12px',
     '.field.in-row': '8px 16px',
     '.toast button': '8px 16px',
     '.cam-hint': '8px 16px',
@@ -532,6 +533,15 @@ async def test_rules(browser, url):
         await pg.click('[data-action=demo]')
         await idle(pg)
         await scan()  # Startseite mit allem
+        await pg.set_viewport_size({'width': 360, 'height': 860})
+        await pg.click('[data-action=observe-open]')
+        await idle(pg)
+        await scan()  # the chips for an observation, folded open
+        chips = await pg.evaluate("""() => [...document.querySelectorAll('.overview .chip')].map(c => Math.round(c.getBoundingClientRect().top))""")
+        check(len(chips) == 3 and len(set(chips)) == 1, f'the three chips for an observation share one row at 360px ({scheme}: {chips})')
+        await pg.click('[data-action=observe-open]')
+        await pg.set_viewport_size({'width': 400, 'height': 860})
+        await idle(pg)
         layout = await pg.evaluate("""(() => { const app = getComputedStyle(document.querySelector('.app')), probe = document.createElement('i');
           probe.style.cssText = 'background:var(--surface);color:var(--ink)'; document.body.append(probe); const p = getComputedStyle(probe);
           const cards = [...document.querySelectorAll('#home > section')];
@@ -541,7 +551,7 @@ async def test_rules(browser, url):
             gaps: cards.slice(1).map((c, i) => Math.round(c.getBoundingClientRect().top - cards[i].getBoundingClientRect().bottom))};
           probe.remove(); return out; })()""")
         want = 'true|true|none|24px|18px 18px 8px|none|0px|0px|H2|Faustina|600|21px|26.25px|normal|true'
-        first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
+        first = want.replace('|H2|', '|DIV|')  # overview: the picture on the left, the heading beside it
         check(
             layout['app'] == ['600px', '18px', '18px']
             and len(layout['cards']) == 6
@@ -554,6 +564,17 @@ async def test_rules(browser, url):
         check(
             order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Vorlieben', 'Einkaufen'],
             f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Vorlieben“, „Einkaufen“ ({scheme}: {order})',
+        )
+        # The text button at a card's foot: --space-3 above its line, whatever the card ends with, then as tall as a row
+        btns = await pg.evaluate(
+            """() => [...document.querySelectorAll('#home .card .card-btn')].map(b => { let el = b.previousElementSibling;
+          while (el && !el.getBoundingClientRect().height) el = el.previousElementSibling;
+          const s = getComputedStyle(b), r = b.getBoundingClientRect();
+          return [b.textContent.trim(), s.marginTop, Math.round(r.top - el.getBoundingClientRect().bottom), Math.round(r.height)]; })"""
+        )
+        check(
+            len(btns) >= 3 and all(m == '12px' and gap >= 12 and h >= 56 for _, m, gap, h in btns),
+            f'card buttons ({scheme}): 12px above the line in the recipe, whatever ends the card, and at least 56px tall ({btns})',
         )
         sides = await pg.evaluate(SIDES)
         check(
@@ -1285,6 +1306,7 @@ PADDING = {
     '.pick .field': 'var(--field-room)',
     '.search .field': 'var(--field-room)',
     '.chip': 'var(--inset-compact)',
+    '.chip.tight': 'var(--inset-tight)',
     '.toast button': 'var(--inset-compact)',
     '.cam-hint': 'var(--inset-compact)',
     '.badge': 'var(--inset-badge)',
@@ -1478,12 +1500,12 @@ def test_overview_card():
     block = {one for _, sel, p, v in app_decls() if p == 'display' and v == 'block' for one in sel.split(', ')}
     fixed = [f'{sel} {p}:{v}' for _, sel, p, v in app_decls() if sel.startswith('.overview') and p in ('height', 'min-height', 'max-height')]
     check(
-        ('.overview p', '3') in clamp
+        ('.overview p', '2') in clamp
         and {'.overview.open p', '.overview p.animating'} <= block
         and 'export function toggleOverview()' in js
         and 'slideHeight(p, h0)' in js
         and not fixed,
-        f'the overview: three lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
+        f'the overview: two lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
     )
 
 

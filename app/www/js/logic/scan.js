@@ -6,7 +6,7 @@ import {haptic, scanBarcode} from '../native.js';
 import {findProduct} from '../derive.js';
 import {identify} from '../recognize.js';
 import {toast} from '../ui/toast.js';
-import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
+import {closeAll, renderSheet, sheet} from '../ui/sheet.js';
 import {serveProduct, shootPhoto} from './feeding.js';
 import {applyTexture, newProduct} from './products.js';
 
@@ -71,7 +71,7 @@ async function run(feed) {
 }
 
 async function serve(p, code) {
-  await closeSheet();
+  await closeAll(); // serving ends on the home page, where the meal is rated
   serveProduct(p.id, code);
 }
 

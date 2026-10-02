@@ -5,7 +5,7 @@ package main
 //   GET  /api/info                  version, protocol, epoch, server time; with a code also "auth"
 //   GET  /api/changes?since=N       every record with changes after N
 //   POST /api/changes               accept changes: {"changes":[…]}
-//   GET  /api/checksum              checksum over every field and clock
+//   GET  /api/checksum?c=a,b        checksum over every field and clock of those collections, the three first ones without
 //   GET  /api/events?code=…         live notice of new numbers (server-sent events)
 //   POST /api/recognize             recognise a packaging photo: {"image":"<base64>"}
 //   GET  /api/barcode/<code>        look food up by EAN: {"found", "brand", "variety", "type", "animal"}
@@ -209,7 +209,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	epoch, seq := a.store.Seq()
 	out := map[string]any{"app": "schmeckts", "version": version, "protocol": protocolVersion,
 		"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "recognition": a.cfg.Get().APIKey != "",
-		"features": []string{"barcode", "fed", "photo", "replace"}}
+		"features": []string{"barcode", "fed", "photo", "replace", "collections"}}
 	if givenCode(r) != "" {
 		status, msg := a.checkCode(r)
 		out["auth"] = status == http.StatusOK
@@ -264,7 +264,16 @@ func (a *API) postChanges(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) checksum(w http.ResponseWriter, r *http.Request) {
-	epoch, seq, sum, n := a.store.Checksum()
+	var colls []string // nil: the three collections every app knows
+	if q := r.URL.Query().Get("c"); q != "" {
+		colls = []string{}
+		for _, c := range strings.Split(q, ",") {
+			if collRe.MatchString(c) {
+				colls = append(colls, c)
+			}
+		}
+	}
+	epoch, seq, sum, n := a.store.Checksum(colls)
 	writeJSON(w, http.StatusOK, map[string]any{"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "sum": sum, "fields": n})
 }
 

@@ -112,7 +112,7 @@ func TestInvalidChangesAreRejected(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()
 	cases := map[string]Change{
-		"Sammlung":     chg("eeeeeeee1", "users", "x1234", clock(ms, 0, "anna"), map[string]any{"a": 1}),
+		"Sammlung":     chg("eeeeeeee1", "Users!", "x1234", clock(ms, 0, "anna"), map[string]any{"a": 1}),
 		"Datensatz":    chg("eeeeeeee2", "pets", "a b", clock(ms, 0, "anna"), map[string]any{"a": 1}),
 		"Feldname":     chg("eeeeeeee3", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"__proto__": 1}),
 		"_del":         chg("eeeeeeee4", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"_del": "ja"}),
@@ -146,12 +146,12 @@ func TestLocalFieldsStayOnThePhone(t *testing.T) {
 func TestIdenticalAfterRestart(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("gggggggg1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
-	e1, q1, sum1, _ := s.Checksum()
+	e1, q1, sum1, _ := s.Checksum(nil)
 	s2, err := OpenStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	e2, q2, sum2, _ := s2.Checksum()
+	e2, q2, sum2, _ := s2.Checksum(nil)
 	if e1 != e2 || q1 != q2 || sum1 != sum2 {
 		t.Fatal("after the restart the stored data must be identical")
 	}
@@ -232,5 +232,50 @@ func TestProductsForThePrompt(t *testing.T) {
 	got := s.Products(60)
 	if len(got) != 2 || got[0] != "Felix | Huhn" || got[1] != "Sheba | Lachs" {
 		t.Fatalf("Produkte = %v", got)
+	}
+}
+
+// A collection the server has never heard of is kept like the others, so a new kind of data in the app needs no new
+// server; a name of another shape, or one collection too many, is rejected.
+func TestNewCollections(t *testing.T) {
+	s, dir := openTemp(t)
+	ms := now.UnixMilli()
+	ok, rej := mustApply(t, s,
+		chg("coll0001", "observations", "obs1", clock(ms, 0, "anna"), map[string]any{"kind": "stink", "at": ms, "pets.pet1": true, "_del": false}),
+		chg("coll0002", "Observations", "obs2", clock(ms, 1, "anna"), map[string]any{"kind": "stink"}),
+		chg("coll0003", "obs/x", "obs3", clock(ms, 2, "anna"), map[string]any{"kind": "stink"}))
+	if len(ok) != 1 || len(rej) != 2 || field(s, "observations", "obs1", "kind") != `"stink"` || field(s, "observations", "obs1", "pets.pet1") != "true" {
+		t.Fatalf("a new collection is kept, names of another shape are not: %v %v", ok, rej)
+	}
+	_, _, recs := s.Since(0)
+	if len(recs) != 1 || recs[0].C != "observations" {
+		t.Fatalf("catching up carries the new collection: %v", recs)
+	}
+	s2, err := OpenStore(dir)
+	if err != nil || field(s2, "observations", "obs1", "kind") != `"stink"` {
+		t.Fatalf("kept across a restart: %v", err)
+	}
+	for i := 0; len(s.st.Records) < maxColls; i++ {
+		mustApply(t, s, chg(fmt.Sprintf("fill%04d", i), fmt.Sprintf("extra%d", i), "rec1", clock(ms, 0, "anna"), map[string]any{"a": 1}))
+	}
+	_, rej = mustApply(t, s, chg("toomany1", "onemore", "rec1", clock(ms, 0, "anna"), map[string]any{"a": 1}))
+	if len(rej) != 1 || rej[0].Reason != "invalid" || len(s.st.Records) != maxColls {
+		t.Fatalf("at most %d collections: %v", maxColls, rej)
+	}
+}
+
+// Without collections named, the checksum covers the three every app knows, so an app that does not know a newer
+// one still finds its data level with the server's; named, it covers those.
+func TestChecksumPerCollection(t *testing.T) {
+	s, _ := openTemp(t)
+	ms := now.UnixMilli()
+	mustApply(t, s, chg("sum00001", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"name": "Minka"}))
+	_, _, before, n1 := s.Checksum(nil)
+	mustApply(t, s, chg("sum00002", "observations", "obs1", clock(ms, 1, "anna"), map[string]any{"kind": "tired"}))
+	_, _, after, n2 := s.Checksum(nil)
+	_, _, base, n3 := s.Checksum([]string{"pets", "products", "servings"})
+	_, _, all, n4 := s.Checksum([]string{"pets", "products", "servings", "observations", "observations"})
+	if before != after || n1 != n2 || base != before || n3 != n1 || all == before || n4 != n1+1 {
+		t.Fatalf("checksum per collection: %v %v %v %v", n1, n2, n3, n4)
 	}
 }

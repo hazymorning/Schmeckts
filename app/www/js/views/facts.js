@@ -1,10 +1,13 @@
-/* Everything the overview's line more can say, beside the facts of the day (views/overview.js words them from what
-   glance() found): the facts about the animals, and every way of saying each kind of line. Pure data, so that a test
-   can read all of it: nothing here names a rating or a verdict, nothing is longer than two sentences.
-   A fact: {id, text, months, day}. The id stays put, so the memory of what was shown (prefs.overview) survives a
-   change to the list. months: the months it holds in, 1 to 12; without, all year. day: the day it comes on as a
-   message, „MM-DD“, or a function of the year for a date that moves. FACTS per species, GENERAL for every animal
-   beside them; „Andere“ and a mixed household take the general ones only. */
+/* Everything the overview card can say (views/overview.js words it from what glance() found): the first sentences by
+   the moment of the day, every way of saying each kind of second sentence, and the asides about the animals. Pure
+   data, so that a test can read all of it: nothing here names a rating or a verdict, nothing is longer than two
+   sentences, and an aside is at most 70 characters.
+   An aside: {id, text, when, months, day}. The id stays put, so the memory of what was shown (prefs.overview) survives
+   a change to the list. when: the moments it fits as a comment on, 'due' (feeding time), 'fresh' (just fed), 'wait'
+   (between meals), 'evening' (today's served), 'night'; without, any moment. months: the months it holds in, 1 to
+   12; without, all year. day: the day it comes on as the news of the day, „MM-DD“, or a function of the year for a
+   date that moves. FACTS per species, GENERAL for every animal beside them; „Andere“ and a mixed household take the
+   general ones only. */
 
 const mmdd = d => `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /* The last Sunday of a month (the clocks change), and the n-th Saturday (the rabbits have their day) */
@@ -29,1206 +32,934 @@ const SUMMER = [6, 7, 8],
 export const FACTS = {
   Katze: [
     {
-      id: 'katze-schmecken-1',
-      text: 'Katzen schmecken nichts Süßes, ihnen fehlt der Rezeptor dafür. Das Interesse am Kuchen gilt allein der Butter.',
-    },
-    {
-      id: 'katze-schmecken-2',
-      text: 'Katzen haben nur einige Hundert Geschmacksknospen, Menschen mehrere Tausend. Wählerisch sind sie trotzdem, aus Prinzip.',
-    },
-    {id: 'katze-riechen-1', text: 'Katzen fressen mit der Nase: Zimmerwarm riecht Futter stärker als kühlschrankkalt.'},
-    {id: 'katze-riechen-2', text: 'Mit Schnupfen fressen viele Katzen schlecht, weil sie ihr Futter kaum riechen.'},
-    {
-      id: 'katze-mahlzeiten-1',
-      text: 'Frei lebende Katzen fressen bis zu 20 kleine Mahlzeiten am Tag. Deine hat also recht, wenn sie um 15 Uhr schon wieder fragt.',
-    },
-    {id: 'katze-wasser-1', text: 'Viele Katzen trinken lieber, wenn das Wasser nicht direkt neben dem Futter steht.'},
-    {
-      id: 'katze-schlaf-1',
-      text: 'Katzen verschlafen 12 bis 16 Stunden am Tag. Den Rest der Zeit denken sie vermutlich ans Essen.',
-    },
-    {
-      id: 'katze-sehen-1',
-      text: 'Was direkt vor ihrer Nase liegt, sehen Katzen unscharf. Die Schnurrhaare tasten das Futter ab.',
-    },
-    {
-      id: 'katze-sehen-2',
-      text: 'Im Dunkeln sehen Katzen viel besser als wir, aber nicht in völliger Finsternis. Ein bisschen Restlicht brauchen auch sie.',
-    },
-    {
-      id: 'katze-sehen-3',
-      text: 'Katzen sehen Farben, aber blasser als wir. Rot und Grün können sie kaum auseinanderhalten.',
-    },
-    {
-      id: 'katze-hoeren-1',
-      text: 'Katzen hören viel höhere Töne als Menschen, bis weit in den Ultraschall. Das Rascheln einer Maus entgeht ihnen nicht.',
-    },
-    {
-      id: 'katze-hoeren-2',
-      text: 'Katzenohren drehen sich unabhängig voneinander. Der Napf wird also auch gehört, wenn sie scheinbar schlafen.',
-    },
-    {
-      id: 'katze-schnurrhaare-1',
-      text: 'Die Schnurrhaare sind so empfindlich, dass ein enger Napf sie stören kann. Viele Katzen mögen flache Schalen lieber.',
-    },
-    {
-      id: 'katze-nase-2',
-      text: 'Katzen haben ein zweites Riechorgan im Gaumen. Das Flehmen, dieser offene Mund mit starrem Blick, gehört dazu.',
-    },
-    {
-      id: 'katze-zunge-1',
-      text: 'Die Katzenzunge ist rau wie Schmirgelpapier. Ihre kleinen Häkchen kämmen das Fell und schaben Fleisch vom Knochen.',
-    },
-    {
       id: 'katze-schlaf-2',
-      text: 'Der Katzenschlaf ist meist leicht. Beim ersten Klappern einer Dose ist die Katze hellwach.',
+      when: ['due'],
+      text: 'Katzen schlafen meist leicht, ein Dosenklappern und sie sind hellwach.',
     },
-    {
-      id: 'katze-schlaf-3',
-      text: 'Viele Katzen dösen nach dem Fressen erst mal eine Runde. Verdauen ist schließlich Arbeit.',
-    },
-    {
-      id: 'katze-nacht-1',
-      text: 'Katzen sind vor allem in der Dämmerung aktiv, morgens und abends. Das Frühstück um fünf hat also System.',
-    },
-    {
-      id: 'katze-wasser-2',
-      text: 'Katzen trinken von Natur aus wenig. Einen guten Teil ihres Wassers holen sie sich aus dem Futter.',
-    },
-    {
-      id: 'katze-wasser-3',
-      text: 'Fließendes Wasser finden viele Katzen spannender als stehendes. Ein tropfender Hahn hat schon manchen Napf geschlagen.',
-    },
-    {
-      id: 'katze-jagd-1',
-      text: 'Auch satte Katzen jagen. Der Jagdtrieb hängt nicht am Hunger, die Socke unterm Bett ist Sport.',
-    },
+    {id: 'katze-zeit-1', when: ['due'], text: 'Katzen haben ein gutes Zeitgefühl, jede Verspätung wird notiert.'},
+    {id: 'katze-laute-1', when: ['due'], text: 'Erwachsene Katzen miauen fast nur Menschen an, jetzt mit gutem Grund.'},
+    {id: 'katze-laute-3', when: ['due'], text: 'Katzen haben viele Laute, zur Futterzeit reicht meist ein einziger.'},
+    {id: 'katze-tempo-1', when: ['due'], text: 'Katzen sprinten bis zu 48 km/h, gleich wird das am Napf vorgeführt.'},
+    {id: 'katze-name-1', when: ['due'], text: 'Katzen erkennen ihren Namen, zur Futterzeit lohnt sich das Hinhören.'},
+    {id: 'katze-sehen-1', when: ['due'], text: 'Ganz nah sehen Katzen unscharf, am Napf tasten die Schnurrhaare mit.'},
+    {id: 'katze-riechen-1', when: ['due'], text: 'Katzen fressen mit der Nase, zimmerwarm duftet Futter stärker.'},
+    {id: 'katze-starren-1', when: ['due'], text: 'Der starre Blick zum Napf ist die höflichste Form der Erinnerung.'},
+    {id: 'katze-schlaf-3', when: ['fresh'], text: 'Viele Katzen dösen nach dem Fressen erst mal, Verdauen ist Arbeit.'},
     {
       id: 'katze-jagd-2',
-      text: 'Ein paar Minuten Spiel vor dem Fressen passen zum Katzenrhythmus: erst jagen, dann fressen, dann putzen, dann schlafen.',
+      when: ['fresh'],
+      text: 'Jagen, fressen, putzen, schlafen: Katzen sind jetzt bei Schritt drei.',
     },
-    {
-      id: 'katze-spiel-1',
-      text: 'Für eine Katze ist ein Papierknäuel oft spannender als das teure Spielzeug daneben. Der Karton vom Spielzeug sowieso.',
-    },
-    {
-      id: 'katze-spring-1',
-      text: 'Eine Katze springt aus dem Stand etwa das Fünffache ihrer Körperlänge. Die Küchenzeile ist keine Hürde, nur eine Zwischenstation.',
-    },
-    {
-      id: 'katze-koerper-1',
-      text: 'Ein langsames Blinzeln ist bei Katzen ein freundliches Zeichen. Zurückblinzeln ist erlaubt.',
-    },
-    {
-      id: 'katze-koerper-2',
-      text: 'Ein hoch aufgestellter Schwanz mit leicht gebogener Spitze heißt bei Katzen meist: Hallo, schön dich zu sehen.',
-    },
-    {
-      id: 'katze-koerper-3',
-      text: 'Der Bauch nach oben heißt bei Katzen: Ich vertraue dir. Streicheln darf man dort trotzdem meist nicht.',
-    },
-    {
-      id: 'katze-koepfchen-1',
-      text: 'Reibt die Katze den Kopf an dir, markiert sie dich als ihr Eigentum. Du gehörst jetzt dazu.',
-    },
-    {
-      id: 'katze-laute-1',
-      text: 'Erwachsene Katzen miauen fast nur Menschen an. Untereinander reicht ein Blick, wir brauchen offenbar Untertitel.',
-    },
-    {
-      id: 'katze-laute-2',
-      text: 'Katzen haben ein breites Repertoire an Lauten, vom Gurren bis zum Schnattern am Fenster. Letzteres gilt den Vögeln.',
-    },
-    {
-      id: 'katze-schnurren-1',
-      text: 'Katzen schnurren nicht nur, wenn sie zufrieden sind. Manche tun es auch, um sich selbst zu beruhigen.',
-    },
-    {
-      id: 'katze-schnurren-2',
-      text: 'Das Schnurren liegt bei etwa 25 bis 150 Hertz. Für viele Menschen ist es der entspannendste Ton im Haus.',
-    },
-    {
-      id: 'katze-krallen-1',
-      text: 'Kratzen ist für Katzen Krallenpflege und Markierung zugleich. Ein Kratzbaum schont deshalb auch das Sofa.',
-    },
-    {
-      id: 'katze-krallen-2',
-      text: 'Katzen ziehen ihre Krallen ein, wenn sie sie nicht brauchen. So bleiben sie beim Laufen scharf.',
-    },
+    {id: 'katze-zunge-1', when: ['fresh'], text: 'Katzenzungen sind rau wie Sandpapier, ideal für die Wäsche danach.'},
     {
       id: 'katze-zaehne-1',
-      text: 'Katzen haben 30 Zähne. Zum Kauen sind sie kaum gemacht, sie reißen und schlucken, Tischmanieren sind was für Menschen.',
-    },
-    {
-      id: 'katze-verdauung-1',
-      text: 'Viele Katzen knabbern ab und zu Gras. Warum genau, ist nicht ganz geklärt, aber es scheint der Verdauung zu helfen.',
-    },
-    {
-      id: 'katze-milch-1',
-      text: 'Milch ist für die meisten erwachsenen Katzen nichts: Ihnen fehlt das Enzym für Milchzucker. Das Klischee stammt vom Bauernhof.',
-    },
-    {
-      id: 'katze-alter-1',
-      text: 'Ältere Katzen riechen und schmecken oft schlechter. Leicht angewärmtes Futter riecht stärker und fällt ihnen leichter.',
-    },
-    {
-      id: 'katze-alter-2',
-      text: 'Mit etwa zwölf Jahren gilt eine Katze als Senior. Viele werden deutlich älter, mit Nickerchen als Geheimrezept.',
-    },
-    {
-      id: 'katze-temperatur-1',
-      text: 'Katzen mögen es warm: Ihre Wohlfühltemperatur liegt höher als unsere. Deshalb liegt sie auf dem Laptop.',
-    },
-    {
-      id: 'katze-territorium-1',
-      text: 'Katzen fressen ungern dort, wo sie auch ihr Geschäft erledigen. Napf und Klo brauchen Abstand.',
+      when: ['fresh'],
+      text: 'Katzen kauen kaum, sie reißen und schlucken. Daher das Tempo am Napf.',
     },
     {
       id: 'katze-territorium-2',
-      text: 'Bei mehreren Katzen frisst jede lieber an ihrem eigenen Napf. Teilen ist nicht ihre Stärke, Zuschauen beim Fressen auch nicht.',
+      when: ['fresh'],
+      text: 'Katzen fressen gern ungestört, Zuschauer am Napf sind nicht gefragt.',
     },
+    {
+      id: 'katze-temperatur-1',
+      when: ['fresh'],
+      text: 'Jetzt muss ein warmes Plätzchen her, Katzen mögen es wärmer als wir.',
+    },
+    {
+      id: 'katze-wasser-4',
+      when: ['fresh'],
+      text: 'Danach ein Schluck, manche Katzen prüfen Wasser erst mit der Pfote.',
+    },
+    {
+      id: 'katze-mahlzeiten-1',
+      when: ['wait'],
+      text: 'Frei lebende Katzen fressen bis zu 20 Happen am Tag, daher das Fragen.',
+    },
+    {id: 'katze-schlaf-1', when: ['wait'], text: 'Bis dahin wird gedöst, Katzen schlafen 12 bis 16 Stunden am Tag.'},
+    {id: 'katze-fenster-1', when: ['wait'], text: 'Bis dahin läuft Katzenfernsehen am Fenster, Vögel im Vollprogramm.'},
+    {id: 'katze-jagd-1', when: ['wait'], text: 'Auch satte Katzen jagen, bis dahin muss eben die Socke herhalten.'},
+    {id: 'katze-box-1', when: ['wait'], text: 'Ein Karton hilft beim Warten, er senkt bei Katzen messbar den Stress.'},
+    {
+      id: 'katze-hoehe-1',
+      when: ['wait'],
+      text: 'Katzen mögen Höhe, vom Schrank aus wird die Küche bis dahin überwacht.',
+    },
+    {id: 'katze-nacht-1', when: ['evening'], text: 'Katzen sind in der Dämmerung am wachsten, der Abend gehört ihnen.'},
+    {
+      id: 'katze-zoomies-1',
+      when: ['evening'],
+      text: 'Abends rasen Katzen gern durch die Wohnung, die Energie muss raus.',
+    },
+    {
+      id: 'katze-kneten-1',
+      when: ['evening'],
+      text: 'Der Milchtritt auf dem Schoß heißt bei Katzen: Hier ist es gemütlich.',
+    },
+    {
+      id: 'katze-schnurren-2',
+      when: ['evening'],
+      text: 'Katzen schnurren mit 25 bis 150 Hertz, genau richtig zum Feierabend.',
+    },
+    {
+      id: 'katze-koerper-1',
+      when: ['evening'],
+      text: 'Langsames Blinzeln ist bei Katzen ein Gruß, zurückblinzeln erlaubt.',
+    },
+    {
+      id: 'katze-koerper-3',
+      when: ['evening'],
+      text: 'Bauch nach oben heißt bei Katzen Vertrauen, Streicheln bleibt riskant.',
+    },
+    {id: 'katze-sehen-2', when: ['night'], text: 'Katzen sehen nachts viel besser als wir, nur nicht im Stockdunkeln.'},
+    {
+      id: 'katze-nacht-2',
+      when: ['night'],
+      text: 'In der Morgendämmerung werden Katzen munter, frühes Wecken hat System.',
+    },
+    {
+      id: 'katze-hoeren-1',
+      when: ['night'],
+      text: 'Katzen hören bis in den Ultraschall, heute Nacht entgeht ihnen nichts.',
+    },
+    {
+      id: 'katze-hoeren-2',
+      when: ['night'],
+      text: 'Katzenohren drehen sich einzeln, eins hört auch im Schlaf noch mit.',
+    },
+    {id: 'katze-tuer-1', when: ['night'], text: 'Geschlossene Türen sind für Katzen ein Skandal, nachts erst recht.'},
     {
       id: 'katze-mahlzeiten-2',
-      text: 'Katzen mögen Routine. Eine Fütterzeit, die sich verschiebt, wird lautstark angemahnt, notfalls um fünf Uhr morgens.',
+      when: ['night'],
+      text: 'Katzen lieben Routine und mahnen sie notfalls schon vor dem Wecker an.',
     },
     {
+      id: 'katze-gang-1',
+      when: ['night'],
+      text: 'Katzen setzen die Hinterpfoten in die Spur der vorderen, fast lautlos.',
+    },
+    {id: 'katze-schmecken-1', text: 'Katzen schmecken nichts Süßes, der Blick zum Kuchen gilt der Butter.'},
+    {id: 'katze-schmecken-2', text: 'Katzen haben nur einige Hundert Geschmacksknospen, wir Tausende.'},
+    {id: 'katze-sehen-3', text: 'Katzen sehen Farben blasser als wir, Rot und Grün verschwimmen.'},
+    {id: 'katze-nase-2', text: 'Katzen riechen auch mit dem Gaumen, daher das verdutzte Gesicht.'},
+    {id: 'katze-zitrus-1', text: 'Katzen meiden Zitrusduft, die Orangenschale auf dem Tisch ist tabu.'},
+    {id: 'katze-milch-1', text: 'Erwachsene Katzen vertragen Milch oft schlecht, Klischee hin oder her.'},
+    {id: 'katze-schnurrhaare-1', text: 'Viele Katzen mögen flache Schalen, das schont die Schnurrhaare.'},
+    {id: 'katze-pfote-1', text: 'Viele Kater bevorzugen die linke Pfote, Kätzinnen eher die rechte.'},
+    {id: 'katze-korb-1', text: 'Teures Körbchen oder Papiertüte? Katzen nehmen oft die Tüte.'},
+    {id: 'katze-schulter-1', text: 'Katzen passen durch enge Lücken, ihr Schlüsselbein sitzt nur lose.'},
+    {id: 'katze-koepfchen-1', text: 'Gibt eine Katze Köpfchen, markiert sie dich mit Duft. Du gehörst dazu.'},
+    {id: 'katze-koerper-2', text: 'Ein steil aufgestellter Schwanz ist bei Katzen ein freundliches Hallo.'},
+    {id: 'katze-bad-1', text: 'Katzen folgen dir gern ins Bad, dort sitzt du endlich mal still.'},
+    {id: 'katze-tastatur-1', text: 'Katzen lieben die Tastatur: warm und mitten in deinem Blickfeld.'},
+    {id: 'katze-sonne-1', text: 'Katzen wandern mit dem Sonnenfleck durch die Wohnung, Solarbetrieb.'},
+    {id: 'katze-wasser-3', text: 'Viele Katzen trinken lieber am tropfenden Hahn als aus dem Napf.'},
+    {id: 'katze-geruch-2', text: 'Katzen erobern neue Möbel so: schnuppern, markieren, besetzen.'},
+    {id: 'katze-alter-3', text: 'Die älteste bekannte Katze wurde 38 Jahre alt, Nickerchen inklusive.'},
+    {
       id: 'katze-hitze-1',
+      when: ['wait'],
       months: SUMMER,
-      text: 'Bei Hitze fressen viele Katzen weniger und lieber abends, wenn es kühler wird. Mittags zählt vor allem der Schattenplatz.',
+      text: 'Bei Hitze fressen Katzen lieber abends, mittags zählt der Schatten.',
     },
     {
       id: 'katze-hitze-2',
       months: SUMMER,
-      text: 'Katzen schwitzen fast nur über die Pfoten. Zum Abkühlen putzen sie sich, und die Feuchtigkeit verdunstet im Fell.',
+      text: 'Katzen schwitzen fast nur an den Pfoten, zum Abkühlen putzen sie sich.',
     },
     {
       id: 'katze-heizung-1',
+      when: ['evening'],
       months: HEATING,
-      text: 'Im Winter ist der Platz an der Heizung heiß begehrt. Die trockene Luft dort lässt das Fell knistern, der Katze ist das egal.',
+      text: 'Abends ist die Heizung Katzenplatz, auch wenn das Fell dort knistert.',
     },
     {
       id: 'katze-fell-fruehling',
       months: SPRING,
-      text: 'Im Frühjahr wechselt die Katze ins Sommerfell. Bürsten hilft jetzt beiden: dem Sofa und dem Katzenmagen.',
+      text: 'Katzen wechseln jetzt ins Sommerfell, Bürsten hilft Sofa und Magen.',
     },
     {
       id: 'katze-fell-herbst',
       months: AUTUMN,
-      text: 'Im Herbst wächst das Winterfell, dichter und weicher. Die Katze wirkt dann rundlicher, als sie ist.',
+      text: 'Jetzt wächst das Winterfell, Katzen wirken dann runder, als sie sind.',
     },
     {
       id: 'katze-herbstlaub',
+      when: ['wait'],
       months: LEAVES,
-      text: 'Raschelndes Herbstlaub ist für Katzen ein Spielzeug mit Soundeffekt. Draußen wie drinnen, wenn eins hereingetragen wird.',
+      text: 'Bis dahin tut es raschelndes Laub, für Katzen ein Spielzeug mit Ton.',
     },
-    {
-      id: 'katze-gruen',
-      months: GREEN,
-      text: 'Das erste Grün im Frühling lockt auch Katzen. Frisches Gras wird jetzt gern probiert, ein Halm reicht meist.',
-    },
+    {id: 'katze-gruen', months: GREEN, text: 'Das erste Gras lockt auch Katzen, ein Halm wird jetzt gern probiert.'},
     {
       id: 'katze-silvester',
       months: DECEMBER,
-      text: 'Silvesterknaller sind für Katzenohren eine Zumutung. Ein ruhiger Raum mit offener Tür hilft mehr als gutes Zureden.',
+      text: 'Bei Silvesterknallern hilft Katzen ein ruhiger Raum mehr als Zureden.',
     },
     {
       id: 'katze-weihnachten',
       months: DECEMBER,
-      text: 'Weihnachtsbaum und Katze sind eine schwierige Kombination. Lametta und Kugeln sind in Katzenaugen Spielzeug.',
+      text: 'Für Katzen ist der Christbaum ein Kletterbaum mit Spielzeug dran.',
     },
-    {
-      id: 'katze-weltkatzentag',
-      day: '08-08',
-      text: 'Heute ist Weltkatzentag. Falls das jemand im Haus noch nicht gemerkt hat: Die Katze weiß es.',
-    },
-    {
-      id: 'katze-box-1',
-      text: 'Wenn ich reinpasse, sitze ich drin: Katzen lieben Kartons. Eine Box senkt bei ihnen messbar den Stress, auch wenn sie nur halb hineinpassen.',
-    },
-    {
-      id: 'katze-name-1',
-      text: 'Katzen kennen ihren Namen sehr wohl. Sie entscheiden nur von Fall zu Fall, ob sich eine Reaktion lohnt.',
-    },
-    {
-      id: 'katze-kneten-1',
-      text: 'Das Kneten auf deinem Bauch stammt aus der Kitten-Zeit, so wurde die Milch angeregt. Übersetzt heißt es: Hier ist es gemütlich.',
-    },
-    {
-      id: 'katze-korb-1',
-      text: 'Der teure Katzenkorb bleibt leer, die Papiertüte daneben ist belegt. Die Katze hat da ihr eigenes System.',
-    },
-    {
-      id: 'katze-bad-1',
-      text: 'Katzen begleiten dich gern ins Bad. Für sie ist das der einzige Ort, an dem du endlich mal stillsitzt.',
-    },
-    {
-      id: 'katze-zoomies-1',
-      text: 'Der abendliche Sprint durch die Wohnung hat einen Namen: Zoomies. Aufgestaute Energie, die um 23 Uhr raus muss.',
-    },
-    {
-      id: 'katze-wasser-4',
-      text: 'Viele Katzen tunken erst die Pfote ins Wasser. So finden sie die Oberfläche, denn stilles Wasser sehen sie schlecht.',
-    },
-    {
-      id: 'katze-tempo-1',
-      text: 'Eine Katze sprintet kurz bis zu 48 km/h. Für die Strecke Sofa bis Napf reicht das locker.',
-    },
-    {
-      id: 'katze-schulter-1',
-      text: 'Das Schlüsselbein der Katze hängt nur an Muskeln. Deshalb passt sie durch jede Lücke, in die der Kopf passt.',
-    },
-    {
-      id: 'katze-zeit-1',
-      text: 'Katzen haben ein gutes Zeitgefühl. Fünf Minuten zu spät mit dem Napf, und der Blick sagt: Wir müssen reden.',
-    },
-    {
-      id: 'katze-alter-3',
-      text: 'Die älteste bekannte Katze wurde 38 Jahre alt. Ihr Rezept, vermutlich: viel Schlaf und pünktliches Frühstück.',
-    },
-    {
-      id: 'katze-putzen-1',
-      text: 'Katzen verbringen etwa ein Drittel ihrer wachen Zeit mit Putzen. Der Rest geht für Fressen, Beobachten und Beschweren drauf.',
-    },
-    {
-      id: 'katze-laute-3',
-      text: 'Katzen haben rund 100 verschiedene Laute, Hunde etwa zehn. Ein Großteil davon bedeutet: Napf.',
-    },
-    {
-      id: 'katze-nase-3',
-      text: 'Der Nasenabdruck einer Katze ist so einzigartig wie ein Fingerabdruck. Zum Entsperren des Handys reicht er trotzdem nicht.',
-    },
-    {
-      id: 'katze-gang-1',
-      text: 'Katzen setzen die Hinterpfoten fast genau in die Spur der Vorderpfoten. Leiser gehen geht kaum.',
-    },
-    {
-      id: 'katze-zitrus-1',
-      text: 'Katzen mögen keine Zitrusdüfte. Die Orangenschale auf dem Tisch ist für sie eine Grenzmarkierung.',
-    },
-    {
-      id: 'katze-starren-1',
-      text: 'Wenn die Katze dich lange anstarrt, ist das kein Angriff. Meist heißt es: Du bist interessant, und wo ist das Futter?',
-    },
-    {
-      id: 'katze-schwanz-1',
-      text: 'Ein zuckender Schwanz beim Liegen heißt nicht Ärger. Die Katze denkt nach, und die Schwanzspitze denkt mit.',
-    },
-    {
-      id: 'katze-kitten-1',
-      text: 'Kitten werden mit blauen Augen geboren. Die richtige Farbe zeigt sich erst nach ein paar Wochen.',
-    },
-    {
-      id: 'katze-schlaf-4',
-      text: 'Katzen verschlafen rund zwei Drittel ihres Lebens. Eine Katze von neun Jahren war also nur drei davon wach.',
-    },
-    {
-      id: 'katze-hoehe-1',
-      text: 'Katzen mögen Höhe. Vom Schrank aus lässt sich die Wohnung besser überwachen, und niemand tritt einem auf den Schwanz.',
-    },
-    {
-      id: 'katze-sofa-1',
-      text: 'Unter dem Sofa liegt der Schatz: Bälle, Mäuse, ein Haargummi. Katzen legen dort Vorräte an, ohne es zu wollen.',
-    },
-    {
-      id: 'katze-tuer-1',
-      text: 'Eine geschlossene Tür ist für Katzen ein Skandal. Nicht weil sie hindurchwollen, sondern weil sie könnten.',
-    },
-    {
-      id: 'katze-geruch-2',
-      text: 'Ein neues Möbelstück wird zuerst beschnuppert, dann markiert, dann besetzt. In dieser Reihenfolge, ohne Ausnahme.',
-    },
-    {
-      id: 'katze-pfote-1',
-      text: 'Katzen sind oft Links- oder Rechtspfoter. Kater bevorzugen meist die linke Pfote, Kätzinnen die rechte.',
-    },
-    {
-      id: 'katze-sonne-1',
-      text: 'Katzen finden den einen Sonnenfleck auf dem Boden und wandern mit ihm durch die Wohnung. Solarbetrieb.',
-    },
-    {
-      id: 'katze-buffet-1',
-      text: 'Ein voller Napf am Morgen ist für eine Katze ein Buffet, kein Frühstück. Sie schaut den ganzen Tag immer mal vorbei.',
-    },
-    {
-      id: 'katze-fenster-1',
-      text: 'Fenstergucken ist Katzenfernsehen. Ein Vogelhaus davor ist das Abo mit Vollprogramm.',
-    },
-    {
-      id: 'katze-tastatur-1',
-      text: 'Die Tastatur ist warm, macht Geräusche und hat deine Aufmerksamkeit. Aus Katzensicht der beste Platz im Haus.',
-    },
-    {
-      id: 'katze-geschenk-1',
-      text: 'Die Maus vor der Tür ist ein Geschenk. Die Katze hält dich für einen schlechten Jäger und hilft aus.',
-    },
+    {id: 'katze-weltkatzentag', day: '08-08', text: 'Heute ist Weltkatzentag. Die Katze weiß es natürlich längst.'},
   ],
   Hund: [
+    {id: 'hund-nase-1', when: ['due'], text: 'Hunde riechen zehntausendmal feiner, der Schrank ist kein Versteck.'},
+    {id: 'hund-zeit-1', when: ['due'], text: 'Hunde brauchen keine Uhr, die Fütterzeit kennen sie trotzdem genau.'},
+    {id: 'hund-ohren-1', when: ['due'], text: 'Hunde bewegen ihre Ohren mit 18 Muskeln, jetzt alle Richtung Küche.'},
+    {id: 'hund-speichel-1', when: ['due'], text: 'Schon beim Napfklappern läuft Hunden das Wasser im Maul zusammen.'},
+    {id: 'hund-rudel-1', when: ['due'], text: 'Hunde lesen Routinen, der Griff zum Schrank sagt ihnen alles.'},
+    {id: 'hund-laute-1', when: ['due'], text: 'Hundebellen kann vieles heißen, kurz vor dem Napf meist nur eins.'},
+    {id: 'hund-koerper-1', when: ['due'], text: 'Gähnen vor dem Napf ist bei Hunden eher Anspannung als Müdigkeit.'},
+    {id: 'hund-schlaf-1', when: ['fresh'], text: 'Danach wird gedöst, Hunde schlafen 12 bis 14 Stunden am Tag.'},
+    {id: 'hund-wasser-1', when: ['fresh'], text: 'Hunde trinken mit nach hinten gerollter Zunge, daher die Pfütze.'},
+    {id: 'hund-ruhe-1', when: ['fresh'], text: 'Jetzt lieber nicht toben, große Hunde brauchen nach dem Fressen Ruhe.'},
     {
-      id: 'hund-schmecken-1',
-      text: 'Hunde haben rund 1700 Geschmacksknospen, Menschen etwa fünfmal so viele. Deshalb ist für Hunde fast alles ein Gericht.',
+      id: 'hund-magen-1',
+      when: ['fresh'],
+      text: 'Hunde kauen wenig, die Hauptarbeit macht jetzt ihr sehr saurer Magen.',
     },
+    {id: 'hund-teppich-1', when: ['fresh'], text: 'Viele Hunde nehmen danach den Teppich als Serviette.'},
+    {id: 'hund-nase-4', when: ['wait'], text: 'Für Hunde ist jeder Schnüffelstopp beim Gassi wie Zeitunglesen.'},
+    {id: 'hund-hoeren-1', when: ['wait'], text: 'Hunde hören den Postboten lange, bevor es klingelt.'},
+    {id: 'hund-koerper-2', when: ['wait'], text: 'Vorne runter, hinten hoch heißt bei Hunden: Lass uns spielen.'},
+    {id: 'hund-nase-6', when: ['wait'], text: 'Hunde riechen vermutlich die Zeit, dein Duft im Haus wird schwächer.'},
+    {id: 'hund-buddeln-1', when: ['wait'], text: 'Hunde verstecken gern Vorräte, im Zweifel mitten im Beet.'},
     {
-      id: 'hund-schmecken-2',
-      text: 'Anders als Katzen schmecken Hunde auch Süßes. Der Blick beim Kuchen ist also kein Zufall.',
-    },
-    {
-      id: 'hund-riechen-1',
-      text: 'Beim Futter zählt für Hunde vor allem, wie es riecht. Was riecht, ist gut, und was stark riecht, ist besser.',
-    },
-    {
-      id: 'hund-zeit-1',
-      text: 'Hunde kennen ihre Fütterzeiten besser als jede Uhr. Die Zeitumstellung dauert bei ihnen etwa eine Woche.',
-    },
-    {
-      id: 'hund-nase-1',
-      text: 'Eine Hundenase riecht zehntausendmal feiner als unsere. Das Leckerli in deiner Tasche ist also kein Geheimnis.',
-    },
-    {
-      id: 'hund-nase-2',
-      text: 'Hunde riechen mit jedem Nasenloch getrennt. So wissen sie, aus welcher Richtung der Braten duftet.',
-    },
-    {id: 'hund-nase-3', text: 'Die feuchte Nase hilft beim Riechen. Duftstoffe bleiben auf ihr besser hängen.'},
-    {
-      id: 'hund-nase-4',
-      text: 'Hunde lesen die Nachrichten mit der Nase. Der Spaziergang mit vielen Stopps ist Zeitunglesen.',
-    },
-    {
-      id: 'hund-nase-5',
-      text: 'Ein Hund merkt sich Menschen vor allem am Geruch. Ein neues Parfüm kann kurz für Verwirrung sorgen.',
-    },
-    {
-      id: 'hund-rute-1',
-      text: 'Wedeln heißt nicht immer Freude. Wie hoch und wie schnell die Rute geht, sagt oft mehr.',
+      id: 'hund-kreis-1',
+      when: ['evening'],
+      text: 'Vor dem Hinlegen dreht sich der Hund im Kreis, als läge da noch Gras.',
     },
     {
       id: 'hund-kauen-1',
-      text: 'Kauen beruhigt Hunde. Nach einem aufregenden Tag muss deshalb oft der Knochen dran glauben.',
+      when: ['evening'],
+      text: 'Kauen beruhigt Hunde, abends muss gern noch ein Knochen dran glauben.',
     },
     {
-      id: 'hund-regen-1',
-      text: 'Viele Hunde mögen keinen Regen, gehen aber begeistert in jede Pfütze. Logik ist nicht ihre Stärke.',
+      id: 'hund-blick-1',
+      when: ['evening'],
+      text: 'Schaut ihr euch jetzt lange an, schütten Hund und Mensch Oxytocin aus.',
     },
+    {id: 'hund-rhythmus-1', when: ['evening'], text: 'Hunde richten ihren Tag nach uns, Feierabend gilt auch für sie.'},
     {
-      id: 'hund-rudel-1',
-      text: 'Hunde sind Rudeltiere. Viele fressen entspannter, wenn jemand in der Nähe ist, am besten jemand mit einem Teller.',
+      id: 'hund-schnueffeln-1',
+      when: ['evening'],
+      text: 'Schnüffeln ist Kopfarbeit, nach langen Runden schlafen Hunde tief.',
     },
+    {id: 'hund-schlaf-2', when: ['night'], text: 'Zucken heute Nacht die Pfoten, rennt der Hund vermutlich im Traum.'},
+    {id: 'hund-traum-2', when: ['night'], text: 'Kleine Hunde träumen öfter als große, die träumen dafür länger.'},
+    {id: 'hund-schnarchen-1', when: ['night'], text: 'Auch Hunde schnarchen, solche mit kurzer Nase besonders oft.'},
+    {id: 'hund-sehen-2', when: ['night'], text: 'Im Halbdunkel sehen Hunde besser als wir, den Weg zum Napf sowieso.'},
+    {id: 'hund-schlaf-3', when: ['night'], text: 'Hunde schlafen nachts in Etappen und sind zwischendurch kurz wach.'},
+    {id: 'hund-schlaf-4', when: ['night'], text: 'Bei Kühle schlafen Hunde eingerollt, bei Wärme lang ausgestreckt.'},
+    {id: 'hund-schmecken-1', text: 'Hunde haben nur rund 1700 Geschmacksknospen, die Nase macht den Rest.'},
+    {id: 'hund-schmecken-2', text: 'Hunde schmecken Süßes, Katzen nicht, der Kuchenblick ist kein Zufall.'},
+    {id: 'hund-nase-2', text: 'Jedes Nasenloch riecht für sich, so wissen Hunde, woher es duftet.'},
+    {id: 'hund-nase-3', text: 'Die feuchte Hundenase ist Werkzeug, Duftstoffe haften daran besser.'},
+    {id: 'hund-rute-2', text: 'Wedelt die Rute nach rechts, vom Hund aus gesehen, ist er entspannt.'},
+    {id: 'hund-regen-1', text: 'Viele Hunde meiden Regen und springen trotzdem in jede Pfütze.'},
+    {id: 'hund-alter-1', text: 'Große Hunde altern schneller als kleine, Größe hat ihren Preis.'},
+    {id: 'hund-sehen-1', text: 'Ein rotes Spielzeug im Gras finden Hunde schwerer als ein blaues.'},
+    {id: 'hund-zaehne-1', text: 'Hunde haben 42 Zähne, zehn mehr als wir, und putzen keinen davon.'},
+    {id: 'hund-tragen-1', text: 'Der Schuh im Hundemaul ist selten Beute, eher ein Mitbringsel.'},
+    {id: 'hund-frisur-1', text: 'Eine neue Frisur ist Hunden egal, ein neues Parfüm fällt ihnen auf.'},
+    {id: 'hund-kopf-1', text: 'Mit schiefem Kopf hören Hunde genauer hin, vor allem beim Wort Gassi.'},
+    {id: 'hund-laecheln-1', text: 'Ein entspanntes, leicht geöffnetes Maul ist bei Hunden ein Lächeln.'},
+    {id: 'hund-welpe-1', text: 'Welpen werden taub und blind geboren, die Nase arbeitet ab Tag eins.'},
     {
-      id: 'hund-alter-1',
-      text: 'Ab wann ein Hund alt ist, hängt von seiner Größe ab. Kleine Hunde bleiben oft länger jung als große.',
-    },
-    {
-      id: 'hund-alter-2',
-      text: 'Ältere Hunde riechen und hören schlechter, und das Bett wird wichtiger. Der Napf wird trotzdem pünktlich erwartet.',
-    },
-    {
-      id: 'hund-schlaf-1',
-      text: 'Hunde schlafen 12 bis 14 Stunden am Tag, Welpen und Senioren noch mehr. Dazwischen liegt der Ernst des Lebens: Gassi und Napf.',
-    },
-    {id: 'hund-schlaf-2', text: 'Hunde träumen. Das Zucken der Pfoten im Schlaf ist meist die Jagd im Traum.'},
-    {
-      id: 'hund-hoeren-1',
-      text: 'Hunde hören viel höhere Töne als wir. Den Postboten hören sie lange, bevor es klingelt.',
-    },
-    {
-      id: 'hund-sehen-1',
-      text: 'Hunde sehen Bewegungen besser als Farben. Ein rotes Spielzeug im Gras ist für sie schwerer zu finden als ein blaues.',
-    },
-    {
-      id: 'hund-koerper-1',
-      text: 'Gähnen ist bei Hunden oft kein Zeichen von Müdigkeit, sondern von Stress oder Beschwichtigung.',
-    },
-    {
-      id: 'hund-koerper-2',
-      text: 'Die Spielverbeugung, Vorderkörper unten, Hinterteil oben, ist eine Einladung. Wer sie annimmt, hat einen Freund.',
-    },
-    {
-      id: 'hund-schwitzen-1',
-      text: 'Hunde schwitzen kaum. Sie kühlen sich über die Zunge und die Pfoten, der Rest ist Schatten und Pfütze.',
-    },
-    {
-      id: 'hund-zaehne-1',
-      text: 'Hunde haben 42 Zähne, deutlich mehr als wir. Die meisten davon sind zum Reißen da, nicht zum Mahlen.',
-    },
-    {
-      id: 'hund-wasser-1',
-      text: 'Hunde trinken schlabbernd mit der Zunge, und dabei geht viel daneben. Die Pfütze neben dem Napf ist normal.',
-    },
-    {
-      id: 'hund-laute-1',
-      text: 'Bellen ist bei Hunden ein ganzes Vokabular: Begrüßung, Warnung, Aufforderung. Der Tonfall macht den Unterschied.',
-    },
-    {
-      id: 'hund-tragen-1',
-      text: 'Hunde tragen gern etwas im Maul herum. Der Schuh ist selten Beute, eher ein Mitbringsel.',
+      id: 'hund-zeit-2',
+      when: ['due'],
+      months: [3, 10],
+      text: 'Uhren stellen sich in Sekunden um, Hunde brauchen etwa eine Woche.',
     },
     {
       id: 'hund-hitze-1',
+      when: ['wait'],
       months: SUMMER,
-      text: 'Bei Hitze fressen viele Hunde weniger und trinken mehr. Der Napf darf in den Schatten.',
-    },
-    {
-      id: 'hund-hitze-2',
-      months: SUMMER,
-      text: 'Hunde kühlen sich über die Zunge. An heißen Tagen ist Hecheln Schwerstarbeit, und der Schatten ist der beste Platz.',
+      text: 'Bei Hitze trinken Hunde mehr, der Wassernapf gehört in den Schatten.',
     },
     {
       id: 'hund-asphalt-1',
+      when: ['wait'],
       months: SUMMER,
-      text: 'Heißer Asphalt tut auch Hundepfoten weh. Der Handrücken auf dem Boden sagt, ob es zu heiß ist.',
+      text: 'Ist der Asphalt zu heiß für den Handrücken, ist er es auch für Pfoten.',
+    },
+    {
+      id: 'hund-schwitzen-1',
+      months: SUMMER,
+      text: 'Hunde schwitzen fast nur an den Pfoten, den Rest erledigt die Zunge.',
     },
     {
       id: 'hund-heizung-1',
+      when: ['evening'],
       months: HEATING,
-      text: 'Im Winter ist der Platz vor der Heizung heiß begehrt. Das Fell hält warm, aber ein wenig Luxus schadet nicht.',
+      text: 'Der Heizungsplatz ist im Winter heiß begehrt, Fell hin oder her.',
     },
     {
       id: 'hund-fell-fruehling',
       months: SPRING,
-      text: 'Im Frühjahr fliegt das Winterfell. Bürsten hilft, und der Staubsauger macht Überstunden.',
+      text: 'Im Frühjahr fliegt das Winterfell, der Staubsauger macht Überstunden.',
     },
     {
       id: 'hund-fell-herbst',
       months: AUTUMN,
-      text: 'Im Herbst wächst das Winterfell nach. Manche Hunde wirken dann doppelt so flauschig.',
+      text: 'Im Herbst wächst das Winterfell, mancher Hund wird zum Plüschtier.',
     },
     {
       id: 'hund-herbstlaub',
+      when: ['wait'],
       months: LEAVES,
-      text: 'Herbstlaub ist für Hunde ein Fest: rascheln, wühlen, schnüffeln. Und zu Hause gibt es Blätter gratis dazu.',
+      text: 'Herbstlaub ist ein Hundefest, ein paar Blätter wandern mit ins Haus.',
     },
-    {
-      id: 'hund-regen-2',
-      months: LEAVES,
-      text: 'Nasser Hund riecht nach nassem Hund. Im Herbst öfter als sonst, und das Handtuch an der Tür hat Saison.',
-    },
+    {id: 'hund-regen-2', months: LEAVES, text: 'Nasser Hund riecht nach nassem Hund, das Handtuch hat jetzt Saison.'},
     {
       id: 'hund-gruen',
+      when: ['wait'],
       months: GREEN,
-      text: 'Das erste Grün im Frühjahr wird auch von Hunden probiert. Ein paar Halme Gras gehören für viele zum Spaziergang.',
+      text: 'Das erste Gras im Frühjahr probieren auch Hunde, halmweise beim Gassi.',
     },
-    {
-      id: 'hund-silvester',
-      months: DECEMBER,
-      text: 'Silvester ist für Hundeohren laut. Ein ruhiger Raum und Gelassenheit helfen mehr als Trost.',
-    },
+    {id: 'hund-silvester', months: DECEMBER, text: 'Silvester ist für Hundeohren laut, ein ruhiger Rückzugsort hilft.'},
     {
       id: 'hund-weihnachten',
       months: DECEMBER,
-      text: 'Der Weihnachtsbaum ist für Hunde vor allem eins: ein Baum. Was Hunde mit Bäumen machen, weiß jeder.',
+      text: 'Der Weihnachtsbaum ist für Hunde vor allem ein Baum, mit allen Folgen.',
     },
-    {
-      id: 'hund-welthundetag',
-      day: '10-10',
-      text: 'Heute ist Welthundetag. Der Hund feiert das wie jeden Tag: mit vollem Einsatz.',
-    },
-    {
-      id: 'hund-kopf-1',
-      text: 'Der schiefe Kopf, wenn du sprichst, ist Konzentration. Der Hund sortiert deine Wörter nach Wichtigkeit: Futter, Gassi, Rest.',
-    },
-    {
-      id: 'hund-kreis-1',
-      text: 'Hunde drehen sich vor dem Hinlegen im Kreis. Das Niedertrampeln von Gras haben sie behalten, das Gras abgeschafft.',
-    },
-    {
-      id: 'hund-laecheln-1',
-      text: 'Hunde können lächeln. Die entspannte Schnauze mit leicht geöffnetem Maul zeigen sie vor allem Menschen.',
-    },
-    {
-      id: 'hund-buddeln-1',
-      text: 'Buddeln ist bei Hunden Programm: Vorrat verstecken, Kühle suchen oder einfach, weil das Beet gerade da war.',
-    },
-    {
-      id: 'hund-nase-6',
-      text: 'Hunde riechen die Zeit. Dein Geruch im Haus wird über den Tag schwächer, und daran merkt der Hund, wann du heimkommst.',
-    },
-    {
-      id: 'hund-schnueffeln-1',
-      text: 'Zehn Minuten Schnüffeln strengen einen Hund so an wie eine halbe Stunde Laufen. Der Spaziergang mit vielen Stopps ist Sport.',
-    },
-    {id: 'hund-ohren-1', text: 'Hundeohren bewegen 18 Muskeln. Unsere schaffen mit Mühe ein Wackeln.'},
-    {
-      id: 'hund-rute-2',
-      text: 'Wedelt die Rute eher nach rechts, ist der Hund entspannt, eher nach links, unsicher. Gesehen vom Hund aus.',
-    },
-    {
-      id: 'hund-frisur-1',
-      text: 'Hunde kennen dich am Geruch, an der Stimme und am Gang. Die neue Frisur ist ihnen egal, und das ist auch eine Form von Liebe.',
-    },
-    {
-      id: 'hund-welpe-1',
-      text: 'Welpen werden taub und blind geboren. Die Nase funktioniert vom ersten Tag an, Prioritäten eben.',
-    },
-    {
-      id: 'hund-traum-2',
-      text: 'Kleine Hunde träumen öfter als große, dafür kürzer. Das Zucken der Pfoten ist die Jagd im Traum, und die Beute entkommt nie.',
-    },
-    {
-      id: 'hund-blick-1',
-      text: 'Wenn du deinen Hund ansiehst und er zurückschaut, schütten beide Oxytocin aus. Dasselbe Hormon wie zwischen Eltern und Kind.',
-    },
+    {id: 'hund-welthundetag', day: '10-10', text: 'Heute ist Welthundetag, Hunde feiern wie immer mit vollem Einsatz.'},
   ],
   Kaninchen: [
-    {
-      id: 'kaninchen-daemmerung-1',
-      text: 'Kaninchen fressen am meisten in der Dämmerung, morgens und abends. Mittags wird gedöst, wie es sich gehört.',
-    },
-    {
-      id: 'kaninchen-heu-1',
-      text: 'Heu sollte immer da sein. Das Kauen hält die Zähne der Kaninchen kurz, und die Heuraufe ist nebenbei der beste Schlafplatz.',
-    },
-    {id: 'kaninchen-verdauung-1', text: 'Kaninchen können nicht erbrechen. Umso wichtiger ist, was im Napf landet.'},
-    {id: 'kaninchen-zaehne-1', text: 'Kaninchenzähne wachsen ein Leben lang. Nagen ist deshalb Pflicht, kein Hobby.'},
-    {
-      id: 'kaninchen-buddeln-1',
-      text: 'Kaninchen buddeln von Natur aus. Eine Kiste mit Erde oder Sand ist für sie ein Spielplatz.',
-    },
-    {
-      id: 'kaninchen-sozial-1',
-      text: 'Kaninchen sind Gruppentiere. Allein gehalten fehlt ihnen etwas, das kein Mensch ersetzen kann.',
-    },
-    {
-      id: 'kaninchen-sozial-2',
-      text: 'Wenn Kaninchen sich gegenseitig putzen, ist das Zuneigung. Beim Menschen bedeutet das Stupsen: weitermachen.',
-    },
-    {
-      id: 'kaninchen-laute-1',
-      text: 'Kaninchen sind fast stumm. Ein Klopfen mit den Hinterläufen ist Alarm, ein leises Zähneknirschen meist Wohlbehagen.',
-    },
-    {
-      id: 'kaninchen-koerper-1',
-      text: 'Ein Kaninchen, das auf der Seite liegt und die Beine streckt, fühlt sich sicher. Das ist die höchste Auszeichnung.',
-    },
-    {
-      id: 'kaninchen-binky-1',
-      text: 'Der Luftsprung mit Körperdrehung heißt Binky. Ein Kaninchen macht ihn nur, wenn es ihm richtig gut geht.',
-    },
-    {
-      id: 'kaninchen-sehen-1',
-      text: 'Kaninchen sehen fast rundum, nur direkt vor der Nase nicht. Was im Napf liegt, wird erschnuppert.',
-    },
+    {id: 'kaninchen-sehen-1', when: ['due'], text: 'Den Napf vor der Nase sehen Kaninchen kaum, sie erschnuppern ihn.'},
     {
       id: 'kaninchen-hoeren-1',
-      text: 'Kaninchenohren drehen sich unabhängig voneinander und sind ein Kühlsystem obendrein.',
+      when: ['due'],
+      text: 'Kaninchenohren drehen sich einzeln, eins ist jetzt sicher auf Empfang.',
     },
     {
-      id: 'kaninchen-verdauung-2',
-      text: 'Kaninchen fressen einen Teil ihres Kots noch einmal, den Blinddarmkot. Das ist normal und sogar wichtig.',
+      id: 'kaninchen-nase-1',
+      when: ['due'],
+      text: 'Bei Aufregung wackelt die Kaninchennase schneller, also gerade jetzt.',
+    },
+    {
+      id: 'kaninchen-zeit-1',
+      when: ['due'],
+      text: 'Kaninchen merken sich Abläufe schnell, die Futterzeit ganz besonders.',
+    },
+    {
+      id: 'kaninchen-verdauung-1',
+      when: ['fresh'],
+      text: 'Kaninchen können nicht erbrechen, was jetzt drin ist, bleibt drin.',
     },
     {
       id: 'kaninchen-trinken-1',
-      text: 'Aus einer Schale trinken Kaninchen meist mehr als aus einer Flasche. Dass sie die Schale auch umwerfen, gehört dazu.',
+      when: ['fresh'],
+      text: 'Kaninchen trinken aus Schalen mehr als aus Flaschen, Pfütze inklusive.',
     },
     {
-      id: 'kaninchen-nacht-1',
-      text: 'Kaninchen dösen tagsüber viel, oft mit offenen Augen. Wach sind sie in der Dämmerung.',
+      id: 'kaninchen-putzen-1',
+      when: ['fresh'],
+      text: 'Danach putzen Kaninchen sich wie Katzen, nasses Gesicht mit Absicht.',
     },
+    {
+      id: 'kaninchen-flop-1',
+      when: ['fresh'],
+      text: 'Kippt ein Kaninchen jetzt langsam zur Seite, ist es tiefenentspannt.',
+    },
+    {
+      id: 'kaninchen-daemmerung-1',
+      when: ['wait'],
+      text: 'Kaninchen dösen tagsüber, richtig gefuttert wird in der Dämmerung.',
+    },
+    {
+      id: 'kaninchen-zaehne-1',
+      when: ['wait'],
+      text: 'Kaninchenzähne wachsen ein Leben lang, bis dahin wird also genagt.',
+    },
+    {
+      id: 'kaninchen-buddeln-1',
+      when: ['wait'],
+      text: 'Kaninchen buddeln gern, eine Sandkiste vertreibt die Wartezeit.',
+    },
+    {id: 'kaninchen-nacht-1', when: ['wait'], text: 'Auch mit geöffneten Augen kann ein Kaninchen gerade dösen.'},
+    {
+      id: 'kaninchen-magen-1',
+      when: ['wait'],
+      text: 'Kaninchen haben einen Stopfmagen, erst Nachschub schiebt alles weiter.',
+    },
+    {
+      id: 'kaninchen-heu-1',
+      when: ['evening'],
+      text: 'Ganz zu ist die Küche bei Kaninchen nie, Heu sollte immer da sein.',
+    },
+    {
+      id: 'kaninchen-sozial-2',
+      when: ['evening'],
+      text: 'Stupst ein Kaninchen beim Streicheln, heißt das meist: weitermachen.',
+    },
+    {
+      id: 'kaninchen-laute-2',
+      when: ['evening'],
+      text: 'Leises Zähneknirschen beim Streicheln ist das Schnurren der Kaninchen.',
+    },
+    {
+      id: 'kaninchen-binky-1',
+      when: ['evening'],
+      text: 'Luftsprünge mit Drehung machen Kaninchen nur, wenn es ihnen gut geht.',
+    },
+    {
+      id: 'kaninchen-daemmerung-2',
+      when: ['evening'],
+      text: 'Abends geht es bei Kaninchen erst los, die Dämmerung ist ihre Zeit.',
+    },
+    {
+      id: 'kaninchen-laute-1',
+      when: ['night'],
+      text: 'Klopft es heute Nacht, schlägt ein Kaninchen mit dem Hinterlauf Alarm.',
+    },
+    {
+      id: 'kaninchen-verdauung-2',
+      when: ['night'],
+      text: 'Nachts fressen Kaninchen Blinddarmkot, Nachschlag aus eigener Küche.',
+    },
+    {
+      id: 'kaninchen-schlaf-1',
+      when: ['night'],
+      text: 'Kaninchen schlafen in Etappen, nachts wird zwischendurch gefuttert.',
+    },
+    {id: 'kaninchen-sozial-1', text: 'Kaninchen sind Gruppentiere, kein Mensch ersetzt ihnen ein zweites.'},
+    {id: 'kaninchen-sprung-1', text: 'Kaninchen springen bis einen Meter hoch, Gehege sind eher Vorschläge.'},
+    {id: 'kaninchen-ohren-2', text: 'Lange Ohren geben Wärme ab, für Kaninchen sind sie die Klimaanlage.'},
+    {id: 'kaninchen-heu-2', text: 'Die Heuraufe ist für Kaninchen Speisekammer und Bett zugleich.'},
+    {id: 'kaninchen-nager-1', text: 'Kaninchen sind keine Nagetiere, auch wenn sie den ganzen Tag nagen.'},
+    {id: 'kaninchen-sehen-2', text: 'Kaninchen sehen fast rundum, sogar ein Stück nach hinten.'},
     {
       id: 'kaninchen-hitze',
+      when: ['wait'],
       months: SUMMER,
-      text: 'Hitze ist für Kaninchen gefährlicher als Kälte. Ein Schattenplatz und kühle Fliesen sind im Sommer Gold wert.',
+      text: 'Hitze ist für Kaninchen gefährlicher als Kälte, kühle Fliesen helfen.',
     },
-    {
-      id: 'kaninchen-heizung',
-      months: HEATING,
-      text: 'Kaninchen halten Kälte besser aus als trockene Heizungsluft. Das Winterfell ist dichter, als man denkt.',
-    },
+    {id: 'kaninchen-heizung', months: HEATING, text: 'Kaninchen vertragen Kälte besser als trockene Heizungsluft.'},
     {
       id: 'kaninchen-fell-fruehling',
       months: SPRING,
-      text: 'Im Frühjahr wechseln Kaninchen das Fell, und zwar reichlich. Bürsten hilft, denn geschluckte Haare sind für sie ein Problem.',
+      text: 'Im Frühjahr haaren Kaninchen stark, Bürsten spart Haare im Magen.',
     },
     {
       id: 'kaninchen-fell-herbst',
       months: AUTUMN,
-      text: 'Im Herbst wächst das Winterfell. Ein Kaninchen sieht dann aus wie eine Kugel mit Ohren.',
+      text: 'Im Herbst wächst das Winterfell, Kaninchen werden zur Kugel mit Ohren.',
     },
     {
       id: 'kaninchen-gruen',
+      when: ['due'],
       months: SPRING,
-      text: 'Das erste Grün im Frühjahr ist für Kaninchen ein Festmahl. Ein paar Halme zum Anfang, damit der Bauch sich umgewöhnen kann.',
+      text: 'Frisches Grün lieber nach und nach, der Kaninchenbauch braucht Zeit.',
     },
     {
       id: 'kaninchen-herbstlaub',
+      when: ['wait'],
       months: LEAVES,
-      text: 'Herbstlaub wird von Kaninchen gern untersucht, manches Blatt auch gefressen. Buddeln macht darin doppelt Spaß.',
+      text: 'Kaninchen durchwühlen Herbstlaub gern und probieren manches Blatt.',
     },
     {
       id: 'kaninchen-silvester',
       months: DECEMBER,
-      text: 'Böller sind für Kaninchen purer Stress. Ein abgedunkelter, ruhiger Platz hilft am Silvesterabend.',
+      text: 'Böller sind für Kaninchen purer Stress, ein dunkler Platz hilft.',
     },
     {
       id: 'kaninchen-weihnachten',
       months: DECEMBER,
-      text: 'Der Weihnachtsbaum ist für Kaninchen ein Nagebaum. Tannennadeln werden gern probiert, die Kabel der Lichterkette leider auch.',
+      text: 'Kaninchen benagen den Weihnachtsbaum, leider auch die Lichterkette.',
     },
     {
       id: 'kaninchen-weltkaninchentag',
       day: year => nthSaturday(year, 9, 4),
-      text: 'Heute ist Weltkaninchentag. Ein Grashalm extra wäre angemessen.',
-    },
-    {
-      id: 'kaninchen-nase-1',
-      text: 'Kaninchen bewegen die Nase bis zu 120 Mal pro Minute. Bei Aufregung noch öfter, bei völliger Ruhe fast gar nicht.',
-    },
-    {
-      id: 'kaninchen-sprung-1',
-      text: 'Ein Kaninchen springt bis zu einem Meter hoch. Das Gehege ist für viele also eher ein Vorschlag.',
-    },
-    {
-      id: 'kaninchen-putzen-1',
-      text: 'Kaninchen putzen sich wie Katzen, mit Pfote und Zunge. Das nasse Gesicht danach ist Absicht.',
-    },
-    {
-      id: 'kaninchen-flop-1',
-      text: 'Ein Kaninchen, das langsam umkippt und liegen bleibt, ist nicht krank, sondern tiefenentspannt. Das nennt sich Flop.',
-    },
-    {
-      id: 'kaninchen-ohren-2',
-      text: 'Kaninchenohren sind so lang, weil sie Wärme abgeben. Ein Kaninchen mit warmen Ohren hat gerade viel gerannt oder ist aufgeregt.',
+      text: 'Heute ist Weltkaninchentag, ein Grashalm extra wäre angemessen.',
     },
   ],
   Vogel: [
     {
-      id: 'vogel-schmecken-1',
-      text: 'Vögel haben nur wenige Hundert Geschmacksknospen. Die Hirse wird trotzdem sorgsam nach der besten Sorte durchsucht.',
+      id: 'vogel-herz-1',
+      when: ['due'],
+      text: 'Ein Sittichherz schlägt Hunderte Male pro Minute, Warten ist zäh.',
+    },
+    {id: 'vogel-hoeren-1', when: ['due'], text: 'Vögel haben keine Ohrmuscheln, die Futtertüte hören sie trotzdem.'},
+    {id: 'vogel-sozial-2', when: ['due'], text: 'Schwarmvögel fressen gern gemeinsam, gleich sind also alle am Napf.'},
+    {id: 'vogel-kopf-1', when: ['due'], text: 'Vögel drehen den Kopf weit herum, kein Griff zur Tüte bleibt geheim.'},
+    {id: 'vogel-koerner-1', when: ['fresh'], text: 'Viele Vögel schälen jedes Korn einzeln, das dauert seine Zeit.'},
+    {id: 'vogel-schnabel-1', when: ['fresh'], text: 'Nach dem Fressen wetzen Vögel den Schnabel, Tischmanieren eben.'},
+    {id: 'vogel-magen-1', when: ['fresh'], text: 'Vögel haben keine Zähne, das Mahlen erledigt der Muskelmagen.'},
+    {
+      id: 'vogel-kropf-1',
+      when: ['fresh'],
+      text: 'Bei Sittichen landet das Futter erst mal im Kropf, als Zwischenlager.',
+    },
+    {id: 'vogel-federn-1', when: ['wait'], text: 'Bis dahin ist Gefiederpflege, das Öl dafür liefert die Bürzeldrüse.'},
+    {id: 'vogel-baden-1', when: ['wait'], text: 'Bis dahin Zeit für ein Bad, Vögel spritzen weiter als gedacht.'},
+    {
+      id: 'vogel-stoffwechsel-1',
+      when: ['wait'],
+      text: 'Kleine Vögel picken den ganzen Tag, ihr Stoffwechsel läuft schnell.',
+    },
+    {id: 'vogel-zweige-1', when: ['wait'], text: 'Sittiche benagen gern frische Zweige, das vertreibt die Wartezeit.'},
+    {
+      id: 'vogel-hitze',
+      when: ['wait'],
+      months: SUMMER,
+      text: 'Bei Hitze sperren Vögel den Schnabel auf, ein Bad kühlt jetzt ab.',
     },
     {
-      id: 'vogel-sehen-1',
-      text: 'Vögel sehen mehr Farben als wir, sogar Ultraviolett. Das bunte Gefieder ist für sie noch bunter.',
+      id: 'vogel-schlaf-3',
+      when: ['evening'],
+      text: 'Jetzt wird es ruhig, Ziervögel brauchen zehn bis zwölf Stunden Schlaf.',
     },
     {
-      id: 'vogel-koerner-1',
-      text: 'Viele Vögel schälen jedes Korn einzeln mit dem Schnabel. Die Hülsen im Napf täuschen: Er ist nicht voll, nur voller Schalen.',
+      id: 'vogel-abend-1',
+      when: ['evening'],
+      text: 'Vor dem Einschlafen plaudern Vögel noch eine Runde, wie im Schwarm.',
+    },
+    {
+      id: 'vogel-licht-winter',
+      when: ['evening'],
+      months: [11, 12, 1],
+      text: 'Jetzt im Winter gehen Vögel mit dem Licht früh schlafen.',
     },
     {
       id: 'vogel-schlaf-1',
-      text: 'Vögel schlafen auf einem Bein, um Wärme zu sparen. Das andere steckt warm im Gefieder.',
+      when: ['night'],
+      text: 'Vögel schlafen jetzt auf einem Bein, das andere steckt im Gefieder.',
     },
-    {
-      id: 'vogel-sozial-1',
-      text: 'Die meisten Ziervögel sind Schwarmtiere. Zu zweit sind sie gesprächiger und ruhiger zugleich.',
-    },
-    {
-      id: 'vogel-federn-1',
-      text: 'Federn werden täglich geputzt und eingefettet. Die Bürzeldrüse liefert das Öl dafür.',
-    },
-    {
-      id: 'vogel-hitze',
-      months: SUMMER,
-      text: 'Bei Hitze sperren Vögel den Schnabel auf und halten die Flügel leicht ab. Ein Bad hilft ihnen beim Abkühlen.',
-    },
-    {
-      id: 'vogel-heizung',
-      months: HEATING,
-      text: 'Trockene Heizungsluft macht Vögeln zu schaffen. Ein Badehaus oder ein Sprühnebel sind jetzt beliebt.',
-    },
+    {id: 'vogel-schlaf-2', when: ['night'], text: 'Vögel können mit einer Hirnhälfte schlafen, die andere hält Wache.'},
+    {id: 'vogel-nacht-1', when: ['night'], text: 'Nymphensittiche schrecken nachts leicht auf, ein Nachtlicht hilft.'},
+    {id: 'vogel-licht-1', when: ['night'], text: 'Vögel wachen mit dem ersten Licht auf, ganz ohne Wecker.'},
+    {id: 'vogel-schmecken-1', text: 'Vögel haben wenige Hundert Geschmacksknospen und sortieren trotzdem.'},
+    {id: 'vogel-sehen-1', text: 'Vögel sehen sogar Ultraviolett, das Gefieder ist für sie noch bunter.'},
+    {id: 'vogel-sprache-1', text: 'Wellensittiche lernen oft gehörte Wörter, also Vorsicht beim Fluchen.'},
+    {id: 'vogel-sozial-1', text: 'Ziervögel leben ungern allein, zu zweit wird deutlich mehr geplaudert.'},
+    {id: 'vogel-kanarien-1', text: 'Bei Kanarienvögeln singen vor allem die Männchen, und zwar ausgiebig.'},
+    {id: 'vogel-heizung', months: HEATING, text: 'Heizungsluft ist Vögeln zu trocken, ein Bad oder Sprühnebel hilft.'},
     {
       id: 'vogel-mauser',
       months: [8, 9, 10],
-      text: 'Nach dem Sommer beginnt bei vielen Vögeln die Mauser. Alte Federn fallen, neue wachsen, und der Käfigboden sieht aus wie ein Kissen.',
+      text: 'Nach dem Sommer mausern viele Vögel, der Käfigboden wird zum Kissen.',
     },
     {
       id: 'vogel-fruehling',
       months: SPRING,
-      text: 'Im Frühjahr singen Vögel am meisten. Das gilt drinnen wie draußen, ob der Nachbar es will oder nicht.',
+      text: 'Im Frühjahr singen Vögel am meisten, ob der Nachbar will oder nicht.',
     },
-    {
-      id: 'vogel-licht-winter',
-      months: [11, 12, 1],
-      text: 'Im Winter sind die Tage kurz, und Vögel richten sich nach dem Licht. Früher schlafen ist dann normal.',
-    },
+    {id: 'vogel-gruen', months: GREEN, text: 'Das erste Grün ist da, Vögel zerpflücken jetzt gern frische Kräuter.'},
+    {id: 'vogel-herbstlaub', months: LEAVES, text: 'Vögel zerlegen einen Ast mit Herbstlaub, bevor er richtig hängt.'},
     {
       id: 'vogel-silvester',
       months: DECEMBER,
-      text: 'Feuerwerk erschreckt Vögel besonders. An Silvester hilft ein abgedeckter Käfig in einem ruhigen Raum.',
-    },
-    {
-      id: 'vogel-gruen',
-      months: GREEN,
-      text: 'Das erste Grün im Frühjahr ist auch für Vögel interessant: Frische Zweige und Kräuter werden gern zerpflückt.',
-    },
-    {
-      id: 'vogel-herbstlaub',
-      months: LEAVES,
-      text: 'Ein Ast mit Herbstlaub im Käfig ist Beschäftigung pur. Zerlegt ist er schneller, als man ihn aufgehängt hat.',
-    },
-    {
-      id: 'vogel-schlaf-2',
-      text: 'Vögel schlafen mit einer Hirnhälfte, die andere passt auf. Das Auge auf der wachen Seite schaut weiter.',
-    },
-    {
-      id: 'vogel-herz-1',
-      text: 'Ein Wellensittichherz schlägt rund 300 Mal in der Minute. Aufregung gibt es bei Vögeln also im Schnellvorlauf.',
-    },
-    {
-      id: 'vogel-sprache-1',
-      text: 'Wellensittiche lernen Wörter, vor allem die, die oft und laut gesagt werden. Vorsicht beim Fluchen.',
-    },
-    {
-      id: 'vogel-baden-1',
-      text: 'Viele Vögel baden gern in einer flachen Schale. Der Spritzradius ist dabei größer, als die Schale vermuten lässt.',
-    },
-    {
-      id: 'vogel-kopf-1',
-      text: 'Vögel können den Kopf fast rundherum drehen, weil ihre Augen kaum beweglich sind. Der Blick über die Schulter ist Alltag.',
+      text: 'An Silvester hilft Vögeln ein abgedeckter Käfig in einem ruhigen Raum.',
     },
   ],
   Nager: [
     {
-      id: 'nager-zaehne-1',
-      text: 'Bei Nagern wachsen die Schneidezähne ein Leben lang nach. Das Käfiggitter wird deshalb nicht aus Bosheit angeknabbert.',
+      id: 'nager-kuehlschrank-1',
+      when: ['due'],
+      text: 'Meerschweinchen quieken schon, wenn nur der Kühlschrank aufgeht.',
+    },
+    {id: 'nager-riechen-2', when: ['due'], text: 'Nager riechen Futter, lange bevor es im Napf liegt.'},
+    {id: 'nager-uhr-1', when: ['due'], text: 'Ratten werden vor der Futterzeit unruhig, ihre innere Uhr geht genau.'},
+    {
+      id: 'nager-vitamin-1',
+      when: ['due'],
+      text: 'Meerschweinchen bilden kein Vitamin C selbst, Frisches muss also her.',
     },
     {
-      id: 'nager-nacht-1',
-      text: 'Viele Nager sind nachtaktiv. Das Laufrad um drei Uhr morgens ist keine Bosheit, sondern Programm.',
+      id: 'nager-zaehne-1',
+      when: ['fresh'],
+      text: 'Nagerzähne wachsen ein Leben lang, jedes Knabbern hält sie in Form.',
     },
     {
       id: 'nager-hamstern-1',
-      text: 'Hamsterbacken sind echte Vorratstaschen. Was jetzt im Napf fehlt, liegt oft im Schlafhaus.',
+      when: ['fresh'],
+      text: 'Hamsterbacken sind Vorratstaschen, gespeist wird später im Schlafhaus.',
     },
-    {
-      id: 'nager-riechen-1',
-      text: 'Nager unterscheiden einander am Geruch. Nach dem Käfigputz ist die Wohnung erst mal fremd, bis sie wieder nach ihnen riecht.',
-    },
-    {
-      id: 'nager-sozial-1',
-      text: 'Meerschweinchen und Ratten leben in Gruppen, Goldhamster allein. Bei Nagern ist Gesellschaft eine Frage der Art.',
-    },
-    {
-      id: 'nager-hoeren-1',
-      text: 'Nager hören Töne, die für uns zu hoch sind. Vieles, was sie einander sagen, bekommen wir gar nicht mit.',
-    },
-    {
-      id: 'nager-hitze',
-      months: SUMMER,
-      text: 'Hitze ist für Nager gefährlich, sie können kaum schwitzen. Eine kühle Fliese oder ein Tontopf im Käfig hilft.',
-    },
-    {
-      id: 'nager-heizung',
-      months: HEATING,
-      text: 'Ein Käfig direkt an der Heizung wird zu trocken und zu warm. Nager mögen es gleichmäßig temperiert.',
-    },
+    {id: 'nager-popcorn-1', when: ['fresh'], text: 'Bei Frischem springen Meerschweinchen vor Freude senkrecht hoch.'},
+    {id: 'nager-atem-1', when: ['fresh'], text: 'Ratten riechen am Atem der anderen, was es gerade gab.'},
     {
       id: 'nager-herbst-vorrat',
+      when: ['fresh'],
       months: AUTUMN,
-      text: 'Im Herbst hamstern viele Nager mehr als sonst. Der Vorrat im Schlafhaus wächst, auch ohne Winter im Haus.',
+      text: 'Im Herbst wird mehr gehamstert, der Vorrat wächst auch ohne Winter.',
+    },
+    {id: 'nager-stopfmagen-1', when: ['wait'], text: 'Mit ihrem Stopfmagen knabbern Meerschweinchen fast pausenlos.'},
+    {id: 'nager-tagschlaf-1', when: ['wait'], text: 'Hamster verschlafen den Tag, wecken sollte man sie besser nicht.'},
+    {id: 'nager-degu-1', when: ['wait'], text: 'Degus sind am Tag munter, Hamster schlafen da lieber.'},
+    {
+      id: 'nager-hitze',
+      when: ['wait'],
+      months: SUMMER,
+      text: 'Nager können kaum schwitzen, eine kühle Fliese hilft jetzt bei Hitze.',
     },
     {
-      id: 'nager-fruehling',
-      months: SPRING,
-      text: 'Im Frühjahr wechseln viele Nager das Fell. Ein bisschen mehr Flaum im Käfig ist normal.',
+      id: 'nager-abend-1',
+      when: ['evening'],
+      text: 'Für Hamster beginnt jetzt erst der Tag, die Dämmerung ist ihr Morgen.',
     },
+    {
+      id: 'nager-schlaf-1',
+      when: ['evening'],
+      text: 'Meerschweinchen dösen in kurzen Etappen, Feierabend kennen sie kaum.',
+    },
+    {
+      id: 'nager-abend-2',
+      when: ['evening'],
+      text: 'Ratten und Mäuse werden jetzt in der Dämmerung erst richtig munter.',
+    },
+    {id: 'nager-nacht-1', when: ['night'], text: 'Viele Nager sind nachtaktiv, im Käfig ist jetzt Hauptverkehrszeit.'},
+    {
+      id: 'nager-laufrad-2',
+      when: ['night'],
+      text: 'Hamster laufen nachts bis zu zehn Kilometer im Rad, Ziel unbekannt.',
+    },
+    {id: 'nager-augen-1', when: ['night'], text: 'Meerschweinchen schlafen oft, ohne die Augen zu schließen.'},
+    {id: 'nager-riechen-1', text: 'Nager erkennen viel am Geruch, frisch geputzt wirkt der Käfig fremd.'},
+    {id: 'nager-sozial-1', text: 'Meerschweinchen und Ratten brauchen Gesellschaft, Goldhamster nicht.'},
+    {id: 'nager-hoeren-1', text: 'Vieles, was Nager einander sagen, ist für unsere Ohren zu hoch.'},
+    {id: 'nager-lachen-1', text: 'Ratten lachen, wenn man sie kitzelt, nur eben im Ultraschall.'},
+    {id: 'nager-backen-2', text: 'In ihren Backen tragen Hamster bis zu einem Fünftel ihres Gewichts.'},
+    {id: 'nager-wort-1', text: 'Das Wort hamstern stammt tatsächlich vom Hamster.'},
+    {id: 'nager-chinchilla-1', text: 'Chinchillas baden in Sand, ihr dichtes Fell würde nass kaum trocknen.'},
+    {id: 'nager-heizung', months: HEATING, text: 'Direkt an der Heizung wird es Nagern jetzt zu warm und zu trocken.'},
+    {id: 'nager-fruehling', months: SPRING, text: 'Im Frühjahr wechseln viele Nager das Fell, mehr Flaum ist normal.'},
     {
       id: 'nager-silvester',
       months: DECEMBER,
-      text: 'Böller und Raketen erschrecken Nager sehr. Ein ruhiger Raum und ein Tuch über dem Käfig helfen an Silvester.',
+      text: 'An Silvester helfen Nagern ein ruhiger Raum und ein Tuch überm Käfig.',
     },
-    {
-      id: 'nager-gruen',
-      months: GREEN,
-      text: 'Das erste Grün im Frühjahr wird auch von Nagern gern probiert. Löwenzahn steht dabei hoch im Kurs.',
-    },
+    {id: 'nager-gruen', months: GREEN, text: 'Das erste Grün ist da, Nager wollen jetzt wissen, wie es schmeckt.'},
     {
       id: 'nager-herbstlaub',
       months: LEAVES,
-      text: 'Trockenes Herbstlaub im Käfig ist ein beliebtes Spiel: rascheln, wühlen, verstecken.',
+      text: 'In trockenem Herbstlaub wird gewühlt und versteckt, Nager lieben das.',
     },
     {
       id: 'nager-weihnachten',
       months: DECEMBER,
-      text: 'Der Weihnachtsbaum ist vielen Nagern egal, die herabfallenden Nadeln nicht. Sie werden gründlich untersucht.',
-    },
-    {
-      id: 'nager-popcorn-1',
-      text: 'Springende Meerschweinchen machen Popcorning: senkrecht in die Luft, aus purer Freude. Meist, wenn es Frisches gibt.',
-    },
-    {
-      id: 'nager-laufrad-2',
-      text: 'Ein Hamster läuft im Rad bis zu zehn Kilometer pro Nacht. Ankommen tut er nirgends, und das ist ihm egal.',
-    },
-    {
-      id: 'nager-kuehlschrank-1',
-      text: 'Meerschweinchen quieken, sobald der Kühlschrank aufgeht. Sie wissen genau, wo die Gurke wohnt.',
-    },
-    {
-      id: 'nager-lachen-1',
-      text: 'Ratten lachen, wenn man sie kitzelt, im Ultraschall. Zu hören ist nichts, zu sehen viel.',
-    },
-    {
-      id: 'nager-backen-2',
-      text: 'Ein Hamster trägt in den Backen bis zu einem Fünftel seines Gewichts. Bei einem Menschen wären das etwa 15 Kilo Kekse.',
+      text: 'Der Weihnachtsbaum ist Nagern egal, jede herabgefallene Nadel nicht.',
     },
   ],
 };
+
 export const GENERAL = [
-  {id: 'allg-wasser-1', text: 'Frisches Wasser gehört zu jeder Mahlzeit. Der Napf von gestern schmeckt nach gestern.'},
+  {id: 'allg-wasser-1', when: ['due'], text: 'Frisches Wasser gehört dazu, das von gestern schmeckt nach gestern.'},
+  {id: 'allg-uhr-1', when: ['due'], text: 'Wer regelmäßig füttert, hat bald Tiere, die die Uhr lesen können.'},
+  {id: 'allg-blick-1', when: ['due'], text: 'Blick zum Napf, zu dir, zum Napf: Diese Sprache versteht jeder.'},
   {
-    id: 'allg-neu-1',
-    text: 'Neues Futter am besten nach und nach unter das gewohnte mischen. Der Magen mag keine Überraschungen, der Kopf auch nicht.',
+    id: 'allg-gewohnheit-1',
+    when: ['due'],
+    text: 'Mit dem Napf in der Hand hast du bei Tieren gerade den höchsten Rang.',
   },
   {
-    id: 'allg-uhr-1',
-    text: 'Wer regelmäßig füttert, hat bald ein Tier, das die Uhr lesen kann. Zumindest zu den Fütterzeiten.',
+    id: 'allg-weihnachten',
+    when: ['due'],
+    months: DECEMBER,
+    text: 'Im Dezember gerät vieles durcheinander, die Fütterzeit bleibt.',
   },
-  {id: 'allg-napf-1', text: 'Napf und Wasserschale werden beim Putzen gern übersehen. Tiere merken es zuerst.'},
-  {id: 'allg-routine-1', text: 'Tiere lieben Routine. Gleiche Zeiten, gleicher Platz, und der Tag hat Struktur.'},
+  {id: 'allg-stille-1', when: ['fresh'], text: 'Tiere brauchen nach dem Fressen Ruhe, der Staubsauger kann warten.'},
+  {id: 'allg-putzen-1', when: ['fresh'], text: 'Nach dem Fressen wird bei vielen Tieren erst mal geputzt.'},
   {
-    id: 'allg-waage-1',
-    text: 'Ob ein Tier zu- oder abnimmt, sieht man im Alltag kaum. Eine Waage sagt es zuverlässiger als das Auge.',
+    id: 'allg-verdauen-1',
+    when: ['fresh'],
+    text: 'Mit vollem Bauch werden auch Tiere müde, das Nickerchen gehört dazu.',
   },
+  {id: 'allg-spiel-1', when: ['wait'], text: 'Bis dahin ein bisschen spielen, Bewegung gehört für Tiere zum Tag.'},
+  {id: 'allg-suchen-1', when: ['wait'], text: 'Ein paar versteckte Happen, und Tiere haben bis dahin Programm.'},
+  {id: 'allg-waage-1', when: ['wait'], text: 'Bis dahin vielleicht mal wiegen, die Waage sieht mehr als das Auge.'},
   {
-    id: 'allg-nase-1',
-    text: 'Fast alle Haustiere entscheiden mit der Nase, ob etwas fressbar ist. Der Blick in den Napf ist nur die zweite Meinung.',
-  },
-  {
-    id: 'allg-alter-1',
-    text: 'Mit dem Alter ändert sich der Geschmack, bei Tieren wie bei Menschen. Ein neuer Favorit mit zehn ist keine Seltenheit.',
-  },
-  {
-    id: 'allg-tagebuch-1',
-    text: 'Wer mitschreibt, sieht Muster, die im Alltag untergehen. Genau dafür ist dieses Tagebuch da.',
-  },
-  {
-    id: 'allg-spiel-1',
-    text: 'Ein bisschen Spiel vor dem Fressen macht bei vielen Tieren Appetit. Bewegung gehört zum Rhythmus.',
+    id: 'allg-hitze',
+    when: ['wait'],
+    months: SUMMER,
+    text: 'Bei Hitze trinken Tiere mehr, ein Wassernapf im Schatten hilft.',
   },
   {
     id: 'allg-leckerli-1',
-    text: 'Ein Leckerli ist für ein Tier vor allem Zuwendung. Kalorien hat es trotzdem, auch wenn es klein aussieht.',
+    when: ['evening'],
+    text: 'Ein Leckerli zum Feierabend ist Zuwendung, Kalorien hat es trotzdem.',
   },
+  {id: 'allg-napf-1', when: ['evening'], text: 'Zeit zum Spülen, einen ungespülten Napf riechen Tiere sofort.'},
+  {id: 'allg-daemmerung-1', when: ['evening'], text: 'Viele Tiere werden in der Dämmerung noch einmal richtig munter.'},
   {
-    id: 'allg-stille-1',
-    text: 'Viele Tiere fressen lieber in Ruhe. Ein Napf im Durchgangsverkehr wird gern erst nachts geleert.',
-  },
-  {
-    id: 'allg-hitze',
-    months: SUMMER,
-    text: 'Bei Hitze fressen viele Tiere weniger und trinken mehr. Ein zweiter Wassernapf im Schatten ist im Sommer nie verkehrt.',
-  },
-  {
-    id: 'allg-heizung',
-    months: HEATING,
-    text: 'Heizungsluft trocknet Nasen, Fell und Federn. Frisches Wasser ist im Winter genauso wichtig wie im Sommer.',
-  },
-  {
-    id: 'allg-fruehling',
-    months: SPRING,
-    text: 'Der Frühling weckt auch Haustiere: mehr Licht, mehr Bewegung, mehr Appetit.',
+    id: 'allg-tagebuch-1',
+    when: ['evening'],
+    text: 'Wer abends mitschreibt, sieht bald Muster, die im Alltag untergehen.',
   },
   {
     id: 'allg-herbst',
+    when: ['evening'],
     months: AUTUMN,
-    text: 'Im Herbst wird das Fell dichter und der Schlafplatz wichtiger. Die Kuscheldecke hat wieder Saison.',
+    text: 'Im Herbst wird der Schlafplatz wichtiger, die Kuscheldecke hat Saison.',
   },
+  {id: 'allg-traum-1', when: ['night'], text: 'Auch Tiere haben Traumschlaf, ein Zucken im Schlaf ist ganz normal.'},
+  {id: 'allg-zeit-1', when: ['night'], text: 'Tiere richten sich nach Licht und Bauch, nicht nach der Wanduhr.'},
   {
-    id: 'allg-gruen',
-    months: GREEN,
-    text: 'Das erste Grün im Frühjahr lockt fast alle Haustiere nach draußen oder ans Fenster. Frühling riecht eben anders.',
+    id: 'allg-schlaf-1',
+    when: ['night'],
+    text: 'Viele Tiere schlafen in Etappen, die Nacht am Stück ist Menschensache.',
   },
+  {id: 'allg-napf-2', text: 'Ein wackelnder Napf ist für Tiere eher Gegner als Geschirr.'},
+  {id: 'allg-napf-3', text: 'Plastiknäpfe halten Gerüche in feinen Kratzern, Keramik nicht.'},
+  {id: 'allg-nase-1', text: 'Tiere prüfen erst mit der Nase, der Blick ist nur die zweite Meinung.'},
+  {id: 'allg-routine-1', text: 'Tiere lieben Routine, gleiche Zeiten und gleicher Platz geben Halt.'},
+  {id: 'allg-neu-1', text: 'Neues Futter lieber nach und nach, Mägen mögen keine Überraschungen.'},
+  {id: 'allg-spiel-2', text: 'Neues Spielzeug wird schnell Alltag, die Verpackung nicht.'},
+  {id: 'allg-heizung', months: HEATING, text: 'Heizungsluft trocknet Nasen, Fell und Federn, frisches Wasser hilft.'},
+  {id: 'allg-fruehling', months: SPRING, text: 'Mehr Licht im Frühling macht auch Tiere munterer.'},
+  {id: 'allg-gruen', months: GREEN, text: 'Das erste Grün lockt Tiere ans Fenster, Frühling riecht eben anders.'},
   {
     id: 'allg-herbstlaub',
     months: LEAVES,
-    text: 'Raschelndes Laub gehört im Herbst zu den spannendsten Geräuschen für viele Tiere.',
+    text: 'Raschelndes Laub zählt für viele Tiere zu den spannendsten Geräuschen.',
   },
   {
     id: 'allg-silvester',
     months: DECEMBER,
-    text: 'Silvester ist für die meisten Tiere kein Fest. Ein ruhiger Raum mit offener Tür ist das beste Geschenk.',
-  },
-  {
-    id: 'allg-weihnachten',
-    months: DECEMBER,
-    text: 'Weihnachten ändert die Zeiten im Haus, und Tiere merken das. Die Fütterzeit bleibt für sie der Fixpunkt.',
+    text: 'Silvester ist für die meisten Tiere kein Fest, ein Rückzugsort hilft.',
   },
   {
     id: 'allg-zeitumstellung-fruehling',
     day: year => lastSunday(year, 3),
-    text: 'Ab heute gibt es Frühstück eine Stunde früher. Zumindest laut Uhr.',
+    text: 'Die Uhr springt vor, für Tiere gibt es Frühstück heute gefühlt früher.',
   },
   {
     id: 'allg-zeitumstellung-herbst',
     day: year => lastSunday(year, 10),
-    text: 'Ab heute gibt es Frühstück eine Stunde später. Zumindest laut Uhr, das Tier sieht das anders.',
+    text: 'Die Uhr geht zurück, der Bauch der Tiere macht das nicht mit.',
   },
   {
     id: 'allg-silvester-tag',
     day: '12-31',
-    text: 'Feuerwerk heute Abend. Ein Rückzugsort mit offener Tür hilft mehr als gutes Zureden.',
+    text: 'Heute Abend knallt es, ein Rückzugsort hilft Tieren mehr als Zureden.',
   },
-  {
-    id: 'allg-neujahr',
-    day: '01-01',
-    text: 'Frohes neues Jahr! Für das Tier beginnt es wie jedes andere: mit der Frage, wann es Frühstück gibt.',
-  },
-  {
-    id: 'allg-heiligabend',
-    day: '12-24',
-    text: 'Heiligabend. Das Tier wünscht sich vor allem, dass die Fütterzeit auch heute gilt.',
-  },
-  {
-    id: 'allg-haustiertag',
-    day: '04-11',
-    text: 'Heute ist Tag des Haustiers. Ein Extra-Streicheln ist erlaubt, ein Extra-Leckerli auch.',
-  },
-  {
-    id: 'allg-blick-1',
-    text: 'Der Blick zum Napf, dann zu dir, dann wieder zum Napf: Diese Sprache versteht jeder Mensch. Genau deshalb wird sie benutzt.',
-  },
-  {
-    id: 'allg-zeit-1',
-    text: 'Zeitumstellung gilt für Menschen. Tiere richten sich nach Licht, Bauch und Gewohnheit, nicht nach der Uhr an der Wand.',
-  },
-  {
-    id: 'allg-napf-2',
-    text: 'Tiere fressen lieber aus einem Napf, der nicht wackelt. Ein rutschender Napf ist ein Gegner, kein Geschirr.',
-  },
-  {
-    id: 'allg-napf-3',
-    text: 'Plastiknäpfe bekommen mit der Zeit winzige Kratzer, in denen sich Gerüche halten. Keramik und Edelstahl riechen nach nichts.',
-  },
-  {
-    id: 'allg-spiel-2',
-    text: 'Ein neues Spielzeug ist zwei Tage interessant. Die Verpackung dagegen: mindestens eine Woche.',
-  },
-  {
-    id: 'allg-suchen-1',
-    text: 'Wer sein Futter suchen darf, ist beschäftigt. Ein paar Brocken versteckt, und der Nachmittag hat ein Programm.',
-  },
-  {
-    id: 'allg-gewohnheit-1',
-    text: 'Tiere merken sich, wer füttert. Der Mensch mit dem Napf hat im Haus automatisch den höheren Rang, zumindest bis der Napf leer ist.',
-  },
+  {id: 'allg-neujahr', day: '01-01', text: 'Frohes neues Jahr! Tiere fragen trotzdem zuerst nach dem Frühstück.'},
+  {id: 'allg-heiligabend', day: '12-24', text: 'Heiligabend, und für Tiere zählt vor allem die gewohnte Fütterzeit.'},
+  {id: 'allg-haustiertag', day: '04-11', text: 'Tag des Haustiers: Extra-Streicheln erlaubt, Extra-Leckerli auch.'},
 ];
 
-/* The facts that hold on a day: those of the species with the general ones, for any other or a mixed household the
-   general ones alone, in their months. dated: only those bound to this very day; otherwise those without a day. */
-export function factsOn(species, date, dated = false) {
-  const list = [...(FACTS[species] || []), ...GENERAL],
+/* The facts that hold on a day, in their months. dated: only those bound to this very day, the species' and the
+   general ones; otherwise those without a day. moment: the moment an aside has to fit (`when`): at a short moment
+   (due, fresh, evening, night) only those made for it, so the aside comments on it; between meals ('wait'), the
+   longest part of the day, those for any moment as well; null: only those for any moment; left out: all of them.
+   A species takes its own and the general ones made for a moment; a mixed household or „Andere“ all the general
+   ones. */
+export function factsOn(species, date, dated = false, moment) {
+  const own = FACTS[species] || [],
+    list = [...own, ...GENERAL.filter(f => dated || !own.length || f.when)],
     month = date.getMonth() + 1,
     today = mmdd(date),
     year = date.getFullYear();
-  const on = f => (typeof f.day === 'function' ? f.day(year) : f.day);
-  return list.filter(f => (!f.months || f.months.includes(month)) && (dated ? on(f) === today : !f.day));
+  const on = f => (typeof f.day === 'function' ? f.day(year) : f.day),
+    fits = f => moment === undefined || (f.when ? f.when.includes(moment) : moment === null || moment === 'wait');
+  return list.filter(f => (!f.months || f.months.includes(month)) && (dated ? on(f) === today : !f.day && fits(f)));
 }
 
-/* Every way of saying each kind of line, as templates with {places} that views/overview.js fills in: the first
-   sentence about the last meal, the second about the next one, what is only true today (class 1), what takes turns
-   by the day (class 2), and the lead-in of the fact of the day; pick() there chooses one a day. Every kind has three
-   at least, the first one the wording of 0.14.0 where there was one. The names in a duel and a feeding run are
-   people's. A place that may open a sentence holds a capitalised word: a meal, a name, „Futterzeit“. */
-export const LINES = {
-  firstMeal: [
-    '{names} {wartet} noch auf die erste Mahlzeit im Tagebuch.',
-    'Noch steht nichts im Tagebuch. {names} {wartet} auf den ersten Eintrag.',
-    'Das Tagebuch von {names} ist noch leer. Der erste Napf macht den Anfang.',
+/* The first sentence, by the moment of the day (momentOf() in views/overview.js): where the day stands for the bowl,
+   the thing that matters now first (feeding time, the next meal, everything served), then when it was last fed, by
+   whom in a household ({by}: „ von Anna“), and what only where that is the news (just served, feeding time; {for}:
+   „ für Tiger“ where it was for some of the pets shown only). The diary on the same page names every meal, so the
+   variety's name, the longest part, is left to it otherwise. Two lines at 360px hold about 56 characters, so it stays
+   under that with a usual name; pick() chooses one a day. */
+export const LEADS = {
+  none: [
+    '{names} {wartet} auf den ersten Eintrag im Tagebuch.',
+    'Noch steht nichts im Tagebuch, {names} {wartet}.',
+    'Das Tagebuch von {names} beginnt mit dem ersten Napf.',
   ],
   due: [
-    'Futterzeit! Zuletzt gab es {when} {what}{by}.',
-    'Es ist so weit: Futterzeit. Zuletzt gab es {when} {what}{by}.',
-    'Die Uhr sagt Futterzeit. Das letzte Mal gab es {when} {what}{by}.',
-    'Zeit für den Napf. Zuletzt gab es {when} {what}{by}.',
+    'Futterzeit! Zuletzt gab’s {what} um {at}{by}.',
+    'Zeit fürs {meal}, zuletzt gefüttert um {at}{by}.',
+    'Futterzeit, zuletzt gab’s um {at} {what}{by}.',
   ],
-  freshHouse: [
-    '{server} hat {names} {when} {what} {verb}.',
-    'Napfdienst hatte {server}: {when} gab es {what} für {names}.',
-    '{server} war {when} dran und hat {names} {what} {verb}.',
+  dueFirst: [
+    'Futterzeit! Heute gab’s noch nichts.',
+    'Zeit fürs {meal}, heute gab’s noch nichts.',
+    'Futterzeit, heute ist noch nichts serviert.',
   ],
-  fresh: [
-    '{names} {hat} {when} {what} {verb}.',
-    'Frisch serviert: {when} gab es {what} für {names}.',
-    'Für {names} gab es {when} {what}.',
+  fresh: ['{Ago} gab’s {what}{for}{by}.', '{what} gab’s {ago}{for}{by}.', 'Frisch serviert: {what}{for}{by}, {ago}.'],
+  freshTreat: [
+    '{Ago} gab’s {what} zum Naschen{for}{by}.',
+    '{what} zum Naschen gab’s {ago}{for}{by}.',
+    'Naschzeit: {what}{for}{by}, {ago}.',
   ],
-  todayOne: [
-    'Heute gab es um {at} {what}{by}.',
-    'Heute erst einmal serviert, um {at}: {what}{by}.',
-    'Um {at} gab es heute {what}{by}, seitdem nichts mehr.',
+  later: [
+    '{meal} gegen {time}, zuletzt gefüttert um {at}{by}.',
+    'Zuletzt um {at} gefüttert{by}, {meal} gegen {time}.',
+    'Pause bis zum {meal} gegen {time}, zuletzt um {at}{by}.',
+  ],
+  morning: [
+    'Heute noch nichts, {meal} gibt’s gegen {time}.',
+    'Noch nichts im Napf heute, {meal} gegen {time}.',
+    'Der Napf hat heute noch frei, {meal} gegen {time}.',
+  ],
+  done: [
+    'Für heute alles serviert, zuletzt um {at}{by}.',
+    'Feierabend am Napf, zuletzt gefüttert um {at}{by}.',
+    'Alles serviert für heute, {meal} morgen gegen {time}.',
+  ],
+  night: [
+    'Nachtruhe, {meal} gibt’s gegen {time}.',
+    'Schlafenszeit, der Napf öffnet gegen {time}.',
+    'Bis zum {meal} gegen {time} wird geschlafen.',
   ],
   today: [
-    'Heute gab es {so} {both}, zuletzt um {at} {what}{by}.',
-    'Der Tag hat {so} {both} gebracht, zuletzt um {at} {what}{by}.',
-    '{names} {hat} heute {so} {both} bekommen, zuletzt um {at} {what}{by}.',
+    'Heute gab’s {so} {both}, zuletzt um {at}{by}.',
+    'Zuletzt um {at} gefüttert{by}, heute {so} {both}.',
+    '{Names} {hat} heute {so} {both} bekommen.',
   ],
-  nothingYet: [
-    'Heute gab es noch nichts, zuletzt gestern um {at} {what}{by}.',
-    'Der Napf wartet noch auf seinen ersten Einsatz heute. Gestern um {at} gab es {what}{by}.',
-    'Heute steht noch nichts im Tagebuch. Zuletzt gab es gestern um {at} {what}{by}.',
+  yesterday: [
+    'Heute noch nichts, zuletzt gestern um {at}{by}.',
+    'Heute steht noch nichts im Tagebuch, zuletzt gestern.',
+    'Der Napf hat heute noch frei, zuletzt gestern um {at}.',
   ],
   lastNight: [
-    'Zuletzt gab es gestern {evening}um {at} {what}{by}.',
-    'Das letzte Futter gab es gestern {evening}um {at}: {what}{by}.',
-    'Gestern {evening}um {at} gab es zuletzt {what}{by}.',
+    'Zuletzt gab’s gestern {evening}um {at} {what}{by}.',
+    'Das letzte Futter gab’s gestern {evening}um {at}.',
+    'Gestern {evening}um {at} gab’s zuletzt {what}{by}.',
   ],
   older: [
-    'Das letzte Futter gab es {since}: {what}{by}.',
-    'Zuletzt gab es {since} {what}{by}. Seitdem steht nichts im Tagebuch.',
+    'Das letzte Futter gab’s {since}: {what}{by}.',
+    'Zuletzt gab’s {since} {what}{by}, seitdem nichts.',
     'Im Tagebuch steht zuletzt {what}{by}, {since}.',
   ],
+};
+
+/* The second sentence, every way of saying each kind, as templates with {places} that views/overview.js fills in:
+   at feeding time the pet waiting, what is only true today (class 1) and what takes turns by the day (class 2); the
+   asides about the animal are the facts above. Short, so that it follows the first sentence and does not stand beside
+   it. The names in a duel and a feeding run are people's. A place that may open a sentence holds a capitalised word:
+   a meal, a name. */
+export const LINES = {
   waiting: [
     '{names} {wartet} bestimmt schon neben dem Napf.',
     '{names} {uebt} schon mal den vorwurfsvollen Blick.',
-    '{names} {hat} die Uhr bestimmt schon im Blick.',
-    '{names} {sitzt} bestimmt schon demonstrativ vor dem Schrank.',
-    'Der Blick von {names} sagt vermutlich alles: Wo bleibt das Futter?',
-  ],
-  digest: [
-    'Jetzt ist erst mal Verdauungsschlaf dran, {meal} gibt es {when}.',
-    'Jetzt wird erst mal verdaut, {meal} gibt es {when}.',
-    'Erst mal Pause am Napf. {meal} gibt es {when}.',
-    'Bis zum {meal} {when} darf verdaut werden.',
-  ],
-  doneToday: [
-    'Für heute ist alles serviert, {meal} gibt es morgen meist {when}.',
-    'Feierabend für heute: {meal} gibt es morgen meist {when}.',
-    'Für heute ist die Küche geschlossen. {meal} gibt es morgen meist {when}.',
-    'Der Napf hat für heute Feierabend, {meal} gibt es morgen meist {when}.',
-  ],
-  night: [
-    'Bis zum {meal} {when} ist noch Schlafenszeit.',
-    'Bis zum {meal} {when} heißt es: weiterschlafen.',
-    'Nachts bleibt die Küche zu, {meal} gibt es {when}.',
-  ],
-  usual: [
-    '{meal} gibt es meist {when}.',
-    '{meal} steht meist {when} an.',
-    'Der nächste Termin am Napf: {meal}, meist {when}.',
+    '{names} {hat} die Uhr bestimmt im Blick.',
+    '{names} {sitzt} bestimmt schon vor dem Schrank.',
   ],
   birthdayAge: [
-    '{pet} hat heute Geburtstag und wird {age}. Extra-Leckerli erlaubt.',
-    'Heute wird {pet} {age}. Da darf der Napf ruhig etwas voller sein.',
-    '{age} Jahre! {pet} hat heute Geburtstag, und das Leckerli geht aufs Haus.',
+    '{pet} wird heute {age}, Extra-Leckerli erlaubt.',
+    'Heute wird {pet} {age}, der Napf darf voller sein.',
+    '{pet} hat Geburtstag und wird {age}, das Leckerli geht aufs Haus.',
   ],
   birthdayToday: [
-    '{pet} hat heute Geburtstag. Extra-Leckerli erlaubt.',
-    'Heute ist ein großer Tag: {pet} hat Geburtstag. Der Napf darf ruhig etwas voller sein.',
-    'Geburtstag! {pet} feiert heute, und das Leckerli geht aufs Haus.',
+    '{pet} hat heute Geburtstag, Extra-Leckerli erlaubt.',
+    'Heute hat {pet} Geburtstag, der Napf darf voller sein.',
+    'Geburtstag! {pet} feiert, das Leckerli geht aufs Haus.',
   ],
   birthdaySoon: [
     'In {days} hat {pet} Geburtstag.',
-    'Nur noch {days}, dann hat {pet} Geburtstag. Das Geschenk darf gern fressbar sein.',
-    '{pet} hat in {days} Geburtstag. Zeit, sich etwas Besonderes zu überlegen.',
+    'Noch {days}, dann hat {pet} Geburtstag.',
+    '{pet} hat in {days} Geburtstag, das Geschenk gern fressbar.',
   ],
   birthdayTomorrow: [
     'Morgen hat {pet} Geburtstag.',
-    'Morgen ist es so weit: {pet} hat Geburtstag. Das Leckerli liegt hoffentlich schon bereit.',
     'Noch einmal schlafen, dann hat {pet} Geburtstag.',
+    'Morgen ist {pet} Geburtstagskind.',
   ],
   premiereLast: [
-    'Das gab es heute zum ersten Mal. Mutig!',
-    'Das gab es heute zum ersten Mal. Neues Futter, neues Glück.',
-    'Eine Premiere heute: Das stand noch nie im Napf.',
-    'Heute gab es etwas ganz Neues. Das Tagebuch hat es notiert.',
+    'Das gab’s heute zum ersten Mal. Mutig!',
+    'Zum ersten Mal im Napf, neues Futter, neues Glück.',
+    'Eine Premiere, das stand noch nie im Napf.',
   ],
   premiere: [
-    'Heute zum ersten Mal im Napf: {sort}. Mutig!',
-    'Neu im Napf heute: {sort}. Schauen wir mal.',
-    'Premiere: {sort} gab es heute zum ersten Mal.',
-    'Etwas Neues im Napf: {sort}, heute zum ersten Mal.',
+    '{sort} gab’s heute zum ersten Mal. Mutig!',
+    'Neu im Napf heute: {sort}.',
+    'Premiere heute: {sort}, zum ersten Mal im Napf.',
   ],
   milestoneNext: [
-    'Das nächste Füttern ist das {m}! Fast schon ein Jubiläum.',
+    'Das nächste Füttern ist das {m}!',
     'Noch einmal füttern, dann steht das {m} Mal im Tagebuch.',
-    'Das {m} Mal steht an. Beim nächsten Füttern ist es so weit.',
+    'Beim nächsten Füttern ist das {m} Mal fällig.',
   ],
   milestone: [
-    'Noch {n} füttern bis zum {m}. Fast schon ein Jubiläum.',
-    'Nur noch {n} füttern, dann ist das {m} erreicht. Das Tagebuch zählt mit.',
-    'Bis zum {m} sind es noch {n} füttern. Das Jubiläum rückt näher.',
+    'Noch {n} bis zum {m}, fast ein Jubiläum.',
+    'Noch {n} füttern, dann ist das {m} erreicht.',
+    'Bis zum {m} fehlen noch {n}.',
   ],
   anniversary: [
-    'Vor genau {span} ging es hier los. {n} Mahlzeiten seitdem.',
-    'Heute vor {span} stand die erste Mahlzeit im Tagebuch. Seitdem sind {n} dazugekommen.',
-    'Seit genau {span} wird hier mitgeschrieben, {n} Mahlzeiten bisher.',
+    'Vor genau {span} ging’s hier los, {n} Mahlzeiten seitdem.',
+    'Seit genau {span} im Tagebuch, {n} Mahlzeiten bisher.',
+    'Heute vor {span} stand die erste Mahlzeit im Tagebuch.',
   ],
   recordStreak: [
     '{days} am Stück, so lang war die Serie noch nie.',
     'Neuer Rekord: {days} in Folge im Tagebuch.',
-    '{days} ohne Lücke, länger als je zuvor. Das nennt man Disziplin.',
+    '{days} ohne Lücke, länger als je zuvor.',
   ],
   recordDay: [
-    'Heute schon {n}, so viele gab es noch an keinem Tag.',
-    'Rekordtag: {n}, mehr als je zuvor an einem Tag.',
-    '{n} heute, ein neuer Rekord. Ob das Tier das auch so sieht?',
+    'Schon {n} heute, so viele gab’s noch nie.',
+    'Rekordtag: {n}, mehr als je zuvor.',
+    '{n} heute, ein neuer Rekord.',
   ],
   earlier: [
-    '{meal} heute {span} früher als sonst.',
-    '{meal} gab es heute {span} früher als sonst. Jemand hatte es eilig.',
-    'Heute war das {meal} {span} früher dran als gewohnt.',
+    '{meal} war heute {span} früher dran.',
+    '{meal} gab’s heute {span} früher, da hatte es wer eilig.',
+    'Heute kam das {meal} {span} früher als sonst.',
   ],
   later: [
-    '{meal} heute {span} später als sonst.',
-    '{meal} gab es heute {span} später als sonst. Der Napf hat gewartet.',
-    'Heute war das {meal} {span} später dran als gewohnt.',
+    '{meal} war heute {span} später dran.',
+    '{meal} gab’s heute {span} später, der Napf hat gewartet.',
+    'Heute kam das {meal} {span} später als sonst.',
   ],
   sameMinute: [
-    'Auf die Minute wie gestern. Wer hier wen erzogen hat, ist die Frage.',
-    'Dieselbe Uhrzeit wie gestern, auf die Minute. Die innere Uhr läuft.',
-    'Auf die Minute genau wie gestern. Zufall gibt es bei Fütterzeiten nicht.',
-    'Dieselbe Minute wie gestern. Irgendwer im Haus hat eine sehr genaue innere Uhr.',
+    'Auf die Minute wie gestern. Wer erzieht hier wen?',
+    'Dieselbe Minute wie gestern, die innere Uhr läuft.',
+    'Auf die Minute genau wie gestern, Zufall ist das nicht.',
   ],
   snacksCounted: ['Bei so vielen Snacks: {grip}', 'So viele Snacks an einem Tag: {grip}', 'Snacks über Snacks. {grip}'],
   snacks: ['Schon {n} heute: {grip}', 'Heute schon {n}. {grip}', '{n} an einem Tag: {grip}'],
   duel: [
-    'Im Fütter-Duell dieser Woche führt {first} mit {n} zu {m}. {second}, da geht noch was!',
-    'Fütter-Duell der Woche: {first} liegt mit {n} zu {m} vorn. {second}, Zeit aufzuholen.',
-    '{first} führt das Fütter-Duell dieser Woche mit {n} zu {m} an. {second}, das Sofa hält dich nicht fest.',
+    'Fütter-Duell der Woche: {first} führt {n} zu {m}.',
+    '{first} liegt im Fütter-Duell vorn, {n} zu {m}. {second}, da geht was!',
+    'Fütter-Duell: {first} führt mit {n} zu {m}, {second} muss ran.',
   ],
   duelTie: [
-    'Fütter-Duell dieser Woche: {score} zwischen {first} und {second}. Spannend!',
-    'Gleichstand im Fütter-Duell: {score} für {first} und {second}. Die nächste Mahlzeit entscheidet.',
-    '{first} und {second} liegen im Fütter-Duell dieser Woche gleichauf, {score}. Es bleibt spannend.',
+    'Fütter-Duell der Woche: {score}, Gleichstand.',
+    'Gleichstand im Fütter-Duell, {score} für {first} und {second}.',
+    '{first} und {second} liegen im Fütter-Duell gleichauf, {score}.',
   ],
   streak: [
-    'Seit {since} lückenlos eingetragen. Dafür {you} ein Leckerli verdient.',
-    'Seit {since} kein Tag ohne Eintrag. Das Tagebuch ist beeindruckt.',
-    '{days} in Folge, jeden Tag ein Eintrag. Das nennt man Routine.',
+    'Seit {since} lückenlos im Tagebuch.',
+    '{days} in Folge eingetragen, das nennt man Routine.',
+    'Seit {since} kein Tag ohne Eintrag.',
   ],
   idea: [
-    'Wie wär’s mal wieder mit {sort}? Das gab es seit {days} Tagen nicht.',
-    '{sort} war zuletzt vor {days} Tagen dran. Vielleicht mal wieder?',
-    'Kleine Erinnerung: {sort} gab es seit {days} Tagen nicht mehr.',
-    '{sort} steht seit {days} Tagen im Regal und wartet. Nur so eine Idee.',
+    'Mal wieder {sort}? Das gab’s seit {days} Tagen nicht.',
+    '{sort} war zuletzt vor {days} Tagen dran.',
+    'Lange nicht mehr im Napf: {sort}, seit {days} Tagen.',
   ],
   feedRun: [
-    '{name} hat {days} in Folge gefüttert. {other}, das Sofa vermisst dich nicht.',
-    '{days} am Stück hat {name} gefüttert. {other}, du bist dran.',
-    '{name} füttert seit {since} ohne Pause. {other}, das Tier kennt dich noch, oder?',
+    '{name} füttert seit {since} am Stück, {other} darf auch mal.',
+    '{days} in Folge hat {name} gefüttert. {other}, du bist dran.',
+    '{name} hat {days} in Folge gefüttert, {other} sieht zu.',
   ],
   feedRunAlone: [
-    '{name} hat {days} in Folge gefüttert. Das nennt man Einsatz.',
-    '{days} am Stück hat {name} gefüttert. Der Napf hat einen Stammgast.',
-    '{name} füttert seit {since} ohne Pause. Zuverlässig wie ein Uhrwerk.',
+    '{name} füttert seit {since} ohne Pause.',
+    '{days} am Stück hat {name} gefüttert, zuverlässig wie ein Uhrwerk.',
+    '{name} hat {days} in Folge gefüttert, Einsatz!',
   ],
   weekday: [
-    '{weekday} gibt es meist {shift} {meal}, heute um {time}.',
-    '{weekday} läuft der Tag anders: {meal} gibt es meist {shift}, heute um {time}.',
-    'Am {day} ist {meal} meist {shift} dran als sonst, heute um {time}.',
+    '{weekday} gibt’s {meal} meist {shift}, heute um {time}.',
+    '{weekday} läuft der Napf anders, {meal} heute um {time}.',
+    'Am {day} ist {meal} meist {shift} dran, heute um {time}.',
   ],
   week: [
-    'Diese Woche standen schon {meals} aus {sorts} auf dem Speiseplan.',
-    '{meals} aus {sorts} diese Woche. Der Speiseplan ist gut gefüllt.',
-    'Die Woche bisher: {meals}, {sorts}. Es geht voran.',
-    'Speiseplan der Woche bisher: {meals} aus {sorts}. Kein Restaurant hat so eine Karte.',
+    'Diese Woche schon {meals} aus {sorts}.',
+    'Speiseplan der Woche: {meals} aus {sorts}.',
+    '{meals} aus {sorts} diese Woche, der Speiseplan steht.',
   ],
   lookback: [
-    'Heute vor einem Jahr gab es {sort}.',
-    'Vor genau einem Jahr stand {sort} im Napf. Erinnert sich noch jemand?',
-    'Heute vor einem Jahr: {sort}. Die Zeit vergeht, der Napf bleibt.',
-    'Kleiner Rückblick: Heute vor einem Jahr gab es {sort}.',
+    'Heute vor einem Jahr gab’s {sort}.',
+    'Vor genau einem Jahr stand {sort} im Napf.',
+    'Rückblick: Heute vor einem Jahr gab’s {sort}.',
   ],
   sorts: [
-    'Schon {n} probiert. Das Regal im Laden ist noch länger.',
-    '{n} stehen bisher im Tagebuch. Für einen Feinschmecker ist das erst der Anfang.',
-    'Bis jetzt {n} probiert. Das Sortiment ist damit nicht erschöpft.',
-    '{n} im Tagebuch. Manche Menschen probieren in einem Jahr weniger Gerichte.',
+    'Schon {n} probiert, das Regal ist noch länger.',
+    '{n} im Tagebuch, für Feinschmecker ein Anfang.',
+    'Bis jetzt {n} probiert.',
   ],
-  days: [
-    'Seit {since} im Tagebuch.',
-    'Seit {since} wird hier mitgeschrieben. Aus Einträgen werden Muster.',
-    '{days} Tagebuch, und es geht weiter. Jeder Eintrag zählt.',
-    'Tag {n} im Tagebuch. Das Tier hat davon nichts gemerkt, du schon.',
-  ],
-  factLead: ['Übrigens: {fact}', 'Wusstest du? {fact}', 'Nebenbei: {fact}', '{fact}'],
+  days: ['Seit {since} im Tagebuch.', 'Tag {n} im Tagebuch.', '{days} Tagebuch, und es geht weiter.'],
 };
 /* A template with its places filled: „{pet}“ becomes what is given for pet, already escaped and set in bold by
    the caller */

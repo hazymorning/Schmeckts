@@ -17,6 +17,7 @@ import {
   state,
 } from './store.js';
 import {report} from './report.js';
+import {BASE, COLLECTIONS} from './fields.js';
 
 const MAX_CHANGES = 500,
   MAX_BYTES = 8e6; // the server accepts at most 500 changes and 12 MB per request
@@ -24,6 +25,13 @@ const CHECK_EVERY = 5 * 60e3,
   INFO_EVERY = 10 * 60e3;
 
 export const isConnected = () => !!prefs.code;
+/* The collections the server holds: all of ours where it takes any (features "collections", from 1.5.0), otherwise
+   the three every server knows. A change to another one waits in the queue, kept and saved, until the server can take
+   it: an older server would reject it and the change would be lost. The checksum covers the same collections. */
+const serverColls = () => (status.features?.includes('collections') ? COLLECTIONS : BASE);
+const sendable = x => serverColls().includes(x.c);
+export const pending = () => queue.filter(sendable); // what goes out with the next sync
+export const held = () => queue.filter(x => !sendable(x)); // what waits for a newer server
 
 /* State for the interface. state: off (no server), wait (no contact yet), ok, offline, error.
    The server reports recognition and features (such as "barcode") in /api/info; null while unknown. */
@@ -90,7 +98,7 @@ async function cycle() {
     if (Date.now() - infoAt > INFO_EVERY) await checkInfo();
     await push();
     await pull();
-    if (queue.length) await push();
+    if (pending().length) await push();
     await verify();
     failures = 0;
     setStatus({state: 'ok', kind: '', message: '', lastOk: Date.now()});
@@ -152,7 +160,7 @@ function protocolProblem(serverInfo) {
 function batch(limit) {
   const out = [];
   let bytes = 20;
-  for (const x of queue) {
+  for (const x of pending()) {
     const size = new Blob([JSON.stringify(x)]).size + 1;
     if (out.length && (out.length >= limit || bytes + size > MAX_BYTES)) break;
     out.push(x);
@@ -163,7 +171,7 @@ function batch(limit) {
 async function push() {
   let limit = MAX_CHANGES,
     clockRounds = 0;
-  while (queue.length) {
+  while (pending().length) {
     const changes = batch(limit);
     let res;
     try {
@@ -213,15 +221,16 @@ async function pull() {
 
 /* Self-check */
 async function verify() {
-  if (queue.length || Date.now() - checkedAt < CHECK_EVERY) return;
-  const res = await request('GET', '/api/checksum');
+  if (pending().length || Date.now() - checkedAt < CHECK_EVERY) return;
+  const colls = serverColls(),
+    res = await request('GET', '/api/checksum?c=' + colls.join(','));
   checkedAt = Date.now();
   if (res.epoch !== state.epoch || res.seq !== state.seq) {
     again = true;
     return;
   } // something new meanwhile: catch up first
-  const mine = await checksum();
-  if (queue.length) return;
+  const mine = await checksum(colls);
+  if (pending().length) return;
   if (mine.sum === res.sum) {
     mismatches = 0;
     return;

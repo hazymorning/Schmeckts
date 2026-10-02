@@ -3,15 +3,15 @@
 import {$} from '../dom.js';
 import {esc} from '../text.js';
 import {icon} from '../icons.js';
-import {dlg} from './sheet.js';
+import {topDialog} from './sheet.js';
 
 export let toastUndo = null;
 let toastTimer = null;
 export function toast(msg, undo, html = false) {
   const el = $('#toast');
-  const host = dlg.open ? dlg : document.body;
+  const host = topDialog() || document.body; // the top dialog, or it would lie under that dialog's dimming
   if (el.parentNode !== host) host.appendChild(el);
-  el.classList.toggle('in-sheet', dlg.open);
+  el.classList.toggle('in-sheet', host !== document.body);
   el.classList.toggle('plain', !undo);
   toastUndo = undo || null;
   el.innerHTML = `<span>${html ? msg : esc(msg)}</span>${undo ? `<button data-action="undo">${icon('undo')}Rückgängig</button>` : ''}`;

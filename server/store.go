@@ -36,10 +36,14 @@ const (
 	maxFutureSkew = 10 * time.Minute     // changes from the future are rejected
 	maxFieldBytes = 512 << 10
 	maxFields     = 64
+	maxColls      = 16 // collections the server keeps at most, the three below included
 )
 
 var (
-	collections  = map[string]bool{"pets": true, "products": true, "servings": true}
+	// The collections every app knows. The server takes any other the app sends as well, named like these, so a new
+	// kind of data in the app needs no new server: it keeps its fields and clocks without knowing what they mean.
+	baseColls    = []string{"pets", "products", "servings"}
+	collRe       = regexp.MustCompile(`^[a-z][A-Za-z0-9]{1,23}$`)
 	localOnly    = map[string]bool{"photo": true, "status": true, "error": true, "autoPets": true, "scanCode": true} // stay on the phone
 	changeIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 	recordIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{4,40}$`)
@@ -103,7 +107,7 @@ func newEpoch() string {
 
 func emptyState() state {
 	st := state{Epoch: newEpoch(), Records: map[string]map[string]*Record{}, Seen: map[string]int64{}}
-	for c := range collections {
+	for _, c := range baseColls {
 		st.Records[c] = map[string]*Record{}
 	}
 	return st
@@ -158,7 +162,7 @@ func readState(path string) (state, error) {
 	if st.Epoch == "" || st.Records == nil {
 		return st, errors.New("incomplete file")
 	}
-	for c := range collections {
+	for _, c := range baseColls {
 		if st.Records[c] == nil {
 			st.Records[c] = map[string]*Record{}
 		}
@@ -219,7 +223,7 @@ func validate(c Change, now time.Time) *Rejected {
 	switch {
 	case !changeIDRe.MatchString(c.ID):
 		return bad("change id")
-	case !collections[c.C]:
+	case !collRe.MatchString(c.C):
 		return bad("collection " + c.C)
 	case !recordIDRe.MatchString(c.R):
 		return bad("record id")
@@ -262,6 +266,14 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 			continue
 		}
 		recs := s.st.Records[c.C]
+		if recs == nil {
+			if len(s.st.Records) >= maxColls {
+				rejected = append(rejected, Rejected{ID: c.ID, Reason: "invalid", Detail: "too many collections"})
+				continue
+			}
+			recs = map[string]*Record{}
+			s.st.Records[c.C] = recs
+		}
 		rec := recs[c.R]
 		if rec == nil {
 			rec = &Record{F: map[string]Field{}}
@@ -314,14 +326,23 @@ func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	return s.st.Epoch, s.st.Seq, out
 }
 
-// Checksum hashes every field and its clock. The app computes it the same way:
-// SHA-256 over the sorted lines "collection/id/field@clock\n".
-func (s *Store) Checksum() (epoch string, seq int64, sum string, fields int) {
+// Checksum hashes every field and its clock in the collections named, the three every app knows without any. The app
+// computes it the same way over the collections it knows: SHA-256 over the sorted lines "collection/id/field@clock\n".
+// So an app that does not know a newer collection still finds its own data level with the server's.
+func (s *Store) Checksum(colls []string) (epoch string, seq int64, sum string, fields int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if colls == nil {
+		colls = baseColls
+	}
 	lines := []string{}
-	for c, recs := range s.st.Records {
-		for id, rec := range recs {
+	seen := map[string]bool{}
+	for _, c := range colls {
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
+		for id, rec := range s.st.Records[c] {
 			for k, f := range rec.F {
 				lines = append(lines, c+"/"+id+"/"+k+"@"+f.T+"\n")
 			}

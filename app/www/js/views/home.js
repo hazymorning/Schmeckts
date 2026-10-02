@@ -2,16 +2,16 @@
    from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {settled, slideHeight} from '../motion.js';
-import {cap, esc} from '../text.js';
+import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
-import {RATINGS} from '../config.js';
+import {observationOf, RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {getPet, getProduct, model, pendingServings, pname, servingPets} from '../derive.js';
+import {diary, getPet, getProduct, model, observedPets, pendingServings, pname, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
-import {dlg} from '../ui/sheet.js';
+import {anyOpen} from '../ui/sheet.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {
   avatar,
@@ -31,7 +31,7 @@ import {
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
-import {overviewHTML} from './overview.js';
+import {observeChips, overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
 
 /* Redraw the home page, with a smooth view transition where possible */
@@ -42,7 +42,7 @@ export function update() {
     done = true;
     renderHome();
   };
-  if (!document.startViewTransition || reduceMotion.matches || dlg.open || viewerOpen()) return run();
+  if (!document.startViewTransition || reduceMotion.matches || anyOpen() || viewerOpen()) return run();
   try {
     const t = document.startViewTransition(run);
     setTimeout(() => {
@@ -67,7 +67,8 @@ export function scrollTop() {
 // fresh: id of the meal just served, which slides in on the next draw
 // open: the overview unfolded, which lasts until the app restarts
 // held: meals rated in „Wie war’s?“ that stay there a moment longer (logic/editing.js), each with the pets rated there
-export const homeView = {fresh: null, open: {}, held: new Map()};
+// observing: the overview's chips for an observation folded open
+export const homeView = {fresh: null, open: {}, held: new Map(), observing: false};
 
 /* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
    settings. */
@@ -129,13 +130,28 @@ export function renderHome() {
    height eases as the other cards' folds do */
 export function toggleOverview() {
   const sec = $('#home .overview'),
+    top = sec && $('.ov-top', sec),
     p = sec && $('p', sec);
   if (!p) return;
   const open = (homeView.open.overview = !homeView.open.overview),
     h0 = p.offsetHeight;
   sec.classList.toggle('open', open);
-  sec.setAttribute('aria-expanded', String(open));
+  top.setAttribute('aria-expanded', String(open));
   slideHeight(p, h0);
+}
+/* „Beobachtung notieren“: the chips fold open in the card above the button, which then says „Abbrechen“, and shut
+   again; only that part is swapped and eases to its height, as a fold on a page does (foldPart() in views/sheets.js) */
+export function toggleObserve() {
+  const sec = $('#home .overview'),
+    body = sec && $('#fold-observe', sec),
+    btn = sec && $('[data-action=observe-open]', sec);
+  if (!body || !btn) return;
+  const open = (homeView.observing = !homeView.observing),
+    h0 = body.offsetHeight;
+  body.innerHTML = open ? observeChips() : '';
+  btn.textContent = open ? 'Abbrechen' : 'Beobachtung notieren';
+  btn.setAttribute('aria-expanded', String(open));
+  slideHeight(body, h0);
 }
 function homeHTML() {
   const banner = loadError
@@ -147,7 +163,7 @@ function homeHTML() {
   const open = new Set(pendingServings()),
     pend = db.servings.filter(s => open.has(s) || (homeView.held.has(s.id) && rateRows(s).length)),
     m = db.servings.length ? model() : null;
-  let html = banner + (m ? overviewHTML(m, homeView.open.overview) : '');
+  let html = banner + (m ? overviewHTML(m, homeView.open.overview, homeView.observing) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
   else
@@ -229,7 +245,8 @@ function hintHTML(m) {
   if (h.kind === 'appetit') {
     [say, why, btns] = [
       `${esc(pet.name)} frisst seit ein paar Tagen schlechter als sonst.`,
-      `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.`,
+      `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
+        (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => lower(observationOf(k).label)))}.` : ''),
       hide,
     ];
   } else if (h.kind === 'sosse') {
@@ -265,23 +282,30 @@ function shopHTML(m) {
     <button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button></section>`;
 }
 
-/* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while
-   nothing has been served today, each day whole. One pass over the calendar's two weeks, newest first, which stops
-   at its first day, so years of data cost nothing. The button leads to „Verlauf“, where the whole history is. */
+/* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals and observations, or
+   yesterday's while nothing has been served or noted today, each day whole. One pass over the calendar's two weeks,
+   newest first, which stops at its first day, so years of data cost nothing. The button leads to „Verlauf“, where the
+   whole history is. */
 function historyHTML() {
   const now = Date.now(),
     since = addDays(weekStart(now), -7), // the calendar's first day, always before yesterday
     today = dayKey(now),
     yesterday = dayKey(addDays(now, -1)),
     recent = [],
-    days = {[today]: [], [yesterday]: []};
+    days = {[today]: [], [yesterday]: []},
+    seen = {[today]: [], [yesterday]: []};
   for (const s of db.servings) {
     if (s.servedAt < since) break;
     if (!servingPets(s).length) continue;
     recent.push(s);
     days[dayKey(s.servedAt)]?.push(s);
   }
-  const shown = days[today].length ? days[today] : days[yesterday],
+  for (const o of db.observations) {
+    if (o.at < since) break;
+    if (observedPets(o).length) seen[dayKey(o.at)]?.push(o);
+  }
+  const day = days[today].length || seen[today].length ? today : yesterday,
+    shown = diary(days[day], seen[day]),
     multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
   return (
     calendarHTML(recent) +

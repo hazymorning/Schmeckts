@@ -1,6 +1,6 @@
 /* Evaluation: analyze() returns the model everything that evaluates reads from. Pure functions; caching happens in
    derive.js. The rules are in PROJECT.md, section "Evaluation". */
-import {flavoursOf, guessTexture, RATINGS, textureOf, TYPES, typeOf} from './config.js';
+import {flavoursOf, guessTexture, OBSERVATIONS, RATINGS, textureOf, TYPES, typeOf} from './config.js';
 import {addDays, dayKey, dayStart} from './dates.js';
 
 const DAY = 864e5;
@@ -384,6 +384,14 @@ function appetite(db, petIds, now) {
         usual,
         day: dayKey(Math.max(...win.map(x => x.t))),
         order: recent - usual,
+        // what was noted about the pet in the same hours, which the hint names beside the ratings
+        seen: [
+          ...new Set(
+            notesOf(db)
+              .filter(o => o.at > cut && o.at <= now && o.pets?.[pid])
+              .map(o => o.kind),
+          ),
+        ],
       });
   }
   return out;
@@ -826,4 +834,98 @@ export function milestones(db) {
     ...count,
     reached: Object.entries(MILESTONES).flatMap(([k, steps]) => steps.filter(n => count[k] >= n).map(n => `${k}:${n}`)),
   };
+}
+
+/* Observations beside the ratings (OBSERVATIONS in config.js): they never change a rating, a verdict or a place, and
+   nothing here is said beyond what they carry. An observation concerns the pets it names, several meaning one of them
+   or all; one of a kind about meals comes after a meal where one of those pets was served it within the kind's hours
+   before. */
+const OBSERVED = {recent: 28 * DAY, before: 56 * DAY, span: 180 * DAY, meals: 4, hits: 2, gap: 30, z: 2, shown: 3};
+const HOUR = 36e5;
+const concerns = (o, pets) => Object.keys(o.pets || {}).some(pid => pets.includes(pid));
+const notesOf = db => db.observations || []; // data from before observations has none
+
+/* The meals an observation may be about: those of its pets within its kind's hours before it, newest first, and none
+   for a kind about the day */
+export function mealsBefore(db, o) {
+  const kind = OBSERVATIONS[o.kind];
+  if (kind?.about !== 'meal') return [];
+  const from = o.at - kind.within * HOUR,
+    pets = Object.keys(o.pets || {});
+  return db.servings.filter(
+    s => s.servedAt <= o.at && s.servedAt >= from && s.productId && pets.some(pid => s.pets?.[pid]),
+  );
+}
+
+/* For one kind about meals: per variety its meals for these pets within OBSERVED.span whose hours are over, and how
+   many of them that kind followed. Map id → {n, hit}. only: a single variety. */
+function followed(db, pets, now, kind, only = null) {
+  const win = OBSERVATIONS[kind].within * HOUR,
+    from = now - OBSERVED.span,
+    products = new Set(db.products.map(p => p.id)),
+    notes = notesOf(db).filter(o => o.kind === kind && o.at <= now && o.at > from && concerns(o, pets)),
+    out = new Map();
+  for (const s of db.servings) {
+    if (s.servedAt < from) break; // the meals are kept newest first
+    if (s.servedAt + win > now || !products.has(s.productId) || (only && s.productId !== only)) continue;
+    const mine = pets.filter(pid => s.pets?.[pid]);
+    if (!mine.length) continue;
+    const x = out.get(s.productId) || {n: 0, hit: 0};
+    x.n++;
+    if (notes.some(o => o.at > s.servedAt && o.at <= s.servedAt + win && concerns(o, mine))) x.hit++;
+    out.set(s.productId, x);
+  }
+  return out;
+}
+
+/* What was noted within the pets asked for: per kind how often in the last four weeks and in the eight before, and
+   when last ({kind, n, before, last}, the most first); and the varieties a kind about meals came after clearly more
+   often than after every other variety: from OBSERVED.meals meals of it and OBSERVED.hits followed, against as many of
+   the others at least, its share OBSERVED.gap points higher and two pooled standard errors apart, as the trend has it,
+   so a run of chance is not news ({kind, id, after: {n, hit}, other: {n, hit}}, the widest gap first, at most
+   OBSERVED.shown). Whole numbers, as variety() has it. {kinds, links} */
+export function observed(db, pets, now) {
+  const cut = now - OBSERVED.recent,
+    back = cut - OBSERVED.before,
+    per = new Map();
+  for (const o of notesOf(db)) {
+    if (o.at > now || o.at <= back || !concerns(o, pets)) continue;
+    const x = per.get(o.kind) || {kind: o.kind, n: 0, before: 0, last: 0};
+    if (o.at > cut) {
+      x.n++;
+      x.last = Math.max(x.last, o.at);
+    } else x.before++;
+    per.set(o.kind, x);
+  }
+  const kinds = [...per.values()].filter(x => x.n).sort((a, b) => b.n - a.n || b.last - a.last),
+    links = [];
+  for (const kind of Object.keys(OBSERVATIONS).filter(k => OBSERVATIONS[k].about === 'meal')) {
+    if (!notesOf(db).some(o => o.kind === kind)) continue;
+    const by = followed(db, pets, now, kind),
+      all = [...by.values()].reduce((a, x) => ({n: a.n + x.n, hit: a.hit + x.hit}), {n: 0, hit: 0});
+    for (const [id, after] of by) {
+      const other = {n: all.n - after.n, hit: all.hit - after.hit};
+      if (after.n < OBSERVED.meals || after.hit < OBSERVED.hits || other.n < OBSERVED.meals) continue;
+      const apart = 100 * (after.hit * other.n - other.hit * after.n), // in points, times both counts: exact
+        of = after.n * other.n,
+        p = all.hit / all.n,
+        se = 100 * Math.sqrt(p * (1 - p) * (1 / after.n + 1 / other.n));
+      if (apart >= OBSERVED.gap * of && apart >= OBSERVED.z * se * of)
+        links.push({kind, id, after, other, gap: apart / of});
+    }
+  }
+  links.sort((a, b) => b.gap - a.gap || b.after.n - a.after.n);
+  return {
+    kinds,
+    links: links.slice(0, OBSERVED.shown).map(x => ({kind: x.kind, id: x.id, after: x.after, other: x.other})),
+  };
+}
+
+/* For the food sheet: per kind about meals, how many of the variety's meals it followed, of how many: [{kind, n, hit}],
+   only kinds that did follow */
+export function observedAfter(db, pets, now, id) {
+  return Object.keys(OBSERVATIONS)
+    .filter(k => OBSERVATIONS[k].about === 'meal' && notesOf(db).some(o => o.kind === k))
+    .map(kind => ({kind, ...(followed(db, pets, now, kind, id).get(id) || {n: 0, hit: 0})}))
+    .filter(x => x.hit);
 }

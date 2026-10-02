@@ -143,7 +143,7 @@ func TestBarcodeInvalidAndRateLimit(t *testing.T) {
 func TestInfoAnnouncesBarcode(t *testing.T) {
 	_, out, _ := call(newTestAPI(t, ""), "GET", "/api/info", "", nil)
 	f, _ := out["features"].([]any)
-	if len(f) != 4 || f[0] != "barcode" || f[1] != "fed" || f[2] != "photo" || f[3] != "replace" {
+	if len(f) != 5 || f[0] != "barcode" || f[1] != "fed" || f[2] != "photo" || f[3] != "replace" || f[4] != "collections" {
 		t.Fatalf("features = %v", out["features"])
 	}
 }
@@ -165,11 +165,12 @@ func TestOverview(t *testing.T) {
 		chg("ueber003", "products", "prod1", clock(ms, 2, "handya"), map[string]any{"brand": "Sheba", "variety": "Lachs", "codes.4006381333931": true, "_del": false}),
 		chg("ueber004", "servings", "srv1", clock(ms, 3, "handya"), map[string]any{"productId": "prod1", "servedAt": ms, "by": "Anna",
 			"pets.pet1": map[string]any{"r": "gut", "by": "Anna"}, "pets.pet2": map[string]any{"r": nil}, "_del": false}),
-		chg("ueber005", "pets", "pet3", clock(ms, 4, "handyb"), map[string]any{"name": "Weg", "_del": true}))
+		chg("ueber005", "pets", "pet3", clock(ms, 4, "handyb"), map[string]any{"name": "Weg", "_del": true}),
+		chg("ueber006", "observations", "obs1", clock(ms, 5, "handya"), map[string]any{"kind": "tired", "at": ms, "pets.pet1": true, "_del": false}))
 	s.Backup(now)
 	out := Overview(s.st, dir, now)
 	for _, want := range []string{"Tiere         2  Minka, Tiger", "Futter        1  davon 1 mit Barcode", "Mahlzeiten    1",
-		"Sheba Lachs", "Minka: Fast leer, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
+		"observations   1  Einträge einer neueren App", "Sheba Lachs", "Minka: Fast leer, Tiger: offen", "4006381333931", "Anna (handya)", "Gerät handyb", "heute", "Letztes Backup: " + now.Format("02.01.2006")} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the overview does not contain %q:\n%s", want, out)
 		}
