@@ -1760,8 +1760,11 @@ dialog.sheet::after {
 .prod {
   --lead: var(--pic-xl);
 }
+/* the line's room above the capitals is trimmed, so the inset to the heading looks as wide as at the sides; older
+   WebViews skip it */
 .card h2 {
   text-wrap: balance;
+  text-box: trim-start cap alphabetic;
   margin: 0 0 var(--space-1);
   color: var(--ink);
 }
