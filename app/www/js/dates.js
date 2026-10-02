@@ -1,4 +1,5 @@
 const rtf = new Intl.RelativeTimeFormat('de', {numeric: 'auto', style: 'short'});
+export const DAY = 864e5;
 const pad = n => String(n).padStart(2, '0');
 export const timeStr = t => {
   const d = new Date(t);
@@ -13,7 +14,7 @@ export const dayKey = t => {
   const d = new Date(t);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
-const daysAgo = t => Math.round((dayStart(Date.now()) - dayStart(t)) / 864e5);
+const daysAgo = t => Math.round((dayStart(Date.now()) - dayStart(t)) / DAY);
 export const addDays = (t, n) => {
   const d = new Date(t);
   d.setDate(d.getDate() + n);

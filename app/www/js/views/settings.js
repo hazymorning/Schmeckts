@@ -112,7 +112,7 @@ function overview() {
         ? armBtn('wipe', 'Alle Daten im Haushalt löschen', 'Nochmal tippen: für alle im Haushalt löschen')
         : armBtn('wipe', 'Alle Daten löschen', 'Nochmal tippen: wirklich alles löschen')
     }</div>
-    <p class="hint foot">${house ? 'Die Daten werden im Haushalt geteilt.' : 'Alle Daten bleiben auf diesem Gerät.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
+    <p class="hint foot">${house ? 'Alle Daten liegen auf diesem Handy und werden im Haushalt abgeglichen.' : 'Alle Daten bleiben auf diesem Handy.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
 }
 
 const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gespeichert hat. Ein Import ersetzt die
@@ -125,7 +125,7 @@ const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gesp
 function exchangePage() {
   const ex = sheet?.exchange;
   return `<p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält
-    nur Tiere, Futter und Mahlzeiten.</p>
+    nur Einträge, keine Einstellungen.</p>
     <div class="btn-col">
       <button class="btn soft" data-action="share-changes">${icon('phone')}Änderungen teilen</button>
       <label class="btn soft" for="exchangeInput">${icon('upload')}Austausch empfangen</label>
@@ -138,8 +138,8 @@ const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
   'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann die Produktsuche im Internet unter „Scannen“, sie ist aus: Sie fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
-  'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, unbekannte Barcodes, nur die Nummer, an freie Produktdatenbanken. Die Foto-Erkennung lässt sich unter „Scannen“ abschalten.',
-  'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt eine Datei mit Tieren, Futter und Mahlzeiten an ein anderes Handy weiter, ohne Server.',
+  'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',
+  'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt deine Einträge als Datei an ein anderes Handy weiter, ohne Server.',
   'Beim Lesen einer Packung berichtigt das Handy falsch gelesene Wörter mit einer Wortliste. Sie enthält Informationen aus Open Pet Food Facts, die hier unter der Open Database License (ODbL) verfügbar gemacht werden.',
 ];
 const privacyPage = () => `<div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;

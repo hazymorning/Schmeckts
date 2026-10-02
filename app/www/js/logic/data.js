@@ -1,6 +1,7 @@
 // with a server, import and delete apply to the whole household
 import {uid} from '../fields.js';
-import {Native, appInfo, haptic} from '../native.js';
+import {DAY} from '../dates.js';
+import {Native, appInfo, haptic, shareFile, sharesFiles} from '../native.js';
 import {report} from '../report.js';
 import {DEMO, RATINGS} from '../config.js';
 import {db, defaults, prefs, purge, replaceDb, save, savePrefs, tidy} from '../store.js';
@@ -46,29 +47,18 @@ export async function exportData() {
   await clearExports();
   const json = JSON.stringify({...db, exportedAt: new Date().toISOString()}); // household data only, no device settings
   const name = `schmeckts-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  if (Native?.Filesystem && Native?.Share) {
-    try {
-      const {uri} = await Native.Filesystem.writeFile({path: name, data: json, directory: 'CACHE', encoding: 'utf8'});
-      await Native.Share.share({title: 'Schmeckt’s-Backup', files: [uri], dialogTitle: 'Backup sichern oder senden'});
-    } catch (e) {
-      if (!/cancel/i.test(String(e?.message))) toast('Das Backup konnte nicht geteilt werden.');
-    }
-    return;
+  try {
+    await shareFile(name, json, 'Schmeckt’s-Backup', 'Backup sichern oder senden');
+    if (!sharesFiles()) toast('Backup gespeichert');
+  } catch (e) {
+    report('backup', e);
+    toast('Das Backup konnte nicht geteilt werden.');
   }
-  const blob = new Blob([json], {type: 'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  toast('Backup gespeichert');
 }
 // a fixture for tests/fixtures/ocr; a person checks it before it goes into the tests
 export async function exportReading() {
   const r = lastReading();
-  if (!r || !Native?.Filesystem || !Native?.Share) return toast('Noch kein Foto gelesen.');
+  if (!r || !sharesFiles()) return toast('Noch kein Foto gelesen.');
   await clearExports();
   const p = getProduct(getServing(r.meal)?.productId);
   const fixture = {
@@ -96,10 +86,10 @@ export async function exportReading() {
     .join(',\n')}\n}\n`;
   const name = `schmeckts-ocr-${fixture.taken.slice(0, 19).replace(/[T:]/g, '-')}.json`;
   try {
-    const {uri} = await Native.Filesystem.writeFile({path: name, data: json, directory: 'CACHE', encoding: 'utf8'});
-    await Native.Share.share({title: name, files: [uri], dialogTitle: 'Gelesenen Text teilen'});
+    await shareFile(name, json, name, 'Gelesenen Text teilen');
   } catch (e) {
-    if (!/cancel/i.test(String(e?.message))) toast('Der gelesene Text konnte nicht geteilt werden.');
+    report('reading as a fixture', e);
+    toast('Der gelesene Text konnte nicht geteilt werden.');
   }
 }
 const secondOf = ({left, top, right, bottom, scale, read}) => ({
@@ -148,7 +138,6 @@ const DEMO_SLOTS = [7.25, 18.1, 12.5, 19.4]; // hours of the day
 const DEMO_CALM = 6; // newest meals without weak ratings, so the sample never reports a decline
 const DEMO_RATED_AFTER = 2 * 3600e3;
 const DEMO_OPEN_AGO = 2 * 3600e3;
-const DAY = 864e5;
 
 export function loadDemo() {
   if (isConnected()) return;

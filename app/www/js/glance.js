@@ -1,9 +1,8 @@
 // Facts for the overview card. Ratings are never read here: the overview stays out of how a meal went.
 import {typeOf} from './config.js';
-import {addDays, dayKey, dayStart, weekStart} from './dates.js';
+import {DAY, addDays, dayKey, dayStart, weekStart} from './dates.js';
 import {feedSlots, nextMeal, nextMilestone} from './smart.js';
 
-const DAY = 864e5;
 const SPAN = 400 * DAY; // long enough that a streak of over a year still counts
 const IDEA = {span: 90 * DAY, served: 3, after: 10}; // after in days
 const RECORD = {meals: 3, streak: 7};
@@ -31,6 +30,11 @@ const minuteOf = t => {
 };
 const slotOf = (slots, min) =>
   slots.reduce((best, s, i) => (best < 0 || Math.abs(s.at - min) < Math.abs(slots[best].at - min) ? i : best), -1);
+// local noon of a YYYY-MM-DD key
+const noonOf = key => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d, 12).getTime();
+};
 // leaves out the run ending at `last`
 function longestRun(days, last) {
   const sorted = [...days].sort();
@@ -193,8 +197,8 @@ export function glance(db, pets, now, avoid = new Set()) {
   if (last) out.sameMinute = yesterdays.some(y => y.min === last.min);
   const runs = new Map();
   for (const name of fedOn.get(streakEnd) || [])
-    for (let d = Date.parse(streakEnd), n = 0; ; d -= DAY) {
-      if (!fedOn.get(dayKey(d + 36e5 * 12))?.has(name)) break; // noon, so a clock change cannot skip a day
+    for (let d = noonOf(streakEnd), n = 0; ; d = addDays(d, -1)) {
+      if (!fedOn.get(dayKey(d))?.has(name)) break;
       runs.set(name, ++n);
     }
   const run = [...runs].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'de'))[0];

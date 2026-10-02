@@ -9,8 +9,7 @@ import {dropViewer} from './viewer.js';
 const layer = (dlg, body) => ({dlg, body, state: null, key: '', depth: 0, pageKeys: [], closing: null});
 const base = layer($('#sheet'), $('#sheetBody')),
   over = layer($('#popup'), $('#popupBody'));
-export const dlg = base.dlg,
-  sheetBody = base.body;
+export const sheetBody = base.body;
 export let sheet = null; // state of the top layer
 const PAGES = new Set(['settings', 'report', 'evaluation', 'shop']);
 export const isPage = state => PAGES.has(state?.kind);

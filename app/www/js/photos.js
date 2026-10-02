@@ -3,9 +3,9 @@
 import {Native} from './native.js';
 import {report} from './report.js';
 import {memPhotos} from './images.js';
-import {request} from './api.js';
+import {ServerError, request} from './api.js';
 import {prefs, savePrefs} from './store.js';
-import {isConnected} from './sync.js';
+import {isConnected, reachable} from './sync.js';
 
 const FS = Native?.Filesystem,
   DIR = 'DATA',
@@ -29,9 +29,9 @@ export const hasPhoto = (s, p) =>
   p ? kept.has(p.id) || (!!p.sharedPhoto && isConnected()) : !!s && (memPhotos.has(s.id) || !!s.photo);
 
 // sharedPhoto: true for a variety's first photo, a stamp once a phone replaced it
-const serverStamp = p => (typeof p.sharedPhoto === 'number' ? p.sharedPhoto : 0);
+export const serverStamp = p => (typeof p.sharedPhoto === 'number' ? p.sharedPhoto : 0);
 // throws if the server fails and no older photo is here; with one here, stale(e) is told and the old one shown
-export async function photoSrc(s, p, stale = () => {}) {
+export async function photoSrc(s, p, stale) {
   if (!p) {
     const b64 = s && memPhotos.get(s.id);
     return b64 ? 'data:image/jpeg;base64,' + b64 : s?.photo || null;
@@ -41,6 +41,7 @@ export async function photoSrc(s, p, stale = () => {}) {
   if ((!b64 || stamp > (prefs.photoStamps[p.id] || 0)) && p.sharedPhoto && isConnected()) {
     let fresh = null;
     try {
+      if (!reachable()) throw new ServerError('offline', 'Der Server ist gerade nicht erreichbar.');
       fresh = await request('GET', '/api/photo/' + p.id, {timeout: 10e3}).then(x => x.image || null);
     } catch (e) {
       if (e.status !== 404) {
@@ -67,7 +68,7 @@ export async function photoData(pid) {
   try {
     return (await FS.readFile({path: file(pid), directory: DIR})).data;
   } catch (e) {
-    report('reading the packaging photo', e);
+    if (!/exist/i.test(e?.message)) throw e; // anything but a missing file keeps the photo
     forgetPhoto(pid);
     return null;
   }

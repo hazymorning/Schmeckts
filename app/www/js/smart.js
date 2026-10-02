@@ -1,14 +1,13 @@
 // The evaluation model. Pure; caching is in derive.js.
 import {flavoursOf, guessTexture, OBSERVATIONS, RATINGS, textureOf, TYPES, typeOf} from './config.js';
-import {addDays, dayKey, dayStart} from './dates.js';
+import {DAY, addDays, dayKey, dayStart} from './dates.js';
 
-const DAY = 864e5;
 const HALF_LIFE = 90 * DAY;
 const WEIGHT_ZERO = Date.UTC(2026, 0, 1); // arbitrary, the score does not depend on it
 export const GOOD = 70; // points from which something counts as going down well
 export const NO = 40; // points under which a rating counts as left
-export const WINDOW = 8; // newest ratings per variety and pet that the verdict uses
-export const VERDICT_SPAN = 180 * DAY; // older ratings still weigh in the score, not in the verdict
+const WINDOW = 8; // newest ratings per variety and pet that the verdict uses
+const VERDICT_SPAN = 180 * DAY; // older ratings still weigh in the score, not in the verdict
 const APPETITE = {recent: 72 * 36e5, usual: 30 * DAY, minRecent: 3, minUsual: 8, minSorts: 2, drop: 30, below: 50};
 export const VERDICTS = {
   nachkaufen: 'Nachkaufen',
@@ -378,8 +377,8 @@ export function shopGroups(m) {
 }
 
 // a treat is nearly always eaten and dry food stands in the bowl all day, so neither says much beside a meal
-export const UNRANKED = ['Snack', 'Trockenfutter'];
-export const ranks = product => !UNRANKED.includes(typeOf(product));
+const UNRANKED = ['Snack', 'Trockenfutter'];
+const ranks = product => !UNRANKED.includes(typeOf(product));
 const RANK = {prior: 2, middle: 50, flop: 50, flat: 1.3, flatSorts: 4, flatRatings: 24};
 const pointsIn = counts => Object.entries(counts).reduce((a, [r, k]) => a + RATINGS[r].score * k, 0);
 // pulled toward RANK.middle by RANK.prior ratings, so evidence beats a lucky start; never shown
@@ -647,7 +646,14 @@ export function basis(m, r) {
 }
 
 // gap, delay and lead in minutes; slot times are minutes since local midnight
-const FEED = {span: 14 * DAY, gap: 90, minDays: 4, delay: 45, lead: 60, ahead: 3};
+const FEED = {span: 14 * DAY, gap: 90, minDays: 4, delay: 45, lead: 60, ahead: 7};
+// wall-clock minute min of the day i days after now's, so a clock change shifts nothing
+function atMinute(now, min, i = 0) {
+  const d = new Date(now);
+  d.setHours(0, min, 0, 0);
+  d.setDate(d.getDate() + i);
+  return d.getTime();
+}
 function mealsIn(db, from, to, pets) {
   const snack = new Set(db.products.filter(p => typeOf(p) === 'Snack').map(p => p.id));
   return db.servings.filter(
@@ -676,38 +682,33 @@ export function feedSlots(db, now, pets) {
     .map(g => ({from: g[0].min, at: g[g.length >> 1].min, remind: g[g.length >> 1].min + FEED.delay}));
 }
 // since: from then on a meal served on another phone also makes the reminder unnecessary
+// keyed by the slot's day, also where the reminder falls after midnight
 export function feedReminders(db, now) {
-  const out = [],
-    atMinute = (i, min) => {
-      const d = new Date(now);
-      d.setHours(0, min, 0, 0);
-      d.setDate(d.getDate() + i);
-      return d.getTime();
-    };
+  const out = [];
   for (const slot of feedSlots(db, now))
     for (let i = 0; i < FEED.ahead; i++) {
-      const at = atMinute(i, slot.remind),
-        since = atMinute(i, slot.from - FEED.lead);
-      if (at > now && !mealsIn(db, since - 1, at).length) out.push({key: `${dayKey(at)}|${slot.at}`, at, since});
+      const at = atMinute(now, slot.remind, i),
+        since = atMinute(now, slot.from - FEED.lead, i);
+      if (at > now && !mealsIn(db, since - 1, at).length)
+        out.push({key: `${dayKey(atMinute(now, 0, i))}|${slot.at}`, at, since});
     }
   return out;
 }
 
 // keys of today's reminders that a meal has made unnecessary
 export function fedToday(db, now) {
-  const today = dayStart(now);
   return feedSlots(db, now)
-    .filter(slot => mealsIn(db, today + (slot.from - FEED.lead) * 6e4 - 1, now).length)
+    .filter(slot => mealsIn(db, atMinute(now, slot.from - FEED.lead) - 1, now).length)
     .map(slot => `${dayKey(now)}|${slot.at}`);
 }
 
 export function nextMeal(db, now, pets) {
   const slots = feedSlots(db, now, pets),
-    today = dayStart(now),
-    minute = (now - today) / 6e4,
-    meals = mealsIn(db, today - FEED.lead * 6e4 - 1, now, pets); // before midnight, for a slot just after it
+    d = new Date(now),
+    minute = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60,
+    meals = mealsIn(db, atMinute(now, -FEED.lead) - 1, now, pets); // before midnight, for a slot just after it
   for (const slot of slots) {
-    if (meals.some(s => s.servedAt >= today + (slot.from - FEED.lead) * 6e4)) continue;
+    if (meals.some(s => s.servedAt >= atMinute(now, slot.from - FEED.lead))) continue;
     if (minute < slot.from) return {at: slot.at};
     if (minute <= slot.remind + FEED.lead) return {at: slot.at, due: true};
   }

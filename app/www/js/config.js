@@ -60,7 +60,7 @@ export const TEXTURES = {
 };
 export const textureOf = (product, key) => TEXTURES[typeOf(product)]?.items.find(([k]) => k === key);
 export const guessTexture = product =>
-  TEXTURES[typeOf(product)]?.items.find(([, , re]) => re.test(`${product.brand} ${product.variety}`))?.[0];
+  TEXTURES[typeOf(product)]?.items.find(([, , re]) => re.test(`${product.brand || ''} ${product.variety || ''}`))?.[0];
 // stored with this spelling when found in packaging text; when several match, the longest wins
 export const BRANDS = [
   'Whiskas',

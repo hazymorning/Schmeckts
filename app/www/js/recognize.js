@@ -1,5 +1,5 @@
 // stages run cheapest first; any may be skipped, and an error moves on to the next
-import {ServerError, request} from './api.js';
+import {request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhoto} from './native.js';
 import {cropped, photoOf, readable} from './images.js';
@@ -15,13 +15,11 @@ import {
 } from './ocr.js';
 import {lookupOnline} from './online.js';
 import {db, prefs} from './store.js';
-import {isConnected, serverCan, status} from './sync.js';
+import {reachable, status} from './sync.js';
 import {getProduct, productsByCode} from './derive.js';
 import {report} from './report.js';
 
 const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'locked']);
-const LOOKING = 'Barcode wird nachgeschlagen …',
-  READING = 'Sorte wird erkannt …';
 
 // run() gives {products}, {details} or null
 const STEPS = [
@@ -35,11 +33,16 @@ const STEPS = [
   },
   {
     name: 'online',
-    hint: LOOKING,
+    hint: 'Barcode wird nachgeschlagen …',
     when: o => !!o.code && !!prefs.lookup,
     run: o => lookupOnline(o.code).then(asDetails),
   },
-  {name: 'server', hint: o => (o.code ? LOOKING : READING), when: () => isConnected(), run: fromServer},
+  {
+    name: 'server',
+    hint: 'Sorte wird erkannt …',
+    when: o => !!o.photo && photoByServer(),
+    run: o => recognize(o.photo).then(asDetails),
+  },
   {
     name: 'text',
     when: o => !!o.photo,
@@ -73,7 +76,8 @@ async function readAgain(b64, first) {
   }
 }
 
-export const photoByServer = () => isConnected() && prefs.serverPhoto;
+// a server out of reach or without a key leaves the photo to the phone
+export const photoByServer = () => reachable() && prefs.serverPhoto && status.recognition !== false;
 
 // meal → {lines, brands}, memory only
 export const memLines = new Map();
@@ -135,27 +139,7 @@ function asDetails(hit) {
   };
 }
 
-// the photo setting holds back the photo only, the barcode always goes out
-async function fromServer({code, photo}) {
-  if (code && (await serverCan('barcode'))) {
-    const hit = await lookupBarcode(code).catch(e => {
-      report('barcode lookup', e);
-      return null;
-    });
-    const found = hit?.found ? asDetails(hit) : null;
-    if (found) return found;
-  }
-  return photo && prefs.serverPhoto ? asDetails(await recognize(photo)) : null;
-}
-
-export async function recognize(b64) {
-  if (!prefs.code) throw Object.assign(new ServerError('none', 'Kein Server verbunden.'), {retry: false});
-  if (status.recognition === false) {
-    throw Object.assign(
-      new ServerError('unavailable', 'Auf dem Server ist die Foto-Erkennung noch nicht eingerichtet.'),
-      {retry: true},
-    );
-  }
+async function recognize(b64) {
   try {
     return await request('POST', '/api/recognize', {body: {image: b64}, timeout: 70e3});
   } catch (e) {
@@ -163,6 +147,3 @@ export async function recognize(b64) {
     throw e;
   }
 }
-
-// the server waits up to 5 s per database
-export const lookupBarcode = code => request('GET', '/api/barcode/' + encodeURIComponent(code), {timeout: 15e3});

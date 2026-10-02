@@ -51,7 +51,7 @@ function cleanVariety(name, brand) {
   return v.replace(/^[\s\-–,·|]+|[\s\-–,·|]+$/g, '');
 }
 
-// unambiguous categories only, as on the server
+// unambiguous categories only
 function classify(tags) {
   const has = (...words) => tags.some(t => words.some(w => String(t).includes(w)));
   const wet = has('wet'),

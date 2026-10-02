@@ -229,7 +229,7 @@ export function renderSuggestions() {
   if (q.length >= 2) {
     const words = q.split(' ');
     hits = db.products
-      .filter(p => p.id !== skip && words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
+      .filter(p => p.id !== skip && words.every(w => norm(`${p.brand || ''} ${p.variety || ''}`).includes(w)))
       .slice(0, 4);
   } else if (serving && !serving.productId) {
     hits = quickProducts(4).map(x => x.product);
@@ -306,7 +306,7 @@ export function renderServeHits(text) {
 }
 function hitList(text, words) {
   const hits = quickProducts()
-    .filter(({product: p}) => words.every(w => norm(p.brand + ' ' + p.variety).includes(w)))
+    .filter(({product: p}) => words.every(w => norm(`${p.brand || ''} ${p.variety || ''}`).includes(w)))
     .slice(0, HITS);
   if (hits.length) return `<ul class="list plist">${serveRows(hits)}</ul>`;
   const q = esc(text);
@@ -322,11 +322,13 @@ const KAUFEN = [
 const verdictPetRow = (pet, x) =>
   `<div class="row verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
     <small>${esc(evidenceOf(x))}</small></span></div>`;
+// the counts and the verdict only see the last 180 days
+const OLD = 'Die letzten Bewertungen sind über ein halbes Jahr alt.';
 function kaufenHTML(e) {
   const pets = db.pets.length > 1 ? db.pets.filter(pet => e.pets[pet.id]) : [];
   return `<span class="label">Kaufen</span>
     ${segmented('buy', KAUFEN, e.kaufen || 'auto')}
-    <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(evidenceOf(e.house))}</span>`}</p>
+    <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(e.house.n || !e.total ? evidenceOf(e.house) : OLD)}</span>`}</p>
     ${pets.map(pet => verdictPetRow(pet, e.pets[pet.id])).join('')}</div>`;
 }
 
@@ -381,7 +383,7 @@ function viewProduct() {
     ${photoLink(p)}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
     ${strip(ratingsIn(model(), [p.id]))}
-    ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}
+    ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">${e.total ? OLD : 'Noch nicht bewertet.'}</p>`}
     ${kaufenHTML(e)}
     ${noticed(p)}
     ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}

@@ -1,6 +1,6 @@
 // Building blocks shared by the views
 import {andList, cap, esc} from '../text.js';
-import {addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
+import {DAY, addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
 import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -112,7 +112,7 @@ export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = 
 }
 
 // treats are not meals; anything else, unknown food included, counts as one
-export function fedLabel(items) {
+function fedLabel(items) {
   const fed = items.filter(x => !isObservation(x)),
     seen = items.length - fed.length,
     snacks = fed.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length,
@@ -126,7 +126,7 @@ export function fedLabel(items) {
     .join(', ');
 }
 export const whoObserved = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean), 'oder');
-export function servingNode(s) {
+function servingNode(s) {
   const rs = servingPets(s)
     .map(pid => rOf(s.pets[pid]))
     .filter(Boolean);
@@ -325,13 +325,12 @@ export function syncChip() {
   return null;
 }
 
-// mark wraps the time, so the overview can set it in bold
-export function since(t, now, mark = x => x) {
+export function since(t, now) {
   const day = dayStart(now),
-    clock = () => mark(timeStr(t).replace(/^0(?=\d:)/, ''));
+    clock = () => timeStr(t).replace(/^0(?=\d:)/, '');
   if (t >= day) return `heute um ${clock()}`;
   if (t >= addDays(day, -1)) return `gestern um ${clock()}`;
-  const days = Math.round((day - dayStart(t)) / 864e5);
+  const days = Math.round((day - dayStart(t)) / DAY);
   if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
   return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
 }

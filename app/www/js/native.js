@@ -34,6 +34,29 @@ export async function shareText(title, text) {
   return 'shared';
 }
 
+// a JSON file through the share menu, or a download in the browser; false when cancelled
+export const sharesFiles = () => !!(Native?.Filesystem && Native?.Share);
+export async function shareFile(name, text, title, dialogTitle) {
+  if (!sharesFiles()) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], {type: 'application/json'}));
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    return true;
+  }
+  try {
+    const {uri} = await Native.Filesystem.writeFile({path: name, data: text, directory: 'CACHE', encoding: 'utf8'});
+    await Native.Share.share({title, files: [uri], dialogTitle});
+  } catch (e) {
+    if (/cancel/i.test(String(e?.message))) return false;
+    throw e;
+  }
+  return true;
+}
+
 // browser stand-in: schedules only last while the page is open
 function browserNotifications() {
   const N = window.Notification,
@@ -109,12 +132,13 @@ export async function takePhoto(hint) {
 
 // on-device text recognition; the plugin reads from a path, so the photo passes through the private cache
 const TextReader = plugin('TextRecognition');
-const TEXT_FILE = 'schmeckts-ocr.jpg';
+let reads = 0;
 const UNREAD = {text: '', width: 0, height: 0, lines: [], ms: 0, raw: null};
 export async function readPhoto(b64) {
   if (!TextReader || !Native?.Filesystem || !b64) return {...UNREAD};
   try {
-    const {uri} = await Native.Filesystem.writeFile({path: TEXT_FILE, data: b64, directory: 'CACHE'});
+    const path = `schmeckts-ocr-${++reads}.jpg`; // readings may overlap
+    const {uri} = await Native.Filesystem.writeFile({path, data: b64, directory: 'CACHE'});
     try {
       const start = performance.now();
       const raw = (await TextReader.processImage({path: uri})) || {};
@@ -122,7 +146,7 @@ export async function readPhoto(b64) {
         {width, height} = jpegSize(b64);
       return {...readingOf(raw, width, height), ms, raw};
     } finally {
-      await Native.Filesystem.deleteFile({path: TEXT_FILE, directory: 'CACHE'}).catch(e =>
+      await Native.Filesystem.deleteFile({path, directory: 'CACHE'}).catch(e =>
         report('deleting the photo from the cache', e),
       );
     }

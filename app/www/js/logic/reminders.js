@@ -95,10 +95,6 @@ async function reconcile() {
       cancel = [],
       plan = [];
     for (const n of notifications) {
-      if (n.extra?.feed) {
-        cancel.push({id: n.id}); // feeding reminders belong to the plugin; drop any left here
-        continue;
-      }
       const s = getServing(n.extra?.serving),
         want = s && prefs.remind && isOpen(s) ? notice(s) : null;
       if (!want) cancel.push({id: n.id});

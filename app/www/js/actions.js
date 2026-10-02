@@ -199,12 +199,6 @@ const ACTIONS = {
     haptic('select');
     openConnect();
   },
-  'mode-local'() {
-    prefs.mode = 'lokal';
-    savePrefs();
-    haptic('select');
-    update();
-  },
   'edit-server'() {
     sheet.editServer = true;
     renderSheet();
@@ -236,17 +230,22 @@ const ACTIONS = {
   rate(el) {
     rate(el);
   },
-  // an unreadable file is let go, and so is a sharedPhoto mark the server cannot back up
+  // a photo found nowhere is let go, and so is a sharedPhoto mark the server cannot back up
   async 'view-photo'(el) {
     const s = getServing(el.dataset.s),
       p = getProduct(el.dataset.p);
     let away = null;
     if (p && !keptPhoto(p.id)) el.setAttribute('aria-busy', 'true');
-    let stale = null;
+    let stale = null,
+      missing = false;
     const load = () =>
       photoSrc(s, p, e => {
         stale = e;
       })
+        .then(src => {
+          missing = !src;
+          return src;
+        })
         .catch(e => {
           if (!(e instanceof ServerError)) throw e;
           away = e;
@@ -261,6 +260,7 @@ const ACTIONS = {
       return toast(
         away.kind === 'offline' ? 'Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar.' : away.message,
       );
+    if (!missing) return toast('Das Foto ließ sich nicht öffnen.');
     if (p) {
       forgetPhoto(p.id);
       if (p.sharedPhoto && isConnected()) unsharePhoto(p);
@@ -542,6 +542,11 @@ document.addEventListener('input', e => {
   if (t.hasAttribute('data-search')) renderServeHits(t.value);
 });
 document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button][data-action]')) {
+    e.preventDefault();
+    e.target.click();
+    return;
+  }
   if (e.key !== 'Enter' || !sheet || e.target.tagName !== 'INPUT') return;
   if (e.target.id === 'f-server' && $('#f-code') && !$('#f-code').value) {
     e.preventDefault();

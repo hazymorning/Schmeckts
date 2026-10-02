@@ -5,7 +5,6 @@ import {addDays, dayStart, timeStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
 import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
-import {isConnected} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
 import {dayNumber, glance, pick, takeTurn} from '../glance.js';
 import {factsOn, fill, LEADS, LINES} from './facts.js';
@@ -104,7 +103,7 @@ function leadLine(g, pets, now, moment) {
   const last = g.last,
     p = getProduct(last.productId),
     treat = p && typeOf(p) === 'Snack',
-    server = isConnected() && last.by ? b(esc(last.by)) : '',
+    feeder = g.feeders.length > 1 && last.by ? b(esc(last.by)) : '',
     fed = servingPets(last),
     some = pets.length > 1 && fed.length < pets.length ? subject(fed) : null,
     next = g.next,
@@ -113,7 +112,7 @@ function leadLine(g, pets, now, moment) {
   const values = {
     what: p ? b(esc(pname(p))) : 'unbenanntes Futter',
     at: at(last.servedAt),
-    by: server ? ` von ${server}` : '',
+    by: feeder ? ` von ${feeder}` : '',
     for: some ? ` für ${some.names}` : '',
     ago,
     Ago: cap(ago),
@@ -171,7 +170,7 @@ function message(g, pets, now, counted) {
   if (g.sameMinute) return say('sameMinute', now);
   if (g.snacks >= SNACKS) {
     const all = subject(pets.map(x => x.id)),
-      grip = `${all.names} ${all.verb('hat', 'haben')} ${isConnected() ? 'euch' : 'dich'} im Griff.`;
+      grip = `${all.names} ${all.verb('hat', 'haben')} ${g.feeders.length > 1 ? 'euch' : 'dich'} im Griff.`;
     return say(counted ? 'snacksCounted' : 'snacks', now, {n: b(g.snacks + ' Snacks'), grip});
   }
   return '';
@@ -213,22 +212,20 @@ const TURN_LINES = {
     say('days', now, {since: b(g.first.days + ' Tagen'), days: b(g.first.days + ' Tage'), n: b(g.first.days)}),
 };
 // Even days get an aside about the animal, other days one of the kinds that hold, or an aside if none does
-function turn(g, now, memory, on, facts) {
-  const house = isConnected(),
-    kinds = on
-      ? [
-          house && g.feeders.length > 1 && 'duel',
-          g.streak >= STREAK && 'streak',
-          g.idea && 'idea',
-          house && g.feedRun && 'run',
-          g.weekday && 'weekday',
-          g.week.meals >= WEEK.meals && g.week.sorts >= WEEK.sorts && 'week',
-          g.lookback && 'lookback',
-          g.sorts >= SORTS && 'sorts',
-          g.first?.days >= DAYS && 'days',
-        ].filter(Boolean)
-      : [],
-    factDay = on && (dayNumber(now) % 2 === 0 || !kinds.length);
+function turn(g, now, memory, facts) {
+  // the duel and the run need several people feeding, whether they share a server or files
+  const kinds = [
+      g.feeders.length > 1 && 'duel',
+      g.streak >= STREAK && 'streak',
+      g.idea && 'idea',
+      g.feedRun?.other && 'run',
+      g.weekday && 'weekday',
+      g.week.meals >= WEEK.meals && g.week.sorts >= WEEK.sorts && 'week',
+      g.lookback && 'lookback',
+      g.sorts >= SORTS && 'sorts',
+      g.first?.days >= DAYS && 'days',
+    ].filter(Boolean),
+    factDay = dayNumber(now) % 2 === 0 || !kinds.length;
   const took = takeTurn(factDay ? [] : kinds, factDay ? facts.map(f => f.id) : [], memory, now);
   return {
     text: took.kind ? TURN_LINES[took.kind](g, now) : took.fact ? facts.find(f => f.id === took.fact).text : '',
@@ -255,7 +252,7 @@ export function overviewLines(g, pets, now, memory) {
       sitzt: all.verb('sitzt', 'sitzen'),
     });
   } else if (!more) {
-    const took = turn(g, now, memory, true, factsOn(species, date, false, ASIDE[moment] || null));
+    const took = turn(g, now, memory, factsOn(species, date, false, ASIDE[moment] || null));
     more = took.text;
     kept = took.memory;
   }
@@ -264,9 +261,6 @@ export function overviewLines(g, pets, now, memory) {
     order = g.birthday?.today && news && moment !== 'due' && moment !== 'dueFirst' ? [more, first] : [first, more];
   return {text: order.filter(Boolean).map(line).join(' '), memory: kept};
 }
-export const overviewText = (g, pets, now = Date.now(), memory = prefs.overview) =>
-  overviewLines(g, pets, now, memory).text;
-
 export const observeChips = () =>
   `<div class="chips obs-chips">${Object.entries(OBSERVATIONS)
     .map(
@@ -298,7 +292,7 @@ export function overviewHTML(m, open, observing = false) {
         .map(p => avatar(p, 'l pair'))
         .join('')}</span>`;
   return `<section class="card overview${open ? ' open' : ''}" data-sec="overview" style="view-transition-name:sec-overview">
-    <div class="ov-top" data-action="toggle-overview" aria-expanded="${!!open}">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
+    <div class="ov-top" data-action="toggle-overview" role="button" tabindex="0" aria-expanded="${!!open}">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
     <div class="card-body fold" id="fold-observe">${observing ? observeChips() : ''}</div>
     <button class="card-btn" data-action="observe-open" aria-expanded="${observing}" aria-controls="fold-observe">${observing ? 'Abbrechen' : 'Beobachtung notieren'}</button></section>`;
 }

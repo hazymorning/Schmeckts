@@ -370,18 +370,16 @@ test('feeding times: from 14 days, treats excluded, from 4 days on; reminder 45 
     ],
   );
   const due = (data, when) => feedReminders(data, when).map(x => [x.key, new Date(x.at).toLocaleString('sv')]);
+  const days = (from, to) => Array.from({length: to - from + 1}, (_, i) => `2026-06-${from + i}`);
   assert.deepEqual(due(db, now), [
-    ['2026-06-11|440', '2026-06-11 08:05:00'],
-    ['2026-06-12|440', '2026-06-12 08:05:00'],
-    ['2026-06-10|1110', '2026-06-10 19:15:00'],
-    ['2026-06-11|1110', '2026-06-11 19:15:00'],
-    ['2026-06-12|1110', '2026-06-12 19:15:00'],
+    ...days(11, 16).map(d => [`${d}|440`, `${d} 08:05:00`]),
+    ...days(10, 16).map(d => [`${d}|1110`, `${d} 19:15:00`]),
   ]);
   const fed = household(['A'], db.products, [...meals, ['snack', {A: 'verputzt'}, day(10, '17:50')]]),
     fedMeal = household(['A'], db.products, [...meals, ['nass', {A: null}, day(10, '17:45')]]);
   assert.deepEqual(
     [due(fed, at(day(10, '18:00'))).length, due(fedMeal, at(day(10, '18:00'))).map(x => x[0])],
-    [5, ['2026-06-11|440', '2026-06-12|440', '2026-06-11|1110', '2026-06-12|1110']],
+    [13, [...days(11, 16).map(d => `${d}|440`), ...days(11, 16).map(d => `${d}|1110`)]],
   );
   assert.deepEqual(feedSlots(household(['A'], ['nass'], meals.slice(0, 6)), now), []);
 });

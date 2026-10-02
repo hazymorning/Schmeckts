@@ -100,6 +100,10 @@ export function deletePet() {
     delete s.pets[id];
   });
   db.servings = db.servings.filter(s => Object.keys(s.pets).length);
+  db.observations.forEach(o => {
+    delete o.pets[id];
+  });
+  db.observations = db.observations.filter(o => Object.keys(o.pets).length);
   db.products.forEach(pr => {
     pr.lastPets = (pr.lastPets || []).filter(x => x !== id);
   });

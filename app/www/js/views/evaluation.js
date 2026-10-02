@@ -1,5 +1,6 @@
 // Evaluation card and page. The analysis is in smart.js, this only words it
 import {andList, cap, esc} from '../text.js';
+import {DAY} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {observationOf, TEXTURES} from '../config.js';
 import {db} from '../store.js';
@@ -35,7 +36,6 @@ import {
 } from './parts.js';
 
 const PLACES = 5;
-const DAY = 864e5;
 const AWAY = 42 * DAY; // a top unserved this long shows since when
 const NUMBERS = ['keine', 'eine', 'zwei', 'drei', 'vier', 'fünf'];
 const brandOf = p => (p.variety ? p.brand : '');

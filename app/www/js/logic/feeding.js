@@ -283,7 +283,7 @@ function takeResult(s, found, house) {
     s.status = 'noserver';
     delete s.error;
     fillName(s.id, found.details);
-  } else if (!house || err?.kind === 'none') {
+  } else if (!house) {
     s.status = 'noserver';
     delete s.error;
   } else if (err?.retry) {

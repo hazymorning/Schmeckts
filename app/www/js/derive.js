@@ -29,7 +29,7 @@ export const petMap = ids => Object.fromEntries(ids.map(id => [id, {r: null, at:
 export const findProduct = (brand, variety) =>
   db.products.find(p => norm(p.brand) === norm(brand) && norm(p.variety) === norm(variety));
 export const productsByCode = code => db.products.filter(p => p.codes?.[code]); // several for multipacks
-export const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r && inFilter(pid) && getPet(pid));
+const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r && inFilter(pid) && getPet(pid));
 export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) && getPet(pid));
 export const servingsInFilter = () => db.servings.filter(s => servingPets(s).length);
 export const observedPets = o => Object.keys(o.pets || {}).filter(pid => inFilter(pid) && getPet(pid));

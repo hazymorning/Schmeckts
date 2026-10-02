@@ -54,6 +54,8 @@ export function readPack(read, products = []) {
   const known = products
     .filter(
       p =>
+        squeeze(p.brand || '') && // an empty brand or variety would match any text
+        squeeze(p.variety || '') &&
         squeeze(`${p.brand} ${p.variety}`).length >= 4 &&
         tight.includes(squeeze(p.brand)) &&
         tight.includes(squeeze(p.variety)),

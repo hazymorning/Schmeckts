@@ -17,7 +17,6 @@ const defaultPrefs = () => ({
   remind: 0,
   feedRemind: false,
   backdrop: true,
-  mode: '',
   server: '',
   code: '',
   name: '',
@@ -36,13 +35,17 @@ export function tidy(d) {
   const out = defaults();
   for (const c of COLLECTIONS) {
     const seen = new Set();
+    // ids end up in HTML attributes, so a backup must not bring others
     out[c] = (Array.isArray(d?.[c]) ? d[c] : []).filter(
-      r => r && typeof r === 'object' && r.id && !seen.has(r.id) && seen.add(r.id),
+      r => r && typeof r === 'object' && validId(r.id) && !seen.has(r.id) && seen.add(r.id),
     );
   }
   for (const p of out.pets) delete p.photos; // obsolete field, dropped locally only
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
+  for (const r of [...out.servings, ...out.observations])
+    if (r.pets && typeof r.pets === 'object') for (const k of Object.keys(r.pets)) if (!validId(k)) delete r.pets[k];
   for (const s of out.servings) {
+    if (s.productId != null && !validId(s.productId)) s.productId = null;
     if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed'; // interrupted by a restart
     if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed';
   }
@@ -208,8 +211,6 @@ async function load() {
   if (fixed) persist('db', 'sync');
   if (prefs.activePet !== 'all' && !db.pets.some(x => x.id === prefs.activePet)) prefs.activePet = 'all';
   prefs.milestones ||= milestones(db).reached; // first run: what is reached counts as seen
-  // '' on a first start lets the welcome page ask
-  prefs.mode = connected() ? 'haushalt' : prefs.mode === 'lokal' || p != null || d != null ? 'lokal' : '';
 }
 function ensureClocks() {
   let n = 0;

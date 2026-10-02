@@ -165,18 +165,13 @@ const welcomeHTML = () => `<div class="welcome">
   <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
   <h2>Was schmeckt deinem Tier?</h2>
   <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie der Napf aussah. So siehst du bald, was wirklich ankommt.</p>
-  <div class="btn-col">${
-    prefs.mode // first start: only the mode choice
-      ? `<button class="btn primary" data-action="add-pet">${icon('plus')}Erstes Tier anlegen</button>
-       ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Mit Beispieldaten ansehen</button>`}`
-      : `<button class="btn primary" data-action="mode-local">${icon('phone')}Nur auf diesem Handy</button>
-       <button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`
-  }
+  <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Erstes Tier anlegen</button>
+    ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Mit Beispieldaten ansehen</button>`}
   </div></div>`;
 
 const stepsHTML = () => `<section class="card" style="view-transition-name:sec-steps"><h2>So geht’s</h2>
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
-  <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
+  <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. Marke und Sorte liest die App von der Packung.</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was dein Tier mag und was stehen bleibt.</p></li></ol></section>`;
 

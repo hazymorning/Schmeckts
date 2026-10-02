@@ -1,5 +1,5 @@
 // exchange by file without a server; the file holds data and clocks only, no settings and no household code
-import {Native, fileUrl, haptic} from '../native.js';
+import {fileUrl, haptic, shareFile} from '../native.js';
 import {report} from '../report.js';
 import {allClocks, changesSince, merge, prefs, savePrefs, state, topClock} from '../store.js';
 import {toast} from '../ui/toast.js';
@@ -16,9 +16,11 @@ function markFor(device) {
   if (device) return prefs.exchange?.[device]?.mark || null;
   return marks.length ? marks.map(([, x]) => x.mark || '').sort()[0] : null;
 }
-function remember(device) {
+// the mark moves on only once the device holds everything this phone has
+function remember(device, level = true) {
   if (!device) return;
-  (prefs.exchange ||= {})[device] = {at: Date.now(), mark: topClock()};
+  const was = prefs.exchange?.[device]?.mark || '';
+  (prefs.exchange ||= {})[device] = {at: Date.now(), mark: level ? topClock() : was};
   savePrefs();
 }
 
@@ -37,24 +39,9 @@ export async function shareChanges(peer = null) {
   const name = fileName();
   const many = `${records.length} ${records.length === 1 ? 'Änderung' : 'Änderungen'}`;
   try {
-    if (Native?.Filesystem && Native?.Share) {
-      const {uri} = await Native.Filesystem.writeFile({path: name, data, directory: 'CACHE', encoding: 'utf8'});
-      await Native.Share.share({
-        title: 'Schmeckt’s-Austausch',
-        files: [uri],
-        dialogTitle: 'Änderungen an das andere Handy',
-      });
-    } else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    }
+    if (!(await shareFile(name, data, 'Schmeckt’s-Austausch', 'Änderungen an das andere Handy'))) return;
   } catch (e) {
-    if (/cancel/i.test(String(e?.message))) return;
+    report('exchange file', e);
     toast('Die Datei konnte nicht geteilt werden.');
     return;
   }
@@ -97,7 +84,7 @@ function apply(text) {
   }
   const took = merge(file.records);
   const back = changesSince(file.clocks);
-  remember(file.device);
+  remember(file.device, !back.length);
   const info = {
     text: message(took, back.length),
     peer: back.length ? {device: file.device, clocks: file.clocks} : null,

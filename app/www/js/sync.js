@@ -23,6 +23,8 @@ const CHECK_EVERY = 5 * 60e3,
   INFO_EVERY = 10 * 60e3;
 
 export const isConnected = () => !!prefs.code;
+// not known to be out of reach: nothing waits on a server the last sync could not reach
+export const reachable = () => isConnected() && (status.state === 'ok' || status.state === 'wait');
 // an older server rejects collections it does not know, so changes to those wait in the queue; checksum likewise
 const serverColls = () => (status.features?.includes('collections') ? COLLECTIONS : BASE);
 const sendable = x => serverColls().includes(x.c);
@@ -95,6 +97,7 @@ async function cycle() {
     await pull();
     if (pending().length) await push();
     await verify();
+    if (!isConnected()) return; // disconnected meanwhile
     failures = 0;
     setStatus({state: 'ok', kind: '', message: '', lastOk: Date.now()});
     openLive();
@@ -107,6 +110,7 @@ async function cycle() {
 }
 
 function reportFailure(e) {
+  if (!isConnected()) return; // a request still on its way when the connection was ended
   if (!(e instanceof ServerError)) {
     report('sync', e);
     e = new ServerError('bad', 'Beim Abgleich ist ein Fehler aufgetreten.');
@@ -287,7 +291,6 @@ export function startSession({code, base, serverInfo}) {
   if (prefs.server && prefs.server !== base) resetSync();
   prefs.server = base;
   prefs.code = code;
-  prefs.mode = 'haushalt';
   savePrefs();
   failures = 0;
   pauseUntil = 0;
@@ -312,7 +315,6 @@ export function disconnect() {
   closeLive();
   clearTimeout(timer);
   prefs.code = '';
-  prefs.mode = 'lokal';
   savePrefs();
   resetSync(); // data stays here; the next connection does a full sync
   setStatus({state: 'off', kind: '', message: '', lastOk: 0, recognition: null, features: null});

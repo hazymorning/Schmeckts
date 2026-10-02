@@ -6,9 +6,18 @@ import {setAside} from '../disk.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {cropSquare, memPhotos, resize} from '../images.js';
-import {keepPhoto, keptPhoto, passPhoto, photoData, photoFrom, replacePhotoFile, sweepPhotos} from '../photos.js';
+import {
+  keepPhoto,
+  keptPhoto,
+  passPhoto,
+  photoData,
+  photoFrom,
+  replacePhotoFile,
+  serverStamp,
+  sweepPhotos,
+} from '../photos.js';
 import {request} from '../api.js';
-import {isConnected, serverCan} from '../sync.js';
+import {isConnected, serverCan, status} from '../sync.js';
 import {report} from '../report.js';
 import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
@@ -127,39 +136,36 @@ export function replaceProductPhoto(pid, img) {
   if (!p) return;
   replacePhotoFile(pid, resize(img, 1100, 0.82).split(',')[1]);
   p.thumb = cropSquare(img, 200, 0.76);
+  prefs.photoStamps[pid] = Date.now();
   save();
-  if (!isConnected()) return;
-  replacing.set(pid, Date.now());
-  sharePhotos();
+  savePrefs();
+  if (isConnected()) sharePhotos();
 }
 
+// a photo replaced here waits until the server has it: this phone's stamp above the household's mark
+const newerHere = () => db.products.filter(p => p.sharedPhoto && (prefs.photoStamps[p.id] || 0) > serverStamp(p));
+
 // servers without the photo or replace feature keep what they have; a first upload never overwrites a numeric mark
-let sharing = false;
-const refused = new Set(),
-  replacing = new Map(); // variety → stamp of a photo replaced here, until the server has it
+let sharing = false,
+  toldOld = false;
+const refused = new Set();
 export async function sharePhotos() {
   if (sharing) return;
   sharing = true;
   try {
-    for (const [id, stamp] of [...replacing]) {
-      if (!(await serverCan('replace'))) {
-        replacing.delete(id);
-        toast('Der Server behält das alte Foto, bis er aktualisiert ist.');
-        continue;
+    const replaced = newerHere();
+    if (replaced.length && !(await serverCan('replace'))) {
+      if (status.features && !toldOld) toast('Der Server behält das alte Foto, bis er aktualisiert ist.');
+      toldOld ||= !!status.features;
+      if (!status.features) return; // out of reach: tried again on the next contact
+    } else
+      for (const p of replaced) {
+        const image = await photoData(p.id);
+        if (!image) continue;
+        await request('POST', '/api/photo/' + p.id, {body: {image}, timeout: 60e3});
+        p.sharedPhoto = prefs.photoStamps[p.id];
+        save();
       }
-      const image = await photoData(id),
-        p = getProduct(id);
-      if (!image || !p) {
-        replacing.delete(id);
-        continue;
-      }
-      await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
-      replacing.delete(id);
-      p.sharedPhoto = stamp;
-      prefs.photoStamps[id] = stamp;
-      save();
-      savePrefs();
-    }
     if (!(await serverCan('photo'))) return;
     for (const {id} of db.products.filter(x => !x.sharedPhoto && keptPhoto(x.id) && !refused.has(x.id))) {
       const image = await photoData(id);
@@ -173,7 +179,7 @@ export async function sharePhotos() {
       }
       const p = getProduct(id);
       if (p && !p.sharedPhoto) {
-        p.sharedPhoto = true;
+        p.sharedPhoto = prefs.photoStamps[id] || true;
         save();
       }
     }
