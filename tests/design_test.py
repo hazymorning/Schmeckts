@@ -130,25 +130,24 @@ def test_tokens():
     check(not loose, f'type only through the --type-* styles {loose[:4]}')
 
 
-# Visible text against what lies beneath it, with opacity, and the typeface in use
+# Visible text and placeholders against what lies beneath them, with opacity, and the typeface in use
 SCAN = """() => { const bad = [];
   const rgba = c => { const m = (c.match(/[\\d.]+/g) || []).map(Number); return [m[0] || 0, m[1] || 0, m[2] || 0, m.length > 3 ? m[3] : 1]; };
   const lum = c => { const f = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
-  const probe = document.createElement('i'); probe.style.color = 'var(--faint)'; document.body.append(probe);
-  const faint = getComputedStyle(probe).color; probe.remove();
-  const ratio = el => {
+  const ratio = (el, color = getComputedStyle(el).color) => {
     let op = 1, layers = [];
     for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e), c = rgba(s.backgroundColor);
       if (c[3] > 0) { layers.unshift(c); if (c[3] >= 1) break; } op *= +s.opacity; }
     let back = [255, 255, 255]; for (const c of layers) back = back.map((v, i) => v * (1 - c[3]) + c[i] * c[3]);
-    const f = rgba(getComputedStyle(el).color), a = f[3] * op, fg = back.map((v, i) => v * (1 - a) + f[i] * a);
+    const f = rgba(color), a = f[3] * op, fg = back.map((v, i) => v * (1 - a) + f[i] * a);
     return op < .1 ? 99 : (Math.max(lum(fg), lum(back)) + .05) / (Math.min(lum(fg), lum(back)) + .05); };
   for (const el of document.querySelectorAll('body *')) {
     if (el.closest('svg') || !el.getClientRects().length) continue;
     const s = getComputedStyle(el), own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     if (!own && el.tagName !== 'INPUT') continue;
     const tag = el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\\s+/).join('.') : '');
-    if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
+    if (el.placeholder && !el.value) { const r = ratio(el, getComputedStyle(el, '::placeholder').color); if (r < 4.5) bad.push(`placeholder ${r.toFixed(2)} ${tag}`); }
+    if (s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
     if (fam !== 'Figtree' && fam !== 'Faustina') bad.push(`${fam} on ${tag}`);
   }

@@ -915,7 +915,7 @@ dialog.sheet::after {
   font: var(--type-body);
 }
 .field::placeholder {
-  color: var(--faint);
+  color: var(--muted);
 }
 .field:focus {
   outline: none;
@@ -1397,7 +1397,7 @@ dialog.sheet::after {
 
 .cal .wd {
   font: var(--type-caption-strong);
-  color: var(--faint);
+  color: var(--muted);
   margin-bottom: var(--space-1);
 }
 .day {
@@ -1416,7 +1416,7 @@ dialog.sheet::after {
   place-items: center;
   font: var(--type-small);
   font-variant-numeric: tabular-nums;
-  color: var(--faint);
+  color: var(--muted);
 }
 .day.has .dn {
   color: var(--ink);
