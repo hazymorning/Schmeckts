@@ -92,7 +92,7 @@ Alles funktioniert, nur der Barcode-Scanner nicht. Der kommt von Google und brau
 
 ## Wenn mehrere Leute füttern
 
-Mit *Änderungen teilen* schickt ihr euch neue Einträge als Datei, per Messenger oder Kabel, ohne Konto. Bequemer ist ein kleiner Server bei euch zu Hause: Die Handys gleichen sich im WLAN von selbst ab, die App erkennt Sorten direkt am Foto und schlägt unbekannte Barcodes nach. Code und Anleitung liegen im Ordner [`server`](server/).
+Mit *Änderungen teilen* schickt ihr euch neue Einträge als Datei, per Messenger oder Kabel, ohne Konto. Wer mag, stellt zusätzlich einen kleinen Server ins Heimnetz: Dann gleichen sich die Handys im WLAN von selbst ab, und die App erkennt Sorten am Foto. Nötig ist er nicht, jedes Handy hat weiter alle Daten selbst. Code und Anleitung liegen im Ordner [`server`](server/).
 
 ## Fragen und Fehler
 
