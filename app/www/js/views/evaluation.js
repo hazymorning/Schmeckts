@@ -85,8 +85,8 @@ function waiting(m, r) {
   if (r.stale)
     return 'Die letzten Bewertungen sind über ein halbes Jahr alt. Nach ein paar neuen steht hier wieder, was ankommt.';
   if (r.settled && !r.mid.length)
-    return `${esc(petNames(m.pets.filter(pid => r.split.some(e => e.pets[pid]?.n))))} sind sich bei allem, was feststeht, nicht einig.`;
-  if (r.settled) return 'Was feststeht, kommt mal so, mal so an.';
+    return `${esc(petNames(m.pets.filter(pid => r.split.some(e => e.pets[pid]?.n))))} sind sich bisher bei keiner Sorte einig.`;
+  if (r.settled) return 'Bisher ist keine Sorte ein klarer Treffer oder Reinfall.';
   return 'Noch steht keine Sorte fest.';
 }
 
@@ -113,7 +113,7 @@ function sideTile(m, r, e, side) {
         ? ['Noch keiner', 'Dafür ist noch zu wenig bewertet.']
         : r.settled === r.top.length
           ? ['Keiner', 'Alles, was feststeht, kommt gut an.']
-          : ['Keiner', 'Keine Sorte bleibt meist stehen.'];
+          : ['Keiner', 'Keine Sorte bleibt regelmäßig stehen.'];
   return `<div class="tile empty ${tone}">${inner(title, why)}</div>`;
 }
 const SHOP_SHOWN = 3;
@@ -217,7 +217,11 @@ function listsHTML(m, r, x) {
       ? card(listTitle('flop', 'Noch kein Ladenhüter'), say('Dafür ist noch zu wenig bewertet.'))
       : card(
           listTitle('flop', 'Kein Ladenhüter'),
-          say(r.settled === r.top.length ? 'Alles, was feststeht, kommt gut an.' : 'Keine Sorte bleibt meist stehen.'),
+          say(
+            r.settled === r.top.length
+              ? 'Alles, was feststeht, kommt gut an.'
+              : 'Keine Sorte bleibt regelmäßig stehen.',
+          ),
         );
   return tops + flops;
 }
@@ -279,7 +283,7 @@ function trendCard(m, x) {
   return rows.length
     ? card(
         'Wie läuft’s gerade?',
-        toldList(rows) + (few.length ? hint(`Für ${petsOf(few)} reicht es noch nicht für einen Vergleich.`) : ''),
+        toldList(rows) + (few.length ? hint(`Bei ${petsOf(few)} reicht es noch nicht für einen Vergleich.`) : ''),
       )
     : '';
 }
@@ -304,7 +308,7 @@ function observedCard(x) {
         l.id,
         obsThumb(l.kind),
         `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
-        `${cap(o.after)} nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten, nach den anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
+        `Nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten ${o.after}, bei anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
       );
     }),
   ];
@@ -369,7 +373,7 @@ function patternCard(m, x) {
     : first
       ? likesList(m, {...first, groups: [first.groups[0], first.groups.at(-1)]})
       : toldList(habits.slice(0, HABITS).map(h => habitRow(h, db.pets.length > 1 && !m.pet)));
-  return `<section class="card">${cardHead('Worauf es ankommt', 'open-level', 'Mehr dazu', 'Mehr', 'profile')}${tips.length ? say(`Neues am ehesten <b>${andList(tips)}</b> probieren.`) : ''}${body}</section>`;
+  return `<section class="card">${cardHead('Worauf es ankommt', 'open-level', 'Mehr dazu', 'Mehr', 'profile')}${tips.length ? say(`Neues probierst du am besten <b>${andList(tips)}</b>.`) : ''}${body}</section>`;
 }
 
 const TRIALS = 3;

@@ -147,7 +147,7 @@ function viewObservation() {
         ? group(
             'Bemerkt bei',
             petChips('toggle-observation-pet', o.pets) +
-              (ids.length > 1 ? `<p class="hint mt-s">Bei ${esc(whoObserved(ids))}: offen, wer es war.</p>` : ''),
+              (ids.length > 1 ? `<p class="hint mt-s">Ob es ${esc(whoObserved(ids))} war, ist offen.</p>` : ''),
           )
         : ''
     }

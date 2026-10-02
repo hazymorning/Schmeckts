@@ -50,7 +50,7 @@ const petRow = p =>
 const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(title)}</div>`;
 
 const LOOKUP = 'Schlägt unbekannte Barcodes nach, nur mit der Nummer';
-const SERVER_PHOTO = 'Erkennt Marke und Sorte. Sonst liest das Handy selbst.';
+const SERVER_PHOTO = 'Der Server erkennt Marke und Sorte, sonst das Handy selbst.';
 
 function overview() {
   const house = isConnected(),
@@ -137,7 +137,7 @@ function exchangePage() {
 const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann die Produktsuche im Internet unter „Scannen“, die anfangs aus ist. Sie fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Internet. Die Produktsuche unter „Scannen“ ist anfangs aus. Eingeschaltet fragt sie bei unbekannten Barcodes zwei freie Produktdatenbanken, und zwar nur mit der Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',
   'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt deine Einträge als Datei an ein anderes Handy weiter, ohne Server.',
   'Beim Lesen einer Packung berichtigt das Handy falsch gelesene Wörter mit einer Wortliste. Sie enthält Informationen aus Open Pet Food Facts, die hier unter der Open Database License (ODbL) verfügbar gemacht werden.',
@@ -157,8 +157,8 @@ function serverSection(notice = syncInfo()) {
         autocomplete="off" inputmode="url" spellcheck="false" enterkeyhint="next">`;
   if (!isConnected())
     return s.connectForm
-      ? `<p class="hint">Verbunden sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen. Adresse und Code zeigt „Schmeckt’s-Server einrichten“ auf dem Mini-PC.</p>${addrField}${codeRow}`
-      : `<p class="hint">Alle Daten bleiben auf diesem Handy. Verbunden sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen.</p>
+      ? `<p class="hint">Wenn ihr verbunden seid, sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen. Adresse und Code findest du auf dem Mini-PC unter „Schmeckt’s-Server einrichten“.</p>${addrField}${codeRow}`
+      : `<p class="hint">Alle Daten bleiben auf diesem Handy. Mit einem Haushalt verbunden, sehen alle dieselben Tiere und Einträge.</p>
         <button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`;
   const needCode = status.kind === 'auth';
   return `<div class="group srv ${notice.tone}" role="status"><div class="row"><span class="sign srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
