@@ -888,10 +888,6 @@ dialog.sheet::after {
   opacity: var(--busy);
   cursor: default;
 }
-.btn .spin {
-  border-color: currentColor;
-  border-top-color: transparent;
-}
 .fab {
   position: fixed;
   right: max(var(--gutter), calc(50% - var(--page-width) / 2 + var(--gutter)));
@@ -1290,6 +1286,19 @@ dialog.sheet::after {
 .photo-btn[aria-busy="true"] {
   opacity: var(--busy);
 }
+/* a sheen runs over the packaging while it is read */
+.photo-btn.reading {
+  position: relative;
+  overflow: hidden;
+}
+.photo-btn.reading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, var(--sheen) 50%, transparent 70%);
+  background-size: 220% 100%;
+  pointer-events: none;
+}
 .ov-pic {
   position: relative;
   flex: 0 0 auto;
@@ -1402,13 +1411,19 @@ dialog.sheet::after {
     0 0 0 var(--stroke) var(--ground, var(--surface)),
     0 0 0 calc(2 * var(--stroke)) var(--c, var(--line));
 }
-.spin {
+/* waiting: a small bowl that fills again and again, or stands filled under reduced motion */
+.wait {
   width: var(--icon-s);
   height: var(--icon-s);
-  border-radius: 50%;
-  border: var(--stroke) solid var(--line);
-  border-top-color: var(--accent);
-  flex: 0 0 auto;
+  color: var(--accent);
+}
+.btn .wait {
+  color: currentColor;
+}
+.wait .fill {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  opacity: var(--busy);
 }
 .skel {
   display: block;
@@ -2443,8 +2458,17 @@ html.step-back::view-transition-new(page) {
 .fab.filled .fill {
   animation: bowlFill var(--dur-long) var(--ease-out) both;
 }
-.spin {
-  animation: spin var(--dur-long) linear infinite;
+/* waits shorter than --patience show nothing */
+.wait {
+  animation: fadeIn var(--dur-fade) var(--ease-out) var(--patience) both;
+}
+.wait .fill {
+  animation: bowlFill var(--dur-long) var(--ease-out) var(--patience) infinite both;
+}
+.photo-btn.reading::after {
+  animation:
+    fadeIn var(--dur-fade) var(--ease-out) var(--patience) both,
+    shimmer var(--dur-long) linear var(--patience) infinite;
 }
 .skel {
   animation: shimmer var(--dur-long) linear infinite;
@@ -2460,6 +2484,16 @@ html.step-back::view-transition-new(page) {
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  /* the loader stands still, still only after a moment, and no sheen runs */
+  .wait {
+    animation-delay: var(--patience) !important;
+  }
+  .wait .fill {
+    animation: none;
+  }
+  .photo-btn.reading::after {
+    display: none;
   }
   /* otherwise applyTheme() still reads the old background */
   html {

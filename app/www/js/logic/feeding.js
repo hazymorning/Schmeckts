@@ -237,12 +237,11 @@ async function recognizeServing(id, sharp = '') {
   const house = photoByServer();
   s.status = house ? 'recognizing' : 'reading';
   delete s.error;
-  if (!house) {
-    readingSince.set(id, Date.now());
+  readingSince.set(id, Date.now());
+  if (!house)
     setTimeout(() => {
       if (getServing(id)?.status === 'reading') refreshServing(id);
     }, READ_PATIENCE);
-  }
   save();
   refreshServing(id);
   let found = {source: '', error: null};

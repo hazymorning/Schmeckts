@@ -82,21 +82,14 @@ function openConnect() {
   } else openSheet({kind: 'settings', page: 'house', connectForm: true});
   requestAnimationFrame(() => $(prefs.server ? '#f-code' : '#f-server')?.focus({preventScroll: true}));
 }
-// progress shows only after 600 ms, so a quick sync does not flicker
 async function syncByHand() {
   const s = sheet;
   if (s?.kind !== 'settings' || s.syncing) return;
-  s.syncing = 'quiet';
-  const timer = setTimeout(() => {
-    if (sheet === s) {
-      s.syncing = 'shown';
-      paintHouse();
-    }
-  }, 600);
+  s.syncing = 'shown';
+  paintHouse();
   try {
     await retrySync();
   } finally {
-    clearTimeout(timer);
     s.syncing = '';
     if (sheet === s) paintHouse();
   }

@@ -20,6 +20,8 @@ const FILM = LEFT('M5.86 16.6h12.28l-.19.8') + BOWL;
 const HALF = LEFT('M5.47 15h13.05l-.58 2.4') + BOWL;
 const MOST = LEFT('M4.97 12.9h14.06l-1.08 4.5') + BOWL;
 const FEED = BOWL + '<path d="M12 5.2v3.6M10.2 7h3.6"/>';
+const FILL =
+  '<path class="fill" fill="currentColor" stroke="none" d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>';
 const I = {
   r_top: BOWL + HEART,
   r_gut: FILM,
@@ -44,10 +46,9 @@ const I = {
     DOT(17.8, 8.2) +
     DOT(19.6, 11.4),
   r_unberuehrt: TREAT + '<path d="M16.3 5.8h4.6"/>',
-  // fill: what the feeding button animates
-  bowl:
-    '<path class="fill" fill="currentColor" stroke="none" d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>' +
-    FEED,
+  // fill: what the feeding button and the loader animate
+  bowl: FILL + FEED,
+  wait: `<g transform="translate(0 -3)">${FILL + BOWL}</g>`, // the bowl alone sits low in the grid
   feed: FEED,
   barcode:
     '<path d="M4 8.5V6.3A2.3 2.3 0 0 1 6.3 4h2.2M15.5 4h2.2A2.3 2.3 0 0 1 20 6.3v2.2M20 15.5v2.2a2.3 2.3 0 0 1-2.3 2.3h-2.2M8.5 20H6.3A2.3 2.3 0 0 1 4 17.7v-2.2"/><path d="M8 8.5v7M10.6 8.5v7M13.4 8.5v7M16 8.5v7"/>',

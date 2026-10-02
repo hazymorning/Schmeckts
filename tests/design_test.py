@@ -283,6 +283,46 @@ async def test_skeleton(browser, url):
     await ctx.close()
 
 
+LOADER = """() => import('./js/recognize.js').then(r => { const w = document.querySelector('#sheet .note .wait'),
+    photo = document.querySelector('#sheet .photo-btn.reading'), sheen = photo.getAnimations({subtree: true}).find(a => a.animationName === 'shimmer');
+  return {waited: Date.now() - [...r.readingSince.values()][0], at: w.querySelector('.fill').getAnimations()[0]?.currentTime ?? null,
+    delay: getComputedStyle(w).animationDelay, fill: getComputedStyle(w.querySelector('.fill')).animationName,
+    sheen: sheen?.currentTime ?? null, shown: getComputedStyle(photo, '::after').display}; })"""
+
+
+async def test_loader(browser, url):
+    for motion in (True, False):
+        ctx = await phone(browser, motion=motion)
+        pg, errors = await open_page(ctx, url, native=True)
+        await pg.click('.welcome [data-action=add-pet]')
+        await idle(pg)
+        await pg.fill('#f-name', 'Minka')
+        await pg.click('[data-action=save-pet]')
+        await idle(pg)
+        await pg.evaluate("window.__ocrText = 'Whiskas'; window.__ocrDelay = 4000")
+        await pg.click('#fab')
+        await idle(pg)
+        await pg.set_input_files('#camInputSheet', str(PACK))
+        await pg.wait_for_selector('#sheet .skel-field')
+        await pg.wait_for_selector('#sheet #f-brand')  # drawn again after the skeleton, still reading
+        got = await pg.evaluate(LOADER)
+        if motion:
+            check(
+                got['delay'] != '0s'
+                and got['fill'] == 'bowlFill'
+                and abs(got['at'] - got['waited']) < 300
+                and abs(got['sheen'] - got['waited']) < 300,
+                f'the loader and the sheen over the photo wait a moment, and drawn again they go on from where they were {got}',
+            )
+        else:
+            check(
+                got['fill'] == 'none' and got['delay'] != '0s' and got['shown'] == 'none',
+                f'reduced motion: the loader stands still, still after a moment, and no sheen runs {got}',
+            )
+        check(not errors, f'no errors in the console {errors}')
+        await ctx.close()
+
+
 async def test_files(browser, url):
     test_logo_files()
     test_tokens()
@@ -296,6 +336,7 @@ run_tests(
         'light': lambda browser, url: test_views(browser, url, 'light'),
         'dark': lambda browser, url: test_views(browser, url, 'dark'),
         'skeleton': test_skeleton,
+        'loader': test_loader,
     },
     camera=('light', 'dark'),
 )

@@ -151,7 +151,7 @@ function serverSection(notice = syncInfo()) {
   const codeRow = `<div class="connect mt-s">
       <input id="f-code" class="field code" data-field="code" value="${esc(s.code || '')}" placeholder="Haushaltscode" aria-label="Haushaltscode"
         autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" maxlength="12">
-      <button class="btn primary" data-action="connect"${s.connecting ? ' disabled' : ''}>${s.connecting ? '<span class="spin"></span>Verbinde …' : 'Verbinden'}</button></div>
+      <button class="btn primary" data-action="connect"${s.connecting ? ' disabled' : ''}>${s.connecting ? `${icon('wait', 'wait')}Verbinde …` : 'Verbinden'}</button></div>
       ${s.connectError ? `<p class="hint note warn" role="alert">${esc(s.connectError)}</p>` : ''}`;
   const addrField = `<label class="label" for="f-server">Adresse des Servers</label>
       <input id="f-server" class="field" data-field="server" value="${esc(s.server ?? prefs.server)}" placeholder="http://192.168.… oder https://…"
@@ -177,7 +177,7 @@ function serverSection(notice = syncInfo()) {
         needCode
           ? ''
           : s.syncing === 'shown'
-            ? `<button class="btn soft" disabled><span class="spin"></span>Abgleich läuft …</button>`
+            ? `<button class="btn soft" disabled>${icon('wait', 'wait')}Abgleich läuft …</button>`
             : status.state === 'ok' && !queue.length
               ? ''
               : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Abgleichen</button>`

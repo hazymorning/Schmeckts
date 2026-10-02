@@ -83,7 +83,7 @@ export const photoByServer = () => reachable() && prefs.serverPhoto && status.re
 export const memLines = new Map();
 // ms the naming sheet shows a skeleton before the empty fields
 export const READ_PATIENCE = 2500;
-export const readingSince = new Map();
+export const readingSince = new Map(); // meal → when its recognition began
 
 // for schmeckts://ocr-dump, which shares it as a test fixture
 let last = null;
