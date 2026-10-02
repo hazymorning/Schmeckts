@@ -82,6 +82,7 @@ server.
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
 | `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung` | hints hidden on this phone; `tipp:beobachtung`: the first observation's toast said what it is for |
 | `prefs.milestones` | `meals:100`, `sorts:10` | milestones already shown |
+| reminder buttons | `actionTypeId` `rate:<key>,<key>`, `extra.pet`, `extra.rate`; a button's id is its rating key | Android keeps them with a pending „Wie war’s?“ across updates |
 | exchange file `kind` | `exchange` | written by „Änderungen teilen“ |
 
 ## Without and with a server

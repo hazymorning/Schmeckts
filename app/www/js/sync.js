@@ -301,6 +301,8 @@ export function startSession({code, base, serverInfo}) {
   return syncNow();
 }
 
+export const caughtUp = ms => Promise.race([syncNow(), new Promise(done => setTimeout(done, ms))]);
+
 export function retrySync() {
   if (status.kind === 'protocol' || status.kind === 'locked') {
     status.kind = '';

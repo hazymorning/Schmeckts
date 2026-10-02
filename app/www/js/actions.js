@@ -27,7 +27,8 @@ import {
   serveProduct,
   shootPhoto,
 } from './logic/feeding.js';
-import {deleteProduct, deleteServing, rate, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
+import {deleteProduct, deleteServing, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
+import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';

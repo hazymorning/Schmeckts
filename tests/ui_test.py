@@ -1019,6 +1019,126 @@ async def test_reminders(browser, url):
     await ctx.close()
 
 
+NOTES = "JSON.parse(localStorage.getItem('__notes') || '[]')"
+ASK = """([id, pets, productId]) => import('./js/store.js').then(async s => { const x = {id, productId, servedAt: Date.now(), note: '',
+  pets: Object.fromEntries(pets.map(p => [p, {r: null, at: null}]))}; s.db.servings.unshift(x); s.save();
+  (await import('./js/logic/reminders.js')).planReminder(x); })"""
+
+
+def household_with_ratings(now):
+    rated = [('lachs00001', 'top'), ('lachs00001', 'gut'), ('lachs00001', 'top'), ('lachs00001', 'mittel'), ('lachs00001', 'gut')]
+    rated += [('rind000001', 'sosse'), ('rind000001', 'sosse')]
+    return {
+        'version': 3,
+        'pets': [pet('minka00001'), pet('tiger00001', 'Tiger')],
+        'products': [product('lachs00001'), product('rind000001', variety='Rind')],
+        'servings': [meal(f'altmeal00{i}', pid, now - (i + 1) * 864e5, {'minka00001': r}) for i, (pid, r) in enumerate(rated)],
+    }
+
+
+async def test_reminder_buttons(browser, url):
+    print('rating reminder buttons: the levels most given, one open pet only, a button rates, a rated meal opens instead')
+    M, T = 'minka00001', 'tiger00001'
+    db = household_with_ratings(int(time.time() * 1000))
+    ctx, pg, errors = await seeded(browser, url, {'db': db, 'prefs': {'remind': 180}}, native=True)
+
+    async def note(sid):
+        await pg.wait_for_function(f"{NOTES}.some(n => n.extra.serving === '{sid}')")
+        await idle(pg)
+        return next(n for n in await pg.evaluate(NOTES) if n['extra']['serving'] == sid)
+
+    async def reconciled():
+        await pg.evaluate("import('./js/logic/reminders.js').then(m => m.syncReminders())")
+        await pg.wait_for_timeout(600)
+        await idle(pg)
+
+    short = await pg.evaluate("import('./js/config.js').then(c => [c.RATINGS.top.short, c.RATINGS.gut.short])")
+    await pg.evaluate(ASK, ['einzeln0001', [M], 'lachs00001'])
+    n = await note('einzeln0001')
+    calls = [c[0] for c in await pg.evaluate('window.__calls') if c[0] in ('registerActionTypes', 'schedule')]
+    types = await pg.evaluate("JSON.parse(localStorage.getItem('__actionTypes') || '[]')")
+    check(
+        n.get('actionTypeId') == 'rate:top,gut'
+        and n['extra'].get('pet') == M
+        and 'Minka' in n['body']
+        and calls[:2] == ['registerActionTypes', 'schedule']
+        and types == [{'id': 'rate:top,gut', 'actions': [{'id': 'top', 'title': short[0]}, {'id': 'gut', 'title': short[1]}]}],
+        f'one open pet: buttons for the two levels it gives this variety most, registered before scheduling {n} {types}',
+    )
+    before = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'schedule'])
+    await reconciled()
+    after = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'schedule'])
+    check(before == after, 'the plugin hands back no actionTypeId, and a reconcile leaves the reminder alone')
+    await pg.evaluate("n => window.__tapNote({actionId: 'gut', notification: n})", n)
+    await idle(pg)
+    told, undo = await pg.inner_text('#toast > span'), await pg.locator('#toast.show [data-action=undo]').count()
+    rated = await state(pg, f"db.servings.find(s => s.id === 'einzeln0001').pets['{M}'].r")
+    await reconciled()
+    check(
+        rated == 'gut'
+        and undo == 1
+        and not await pg.evaluate(OPEN)
+        and await pg.locator('.pend[data-id=einzeln0001]').count() == 0
+        and not [x for x in await pg.evaluate(NOTES) if x['extra']['serving'] == 'einzeln0001'],
+        f'a button rates the meal with a toast to undo, opens nothing, and the reminder goes ({told})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    check(await state(pg, f"db.servings.find(s => s.id === 'einzeln0001').pets['{M}'].r") is None, 'undone like a rating in the app')
+    await change(pg, f"s.db.servings.find(x => x.id === 'einzeln0001').pets['{M}'] = {{r: 'top', at: Date.now()}}")
+    await pg.evaluate("n => window.__tapNote({actionId: 'gut', notification: n})", n)
+    await idle(pg)
+    check(
+        await pg.evaluate(LEVEL) == [True, 'serving', None, None]
+        and await state(pg, f"db.servings.find(s => s.id === 'einzeln0001').pets['{M}'].r") == 'top',
+        'rated meanwhile: the button opens the meal and changes nothing',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(ASK, ['zusammen01', [M, T], 'lachs00001'])
+    both = await note('zusammen01')
+    await change(pg, f"s.db.servings.find(x => x.id === 'zusammen01').pets['{T}'] = {{r: 'top', at: Date.now()}}")
+    await reconciled()
+    left = await note('zusammen01')
+    check(
+        'actionTypeId' not in both
+        and 'pet' not in both['extra']
+        and 'Tiger' in both['body']
+        and left.get('actionTypeId') == 'rate:top,gut'
+        and left['extra'].get('pet') == M
+        and 'Tiger' not in left['body'],
+        f'two open pets: no buttons; once one is rated, buttons for the other, and the text names only it {both} {left}',
+    )
+    # a reminder already due that Android has not shown yet, inexact as it is
+    due, served = 'ueberfaellig', await pg.evaluate('Date.now() - 181 * 60000')
+    nid = 7
+    for c in due:
+        nid = (nid * 31 + ord(c)) % 2147483647
+    await change(
+        pg,
+        f"s.db.servings.unshift({{id: '{due}', productId: 'lachs00001', servedAt: {served}, note: '', pets: {{{M}: {{r: null, at: null}}, {T}: {{r: null, at: null}}}}}})",
+    )
+    await pg.evaluate(
+        f"""localStorage.setItem('__notes', JSON.stringify([...JSON.parse(localStorage.getItem('__notes')),
+      {{id: {nid}, title: 'Wie war’s?', body: 'Lachs für Minka und Tiger', extra: {{serving: '{due}', at: {served + 180 * 60000}}}}}]))"""
+    )
+    await change(pg, f"s.db.servings.find(x => x.id === '{due}').pets['{T}'] = {{r: 'gut', at: Date.now()}}")
+    await reconciled()
+    kept = [x['body'] for x in await pg.evaluate(NOTES) if x['id'] == nid]
+    await change(pg, f"s.db.servings.find(x => x.id === '{due}').pets['{M}'] = {{r: 'gut', at: Date.now()}}")
+    await reconciled()
+    check(
+        kept == ['Lachs für Minka und Tiger'] and not [x for x in await pg.evaluate(NOTES) if x['id'] == nid],
+        f'a reminder already due stays when its text would change, and goes once the meal is rated {kept}',
+    )
+    await pg.evaluate('window.__noButtons = true')
+    await pg.evaluate(ASK, ['rindmeal01', [M], 'rind000001'])
+    plain = await note('rindmeal01')
+    check('actionTypeId' not in plain and 'pet' not in plain['extra'], f'buttons refused by the plugin: the reminder comes without {plain}')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_feed_remind(browser, url):
     print('feeding reminder: the usual times handed to our own plugin, with the server when connected')
     ctx, pg, errors = await one_pet(browser, url, timezone_id='Europe/Berlin')
@@ -2460,6 +2580,7 @@ run_tests(
         'texture': test_texture,
         'suggestions': test_suggestions,
         'reminder': test_reminders,
+        'reminder-buttons': test_reminder_buttons,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
         'birthday': test_birthday,

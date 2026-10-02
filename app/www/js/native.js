@@ -89,6 +89,7 @@ function browserNotifications() {
     },
     cancel: async ({notifications}) => notifications.forEach(({id}) => drop(id)),
     getPending: async () => ({notifications: [...pending.values()].map(x => x.n)}),
+    registerActionTypes: async () => {}, // a page's notifications carry no buttons
     addListener: async (event, fn) => {
       if (event === 'localNotificationActionPerformed') taps.push(fn);
     },

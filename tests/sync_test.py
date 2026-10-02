@@ -346,6 +346,55 @@ async def main():
             await expect(await planned([]), 'reminder cancelled when another phone deletes the meal')
             await a.evaluate("import('./js/store.js').then(s => { s.prefs.remind = 0; })")
 
+            # A reminder's button waits for the household: a pet B rated meanwhile opens on A instead of being rated
+            # over; A's pulls are held until the button is pressed, and live notices do not reach it
+            release = asyncio.Event()
+
+            async def hold_pulls(route):
+                if route.request.method == 'GET':
+                    await release.wait()
+                await route.continue_()
+
+            async def no_live(route):
+                await route.abort()
+
+            meal = "db.servings.find(s => s.id === 'knopfmahl01')"
+            await run(
+                a,
+                "db.servings.unshift({id: 'knopfmahl01', productId: 'lxprod0001', servedAt: Date.now(), pets: {lxpet00001: {r: null, at: null}}, note: ''}); save();",
+            )
+            await until(b, f'!!{meal}', 6)
+            await ctx_a.route(f'{srv.url}/api/events**', no_live)
+            await ctx_a.route(f'{srv.url}/api/changes**', hold_pulls)
+            await run(b, f"{meal}.pets.lxpet00001 = {{r: 'schlecht', at: Date.now()}}; save();")
+            await until(b, 'queue.length === 0')
+            stale = await state(a, f'{meal}.pets.lxpet00001.r')
+            await a.evaluate("void window.__tapNote({actionId: 'gut', notification: {extra: {serving: 'knopfmahl01', pet: 'lxpet00001'}}})")
+            await asyncio.sleep(0.5)
+            release.set()
+            await expect(
+                stale is None
+                and await until_sheet(a, "sheet?.kind === 'serving' && sheet.id === 'knopfmahl01'", 6)
+                and await state(a, f'{meal}.pets.lxpet00001.r') == 'schlecht',
+                'a reminder button first catches up: what B rated meanwhile opens on A and stays',
+            )
+            await ctx_a.unroute(f'{srv.url}/api/changes**')
+            await ctx_a.unroute(f'{srv.url}/api/events**')
+            await close_sheet(a)
+            await block(ctx_a)
+            await run(
+                a,
+                "db.servings.unshift({id: 'knopfmahl02', productId: 'lxprod0001', servedAt: Date.now(), pets: {lxpet00001: {r: null, at: null}}, note: ''}); save();",
+            )
+            await until_sync(a, "status.state === 'offline'", 15)
+            await a.evaluate("window.__tapNote({actionId: 'gut', notification: {extra: {serving: 'knopfmahl02', pet: 'lxpet00001'}}})")
+            await expect(
+                await until(a, "db.servings.find(s => s.id === 'knopfmahl02').pets.lxpet00001.r === 'gut'", 0.5),
+                'with the server out of reach the button rates at once',
+            )
+            await unblock(ctx_a, a)
+            await until(a, 'queue.length === 0')
+
             # Feeding reminder: the plugin gets server and code, and the server knows of B's meal but not of its treat
             await a.evaluate(
                 "import('./js/store.js').then(async s => { s.prefs.feedRemind = true; (await import('./js/logic/reminders.js')).syncReminders(); })"
