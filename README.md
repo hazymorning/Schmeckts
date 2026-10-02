@@ -15,7 +15,7 @@
   <a href="#installieren"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1798bb44-ce7c-4fe1-aa79-b14bd7346e2e"><img src="https://github.com/user-attachments/assets/382cc84e-bfce-4891-86fc-8ddd5056eef1" width="292" alt="Installationsanleitung"></picture></a>
 </p>
 
-Unsere Katze ist wählerisch. Manches ist sofort weg, anderes wird nur kurz beschnuppert, und was gestern noch super war, bleibt heute stehen. Merken kann sich das keiner, also schreibt die App mit. Nach ein paar Wochen weißt du, was deinem Tier wirklich schmeckt.
+Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumutung. Also schreibt die App mit, bis klar ist, was ankommt. Die Katze hält das für übertrieben.
 
 <p align="center">
   <picture>
@@ -26,19 +26,31 @@ Unsere Katze ist wählerisch. Manches ist sofort weg, anderes wird nur kurz besc
 
 ## So geht’s
 
-1. Beim Füttern den Barcode scannen. Kennt die App die Sorte, ist die Mahlzeit schon eingetragen.
-2. Neue Sorte oder kein Barcode? Foto von der Packung machen, die App schlägt Marke und Sorte vor.
-3. Später antippen, wie viel gefressen wurde.
+1. Beim Füttern den Barcode scannen oder die Packung fotografieren.
+2. Später antippen, wie viel gefressen wurde.
+3. Nach ein paar Wochen nachsehen, was wirklich schmeckt.
 
-## Was noch drin ist
+<details>
+<summary><b>Was noch drin ist</b></summary>
+<br>
 
-- *Vorlieben*: Lieblingssorten, Ladenhüter, welche Marken und Geschmacksrichtungen gut ankommen und was als Nächstes in den Napf kann.
-- *Einkaufen*: was sich nachzukaufen lohnt und was eher nicht. Die Liste kannst du verschicken.
-- *Verlauf*: alle Mahlzeiten, Tag für Tag.
-- *Beobachtungen*: Gute Laune, großer Hunger, müder Tag, heftiger Stunk oder Erbrechen? Ein Tipp, und es ist notiert. Die App zeigt dir, ob so was nach einer bestimmten Sorte öfter vorkommt.
-- Auf Wunsch Erinnerungen ans Füttern und ans Bewerten. Bewerten geht dann oft direkt in der Benachrichtigung.
-- Mehrere Tiere, auch Hunde, Kaninchen oder Vögel, gern mit Spitznamen.
-- Backup für den Umzug aufs neue Handy.
+- *Vorlieben*: Leibgerichte, Ladenhüter und was als Nächstes in den Napf kann.
+- *Einkaufen*: was sich nachzukaufen lohnt, als Liste zum Verschicken.
+- *Verlauf*: jede Mahlzeit, Tag für Tag.
+- *Beobachtungen*: von guter Laune bis Erbrechen, mit einem Tipp notiert. Lüften musst du selbst.
+- Erinnerungen ans Füttern und Bewerten.
+- Mehrere Tiere, auch mit Spitznamen, auf die sie genauso wenig hören.
+- Backup fürs neue Handy.
+
+</details>
+
+<details>
+<summary><b>Wenn mehrere Leute füttern</b></summary>
+<br>
+
+Mit *Änderungen teilen* gehen neue Einträge als Datei ans andere Handy, ganz ohne Konto. Ein kleiner [Server](server/) im Heimnetz gleicht die Handys von selbst ab und erkennt Sorten am Foto. Nötig ist er nicht.
+
+</details>
 
 <!-- Der QR-Code springt hierher (…#how-to-install). Nicht löschen. -->
 <a id="how-to-install"></a>
@@ -51,64 +63,42 @@ Unsere Katze ist wählerisch. Manches ist sofort weg, anderes wird nur kurz besc
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/d12e5669-bdf4-4513-805b-bd4b8d16e2eb" width="292" alt="APK herunterladen"></a>
 </p>
 
-1. Auf dem Handy auf den Button tippen. Falls der Browser fragt, die Datei behalten.
-2. Nach dem Download auf *Öffnen* tippen. Sonst liegt `schmeckts.apk` in deinen *Downloads*.
-3. Beim ersten Mal fragt Android, ob dein Browser Apps installieren darf: *Einstellungen*, *Aus dieser Quelle zulassen*, zurück.
-4. *Installieren*, dann *Öffnen*.
+1. Auf dem Handy den Button antippen und die Datei behalten.
+2. *Öffnen* tippen oder `schmeckts.apk` in den *Downloads* suchen.
+3. Android fragt beim ersten Mal, ob der Browser Apps installieren darf: *Einstellungen*, *Aus dieser Quelle zulassen*, zurück.
+4. *Installieren*, *Öffnen*, füttern.
 
 <details>
-<summary><b>Play Protect will die App prüfen</b></summary>
+<summary><b>Wenn’s hakt</b></summary>
 <br>
 
-Die App kommt nicht aus dem Play Store, deshalb will Google sie einmal scannen. Einfach zulassen, danach geht’s normal weiter.
+*Play Protect* will die App prüfen, weil sie nicht aus dem Play Store kommt. Zulassen, fertig.
 
-</details>
+Updates einfach drüberinstallieren. Wer vorher deinstalliert, fängt von vorne an.
 
-<details>
-<summary><b>Update installieren</b></summary>
-<br>
+Bei *„App nicht installiert“* ist meist noch eine alte Testversion drauf: Backup machen, alte App löschen, neue installieren, Backup zurückholen.
 
-Neue Version herunterladen und einfach drüberinstallieren, deine Einträge bleiben. Die alte vorher nicht deinstallieren, sonst sind sie weg.
-
-</details>
-
-<details>
-<summary><b>„App nicht installiert“</b></summary>
-<br>
-
-Meistens ist noch eine alte Testversion drauf. In den *Einstellungen* ein Backup machen, die alte App löschen, die neue installieren und das Backup wieder einspielen.
-
-</details>
-
-<details>
-<summary><b>Handy ohne Google-Dienste</b></summary>
-<br>
-
-Geht alles, nur der Barcode-Scanner nicht. Der ist von Google und braucht die Play-Dienste.
+Ohne Google-Dienste geht alles außer dem Barcode-Scanner, der ist von Google.
 
 </details>
 
 <p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">Alle Versionen</a></sub></p>
 
-## Wenn mehrere Leute füttern
-
-Mit *Änderungen teilen* schickt ihr euch neue Einträge als Datei, per Messenger oder Kabel, ganz ohne Konto. Wer mag, stellt noch einen kleinen Server ins Heimnetz. Dann gleichen sich die Handys im WLAN von selbst ab, und die App erkennt Sorten schon am Foto. Nötig ist er nicht. Code und Anleitung liegen in [`server`](server/).
-
-## Fragen und Fehler
-
-Fragen und Ideen gern in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions), Fehler [hier melden](https://github.com/hazymorning/Schmeckts/issues/new/choose). Bitte dazuschreiben, welches Handy, welche Android-Version und welche App-Version (steht unten in den Einstellungen).
-
 ## Datenschutz
 
-Alles bleibt auf deinem Handy. Kein Konto, keine Cloud, keine Werbung, kein Tracking. Was deine Katze frisst und was sie verschmäht, bleibt unter euch. Sie würde es eh abstreiten.
+Alles bleibt auf deinem Handy. Kein Konto, keine Cloud, keine Werbung, kein Tracking. Was deine Katze frisst, bleibt unter euch. Sie würde es eh abstreiten.
 
 <details>
 <summary><b>Was trotzdem nach draußen geht</b></summary>
 <br>
 
-Der Barcode-Scanner ist von Google und schickt laut Google Gerätedaten wie das Handymodell mit, aber keine Bilder. Wenn du die Barcode-Suche einschaltest, fragt die App unbekannte Nummern bei zwei freien Produktdatenbanken nach, und zwar nur die Nummer. Die Schrift auf den Packungen liest die App selbst.
+Der Barcode-Scanner ist von Google und schickt laut Google Gerätedaten wie das Handymodell mit, aber keine Bilder. Die Produktsuche fragt, wenn du sie einschaltest, bei unbekannten Barcodes zwei freie Datenbanken, nur mit der Nummer.
 
 </details>
+
+## Fragen und Fehler
+
+Fragen und Ideen gern in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions), Fehler [hier melden](https://github.com/hazymorning/Schmeckts/issues/new/choose), am besten mit Handy, Android- und App-Version.
 
 ## Lizenz
 
