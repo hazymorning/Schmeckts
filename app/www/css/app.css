@@ -1332,7 +1332,7 @@ dialog.sheet::after {
   display: block;
   width: var(--pic-xxxl);
   height: var(--pic-xxxl);
-  margin: var(--space-1) auto var(--space-2);
+  margin: var(--space-4h) auto var(--space-2); /* 24 under the page title with its 6 */
   cursor: pointer;
   border-radius: 50%;
 }
@@ -2013,6 +2013,9 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 }
 .mt {
   margin-top: var(--space-6);
+}
+.apart {
+  margin-top: var(--space-7);
 }
 .mt-s {
   margin-top: var(--space-2h);

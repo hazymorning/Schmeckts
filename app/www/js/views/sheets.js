@@ -72,6 +72,8 @@ const prodRow = (s, p, inner, action, label) =>
   hasPhoto(s, p)
     ? `<div class="row set-row">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="${action}" aria-label="${label}">${inner}${icon('pencil', 'chev')}</button></div>`
     : `<button class="row set-row" data-action="${action}" aria-label="${label}">${thumbOf(s, p, 'xl')}${inner}${icon('pencil', 'chev')}</button>`;
+// removing sits well below the main button, so neither is taken for the other
+const apart = btn => `<div class="apart">${btn}</div>`;
 const photoLabel = p => (hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen');
 const photoLink = p =>
   `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${photoLabel(p)}</button>`;
@@ -211,7 +213,8 @@ function viewName() {
     <div class="suggest" id="lineChips"></div>
     ${group('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
     ${textureChips(s)}
-    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !product ? deleteMealBtn(serving.id) : ''}</div>`;
+    <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button></div>
+    ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
 }
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
 // x: a variety, or the sheet itself while naming
@@ -407,8 +410,8 @@ function viewProduct() {
     ${noticed(p)}
     ${hist ? group('Verlauf', `<ul class="list plist">${hist}</ul>`, '') : ''}
     ${codes.length ? group('Barcodes', `<ul class="list plist">${codes.map(barcodeRow).join('')}</ul>`, '') : ''}
-    <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Servieren</button>
-    ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
+    <div class="mt"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Servieren</button></div>
+    ${apart(armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen', {cls: 'quiet'}))}`;
 }
 
 // at: id of the day to open at
@@ -580,8 +583,8 @@ function viewPet() {
       'set-group',
     )}
     ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
-    <div class="mt btn-col"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button>
-    ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
+    <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button></div>
+    ${editing ? apart(armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
 }
 
 const VIEWS = {
