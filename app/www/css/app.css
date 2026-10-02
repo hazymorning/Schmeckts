@@ -1667,27 +1667,31 @@ dialog.sheet::after {
   font: var(--type-body-strong);
   font-variant-numeric: tabular-nums;
 }
-.dots {
+/* Ratings as small bars: the height is the points (--v, 0 to 1), the tone only backs it up. An open rating is an
+   empty slot at full height. */
+.bars {
   display: flex;
-  gap: var(--space-1);
-  height: 6px;
-  align-items: center;
+  align-items: flex-end;
+  gap: var(--space-hair);
+  height: var(--meter);
 }
-.dots i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.bars i {
+  width: var(--meter-w);
+  height: calc(var(--meter-w) + var(--v, 0) * (var(--meter) - var(--meter-w)));
+  border-radius: var(--radius-full);
   background: var(--c, var(--faint));
 }
-.dots i.open {
+.bars i.open {
+  height: var(--meter);
   background: none;
-  box-shadow: inset 0 0 0 var(--stroke) var(--faint);
+  box-shadow: inset 0 0 0 var(--hairline) var(--muted);
 }
-.dots b {
+.bars b {
+  align-self: center;
   font: var(--type-caption-strong);
-  color: var(--faint);
+  color: var(--muted);
 }
-.dots.strip {
+.bars.strip {
   flex: none;
 }
 
@@ -1966,7 +1970,7 @@ dialog.sheet::after {
   text-align: center;
 }
 .days {
-  --ground: var(--bg); /* the dots' cut-out colour: the page ground, not a card */
+  --ground: var(--bg); /* the nodes' cut-out colour: the page ground, not a card */
 }
 .days .cal {
   margin-top: 0;

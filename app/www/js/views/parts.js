@@ -136,6 +136,15 @@ function servingNode(s) {
     : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
   return `<i class="${cls}"></i>`;
 }
+// its height is the points, averaged over the pets on it
+function servingBar(s) {
+  const rs = servingPets(s)
+    .map(pid => rOf(s.pets[pid]))
+    .filter(Boolean);
+  if (!rs.length) return '<i class="open"></i>';
+  const v = rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length;
+  return `<i class="${rs.every(r => r === rs[0]) ? rateCls(rs[0]) : scoreCls(v)}" style="--v:${v / 100}"></i>`;
+}
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 // two weeks from last Monday, or with week the seven days up to today in one row
 export function calendarHTML(list, week = false) {
@@ -157,16 +166,16 @@ export function calendarHTML(list, week = false) {
       items = byDay.get(k) || [],
       isToday = k === todayKey;
     if (i < 7) names += `<span class="wd">${WEEKDAYS[(d.getDay() + 6) % 7]}</span>`;
-    const dots = items.slice(0, 3).map(servingNode).join('') + (items.length > 3 ? '<b>+</b>' : '');
+    const bars = items.slice(0, 3).map(servingBar).join('') + (items.length > 3 ? '<b>+</b>' : '');
     const label = dayLabel(d.getTime()) + (items.length ? ', ' + fedLabel(items) : ', nichts eingetragen');
-    cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="dots">${dots}</span></button>`;
+    cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="bars">${bars}</span></button>`;
     if (isToday) future = true;
     d.setDate(d.getDate() + 1);
   }
   return `<div class="cal">${names}${cells}</div>`;
 }
 /* {keys, more}: from ratingsIn(), oldest first. open: ratings the verdict still lacks, drawn hollow. The label says
-   it in words, so nothing rests on colour. */
+   it in words. */
 const STRIP = 8;
 export function strip({keys, more}, open = 0) {
   if (!keys.length) return '';
@@ -175,9 +184,9 @@ export function strip({keys, more}, open = 0) {
   const said =
     evidenceOf({n: keys.length, counts}) +
     (open ? `, noch ${open === 1 ? 'eine Bewertung' : 'zwei Bewertungen'} offen` : '');
-  return `<span class="dots strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
+  return `<span class="bars strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
     .slice(-STRIP)
-    .map(r => `<i class="${rateCls(r)}"></i>`)
+    .map(r => `<i class="${rateCls(r)}" style="--v:${RATINGS[r].score / 100}"></i>`)
     .join('')}${'<i class="open"></i>'.repeat(open)}</span>`;
 }
 export function dayGroups(list) {

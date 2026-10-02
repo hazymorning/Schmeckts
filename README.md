@@ -33,7 +33,7 @@ Unsere Katze ist wählerisch. Manche Sorten sind sofort weg, an anderen schnuppe
 ## Was noch drin ist
 
 - *Vorlieben*: die fünf Sorten, die am besten ankommen, und die, die stehen bleiben; ob dein Tier gerade anders frisst als sonst, welche Marken, Konsistenzen und Geschmacksrichtungen ankommen, ob es Abwechslung mag und was als Nächstes in den Napf kann.
-- *Einkaufen*: was gut ankommt und nachgekauft werden kann, nach Futterart, mit den letzten Bewertungen als Punkte. Die Liste lässt sich verschicken.
+- *Einkaufen*: was gut ankommt und nachgekauft werden kann, nach Futterart, mit den letzten Bewertungen als kleine Balken. Die Liste lässt sich verschicken.
 - *Verlauf*: alle Mahlzeiten, Tag für Tag.
 - *Beobachtungen*: Hat dein Tier gute Laune, großen Hunger oder einen müden Tag, oder stinkt es heftig, notierst du das mit einem Tipp auf der Startseite. Die Einträge stehen im Verlauf, und unter *Vorlieben* siehst du, ob so etwas nach einer bestimmten Sorte öfter vorkommt.
 - Erinnerungen ans Bewerten und ans Füttern, beide erst mal aus.

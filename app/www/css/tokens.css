@@ -110,6 +110,8 @@
   --pic-xl: 56px;
   --pic-xxl: 72px;
   --pic-xxxl: 112px;
+  --meter: 16px; /* a rating bar at full points; the lowest is as tall as it is wide */
+  --meter-w: 4px;
 
   --hairline: 1px;
   --stroke: 2px; /* every emphasised line */
