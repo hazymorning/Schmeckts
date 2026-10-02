@@ -121,7 +121,8 @@
   --dim: 0.35; /* days to come */
   --busy: 0.6;
   --mood: 0.16; /* 0.26 in dark, below */
-  --mood-filter: saturate(0.85);
+  --mood-blur: 24px;
+  --mood-filter: saturate(0.85) blur(var(--mood-blur));
   --blur-edge: 6px; /* what scrolls under the status bar */
 
   --bg: light-dark(#eeede7, #1b1c17);

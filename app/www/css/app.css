@@ -149,8 +149,10 @@ strong {
   --cs: var(--happy-soft);
 }
 
-/* only the alpha in the mask gradient matters */
+/* Only the alpha in the mask gradient matters. A layer of its own, so the blur below is drawn once and not with every
+   redraw of the cards over it. */
 .mood {
+  will-change: transform;
   position: absolute;
   top: 0;
   left: 0;
@@ -161,11 +163,13 @@ strong {
   -webkit-mask-image: linear-gradient(to bottom, var(--ink) 35%, transparent);
   mask-image: linear-gradient(to bottom, var(--ink) 35%, transparent);
 }
+/* out of focus, so it reads as a mood rather than a faded picture; the edges reach past the box, or the blur would
+   lighten them */
 .mood img {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: calc(-2 * var(--mood-blur));
+  width: calc(100% + 4 * var(--mood-blur));
+  height: calc(100% + 4 * var(--mood-blur));
   object-fit: cover;
   opacity: var(--mood);
   filter: var(--mood-filter);
