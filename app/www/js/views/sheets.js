@@ -420,16 +420,16 @@ export const reportState = at => ({kind: 'report', at});
 const shopList = (m, list) =>
   list.length ? `<ul class="list shop">${list.map(e => shopRow(m, e)).join('')}</ul>` : '';
 const unclear = g => [...g.geht, ...g.neu];
-const FOLDS = {
-  nicht: {label: 'Anzeigen', inner: () => shopList(model(), shopGroups(model()).nicht)},
-  unklar: {label: 'Anzeigen', inner: () => shopList(model(), unclear(shopGroups(model())))},
-};
+const FOLDS = {nicht: g => g.nicht, unklar: unclear};
+const FOLDED = 3; // rows a fold shows before the rest
+const foldLabel = (list, open) => (open ? 'Weniger' : `Alle ${list.length} zeigen`);
 function foldBox(key) {
-  const inner = FOLDS[key].inner(),
+  const m = model(),
+    list = FOLDS[key](shopGroups(m)),
     open = !!sheet.open?.[key];
-  if (!inner) return '';
-  return `<div class="card-body fold" id="fold-${key}">${open ? inner : ''}</div>
-    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${open ? 'Weniger' : FOLDS[key].label}</button>`;
+  if (list.length <= FOLDED) return shopList(m, list);
+  return `${shopList(m, list.slice(0, FOLDED))}<div class="card-body fold" id="fold-${key}">${open ? shopList(m, list.slice(FOLDED)) : ''}</div>
+    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${foldLabel(list, open)}</button>`;
 }
 
 function viewReport() {
@@ -453,35 +453,33 @@ export function foldPart(key) {
     body = $('#fold-' + key, sheetBody),
     btn = $(`[data-action=fold][data-v="${key}"]`, sheetBody);
   if (!f || !body || !btn) return;
-  const open = !sheet.open?.[key],
+  const m = model(),
+    list = f(shopGroups(m)),
+    open = !sheet.open?.[key],
     h0 = body.offsetHeight;
   sheet.open = {...sheet.open, [key]: open};
-  body.innerHTML = open ? f.inner() : '';
-  btn.textContent = open ? 'Weniger' : f.label;
+  body.innerHTML = open ? shopList(m, list.slice(FOLDED)) : '';
+  btn.textContent = foldLabel(list, open);
   btn.setAttribute('aria-expanded', String(open));
   slideHeight(body, h0);
   drawn.set(sheetBody, VIEWS[sheet.kind]()); // so the next redraw sees nothing new
 }
-const sorts = (n, one, many) => (n === 1 ? `1 Sorte ${one}` : `${n} Sorten ${many}`);
 function viewShop() {
   const m = model(),
     g = shopGroups(m),
     types = TYPES.map(t => [t, g.nachkaufen.filter(e => typeOf(e.product) === t)]).filter(([, l]) => l.length),
-    open = unclear(g).length;
+    share = types.length
+      ? `<button class="icon-btn" data-action="share-list" aria-label="Liste teilen">${icon('share')}</button>`
+      : '';
   const buy = types.length
-    ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('') +
-      `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Liste teilen</button></div>`
+    ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('')
     : '<p class="hint card-line">Noch nichts zum Nachkaufen, erst mal probieren.</p>';
-  return `${head('Einkaufen' + forWhom(m.pet))}
+  return `${head('Einkaufen' + forWhom(m.pet), 'settings-back', share)}
     <section class="card"><h2>${sideIcon('top')}Nachkaufen</h2>${buy}</section>${
       g.nicht.length
-        ? `<section class="card"><h2>${sideIcon('flop')}Nicht mehr kaufen</h2><p class="say card-line">${sorts(g.nicht.length, 'bleibt', 'bleiben')} meist stehen.</p>${foldBox('nicht')}</section>`
+        ? `<section class="card"><h2>${sideIcon('flop')}Nicht mehr kaufen</h2>${foldBox('nicht')}</section>`
         : ''
-    }${
-      open
-        ? `<section class="card"><h2>Noch unklar</h2><p class="say card-line">${sorts(open, 'ist', 'sind')} noch unklar.</p>${foldBox('unklar')}</section>`
-        : ''
-    }`;
+    }${unclear(g).length ? `<section class="card"><h2>Noch unklar</h2>${foldBox('unklar')}</section>` : ''}`;
 }
 
 function viewProfile() {

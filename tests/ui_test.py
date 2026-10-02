@@ -467,6 +467,32 @@ async def test_shop(browser, url):
     await ctx.close()
 
 
+async def test_shop_folds(browser, url):
+    print('„Einkaufen“: what is no longer bought shows its first three at once, the rest behind one tap')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    left = [f'stehen{i:04d}' for i in range(5)]
+    await load(
+        pg,
+        [pet(M)],
+        [product(i, 'Sheba', f'Sorte {n}') for n, i in enumerate([*left, 'unklar0001'])],
+        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5, {M: 'schlecht'}) for i in left for n in range(2)]
+        + [meal('unklar0001-0', 'unklar0001', now - 864e5, {M: 'mittel'})],
+    )
+    await open_sheet(pg, kind='shop')
+    ROWS = "s => document.querySelector(s).closest('.card').querySelectorAll('.shop > li').length"
+    shut = await pg.evaluate(ROWS, '#sheet [data-action=fold][data-v=nicht]')
+    await tap(pg, '#sheet [data-action=fold][data-v=nicht]')
+    rows = [shut, await pg.evaluate(ROWS, '#sheet [data-action=fold][data-v=nicht]'), await pg.evaluate(ROWS, '#sheet [data-id=unklar0001]')]
+    check(
+        rows == [3, 5, 1] and await pg.locator('#sheet [data-action=fold][data-v=unklar]').count() == 0,
+        f'three at once, the rest after a tap; a short list has nothing to unfold {rows}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 M, T = 'minka00001', 'tiger00001'
 BRANDS = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Rinti', 'Bozita', 'Schesir']
 
@@ -2391,6 +2417,7 @@ run_tests(
         'buying': test_buying,
         'cards': test_cards,
         'shop': test_shop,
+        'shop-folds': test_shop_folds,
         'history': test_home_history,
         'report': test_report,
         'evaluation': test_evaluation,

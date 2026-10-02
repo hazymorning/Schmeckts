@@ -96,6 +96,7 @@ strong {
 }
 .btn .ic,
 .card-btn .ic,
+.more .ic,
 .chip .ic,
 .seg button .ic,
 .toast button .ic,
@@ -471,8 +472,11 @@ dialog.sheet.page .sheet-body {
   padding: 0 var(--gutter);
   background: var(--bg);
 }
-.head .icon-btn {
+.head .icon-btn:first-child {
   margin-left: calc(-1 * var(--space-3));
+}
+.head .icon-btn:last-child:not(:first-child) {
+  margin-right: calc(-1 * var(--space-3));
 }
 /* shown once the page title has scrolled under the bar */
 .bar-title {
@@ -1063,6 +1067,20 @@ dialog.sheet::after {
   height: var(--icon-s);
   vertical-align: middle;
   margin-right: var(--space-1h);
+}
+/* The way from a card to its page, at the end of the heading. The tap area reaches into the card's padding above,
+   so the heading line keeps its height. */
+.more {
+  display: flex;
+  align-items: center;
+  gap: var(--space-hair);
+  flex: 0 0 auto;
+  min-height: var(--tap);
+  margin: calc(-1 * var(--space-3h)) calc(-1 * var(--space-3)) calc(-1 * var(--space-1h)) 0;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-m);
+  font: var(--type-small-strong);
+  color: var(--accent-ink);
 }
 /* --space-3 above the line, so what ends the card does not sit on it */
 .card-btn {
@@ -1747,6 +1765,16 @@ dialog.sheet::after {
   margin: 0 0 var(--space-1);
   color: var(--ink);
 }
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+}
+.card-head h2 {
+  margin: 0;
+}
 /* flow-root, so the children's margins count towards the height and the animation does not jump */
 .card-body {
   display: flow-root;
@@ -1896,8 +1924,9 @@ dialog.sheet::after {
   font: var(--type-caption-strong);
   color: var(--c);
 }
-.tile + .card-btn {
-  margin-top: var(--space-3h);
+/* with the card's 8px foot this makes 18, as at the top */
+.tile:last-child {
+  margin-bottom: var(--space-2h);
 }
 .portrait {
   display: flex;
@@ -2193,6 +2222,7 @@ body,
 .box,
 .btn,
 .card-btn,
+.more,
 .chip,
 .seg button,
 .field,
@@ -2234,7 +2264,7 @@ dialog.sheet.dragging {
 :is(button.row, button.box, button.tile, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
-:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
+:is(.icon-btn, .more, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {

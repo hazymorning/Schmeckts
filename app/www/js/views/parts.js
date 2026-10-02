@@ -91,12 +91,15 @@ export const closeBtn = `<button class="icon-btn" data-action="close" aria-label
 export const deleteMealBtn = id =>
   `<button class="btn quiet" data-action="delete-serving" data-id="${id}">${icon('trash')}Eintrag löschen</button>`;
 /* Sheet or page head, decided by the state so one view can be both. back: for a step that is not a level of its
-   own, such as cropping. */
-export const head = (title, back = 'settings-back') =>
+   own, such as cropping. end: a button at the end of the bar. */
+export const head = (title, back = 'settings-back', end = '') =>
   isPage(sheet)
-    ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span></div>
+    ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span>${end}</div>
     <h2 class="page-title">${title}</h2>`
-    : `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>`;
+    : `<div class="sh-head"><h2>${title}</h2>${end}${closeBtn}</div>`;
+// a card's heading with the way to its page at its end; label names that page for screen readers
+export const cardHead = (title, action, label, more = 'Alle', v = '') =>
+  `<div class="card-head"><h2>${title}</h2><button class="more" data-action="${action}"${v ? ` data-v="${v}"` : ''} aria-label="${label}">${more}${icon('chevron')}</button></div>`;
 export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 // option: [value, label, icon?, action?]
 export const segmented = (action, options, current) =>

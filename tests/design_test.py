@@ -186,8 +186,6 @@ async def test_views(browser, url, scheme):
     await tap('#sheet [data-action=settings-back]')
     await tap('#sheet [data-action=settings-back]')
     await tap('[data-sec=shop] [data-action=open-shop]')
-    for key in ('nicht', 'unklar'):
-        await tap(f'#sheet [data-action=fold][data-v={key}]')
     await scan()
     await tap('#sheet [data-action=settings-back]')
     await tap('[data-action=open-settings]')

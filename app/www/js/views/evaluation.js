@@ -18,6 +18,7 @@ import {
 import {GOOD, goodOf, poorOf, ratingsIn} from '../smart.js';
 import {
   avatar,
+  cardHead,
   evidenceOf,
   forWhom,
   habitRow,
@@ -125,8 +126,7 @@ export function evaluationCard(m) {
           : 'Ab drei Bewertungen einer Sorte steht hier, was am besten ankommt und was stehen bleibt.';
     body = `<p class="say card-line">${waiting(m, r)}</p>${next ? `<p class="hint card-line">${next}</p>` : ''}`;
   }
-  return `<section class="card" data-sec="evaluation" style="view-transition-name:sec-evaluation"><h2>Vorlieben</h2>${body}
-    <button class="card-btn" data-action="open-evaluation">Alle Vorlieben${icon('chevron')}</button></section>`;
+  return `<section class="card" data-sec="evaluation" style="view-transition-name:sec-evaluation">${cardHead('Vorlieben', 'open-evaluation', 'Alle Vorlieben')}${body}</section>`;
 }
 
 // the lists below name the varieties, so this only says how many of all settled ones go down well
@@ -353,8 +353,7 @@ function patternCard(m, x) {
     : first
       ? likesList(m, {...first, groups: [first.groups[0], first.groups.at(-1)]})
       : toldList(habits.slice(0, HABITS).map(h => habitRow(h, db.pets.length > 1 && !m.pet)));
-  return `<section class="card"><h2>Worauf es ankommt</h2>${tips.length ? say(`Neues am ehesten <b>${andList(tips)}</b> probieren.`) : ''}${body}
-    <button class="card-btn" data-action="open-level" data-v="profile">Mehr dazu${icon('chevron')}</button></section>`;
+  return `<section class="card">${cardHead('Worauf es ankommt', 'open-level', 'Mehr dazu', 'Mehr', 'profile')}${tips.length ? say(`Neues am ehesten <b>${andList(tips)}</b> probieren.`) : ''}${body}</section>`;
 }
 
 const TRIALS = 3;
