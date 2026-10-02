@@ -7,6 +7,7 @@ import {REMIND, REMIND_MAX_H} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {feedSlots} from '../smart.js';
+import {petNames} from '../derive.js';
 import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} from './parts.js';
 import {sheet} from '../ui/sheet.js';
 
@@ -112,7 +113,7 @@ function overview() {
         ? armBtn('wipe', 'Alle Daten im Haushalt löschen', 'Nochmal tippen: für alle im Haushalt löschen')
         : armBtn('wipe', 'Alle Daten löschen', 'Nochmal tippen: wirklich alles löschen')
     }</div>
-    <p class="hint foot">${house ? 'Alle Daten liegen auf diesem Handy und werden im Haushalt abgeglichen.' : 'Alle Daten bleiben auf diesem Handy.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}</p>`;
+    <p class="hint foot">${house ? 'Alle Daten liegen auf diesem Handy und werden im Haushalt abgeglichen.' : 'Alle Daten bleiben auf diesem Handy.'}${appInfo.version ? `<br>Version ${esc(appInfo.version)}` : ''}${db.pets.length ? `<br>Mit Liebe für ${esc(petNames(db.pets.map(p => p.id)))}${icon('heart', 'love')}` : ''}</p>`;
 }
 
 const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gespeichert hat. Ein Import ersetzt die

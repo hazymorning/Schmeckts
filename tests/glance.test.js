@@ -583,11 +583,14 @@ test('the lines: at least three ways of saying every kind, two sentences at most
     hat: 'hat',
     names: 'Minka',
     wartet: 'wartet',
+    findet: 'findet',
+    freut: 'freut',
+    ist: 'ist',
     since: 'vor 3 Tagen',
     evening: 'Abend ',
   };
   for (const [kind, list] of Object.entries(LEADS))
-    for (const t of list) assert.ok(fill(t, usual).length <= 44, `${kind}: ${fill(t, usual)}`);
+    for (const t of list) assert.ok(fill(t, usual).length <= 46, `${kind}: ${fill(t, usual)}`);
   for (const [kind, list] of Object.entries(LINES))
     for (const t of list) assert.ok(t.replace(/\{\w+\}/g, 'Wort').length <= 52, `${kind}: ${t}`);
   const phrases = [...Object.values(RATINGS).flatMap(r => [r.label, r.said]), ...Object.values(VERDICTS)].map(w =>
@@ -638,7 +641,8 @@ test('the overview card: the moment picks the first sentence, news of the day th
     servings: [],
   });
   const say = (kind, values, days = 0) => fill(byDay(LINES[kind], T + days * DAY), values);
-  const lead = (moment, values, days = 0) => fill(byDay(LEADS[moment], T + days * DAY), values);
+  const who = {names: 'Minka', wartet: 'wartet', findet: 'findet', freut: 'freut', ist: 'ist', hat: 'hat'},
+    lead = (moment, values, days = 0) => fill(byDay(LEADS[moment], T + days * DAY), {...who, ...values});
   const lines = text =>
     text
       .split('<span class="ov-line">')

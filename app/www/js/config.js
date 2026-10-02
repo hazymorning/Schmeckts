@@ -10,21 +10,82 @@ export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1))
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]);
 // keys are stored in the data, never rename them; short has to fit a column of six at 360px
+// cheer: what the confirmation adds
 export const RATINGS = {
-  top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100},
-  gut: {label: 'Fast leer', short: 'Fast leer', said: 'fast leer', score: 80},
-  mittel: {label: 'Halb gegessen', short: 'Hälfte übrig', said: 'halb gegessen', score: 50},
-  eager: {label: 'Nur bissl', short: 'Nur bissl', said: 'nur ein bissl gefressen', score: 40},
-  sosse: {label: 'Soße geleckt', short: 'Nur Soße', said: 'nur die Soße geleckt', score: 30},
-  schlecht: {label: 'Kaum angerührt', short: 'Fast nix', said: 'kaum angerührt', score: 0},
-  gern: {label: 'Gern gefressen', short: 'Gern gefressen', said: 'gern gefressen', score: 100},
-  normal: {label: 'Normal gefressen', short: 'Normal gefressen', said: 'normal gefressen', score: 80},
-  wenig: {label: 'Wenig gefressen', short: 'Wenig gefressen', said: 'wenig gefressen', score: 35},
-  liegen: {label: 'Liegen gelassen', short: 'Liegen gelassen', said: 'liegen gelassen', score: 0},
-  verputzt: {label: 'Sofort verputzt', short: 'Sofort verputzt', said: 'sofort verputzt', score: 100},
-  spaeter: {label: 'Später gefressen', short: 'Später gefressen', said: 'später gefressen', score: 70},
-  angeknabbert: {label: 'Nur angeknabbert', short: 'Nur geknabbert', said: 'nur angeknabbert', score: 35},
-  unberuehrt: {label: 'Nicht angerührt', short: 'Nicht angerührt', said: 'nicht angerührt', score: 0},
+  top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100, cheer: 'Ratzeputz!'},
+  gut: {label: 'Fast leer', short: 'Fast leer', said: 'fast leer', score: 80, cheer: 'Fast wie geleckt.'},
+  mittel: {label: 'Halb gegessen', short: 'Hälfte übrig', said: 'halb gegessen', score: 50, cheer: 'Halbe-halbe.'},
+  eager: {
+    label: 'Nur bissl',
+    short: 'Nur bissl',
+    said: 'nur ein bissl gefressen',
+    score: 40,
+    cheer: 'Probiert ist probiert.',
+  },
+  sosse: {
+    label: 'Soße geleckt',
+    short: 'Nur Soße',
+    said: 'nur die Soße geleckt',
+    score: 30,
+    cheer: 'Die Soße war der Star.',
+  },
+  schlecht: {
+    label: 'Kaum angerührt',
+    short: 'Fast nix',
+    said: 'kaum angerührt',
+    score: 0,
+    cheer: 'Heute lieber nicht.',
+  },
+  gern: {label: 'Gern gefressen', short: 'Gern gefressen', said: 'gern gefressen', score: 100, cheer: 'Läuft!'},
+  normal: {
+    label: 'Normal gefressen',
+    short: 'Normal gefressen',
+    said: 'normal gefressen',
+    score: 80,
+    cheer: 'Alles im grünen Bereich.',
+  },
+  wenig: {
+    label: 'Wenig gefressen',
+    short: 'Wenig gefressen',
+    said: 'wenig gefressen',
+    score: 35,
+    cheer: 'Heute eher sparsam.',
+  },
+  liegen: {
+    label: 'Liegen gelassen',
+    short: 'Liegen gelassen',
+    said: 'liegen gelassen',
+    score: 0,
+    cheer: 'Der Napf bleibt voll.',
+  },
+  verputzt: {
+    label: 'Sofort verputzt',
+    short: 'Sofort verputzt',
+    said: 'sofort verputzt',
+    score: 100,
+    cheer: 'Weg war’s!',
+  },
+  spaeter: {
+    label: 'Später gefressen',
+    short: 'Später gefressen',
+    said: 'später gefressen',
+    score: 70,
+    cheer: 'Gut Ding will Weile.',
+  },
+  angeknabbert: {
+    label: 'Nur angeknabbert',
+    short: 'Nur geknabbert',
+    said: 'nur angeknabbert',
+    score: 35,
+    cheer: 'Immerhin probiert.',
+  },
+  unberuehrt: {
+    label: 'Nicht angerührt',
+    short: 'Nicht angerührt',
+    said: 'nicht angerührt',
+    score: 0,
+    cheer: 'Keine Chance.',
+  },
 };
 export const SCALES = {
   portion: ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht'], // the bowl after the meal
@@ -201,7 +262,19 @@ export function flavoursOf(text) {
 /* Keys are stored in the data; a kind from a newer app version is kept and shown generically. 'meal' weighs it
    against the meals in the `within` hours before (a stink takes a day to come through, hunger means the last meal
    did not last), 'day' only against the day. */
+// button: {pet} is the name, or "Bande" for several
 export const OBSERVATIONS = {
+  happy: {
+    icon: 'o_happy',
+    button: 'Happy {pet}',
+    chip: 'Happy',
+    label: 'Gute Laune',
+    said: 'Gute Laune notiert. Herrlich!',
+    about: 'meal',
+    within: 24,
+    window: 'in den 24 Stunden',
+    after: 'innerhalb eines Tages',
+  },
   stink: {
     icon: 'o_stink',
     button: 'Heftiger Stunk!',
@@ -224,7 +297,6 @@ export const OBSERVATIONS = {
     window: 'in den drei Stunden',
     after: 'innerhalb von drei Stunden',
   },
-  // {pet}: the name, or "Bande" for several
   tired: {
     icon: 'o_tired',
     button: 'Müde {pet}',

@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, open_page, phone, run_tests, set_theme
 
 RATING = ('--good', '--mid', '--sauce', '--bad')
-OBSERVED = ('--stink', '--hungry', '--tired')
+OBSERVED = ('--happy', '--stink', '--hungry', '--tired')
 TEXT_PAIRS = (
     [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')]
     + [
@@ -18,11 +18,18 @@ TEXT_PAIRS = (
         ('--toast-action', '--ink'),
         ('--accent-ink', '--accent-soft'),
         ('--bad', '--bad-soft'),
+        ('--good', '--good-soft'),
+        ('--muted', '--good-soft'),
+        ('--muted', '--bad-soft'),
         ('--bad', '--surface'),
     ]
     + [('--ink', r + '-soft') for r in RATING + OBSERVED]
 )
-ICON_PAIRS = [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')] + [(o, o + '-soft') for o in OBSERVED]
+ICON_PAIRS = (
+    [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')]
+    + [(o, o + '-soft') for o in OBSERVED]
+    + [('--surface', o) for o in OBSERVED]
+)
 TOKENS = (
     """(names) => { const rgb = """
     + RGB

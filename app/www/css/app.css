@@ -144,6 +144,10 @@ strong {
   --c: var(--tired);
   --cs: var(--tired-soft);
 }
+.o-happy {
+  --c: var(--happy);
+  --cs: var(--happy-soft);
+}
 
 /* only the alpha in the mask gradient matters */
 .mood {
@@ -166,19 +170,53 @@ strong {
   opacity: var(--mood);
   filter: var(--mood-filter);
 }
-/* Behind the status bar, shown once the page scrolls. Dialogs sit in the top layer, above it. */
-body::before {
+/* Soft edges, as native apps draw them: what scrolls under the status bar goes out of focus and fades into the
+   ground, and the page fades out towards the feeding button. --from: where the fade starts, --over: how long it is,
+   --to: its direction. Dialogs sit in the top layer, above both. */
+body::before,
+body::after,
+:is(.grip-zone, .head, .days .tl-date)::after,
+dialog.sheet::after {
   content: "";
-  position: fixed;
-  inset: 0 0 auto 0;
-  height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  background: var(--bg);
-  opacity: 0;
-  z-index: var(--z-strip);
   pointer-events: none;
+  background: var(--bg);
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+  --fade: linear-gradient(
+    var(--to, to bottom),
+    var(--ink) var(--from, 0px),
+    color-mix(in srgb, var(--ink) 78%, transparent) calc(var(--from, 0px) + 0.25 * var(--over)),
+    color-mix(in srgb, var(--ink) 42%, transparent) calc(var(--from, 0px) + 0.5 * var(--over)),
+    color-mix(in srgb, var(--ink) 14%, transparent) calc(var(--from, 0px) + 0.75 * var(--over)),
+    transparent calc(var(--from, 0px) + var(--over))
+  );
+}
+body::before,
+body::after {
+  position: fixed;
+  left: 0;
+  right: 0;
+}
+body::before {
+  --from: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --over: var(--space-7);
+  top: 0;
+  z-index: var(--z-strip);
+  height: calc(var(--from) + var(--over));
+  -webkit-backdrop-filter: blur(var(--blur-edge));
+  backdrop-filter: blur(var(--blur-edge));
+  opacity: 0;
 }
 :root.scrolled body::before {
   opacity: 1;
+}
+body::after {
+  --to: to top;
+  --from: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --over: calc(var(--control-l) + 2 * var(--space-5));
+  bottom: 0;
+  z-index: var(--z-edge);
+  height: calc(var(--from) + var(--over));
 }
 /* the bottom leaves room for the feeding button */
 .app {
@@ -383,6 +421,7 @@ dialog.sheet.page .sheet-body {
 
 .grip-zone {
   position: relative;
+  z-index: var(--z-raise);
   padding: var(--space-2h) 0 var(--space-2);
   touch-action: none;
   cursor: grab;
@@ -443,18 +482,16 @@ dialog.sheet.page .sheet-body {
 dialog.sheet.titled .bar-title {
   opacity: 1;
 }
-/* The line sits inside its element's box, so it never covers content; of stacked edges only the lowest draws
-   it. */
+/* What scrolls under a bar fades into it; of stacked edges only the lowest draws. The foot of a sheet fades too,
+   and the body's bottom padding keeps the last button clear of it. */
 :is(.grip-zone, .head, .days .tl-date)::after {
-  content: "";
+  --over: var(--space-5);
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: var(--hairline);
-  background: var(--line);
+  top: 100%;
+  height: var(--over);
   opacity: 0;
-  pointer-events: none;
 }
 dialog.sheet.scrolled :is(.grip-zone, .head)::after,
 .days .tl-date.stuck::after {
@@ -463,6 +500,17 @@ dialog.sheet.scrolled :is(.grip-zone, .head)::after,
 /* the stuck day line draws the edge instead */
 dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   opacity: 0;
+}
+dialog.sheet::after {
+  --to: to top;
+  --from: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --over: var(--space-6);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-bar);
+  height: calc(var(--from) + var(--over));
 }
 
 /* always dark: color-scheme resolves the tokens dark */
@@ -923,15 +971,11 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   background: var(--accent);
   color: var(--on-accent);
 }
-.chip.tight {
-  gap: var(--space-1h);
-  padding: var(--inset-tight);
-}
 .chip .av {
   margin-left: calc(-1 * var(--space-2));
 }
-/* Scrolls sideways edge to edge in its card, fading at the edges; the padding keeps the ends in line with the
-   card's text. Only the alpha in the mask gradient matters. */
+/* Scrolls sideways edge to edge in its card, so a chip slides under the card's rim like on a shelf; the padding keeps
+   the ends in line with the card's text */
 .rail {
   display: flex;
   gap: var(--space-2);
@@ -942,20 +986,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   scroll-snap-type: x mandatory;
   scroll-padding-inline: var(--gutter);
   scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent,
-    var(--ink) var(--gutter),
-    var(--ink) calc(100% - var(--gutter)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent,
-    var(--ink) var(--gutter),
-    var(--ink) calc(100% - var(--gutter)),
-    transparent
-  );
 }
 .rail::-webkit-scrollbar {
   display: none;
@@ -1183,6 +1213,20 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .toned .ic {
   color: var(--c, var(--muted));
 }
+/* the tone at full strength, so a row of chips reads by colour before the words */
+.disc {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--pic-s);
+  height: var(--pic-s);
+  margin-left: calc(-1 * var(--space-2h));
+  border-radius: 50%;
+  background: var(--c);
+}
+.toned .disc .ic {
+  color: var(--surface);
+}
 /* chosen: a ring in the tone, quieter than the accent fill */
 .toned[aria-pressed="true"] {
   background: var(--cs);
@@ -1216,6 +1260,29 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   position: absolute;
   top: 0;
   left: 0;
+}
+/* a party hat tipped over the picture's corner on a birthday; at night a z drifts up from it */
+.hat {
+  position: absolute;
+  top: calc(-1 * var(--space-2h));
+  right: calc(-1 * var(--space-1));
+  display: grid;
+  color: var(--happy);
+  transform: rotate(18deg);
+}
+.hat .ic {
+  width: var(--icon-l);
+  height: var(--icon-l);
+  stroke-width: var(--icon-stroke-l);
+}
+.ov-pic.sleepy::after {
+  content: "z";
+  position: absolute;
+  top: 0;
+  right: var(--space-1);
+  font: var(--type-small-strong);
+  color: var(--muted);
+  pointer-events: none;
 }
 .ov-pic .av.pair + .av.pair {
   top: auto;
@@ -1778,14 +1845,45 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .told li {
   align-items: flex-start;
 }
-.t-main small .side {
+/* the best and the worst variety on their tone's ground, the icon on a disc of the card's colour */
+.tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3h);
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--cs, var(--raise));
+  color: var(--ink);
+  text-align: left;
+}
+.tile + .tile {
+  margin-top: var(--space-2);
+}
+.tile-ic {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--pic-l);
+  height: var(--pic-l);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--c, var(--muted));
+}
+.tile-ic .ic {
+  width: var(--icon-l);
+  height: var(--icon-l);
+  stroke-width: var(--icon-stroke-l);
+}
+.tile .t-main small {
+  white-space: normal;
+}
+.tile .kicker {
+  font: var(--type-caption-strong);
   color: var(--c);
 }
-.sides > .row > .sk {
-  color: var(--faint);
-}
-.sides > .row small {
-  white-space: normal;
+.tile + .card-btn {
+  margin-top: var(--space-3h);
 }
 .portrait {
   display: flex;
@@ -2016,6 +2114,12 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .set-under .label {
   margin-top: var(--space-3);
 }
+.foot .love {
+  width: var(--icon-s);
+  height: var(--icon-s);
+  margin-left: var(--space-1);
+  vertical-align: -0.2em;
+}
 .foot {
   margin: var(--space-6) 0 0;
   text-align: center;
@@ -2063,6 +2167,7 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 body,
 .card,
 .group,
+.tile,
 .icon-btn,
 .sync-chip,
 .pet,
@@ -2109,7 +2214,7 @@ dialog.sheet.dragging {
 .slider-names > span {
   transition: var(--state);
 }
-:is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
+:is(button.row, button.box, button.tile, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
 :is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
@@ -2134,6 +2239,18 @@ dialog.sheet.dragging {
 }
 .toast.show .toast-ic {
   animation: badgeIn var(--dur-step) var(--ease-spring) both;
+}
+html.arrive #home > * {
+  animation: appear var(--dur-step) var(--ease-out) both;
+}
+html.arrive #home > :nth-child(2) {
+  animation-delay: var(--stagger);
+}
+html.arrive #home > :nth-child(3) {
+  animation-delay: calc(2 * var(--stagger));
+}
+html.arrive #home > :nth-child(n + 4) {
+  animation-delay: calc(3 * var(--stagger));
 }
 dialog.sheet[open] {
   animation: sheetIn var(--dur-step) var(--ease-out);
@@ -2235,6 +2352,22 @@ html.step-back::view-transition-new(page) {
   transform: scaleY(0);
   opacity: 0;
 }
+.disc.pop {
+  animation: boing var(--dur-step) var(--ease-spring);
+}
+.ov-pic.sleepy::after {
+  animation: snooze calc(2.5 * var(--dur-long)) var(--ease-out) infinite;
+}
+/* at feeding time a ring breathes out of the feeding button */
+.fab.due::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke) solid var(--accent);
+  border-radius: var(--radius-m);
+  pointer-events: none;
+  animation: ring calc(2 * var(--dur-long)) var(--ease-out) infinite;
+}
 .fab.filled .fill {
   animation: bowlFill var(--dur-long) var(--ease-out) both;
 }
@@ -2252,6 +2385,7 @@ html.step-back::view-transition-new(page) {
   *::after,
   ::backdrop {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }

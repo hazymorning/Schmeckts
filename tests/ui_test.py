@@ -539,8 +539,10 @@ async def test_home_history(browser, url):
     )
     cal = today3 + [[f'c{d}-{i}', f'2026-06-{1 + d:02d}T{8 + 4 * i:02d}:00', [M]] for d in range(11) for i in range(3)]
     await seed('2026-06-12T12:00:00+02:00', cal)
+    week = await pg.eval_on_selector_all('#home .cal .day', 'l => l.map(b => b.classList.contains("today"))')
+    check(len(week) == 7 and week[-1] and not any(week[:-1]), f'the home calendar: the last seven days in one row, today last {week}')
     jumps = []
-    for day in ('2026-06-12', '2026-06-01'):
+    for day in ('2026-06-12', '2026-06-06'):
         await tap(pg, f'[data-sec=hist] [data-action=jump-day][data-day="{day}"]')
         jumps.append(
             await pg.evaluate(
@@ -599,8 +601,8 @@ async def test_report(browser, url):
 async def test_evaluation(browser, url):
     print('„Vorlieben“: a row opens its food sheet, the page leads to a level and back')
     ctx, pg, errors = await demo(browser, url)
-    pid = await pg.get_attribute('[data-sec=evaluation] .sides button', 'data-id')
-    await tap(pg, '[data-sec=evaluation] .sides button')
+    pid = await pg.get_attribute('[data-sec=evaluation] button.tile', 'data-id')
+    await tap(pg, '[data-sec=evaluation] button.tile')
     check(await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet?.kind, m.sheet?.id])") == ['product', pid], 'a row opens its food sheet')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
@@ -1988,13 +1990,13 @@ async def test_observations(browser, url):
     CHIP = '#home .overview [data-action=observe]'
     ROW = '[data-sec=hist] [data-action=open-observation]'
     named, mau = await pg.locator(f'{CHIP}[data-v=tired]').inner_text(), await state(pg, 'db.pets[0].name')
-    check(await pg.locator(CHIP).count() == 3 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
+    check(await pg.locator(CHIP).count() == 4 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
     await tap(pg, '[data-action=observe][data-v=stink]')
     after, pet_ = await pg.evaluate(OBS), await state(pg, 'db.pets[0].id')
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
-        and await pg.locator(CHIP).count() == 3
+        and await pg.locator(CHIP).count() == 4
         and await pg.locator(ROW).count() == 1,
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary {after[0]}',
     )

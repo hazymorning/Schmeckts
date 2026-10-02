@@ -44,7 +44,6 @@
   --inset-box: var(--space-3);
   --inset-control: var(--space-3) var(--space-4); /* height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* chips, fields in a row, the toast's action */
-  --inset-tight: var(--space-2) var(--space-3); /* three chips in a card row at 360px */
   --inset-badge: var(--space-1) var(--space-2h);
   --field-room: calc(
     var(--space-3h) + var(--icon-s) + var(--space-2h)
@@ -74,6 +73,7 @@
   --dur-fade: 200ms;
   --dur-step: 300ms;
   --dur-long: 1200ms; /* loops: spinner, shimmer, bowl */
+  --stagger: 50ms; /* between cards rising in turn */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
@@ -88,6 +88,7 @@
   --z-raise: 1; /* within one component */
   --z-sticky: 2;
   --z-bar: 3;
+  --z-edge: 3; /* the home page's fading foot, under the feeding button */
   --z-fab: 4;
   --z-strip: 5; /* behind the status bar */
   --z-toast: 6;
@@ -119,6 +120,7 @@
   --busy: 0.6;
   --mood: 0.16; /* 0.26 in dark, below */
   --mood-filter: saturate(0.85);
+  --blur-edge: 6px; /* what scrolls under the status bar */
 
   --bg: light-dark(#eeede7, #1b1c17);
   --surface: light-dark(#fafaf6, #25261f);
@@ -131,21 +133,23 @@
   --accent-ink: light-dark(#4a5134, #a9b283); /* accent as text */
   --accent-soft: light-dark(#dee0d7, #393b2e);
   --on-accent: light-dark(#ffffff, #1b1c17); /* also on the red confirm button */
-  --good: light-dark(#4d6c57, #93bba0);
-  --good-soft: light-dark(#d9dfd8, #373e34);
+  --good: light-dark(#476651, #93bba0);
+  --good-soft: light-dark(#d9dfd8, #333a30);
   --mid: light-dark(#8a6822, #d2ae62);
   --mid-soft: light-dark(#e5dece, #413c2a);
   --sauce: light-dark(#7a5a43, #c49c7e);
   --sauce-soft: light-dark(#e2dcd4, #3e392e);
   --bad: light-dark(#8f3f43, #d98c8e);
   --bad-soft: light-dark(#e9dcd9, #3e342f);
-  /* observations, quieter than the ratings and apart from them */
-  --stink: light-dark(#36676a, #8cc3c3);
-  --stink-soft: light-dark(#dae6e5, #2c3a3b);
-  --hungry: light-dark(#87496b, #d9a0bf);
-  --hungry-soft: light-dark(#efe0e8, #3c2f37);
-  --tired: light-dark(#4e5888, #a9b1de);
-  --tired-soft: light-dark(#e2e3ef, #2f3240);
+  /* observations: four hues the ratings leave free, at one lightness */
+  --stink: light-dark(#257070, #89cccb);
+  --stink-soft: light-dark(#d3eeee, #203c3c);
+  --hungry: light-dark(#81526d, #dfadc8);
+  --hungry-soft: light-dark(#f7e1ec, #44303b);
+  --tired: light-dark(#51628d, #abbdeb);
+  --tired-soft: light-dark(#e0e8fb, #2f3649);
+  --happy: light-dark(#5a6b3c, #b4c696);
+  --happy-soft: light-dark(#e3ecd7, #333a26);
 
   --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 
@@ -237,6 +241,38 @@
 @keyframes pop {
   35% {
     transform: scale(1.06);
+  }
+}
+@keyframes boing {
+  0% {
+    transform: scale(0.6);
+  }
+  55% {
+    transform: scale(1.18);
+  }
+}
+@keyframes snooze {
+  0% {
+    opacity: 0;
+    transform: translate(0, 4px) scale(0.8);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(8px, -14px) scale(1.2);
+  }
+}
+@keyframes ring {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.18, 1.35);
   }
 }
 @keyframes badgeIn {
