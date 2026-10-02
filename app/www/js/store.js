@@ -1,6 +1,4 @@
-/* Database (db), settings (prefs), sync state with field clocks (state) and unconfirmed changes (queue).
-   Crash-safe through the write order queue → db → sync: one of our own changes lands in the queue first and the next
-   start replays it; a change from the server lands in db first, and if sync is missing the app fetches it again. */
+// write order queue → db → sync: after a crash the queue replays and server changes missing from sync are refetched
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
 import {report} from './report.js';
@@ -19,7 +17,6 @@ const defaultPrefs = () => ({
   remind: 0,
   feedRemind: false,
   backdrop: true,
-  mode: '',
   server: '',
   code: '',
   name: '',
@@ -32,21 +29,25 @@ const defaultPrefs = () => ({
   overview: {day: '', kind: null, fact: null, kinds: [], facts: []},
   photoStamps: {},
 });
-export const hooks = {changed() {}, saved() {}}; // main.js sets these: redraw the interface, sync after a save
+export const hooks = {changed() {}, saved() {}};
 
 export function tidy(d) {
   const out = defaults();
   for (const c of COLLECTIONS) {
     const seen = new Set();
+    // ids end up in HTML attributes, so a backup must not bring others
     out[c] = (Array.isArray(d?.[c]) ? d[c] : []).filter(
-      r => r && typeof r === 'object' && r.id && !seen.has(r.id) && seen.add(r.id),
+      r => r && typeof r === 'object' && validId(r.id) && !seen.has(r.id) && seen.add(r.id),
     );
   }
-  for (const p of out.pets) delete p.photos; // the album is gone; dropped here without deleting it household-wide
+  for (const p of out.pets) delete p.photos; // obsolete field, dropped locally only
   out.servings = out.servings.filter(s => s.pets && typeof s.pets === 'object' && s.servedAt);
+  for (const r of [...out.servings, ...out.observations])
+    if (r.pets && typeof r.pets === 'object') for (const k of Object.keys(r.pets)) if (!validId(k)) delete r.pets[k];
   for (const s of out.servings) {
-    if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed'; // recognition was interrupted
-    if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed'; // reading was interrupted: type it in
+    if (s.productId != null && !validId(s.productId)) s.productId = null;
+    if (s.status === 'recognizing') s.status = s.photo ? 'waiting' : 'failed'; // interrupted by a restart
+    if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed';
   }
   out.servings.sort((a, b) => b.servedAt - a.servedAt);
   out.observations = out.observations.filter(o => complete('observations', o));
@@ -59,18 +60,19 @@ function tidyPrefs(p) {
     ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))].slice(-300)
     : [];
   out.remind = tidyRemind(out.remind);
-  out.feedRemind = out.feedRemind === true; // reminder to feed at the usual times
-  delete out.feedStart; // dropped: the feeding sheet always shows both buttons
-  out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // pet photos behind the header, on by default ('off': a value from 1.1.0)
-  delete out.closedWeek; // dropped: the last week is part of „Verlauf“ now and has nothing to close
-  out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null; // null: never set, see load()
-  out.lookup = out.lookup === true; // product lookup on the internet, off by default
-  out.serverPhoto = out.serverPhoto !== false; // photo recognition through the server, on by default
-  delete out.aiKey; // dropped: the key for photo recognition lives on the server
-  out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {}; // remembered barcode answers
-  out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {}; // state per device we have exchanged with
+  out.feedRemind = out.feedRemind === true;
+  delete out.feedStart;
+  out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // 'off' is an older stored value
+  delete out.closedWeek;
+  // null: never set
+  out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null;
+  out.lookup = out.lookup === true;
+  out.serverPhoto = out.serverPhoto !== false;
+  delete out.aiKey;
+  out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};
+  out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {};
   out.overview = tidyOverview(out.overview);
-  // the stamp of the packaging photo this phone holds per variety, where a phone replaced it (photos.js)
+  // variety id → stamp of the packaging photo this phone holds
   out.photoStamps = Object.fromEntries(
     Object.entries(out.photoStamps && typeof out.photoStamps === 'object' ? out.photoStamps : {}).filter(
       ([, v]) => Number.isFinite(v) && v > 0,
@@ -78,9 +80,7 @@ function tidyPrefs(p) {
   );
   return out;
 }
-/* The overview's memory of its line taking turns (views/overview.js, takeTurn() in glance.js): the day and the choice
-   of the last drawing, the kinds of the last MEMORY.kinds days and the facts of the last MEMORY.facts days, each with
-   the day it came on; anything older or malformed goes */
+// what the overview line showed recently, so it takes turns; older entries are dropped
 function tidyOverview(o) {
   const m = o && typeof o === 'object' ? o : {},
     str = v => (typeof v === 'string' ? v : null),
@@ -124,13 +124,12 @@ export let db = defaults(),
   prefs = defaultPrefs(),
   queue = [];
 export const state = tidyState(null);
-export let revision = 0; // counts every change to the data; derive.js then recomputes the evaluation
-export let loadError = null; // stored data present but unreadable: nothing is written then
-export let dbFound = false; // db.json was there and read: only then may what is missing from it be tidied away
+export let revision = 0;
+export let loadError = null; // stored data unreadable: write nothing
+export let dbFound = false; // only then may records missing from db.json be tidied away
 let snap = Object.fromEntries(COLLECTIONS.map(c => [c, new Map()]));
 
-/* For the evaluation (derive.js): varieties whose meals have changed (null: all). meals: the meal before and after
-   the change */
+// varieties whose meals changed since the last takeStale(); sorts null means all
 const allStale = () => ({sorts: null});
 let stale = allStale();
 export function takeStale() {
@@ -144,7 +143,6 @@ function markStale(c, ...meals) {
   for (const m of meals) if (m) stale.sorts.add(m.productId);
 }
 
-/* Saving to disk */
 const stateForDisk = () => ({
   ...state,
   device: clockState.device,
@@ -181,8 +179,7 @@ export function log(text) {
   persist('sync');
 }
 
-/* Loading and replaying the queue */
-const ZERO = () => `0000000000000-0000-${clockState.device}`; // unknown origin: loses against every real change
+const ZERO = () => `0000000000000-0000-${clockState.device}`; // loses against every real clock
 const clocksOf = (c, id) => (state.clocks[c][id] ||= {});
 const snapshot = () =>
   Object.fromEntries(
@@ -190,7 +187,7 @@ const snapshot = () =>
   );
 const sortServings = () => {
   db.servings.sort((a, b) => b.servedAt - a.servedAt);
-  db.observations.sort((a, b) => b.at - a.at); // newest first, as the meals
+  db.observations.sort((a, b) => b.at - a.at);
 };
 
 async function load() {
@@ -199,11 +196,12 @@ async function load() {
   db = tidy(d);
   prefs = tidyPrefs(p);
   Object.assign(state, tidyState(s));
-  if (d == null) Object.assign(state, {epoch: '', seq: 0, clocks: tidyState(null).clocks}); // clocks without values do not count
+  // clocks without data do not count
+  if (d == null) Object.assign(state, {epoch: '', seq: 0, clocks: tidyState(null).clocks});
   queue = Array.isArray(q) ? q.filter(validChange) : [];
   Object.assign(clockState, {device: state.device, offset: state.offset, ms: state.ms, n: state.n});
   for (const x of queue) observe(x.t);
-  let fixed = false; // replay the queue: whatever is in it but missing from db or sync (a crash while writing)
+  let fixed = false; // replay what a crash kept out of db or sync
   for (const x of queue)
     if (applyRecord(x.c, x.r, Object.fromEntries(Object.entries(x.f).map(([k, v]) => [k, {v, t: x.t}])), false))
       fixed = true;
@@ -212,12 +210,9 @@ async function load() {
   snap = snapshot();
   if (fixed) persist('db', 'sync');
   if (prefs.activePet !== 'all' && !db.pets.some(x => x.id === prefs.activePet)) prefs.activePet = 'all';
-  prefs.milestones ||= milestones(db).reached; // never recorded: what is reached counts as seen
-  // connected means `haushalt`; a phone already in use is otherwise `lokal`; on the very first start the welcome page asks
-  prefs.mode = connected() ? 'haushalt' : prefs.mode === 'lokal' || p != null || d != null ? 'lokal' : '';
+  prefs.milestones ||= milestones(db).reached; // first run: what is reached counts as seen
 }
 function ensureClocks() {
-  // records without clocks, e.g. carried over from older versions
   let n = 0;
   for (const c of COLLECTIONS)
     for (const rec of db[c]) {
@@ -241,7 +236,6 @@ function ensureClocks() {
 try {
   await load();
 } catch (e) {
-  // loadError makes the app say so and write nothing at all, so the stored state stays as it is
   loadError = e;
   report('stored data unreadable', e);
 }
@@ -250,16 +244,15 @@ export function replaceDb(next) {
   db = next;
   revision++;
   stale = allStale();
-} // import, delete and undo swap the whole database
+}
 
-/* Our own changes */
 export function save() {
   const changes = diff();
   if (changes.length) {
     queue.push(...changes);
     persist('queue', 'db', 'sync');
     hooks.saved();
-  } else persist('db'); // local fields such as the photo and the recognition status
+  } else persist('db'); // local-only fields such as photo and status
 }
 export function savePrefs() {
   persist('prefs');
@@ -272,13 +265,12 @@ function diff() {
     const prev = snap[c],
       cur = new Map();
     for (const rec of db[c]) {
-      if (!validId(rec.id)) continue; // not synced, the server would reject it
+      if (!validId(rec.id)) continue; // the server would reject it
       const f = fieldsOf(c, rec),
         p = prev.get(rec.id),
         ch = {};
       cur.set(rec.id, f);
-      if (!p)
-        Object.assign(ch, f, {_del: 'false'}); // new or restored: every field
+      if (!p) Object.assign(ch, f, {_del: 'false'});
       else {
         for (const k in f) if (p[k] !== f[k]) ch[k] = f[k];
         for (const k in p) if (!(k in f)) ch[k] = 'null';
@@ -308,17 +300,15 @@ function change(c, r, json) {
   return {id: randomId(16), c, r, t, f};
 }
 
-/* Changes from other devices */
 let changedTimer = null;
 function notify() {
   clearTimeout(changedTimer);
   changedTimer = setTimeout(() => hooks.changed(), 120);
-} // batched
+}
 
-/* records: [{c, r, f: {field: {v, t}}}], each one complete, the way the server delivers them. Returns the number of
-   records changed (0 = nothing new). */
+// records: [{c, r, f: {field: {v, t}}}], each complete; returns how many changed
 export function merge(records) {
-  save(); // record our own uncaptured changes first
+  save(); // capture our own changes first
   let changed = 0;
   for (const x of records) if (applyRecord(x.c, x.r, x.f || {}, true)) changed++;
   if (changed) {
@@ -329,8 +319,6 @@ export function merge(records) {
   return changed;
 }
 
-/* Manual exchange (logic/exchange.js): all of our own field clocks, plus the records this device holds newer than the
-   other side. peer: their clocks (from their file), otherwise a mark (the highest clock at the last exchange), null: everything. */
 export const allClocks = () => Object.fromEntries(COLLECTIONS.map(c => [c, state.clocks[c]]));
 export const topClock = () => {
   let top = '';
@@ -338,6 +326,7 @@ export const topClock = () => {
     for (const clocks of Object.values(state.clocks[c])) for (const t of Object.values(clocks)) if (t > top) top = t;
   return top;
 };
+// peer: their clocks, or the highest clock at the last exchange, or null for everything
 export function changesSince(peer) {
   const out = [];
   for (const c of COLLECTIONS) {
@@ -350,8 +339,7 @@ export function changesSince(peer) {
         f = {};
       if (rec)
         for (const [k, t] of Object.entries(clocks)) f[k] = k === '_del' ? {v: false, t} : {v: valueOf(c, rec, k), t};
-      else if (clocks._del)
-        f._del = {v: true, t: clocks._del}; // deleted: this device no longer knows the other values
+      else if (clocks._del) f._del = {v: true, t: clocks._del};
       else continue;
       out.push({c, r: id, f});
     }
@@ -359,8 +347,7 @@ export function changesSince(peer) {
   return out;
 }
 
-/* Merges the fields of one record. full: fields holds every field the server knows.
-   The clock decides which fields win, then the record here is updated or one that comes back is created. */
+// full: fields holds every field the server knows
 function applyRecord(c, id, fields, full) {
   if (!state.clocks[c] || !validId(id)) return false;
   const list = db[c],
@@ -373,12 +360,11 @@ function applyRecord(c, id, fields, full) {
   if (!Object.keys(win).length) return false;
   const deleted = '_del' in win ? win._del === true : rec ? false : known;
   if (rec) return updateRecord(c, id, idx, rec, win, deleted);
-  if (deleted) return false; // stays deleted, only the clocks are new
+  if (deleted) return false;
   return createRecord(c, id, clocks, fields, full);
 }
 
-/* Per field the larger clock wins. The clocks of the winners are taken over right here, because a field whose
-   value this device cannot use still counts as seen. */
+// clocks are taken over even where this device cannot use the value, so the field counts as seen
 function winningFields(c, rec, clocks, fields) {
   const win = {};
   for (const [k, x] of Object.entries(fields)) {
@@ -393,7 +379,6 @@ function winningFields(c, rec, clocks, fields) {
   return win;
 }
 
-/* The record is here: it either goes away or takes the winning values over */
 function updateRecord(c, id, idx, rec, win, deleted) {
   const before = {...rec};
   if (deleted) {
@@ -409,7 +394,7 @@ function updateRecord(c, id, idx, rec, win, deleted) {
   const s = snap[c].get(id) || {};
   for (const [k, v] of Object.entries(win)) {
     if (k === '_del') continue;
-    // only what this device actually holds is remembered: otherwise the next save would see a missing field and delete it household-wide
+    // remember only what this device holds, or the next save would delete the rest household-wide
     if (setField(c, rec, k, v) && v != null) s[k] = JSON.stringify(v);
     else delete s[k];
   }
@@ -418,7 +403,7 @@ function updateRecord(c, id, idx, rec, win, deleted) {
   return true;
 }
 
-/* Visible (again): values from the server, and from the queue wherever our own clock is newer */
+// queued values win where the clock is our own
 function createRecord(c, id, clocks, fields, full) {
   const values = {},
     mine = queuedValues(c, id);
@@ -429,7 +414,7 @@ function createRecord(c, id, clocks, fields, full) {
     else if (full) {
       if (fields[k]) clocks[k] = fields[k].t;
       else delete clocks[k];
-    } // value unknown
+    }
   }
   const made = fromFields(c, id, values);
   if (!complete(c, made)) return false;
@@ -444,8 +429,7 @@ function queuedValues(c, r) {
   return out;
 }
 
-/* Full sync (new epoch, first connection, differing checksum): merge everything from the server, then resend every
-   field whose own clock is newer. */
+// full sync: merge everything, then resend every field whose own clock is newer
 export function reconcile(records) {
   merge(records);
   const server = {};
@@ -468,7 +452,7 @@ export function reconcile(records) {
         if (rec) add(t, k, k === '_del' ? false : valueOf(c, rec, k));
         else if (k === '_del') add(t, k, true);
         else if (rt) clocks[k] = rt;
-        else delete clocks[k]; // value of a deleted record: no longer known
+        else delete clocks[k];
       }
       for (const [t, f] of groups) out.push({id: randomId(16), c, r: id, t, f});
     }
@@ -478,16 +462,14 @@ export function reconcile(records) {
   return out.length;
 }
 
-/* For the sync */
 export function ack(ids) {
-  // confirmed by the server, or rejected for good
+  // confirmed, or rejected for good
   const done = new Set(ids),
     before = queue.length;
   queue = queue.filter(x => !done.has(x.id));
   if (queue.length !== before) persist('queue');
 }
 export function restamp(id) {
-  // the server rejects the clock: restamp with the corrected time
   const x = queue.find(q => q.id === id);
   if (!x) return;
   rebase();
@@ -509,7 +491,7 @@ export function resetSync() {
   persist('queue', 'sync');
 }
 
-/* Remove records without a trace, without deleting them household-wide (sample data before connecting). ids: {collection: Set} */
+// local only, e.g. sample data before connecting; ids: {collection: Set}
 export function purge(ids) {
   for (const c of COLLECTIONS) {
     const gone = ids[c];
@@ -525,8 +507,7 @@ export function purge(ids) {
   persist('queue', 'db', 'sync', 'prefs');
 }
 
-/* Checksum as on the server: SHA-256 over the sorted lines "collection/id/field@clock\n", over the collections the
-   server holds (sync.js) */
+// must match the server: SHA-256 over the sorted lines "c/id/field@clock\n"
 export async function checksum(colls = COLLECTIONS) {
   const lines = [];
   for (const c of colls)

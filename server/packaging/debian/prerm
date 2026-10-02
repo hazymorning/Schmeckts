@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop the service before removal (on an upgrade postinst starts it again)
+# on an upgrade postinst restarts the service instead
 set -e
 if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
   systemctl disable --now schmeckts.service >/dev/null 2>&1 || true

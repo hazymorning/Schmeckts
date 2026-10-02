@@ -1,5 +1,4 @@
-/* Our own SVG icon set on a 24 grid. The ratings (r_<key>) show what you see when you come back: the bowl, or the
-   morsel for treats. Plus line drawings for empty states, drawn from the logo: a bowl in a speech bubble. */
+// icons on a 24 grid; r_<key> is looked up by rating key
 
 const BOWL = '<path d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>';
 const DOT = (x, y) => `<circle cx="${x}" cy="${y}" r="1.15" fill="currentColor" stroke="none"/>`;
@@ -15,14 +14,12 @@ const FULL =
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
 const I = {
   r_top: BOWL + HEART,
-  // almost empty: a thin rest at the bottom of the bowl
   r_gut:
     '<path d="M5.69 15.9h12.62l-.36 1.5a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
     BOWL,
   r_mittel:
     '<path d="M5.3 14.3h13.4l-.75 3.1a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
     BOWL,
-  // started eagerly and left the rest: more than half still in the bowl, the heart above it broken
   r_eager:
     '<path d="M5.08 13.4h13.84l-.97 4a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
     BOWL +
@@ -82,12 +79,10 @@ const I = {
   pin: '<path d="M9.2 3.5h5.6l-.9 5.6 3.1 3.3v1.4H7v-1.4l3.1-3.3z"/><path d="M12 13.8v6.7"/>',
   layers: '<path d="M12 4.5l8 4-8 4-8-4z"/><path d="M4 12.3l8 4 8-4"/><path d="M4 16.1l8 4 8-4"/>',
   fish: '<path d="M21 12c-1.7 3-4.5 5-7.8 5-3.4 0-6.1-2-7.7-5 1.6-3 4.3-5 7.7-5 3.3 0 6.1 2 7.8 5z"/><path d="M5.5 12L2.5 8.8v6.4z"/><path d="M16.6 10.9v.2"/>',
-  // Observations (OBSERVATIONS in config.js): a smell rising, knife and fork, sleep
   o_stink:
     '<path d="M7.2 19.5c-1.6-1.7-1.6-3.4 0-5.1s1.6-3.4 0-5.1M12 20.5c-1.6-1.7-1.6-3.4 0-5.1s1.6-3.4 0-5.1-1.6-3.4 0-5.1M16.8 19.5c-1.6-1.7-1.6-3.4 0-5.1s1.6-3.4 0-5.1"/>',
   o_hungry: '<path d="M6.5 3.5v5a2.5 2.5 0 0 0 5 0v-5M9 3.5v17M16.5 20.5v-17c2 1.4 3 4 3 7.6h-3"/>',
   o_tired: '<path d="M4.5 10.5h6.5l-6.5 8h6.5M14 4.5h5l-5 6h5"/>',
-  // „Vorlieben“: what a pet likes best, what a comparison of brands is about, and which way it is going
   heart: '<path d="M12 19.3s-7.2-4.4-7.2-9.4A4 4 0 0 1 12 7.6a4 4 0 0 1 7.2 2.3c0 5-7.2 9.4-7.2 9.4z"/>',
   tag: '<path d="M3.8 11.9V5.3c0-.8.7-1.5 1.5-1.5h6.6l8.4 8.4a1.5 1.5 0 0 1 0 2.1l-6.3 6.3a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/>',
   rise: '<path d="M4 16.5l5-5 3.5 3.5L19.5 8"/><path d="M14.5 8h5v5"/>',
@@ -109,7 +104,7 @@ const I = {
   rodent:
     '<path d="M6.2 9a2 2 0 1 1 3-2.3M17.8 9a2 2 0 1 0-3-2.3"/><path d="M4.4 14.2c0-4 3.4-6.9 7.6-6.9s7.6 2.9 7.6 6.9c0 3.6-3.4 5.9-7.6 5.9s-7.6-2.3-7.6-5.9z"/><path d="M9.8 13.2v.4M14.2 13.2v.4M11.2 15.8h1.6"/>',
 };
-/* Line drawings on a 64 grid: the logo's speech bubble with a bowl or a camera inside */
+// empty-state drawings on a 64 grid
 const BUBBLE = '<path d="M34 8A22 22 0 1 1 20.5 47.2L12 57l3.4-15.4A22 22 0 0 1 34 8z"/>';
 const S = {
   empty: BUBBLE + '<circle cx="34" cy="30" r="12"/><path d="M26.5 33.5a8 8 0 0 0 15 0" stroke-dasharray="1.5 3.2"/>',

@@ -6,7 +6,7 @@ Installed-Size: @SIZE@
 Depends: zenity, pkexec | policykit-1
 Section: net
 Priority: optional
-Description: Haushalts-Server der App Schmeckts
- Speichert die gemeinsamen Daten aller Handys im Haushalt, legt jeden Tag
- ein Backup an und erkennt Futter auf Fotos und per Barcode. Nur im
- Heimnetz erreichbar.
+Description: optionaler Haushalts-Server der App Schmeckts
+ Gleicht die Handys eines Haushalts untereinander ab und erkennt Futter auf
+ Packungsfotos. Die App braucht ihn nicht, jedes Handy behaelt seine Daten
+ selbst. Nur im Heimnetz erreichbar.

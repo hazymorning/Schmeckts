@@ -9,15 +9,13 @@ export const norm = s =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 export const andList = (l, and = 'und') =>
-  l.length > 1 ? l.slice(0, -1).join(', ') + ` ${and} ` + l.at(-1) : l[0] || ''; // “A, B und C”
+  l.length > 1 ? l.slice(0, -1).join(', ') + ` ${and} ` + l.at(-1) : l[0] || '';
 export const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-/* The small words, German and English: what a name is not cut after, and what packaging print says nothing with */
+// filler words, German and English, that carry no meaning on their own
 export const SMALL = new Set(
   'und oder mit ohne in im am an auf aus bei fur von vor zu zum zur neu the and with for'.split(' '),
 );
-/* A name at most `max` characters long: cut where a part in another language begins („ / “, „ | “), otherwise
-   after a whole word, and without a joining „&“ or „/“ or a small word („in“, „mit“) left at the end. The variety
-   read off a packaging (ocr.js) and the variety in the overview's first sentence (views/home.js) are cut this way. */
+// prefers cutting where another language begins (" / ", " | "), then at a word; never ends on a joiner or filler word
 export function cutName(v, max) {
   if (v.length <= max) return v.trim();
   const head = v.slice(0, max + 1),
@@ -28,14 +26,13 @@ export function cutName(v, max) {
   for (let end; (end = out.match(loose)) && (!end[1] || SMALL.has(norm(end[1])));) out = out.slice(0, end.index);
   return out.trim();
 }
-/* Barcodes as on the server: EAN-13, EAN-8 and UPC-A with a valid check digit only; UPC-A becomes EAN-13 with a
-   leading 0. Returns the code or '' */
+// must match the server's rules: UPC-A is stored as EAN-13, an invalid code gives ''
 export function normBarcode(raw) {
   let c = String(raw ?? '').trim();
   if (!/^[0-9]+$/.test(c)) return '';
   if (c.length === 12) c = '0' + c;
   if (c.length !== 8 && c.length !== 13) return '';
   let sum = 0;
-  for (let i = c.length - 2, w = 3; i >= 0; i--, w = 4 - w) sum += +c[i] * w; // from the right: weight 3, 1, 3, …
+  for (let i = c.length - 2, w = 3; i >= 0; i--, w = 4 - w) sum += +c[i] * w; // weights 3, 1, 3, … from the right
   return (10 - (sum % 10)) % 10 === +c[c.length - 1] ? c : '';
 }

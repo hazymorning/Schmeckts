@@ -1,6 +1,4 @@
-/* Product lookup on the internet for unknown barcodes, straight from the phone: Open Pet Food Facts first, then Open
-   Food Facts (API v2). It only runs when allowed in the settings; only the number is transmitted. Brand, variety,
-   type and species are derived as on the server. The phone remembers hits for 90 days and misses for 7. */
+// barcode lookup straight from the phone, only when allowed in the settings; only the number is sent
 import {prefs, savePrefs} from './store.js';
 
 const BARCODE_URLS = ['https://world.openpetfoodfacts.org', 'https://world.openfoodfacts.org'];
@@ -11,7 +9,6 @@ const KEEP_FOUND = 90 * 864e5,
   TIMEOUT = 5e3;
 const QUANTITY = /\b\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b|\b\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)\b/gi;
 
-/* Returns {found, brand, variety, type, animal}. Throws when no database is reachable. */
 export async function lookupOnline(code) {
   const kept = remembered(code);
   if (kept) return kept;
@@ -21,7 +18,7 @@ export async function lookupOnline(code) {
     try {
       hit = await fetchProduct(base, code);
     } catch {
-      continue; // this database is not answering; if none of them answers, the throw below hits
+      continue;
     }
     reached = true;
     if (hit.found) return remember(code, hit);
@@ -47,14 +44,14 @@ async function fetchProduct(base, code) {
   return {found: true, brand, variety, ...classify(Array.isArray(p.categories_tags) ? p.categories_tags : [])};
 }
 
-/* "Sheba Fresh Choice Huhn in Sauce 4x50g" → "Fresh Choice Huhn in Sauce" */
+// "Sheba Fresh Choice Huhn in Sauce 4x50g" → "Fresh Choice Huhn in Sauce"
 function cleanVariety(name, brand) {
   let v = String(name).replace(QUANTITY, ' ').replace(/\s+/g, ' ').trim();
   if (brand && v.toLowerCase().startsWith(brand.toLowerCase())) v = v.slice(brand.length);
   return v.replace(/^[\s\-–,·|]+|[\s\-–,·|]+$/g, '');
 }
 
-/* Type and species from unambiguous categories only, as on the server */
+// unambiguous categories only
 function classify(tags) {
   const has = (...words) => tags.some(t => words.some(w => String(t).includes(w)));
   const wet = has('wet'),
@@ -73,12 +70,12 @@ function classify(tags) {
   return {type, animal: cat && !dog ? 'Katze' : dog && !cat ? 'Hund' : ''};
 }
 
-/* Memory in this phone's settings (prefs.codes), so that the same number does not go out again */
+// remembered so the same number does not go out again
 function remembered(code) {
   const kept = prefs.codes?.[code];
   if (!kept || Date.now() - kept.at > (kept.found ? KEEP_FOUND : KEEP_MISS)) return null;
   const hit = {...kept};
-  delete hit.at; // the timestamp is cache bookkeeping and stays out of the result
+  delete hit.at;
   return hit;
 }
 function remember(code, hit) {

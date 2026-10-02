@@ -1,5 +1,4 @@
-/* Everything derived from the data: lookups, open meals, suggestions while feeding and the evaluation model
-   (model(), computed in smart.js). Read only. */
+// Read-only lookups and cached models over the data.
 import {andList, norm} from './text.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
 import {
@@ -30,16 +29,14 @@ export const petMap = ids => Object.fromEntries(ids.map(id => [id, {r: null, at:
 export const findProduct = (brand, variety) =>
   db.products.find(p => norm(p.brand) === norm(brand) && norm(p.variety) === norm(variety));
 export const productsByCode = code => db.products.filter(p => p.codes?.[code]); // several for multipacks
-export const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r && inFilter(pid) && getPet(pid));
+const openPets = s => Object.keys(s.pets).filter(pid => !s.pets[pid].r && inFilter(pid) && getPet(pid));
 export const servingPets = s => Object.keys(s.pets).filter(pid => inFilter(pid) && getPet(pid));
-// Every meal within the pet filter, newest first: what the list on the history page shows, whatever is evaluated
 export const servingsInFilter = () => db.servings.filter(s => servingPets(s).length);
-/* The pets an observation may concern, within the filter; with several it is not clear which of them it was */
 export const observedPets = o => Object.keys(o.pets || {}).filter(pid => inFilter(pid) && getPet(pid));
 export const observationsInFilter = () => db.observations.filter(o => observedPets(o).length);
-/* The diary: meals and observations by time, newest first. Each keeps its own shape; timeOf() reads either. */
 export const timeOf = x => x.servedAt ?? x.at;
 export const isObservation = x => x.servedAt === undefined && typeof x.at === 'number';
+// both lists come in newest first
 export function diary(servings, observations) {
   const out = [];
   let i = 0,
@@ -54,8 +51,7 @@ export function diary(servings, observations) {
 }
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
 
-/* The evaluation model, recomputed only when the data, the pet filter, the hidden hints or the hour change (windows
-   such as the 72 hours for appetite). The sums per variety stay put while that happens and only varieties with
+/* The hour is in the key because some windows are time based. Per-variety sums are kept, and only varieties with
    changed meals are recomputed. */
 const cache = {};
 let sums = null;
@@ -75,10 +71,8 @@ function refresh(now) {
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-/* „Worauf es ankommt“ as the model stands: the groups per comparison, and apart from them the habits in the order its
-   card on „Vorlieben“ shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating only a little. The
-   card asks for them only while there is nothing to compare, since Abwechslung reads every meal. */
 export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
+// the card shows the first two, so the order matters; asked for lazily since change() reads every meal
 export const habitsModel = () =>
   cached('habits', [prefs.activePet], () => {
     const m = model(),
@@ -86,9 +80,7 @@ export const habitsModel = () =>
       of = kind => eaten.filter(h => h.kind === kind);
     return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
   });
-/* „Vorlieben“: the sides of the ranked varieties, for its card on the home page and the first cards of its page, and
-   the rest of the page only when it opens: what moved, how it goes per pet, what it depends on, what to serve next,
-   what it rests on, and when each variety was last served within the filter */
+// the home card needs only the ranking; the rest waits until the page opens
 export const rankingModel = () => cached('ranking', [prefs.activePet], now => ranking(model(), now));
 export const evaluationModel = () =>
   cached('evaluation', [prefs.activePet], now => {
@@ -114,8 +106,6 @@ export function pendingServings() {
   return db.servings.filter(s => s.servedAt > cut && openPets(s).length);
 }
 
-/* Which pets a serving is for, picked without asking, in this order:
-   active pet > only pet > whoever had this food last > matching species > last used > everyone */
 export function defaultPets(p) {
   const valid = ids => (ids || []).filter(id => getPet(id));
   if (prefs.activePet !== 'all' && getPet(prefs.activePet)) return {ids: [prefs.activePet], auto: false};
@@ -133,10 +123,9 @@ export function defaultPets(p) {
   return {ids: db.pets.map(x => x.id), auto: true};
 }
 
-/* When each variety was last served within the pet filter: variety → time, only for varieties served at all */
 function lastServed() {
   const last = new Map(),
-    pet = prefs.activePet !== 'all' && getPet(prefs.activePet) ? prefs.activePet : null; // as the model has it
+    pet = prefs.activePet !== 'all' && getPet(prefs.activePet) ? prefs.activePet : null; // same pet rule as the model
   for (const s of db.servings) {
     if (!s.productId || last.has(s.productId)) continue;
     if (pet && !s.pets[pet]) continue;
@@ -144,11 +133,7 @@ function lastServed() {
   }
   return last;
 }
-/* Varieties with when each was last served within the filter, 0 for one never served: what a row of the quick picker
-   says under the name. [{product, at}] */
 export const withLast = (products, last = lastServed()) => products.map(p => ({product: p, at: last.get(p.id) || 0}));
-/* Quick picker while feeding: most recently served varieties first, leaving out the ones no longer bought (model),
-   each with when it was last served. [{product, at}] */
 export function quickProducts(limit = Infinity) {
   const last = lastServed();
   const flop = new Set(
@@ -164,9 +149,6 @@ export function quickProducts(limit = Infinity) {
     .slice(0, limit);
   return withLast(products, last);
 }
-/* The shopping list as shareable text, matching the pet filter: what to buy again („Nachkaufen“ including „Gemischt“
-   with „nur für …“ and the manual `immer`), one block per food type with the type's name above it, the best first.
-   Nothing that is not to be bought. */
 export function shoppingList() {
   const m = model(),
     g = shopGroups(m),

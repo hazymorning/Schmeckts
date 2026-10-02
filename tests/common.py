@@ -17,7 +17,6 @@ from playwright.async_api import async_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WWW = ROOT / 'app/www'
 failures = []
-SHOTS = ROOT / 'dist/test' if '--shots' in sys.argv else None
 
 
 PACK = ROOT / 'dist/test/package.jpg'  # created at start-up
@@ -115,25 +114,6 @@ window.Capacitor = {isNativePlatform: () => true,
     return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done(answer); }, window.__ocrDelay || 0)); }},
   Filesystem, LocalNotifications, FeedReminder, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
-
-# Layout shifts while the page is being built: entries with no tap or key behind them.
-# Started before the app's own module, so nothing is missed.
-SHIFTS = """
-window.__shifts = [];
-new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push(e.value); })
-  .observe({type: 'layout-shift', buffered: true});
-"""
-
-# Android's system font size, simulated: it multiplies every font size the app sets. This re-declares the text
-# styles (--type-*) and every px font size from the style sheets, scaled, as !important.
-BIG_TEXT = """k => { const s = document.createElement('style'), rules = [...document.styleSheets].flatMap(x => [...x.cssRules]);
-  const px = v => v.replace(/([\\d.]+)px/g, (_, n) => `${(parseFloat(n) * k).toFixed(2)}px`);
-  const types = rules.filter(r => r.selectorText === ':root').flatMap(r => [...r.style].filter(p => p.startsWith('--type-'))
-    .map(p => `${p}:${px(r.style.getPropertyValue(p))} !important`));
-  s.textContent = `:root{${types.join(';')}}` + rules
-    .filter(r => r.style && r.style.fontSize && r.style.fontSize.endsWith('px'))
-    .map(r => `${r.selectorText}{font-size:${(parseFloat(r.style.fontSize) * k).toFixed(2)}px !important}`).join('');
-  document.head.append(s); }"""
 
 # A colour as sRGB "rgb(r, g, b)", even when set as oklch(): through a canvas, the way the screen shows it
 RGB = """(c => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d', {willReadFrequently: true});
@@ -243,9 +223,8 @@ def keep_promises(pg):
     pg.evaluate = evaluate
 
 
-async def open_page(ctx, url, scheme='light', native=False, choose=True):
-    """A new page in a browser context (= one phone). Returns the page and the list of errors.
-    choose: pick „Nur auf diesem Handy“ right at the first start, which is how most tests begin."""
+async def open_page(ctx, url, scheme='light', native=False):
+    """A new page in a browser context (= one phone). Returns the page and the list of errors."""
     pg = await ctx.new_page()
     keep_promises(pg)
     pg.set_default_timeout(8000)
@@ -256,9 +235,6 @@ async def open_page(ctx, url, scheme='light', native=False, choose=True):
         await pg.add_init_script(NATIVE)
     await pg.goto(url)
     await started(pg)
-    if choose and await pg.locator('.welcome [data-action=mode-local]').count():
-        await pg.click('.welcome [data-action=mode-local]')
-        await idle(pg)
     return pg, errors
 
 
@@ -278,12 +254,6 @@ async def until(pg, expr, timeout=10.0):
     return False
 
 
-async def shot(pg, name):
-    if SHOTS:
-        SHOTS.mkdir(parents=True, exist_ok=True)
-        await pg.screenshot(path=str(SHOTS / f'{name}.png'))
-
-
 async def phone(browser, scheme='light', touch=False, motion=False, width=400, height=860, **kw):
     """One phone as a browser context, and the only place the tests make one: that way run_tests can see that
     every phone belongs to exactly one test and is closed again before the next one starts.
@@ -299,16 +269,6 @@ async def phone(browser, scheme='light', touch=False, motion=False, width=400, h
         mine.append(ctx)
         ctx.on('close', lambda _: mine.remove(ctx) if ctx in mine else None)
     return ctx
-
-
-def rgb_of(hexv):
-    return tuple(int(hexv[i : i + 2], 16) for i in (1, 3, 5))
-
-
-def near(rgb, hexv, tol=2):
-    """rgb(…) from the browser matches #RRGGBB up to rounding"""
-    got = [int(x) for x in re.findall(r'\d+', rgb)[:3]]
-    return all(abs(a - b) <= tol for a, b in zip(got, rgb_of(hexv)))
 
 
 def contrast(a, b):
@@ -338,8 +298,7 @@ _pictures = []
 
 
 def make_pictures():
-    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus two plain ones.
-    Written once: several tests ask for them, and running side by side they must not write over each other."""
+    """Four quadrants (red, green, blue, yellow) for cropping, plus two plain photos, written once per run."""
     from PIL import Image
 
     if _pictures:
@@ -354,6 +313,7 @@ def make_pictures():
         f = out / f'photo{i}.jpg'
         Image.new('RGB', (300, 200), (25 * i, 255 - 25 * i, 120)).save(f, quality=80)
         files.append(str(f))
+    _pictures[:] = files
     return files
 
 
@@ -367,7 +327,7 @@ async def seeded(browser, url, files, scheme='light', native=False):
         key = f'__fs:{name}.json' if native else keys[name]
         await seed.evaluate('([k, v]) => localStorage.setItem(k, v)', [key, json.dumps(data)])
     await seed.close()
-    pg, errors = await open_page(ctx, url, native=native, choose=False)
+    pg, errors = await open_page(ctx, url, native=native)
     return ctx, pg, errors
 
 

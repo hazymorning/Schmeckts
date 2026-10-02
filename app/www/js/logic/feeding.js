@@ -1,6 +1,4 @@
-/* Serving: a known variety or a photo. In a household the server recognises the photo in the background; in mode
-   `lokal` the variety is typed in right away (status noserver). The photo stays on this phone and only the preview
-   is synced. */
+// the photo stays on this phone, only the preview is synced
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
 import {esc} from '../text.js';
@@ -34,7 +32,7 @@ export function serveProduct(pid, scanCode = '') {
   };
   db.servings.unshift(s);
   linkProduct(s, p);
-  prefs.lastPets = ids; // sets the variety and the pets fed last, and attaches a scanned code
+  prefs.lastPets = ids;
   save();
   savePrefs();
   served(s.id);
@@ -43,9 +41,7 @@ export function serveProduct(pid, scanCode = '') {
   scrollTop();
   toast(withMilestone(msg), () => undoServe(s.id));
 }
-/* A milestone in the toast of the action that reaches it: „… serviert. Die 100. Mahlzeit!“ or „… 10 Sorten
-   probiert!“. Each threshold only once per device (prefs.milestones). Anything already passed, by another phone for
-   instance, counts as seen. */
+// each milestone is announced once per device
 function withMilestone(msg) {
   const m = milestones(db),
     fresh = m.reached.filter(k => !prefs.milestones.includes(k));
@@ -58,8 +54,6 @@ function withMilestone(msg) {
   ].filter(Boolean);
   return notes.length ? `${msg}${/[.!?…]$/.test(msg) ? '' : '.'} ${notes.join(' ')}` : msg;
 }
-/* Feedback after serving: haptics, the bowl in the feeding button fills up, the entry appears under „Heute“,
-   and the rating reminder if it is switched on */
 function served(id) {
   haptic('success');
   homeView.fresh = id;
@@ -74,15 +68,12 @@ function undoServe(id) {
   memLines.delete(id);
   tries.delete(id);
   if (s.productId) cleanupProduct(s.productId);
-  if (sheet?.kind === 'serving' && sheet.id === id) closeSheet(); // is being named right now (mode `lokal`)
+  if (sheet?.kind === 'serving' && sheet.id === id) closeSheet();
   save();
   update();
 }
 
-/* The camera for a packaging: our own, without it or its permission the camera app (photo plugin), and in the
-   browser the file input named, whose photo then comes in through actions.js. hint: what the camera says, the
-   camera app only where one is given (the front after a scan). The photo as a blob, null after „Abbrechen“ or once
-   the file input has taken over. */
+// null on cancel, or when the file input took over (its photo arrives through actions.js)
 async function packagingPhoto(hint, input, scanCode = '') {
   try {
     return await openCamera(hint || 'Packung fotografieren');
@@ -92,7 +83,7 @@ async function packagingPhoto(hint, input, scanCode = '') {
       if (scanCode) toast(hint);
       document.getElementById(input).click();
       return null;
-    } // browser: the photo button takes over a scanned code
+    }
     try {
       return await takePhoto(hint);
     } catch (err) {
@@ -102,18 +93,12 @@ async function packagingPhoto(hint, input, scanCode = '') {
     }
   }
 }
-/* Take a photo of the packaging and serve. Returns true when something was served; after „Abbrechen“ the feeding
-   sheet stays open. */
 export async function shootPhoto(hint, scanCode = '') {
   const blob = await packagingPhoto(hint, 'camInputSheet', scanCode);
   if (blob) await servePhoto(blob, scanCode);
   return !!blob;
 }
-/* „Foto ändern“ or „Foto hinzufügen“ under a variety's card, in the meal's sheet and in the food sheet: the same
-   camera, and the photo becomes the variety's (replaceProductPhoto() in logic/products.js); „Abbrechen“ changes
-   nothing. In the browser the file input takes over, and its photo comes in through productPhotoFile() for the
-   variety the link was tapped for. */
-let shooting = null; // the variety whose photo the file input is to replace
+let shooting = null; // the variety the browser's file input is for
 export async function reshootProduct(pid) {
   if (!getProduct(pid)) return;
   shooting = pid;
@@ -126,7 +111,6 @@ export async function productPhotoFile(file, pid = shooting) {
   try {
     img = await fileToImage(file);
   } catch {
-    // An unreadable file leaves the old photo in place; the toast asks for another one
     toast('Das Foto ließ sich nicht lesen.');
     return;
   }
@@ -134,7 +118,6 @@ export async function productPhotoFile(file, pid = shooting) {
   renderSheet();
   update();
 }
-/* „Neues Foto“ while naming: the same camera, and the photo replaces the meal's; „Abbrechen“ changes nothing */
 export async function rephoto() {
   const id = sheet?.kind === 'serving' && sheet.step === 'name' ? sheet.id : null;
   if (!id) return;
@@ -142,20 +125,18 @@ export async function rephoto() {
   if (blob) await replacePhoto(id, blob);
 }
 
-/* Photo: the meal is saved as served at once, recognition then runs in the background.
-   scanCode: a scanned barcode still unknown; it goes onto the recognised or named variety. */
+// scanCode: an unknown barcode, attached to the variety once it is known
 export async function servePhoto(file, scanCode = '') {
   if (!file || !db.pets.length) return;
   let img;
   try {
     img = await fileToImage(file);
   } catch {
-    // An unreadable file leaves nothing to serve; the toast asks for another photo
     toast('Das Foto ließ sich nicht lesen.');
     return;
   }
   const full = resize(img, 1100, 0.82),
-    local = !photoByServer(); // no server for the photo: the phone reads the text and the variety is typed in
+    local = !photoByServer();
   const {ids, auto} = defaultPets(null);
   const s = {
     id: uid(),
@@ -176,29 +157,26 @@ export async function servePhoto(file, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  await closeAll(); // serving ends on the home page, where the meal is rated
+  await closeAll();
   update();
   scrollTop();
-  if (local) openSheet({kind: 'serving', id: s.id, step: 'name', brand: '', variety: '', type: 'Nassfutter'}); // type the variety in directly
+  if (local) openSheet({kind: 'serving', id: s.id, step: 'name', brand: '', variety: '', type: 'Nassfutter'});
   toast(
     withMilestone(
       `Serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}${local ? '' : '. Sorte wird erkannt …'}`,
     ),
     () => undoServe(s.id),
   );
-  // recognize.js picks the source. Where the phone reads the text itself, it reads it off the original with its long
-  // edge capped (READ_MAX), made once the meal is on screen and only for this first reading.
+  // the large copy for reading is made only once the meal is on screen
   (local ? readable(img) : Promise.resolve(''))
     .catch(e => {
       report('the photo for reading', e);
-      return ''; // read off the 1100 px copy instead
+      return ''; // read the 1100 px copy instead
     })
     .then(sharp => recognizeServing(s.id, sharp));
 }
 
-/* A new photo for a meal still without a variety: shrunk exactly as servePhoto() does, everything the old photo
-   brought goes (the guess, an error, the lines read, the attempts), the open sheet's fields are emptied, and the
-   recognition starts again by mode: the sheet shows the skeleton and then the new reading, or the server's status. */
+// sizes as in servePhoto(); everything the old photo brought goes
 export async function replacePhoto(id, file) {
   const s = getServing(id);
   if (!s || s.productId || !file) return;
@@ -206,11 +184,10 @@ export async function replacePhoto(id, file) {
   try {
     img = await fileToImage(file);
   } catch {
-    // An unreadable file leaves the old photo in place; the toast asks for another one
     toast('Das Foto ließ sich nicht lesen.');
     return;
   }
-  running.delete(id); // a run still going for the old photo answers for nothing from here on
+  running.delete(id); // a run for the old photo no longer counts
   const full = resize(img, 1100, 0.82);
   s.photo = resize(img, 480, 0.74);
   s.thumb = cropSquare(img, 200, 0.76);
@@ -231,10 +208,10 @@ export async function replacePhoto(id, file) {
     .then(sharp => recognizeServing(id, sharp));
 }
 
-const running = new Map(); // recognitions in flight: meal → the photo being recognised, so a new photo supersedes
-const tries = new Map(); // meal → {n, next}: attempts, and the earliest next attempt
-const PAUSE = [0, 30e3, 2 * 60e3, 10 * 60e3, 30 * 60e3]; // no automatic attempt after that
-const BUSY_PAUSE = 90e3; // the server's own cost brake lets one photo through every 90 seconds
+const running = new Map(); // meal → the photo being recognised, so a new photo supersedes the run
+const tries = new Map(); // meal → {n, next}: attempts and the earliest next one
+const PAUSE = [0, 30e3, 2 * 60e3, 10 * 60e3, 30 * 60e3]; // ms; no automatic attempt after the last
+const BUSY_PAUSE = 90e3; // the server's cost brake lets one photo through per 90 s
 
 export function retryNow(id) {
   tries.delete(id);
@@ -254,14 +231,13 @@ async function recognizeServing(id, sharp = '') {
     }
     return;
   }
-  if (running.get(id) === b64) return; // this very photo is being recognised already
+  if (running.get(id) === b64) return;
   running.set(id, b64);
-  const house = photoByServer(); // the server recognises, otherwise the phone reads the text on the photo itself
+  const house = photoByServer();
   s.status = house ? 'recognizing' : 'reading';
   delete s.error;
   if (!house) {
     readingSince.set(id, Date.now());
-    // the naming sheet shows a skeleton for READ_PATIENCE and the empty fields after: redrawn when that is over
     setTimeout(() => {
       if (getServing(id)?.status === 'reading') refreshServing(id);
     }, READ_PATIENCE);
@@ -274,7 +250,7 @@ async function recognizeServing(id, sharp = '') {
   } catch (e) {
     report('recognition', e);
   }
-  if (running.get(id) !== b64) return; // a new photo since this began: that run answers, this one counts for nothing
+  if (running.get(id) !== b64) return; // superseded by a new photo
   running.delete(id);
   readingSince.delete(id);
   const cur = getServing(id);
@@ -286,17 +262,14 @@ async function recognizeServing(id, sharp = '') {
   refreshServing(id);
 }
 
-/* What the chain came back with: a known variety, details to apply, something for a human to confirm, or an
-   error. Sets status and error on the meal, which stay on this phone. */
 function takeResult(s, found, house) {
   const err = found.error;
   if (found.lines?.length || found.brands?.length)
-    memLines.set(s.id, {lines: found.lines || [], brands: found.brands || []}); // what the phone read, as chips while naming
+    memLines.set(s.id, {lines: found.lines || [], brands: found.brands || []});
   if (found.products?.length) {
     tries.delete(s.id);
-    if (found.source === 'text')
-      recognized(s, found.products[0]); // one of our own varieties read off the photo
-    else linkProduct(s, found.products[0]); // the barcode now belongs to a known variety
+    if (found.source === 'text') recognized(s, found.products[0]);
+    else linkProduct(s, found.products[0]);
   } else if (found.details && found.source !== 'text') {
     tries.delete(s.id);
     refinePets(s, findProduct(found.details.brand, found.details.variety), found.details.animal);
@@ -304,15 +277,15 @@ function takeResult(s, found, house) {
     if (sheet?.kind === 'serving' && sheet.id === s.id && sheet.step === 'name' && !sheet.brand && !sheet.variety)
       sheet.step = null;
   } else if (found.details) {
-    // read by the phone: a human confirms or changes it while naming
+    // read by the phone: a person confirms it while naming
     tries.delete(s.id);
     s.guess = found.details;
     s.status = 'noserver';
     delete s.error;
     fillName(s.id, found.details);
-  } else if (!house || err?.kind === 'none') {
+  } else if (!house) {
     s.status = 'noserver';
-    delete s.error; // no server and no key: the variety gets typed in
+    delete s.error;
   } else if (err?.retry) {
     waitForAnotherTry(s, err);
   } else {
@@ -321,10 +294,7 @@ function takeResult(s, found, house) {
   }
 }
 
-/* One of our own varieties read off the photo: served like a barcode hit, the naming sheet for this meal closes,
-   and the toast offers to take the recognition back. For that a snapshot of what linking changes is kept as long
-   as the toast stands: the meal's photo, thumbnail and lines, the reading as its guess, and what the variety takes
-   over from the meal. */
+// keeps what linking changes for as long as the toast offers to undo it
 function recognized(s, p) {
   const was = {
     photo: s.photo,
@@ -345,9 +315,7 @@ function recognized(s, p) {
     toast(`<b>${esc(pname(p))}</b> erkannt und serviert`, () => unrecognize(s.id, p.id, was), true),
   );
 }
-/* Undo of the recognition, not of the meal: the variety comes off again, the meal is as it was before, and „Futter
-   benennen“ opens with the reading in its fields. A photo keepPhoto() wrote for the variety stays: it shows the
-   right packaging. */
+// undoes the recognition, not the meal; a photo keepPhoto() wrote stays, it shows the right packaging
 function unrecognize(id, pid, was) {
   const s = getServing(id),
     p = getProduct(pid);
@@ -371,11 +339,9 @@ function unrecognize(id, pid, was) {
   openSheet({kind: 'serving', id, step: 'name', ...guessOf(s)});
 }
 
-/* An error worth another attempt: the meal gets status 'waiting' and retryWaiting() picks it up again. Once
-   PAUSE has run out it stays failed and a human types the variety in. */
 function waitForAnotherTry(s, err) {
   const t = tries.get(s.id) || {n: 0, next: 0};
-  if (err.kind !== 'offline' || err.timeout) t.n++; // an unreachable server costs nothing and does not count
+  if (err.kind !== 'offline' || err.timeout) t.n++; // an unreachable server costs nothing, so it does not count
   if (t.n >= PAUSE.length) {
     tries.delete(s.id);
     s.status = 'failed';
@@ -391,9 +357,7 @@ function waitForAnotherTry(s, err) {
       : `${err.message} Die App versucht es später automatisch noch einmal.`;
 }
 
-/* What was read goes into the open naming sheet field by field, only where nothing has been typed yet: into the
-   state and into the field on screen, so a finger typing in the other field keeps its place. Type and texture
-   follow only while nothing has been typed at all. */
+// empty fields only, written straight into the input so typing in the other field keeps its place
 function fillName(id, guess) {
   if (sheet?.kind !== 'serving' || sheet.id !== id || sheet.step !== 'name') return;
   const typed = ['brand', 'variety'].filter(f => String(sheet[f] || '').trim());
@@ -405,7 +369,6 @@ function fillName(id, guess) {
   }
   if (!typed.length) Object.assign(sheet, {type: guess.type || sheet.type, texture: guess.texture});
 }
-/* What the phone read prefills the form while naming (actions.js) */
 export const guessOf = s => ({
   brand: s?.guess?.brand || '',
   variety: s?.guess?.variety || '',
@@ -414,10 +377,8 @@ export const guessOf = s => ({
 });
 
 function settle(s) {
-  // named, here or on another phone: photo and recognition status are no longer needed
   const p = getProduct(s.productId);
-  if (p)
-    linkProduct(s, p); // tidies up and attaches a scanned code
+  if (p) linkProduct(s, p);
   else {
     keepPhoto(s.productId, memPhotos.get(s.id) || s.photo?.split(',')[1], s.id); // the variety has not arrived here yet
     delete s.photo;
@@ -431,9 +392,7 @@ function settle(s) {
   tries.delete(s.id);
 }
 
-/* Meals named meanwhile on another phone, whether photos go to the server or not: at start, after every change
-   from elsewhere and before recognising. refresh: redraw what shows such a meal (a change from elsewhere redraws
-   everything anyway). */
+// refresh false: the caller redraws everything anyway
 export function settleNamed(refresh = true) {
   const named = db.servings.filter(s => s.productId && (s.status || s.photo));
   for (const s of named) settle(s);
@@ -442,7 +401,6 @@ export function settleNamed(refresh = true) {
   if (refresh) for (const s of named) refreshServing(s.id);
 }
 
-/* Server reachable again: recognise the waiting photos one after another */
 let retrying = false;
 export async function retryWaiting() {
   settleNamed();
@@ -459,7 +417,7 @@ export async function retryWaiting() {
         continue;
       }
       if (s.status !== 'waiting' && s.status !== 'noserver') continue;
-      if (s.guess) continue; // the phone has already read the text, a human confirms it while naming
+      if (s.guess) continue; // a person confirms the phone's reading while naming
       if ((tries.get(s.id)?.next || 0) > Date.now()) continue;
       await recognizeServing(s.id);
     }
@@ -470,14 +428,12 @@ export async function retryWaiting() {
 
 function refreshServing(id) {
   update();
-  if (isClosing() || sheet?.kind !== 'serving' || sheet.id !== id) return; // a sheet on its way out is not redrawn
+  if (isClosing() || sheet?.kind !== 'serving' || sheet.id !== id) return;
   const typing =
     document.activeElement && topBody().contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
   if (sheet.step !== 'name' || !typing) renderSheet();
 }
 
-/* Narrow down the pets while they are still only guessed: the pets that last had this food, and failing that
-   the pets whose species matches the packaging. */
 export function refinePets(s, known, animalHint) {
   if (!s.autoPets || db.pets.length < 2 || Object.values(s.pets).some(x => x.r)) return;
   let pref = (known?.lastPets || []).filter(pid => getPet(pid));

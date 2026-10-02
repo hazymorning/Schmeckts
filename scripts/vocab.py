@@ -1,17 +1,7 @@
 #!/usr/bin/env python3
-"""Generate app/www/js/vocab.js from the Open Pet Food Facts export.
+"""Generates app/www/js/vocab.js from the Open Pet Food Facts export (ODbL).
 
-Run this on your own machine, not inside a coding agent: it downloads ~3 MB.
-
-    python3 scripts/vocab.py                 # downloads the export, writes app/www/js/vocab.js
-    python3 scripts/vocab.py path/to/export.csv[.gz]   # uses a local copy instead
-
-The export is the nightly CSV dump of Open Pet Food Facts (Open Database License, ODbL):
-https://static.openpetfoodfacts.org/data/en.openpetfoodfacts.org.products.csv.gz
-
-What comes out is a word list, not a catalogue: brands that occur on at least MIN_BRAND_PRODUCTS products, and
-words of product names that occur in at least MIN_WORD_PRODUCTS products, each in its most common spelling.
-`js/ocr.js` uses both to put misread words right; the hand-kept BRANDS list in config.js keeps precedence.
+Usage: scripts/vocab.py [path/to/export.csv[.gz]]   without a path it downloads the export, about 3 MB
 """
 
 import csv
@@ -30,10 +20,9 @@ MIN_BRAND_PRODUCTS = 3
 MIN_WORD_PRODUCTS = 2
 MIN_WORD_LEN = 3
 MAX_BRAND_LEN = 30
-# products from these markets feed the word list: German packaging is German and English, and words from
-# other languages (French, Spanish) would only invite wrong corrections. Brands are counted worldwide.
+# German packaging is German and English; other languages would invite wrong corrections. Brands count worldwide.
 MARKETS = ('germany', 'austria', 'switzerland', 'united-kingdom', 'united-states', 'ireland', 'australia', 'canada', 'new-zealand')
-# packaging words that are too short or too generic to reach the thresholds, and words we always want
+# packaging words too short or too generic to reach the thresholds
 EXTRA_WORDS = (
     'mit in und ohne für Sauce Soße Gelee Jelly Pastete Ragout Royal Adult Kitten Senior Junior Sterilised '
     'Sterilized Indoor Menü Mousse Terrine Stückchen Häppchen Filets Filet Snack Sticks Dose Beutel'
@@ -57,8 +46,7 @@ def read_export(path):
 
 
 def best_spelling(variants):
-    """The spelling seen most often, except that a capitalised spelling beats an all-lower or all-caps one
-    that is not at least twice as common: the word ends up in a variety name, and packaging shouts."""
+    """The most common spelling, mixed case counting double: the word ends up in a variety name, and packaging shouts."""
 
     def key(item):
         s, n = item
@@ -133,8 +121,7 @@ def main():
         '   Open Database License (ODbL)."\n'
         f'   VOCAB_BRANDS: brands on at least {MIN_BRAND_PRODUCTS} products ({len(brands)}).\n'
         f'   VOCAB_WORDS: words of product names on at least {MIN_WORD_PRODUCTS} of those market products ({len(word_list)}),\n'
-        '   plus a few\n'
-        '   packaging words. Each in its most common spelling. Used by js/ocr.js to put misread words right;\n'
+        '   plus a few packaging words. Each in its most common spelling. Used by js/ocr.js to put misread words right;\n'
         '   BRANDS in config.js keeps precedence. */\n'
         f'export const VOCAB_BRANDS = {js_array(brands)};\n'
         f'export const VOCAB_WORDS = {js_array(word_list)};\n'

@@ -1,8 +1,4 @@
-/* Starting the app: build the interface, wire up the storage and sync hooks, start syncing, handle Android's back
-   button. Imports the sheet views and actions, which register themselves as they load.
-   store.js loads the stored data before this module runs (top-level await), and the native splash screen stays
-   up until the home page is drawn and the typefaces are there (ui/splash.js), so nobody sees the page build up.
-   ui/splash.js comes first, because its fallback timer starts as the module loads. */
+// ui/splash.js comes first: its fallback timer starts as the module loads
 import {hideSplash, hideSplashWhenReady} from './ui/splash.js';
 import {appInfo, Native} from './native.js';
 import {icon} from './icons.js';
@@ -16,13 +12,13 @@ import {closeCamera} from './ui/camera.js';
 import {closeViewer} from './ui/viewer.js';
 import {renderHome, renderSyncChip, update} from './views/home.js';
 import {paintHouse} from './views/settings.js';
-import './views/sheets.js'; // registers the contents of the sheets
-import './ui/slider.js'; // the rating slider under a finger, registers itself
+import './views/sheets.js';
+import './ui/slider.js';
 import {retryWaiting, settleNamed} from './logic/feeding.js';
 import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
 import {followPhotos, sharePhotos, tidyPhotos} from './logic/products.js';
-import {openLink} from './actions.js'; // also registers clicks and input
+import {openLink} from './actions.js';
 import {report} from './report.js';
 
 document.querySelectorAll('[data-icon]').forEach(el => {
@@ -34,39 +30,39 @@ hooks.changed = () => {
   settleNamed(false);
   followPhotos();
   update();
-  if (sheet && !typingIn(topBody())) renderSheet(); // the page under a sheet follows once the sheet has gone
-  syncReminders(); // rated or deleted elsewhere: cancel the reminder
+  if (sheet && !typingIn(topBody())) renderSheet();
+  syncReminders();
 };
 hooks.saved = () => {
   syncSoon(400);
   syncReminders();
-  followPhotos(); // knows where each meal is now, for the next change from elsewhere
-}; // sync shortly after our own save, keep the reminders current
+  followPhotos();
+};
 syncHooks.status = () => {
   renderSyncChip();
   paintHouse();
-}; // the box in the settings only changes on new content
+};
 syncHooks.reachable = () => {
-  retryWaiting(); // recognise waiting photos as soon as the server is reachable
-  sharePhotos(); // and hand it the packaging photos it does not have yet
+  retryWaiting();
+  sharePhotos();
 };
 diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportieren.');
 try {
   startSync();
   applyTheme();
-  settleNamed(false); // named on another phone while this one was away
+  settleNamed(false); // named on another phone meanwhile
   followPhotos();
-  renderHome(); // drawn exactly once before the splash goes
+  renderHome(); // exactly once before the splash goes
   startReminders();
   clearExports();
   tidyPhotos();
 } catch (e) {
   report('start', e);
-  hideSplash(); // whatever happened, the app must not stay behind the splash
+  hideSplash(); // never stay behind the splash
 }
 hideSplashWhenReady();
 if (Native?.App) {
-  // Back: close an open camera, the photo or an open sheet, otherwise send the app to the background (as native apps do)
+  // with nothing left to close, back sends the app to the background as native apps do
   Native.App.addListener('backButton', ({canGoBack}) => {
     if (closeCamera() || closeViewer()) return;
     if (anyOpen()) sheetBack();
@@ -78,13 +74,12 @@ if (Native?.App) {
       appInfo.version = i.version;
     })
     .catch(e => report('app version', e));
-  // Shortcuts and deep links, on a cold start (Capacitor holds the event back) and while the app is running
+  // on a cold start Capacitor holds the event back until this listener exists
   Native.App.addListener('appUrlOpen', ({url}) => {
     openLink(url);
   });
 }
-/* The strip behind the status bar is only there once the page has moved (body::before). CSS cannot ask how far
-   the document has scrolled, so the class says it. */
+// CSS cannot ask how far the document has scrolled
 const markScrolled = () => document.documentElement.classList.toggle('scrolled', window.scrollY > 0);
 markScrolled();
 window.addEventListener('scroll', markScrolled, {passive: true});

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Labels of the static app shortcuts. German, like the rest of the interface. -->
 <resources>
     <string name="shortcut_feed">Füttern</string>
     <string name="shortcut_feed_long">Füttern eintragen</string>

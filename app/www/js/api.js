@@ -1,12 +1,9 @@
-/* Requests to the household server: household code as bearer, a timeout, server time for the clock,
-   errors as a ServerError carrying a kind and a German message. */
 import {measure} from './clock.js';
 import {prefs} from './store.js';
 
 export const PROTOCOL = 1;
 
-/* kind: offline (unreachable), auth (wrong code), locked (too many failed attempts), busy (cost brake),
-   unavailable (503), server (5xx), bad (any other rejection), input (address or code impossible as given) */
+// kind: offline, auth, locked (too many attempts), busy (cost brake), unavailable, server, bad or input
 export class ServerError extends Error {
   constructor(kind, message, status = 0) {
     super(message);
@@ -15,9 +12,7 @@ export class ServerError extends Error {
   }
 }
 
-/* Home network: the only place unencrypted http may go. IPv4 10/8, 172.16/12, 192.168/16, 100.64/10 (VPN) and 127/8,
-   IPv6 fc00::/7 and fe80::/10, plus the names localhost, *.local and *.home.arpa. host: URL.hostname, so already in
-   normal form (lower case, IPv4 as four decimal numbers, IPv6 in square brackets). */
+// private ranges and local names; host comes from URL.hostname, so it is already normalised
 function isHome(host) {
   const name = host.replace(/\.$/, '');
   if (name === 'localhost' || /\.(local|home\.arpa)$/.test(name)) return true;
@@ -38,9 +33,7 @@ function isHome(host) {
   return (h & 0xfe00) === 0xfc00 || (h & 0xffc0) === 0xfe80;
 }
 
-/* The address as typed → "http://192.168.1.20:8486", http when none is given. Empty stays empty: there is no default.
-   Both request() and eventsUrl() get their address from here, so the network rule is checked in one place: http
-   only on the home network, https everywhere else. Throws ServerError 'input'. */
+// every address passes here, so plain http is refused outside the home network in one place
 export function normServer(s) {
   let v = String(s || '')
     .trim()
@@ -51,7 +44,6 @@ export function normServer(s) {
   try {
     url = new URL(v);
   } catch {
-    // Whatever URL() rejected, the result is the same: the address cannot be used
     throw new ServerError('input', 'Das ist keine gültige Adresse.');
   }
   if (url.protocol !== 'https:' && !isHome(url.hostname))
@@ -59,7 +51,7 @@ export function normServer(s) {
   return v;
 }
 
-/* "k7pm 3qxd" → "K7PM-3QXD". The server compares without spaces, hyphens and case anyway. */
+// "k7pm 3qxd" → "K7PM-3QXD"
 export function normCode(s) {
   const v = String(s || '')
     .toUpperCase()
@@ -68,7 +60,7 @@ export function normCode(s) {
 }
 
 export async function request(method, path, {body, code = prefs.code, base = prefs.server, timeout = 20e3} = {}) {
-  base = normServer(base); // every request: http only on the home network
+  base = normServer(base);
   const ctrl = new AbortController(),
     timer = setTimeout(() => ctrl.abort(), timeout);
   const headers = {};

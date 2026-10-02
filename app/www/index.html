@@ -12,7 +12,7 @@
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
-<div class="mood" id="mood" aria-hidden="true" hidden><img alt="" decoding="async"></div> <!-- mood picture, views/mood.js -->
+<div class="mood" id="mood" aria-hidden="true" hidden><img alt="" decoding="async"></div>
 <div class="app">
   <header class="top">
     <h1 class="brand">Schmeckt’s?</h1>
@@ -36,11 +36,11 @@
   <input type="file" id="importInput" accept="application/json,.json" hidden>
   <input type="file" id="exchangeInput" accept="application/json,.json" hidden>
 </dialog>
-<dialog class="sheet" id="popup" aria-label="Details"> <!-- a sheet over a page, so the page stays as it was: ui/sheet.js -->
+<dialog class="sheet" id="popup" aria-label="Details"> <!-- a sheet over a page -->
   <div class="grip-zone"><div class="grip"></div></div>
   <div class="sheet-body" id="popupBody"></div>
 </dialog>
-<dialog class="camera fullscreen" id="camera" aria-label="Kamera"> <!-- in-app camera for packaging photos, ui/camera.js -->
+<dialog class="camera fullscreen" id="camera" aria-label="Kamera">
   <video autoplay playsinline muted></video>
   <p class="cam-hint" role="status"></p>
   <div class="cam-bar">
@@ -48,7 +48,7 @@
     <button class="shutter" data-cam="shoot" aria-label="Auslösen"></button>
   </div>
 </dialog>
-<dialog class="viewer fullscreen" id="viewer" aria-label="Foto"> <!-- the packaging photo, large: ui/viewer.js -->
+<dialog class="viewer fullscreen" id="viewer" aria-label="Foto">
   <img alt="Foto der Packung">
   <button class="icon-btn" aria-label="Schließen" data-icon="close"></button>
 </dialog>

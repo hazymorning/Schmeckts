@@ -1,22 +1,29 @@
-/* Creating, filling, merging and tidying up food varieties. Barcodes only reach a variety in linkProduct, and there
-   they reach every variety a scanned meal (scanCode) is given: that is how a multipack grows, and a wrongly
-   recognised variety disappears together with its code. */
+// barcodes reach a variety only in linkProduct, so a multipack grows and a wrong variety takes its code with it
 import {uid} from '../fields.js';
+import {serverNow} from '../clock.js';
 import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
 import {db, dbFound, loadError, prefs, save, savePrefs} from '../store.js';
 import {setAside} from '../disk.js';
 import {shareText} from '../native.js';
 import {findProduct, getProduct, shoppingList} from '../derive.js';
 import {cropSquare, memPhotos, resize} from '../images.js';
-import {keepPhoto, keptPhoto, passPhoto, photoData, photoFrom, replacePhotoFile, sweepPhotos} from '../photos.js';
-import {request} from '../api.js';
-import {isConnected, serverCan} from '../sync.js';
+import {
+  keepPhoto,
+  keptPhoto,
+  passPhoto,
+  photoData,
+  photoFrom,
+  replacePhotoFile,
+  serverStamp,
+  sweepPhotos,
+} from '../photos.js';
+import {ServerError, request} from '../api.js';
+import {isConnected, serverCan, status} from '../sync.js';
 import {report} from '../report.js';
 import {memLines} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 
-/* The manual buying setting, which holds household-wide and takes precedence over the computed verdict:
-   'immer', 'nicht' or anything else for „Automatisch“ (the field is dropped and null is synced) */
+// overrides the computed verdict household-wide; any other value means automatic
 export function setKaufen(id, v) {
   const p = getProduct(id);
   if (!p) return;
@@ -25,13 +32,12 @@ export function setKaufen(id, v) {
   save();
 }
 
-/* Passing on the shopping list, matching the pet filter: through the share menu, or the clipboard without one */
 export async function shareShopping() {
   const {title, text} = shoppingList();
   try {
     if ((await shareText(title, text)) === 'copied') toast('Liste kopiert');
   } catch {
-    // shareText() swallows a cancel itself, so anything left here is a real failure of the share menu
+    // shareText() already swallows a cancel
     toast('Die Liste konnte nicht geteilt werden.');
   }
 }
@@ -39,9 +45,7 @@ export async function shareShopping() {
 export function cleanupProduct(pid) {
   if (!db.servings.some(s => s.productId === pid)) db.products = db.products.filter(p => p.id !== pid);
 }
-/* Consistency or treat type after recognition, a barcode hit, naming and choosing. The human's choice wins
-   (userType, null = none). Otherwise an existing value stays; an empty field is filled from the server's value, then
-   from the keywords in brand and variety. Anything that does not fit the type is dropped (null is synced). */
+// the person's choice wins (userType, null = none), then an existing value, the server's, the keywords
 export function applyTexture(p, details = {}) {
   const fits = v => (textureOf(p, v) ? v : null);
   const v =
@@ -52,7 +56,6 @@ export function applyTexture(p, details = {}) {
   else delete p.texture;
 }
 export function toggleTexture(id, v) {
-  // the choice in the food sheet; a second tap clears it
   const p = getProduct(id);
   if (!p) return;
   applyTexture(p, {texture: p.texture === v ? null : v, userType: true});
@@ -90,7 +93,7 @@ export function linkProduct(s, p) {
   s.productId = p.id;
   p.lastPets = Object.keys(s.pets);
   if (s.scanCode) (p.codes ||= {})[s.scanCode] = true;
-  keepPhoto(p.id, memPhotos.get(s.id) || s.photo?.split(',')[1], s.id); // the meal's photo becomes the variety's
+  keepPhoto(p.id, memPhotos.get(s.id) || s.photo?.split(',')[1], s.id);
   delete s.photo;
   delete s.thumb;
   delete s.status;
@@ -100,8 +103,7 @@ export function linkProduct(s, p) {
   memPhotos.delete(s.id);
   memLines.delete(s.id);
   if (prev && prev !== p.id) {
-    // Corrected: the photo goes along when it came from this meal or its variety is left without a meal, and so
-    // does the thumbnail in the second case
+    // corrected: the photo follows if it came from this meal or the old variety has no meal left
     const last = !db.servings.some(x => x.productId === prev),
       was = getProduct(prev);
     if (last && !p.thumb && was?.thumb) p.thumb = was.thumb;
@@ -115,15 +117,13 @@ export function mergeProducts(from, into) {
     if (s.productId === from.id) s.productId = into.id;
   });
   if (!into.thumb && from.thumb) into.thumb = from.thumb;
-  Object.assign((into.codes ||= {}), from.codes); // the barcodes come along
+  Object.assign((into.codes ||= {}), from.codes);
   applyTexture(into, {texture: from.texture});
   db.products = db.products.filter(p => p.id !== from.id);
 }
 
-/* A change from another phone moved meals from a variety that is gone to another one (merged or corrected there):
-   the photo follows them, since the next start would otherwise tidy it away with the old variety. Run at start,
-   after every save here and after every change from elsewhere, so it always knows the step before. */
-let owners = new Map(); // meal → its variety, as of the last look
+// meals moved off a variety that is gone: the photo follows, or the next start would sweep it away
+let owners = new Map(); // meal → its variety at the last look
 export function followPhotos() {
   for (const s of db.servings) {
     const was = owners.get(s.id);
@@ -132,87 +132,76 @@ export function followPhotos() {
   owners = new Map(db.servings.map(s => [s.id, s.productId]));
 }
 
-/* „Foto ändern“ in the food sheet: the variety's large photo on this phone is written anew (1100 px), its thumbnail
-   too (200 px, synced), and in a household the new photo goes to the server through sharePhotos(), which then marks
-   the variety with the photo's stamp so the other phones fetch it anew. Alone (`lokal`) that is all. */
 export function replaceProductPhoto(pid, img) {
   const p = getProduct(pid);
   if (!p) return;
   replacePhotoFile(pid, resize(img, 1100, 0.82).split(',')[1]);
   p.thumb = cropSquare(img, 200, 0.76);
+  prefs.photoStamps[pid] = Math.max(serverNow(), serverStamp(p) + 1); // newer than the household's, whatever the clocks say
   save();
-  if (!isConnected()) return;
-  replacing.set(pid, Date.now());
-  sharePhotos();
+  savePrefs();
+  if (isConnected()) sharePhotos();
 }
 
-/* In a household every variety whose large photo lies on this phone and not yet on the server goes there, one after
-   the other, whenever the server has just been reached. The mark on the variety then tells the other phones they can
-   fetch it. A server that cannot keep photos (before 1.3.0) is left alone, and one it refused is not sent again while
-   the app runs. A photo replaced here goes the same way, where the server replaces photos (`replace`, from 1.4.0):
-   the mark then carries the new photo's stamp, and this phone's own stamp says it holds that one; an older server
-   keeps its photo, and a toast says so. Never an old photo over a newer one: a variety whose mark is a number is
-   left alone by the first branch. */
-let sharing = false;
-const refused = new Set(),
-  replacing = new Map(); // variety → the stamp of the photo replaced here, until the server has it
+// a photo replaced here waits until the server has it: this phone's stamp above the household's mark
+const newerHere = () => db.products.filter(p => p.sharedPhoto && (prefs.photoStamps[p.id] || 0) > serverStamp(p));
+
+// servers without the photo or replace feature keep what they have; a first upload never overwrites a numeric mark
+let sharing = false,
+  toldOld = false;
+const refused = new Set();
+// one photo to the server. A refused photo or an unreadable file is skipped from then on; anything else on the
+// server's side ends the round, and the next contact tries again.
+async function upload(id) {
+  try {
+    const image = await photoData(id);
+    if (!image) return false;
+    await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
+    return true;
+  } catch (e) {
+    if (e instanceof ServerError && e.kind !== 'bad') throw e;
+    if (!(e instanceof ServerError)) report('reading a photo to share', e);
+    refused.add(id);
+    return false;
+  }
+}
 export async function sharePhotos() {
   if (sharing) return;
   sharing = true;
   try {
-    for (const [id, stamp] of [...replacing]) {
-      if (!(await serverCan('replace'))) {
-        replacing.delete(id);
-        toast('Der Server behält das alte Foto, bis er aktualisiert ist.');
-        continue;
-      }
-      const image = await photoData(id),
-        p = getProduct(id);
-      if (!image || !p) {
-        replacing.delete(id);
-        continue;
-      }
-      await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
-      replacing.delete(id);
-      p.sharedPhoto = stamp;
-      prefs.photoStamps[id] = stamp;
-      save();
-      savePrefs();
-    }
+    const replaced = newerHere().filter(p => !refused.has(p.id));
+    if (replaced.length && !(await serverCan('replace'))) {
+      if (status.features && !toldOld) toast('Der Server behält das alte Foto, bis er aktualisiert ist.');
+      toldOld ||= !!status.features;
+      if (!status.features) return; // out of reach: tried again on the next contact
+    } else
+      for (const p of replaced)
+        if (await upload(p.id)) {
+          p.sharedPhoto = prefs.photoStamps[p.id];
+          save();
+        }
     if (!(await serverCan('photo'))) return;
     for (const {id} of db.products.filter(x => !x.sharedPhoto && keptPhoto(x.id) && !refused.has(x.id))) {
-      const image = await photoData(id);
-      if (!image) continue;
-      try {
-        await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
-      } catch (e) {
-        if (e.kind !== 'bad') throw e;
-        refused.add(id); // no JPEG, too large, or a variety the server does not know
-        continue;
-      }
       const p = getProduct(id);
-      if (p && !p.sharedPhoto) {
-        p.sharedPhoto = true;
+      if ((await upload(id)) && p && !p.sharedPhoto) {
+        p.sharedPhoto = prefs.photoStamps[id] || true;
         save();
       }
     }
   } catch (e) {
-    if (e.kind !== 'offline') report('handing a photo to the server', e); // offline: the next time the server is reached
+    if (e.kind !== 'offline') report('handing a photo to the server', e); // offline: retried on the next contact
   } finally {
     sharing = false;
   }
 }
-/* The household server has no photo for a variety marked as having one: the mark goes, so no phone offers it any
-   more, and a phone that still holds the photo hands it over anew */
+// the server has no photo for it: no phone offers it any more, and one still holding it uploads it again
 export function unsharePhoto(p) {
   if (!p.sharedPhoto) return;
   delete p.sharedPhoto;
   save();
 }
 
-/* At start: the photos of varieties that are gone (deleted here or elsewhere) go too. Not while the stored data
-   could not be read, nor while a data file that could not be read lies set aside: until it is restored, the
-   varieties it holds may come back, so a broken db.json never takes the photos with it. */
+// not while a broken or set-aside db.json could still bring varieties back
 export async function tidyPhotos() {
   if (loadError || !dbFound || (await setAside())) return;
   sweepPhotos(new Set([...db.products.map(p => p.id), ...db.servings.map(s => s.productId).filter(Boolean)]));

@@ -1,11 +1,8 @@
 {
   "name": "schmeckts",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "description": "Schmeckt’s? – a feeding diary for pets",
-  "scripts": {
-    "sync": "cap sync android"
-  },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.1",
     "@capacitor-mlkit/text-recognition": "^8.2.1",

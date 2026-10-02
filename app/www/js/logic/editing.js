@@ -1,4 +1,3 @@
-/* Rating, naming and deleting meals and food varieties, and removing a variety's barcodes. */
 import {haptic} from '../native.js';
 import {RATINGS} from '../config.js';
 import {settled} from '../motion.js';
@@ -15,9 +14,7 @@ import {renderSuggestions} from '../views/sheets.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, retryNow, serveProduct} from './feeding.js';
 
-/* Rates what a meal was for one pet, from a level's button on the rating slider, which then shows the level, pops
-   and says it under the track. The toast confirms at once, with „Rückgängig“. A level the meal already holds stays
-   as it is: a second tap, Enter twice. */
+// a level the meal already holds stays as it is (a second tap, Enter twice)
 export function rate(el) {
   const s = getServing(el.dataset.s),
     pid = el.dataset.p,
@@ -36,27 +33,24 @@ export function rate(el) {
   showRated(disc, s, pid);
 }
 
-/* Puts the rating that was there back, wherever the tap came from */
 const undoRating = (sid, pid, prev) => () => {
   const cur = getServing(sid);
   if (!cur || !cur.pets[pid]) return;
   cur.pets[pid] = prev;
   save();
   update();
-  renderSheet(); // the meal's sheet, or the page it was opened from once that sheet has gone
+  renderSheet();
 };
 
-/* Once every pet of a meal is rated, the meal stays where it was rated for a moment, to be read and put right with
-   another slide; then the card in „Wie war’s?“ folds away, or the sheet closes. Rated again, the moment starts over;
-   a finger still on a slider holds it until it lifts. */
+// a fully rated meal stays put for a moment so it can be corrected; a finger still on a slider holds it longer
 const HOLD = 1500; // ms
-const holds = new Map(); // meal id → the number of its newest hold: an older one that ends leaves the meal alone
+const holds = new Map(); // meal id → its newest hold, so an older one ending does nothing
 let lastHold = 0;
 const rated = s => Object.values(s.pets).every(x => x.r);
 function showRated(disc, s, pid) {
   const inSheet = sheet?.kind === 'serving' && sheet.id === s.id;
   if (!inSheet) {
-    // the pet's row stays in „Wie war’s?“ while the meal does, the rest of the home page follows once the pop has run
+    // the row stays until the pop has run
     if (!homeView.held.has(s.id)) homeView.held.set(s.id, new Set());
     homeView.held.get(s.id).add(pid);
   }
@@ -74,9 +68,8 @@ function showRated(disc, s, pid) {
 function finish(sid, inSheet) {
   holds.delete(sid);
   const s = getServing(sid);
-  if (!s || !rated(s)) return; // undone in the meantime, or given another pet
+  if (!s || !rated(s)) return; // undone meanwhile, or given another pet
   if (inSheet) {
-    // not while something is typed there or the sheet has moved on
     const busy = document.activeElement?.matches('input, textarea') && topDialog()?.contains(document.activeElement);
     if (sheet?.kind === 'serving' && sheet.id === sid && !sheet.step && !busy && !viewerOpen()) closeSheet();
     return;
@@ -91,8 +84,6 @@ function finish(sid, inSheet) {
   settled(li).then(gone);
 }
 
-/* „Speichern“ while naming, from three places: a meal gets its variety, „Neues Futter“ serves it straight
-   away, and the food sheet renames an existing variety. */
 export function saveName() {
   const s = sheet;
   const brand = (s.brand || '').trim(),
@@ -120,7 +111,7 @@ function serveNewProduct(details) {
   p.type = details.type;
   applyTexture(p, details);
   save();
-  closeAll().then(() => serveProduct(p.id)); // serving ends on the home page, where the meal is rated
+  closeAll().then(() => serveProduct(p.id)); // the meal is rated on the home page
 }
 function renameProduct(id, details) {
   const p = getProduct(id);
@@ -137,15 +128,12 @@ function renameProduct(id, details) {
   save();
   backFromNaming();
 }
-/* Back from „Futter benennen“ to the sheet it was opened from */
 function backFromNaming() {
   sheet.step = null;
   renderSheet();
   update();
 }
-/* A chip read off the packaging, tapped: its field takes the chip's text in place of what was there, and a tap on
-   the pressed one, the one the field holds already, clears the field. The field on screen is written, not redrawn,
-   and only the chips are drawn anew, so the focus stays where it was. */
+// the field is written, not redrawn, so the focus stays where it was
 export function setPackLine(field, line) {
   if (!sheet || !['brand', 'variety'].includes(field)) return;
   haptic('select');
@@ -202,13 +190,12 @@ export function deleteServing(id) {
       db.servings.sort((a, b) => b.servedAt - a.servedAt);
       save();
       update();
-      renderSheet(); // the page it was deleted from, „Verlauf“
-      // Deleted while the photo was being read: that result was dropped meanwhile, so it is read again
+      renderSheet();
+      // deleted while its photo was being read: that result was dropped, so read it again
       if (!s.productId && (s.status === 'reading' || s.status === 'recognizing')) retryNow(s.id);
     });
   });
 }
-/* Remove a barcode from the food sheet, for instance when it is stuck on the wrong variety. Undo puts it back. */
 export function removeCode(code) {
   const p = getProduct(sheet?.id);
   if (!p?.codes?.[code]) return;

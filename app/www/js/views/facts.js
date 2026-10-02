@@ -1,16 +1,11 @@
-/* Everything the overview card can say (views/overview.js words it from what glance() found): the first sentences by
-   the moment of the day, every way of saying each kind of second sentence, and the asides about the animals. Pure
-   data, so that a test can read all of it: nothing here names a rating or a verdict, nothing is longer than two
-   sentences, and an aside is at most 70 characters.
-   An aside: {id, text, when, months, day}. The id stays put, so the memory of what was shown (prefs.overview) survives
-   a change to the list. when: the moments it fits as a comment on, 'due' (feeding time), 'fresh' (just fed), 'wait'
-   (between meals), 'evening' (today's served), 'night'; without, any moment. months: the months it holds in, 1 to
-   12; without, all year. day: the day it comes on as the news of the day, „MM-DD“, or a function of the year for a
-   date that moves. FACTS per species, GENERAL for every animal beside them; „Andere“ and a mixed household take the
-   general ones only. */
+/* Wordings for the overview card. Pure data so a test can check them: no ratings or verdicts, at most two sentences,
+   asides at most 70 characters.
+   An aside: {id, text, when?, months?, day?}. Keep ids stable, prefs.overview remembers them. when: the moments it fits
+   ('due', 'fresh', 'wait', 'evening', 'night'), default any. months: 1-12, default all year. day: "MM-DD", or a
+   function of the year for a date that moves. */
 
 const mmdd = d => `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-/* The last Sunday of a month (the clocks change), and the n-th Saturday (the rabbits have their day) */
+// for dates that move each year
 export function lastSunday(year, month) {
   const d = new Date(year, month, 0);
   d.setDate(d.getDate() - d.getDay());
@@ -738,12 +733,8 @@ export const GENERAL = [
   {id: 'allg-haustiertag', day: '04-11', text: 'Tag des Haustiers: Extra-Streicheln erlaubt, Extra-Leckerli auch.'},
 ];
 
-/* The facts that hold on a day, in their months. dated: only those bound to this very day, the species' and the
-   general ones; otherwise those without a day. moment: the moment an aside has to fit (`when`): at a short moment
-   (due, fresh, evening, night) only those made for it, so the aside comments on it; between meals ('wait'), the
-   longest part of the day, those for any moment as well; null: only those for any moment; left out: all of them.
-   A species takes its own and the general ones made for a moment; a mixed household or „Andere“ all the general
-   ones. */
+/* dated: only facts bound to this day. moment: a short moment takes only facts made for it, 'wait' also those for
+   any moment, null only those for any moment, undefined all. */
 export function factsOn(species, date, dated = false, moment) {
   const own = FACTS[species] || [],
     list = [...own, ...GENERAL.filter(f => dated || !own.length || f.when)],
@@ -755,12 +746,8 @@ export function factsOn(species, date, dated = false, moment) {
   return list.filter(f => (!f.months || f.months.includes(month)) && (dated ? on(f) === today : !f.day && fits(f)));
 }
 
-/* The first sentence, by the moment of the day (momentOf() in views/overview.js): where the day stands for the bowl,
-   the thing that matters now first (feeding time, the next meal, everything served), then when it was last fed, by
-   whom in a household ({by}: „ von Anna“), and what only where that is the news (just served, feeding time; {for}:
-   „ für Tiger“ where it was for some of the pets shown only). The diary on the same page names every meal, so the
-   variety's name, the longest part, is left to it otherwise. Two lines at 360px hold about 56 characters, so it stays
-   under that with a usual name; pick() chooses one a day. */
+/* The diary below names every meal, so the variety is only named where it is news. Two lines at 360px hold about
+   56 characters; stay under that. */
 export const LEADS = {
   none: [
     '{names} {wartet} auf den ersten Eintrag im Tagebuch.',
@@ -825,11 +812,8 @@ export const LEADS = {
   ],
 };
 
-/* The second sentence, every way of saying each kind, as templates with {places} that views/overview.js fills in:
-   at feeding time the pet waiting, what is only true today (class 1) and what takes turns by the day (class 2); the
-   asides about the animal are the facts above. Short, so that it follows the first sentence and does not stand beside
-   it. The names in a duel and a feeding run are people's. A place that may open a sentence holds a capitalised word:
-   a meal, a name. */
+/* Short, so the line follows the lead instead of standing beside it. A {place} that can open a sentence must hold a
+   capitalised word. */
 export const LINES = {
   waiting: [
     '{names} {wartet} bestimmt schon neben dem Napf.',
@@ -961,6 +945,5 @@ export const LINES = {
   ],
   days: ['Seit {since} im Tagebuch.', 'Tag {n} im Tagebuch.', '{days} Tagebuch, und es geht weiter.'],
 };
-/* A template with its places filled: „{pet}“ becomes what is given for pet, already escaped and set in bold by
-   the caller */
+// values come escaped from the caller
 export const fill = (template, values) => template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');

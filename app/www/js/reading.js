@@ -1,12 +1,7 @@
-/* What the phone reads off a photo, apart from the plugin: its lines with their place and size, and the size of
-   the photo it read. Pure functions, used by native.js and by the tests in Node. */
+// Text recognition results as plain data, kept free of the plugin so the Node tests can run it.
 
-/* The plugin's answer (processImage: blocks of lines of words, each with its box and four corners) as lines, in
-   the order the plugin read them: {text, width, height, lines: [{text, elements: [{text, box, w, h, cx, cy, tilt}],
-   box, w, h, cx, cy, tilt, lang}]}. box is {left, top, right, bottom} in pixels of the photo; w and h the length and
-   height along the line's own direction, so a slanted line does not count taller than it is; cx and cy the middle;
-   tilt the direction in radians, 0 level and positive falling to the right; lang the language the plugin
-   recognised, '' for none. A line without a box is left out. */
+/* box is in photo pixels; w and h run along the line's own direction, so a slanted line is not taller than it is;
+   tilt is in radians, positive falling to the right. */
 export function readingOf(raw, width = 0, height = 0) {
   const lines = [];
   for (const block of raw?.blocks || [])
@@ -22,8 +17,7 @@ export function readingOf(raw, width = 0, height = 0) {
   return {text: String(raw?.text || ''), width, height, lines};
 }
 
-/* Box, length, height, middle and direction of a line or a word: from its four corners (top left, top right,
-   bottom right, bottom left, as the plugin gives them), otherwise from its box, level */
+// corners come top left, top right, bottom right, bottom left; without them the box is taken as level
 function shapeOf(x) {
   const c = x?.cornerPoints?.length === 4 ? x.cornerPoints : null,
     b = x?.boundingBox;
@@ -51,9 +45,7 @@ function shapeOf(x) {
   };
 }
 
-/* The size of a JPEG given as base64, from its frame header, without decoding the picture. {width, height}, both 0
-   when there is no header to read. The photos come from a canvas, so the header sits in the first few hundred
-   bytes; a camera's photo with a large preview in front of it is read up to 48 KB. */
+// from the frame header without decoding; 48 KB reaches past a camera photo's embedded preview
 export function jpegSize(b64) {
   const none = {width: 0, height: 0};
   let bytes;

@@ -9,11 +9,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONObject;
 
 /**
- * The feeding reminder (www/js/logic/reminders.js). set() hands over every reminder the app wants at once, each as
- * {id, at, since, title, body, sure}, with the household server and its code while the phone is connected; that
- * replaces whatever was set before. dismiss holds reminders already shown whose meal has been served since.
- * FeedReceiver sets the alarms and decides when one goes off.
- * Registered in MainActivity (scripts/prepare.py); in the app it is Capacitor.Plugins.FeedReminder.
+ * set() replaces all reminders, each {id, at, since, title, body, sure}, plus server and code while connected.
+ * dismiss: ids of shown reminders whose meal has been served. Registered in MainActivity by scripts/prepare.py.
  */
 @CapacitorPlugin(name = "FeedReminder")
 public class FeedReminderPlugin extends Plugin {

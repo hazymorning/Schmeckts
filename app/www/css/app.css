@@ -1,9 +1,6 @@
-/* Layout and components in four sections, each opened by a marker comment the tests read. Foundations: the reset,
-   body, icons, rating colours and the page's scaffolding. Recipes: one block per kind of text, container, row, box,
-   control and picture, which alone sets its padding, type, size, radius, shadow and layer. Views: where each screen
-   places the recipes, and nothing else. Motion: every transition, press and animation; the keyframes are in
-   tokens.css. Every value comes from tokens.css, and PROJECT.md ("Design rules") says which one serves what. Sizes
-   are in px; the WebView scales them with the system font size, which is why no text container has a fixed height. */
+/* Four sections, each opened by an == marker the tests read: Foundations, Recipes (each alone sets its box, type and
+   layer), Views (placement only), Motion. The WebView scales px with the system font, so no text box has a fixed
+   height. */
 
 /* == Foundations == */
 * {
@@ -18,10 +15,10 @@ body {
   color: var(--ink);
   font: var(--type-body);
   -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision; /* advance widths without hinting's rounding, or gaps open around f and t */
+  text-rendering: geometricPrecision; /* hinting's rounding opens gaps around f and t */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
-  text-wrap: pretty; /* German settings are long: this keeps a two-letter word from ending up on a line of its own */
+  text-wrap: pretty; /* keeps a short word off a line of its own */
 }
 body.locked {
   overflow: hidden;
@@ -66,7 +63,7 @@ strong {
 :focus-visible {
   outline: var(--stroke) solid var(--accent);
   outline-offset: var(--stroke);
-} /* the ring follows the element's radius */
+}
 .ic {
   width: var(--icon);
   height: var(--icon);
@@ -97,8 +94,6 @@ strong {
   width: var(--pic-xxl);
   height: var(--pic-xxl);
 }
-/* Small icons in controls, rows, fields and badges: --icon-s throughout at the icon set's stroke width, vertically
-   centred; 14px from the edge in fields and boxes */
 .btn .ic,
 .card-btn .ic,
 .chip .ic,
@@ -121,9 +116,8 @@ strong {
   display: grid;
   place-items: center;
   color: var(--muted);
-} /* a row's leading icon, no tile: two levels of container are enough (PROJECT.md, "Principles" 6) */
+}
 
-/* Rating colours */
 .r-good {
   --c: var(--good);
   --cs: var(--good-soft);
@@ -141,9 +135,7 @@ strong {
   --cs: var(--bad-soft);
 }
 
-/* Mood picture: the pet's profile picture behind the header and the upper part of the page, full width, fading
-   out downwards. The page renders over it unchanged (views/mood.js). Only the alpha in the mask gradient
-   matters, the colour in it is arbitrary. */
+/* only the alpha in the mask gradient matters */
 .mood {
   position: absolute;
   top: 0;
@@ -164,10 +156,7 @@ strong {
   opacity: var(--mood);
   filter: var(--mood-filter);
 }
-/* Behind the status bar: nothing while the page sits at the top, so the mood picture reaches the edge of the
-   screen. As soon as the page moves, a strip of the page's ground exactly as tall as the status bar appears and
-   cuts the content straight; it has no line, because the status bar is the edge of the screen. Sheets, their
-   dimming and the camera lie above it in any case, because a modal dialog is in the top layer. */
+/* Behind the status bar, shown once the page scrolls. Dialogs sit in the top layer, above it. */
 body::before {
   content: "";
   position: fixed;
@@ -181,7 +170,7 @@ body::before {
 :root.scrolled body::before {
   opacity: 1;
 }
-/* The page: the bottom leaves room for the feeding button and the gutter above and below it */
+/* the bottom leaves room for the feeding button */
 .app {
   position: relative;
   max-width: var(--page-width);
@@ -212,10 +201,9 @@ body::before {
 :root[data-theme="dark"] .logo.light,
 :root:not([data-theme="dark"]) .logo.dark {
   display: none;
-} /* data-theme: the scheme currently in force */
+}
 
 /* == Recipes == */
-/* Text roles */
 .brand,
 .page-title,
 .welcome h2 {
@@ -277,36 +265,30 @@ body::before {
 }
 .t-main small b {
   font: var(--type-small-strong);
-} /* a name in a row's second line: „Vermutlich Lachs, tippen zum Bestätigen“ */
+}
 .t-main .num {
   font-variant-numeric: tabular-nums;
 }
 
-/* Containers
-   Every section of the home page is a card: surface, --radius-l, --inset-card, 14px apart, no border, no shadow, no
-   coloured background. The heading sits at the top of the card. */
 .card {
   padding: var(--inset-card);
   border-radius: var(--radius-l);
   background: var(--surface);
   margin: 0;
 }
-/* A group of rows on a page, such as the settings: its 4px above and below keep the first and the last row out of
-   the corners */
+/* the 4px above and below keep the end rows out of the corners */
 .group {
   padding: var(--inset-group);
   border-radius: var(--radius-l);
   background: var(--surface);
 }
-/* The settings: one group of rows per subject. The group is the grid that holds every row to the same columns, so
-   a segment or a field under a row lines up with the text above it without a distance of its own (PROJECT.md,
-   "Settings"). */
+/* a grid, so a segment or field under a row lines up with the row's text */
 .set-group {
   display: grid;
   grid-template-columns: var(--pic-s) 1fr;
   column-gap: var(--space-3);
 }
-/* The line between two rows starts at the text column, so the icons read as a column of their own */
+/* dividers start at the text column, so the icons form a column of their own */
 .set-group > .set-row:not(:first-child)::before {
   content: "";
   position: absolute;
@@ -325,7 +307,6 @@ body::before {
   border-top: var(--divider);
 }
 
-/* Bottom sheet */
 dialog.sheet {
   position: fixed;
   inset: auto 0 0 0;
@@ -356,9 +337,6 @@ dialog.sheet::backdrop {
   padding: var(--space-1) var(--gutter)
     calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
-/* A page: the settings and everything below them. It fills the screen, comes in from the side and leaves the same
-   way, so a step into the depth never reads as a new layer on top (PROJECT.md, "Principles" 3). Same dialog as a
-   sheet, because a page is a sheet that fills the screen and moves sideways. */
 dialog.sheet.page {
   inset: 0;
   width: 100%;
@@ -372,10 +350,8 @@ dialog.sheet.page {
 dialog.sheet.page .grip-zone {
   display: none;
 }
-/* A page always fills the dialog, however little it holds. Sized by its contents it would be 844px on one level
-   and 260px on the next, and the step would then scale both pictures into a box shrinking between the two while
-   they slide: the top would stand still and the bottom drag after it (PROJECT.md, „Principles“ 3: the height
-   never jumps). */
+/* Always full height: sized by content, a step between levels of different heights would scale both pictures
+   and drag the bottom after the top. */
 dialog.sheet.page .sheet-body {
   position: relative;
   z-index: var(--z-raise);
@@ -384,12 +360,9 @@ dialog.sheet.page .sheet-body {
   background: var(--bg);
   padding: 0 var(--gutter) calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   view-transition-name: page;
-  --stick: var(--bar); /* what stays at the top parks under the bar */
+  --stick: var(--bar); /* sticky offset below the bar */
 }
 
-/* Heads and edges. A sheet's head carries its title and the X. A page's head is a bar with the arrow that stays at
-   the top while the page scrolls, in the page's own colour and the full width, so at rest it does not read as a
-   bar; the negative margins take it to the edges of the scroll box. */
 .grip-zone {
   position: relative;
   padding: var(--space-2h) 0 var(--space-2);
@@ -423,11 +396,12 @@ dialog.sheet.page .sheet-body {
 }
 .sh-head .icon-btn.lead {
   margin: 0 0 0 calc(-1 * var(--space-3));
-} /* the back arrow sits at the leading edge, the title right beside it */
+}
+/* the negative margin takes the bar to the edges of the scroll box */
 .head {
   position: sticky;
   top: 0;
-  z-index: var(--z-bar); /* above the day lines of the history, which park under it */
+  z-index: var(--z-bar); /* above the sticky day lines */
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -439,7 +413,7 @@ dialog.sheet.page .sheet-body {
 .head .icon-btn {
   margin-left: calc(-1 * var(--space-3));
 }
-/* The page's title, small beside the arrow once the large one has gone under the bar (.titled, ui/sheet.js) */
+/* shown once the page title has scrolled under the bar */
 .bar-title {
   flex: 1;
   min-width: 0;
@@ -451,9 +425,8 @@ dialog.sheet.page .sheet-body {
 dialog.sheet.titled .bar-title {
   opacity: 1;
 }
-/* The edge: one line along the lower edge of what stays at the top, only while something lies under it, and of
-   stacked edges only the lowest draws it. The element carrying it is positioned (sticky or relative). No fades, and
-   the line sits inside its own element's box, so it never covers content. */
+/* The line sits inside its element's box, so it never covers content; of stacked edges only the lowest draws
+   it. */
 :is(.grip-zone, .head, .days .tl-date)::after {
   content: "";
   position: absolute;
@@ -469,11 +442,12 @@ dialog.sheet.scrolled :is(.grip-zone, .head)::after,
 .days .tl-date.stuck::after {
   opacity: 1;
 }
+/* the stuck day line draws the edge instead */
 dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   opacity: 0;
-} /* the day line under it draws the line */
+}
 
-/* Full screen: our own camera and the photo viewer, always dark (color-scheme resolves the tokens dark) */
+/* always dark: color-scheme resolves the tokens dark */
 .fullscreen {
   color-scheme: dark;
   position: fixed;
@@ -499,9 +473,8 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   height: 100%;
   object-fit: cover;
 }
-/* The packaging photo, large (ui/viewer.js): whole and as large as it fits between two rows as tall as a page bar,
-   the X in the top one. The img box is exactly the photo, which the step from the thumbnail needs. The dialog is its
-   own ground and fades with the photo; a backdrop would appear at once. */
+/* The img box is exactly the photo, which the zoom from the thumbnail needs. The dialog is its own ground and
+   fades with the photo; a backdrop would appear at once. */
 .viewer::backdrop {
   background: none;
 }
@@ -527,7 +500,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   right: calc(var(--safe-area-inset-right, env(safe-area-inset-right, 0px)) + var(--space-1));
 }
 
-/* Toast with undo */
 .toast {
   position: fixed;
   left: 50%;
@@ -575,7 +547,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font: var(--type-small-strong);
 }
 
-/* Rows and boxes */
 .row {
   display: flex;
   align-items: center;
@@ -593,8 +564,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .set-row .t-main b {
   white-space: normal;
 }
-/* At most two lines saying what the setting does: a line that follows the state, such as the sync, cannot push
-   the row further apart than that */
+/* at most two lines, so a status line cannot grow the row */
 .set-row .t-main small {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -603,7 +573,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   white-space: normal;
   margin-top: var(--space-hair);
 }
-/* A meal still to be rated, folding away once it is */
 .pend {
   padding: var(--inset-row);
   max-height: 900px;
@@ -630,7 +599,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 }
 .box > .ic:last-child {
   margin-right: var(--space-hair);
-} /* a trailing icon 14 from the edge, like a field's */
+}
 .prod-card,
 .prod-edit {
   display: flex;
@@ -646,26 +615,20 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font: var(--type-small);
   margin: 0 0 var(--space-3h);
 }
-/* Rating slider (views/parts.js, ui/slider.js): the variety's scale as one track, a pill with a button for each
-   level from the best to the worst, its icon in its colour, and under each the level in one word. Once the meal
-   holds a level, the thumb stands on it: a disc as large as a small tap target, ringed in the level's colour and
-   carrying its icon, with the level's word under it in that colour and, under the words, the level's name and what
-   the bowl looks like. While a finger is on the slider the thumb lifts onto the level under it, and the words under
-   the track say that one. The whole bar, the track and the words under it, takes the finger; the buttons are for
-   the keyboard and a screen reader. */
+/* the whole bar takes the finger; the buttons are for keyboard and screen readers */
 .slider {
   --thumb: var(--tap-s);
   --stop: calc(
     (100cqw - 2 * var(--space-1) - (var(--n) - 1) * var(--space-hair)) / var(--n)
   ); /* a level's width on the track */
-  container-type: inline-size; /* the thumb goes its way in the slider's width, cqw */
+  container-type: inline-size; /* the thumb moves in cqw */
 }
 .slider-bar {
   display: flex;
   flex-direction: column;
   gap: var(--space-2h);
   cursor: pointer;
-  touch-action: pan-y; /* up and down the page scrolls; sideways the finger slides */
+  touch-action: pan-y;
 }
 .slider-track {
   position: relative;
@@ -674,7 +637,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   padding: var(--space-1);
   border-radius: var(--radius-full);
   background: var(--surface-2) linear-gradient(90deg, var(--wash));
-} /* the levels' soft colours as a faint wash, from the good end to the bad one (views/parts.js) */
+}
 .slider-track button {
   flex: 1 1 0;
   min-width: 0;
@@ -683,7 +646,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   place-items: center;
   border-radius: var(--radius-full);
   color: var(--c);
-  pointer-events: none; /* the finger belongs to the bar */
+  pointer-events: none; /* the bar handles the pointer */
 }
 .slider-thumb {
   position: absolute;
@@ -708,13 +671,10 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 }
 .slider.pointing .slider-thumb > i {
   box-shadow: var(--shadow-high);
-} /* lifted under the finger */
+}
 .slider.unset .slider-thumb {
   display: none;
 }
-/* Under each level its name in two words, the first over the second in smaller print, centred in the level's
-   column and broken only where a large system font makes a word wider than it; the column of the level shown takes
-   the level's colour */
 .slider-names {
   display: grid;
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
@@ -737,7 +697,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   hyphens: auto;
   overflow-wrap: anywhere;
 }
-/* The two ends of a scale, under the counters */
 .ends {
   display: flex;
   justify-content: space-between;
@@ -746,7 +705,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font: var(--type-caption);
   color: var(--muted);
 }
-/* A counter: a level's icon with how often it was chosen under it */
 .cnt .ic {
   width: var(--icon-l);
   height: var(--icon-l);
@@ -765,7 +723,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   color: var(--ink);
 }
 
-/* Controls */
 .btn {
   display: flex;
   align-items: center;
@@ -809,7 +766,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   border-color: currentColor;
   border-top-color: transparent;
 }
-/* Feeding button: the bowl fills up briefly on serving */
 .fab {
   position: fixed;
   right: max(var(--gutter), calc(50% - var(--page-width) / 2 + var(--gutter)));
@@ -866,7 +822,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--track-code);
   text-transform: uppercase;
-} /* the one exception: the household code */
+}
 .field.code::placeholder {
   font: var(--type-body);
   letter-spacing: normal;
@@ -887,16 +843,17 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .search .field {
   padding-left: var(--field-room);
 }
-/* Select field: our own arrow instead of the system's control, which sits invisibly on top and opens the picker */
+/* our own arrow; the native control sits invisibly on top and opens the picker */
 .pick {
   position: relative;
   display: block;
 }
+/* appearance: none, or Android draws its own arrow beside ours */
 .pick .field {
   padding-right: var(--field-room);
   appearance: none;
   -webkit-appearance: none;
-} /* Android would otherwise draw its own arrow beside it */
+}
 .pick .field::-webkit-calendar-picker-indicator {
   position: absolute;
   right: 0;
@@ -933,7 +890,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .chip.tight {
   gap: var(--space-1h);
   padding: var(--inset-tight);
-} /* three that share the row of a card at 360px: the observations on the overview */
+}
 .chip .av {
   margin-left: calc(-1 * var(--space-2));
 }
@@ -962,7 +919,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   color: var(--ink);
   box-shadow: var(--shadow-low);
 }
-/* The switch. The whole row is the button, so the tap target is the row and the track only shows the state. */
+/* the row is the button; the track only shows the state */
 .sw {
   position: relative;
   width: 46px;
@@ -1001,9 +958,8 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   height: var(--icon-s);
   vertical-align: middle;
   margin-right: var(--space-1h);
-} /* a link with an icon in front: „Neues Foto“ */
-/* A text button at the foot of a card, e.g. „Weitere anzeigen“: as tall as a settings row, so the line above it
-   and the card's edge below leave it air, and --space-3 above the line, so what ends the card does not sit on it */
+}
+/* --space-3 above the line, so what ends the card does not sit on it */
 .card-btn {
   display: flex;
   align-items: center;
@@ -1047,7 +1003,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   height: var(--icon);
   margin: 0;
 }
-/* Notice at the top: changes waiting or the sync stuck. The tap target is --tap, only the badge shows */
 .sync-chip {
   min-height: var(--tap);
   padding: 0 var(--space-1);
@@ -1061,7 +1016,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   color: var(--bad);
 }
 
-/* Pictures: sizes only through the modifier the markup names */
+/* picture sizes only through the modifier the markup names */
 .av {
   width: var(--pic-m);
   height: var(--pic-m);
@@ -1153,9 +1108,8 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .srv-ic .ic {
   width: var(--icon);
   height: var(--icon);
-} /* the tile itself is `thumb m srv-ic` */
-/* A packaging photo that opens large (ui/viewer.js): the button takes the shape of its picture, so the focus ring
-   follows it */
+}
+/* takes the picture's shape, so the focus ring follows it */
 .photo-btn {
   display: block;
   flex: none;
@@ -1166,8 +1120,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 }
 .photo-btn[aria-busy="true"] {
   opacity: var(--busy);
-} /* its photo is on the way from the household server */
-/* The overview's picture: one pet, or two overlapping */
+}
 .ov-pic {
   position: relative;
   flex: 0 0 auto;
@@ -1187,7 +1140,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   bottom: 0;
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
-/* Pets at the top */
 .pets {
   display: flex;
   gap: var(--space-2h);
@@ -1224,7 +1176,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   color: var(--ink);
   font: var(--type-caption-strong);
 }
-/* The pet's photo in its editor, with the camera badge on it */
 .pet-photo {
   position: relative;
   display: block;
@@ -1275,8 +1226,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   background: linear-gradient(90deg, var(--surface-2) 20%, var(--line) 45%, var(--surface-2) 70%);
   background-size: 220% 100%;
 }
-/* A field still to come, while the packaging is read (views/sheets.js): a line inside a label, within the label's
-   line box so the label is as tall as one with text, and a block as tall as a field */
+/* as tall as the label and field it stands in for */
 .skel-text {
   display: inline-block;
   width: 28%;
@@ -1290,8 +1240,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   border-radius: var(--radius-m);
 }
 
-/* Components */
-/* Verlauf: a two-week calendar, a timeline of the last three days, and older days on request */
 .cal .wd {
   font: var(--type-caption-strong);
   color: var(--faint);
@@ -1347,9 +1295,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   padding: var(--space-2h) 0 var(--space-hair);
   margin-bottom: var(--space-hair);
 }
-/* On „Verlauf“ the day line stays under the bar while its meals scroll past (views/sheets.js marks it .stuck, which
-   CSS cannot match), on the page ground like the bar. On the home page, where at most one day is shown, it scrolls
-   with its card. */
+/* sticky on the history page; views/sheets.js marks it .stuck, which CSS cannot detect */
 .days .tl-date {
   position: sticky;
   top: var(--stick);
@@ -1363,11 +1309,8 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font: var(--type-small);
   color: var(--muted);
 }
-/* The two columns before the meal, in em of their own text: with a larger system font they grow with it and
-   the line keeps running through the middle of the dot. At 14px they are whole pixels, 49 and 28, so the dot's
-   middle falls on a pixel and the line lies exactly on it. Each meal draws its piece of the line, from its top to
-   its dot and from its dot to its foot, a dot sitting in the middle of its meal however tall that is: the line runs
-   from the first dot to the last and no further, and one meal alone has none. */
+/* Columns in em, so the line stays centred on the dot at any font size; at 14px they are whole pixels (49, 28).
+   Each meal draws its own piece of the line, so it runs from the first dot to the last. */
 .tl {
   list-style: none;
   margin: 0;
@@ -1432,7 +1375,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .tl-note {
   font-style: italic;
 }
-/* Overview: two lines ending in „…“; unfolded, the whole text (Views) */
 .overview p {
   margin: 0;
   font: var(--type-small);
@@ -1451,7 +1393,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .told li {
   font: var(--type-body);
 }
-/* Food sheet, „Kaufen“: the computed verdict with a short reason, one row per pet where there are several */
 .verdict p {
   margin: 0;
   display: flex;
@@ -1493,7 +1434,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
     0 0 0 calc(2 * var(--stroke)) var(--bg),
     0 0 0 calc(4 * var(--stroke)) var(--ink);
 }
-/* Cropping: a square stage, the round cut-out matching the profile picture, dimmed outside it */
 .crop {
   position: relative;
   width: 100%;
@@ -1580,7 +1520,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font: var(--type-body-strong);
   font-variant-numeric: tabular-nums;
 }
-/* The meals of a calendar day: up to three dots, then a „+“ */
 .dots {
   display: flex;
   gap: var(--space-1);
@@ -1601,13 +1540,10 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   font: var(--type-caption-strong);
   color: var(--faint);
 }
-/* A strip of ratings (strip() in views/parts.js): the same dots, oldest first, as a whole that never shrinks */
 .dots.strip {
   flex: none;
 }
 
-/* A place in Top 5 and Flop 5 („Vorlieben“): its figure on the packaging's upper left corner, filled in the colour of
-   its side and cut out of the card by a ring, as a medal hangs on a picture */
 .ranked {
   position: relative;
   flex: 0 0 auto;
@@ -1630,11 +1566,10 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 }
 
 /* == Views == */
-/* Home: header and cards */
 .brand {
   margin: 0;
   color: var(--ink);
-} /* the wordmark only, no logo */
+}
 .card + .card {
   margin-top: var(--space-3h);
 }
@@ -1643,10 +1578,10 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   margin: 0 0 var(--space-1);
   color: var(--ink);
 }
-/* What folds open under a .card-btn, a part of a page: the content eases open */
+/* flow-root, so the children's margins count towards the height and the animation does not jump */
 .card-body {
   display: flow-root;
-} /* the children's margins count towards the height, so the animation does not jump */
+}
 .card-line {
   margin: 0 0 var(--space-2h);
 }
@@ -1661,9 +1596,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   color: var(--faint);
 }
 
-/* Overview: the picture on the left, the name and the text about the day on the right in two lines ending in „…“;
-   unfolded (.open) and while folding (.animating) the whole text is there, and the card is as tall as it. Under them
-   „Beobachtung notieren“ and the chips it folds open. */
 .ov-top {
   display: flex;
   align-items: center;
@@ -1673,10 +1605,10 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .ov-pic,
 .ov-text {
   margin-bottom: var(--space-2h);
-} /* with the button's own distance above its line, as far from it as the last row of another card */
+}
 .obs-chips {
   margin-top: var(--space-2);
-} /* the chips under the text, the button's distance below them */
+}
 .ov-text {
   flex: 1;
   min-width: 0;
@@ -1692,7 +1624,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   display: block;
 }
 
-/* Open ratings */
 .pend-head,
 .pend-top {
   display: flex;
@@ -1700,33 +1631,28 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   gap: var(--space-3);
   margin-bottom: var(--space-3h);
 }
-/* With a large photo on this phone the thumbnail is a button of its own beside the head */
 .pend-top > .pend-head {
   flex: 1;
   min-width: 0;
   margin-bottom: 0;
 }
-/* Several pets: each name right above its slider, and more room between pets */
 .pet-rate > .pet-label {
   margin-bottom: var(--space-2);
 }
 .pet-rate + .pet-rate,
 .rephoto + .pet-rate {
   margin-top: var(--space-4h);
-} /* and under „Foto ändern“ the first slider keeps the card's distance */
+}
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
 }
-/* A meal without a variety: „Eintrag löschen“ under its slider */
 .pend > .btn {
   margin-top: var(--space-3);
 }
 
-/* Hint, Einkaufen, Vorlieben, and the lines told in a card */
 .why {
   margin: var(--space-hair) 0 0;
 }
-/* What stands under a variety's or a group's name stands in full, as does what a told line rests on, never cut off */
 .shop .t-main small,
 .likes .t-main small {
   white-space: normal;
@@ -1734,7 +1660,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .told .why {
   display: block;
 }
-/* A group of „Vorlieben“: its name, and „deutlich“ beside it where it is an end of a clear comparison */
 .t-top {
   display: flex;
   align-items: center;
@@ -1754,7 +1679,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   flex: 1 1 auto;
   width: auto;
   white-space: nowrap;
-} /* when the text will not fit side by side, each button takes its own row */
+}
 .grp {
   margin: var(--space-2) 0 0;
 }
@@ -1766,8 +1691,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .told li {
   align-items: flex-start;
 }
-/* „Vorlieben“ on the home page: a row for the top and one for the flop, the side named in its colour before the
-   brand; a side without a variety shows the empty sketch where the packaging would be and says why in full */
 .t-main small .side {
   color: var(--c);
 }
@@ -1777,17 +1700,16 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .sides > .row small {
   white-space: normal;
 }
-/* Its page opens with the pets, laid out as the overview is: the picture on the left, the names and what they like
-   best beside it */
 .portrait {
   display: flex;
   align-items: center;
   gap: var(--space-3h);
 }
+/* with the card's 8px foot this makes 18, as at the top */
 .portrait > .ov-pic,
 .portrait-text {
   margin-bottom: var(--space-2h);
-} /* with the card's 8px at the bottom that makes 18px, as at the top */
+}
 .portrait-text {
   flex: 1;
   min-width: 0;
@@ -1798,14 +1720,11 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .portrait .say {
   margin: 0;
 }
-/* The two lists' headings lead with their picture in the side's colour, a heart and the bowl left standing */
 .card h2 > .ic {
   margin-right: var(--space-2);
   vertical-align: -0.125em;
   color: var(--c);
 }
-/* Its page: a variety's name over at most two lines and what its ratings say in full under it; a told line that opens
-   its variety, the words taking the room the strip at its end leaves */
 .ranks .t-main b {
   white-space: normal;
   display: -webkit-box;
@@ -1827,7 +1746,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   min-width: 0;
 }
 
-/* Welcome and first steps */
 .welcome {
   text-align: center;
   margin: var(--space-6) var(--space-1h) var(--space-5);
@@ -1851,25 +1769,23 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .steps-hero {
   display: flex;
   justify-content: center;
-  margin: var(--space-3) 0 var(--space-1); /* 12 under the heading, whose own 4 collapses into it */
+  margin: var(--space-3) 0 var(--space-1); /* the heading's 4 collapses into the 12 */
   color: var(--faint);
 }
 
-/* Verlauf, on the home page and on its page */
 .cal {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: var(--space-hair);
   margin: var(--space-3h) 0 var(--space-2h);
   text-align: center;
-} /* 14px at the top: the margin collapses with the heading's 4px, which left 6px */
+}
 .days {
-  --ground: var(--bg); /* what the dots on the line and the pets' rings cut out of: the page ground, not a card */
+  --ground: var(--bg); /* the dots' cut-out colour: the page ground, not a card */
 }
 .days .cal {
   margin-top: 0;
-} /* on its page the calendar stands right under the title, which keeps its own distance */
-/* A meal on the timeline: the time, the dot on the line and the picture sit closer than a row's gap */
+}
 .tl-item {
   gap: 0;
 }
@@ -1879,7 +1795,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .tl-item .t-main {
   margin-right: var(--space-2);
 }
-/* The name of the food matters most, so it may take two lines; what is under it stays on one */
 .tl-item .t-main b {
   white-space: normal;
   display: -webkit-box;
@@ -1891,12 +1806,10 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   margin-top: var(--space-hair);
 }
 
-/* Sheets and pages */
 .page-title {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-/* „Verlauf“, „Vorlieben“ and „Einkaufen“: cards on the page ground, as far apart as the ones on the home page */
 dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"]) .page-title {
   margin-bottom: var(--space-3h);
 }
@@ -1919,9 +1832,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .tex {
   margin-bottom: var(--space-4h);
 }
-/* Feeding: barcode and photo in equally wide columns, the same height and built the same way (icon, bold first
-   line, small second line). Barcode is the primary box on the accent fill, photo sits on surface 2. When
-   „Füttern beginnt mit“ hides one of them, the other takes the full width. */
 .cta-row {
   display: grid;
   grid-auto-flow: column;
@@ -1931,9 +1841,7 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .cta {
   min-width: 0;
 }
-/* Under the two big buttons: the search field, then one box showing either the varieties served lately or the
-   hits. Both margins sit on these two containers, which are always present; on an element that is hidden while
-   typing, the field would jump on the first letter. */
+/* margins sit on these always-present boxes; on one hidden while typing, the field would jump */
 .serve {
   margin: var(--space-5) 0 var(--space-2h);
 }
@@ -1949,8 +1857,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .serve-list .empty {
   margin: 0;
 }
-/* A variety to serve: the name may take two lines, what is under it stays on one, and the strip at the end never
-   shrinks (its recipe) */
 .plist .t-main b {
   white-space: normal;
   display: -webkit-box;
@@ -1958,13 +1864,9 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* The product card. With a large photo on this phone the thumbnail opens it and the rest of the card leads to
-   naming */
 .prod-card {
   margin-bottom: var(--space-4h);
 }
-/* „Serviert“: the label of the time field, and who served at the right end of the same line, since the name is
-   not for changing and the time is */
 .served {
   display: flex;
   justify-content: space-between;
@@ -1987,7 +1889,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .photo-btn:has(> .name-photo) {
   width: 100%;
 }
-/* Naming: what was read as a sentence, or that nothing was, under the photo, and „Neues Foto“ right under that */
 .read-note {
   margin-top: var(--space-3);
 }
@@ -2010,7 +1911,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .sugg > .ic {
   color: var(--faint);
 }
-/* The food sheet: the variety's ratings as a strip, oldest first, over its counters */
 .sheet-body > .strip {
   margin-bottom: var(--space-3h);
 }
@@ -2028,7 +1928,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 .verdict p span {
   color: var(--muted);
 }
-/* A part of a page folded open: its rows start under a line, as every row after them does */
 .fold > .list {
   border-top: var(--divider);
 }
@@ -2039,16 +1938,14 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
   cursor: pointer;
 }
 
-/* Settings */
 .set-row .chev {
   color: var(--faint);
 }
-/* A row that acts at once carries no chevron, so its colour says that it does something */
+/* no chevron, so the colour says it acts */
 .set-row.act .lead,
 .set-row.act .t-main b {
   color: var(--accent-ink);
 }
-/* A segment or a field belongs to the row above it and stands in the text column, from the grid */
 .set-under {
   grid-column: 2;
   margin-bottom: var(--space-3h);
@@ -2061,10 +1958,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
   text-align: center;
   color: var(--muted);
 }
-/* The household server: a group holding one row */
+/* only the icon carries the colour; the soft fills barely stand out here */
 .srv.ok .srv-ic {
   color: var(--accent-ink);
-} /* the soft fills barely stand out beside it: only the icon carries the colour */
+}
 .srv.bad .srv-ic {
   color: var(--bad);
 }
@@ -2094,14 +1991,12 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
   overflow-wrap: anywhere;
 }
 
-/* Camera */
 .cam-cancel {
   justify-self: start;
   width: auto;
 }
 
 /* == Motion == */
-/* A change of state */
 body,
 .card,
 .group,
@@ -2128,7 +2023,6 @@ body,
 .srv-ic {
   transition: var(--state);
 }
-/* What appears at an edge fades by opacity */
 body::before,
 .bar-title,
 :is(.grip-zone, .head, .days .tl-date)::after {
@@ -2137,21 +2031,21 @@ body::before,
 .animating {
   overflow: hidden;
   transition: height var(--dur-step) var(--ease-out);
-} /* a card or the overview folding */
+}
 dialog.sheet {
   transition: transform var(--dur-step) var(--ease-out);
-} /* back into place after a short swipe */
+}
+/* the finger leads */
 dialog.sheet.dragging {
   transition: none;
-} /* the finger leads */
+}
 .slider-thumb {
   transition: transform var(--dur-step) var(--ease-out);
-} /* the rating slider's thumb glides from level to level */
+}
 .slider-thumb > i,
 .slider-names > span {
   transition: var(--state);
-} /* its ring and icon take the level's colour on the way, lift under the finger, and the level's column takes it too */
-/* Press */
+}
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
@@ -2161,7 +2055,6 @@ dialog.sheet.dragging {
 :is(.icon-btn, .day.has):active {
   background: var(--surface-2);
 }
-/* The toast: leaves in --dur-fade with --ease-in, arrives with a spring */
 .toast {
   opacity: 0;
   transform: translate(-50%, var(--space-3));
@@ -2176,7 +2069,6 @@ dialog.sheet.dragging {
     opacity var(--dur-fade) var(--ease-out),
     transform var(--dur-step) var(--ease-spring);
 }
-/* Sheet and page */
 dialog.sheet[open] {
   animation: sheetIn var(--dur-step) var(--ease-out);
 }
@@ -2198,15 +2090,12 @@ dialog.sheet.page.closing {
 .sheet-body.swap-in {
   animation: appear var(--dur-step) var(--ease-out);
 }
-/* A level deeper and back: the page you go to comes in from the side while the one you leave goes out the other
-   way, one movement with both pictures easing out. The browser takes both pictures itself, so nothing has to be
-   copied first (ui/sheet.js sets the direction on <html>). Nothing moves inside either of them, and nothing but the
-   two pictures moves: the box they sit in is the same on every level, so anything the browser would animate on it
-   can only fight the slide. */
+/* The box is the same on every level, so only the two pictures slide and nothing else may animate. ui/sheet.js
+   sets the direction on <html>. */
 ::view-transition-group(page) {
   animation: none;
 }
-/* The default lightens the two pictures where they overlap; here one slides in front of the other. */
+/* the default blends the overlap; here one slides over the other */
 ::view-transition-image-pair(page) {
   isolation: auto;
 }
@@ -2214,9 +2103,8 @@ dialog.sheet.page.closing {
 ::view-transition-new(page) {
   mix-blend-mode: normal;
 }
-/* Only the page takes part, or the photo: nothing on the home page under it changes during the step, and a picture
-   of every card and every meal there would cost the very frame the step needs. The names sit in the style
-   attribute, so this has to be !important, and it is matched only while a step is actually running. */
+/* Only the page or the photo takes part; capturing every card would cost the frame the step needs. The names are
+   in style attributes, hence !important, and only while a step runs. */
 html:is(.step-fwd, .step-back, .zoom) :is(.card, .pend, .tl li, .pet, .fab, .toast) {
   view-transition-name: none !important;
 }
@@ -2232,12 +2120,11 @@ html.step-back::view-transition-old(page) {
 html.step-back::view-transition-new(page) {
   animation: pageFromAside var(--dur-step) var(--ease-out) both;
 }
-/* The home page redrawn (reordering, fading in and out) */
 ::view-transition-group(*) {
   animation-duration: var(--dur-step);
   animation-timing-function: var(--ease-out);
 }
-/* The page as a whole never moves or fades: only the pieces with a name of their own do */
+/* only named pieces animate, never the page as a whole */
 ::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
@@ -2251,10 +2138,9 @@ html.step-back::view-transition-new(page) {
 }
 ::view-transition-new(.fresh):only-child {
   animation: dropIn var(--dur-step) var(--ease-out) both;
-} /* a new entry drops into „Heute“ (view-transition-class) */
-/* A photo grows out of its thumbnail to the whole screen and back (ui/viewer.js): only the photo moves, the ground
-   fades in the photo's duration. z-index: on opening the ground's group comes later in the tree and would cover the
-   photo. The thumbnail is the middle square of the photo, which cover gives back, so the first frame matches it. */
+}
+/* z-index: on opening, the ground's group comes later and would cover the photo. cover gives back the thumbnail's
+   middle square, so the first frame matches. */
 ::view-transition-group(photo) {
   z-index: var(--z-raise);
   animation-duration: var(--dur-step);
@@ -2271,7 +2157,6 @@ html.step-back::view-transition-new(page) {
 ::view-transition-old(viewer):only-child {
   animation: fadeOut var(--dur-step) var(--ease-out) both;
 }
-/* Confirmations and what runs by itself */
 .pend.leaving {
   overflow: hidden;
   animation: leave var(--dur-step) var(--ease-in) both;
@@ -2295,8 +2180,7 @@ html.step-back::view-transition-new(page) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* ::backdrop is not an element and * does not reach it, so the sheet's dimming has to be named: without it
-     the backdrop still faded in for 350 ms while everything else stood still. */
+  /* * does not reach ::backdrop, so the sheet's dimming is named */
   *,
   *::before,
   *::after,
@@ -2305,7 +2189,8 @@ html.step-back::view-transition-new(page) {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* otherwise applyTheme() still reads the old background */
   html {
     transition: none !important;
-  } /* otherwise applyTheme() still reads the old background */
+  }
 }

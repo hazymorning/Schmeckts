@@ -1,15 +1,4 @@
-// Schmeckt's server: shared data and AI recognition for the app on the home network.
-//
-//	schmeckts-server                     start the server (this is how it runs as a system service)
-//	schmeckts-server setup               take the API key from stdin, create a code, show the connection details
-//	schmeckts-server setup --new-code    create a new household code as well
-//	schmeckts-server connection          show the connection details
-//	schmeckts-server overview            show the stored data readably: pets, food, recent meals, devices
-//	schmeckts-server restore <backup.json>   bring the stored data back from a backup
-//	schmeckts-server version
-//
-// The data directory is $STATE_DIRECTORY (set by systemd) or /var/lib/schmeckts.
-// Everything the commands print is German, like the app.
+// Schmeckt's server: sync between the phones of a household and photo recognition, on the home network.
 package main
 
 import (
@@ -22,13 +11,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"os/user"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -60,14 +49,10 @@ func main() {
 		err = setup(dir, args)
 	case "connection":
 		err = showConnection(dir)
-	case "overview":
-		err = showOverview(dir)
-	case "restore":
-		err = restore(dir, args)
 	case "version":
 		fmt.Println(version)
 	default:
-		err = sayf("Unbekannter Befehl %q. Möglich: setup, connection, overview, restore, version", cmd)
+		err = fmt.Errorf("Unbekannter Befehl %q. Möglich: setup, connection, version", cmd)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -78,23 +63,26 @@ func main() {
 func serve(dir string) error {
 	store, err := OpenStore(dir)
 	if err != nil {
-		return because("Datenbestand nicht lesbar", err)
+		return fmt.Errorf("Der Ordner %s ist nicht nutzbar: %w", dir, err)
 	}
 	photos, err := OpenPhotos(dir)
 	if err != nil {
-		return because("Ordner für die Packungsfotos nicht anlegbar", err)
+		return fmt.Errorf("Der Ordner für die Packungsfotos ist nicht nutzbar: %w", err)
 	}
 	cfg := NewConfigHolder(dir)
-	api := NewAPI(store, cfg, OpenBarcodes(dir), photos)
+	api := NewAPI(store, cfg, photos)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	go func() { // daily backup, checked once an hour, and the photos of varieties that are gone go
+	var upkeep sync.WaitGroup
+	upkeep.Add(1)
+	go func() {
+		defer upkeep.Done()
 		for {
-			if err := store.Backup(time.Now()); err != nil {
-				log.Printf("backup failed: %v", err)
+			if err := store.PruneSeen(time.Now()); err != nil {
+				log.Printf("pruning change ids failed: %v", err)
 			}
-			photos.Sweep(store.Varieties())
+			photos.Sweep(store.DeletedVarieties())
 			select {
 			case <-ctx.Done():
 				return
@@ -109,27 +97,34 @@ func serve(dir string) error {
 		Handler:           api.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
-		BaseContext:       func(net.Listener) context.Context { return ctx }, // ends live connections on shutdown
 	}
-	go func() {
-		<-ctx.Done()
-		shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		srv.Shutdown(shut)
-	}()
+	srv.RegisterOnShutdown(api.Close)
 	epoch, seq := store.Seq()
-	log.Printf("Schmeckt’s-Server %s läuft auf Port %d (Datenbestand %s, Nummer %d)", version, port, epoch, seq)
-	if c := cfg.Get(); c.Code == "" || c.APIKey == "" {
-		log.Printf("Noch nicht vollständig eingerichtet: bitte „Schmeckt’s-Server einrichten“ öffnen")
+	log.Printf("Schmeckt’s-Server %s läuft auf Port %d (Abgleich %s, Stand %d)", version, port, epoch, seq)
+	if cfg.Get().Code == "" {
+		log.Printf("Noch nicht eingerichtet: bitte „Schmeckt’s-Server einrichten“ öffnen")
 	}
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+	failed := make(chan error, 1)
+	go func() { failed <- srv.ListenAndServe() }()
+	select {
+	case err = <-failed: // the port is taken, for instance
+	case <-ctx.Done():
+		shut, cancel := context.WithTimeout(context.Background(), recognizeTimeout+5*time.Second) // lets a recognition finish
+		defer cancel()
+		if err := srv.Shutdown(shut); err != nil {
+			log.Printf("shutdown: %v", err)
+		}
+	}
+	stop()
+	upkeep.Wait()
+	if err != nil {
 		return err
 	}
 	log.Printf("server stopped")
 	return nil
 }
 
-// ownFiles gives files that root created during setup to the service user.
+// ownFiles hands files that root created during setup to the service user.
 func ownFiles(paths ...string) {
 	u, err := user.Lookup(serviceUser)
 	if err != nil || os.Geteuid() != 0 {
@@ -144,7 +139,7 @@ func ownFiles(paths ...string) {
 
 func requireRoot() error {
 	if os.Geteuid() != 0 {
-		return say("Dafür werden Administratorrechte gebraucht. Bitte über „Schmeckt’s-Server einrichten“ oder mit sudo starten.")
+		return errors.New("Dafür werden Administratorrechte gebraucht. Bitte über „Schmeckt’s-Server einrichten“ oder mit sudo starten.")
 	}
 	return nil
 }
@@ -159,16 +154,16 @@ func setup(dir string, args []string) error {
 	ownFiles(dir)
 	cfg, err := readConfig(dir)
 	if err != nil {
-		return because("Die Konfiguration ist beschädigt", err)
+		return fmt.Errorf("Die Konfiguration ist beschädigt: %w", err)
 	}
 	key := ""
-	if info, _ := os.Stdin.Stat(); info.Mode()&os.ModeCharDevice == 0 {
+	if info, err := os.Stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice == 0 {
 		line, _ := bufio.NewReader(io.LimitReader(os.Stdin, 4096)).ReadString('\n')
 		key = strings.TrimSpace(line)
 	}
 	if key != "" {
 		if !strings.HasPrefix(key, "sk-ant-") {
-			return say("Das sieht nicht wie ein Anthropic-API-Schlüssel aus. Er beginnt mit „sk-ant-“.")
+			return errors.New("Das sieht nicht wie ein Anthropic-API-Schlüssel aus. Er beginnt mit „sk-ant-“.")
 		}
 		test := cfg
 		test.APIKey = key
@@ -202,31 +197,19 @@ func showConnection(dir string) error {
 		return err
 	}
 	if cfg.Code == "" {
-		return say("Der Server ist noch nicht eingerichtet.")
+		return errors.New("Der Server ist noch nicht eingerichtet.")
 	}
 	return printConnection(cfg)
-}
-
-func showOverview(dir string) error {
-	if err := requireRoot(); err != nil {
-		return err
-	}
-	st, err := readState(filepath.Join(dir, stateFile))
-	if err != nil {
-		return because("Der Datenbestand ist nicht lesbar", err)
-	}
-	fmt.Printf("Schmeckt’s-Server %s\n\n%s", version, Overview(st, dir, time.Now()))
-	return nil
 }
 
 func printConnection(cfg Config) error {
 	fmt.Printf("Adresse:  http://%s:%d\n", lanAddress(), cfg.port())
 	fmt.Printf("Code:  %s\n\n", cfg.Code)
-	fmt.Println("In der App: Einstellungen, Haushalts-Server, Code eingeben.")
+	fmt.Println("In der App: Einstellungen, „Haushalt“, „Mit Haushalt verbinden“, dann Adresse und Code eintragen.")
 	if cfg.APIKey != "" {
 		fmt.Println("Foto-Erkennung: eingerichtet")
 	} else {
-		fmt.Println("Foto-Erkennung: noch kein API-Schlüssel eingetragen")
+		fmt.Println("Foto-Erkennung: aus, kein API-Schlüssel eingetragen")
 	}
 	if running(cfg.port()) {
 		fmt.Println("Server: läuft")
@@ -246,12 +229,11 @@ func running(port int) bool {
 	return res.StatusCode == http.StatusOK
 }
 
-// lanAddress looks for the PC's address on the home network, preferring 192.168.x.x.
 func lanAddress() string {
 	ifaces, _ := net.Interfaces()
 	found := []string{}
 	for _, ifc := range ifaces {
-		if ifc.Flags&net.FlagUp == 0 || ifc.Flags&net.FlagLoopback != 0 {
+		if ifc.Flags&net.FlagUp == 0 || ifc.Flags&net.FlagLoopback != 0 || virtual(ifc.Name) {
 			continue
 		}
 		addrs, _ := ifc.Addrs()
@@ -270,48 +252,12 @@ func lanAddress() string {
 	return found[0]
 }
 
-func systemctl(args ...string) error {
-	out, err := exec.Command("systemctl", args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("systemctl %s: %v %s", strings.Join(args, " "), err, out)
-	}
-	return nil
-}
-
-func restore(dir string, args []string) error {
-	if err := requireRoot(); err != nil {
-		return err
-	}
-	if len(args) != 1 {
-		files, _ := filepath.Glob(filepath.Join(dir, backupDir, "state-*.json"))
-		sort.Strings(files)
-		msg := "Bitte ein Backup angeben, zum Beispiel:\n  sudo schmeckts-server restore " + filepath.Join(dir, backupDir, "state-JJJJ-MM-TT.json")
-		if len(files) > 0 {
-			msg += "\n\nVorhandene Backups:\n  " + strings.Join(files, "\n  ")
-		}
-		return say(msg)
-	}
-	st, err := readState(args[0])
-	if err != nil {
-		return because("Das Backup ist nicht lesbar", err)
-	}
-	st.Epoch = newEpoch() // this makes every phone do a full resync
-	usesSystemd := systemctl("is-active", "--quiet", "schmeckts") == nil
-	if usesSystemd {
-		if err := systemctl("stop", "schmeckts"); err != nil {
-			return err
+// virtual tells container and VM bridges apart from the network the phones are on.
+func virtual(name string) bool {
+	for _, p := range []string{"docker", "br-", "virbr", "veth"} {
+		if strings.HasPrefix(name, p) {
+			return true
 		}
 	}
-	s := &Store{dir: dir, st: st}
-	if err := s.persist(); err != nil {
-		return err
-	}
-	ownFiles(filepath.Join(dir, stateFile))
-	if usesSystemd {
-		if err := systemctl("start", "schmeckts"); err != nil {
-			return err
-		}
-	}
-	fmt.Printf("Wiederhergestellt aus %s. Die Handys gleichen beim nächsten Kontakt komplett neu ab.\n", filepath.Base(args[0]))
-	return nil
+	return false
 }

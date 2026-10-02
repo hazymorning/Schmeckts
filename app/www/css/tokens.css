@@ -1,11 +1,7 @@
-/* Design foundations: every value the interface uses, each with its role in one line. app.css and js/ only name
-   these; PROJECT.md ("Design rules") says which to use for what; tests/design_test.py holds the two together.
-   Colours: the palette's values alone, derived tokens with opacity where needed (8-digit hex). */
+/* Design tokens. app.css and js/ only name these, and colours appear nowhere else (tests/design_test.py). */
 
-/* Typefaces (bundled with the app, SIL Open Font License)
-   Faustina for headings and numbers, Figtree for everything else.
-   font-display: block because the files ship inside the app and load at once; the splash screen stays up until
-   they are ready (ui/splash.js). With swap, text would first render in a fallback and then reflow. */
+/* Bundled fonts (SIL Open Font License). font-display: block, since they ship with the app and the splash waits for
+   them; swap would reflow. */
 @font-face {
   font-family: "Figtree";
   src: url(../fonts/figtree-latin.woff2) format("woff2");
@@ -26,7 +22,6 @@
   --font-display: "Faustina", "Iowan Old Style", Georgia, serif;
   --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Space: every margin, gap and offset. Whole steps and the halves between them; 2px for optical nudges. */
   --space-hair: 2px;
   --space-1: 4px;
   --space-1h: 6px;
@@ -39,108 +34,103 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-7: 32px;
-  --gutter: var(--space-4h); /* 18: the side margin of every page and sheet, and a card's inset */
-  --page-width: 600px; /* the widest a page or a sheet gets */
+  --gutter: var(--space-4h); /* side margin of pages and sheets, card inset */
+  --page-width: 600px;
 
-  /* Insets: the padding of each kind of box. A box takes its recipe's inset and nothing else. */
-  --inset-card: var(--gutter) var(--gutter) var(--space-2); /* .card: 18 at top and sides, 8 at the foot, where the last row brings its 10 */
-  --inset-group: var(--space-1) var(--space-4); /* .group: 4 above and below its rows, 16 at the sides */
-  --inset-row: var(--space-2h) 0; /* .row, .pend, .card-btn: 10 above and below */
-  --inset-box: var(--space-3); /* .box and .banner: 12 all round a filled box */
-  --inset-control: var(--space-3) var(--space-4); /* .btn, .field: 12 by 16; the height comes from --control */
-  --inset-compact: var(--space-2) var(--space-4); /* .chip, .field.in-row, the toast's action, .cam-hint: 8 by 16 */
-  --inset-tight: var(--space-2) var(--space-3); /* .chip.tight: 8 by 12, three chips sharing a card's row at 360px */
-  --inset-badge: var(--space-1) var(--space-2h); /* .badge: 4 by 10 */
+  /* A box takes its recipe's inset and nothing else */
+  --inset-card: var(--gutter) var(--gutter) var(--space-2); /* the last row adds 10 at the foot */
+  --inset-group: var(--space-1) var(--space-4);
+  --inset-row: var(--space-2h) 0;
+  --inset-box: var(--space-3);
+  --inset-control: var(--space-3) var(--space-4); /* height comes from --control */
+  --inset-compact: var(--space-2) var(--space-4); /* chips, fields in a row, the toast's action */
+  --inset-tight: var(--space-2) var(--space-3); /* three chips in a card row at 360px */
+  --inset-badge: var(--space-1) var(--space-2h);
   --field-room: calc(
     var(--space-3h) + var(--icon-s) + var(--space-2h)
   ); /* 44: the side of a field that holds an icon */
 
-  /* Radius: one per role (PROJECT.md, "Principles" 2). A circle is 50%. */
-  --radius-s: 12px; /* small and nested: thumbnails, the chosen segment, a button inside a control */
-  --radius-m: 16px; /* controls and boxes you tap: buttons, fields, boxes, the toast */
-  --radius-l: 24px; /* containers: cards, groups, the top of a sheet, large photo frames */
-  --radius-full: 999px; /* pills, lines and bars */
+  --radius-s: 12px; /* small and nested */
+  --radius-m: 16px; /* controls and boxes you tap */
+  --radius-l: 24px; /* containers */
+  --radius-full: 999px;
 
-  /* Type: five sizes, four leadings, three weights. app.css sets type only as font: var(--type-...). */
-  --type-title: 650 30px/1.1 var(--font-display); /* wordmark, page title, welcome heading; always with --track-title */
-  --type-heading: 600 21px/1.25 var(--font-display); /* card and sheet headings, the title in a bar, counts, initials */
-  --type-subheading: 600 16px/1.25 var(--font-display); /* day lines, initials in small thumbnails, the level's name on the rating slider */
-  --type-body: 400 16px/1.5 var(--font-ui); /* running text, fields, a card's own sentence */
-  --type-body-strong: 600 16px/1.5 var(--font-ui); /* row titles, button labels, figures in Figtree */
-  --type-small: 400 14px/1.4 var(--font-ui); /* secondary text: a row's second line, hints, notes, the toast, day numbers */
-  --type-small-strong: 600 14px/1.4 var(--font-ui); /* labels and small controls: field labels, chips, segments, text buttons, times */
-  --type-caption: 400 12px/1.25 var(--font-ui); /* under a figure or a picture: a rating's second line, pet names, units */
-  --type-caption-strong: 600 12px/1.25 var(--font-ui); /* badges, weekdays, the levels' words on the rating slider, the places of „Vorlieben“ */
-  --weight-strong: 600; /* b and strong inside running text */
-  --track-title: -0.015em; /* only with --type-title: Faustina runs narrow at that size */
-  --track-code: 0.14em; /* only in the household code field */
+  /* app.css sets type only as font: var(--type-...) */
+  --type-title: 650 30px/1.1 var(--font-display); /* always with --track-title */
+  --type-heading: 600 21px/1.25 var(--font-display);
+  --type-subheading: 600 16px/1.25 var(--font-display);
+  --type-body: 400 16px/1.5 var(--font-ui);
+  --type-body-strong: 600 16px/1.5 var(--font-ui);
+  --type-small: 400 14px/1.4 var(--font-ui); /* secondary text */
+  --type-small-strong: 600 14px/1.4 var(--font-ui); /* labels and small controls */
+  --type-caption: 400 12px/1.25 var(--font-ui);
+  --type-caption-strong: 600 12px/1.25 var(--font-ui);
+  --weight-strong: 600; /* b and strong in running text */
+  --track-title: -0.015em; /* Faustina runs narrow at title size */
+  --track-code: 0.14em; /* household code field */
 
-  /* Motion. Duration by what changes: in place (--dur-fade) or from one place to another (--dur-step); a ground or
-     a dimming takes the duration of what moves on it. Curve by direction: --ease-out for what arrives, answers or
-     changes, --ease-in for what leaves the screen, --ease-spring for a confirmation. */
-  --dur-fade: 200ms; /* a state that changes, appears or goes in place */
-  --dur-step: 300ms; /* something that moves: a sheet, a page, a level, a photo, a swap, a card's height, a pop */
-  --dur-long: 1200ms; /* what runs by itself: a turn of the spinner, a sweep of the shimmer, the bowl filling */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* arriving, answering, changing */
-  --ease-in: cubic-bezier(0.5, 0, 0.75, 0); /* leaving the screen */
-  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1); /* a confirmation: the pop, the toast rising */
+  /* --dur-fade for changes in place, --dur-step for movement; a dimming takes the duration of what moves on it.
+     --ease-out to arrive, --ease-in to leave, --ease-spring to confirm. */
+  --dur-fade: 200ms;
+  --dur-step: 300ms;
+  --dur-long: 1200ms; /* loops: spinner, shimmer, bowl */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --state:
     transform var(--dur-fade) var(--ease-out), opacity var(--dur-fade) var(--ease-out),
     color var(--dur-fade) var(--ease-out), background-color var(--dur-fade) var(--ease-out),
-    border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out); /* every change of state */
-  --press: 0.95; /* a pressed control or picture */
-  --press-wide: 0.98; /* a pressed row, box or button as wide as its container */
+    border-color var(--dur-fade) var(--ease-out), box-shadow var(--dur-fade) var(--ease-out);
+  --press: 0.95;
+  --press-wide: 0.98; /* rows, boxes, full-width buttons */
 
-  /* Layers, lowest first. Dialogs (sheet, page, camera, photo viewer) are in the top layer and take none. */
-  --z-raise: 1; /* above its neighbours inside one component: the timeline's dot, a page's body, the moving photo */
-  --z-sticky: 2; /* sticks while its list scrolls: the day line */
-  --z-bar: 3; /* the bar at the top of a page, above what sticks under it */
-  --z-fab: 4; /* the feeding button over the page */
-  --z-strip: 5; /* the strip behind the status bar */
-  --z-toast: 6; /* the toast */
+  /* Dialogs sit in the top layer and take no z-index */
+  --z-raise: 1; /* within one component */
+  --z-sticky: 2;
+  --z-bar: 3;
+  --z-fab: 4;
+  --z-strip: 5; /* behind the status bar */
+  --z-toast: 6;
 
-  /* Sizes */
-  --icon-s: 20px; /* inside controls, rows, fields and badges; chevrons; the spinner */
-  --icon: 24px; /* on its own: icon buttons, a row's leading icon, the feeding button, the levels on the rating slider and in its thumb */
-  --icon-l: 32px; /* a rating shown as the content: counters, the two feeding choices */
-  --icon-stroke: 1.8; /* the icon set's line, for icons at 20 and 24px and the sketches */
-  --icon-stroke-l: 1.4; /* icons at 32px, and the placeholder in a picture from --pic-xxl up */
-  --tap-s: 44px; /* one choice among several side by side: chip, segment, a level and the thumb of the rating slider, the toast’s action, a field in a row */
-  --tap: 48px; /* the smallest tap target: icon buttons, rows, text buttons */
-  --control: 52px; /* a button or a field, the toast */
-  --control-l: 56px; /* the feeding button; a settings row; a card's text button */
-  --bar: 56px; /* a page's bar: the 48px back arrow with --space-1 above and below; the photo viewer's rows. A number, because views/sheets.js reads it through --stick */
-  --pic-xs: 24px; /* a picture beside a name: chips, pet labels, minis, verdicts; a place of „Vorlieben“ */
-  --pic-s: 32px; /* a row's leading column: its icon or avatar, a step's number, a calendar day's number */
-  --pic-m: 40px; /* a small thumbnail: timeline, suggestions, the server's tile, the camera badge */
-  --pic-l: 48px; /* a list thumbnail; the overview's two pictures */
-  --pic-xl: 56px; /* a picture on its own: the pet bar, the product card, the empty-state sketch */
-  --pic-xxl: 72px; /* the overview's picture, the first-steps sketch */
-  --pic-xxxl: 112px; /* the pet's photo in its editor */
+  --icon-s: 20px; /* inside controls */
+  --icon: 24px; /* on its own */
+  --icon-l: 32px; /* a rating as the content */
+  --icon-stroke: 1.8; /* icons at 20 and 24px, sketches */
+  --icon-stroke-l: 1.4; /* icons at 32px */
+  --tap-s: 44px; /* choices side by side */
+  --tap: 48px; /* smallest tap target */
+  --control: 52px;
+  --control-l: 56px; /* feeding button, settings row */
+  --bar: 56px; /* a plain length: views/sheets.js reads it through --stick */
+  --pic-xs: 24px;
+  --pic-s: 32px;
+  --pic-m: 40px;
+  --pic-l: 48px;
+  --pic-xl: 56px;
+  --pic-xxl: 72px;
+  --pic-xxxl: 112px;
 
-  /* Lines */
-  --hairline: 1px; /* dividers, the line under a bar, the switch's outline */
-  --stroke: 2px; /* every emphasised line: focus, rings, cut-outs, a field's border, open dots, the spinner, the timeline */
+  --hairline: 1px;
+  --stroke: 2px; /* every emphasised line */
   --divider: var(--hairline) solid var(--line);
 
   /* Opacity */
-  --dim: 0.35; /* not there yet: days to come */
-  --busy: 0.6; /* a button while its work runs */
-  --mood: 0.16; /* the mood picture; 0.26 in dark, below */
-  --mood-filter: saturate(0.85); /* the mood picture */
+  --dim: 0.35; /* days to come */
+  --busy: 0.6;
+  --mood: 0.16; /* 0.26 in dark, below */
+  --mood-filter: saturate(0.85);
 
-  /* Palette: light-dark(light, dark) */
   --bg: light-dark(#eeede7, #1b1c17);
   --surface: light-dark(#fafaf6, #25261f);
   --surface-2: light-dark(#e4e3da, #30312a);
   --ink: light-dark(#25261f, #ecece3);
   --muted: light-dark(#62625a, #a6a699);
-  --faint: light-dark(#9d9d92, #77776c); /* decoration and placeholders only, never meaningful text */
+  --faint: light-dark(#9d9d92, #77776c); /* decoration only, never meaningful text */
   --line: light-dark(#d8d7cd, #3b3c34);
-  --accent: light-dark(#58603f, #a9b283); /* accent fill, focus ring, bars */
+  --accent: light-dark(#58603f, #a9b283);
   --accent-ink: light-dark(#4a5134, #a9b283); /* accent as text */
   --accent-soft: light-dark(#dee0d7, #393b2e);
-  --on-accent: light-dark(#ffffff, #1b1c17); /* type on strong fills: accent, and the red confirm button too */
+  --on-accent: light-dark(#ffffff, #1b1c17); /* also on the red confirm button */
   --good: light-dark(#4d6c57, #93bba0);
   --good-soft: light-dark(#d9dfd8, #373e34);
   --mid: light-dark(#8a6822, #d2ae62);
@@ -150,82 +140,81 @@
   --bad: light-dark(#8f3f43, #d98c8e);
   --bad-soft: light-dark(#e9dcd9, #3e342f);
 
-  /* Derived, from the palette's values alone */
-  --seg-on: light-dark(#fafaf6, #3b3c34); /* the chosen segment: light --surface, dark --line */
-  --toast-action: light-dark(#a9b283, #4a5134); /* undo on the toast (fill --ink): the other mode's accent */
-  --backdrop: light-dark(#25261f66, #1b1c17b3); /* behind sheets: --ink at 40 % in light, --bg at 70 % in dark */
-  --shadow-low: 0 1px 4px light-dark(#25261f1a, #1b1c174d); /* resting lift: the chosen segment, the welcome picture, the rating slider's thumb */
+  /* Derived from the palette's values only */
+  --seg-on: light-dark(#fafaf6, #3b3c34); /* light --surface, dark --line */
+  --toast-action: light-dark(#a9b283, #4a5134); /* the other mode's accent */
+  --backdrop: light-dark(#25261f66, #1b1c17b3); /* --ink at 40 % in light, --bg at 70 % in dark */
+  --shadow-low: 0 1px 4px light-dark(#25261f1a, #1b1c174d); /* resting lift */
   --shadow-high:
-    0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759); /* what floats: sheet, feeding button, toast, the rating slider's thumb under a finger */
+    0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759); /* what floats */
 }
 :root[data-theme="light"] {
   color-scheme: light;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --mood: 0.26; /* light-dark() takes colours only, so the one number that differs by scheme is set here */
+  --mood: 0.26; /* light-dark() takes colours only */
 }
 
-/* The motion library: every @keyframes in the app. Movement and opacity only, plus the
-   shimmer's gradient and the collapse of a leaving meal. app.css names these and defines none. */
+/* Every @keyframes in the app; app.css defines none */
 @keyframes fadeIn {
   from {
     opacity: 0;
   }
-} /* a dimming or a ground appears */
+}
 @keyframes fadeOut {
   to {
     opacity: 0;
   }
-} /* and goes */
+}
 @keyframes sheetIn {
   from {
     transform: translateY(100%);
   }
-} /* a sheet rises from below */
+}
 @keyframes sheetOut {
   to {
     transform: translateY(100%);
   }
-} /* and sinks, from wherever a swipe left it */
+}
 @keyframes pageIn {
   from {
     transform: translateX(100%);
   }
-} /* a page, or the level you go to, comes in from the side */
+}
 @keyframes pageOut {
   to {
     transform: translateX(100%);
   }
-} /* a page, or the level you leave going back, goes out */
+}
 @keyframes pageAside {
   to {
     transform: translateX(-25%);
   }
-} /* the level you leave going deeper moves a quarter aside */
+}
 @keyframes pageFromAside {
   from {
     transform: translateX(-25%);
   }
-} /* and comes back from there */
+}
 @keyframes appear {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
-} /* content appears in place: a sheet's new contents, a piece of the home page */
+}
 @keyframes vanish {
   to {
     opacity: 0;
     transform: translateY(10px);
   }
-} /* a piece of the home page goes */
+}
 @keyframes dropIn {
   from {
     opacity: 0;
     transform: translateY(-22px);
   }
-} /* a new meal arrives at the top of „Heute“ */
+}
 @keyframes leave {
   to {
     opacity: 0;
@@ -235,12 +224,12 @@
     padding-bottom: 0;
     border-top-width: 0;
   }
-} /* a rated meal folds away and its room closes */
+}
 @keyframes pop {
   35% {
     transform: scale(1.06);
   }
-} /* a confirmation: a rating stored, a meal served */
+}
 @keyframes bowlFill {
   0% {
     transform: scaleY(0);
@@ -255,12 +244,12 @@
     transform: scaleY(1);
     opacity: 0;
   }
-} /* the bowl in the feeding button */
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
-} /* waiting */
+}
 @keyframes shimmer {
   from {
     background-position: 120% 0;
@@ -268,4 +257,4 @@
   to {
     background-position: -100% 0;
   }
-} /* a line still loading */
+}

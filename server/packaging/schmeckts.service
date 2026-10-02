@@ -1,6 +1,5 @@
 [Unit]
 Description=Schmeckt’s? household server
-Documentation=man:schmeckts-server
 After=network-online.target
 Wants=network-online.target
 
@@ -13,7 +12,7 @@ StateDirectoryMode=0700
 Restart=on-failure
 RestartSec=3
 
-# Hardening: writes go only to the state directory, sockets only to IP, Unix and netlink
+# Hardening
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

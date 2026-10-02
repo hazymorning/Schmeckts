@@ -1,5 +1,3 @@
-/* Fixed values: species, food types, ratings and their scales, consistency and treat type, patterns for flavour. */
-
 export const SPECIES = [
   {k: 'Katze', i: 'cat'},
   {k: 'Hund', i: 'dog'},
@@ -10,11 +8,8 @@ export const SPECIES = [
 ];
 export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1)).i;
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
-export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]); // without a known type: wet food
-/* Rating levels of every scale. What is measured is acceptance: score, 0 to 100. The keys live in the data and never
-   change; the key alone determines points, wording and icon. short: the level in two words for its column on the
-   rating slider, the first over the second, each short enough for a column of six at 360px. said: the level inside
-   a sentence, „2 von 3 Mal nur die Soße geleckt“. */
+export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]);
+// keys are stored in the data, never rename them; short has to fit a column of six at 360px
 export const RATINGS = {
   top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100},
   gut: {label: 'Fast leer', short: 'Fast leer', said: 'fast leer', score: 80},
@@ -31,7 +26,6 @@ export const RATINGS = {
   angeknabbert: {label: 'Nur angeknabbert', short: 'Nur geknabbert', said: 'nur angeknabbert', score: 35},
   unberuehrt: {label: 'Nicht angerührt', short: 'Nicht angerührt', said: 'nicht angerührt', score: 0},
 };
-/* Observation scales: what you observe depends on the food type. The mapping is in SCALE_OF. */
 export const SCALES = {
   portion: ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht'], // the bowl after the meal
   bowl: ['gern', 'normal', 'wenig', 'liegen'], // the bowl stands for longer
@@ -39,9 +33,7 @@ export const SCALES = {
 };
 const SCALE_OF = {Nassfutter: 'portion', Trockenfutter: 'bowl', Snack: 'bite', Sonstiges: 'bite'};
 export const scaleOf = product => SCALES[SCALE_OF[typeOf(product)]];
-/* Consistency (wet food) and treat type: the variety's optional texture field, per type [key, label, keywords].
-   The keywords in brand and variety fill an empty field and stand in for it in the evaluation while it is missing.
-   The keys live in the data. Dry food and Sonstiges have no entry here. */
+// [key, label, pattern]; keys are stored in the data, the pattern guesses a missing texture from the name
 export const TEXTURES = {
   Nassfutter: {
     title: 'Konsistenz',
@@ -66,13 +58,10 @@ export const TEXTURES = {
     ],
   },
 };
-/* textureOf: the entry for a key, only when it fits the variety's type; guessTexture: the key from the keywords */
 export const textureOf = (product, key) => TEXTURES[typeOf(product)]?.items.find(([k]) => k === key);
 export const guessTexture = product =>
-  TEXTURES[typeOf(product)]?.items.find(([, , re]) => re.test(`${product.brand} ${product.variety}`))?.[0];
-/* Text recognition on the packaging (js/ocr.js). BRANDS: common cat and dog food brands including German retail
-   brands; if one of them appears in the text, it applies with this spelling. Where several match, the longest wins.
-   TYPE_WORDS and ANIMAL_WORDS: keywords for type and species; the consistency comes from TEXTURES. */
+  TEXTURES[typeOf(product)]?.items.find(([, , re]) => re.test(`${product.brand || ''} ${product.variety || ''}`))?.[0];
+// stored with this spelling when found in packaging text; when several match, the longest wins
 export const BRANDS = [
   'Whiskas',
   'Sheba',
@@ -145,9 +134,7 @@ export const BRANDS = [
   'K-Classic',
   'Dein Bestes',
 ];
-/* Product lines that belong to one brand and stand on the front larger than the logo, which a script logo often
-   keeps from being read („Miamor“). Read on a packaging without a brand, the line names the brand (js/ocr.js).
-   Only lines no other brand uses. */
+// a script logo often cannot be read, so a line printed larger names the brand; only lines no other brand uses
 export const PRODUCT_LINES = [
   ['Miamor', ['Ragout Royale', 'Feine Filets', 'Feine Beutel', 'Milde Mahlzeit', 'Trinkfein']],
   ['Animonda', ['Carny', 'Vom Feinsten', 'Rafiné', 'Integra Protect', 'GranCarno']],
@@ -167,11 +154,8 @@ export const ANIMAL_WORDS = [
   ['Katze', /katze|kätzchen|kitten|\bcat\b/i],
   ['Hund', /hund|welpe|puppy|\bdog\b/i],
 ];
-/* Flavour groups for „Worauf es ankommt“ (profile() in smart.js) and the keywords of ocr.js. A word matches at its start,
-   after a space, a comma, an „&“ or a „/“ or at the beginning, so „Elemente“ is no duck and „Herzhaftes“ no heart;
-   „Wild“ does not match inside „Wildschwein“, and „Lachs“ not inside „Seelachs“, which is fish. Heart, liver and
-   cheese are what a compound ends in as well („Rinderherz“, „Hühnerleber“, „Frischkäse“). A variety may name
-   several flavours („Huhn & Thunfisch“): flavoursOf() gives every group it names, in this order. */
+/* Words match only at their start (so "Elemente" is no duck); liver, heart and cheese also end compounds.
+   flavoursOf() returns groups in this order. */
 const start = words => new RegExp(`(?<!\\p{L})(?:${words})`, 'iu');
 const FISH_KINDS = start(
   'hering|makrele|sardine|sardelle|seelachs|kabeljau|forelle|weißfisch|seehecht|herring|mackerel|cod(?!\\p{L})|trout|whitefish',
@@ -201,11 +185,10 @@ export const FLAVORS = [
   ['Käse', /käse|cheese/i],
 ];
 const OWN_FISH = ['Thunfisch', 'Lachs']; // fish with a group of their own
-/* Every flavour group a text names, in the order of FLAVORS. The general fish counts only when no particular one is
-   named: „Lachs mit Fischöl“ is salmon, „Seelachs“ and „Forelle“ are fish. Remembered per text: the evaluation asks
-   for the same variety names on every redraw, and the patterns are not free. */
+/* Generic fish counts only when no fish with its own group is named ("Lachs mit Fischöl" is salmon). Cached because
+   every redraw asks for the same names again. */
 const flavoursKnown = new Map();
-const FLAVOURS_REMEMBERED = 2000; // texts remembered at most, then the memory starts over
+const FLAVOURS_REMEMBERED = 2000;
 export function flavoursOf(text) {
   const t = String(text || '');
   if (flavoursKnown.has(t)) return flavoursKnown.get(t);
@@ -215,14 +198,9 @@ export function flavoursOf(text) {
   flavoursKnown.set(t, out);
   return out;
 }
-/* Rating reminder in minutes after serving, 0 = off: the REMIND steps, or whole hours of your own from 1 to
-   REMIND_MAX_H. tidyRemind turns any stored value into a valid one. */
-/* Observations („Beobachtung notieren“ on the overview card): what a pet showed that stood out. The key lives in the
-   data and never changes, a kind a newer phone added and this one does not know is kept and shown as „Beobachtung“.
-   chip: the word on its chip; label: what the diary says; said: the toast; about: what it is weighed against, 'meal'
-   the meals of the pets concerned within `within` hours before it (`window` names them in its sheet, `after` in
-   „Vorlieben“), 'day' nothing but the day. A stink comes from what
-   went through, so a day back; a hunger right after a meal says that meal did not last. */
+/* Keys are stored in the data; a kind from a newer app version is kept and shown generically. 'meal' weighs it
+   against the meals in the `within` hours before (a stink takes a day to come through, hunger means the last meal
+   did not last), 'day' only against the day. */
 export const OBSERVATIONS = {
   stink: {
     icon: 'o_stink',
@@ -249,11 +227,12 @@ export const OBSERVATIONS = {
 export const observationOf = kind =>
   OBSERVATIONS[kind] || {icon: 'sparkle', chip: 'Beobachtung', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
 
+// rating reminder, minutes after serving, 0 = off
 export const REMIND = [0, 60, 180, 360];
-export const REMIND_DEFAULT = 180; // what the switch turns on with when nothing was chosen yet
+export const REMIND_DEFAULT = 180; // used when the switch is turned on with nothing chosen yet
 export const REMIND_MAX_H = 24;
 export const tidyRemind = m =>
   Number.isFinite(m) && m > 0 ? Math.min(REMIND_MAX_H, Math.max(1, Math.round(m / 60))) * 60 : 0;
-export const REMIND_MAX_AGE = 10 * 60e3; // only meals at most 10 minutes old get one scheduled
-export const PENDING_WINDOW = 48 * 3600e3; // open meals drop out of „Wie war’s?“ after 48 h
-export const DEMO = 'demo'; // sample data identifiers start with this; they are removed on connecting
+export const REMIND_MAX_AGE = 10 * 60e3; // older meals get no reminder scheduled
+export const PENDING_WINDOW = 48 * 3600e3; // older open meals no longer ask for a rating
+export const DEMO = 'demo'; // id prefix of sample data, removed on connecting

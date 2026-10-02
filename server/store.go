@@ -1,14 +1,7 @@
 package main
 
-// Storage: every record with one clock per field, persisted in a JSON file.
-//
-// A change sets individual fields of a record. Per field the larger timestamp wins
-// (a hybrid clock as sortable text, see clockPattern). "_del" is an ordinary field:
-// true = deleted, false = restored. Every accepted change increments the running
-// number (seq); devices fetch "everything since N".
-//
-// The file is replaced in full and atomically on every change (write, fsync, rename).
-// A crash mid-write always leaves either the old or the new version behind.
+// Records with one clock per field; per field the larger clock wins. "_del" is an ordinary field
+// (true deleted, false restored). Each accepted change bumps seq, and devices fetch everything since N.
 
 import (
 	"crypto/rand"
@@ -16,8 +9,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,21 +23,17 @@ import (
 
 const (
 	stateFile     = "state.json"
-	backupDir     = "backups"
-	keepBackups   = 30
 	keepSeen      = 180 * 24 * time.Hour // how long the server recognises changes sent twice
 	maxFutureSkew = 10 * time.Minute     // changes from the future are rejected
 	maxFieldBytes = 512 << 10
 	maxFields     = 64
-	maxColls      = 16 // collections the server keeps at most, the three below included
+	maxColls      = 16 // baseColls included
 )
 
 var (
-	// The collections every app knows. The server takes any other the app sends as well, named like these, so a new
-	// kind of data in the app needs no new server: it keeps its fields and clocks without knowing what they mean.
+	// other collections matching collRe are kept as well, so a new kind of data in the app needs no new server
 	baseColls    = []string{"pets", "products", "servings"}
 	collRe       = regexp.MustCompile(`^[a-z][A-Za-z0-9]{1,23}$`)
-	localOnly    = map[string]bool{"photo": true, "status": true, "error": true, "autoPets": true, "scanCode": true} // stay on the phone
 	changeIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 	recordIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{4,40}$`)
 	fieldRe      = regexp.MustCompile(`^(_del|[A-Za-z][A-Za-z0-9]{0,31})(\.[A-Za-z0-9_-]{1,40})?$`)
@@ -57,7 +46,7 @@ type Field struct {
 }
 
 type Record struct {
-	S int64            `json:"s"` // number of the last accepted change
+	S int64            `json:"s"` // seq of the last accepted change
 	F map[string]Field `json:"f"`
 }
 
@@ -68,7 +57,6 @@ type state struct {
 	Seen    map[string]int64              `json:"seen"` // change id → timestamp in ms
 }
 
-// Change is a change the way a device sends it.
 type Change struct {
 	ID string                     `json:"id"`
 	C  string                     `json:"c"`
@@ -83,7 +71,6 @@ type Rejected struct {
 	Detail string `json:"detail"`
 }
 
-// OutRecord is a record the way devices receive it.
 type OutRecord struct {
 	C string           `json:"c"`
 	R string           `json:"r"`
@@ -92,9 +79,10 @@ type OutRecord struct {
 }
 
 type Store struct {
-	mu  sync.Mutex
-	dir string
-	st  state
+	mu    sync.Mutex
+	dir   string
+	st    state
+	saved []byte // the state on disk, for a rollback that does not depend on reading it back
 }
 
 func newEpoch() string {
@@ -113,49 +101,38 @@ func emptyState() state {
 	return st
 }
 
-// OpenStore loads the stored data. If the file is corrupted it is set aside and the newest
-// backup is loaded, under a new epoch, so that every device does a full sync.
+// An unreadable file is set aside and the store starts empty under a new epoch; the phones then send
+// everything they hold again.
 func OpenStore(dir string) (*Store, error) {
-	s := &Store{dir: dir}
-	if err := os.MkdirAll(filepath.Join(dir, backupDir), 0o700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	st, err := readState(filepath.Join(dir, stateFile))
-	switch {
-	case err == nil:
-		s.st = st
-	case errors.Is(err, os.ErrNotExist):
-		s.st = emptyState()
-		if err := s.persist(); err != nil {
-			return nil, err
+	removeTemps(dir)
+	s := &Store{dir: dir}
+	path := filepath.Join(dir, stateFile)
+	raw, err := os.ReadFile(path)
+	if err == nil {
+		if s.st, err = parseState(raw); err == nil {
+			s.saved = raw
+			return s, nil
 		}
-	default:
-		broken := filepath.Join(dir, fmt.Sprintf("state.defekt-%d.json", time.Now().Unix()))
-		log.Printf("stored data corrupted (%v), setting it aside as %s", err, broken)
-		if rerr := os.Rename(filepath.Join(dir, stateFile), broken); rerr != nil {
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		aside := filepath.Join(dir, "state-unreadable-"+time.Now().Format("20060102-150405")+".json")
+		if rerr := os.Rename(path, aside); rerr != nil {
 			return nil, rerr
 		}
-		s.st = emptyState()
-		if b := newestBackup(dir); b != "" {
-			if bst, berr := readState(b); berr == nil {
-				bst.Epoch = newEpoch()
-				s.st = bst
-				log.Printf("Backup %s geladen", filepath.Base(b))
-			}
-		}
-		if err := s.persist(); err != nil {
-			return nil, err
-		}
+		log.Printf("%s nicht lesbar (%v), beiseitegelegt als %s, die Handys senden ihre Daten neu", stateFile, err, filepath.Base(aside))
+	}
+	s.st = emptyState()
+	if err := s.persist(); err != nil {
+		return nil, err
 	}
 	return s, nil
 }
 
-func readState(path string) (state, error) {
+func parseState(raw []byte) (state, error) {
 	var st state
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return st, err
-	}
 	if err := json.Unmarshal(raw, &st); err != nil {
 		return st, err
 	}
@@ -173,32 +150,40 @@ func readState(path string) (state, error) {
 	return st, nil
 }
 
-// writeAtomic replaces a file so that after a crash there is always a complete version.
-func writeAtomic(path string, data []byte, mode os.FileMode) error {
-	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+// writeAtomic leaves the file 0600, as os.CreateTemp makes it.
+func writeAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	f, err := os.CreateTemp(dir, "."+filepath.Base(path)+"-*.tmp")
 	if err != nil {
 		return err
 	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), path)
+	}
+	if err != nil {
+		os.Remove(f.Name())
 		return err
 	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return err
-	}
-	if d, err := os.Open(filepath.Dir(path)); err == nil {
+	if d, err := os.Open(dir); err == nil {
 		d.Sync()
 		d.Close()
 	}
 	return nil
+}
+
+// removeTemps clears what writeAtomic left behind in a crash.
+func removeTemps(dir string) {
+	files, _ := filepath.Glob(filepath.Join(dir, ".*.tmp"))
+	for _, f := range files {
+		os.Remove(f)
+	}
 }
 
 func (s *Store) persist() error {
@@ -206,7 +191,11 @@ func (s *Store) persist() error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(filepath.Join(s.dir, stateFile), data, 0o600)
+	if err := writeAtomic(filepath.Join(s.dir, stateFile), data); err != nil {
+		return err
+	}
+	s.saved = data
+	return nil
 }
 
 func parseClock(t string) (time.Time, bool) {
@@ -248,9 +237,8 @@ func validate(c Change, now time.Time) *Rejected {
 	return nil
 }
 
-// Apply accepts changes and persists them before returning.
-// ok holds every id the device may drop from its queue (accepted or already known),
-// rejected the permanently invalid ones.
+// Apply persists before it returns. ok holds every id the device may drop from its queue,
+// accepted or already known; rejected holds the invalid ones.
 func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []Rejected, seq int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -280,9 +268,6 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 		}
 		applied := false
 		for k, v := range c.F {
-			if c.C == "servings" && localOnly[k] {
-				continue
-			}
 			if cur, has := rec.F[k]; has && cur.T >= c.T {
 				continue
 			}
@@ -300,8 +285,7 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 	}
 	if dirty {
 		if err := s.persist(); err != nil {
-			// Back to the persisted state, so that memory and disk agree
-			if st, rerr := readState(filepath.Join(s.dir, stateFile)); rerr == nil {
+			if st, perr := parseState(s.saved); perr == nil {
 				s.st = st
 			}
 			return nil, nil, 0, err
@@ -310,7 +294,6 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 	return ok, rejected, s.st.Seq, nil
 }
 
-// Since returns every record that has changed after the number since.
 func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -318,7 +301,7 @@ func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	for c, recs := range s.st.Records {
 		for id, rec := range recs {
 			if rec.S > since {
-				out = append(out, OutRecord{C: c, R: id, S: rec.S, F: rec.F})
+				out = append(out, OutRecord{C: c, R: id, S: rec.S, F: maps.Clone(rec.F)}) // Apply writes to rec.F after the unlock
 			}
 		}
 	}
@@ -326,9 +309,8 @@ func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	return s.st.Epoch, s.st.Seq, out
 }
 
-// Checksum hashes every field and its clock in the collections named, the three every app knows without any. The app
-// computes it the same way over the collections it knows: SHA-256 over the sorted lines "collection/id/field@clock\n".
-// So an app that does not know a newer collection still finds its own data level with the server's.
+// Checksum must match the app's: SHA-256 over the sorted lines "collection/id/field@clock\n".
+// Without colls it covers baseColls, so an app that lacks a newer collection can still compare.
 func (s *Store) Checksum(colls []string) (epoch string, seq int64, sum string, fields int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -362,7 +344,6 @@ func (s *Store) Seq() (string, int64) {
 	return s.st.Epoch, s.st.Seq
 }
 
-// Products returns the visible food varieties, newest first (for the recognition prompt).
 func (s *Store) Products(limit int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -392,7 +373,6 @@ func (s *Store) Products(limit int) []string {
 	return names
 }
 
-// Variety says whether a food variety is there, not deleted.
 func (s *Store) Variety(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -400,21 +380,20 @@ func (s *Store) Variety(id string) bool {
 	return rec != nil && string(rec.F["_del"].V) != "true"
 }
 
-// Varieties are the food varieties that are there, deleted ones left out.
-func (s *Store) Varieties() map[string]bool {
+// Deleted varieties. Unknown ones do not count: after a reset the phones bring them back.
+func (s *Store) DeletedVarieties() map[string]bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := map[string]bool{}
 	for id, rec := range s.st.Records["products"] {
-		if string(rec.F["_del"].V) != "true" {
+		if string(rec.F["_del"].V) == "true" {
 			out[id] = true
 		}
 	}
 	return out
 }
 
-// LastMeal is the newest meal served at or after since, treats left out: its time in ms and who served it, 0 and ""
-// without one. A meal whose variety is unknown or gone counts, as it does in the app.
+// LastMeal leaves treats out but, like the app, counts meals of unknown or deleted varieties. at is in ms.
 func (s *Store) LastMeal(since int64) (at int64, by string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -438,45 +417,15 @@ func (s *Store) LastMeal(since int64) (at int64, by string) {
 	return at, by
 }
 
-// Backup writes a copy once a day and keeps the last 30.
-// It also drops change ids older than keepSeen.
-func (s *Store) Backup(now time.Time) error {
+// PruneSeen forgets change ids older than keepSeen.
+func (s *Store) PruneSeen(now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	name := filepath.Join(s.dir, backupDir, "state-"+now.Format("2006-01-02")+".json")
-	if _, err := os.Stat(name); err == nil {
+	cut := now.Add(-keepSeen).UnixMilli()
+	n := len(s.st.Seen)
+	maps.DeleteFunc(s.st.Seen, func(_ string, at int64) bool { return at < cut })
+	if len(s.st.Seen) == n {
 		return nil
 	}
-	cut := now.Add(-keepSeen).UnixMilli()
-	for id, at := range s.st.Seen {
-		if at < cut {
-			delete(s.st.Seen, id)
-		}
-	}
-	if err := s.persist(); err != nil {
-		return err
-	}
-	data, err := os.ReadFile(filepath.Join(s.dir, stateFile))
-	if err != nil {
-		return err
-	}
-	if err := writeAtomic(name, data, 0o600); err != nil {
-		return err
-	}
-	files, _ := filepath.Glob(filepath.Join(s.dir, backupDir, "state-*.json"))
-	sort.Strings(files)
-	for len(files) > keepBackups {
-		os.Remove(files[0])
-		files = files[1:]
-	}
-	return nil
-}
-
-func newestBackup(dir string) string {
-	files, _ := filepath.Glob(filepath.Join(dir, backupDir, "state-*.json"))
-	sort.Strings(files)
-	if len(files) == 0 {
-		return ""
-	}
-	return files[len(files)-1]
+	return s.persist()
 }

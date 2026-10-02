@@ -1,15 +1,13 @@
 package main
 
-// Packaging photos: the large photo a phone took of a variety, kept here so that every phone in the household can
-// show it, not only the one that took it. One file per variety in photos/ beside the data, never part of the synced
-// data nor of a backup. A photo sent for a variety replaces the one before (from 1.4.0; until then the first one
-// stayed), and a variety that is gone takes its photo along.
+// Packaging photos, one file per variety in photos/, kept out of the synced data.
 
 import (
 	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const (
@@ -18,33 +16,39 @@ const (
 )
 
 type Photos struct {
+	mu  sync.Mutex
 	dir string
 }
 
 func OpenPhotos(dir string) (*Photos, error) {
 	p := &Photos{dir: filepath.Join(dir, photoDir)}
-	return p, os.MkdirAll(p.dir, 0o700)
+	if err := os.MkdirAll(p.dir, 0o700); err != nil {
+		return nil, err
+	}
+	removeTemps(p.dir)
+	return p, nil
 }
 
 func (p *Photos) file(id string) string {
 	return filepath.Join(p.dir, id+".jpg")
 }
 
-// Put keeps the photo of a variety, in place of the one it had.
 func (p *Photos) Put(id string, jpeg []byte) error {
-	return writeAtomic(p.file(id), jpeg, 0o600)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return writeAtomic(p.file(id), jpeg)
 }
 
-// Get is the photo of a variety, an error without one.
 func (p *Photos) Get(id string) ([]byte, error) {
 	return os.ReadFile(p.file(id))
 }
 
-// Sweep removes the photos of the varieties that are gone.
-func (p *Photos) Sweep(varieties map[string]bool) {
+func (p *Photos) Sweep(deleted map[string]bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	files, _ := filepath.Glob(filepath.Join(p.dir, "*.jpg"))
 	for _, f := range files {
-		if !varieties[strings.TrimSuffix(filepath.Base(f), ".jpg")] {
+		if deleted[strings.TrimSuffix(filepath.Base(f), ".jpg")] {
 			os.Remove(f)
 		}
 	}

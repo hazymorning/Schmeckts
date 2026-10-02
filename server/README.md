@@ -1,12 +1,9 @@
 # Schmeckt’s? – der Haushalts-Server
 
-Den Server brauchst du nur, wenn mehrere Menschen dasselbe Fütterungstagebuch führen wollen. Er ist ein kleines
-Programm für einen Rechner, der bei euch zu Hause läuft, und dafür reicht schon ein Mini-PC. Er verwaltet die
-gemeinsamen Daten, hebt die Packungsfotos für alle Handys auf, gibt sie zur Erkennung weiter und schlägt Barcodes
-nach. Vor einer Erinnerung ans
-Füttern fragen die Handys bei ihm nach, ob schon jemand gefüttert hat. Die gespeicherten Daten bleiben dabei bei
-euch, nach draußen gehen nur die Packungsfotos und die Barcode-Anfragen. [Die App](../README.md) läuft aber auch
-ohne ihn.
+Die App braucht keinen Server. Er ist ein Zusatz für Haushalte, in denen mehrere Leute füttern: Die Handys gleichen
+sich über ihn im WLAN ab, und wenn du willst, lässt er Packungsfotos von einer KI erkennen. Jedes Handy behält dabei
+alle Daten selbst und läuft weiter wie gewohnt, wenn der Server einmal aus ist. Er ist ein kleines Programm für einen
+Rechner bei euch zu Hause, ein Mini-PC reicht. Nach draußen gehen von ihm nur die Packungsfotos zur Erkennung.
 
 In diesem Ordner liegt alles, was dazugehört: das Go-Programm, `packaging/` für das Debian-Paket und
 `build-deb.sh`, mit dem es gebaut wird.
@@ -26,7 +23,9 @@ Das Paket gibt es in zwei Varianten:
 Wenn du unsicher bist, öffne die Einstellungen, geh ganz unten auf „System“ und dann auf „Über“. Wenn dort Intel,
 AMD oder Celeron steht, nimmst du amd64.
 
-Lade die Datei anschließend auf den Mini-PC herunter, zum Beispiel indem du diese Seite dort im Browser öffnest.
+Beide hängen an jedem Release der App. Öffne am Mini-PC im Browser
+[github.com/hazymorning/Schmeckts/releases/latest](https://github.com/hazymorning/Schmeckts/releases/latest) und lade
+unter „Assets“ die passende Datei herunter.
 
 ### 2. Installieren
 
@@ -43,10 +42,11 @@ sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb
 
 Danach läuft der Server sofort los und startet von nun an automatisch mit dem PC.
 
-### 3. Einen API-Schlüssel besorgen
+### 3. Einen API-Schlüssel besorgen (optional)
 
-Mit diesem Schlüssel kann der Server die Packungsfotos von Claude erkennen lassen. Pro Foto kostet das ungefähr
-einen halben Cent.
+Den Schlüssel brauchst du nur für die Foto-Erkennung. Damit lässt der Server die Packungsfotos von Claude erkennen,
+pro Foto kostet das ungefähr einen halben Cent. Ohne Schlüssel gleicht der Server nur die Handys ab, dann kannst du
+diesen Schritt überspringen.
 
 1. Melde dich bei [platform.claude.com](https://platform.claude.com) an, oder lege dir ein Konto an und hinterlege eine Zahlungsart.
 2. Erstelle unter „API Keys“ einen neuen Schlüssel, zum Beispiel mit dem Namen „Schmeckts“, und kopiere ihn. Er beginnt mit `sk-ant-`.
@@ -55,28 +55,23 @@ einen halben Cent.
 ### 4. Einrichten
 
 1. Öffne das Anwendungsmenü und starte „Schmeckt’s-Server einrichten“.
-2. Wähle „Einrichten oder API-Schlüssel ändern“, füge den Schlüssel ein, bestätige und gib dein Passwort ein.
-3. Der Server prüft den Schlüssel bei Anthropic, und danach zeigt dir das Fenster die **Adresse** und den **Haushalts-Code** an.
+2. Wähle „Einrichten“, füge den Schlüssel ein oder lass das Feld leer, bestätige und gib dein Passwort ein.
+3. Einen Schlüssel prüft der Server bei Anthropic. Danach zeigt dir das Fenster die **Adresse** und den **Haushaltscode** an.
 
-In diesem Fenster kannst du die Verbindungsdaten jederzeit wieder aufrufen. Unter „Übersicht“ siehst du außerdem,
-was alles gespeichert ist (Tiere, Futter, letzte Mahlzeiten, Geräte), und mit „Neuer Code“ erstellst du einen neuen
-Haushalts-Code, falls mal ein Handy verloren geht.
+Unter „Verbindungsdaten“ rufst du beides jederzeit wieder auf. Mit „Neuer Code“ erstellst du einen neuen
+Haushaltscode, falls mal ein Handy verloren geht. Einen Schlüssel kannst du später über „Einrichten“ nachtragen.
 
 ### 5. Die Handys verbinden
 
-Tippe in der App beim ersten Start auf „Mit Haushalt verbinden“, später findest du den Punkt unter Einstellungen,
-„Haushalt“, „Mit Haushalt verbinden“. Dort trägst du Adresse und Haushalts-Code ein und tippst auf „Verbinden“.
+Tippe in der App auf Einstellungen, „Haushalt“, „Mit Haushalt verbinden“, trag Adresse und Haushaltscode ein und
+tippe auf „Verbinden“. Was schon auf dem Handy ist, bleibt und wird mit dem Haushalt geteilt.
 Danach gleichen alle Handys ihre Daten von allein ab, zu Hause über das WLAN und unterwegs, sobald WireGuard läuft.
 Wenn etwas wartet oder der Abgleich hakt, erscheint oben in der App ein kleiner Hinweis. Nach einem neuen Code steht
 dort „Code prüfen“, und du tippst den neuen Code einfach dort ein.
 
 ## Gut zu wissen
 
-- **Backups:** Der Server legt täglich ein Backup an und behält die letzten 30 davon, zu finden unter `/var/lib/schmeckts/backups`. Die Packungsfotos liegen daneben unter `/var/lib/schmeckts/photos` und gehören nicht zum Backup.
-- **Geänderte Fotos:** Ändert jemand in der App das Foto einer Sorte, bekommt der Server das neue, und alle anderen Handys holen es sich beim nächsten Öffnen. Dafür muss der Server mindestens Version 1.4.0 haben.
-- **Beobachtungen:** Was jemand in der App als Beobachtung notiert, teilen die Handys ab Server-Version 1.5.0. Ein älterer Server verliert nichts: Die Einträge warten auf dem Handy, bis der Server aktualisiert ist. Ab 1.5.0 nimmt der Server auch künftige neue Datenarten der App an, ohne selbst ein Update zu brauchen.
-- **Updates:** Doppelklicke einfach wieder auf die neue .deb-Datei, oder nimm im Terminal `sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb`. Daten, Code und API-Schlüssel bleiben dabei erhalten.
-- **Übersicht im Terminal:** `sudo schmeckts-server overview`.
+- **Die Daten liegen auf den Handys:** Geht auf dem Server etwas verloren, schicken die Handys beim nächsten Abgleich wieder alles, was sie haben. Ein eigenes Backup braucht der Server deshalb nicht.
+- **Updates:** Lade die neue .deb-Datei wie oben vom neuesten Release herunter und doppelklicke sie, oder nimm im Terminal `sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb`. Daten, Code und API-Schlüssel bleiben dabei erhalten.
 - **Läuft er noch?** Mit `systemctl status schmeckts` siehst du den Zustand und mit `journalctl -u schmeckts -e` die letzten Meldungen.
-- **Backup zurückspielen:** `sudo schmeckts-server restore` listet dir erst einmal alle Backups auf. Wenn du eines davon mit angibst, wird es zurückgespielt. Die Handys gleichen danach alles automatisch neu ab.
 - **Nicht ins Internet stellen:** Richte im Router bitte keine Portweiterleitung für den Server ein. Er nimmt ohnehin nur Anfragen aus dem Heimnetz und über WireGuard entgegen.

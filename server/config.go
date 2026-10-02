@@ -1,8 +1,6 @@
 package main
 
-// The server's configuration in config.json inside the data directory. Only the service and root
-// may read it, because it holds the API key. The server rereads it as soon as it changes, so no
-// restart is needed after setup.
+// config.json holds the API key, so only the service and root may read it.
 
 import (
 	"crypto/rand"
@@ -24,12 +22,10 @@ const (
 )
 
 type Config struct {
-	APIKey       string   `json:"apiKey,omitempty"`
-	Code         string   `json:"code,omitempty"`
-	Model        string   `json:"model,omitempty"`
-	Port         int      `json:"port,omitempty"`
-	AnthropicURL string   `json:"anthropicUrl,omitempty"` // for tests only, empty otherwise
-	BarcodeURLs  []string `json:"barcodeUrls,omitempty"`  // for tests only, Open Pet Food Facts and Open Food Facts otherwise
+	APIKey string `json:"apiKey,omitempty"`
+	Code   string `json:"code,omitempty"`
+	Model  string `json:"model,omitempty"`
+	Port   int    `json:"port,omitempty"`
 }
 
 func (c Config) model() string {
@@ -44,13 +40,6 @@ func (c Config) port() int {
 		return c.Port
 	}
 	return defaultPort
-}
-
-func (c Config) anthropicURL() string {
-	if c.AnthropicURL != "" {
-		return strings.TrimRight(c.AnthropicURL, "/")
-	}
-	return "https://api.anthropic.com"
 }
 
 // normCode makes input such as "k7pm 3qxd" or "K7PM-3QXD" comparable.
@@ -100,10 +89,10 @@ func writeConfig(dir string, c Config) error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(filepath.Join(dir, configFile), append(data, '\n'), 0o600)
+	return writeAtomic(filepath.Join(dir, configFile), append(data, '\n'))
 }
 
-// ConfigHolder returns the current configuration and rereads the file whenever it has changed.
+// ConfigHolder rereads config.json when it changes, so setup needs no restart.
 type ConfigHolder struct {
 	mu    sync.Mutex
 	dir   string

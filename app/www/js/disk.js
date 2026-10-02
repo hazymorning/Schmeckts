@@ -1,6 +1,4 @@
-/* Durable storage for queue, db, sync and prefs: files in private app storage in the app (Android does not clear
-   those even when short on space), localStorage in the browser. Writing happens in the background, atomically and
-   always in the order given by ORDER; why that guards against data loss is explained in store.js. */
+// private app files on the phone (Android keeps them when space runs low), localStorage in the browser
 import {Native} from './native.js';
 import {report} from './report.js';
 
@@ -17,13 +15,12 @@ export const storageOK = FS
         localStorage.removeItem('__t');
         return true;
       } catch {
-        // No localStorage at all (a file:// page in some browsers): the app says so and keeps nothing
+        // e.g. a file:// page in some browsers
         return false;
       }
     })();
-export const diskHooks = {failed() {}}; // reports write failures (storage full)
+export const diskHooks = {failed() {}};
 
-/* Reading */
 async function readText(path) {
   try {
     return (await FS.readFile({path, directory: DIR, encoding: 'utf8'})).data;
@@ -32,7 +29,7 @@ async function readText(path) {
       () => true,
       () => false,
     );
-    if (exists) throw e; // there but unreadable: never carry on with an empty state
+    if (exists) throw e; // never carry on with an empty state
     return null;
   }
 }
@@ -51,14 +48,13 @@ export async function read(name) {
   let path = name + '.json',
     text = await readText(path);
   if (text == null) {
-    path += '.tmp';
+    path += '.tmp'; // a crash between delete and rename
     text = await readText(path);
-  } // a crash between deleting and renaming
+  }
   if (text == null) return null;
   try {
     return JSON.parse(text);
   } catch {
-    // corrupted: set it aside instead of overwriting
     const aside = `${name}.corrupt-${Date.now()}.json`;
     await FS.rename({from: path, to: aside, directory: DIR, toDirectory: DIR}).catch(e =>
       report('setting the corrupted file aside', e),
@@ -68,7 +64,7 @@ export async function read(name) {
   }
 }
 
-/* Whether a file that could not be read lies set aside; also when that cannot be told, so nothing is tidied away */
+// true when unsure, so nothing is tidied away
 export async function setAside() {
   if (!FS) return false;
   try {
@@ -79,7 +75,6 @@ export async function setAside() {
   }
 }
 
-/* Writing */
 async function writeNow(name, text) {
   if (!FS) {
     if (storageOK) localStorage.setItem(KEYS[name], text);
@@ -91,8 +86,7 @@ async function writeNow(name, text) {
   try {
     await FS.rename({from: tmp, to: path, directory: DIR, toDirectory: DIR});
   } catch {
-    // If rename will not replace the target, delete first. The target need not exist, so a failing delete is
-    // ignored; the rename after it throws if it fails. If the app crashes in between, read() takes the .tmp.
+    // rename may not overwrite; the target may be missing, and after a crash here read() takes the .tmp
     await FS.deleteFile({path, directory: DIR}).catch(() => {});
     await FS.rename({from: tmp, to: path, directory: DIR, toDirectory: DIR});
   }
@@ -102,10 +96,9 @@ const pending = new Map(); // name → {produce, done}
 let busy = false,
   fails = 0,
   retryTimer = null;
-const idle = []; // resolvers waiting in flush()
+const idle = [];
 
-/* produce() returns {text, ctx} only at write time, so the newest state always reaches the disk.
-   done(ctx) runs once exactly that state has been written. */
+// produce() runs at write time so the newest state is written; done(ctx) runs after that write
 export function schedule(name, produce, done) {
   pending.set(name, {produce, done});
   if (!busy) loop();
@@ -121,7 +114,7 @@ async function loop() {
     try {
       await writeNow(name, text);
     } catch (e) {
-      if (!pending.has(name)) pending.set(name, job); // retry later; everything queued behind it waits
+      if (!pending.has(name)) pending.set(name, job); // everything behind it waits
       busy = false;
       if (!fails++) diskHooks.failed(e);
       report(`saving ${name} failed`, e);
@@ -141,5 +134,4 @@ async function loop() {
   idle.splice(0).forEach(resolve => resolve());
 }
 
-/* Waits until everything has been written */
 export const flush = () => (busy || pending.size ? new Promise(resolve => idle.push(resolve)) : Promise.resolve());

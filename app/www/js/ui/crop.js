@@ -1,12 +1,10 @@
-/* Cropping for the profile picture: a square stage, panning with one finger or the mouse, zooming with two fingers
-   or the slider. The state c = {w, h, z, cx, cy}: image size, zoom (1 = the short side fills the stage) and the pixel
-   at the centre of the stage. The computing functions are pure; mountCrop() wires them to stage and slider. */
+/* Profile picture cropping. c = {w, h, z, cx, cy}: image size, zoom (1: the short side fills the stage) and the
+   image pixel at the stage centre. */
 
 export const ZOOM_MAX = 4;
-const side = c => Math.min(c.w, c.h) / c.z; // edge length of the crop in pixels
+const side = c => Math.min(c.w, c.h) / c.z; // crop edge in image pixels
 const within = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 function clamp(c) {
-  // the crop stays inside the image
   c.z = within(c.z, 1, ZOOM_MAX);
   const half = side(c) / 2;
   c.cx = within(c.cx, half, c.w - half);
@@ -14,21 +12,19 @@ function clamp(c) {
   return c;
 }
 export function cropStart(img) {
-  // fully zoomed out, centre of the image
   const w = img.naturalWidth || img.width,
     h = img.naturalHeight || img.height;
   return {w, h, z: 1, cx: w / 2, cy: h / 2};
 }
 export const cropRect = c => ({x: c.cx - side(c) / 2, y: c.cy - side(c) / 2, side: side(c)});
-/* dx, dy: distance travelled on the stage in px, stage: its width */
+// dx, dy: px moved on the stage; stage: its width in px
 function cropMove(c, dx, dy, stage) {
   const k = side(c) / stage;
   c.cx -= dx * k;
   c.cy -= dy * k;
   return clamp(c);
 }
-/* The point (fx, fy) on the stage, 0 to 1, stays put while zooming: the centre for the slider, the midpoint
-   between the fingers when pinching */
+// (fx, fy): the stage point that stays put, 0 to 1
 function cropZoom(c, z, fx = 0.5, fy = 0.5) {
   const s0 = side(c),
     px = c.cx + (fx - 0.5) * s0,
@@ -40,7 +36,6 @@ function cropZoom(c, z, fx = 0.5, fy = 0.5) {
   return clamp(c);
 }
 
-/* stage: the square element the crop is shown in, img: the loaded image (hung inside it), slider: the zoom slider */
 export function mountCrop(stage, img, c, slider) {
   const layout = () => {
     const k = stage.clientWidth / side(c),
@@ -52,7 +47,7 @@ export function mountCrop(stage, img, c, slider) {
     });
     slider.value = c.z;
   };
-  const pts = new Map(); // active pointers: one finger or the mouse pans, two fingers zoom as well
+  const pts = new Map();
   const gauge = () => {
     const l = [...pts.values()],
       n = l.length || 1;
@@ -66,7 +61,7 @@ export function mountCrop(stage, img, c, slider) {
     try {
       stage.setPointerCapture(e.pointerId);
     } catch {
-      /* the pointer is already gone: panning works without capture, it stops at the edge of the stage */
+      /* pointer already gone; panning works without capture */
     }
     pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
   });
@@ -76,7 +71,7 @@ export function mountCrop(stage, img, c, slider) {
     pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
     const b = gauge(),
       r = stage.getBoundingClientRect();
-    cropMove(c, b.x - a.x, b.y - a.y, r.width); // first follow the midpoint of the fingers, then zoom around it
+    cropMove(c, b.x - a.x, b.y - a.y, r.width); // pan first, then zoom around the midpoint
     if (a.d && b.d) cropZoom(c, (c.z * b.d) / a.d, (b.x - r.left) / r.width, (b.y - r.top) / r.height);
     layout();
   });

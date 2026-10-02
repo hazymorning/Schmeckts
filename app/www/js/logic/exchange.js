@@ -1,10 +1,5 @@
-/* Manual exchange, without a server. „Änderungen teilen“ writes a file holding every change since the last exchange
-   with the other device, together with our own field clocks, and hands it to the share menu. „Austausch empfangen“
-   merges such a file strictly by the protocol: per field the larger clock wins, and a deletion stays a deletion.
-   The report afterwards says what was taken over and what the other device is missing; „Antwort senden“ sends exactly
-   that back, after which both are level. The file holds data and clocks only: no settings, no household code, no
-   key. */
-import {Native, fileUrl, haptic} from '../native.js';
+// exchange by file without a server; the file holds data and clocks only, no settings and no household code
+import {fileUrl, haptic, shareFile} from '../native.js';
 import {report} from '../report.js';
 import {allClocks, changesSince, merge, prefs, savePrefs, state, topClock} from '../store.js';
 import {toast} from '../ui/toast.js';
@@ -15,21 +10,21 @@ const KIND = 'exchange',
   PROTOCOL = 1;
 const fileName = () => `schmeckts-${KIND}-${new Date().toISOString().slice(0, 10)}.json`;
 
-/* The mark for a device: what it had already seen at the last exchange. Without a known counterpart the oldest
-   mark across all devices applies, so nothing is left out; with no exchange at all the file holds everything. */
+// without a known device the oldest mark applies, so nothing is left out
 function markFor(device) {
   const marks = Object.entries(prefs.exchange || {});
   if (device) return prefs.exchange?.[device]?.mark || null;
   return marks.length ? marks.map(([, x]) => x.mark || '').sort()[0] : null;
 }
-function remember(device) {
+// the mark moves on only once the device holds everything this phone has
+function remember(device, level = true) {
   if (!device) return;
-  (prefs.exchange ||= {})[device] = {at: Date.now(), mark: topClock()};
+  const was = prefs.exchange?.[device]?.mark || '';
+  (prefs.exchange ||= {})[device] = {at: Date.now(), mark: level ? topClock() : was};
   savePrefs();
 }
 
-/* Build the file and pass it on. peer: {device, clocks} after receiving („Antwort senden“), otherwise the
-   stored state. */
+// peer: {device, clocks} when answering a received file
 export async function shareChanges(peer = null) {
   const records = changesSince(peer ? peer.clocks : markFor(null));
   const data = JSON.stringify({
@@ -44,37 +39,21 @@ export async function shareChanges(peer = null) {
   const name = fileName();
   const many = `${records.length} ${records.length === 1 ? 'Änderung' : 'Änderungen'}`;
   try {
-    if (Native?.Filesystem && Native?.Share) {
-      const {uri} = await Native.Filesystem.writeFile({path: name, data, directory: 'CACHE', encoding: 'utf8'});
-      await Native.Share.share({
-        title: 'Schmeckt’s-Austausch',
-        files: [uri],
-        dialogTitle: 'Änderungen an das andere Handy',
-      });
-    } else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    }
+    if (!(await shareFile(name, data, 'Schmeckt’s-Austausch', 'Änderungen an das andere Handy'))) return;
   } catch (e) {
-    if (/cancel/i.test(String(e?.message))) return;
+    report('exchange file', e);
     toast('Die Datei konnte nicht geteilt werden.');
     return;
   }
   haptic('success');
   remember(peer?.device);
   if (peer && sheet?.kind === 'settings') {
-    delete sheet.exchange;
+    delete sheet.exchange; // the other device is level now
     renderSheet();
-  } // the other device is level now, so the report drops „Antwort senden“
+  }
   toast(`${many} weitergegeben`);
 }
 
-/* Take a file in: from the file picker or from another app (intent, see actions.js) */
 export const receiveFile = async file => {
   if (file) apply(await file.text().catch(() => ''));
 };
@@ -95,7 +74,7 @@ function apply(text) {
   try {
     file = JSON.parse(text);
   } catch {
-    file = null; // check() below turns this into a message
+    file = null;
   }
   const bad = check(file);
   if (bad) {
@@ -105,8 +84,7 @@ function apply(text) {
   }
   const took = merge(file.records);
   const back = changesSince(file.clocks);
-  remember(file.device);
-  // The report sits on the „Austausch von Hand“ page, with „Antwort senden“ when the other device is missing something
+  remember(file.device, !back.length);
   const info = {
     text: message(took, back.length),
     peer: back.length ? {device: file.device, clocks: file.clocks} : null,
@@ -116,7 +94,7 @@ function apply(text) {
   if (sheet?.kind === 'settings') {
     sheet.exchange = info;
     if (sheet.page === 'exchange') renderSheet();
-    else openPage('exchange'); // a file from another app, with the settings already open elsewhere
+    else openPage('exchange');
   } else openSheet({kind: 'settings', page: 'exchange', exchange: info});
   toast(info.text);
 }
@@ -127,7 +105,6 @@ const message = (took, back) =>
     ? ` ${back} ${back === 1 ? 'Änderung fehlt' : 'Änderungen fehlen'} auf dem anderen Gerät.`
     : ' Beide Geräte sind gleich.');
 
-/* Reject foreign or damaged files, each with its own message */
 function check(file) {
   if (!file || typeof file !== 'object') return 'Diese Datei ist kein Schmeckt’s-Austausch.';
   if (file.app !== 'schmeckts' || file.kind !== KIND) {

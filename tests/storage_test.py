@@ -9,7 +9,7 @@ from common import SAVED, check, real_errors, run_tests, seeded, started, state
 
 async def test_files(browser, url):
     print('storage: files, crash, corrupted file')
-    ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'theme': 'dark', 'name': 'Anna', 'mode': 'lokal'}}, native=True)
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'theme': 'dark', 'name': 'Anna'}}, native=True)
     check(await state(pg, "db.servings.length + '|' + prefs.name + '|' + prefs.theme") == '3|Anna|dark', 'start: data and settings from the files')
     check(
         await state(pg, "Object.values(state.clocks.servings).every(c => c._del && c.productId && c['pets.lxpet00001'])"),

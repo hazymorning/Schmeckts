@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The splash the app holds up until it is ready (@capacitor/splash-screen, launchAutoHide false). The same
-     picture Android 12 shows on its own, so nothing on screen changes when one hands over to the other:
-     288dp is the size windowSplashScreenAnimatedIcon is drawn at. -->
+<!-- Matches the Android 12 system splash so the handover does not show: 288dp is the size
+     windowSplashScreenAnimatedIcon is drawn at. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background"/>
     <item

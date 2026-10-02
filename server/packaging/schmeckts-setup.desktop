@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Schmeckt’s-Server einrichten
-Comment=API-Schlüssel eintragen und Handys verbinden
+Comment=Handys verbinden und Foto-Erkennung einrichten
 Exec=schmeckts-setup
 Icon=schmeckts
 Terminal=false

@@ -1,6 +1,3 @@
-/* Scanning while feeding. The recognition chain (recognize.js) resolves the code: serve a known variety, offer a
-   choice where several match, otherwise look the product up on the internet or through the server. Without a hit the
-   photo of the front follows. */
 import {normBarcode} from '../text.js';
 import {haptic, scanBarcode} from '../native.js';
 import {findProduct} from '../derive.js';
@@ -13,7 +10,6 @@ import {applyTexture, newProduct} from './products.js';
 const FRONT = 'Vorderseite fotografieren';
 let running = false;
 
-/* Starts in the open feeding sheet: the „Scannen“ button, a shortcut or schmeckts://scan */
 export async function scan() {
   const feed = sheet;
   if (running || feed?.kind !== 'feed') return;
@@ -27,9 +23,8 @@ export async function scan() {
   }
 }
 
-const open = feed => sheet === feed; // false once the feeding sheet has been closed or replaced
+const open = feed => sheet === feed;
 function note(feed, text) {
-  // a short notice with a spinner in the feeding sheet
   if ((feed.busy || '') === text) return;
   feed.busy = text;
   if (open(feed)) renderSheet();
@@ -44,7 +39,7 @@ async function run(feed) {
     return offerPhoto(feed, 'Scannen klappt auf diesem Handy gerade nicht. Mach stattdessen ein Foto.');
   }
   note(feed, '');
-  if (!raw || !open(feed)) return; // cancelled: the feeding sheet stays
+  if (!raw || !open(feed)) return; // cancelled: the sheet stays open
   const code = normBarcode(raw);
   if (!code) {
     haptic('strong');
@@ -71,11 +66,11 @@ async function run(feed) {
 }
 
 async function serve(p, code) {
-  await closeAll(); // serving ends on the home page, where the meal is rated
+  await closeAll();
   serveProduct(p.id, code);
 }
 
-/* Camera for the front. After „Abbrechen“ the feeding sheet stays and the photo button then takes over the code. */
+// on cancel the sheet stays and its photo button takes the code over
 async function photo(feed, code) {
   feed.code = code;
   await shootPhoto(FRONT, code);

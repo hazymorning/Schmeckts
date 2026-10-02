@@ -1,8 +1,5 @@
-"""Renders from design/schmeckts-app-icon.svg whatever Android will not take as a vector: the launcher icons for
-Android 7 (API 24/25, mipmap-*/ic_launcher.png and ic_launcher_round.png). That file is the whole icon including its
-background. From Android 8 on the adaptive icon from app/native/res (vectors) applies. Needs Python with
-Playwright/Chromium.
-Usage: python3 design/render-icons.py"""
+"""Renders the Android 7 launcher icons in app/native/res from design/schmeckts-app-icon.svg; Android 8 on uses the
+vectors. Run it again after changing the icon. Needs Playwright."""
 
 import asyncio
 import pathlib
@@ -10,7 +7,7 @@ import re
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-RES = ROOT / 'app/android/app/src/main/res'
+RES = ROOT / 'app/native/res'
 SVG = (ROOT / 'design/schmeckts-app-icon.svg').read_text()
 DENS = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
 
@@ -39,7 +36,6 @@ async def main():
             out = RES / f'mipmap-{d}'
             await shot(48 * k, False, out / 'ic_launcher.png')
             await shot(48 * k, True, out / 'ic_launcher_round.png')
-            (out / 'ic_launcher_foreground.png').unlink(missing_ok=True)  # Capacitor's template, replaced by the vector
         await b.close()
 
 

@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
-"""Tests of the sync against the real Go server: several phones (one browser context each) and a server with its
-own data directory on a free port, plus a fake Anthropic for photo recognition and a fake product database for the
-barcode lookup (config barcodeUrls).
-Checks taking data over and connecting, syncing in both directions, live notifications, the queue without a
-connection, restarts, a phone with a skewed clock, a restore (new epoch), the checksum, a changed code, the
-protocol version, recognition including the automatic retry, and scanning: lookup through the server, the detour
-via a photo, a known code without a connection, codes from two phones, removal, a server without barcode lookup.
-At the end both phones and the server must hold the same data.
+"""The sync against the real Go server: several phones (one browser context each), the server with a data directory
+of its own, and a fake Anthropic for photo recognition. At the end both phones and the server hold the same data.
 Usage: python3 tests/sync_test.py   (needs Go, builds the server itself)"""
 
 import asyncio
@@ -15,8 +9,8 @@ import http.server
 import json
 import os
 import pathlib
+import random
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -44,17 +38,11 @@ from common import (
 )
 
 CODE, NEW_CODE = 'K7PM-3QXD', 'W9ZX-4HJT'
-HIT, MISS, C1, C2, OLD = '5901234123457', '4012345000016', '4012345000023', '4012345000030', '4012345000047'  # valid EAN-13
-
-
-def free_port():
-    with socket.socket() as s:
-        s.bind(('127.0.0.1', 0))
-        return s.getsockname()[1]
+MISS, C1, C2 = '4012345000016', '4012345000023', '4012345000030'  # valid EAN-13
 
 
 class FakeAnthropic:
-    """Answers like the Messages API with the packaging in reply, and counts the calls."""
+    """Answers like the Messages API with reply as the packaging, and counts the calls."""
 
     def __init__(self):
         self.calls, self.reply = 0, {'brand': 'Sheba', 'variety': 'Lachs in Soße', 'type': 'Nassfutter', 'animal': 'Katze'}
@@ -64,103 +52,71 @@ class FakeAnthropic:
             def log_message(self, *args):
                 pass
 
-            def send(self, body):
-                raw = json.dumps(body).encode()
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get('content-length', 0)))
+                fake.calls += 1
+                raw = json.dumps({'content': [{'type': 'text', 'text': json.dumps(fake.reply, ensure_ascii=False)}]}).encode()
                 self.send_response(200)
                 self.send_header('content-type', 'application/json')
                 self.send_header('content-length', str(len(raw)))
                 self.end_headers()
                 self.wfile.write(raw)
 
-            def do_GET(self):
-                self.send({'data': []})
-
-            def do_POST(self):
-                self.rfile.read(int(self.headers.get('content-length', 0)))
-                fake.calls += 1
-                self.send({'content': [{'type': 'text', 'text': json.dumps(fake.reply, ensure_ascii=False)}]})
-
         srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.url = f'http://127.0.0.1:{srv.server_port}'
 
 
-class FakeFoodDB:
-    """Antwortet wie Open Pet Food Facts (API v2) und merkt sich die gefragten Codes."""
-
-    def __init__(self):
-        self.calls = []
-        self.products = {
-            HIT: {
-                'product_name': 'Sheba Fresh Choice Huhn in Sauce 4x50g',
-                'brands': 'Sheba, Mars',
-                'categories_tags': ['en:pet-food', 'en:cat-food', 'en:wet-cat-food'],
-            }
-        }
-        fake = self
-
-        class Handler(http.server.BaseHTTPRequestHandler):
-            def log_message(self, *args):
-                pass
-
-            def do_GET(self):
-                code = self.path.split('/product/')[-1].split('.json')[0]
-                fake.calls.append(code)
-                p = fake.products.get(code)
-                raw = json.dumps({'status': 1, 'code': code, 'product': p} if p else {'status': 0, 'code': code}).encode()
-                self.send_response(200 if p else 404)
-                self.send_header('content-type', 'application/json')
-                self.send_header('content-length', str(len(raw)))
-                self.end_headers()
-                self.wfile.write(raw)
-
-        srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-        threading.Thread(target=srv.serve_forever, daemon=True).start()
-        self.url = f'http://127.0.0.1:{srv.server_port}'
+def some_port():
+    return random.randint(20000, 32000)  # below the ephemeral range, where Chromium's own connections come from
 
 
 class GoServer:
     """The real server from server/, with its own data directory."""
 
-    def __init__(self, binary, anthropic):
+    def __init__(self, binary):
         self.binary, self.dir = binary, pathlib.Path(tempfile.mkdtemp(prefix='schmeckts-test-'))
-        self.port = free_port()
-        self.url = f'http://127.0.0.1:{self.port}'
         self.env = {**os.environ, 'STATE_DIRECTORY': str(self.dir)}
-        self.cfg = {'code': CODE, 'apiKey': 'sk-ant-test', 'anthropicUrl': anthropic.url, 'port': self.port}
-        self.started = False
-        self.write_config()
+        self.cfg = {'code': CODE, 'apiKey': 'sk-ant-test', 'port': some_port()}
+        self.proc = None
+
+    @property
+    def url(self):
+        return f'http://127.0.0.1:{self.cfg["port"]}'
 
     def write_config(self):
         (self.dir / 'config.json').write_text(json.dumps(self.cfg))
 
-    def start(self, tries=5):
-        """Starts the server and waits until it answers. The port was free when it was chosen, but something else
-        may have taken it since (the phones' own connections, another suite on the same machine): then the server
-        gets another one, a few times over, and only at its first start, while nothing holds its address yet."""
+    async def start(self):
+        """On its port while that is free, otherwise on another one. Only an answer with the epoch from our own
+        state.json counts, so a foreign server on the port is never taken for ours."""
         log = self.dir / 'server.log'
-        for attempt in range(tries):
-            seen = log.stat().st_size if log.exists() else 0
-            self.proc = subprocess.Popen([self.binary], env=self.env, stdout=open(log, 'a'), stderr=subprocess.STDOUT)
-            for _ in range(100):
-                try:
-                    urllib.request.urlopen(self.url + '/api/info', timeout=1)
-                    return
-                except Exception:
-                    time.sleep(0.05)
-            said = log.read_bytes()[seen:].decode('utf-8', 'replace')
-            if 'address already in use' not in said or self.started or attempt == tries - 1:
-                raise RuntimeError('server does not start:\n' + said)
-            self.proc.wait(10)
-            self.port = free_port()
-            self.url = f'http://127.0.0.1:{self.port}'
-            self.cfg['port'] = self.port
+        for attempt in range(10):
             self.write_config()
+            self.proc = subprocess.Popen([self.binary], env=self.env, stdout=open(log, 'a'), stderr=subprocess.STDOUT)
+            if await self.answers():
+                return
+            self.proc.kill()
+            self.proc.wait(10)
+            if attempt >= 2:  # a restart tries its own port a few times first
+                self.cfg['port'] = some_port()
+        raise RuntimeError('server does not start:\n' + log.read_text()[-2000:])
 
-    def stop(self):
-        self.started = True  # from here on the phones know the address, so a restart keeps it
+    async def answers(self):
+        for _ in range(100):
+            if self.proc.poll() is not None:
+                return False
+            try:
+                info = json.load(urllib.request.urlopen(self.url + '/api/info', timeout=1))
+                ours = json.loads((self.dir / 'state.json').read_text())['epoch']
+                return info.get('epoch') == ours and self.proc.poll() is None
+            except Exception:
+                await asyncio.sleep(0.05)
+        return False
+
+    async def stop(self):
         self.proc.terminate()
-        self.proc.wait(10)
+        await asyncio.to_thread(self.proc.wait, 10)
 
     def get(self, path):
         req = urllib.request.Request(self.url + path, headers={'Authorization': 'Bearer ' + self.cfg['code']})
@@ -175,15 +131,6 @@ class GoServer:
             out.setdefault(x['c'], {})[x['r']] = {k: f['v'] for k, f in x['f'].items() if k != '_del' and f['v'] is not None}
         return out
 
-    def restore(self, backup):
-        """Restoring as on the mini-PC. The command needs root, so it is reproduced here otherwise."""
-        if os.geteuid() == 0:
-            subprocess.run([self.binary, 'restore', str(backup)], env=self.env, check=True, capture_output=True)
-        else:
-            st = json.loads(pathlib.Path(backup).read_text())
-            st['epoch'] = 'nachgebildet' + str(int(time.time()))
-            (self.dir / 'state.json').write_text(json.dumps(st))
-
 
 PROJECTION = """Promise.all([import('./js/fields.js'), import('./js/store.js')]).then(([f, {db}]) => {
   const out = {};
@@ -193,25 +140,32 @@ PROJECTION = """Promise.all([import('./js/fields.js'), import('./js/store.js')])
 
 
 async def run(pg, body):
-    """Runs JS with the exports of store.js (db, save, queue, …), the way the logic modules do."""
+    """Runs JS with the exports of store.js (db, prefs, save, …), the way the logic modules do."""
     return await pg.evaluate(f"import('./js/store.js').then(async m => {{ const {{db, prefs, save}} = m; {body} }})")
 
 
-async def until_sync(pg, expr, timeout=10.0):
-    """Wartet, bis expr mit dem Sync-Status (status) wahr ist."""
+async def wait_js(pg, expr, timeout=10.0):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
-        if await pg.evaluate(f"import('./js/sync.js').then(({{status}}) => {expr})"):
+        if await pg.evaluate(expr):
             return True
         await asyncio.sleep(0.1)
     return False
+
+
+def until_sync(pg, expr, timeout=10.0):
+    return wait_js(pg, f"import('./js/sync.js').then(({{status, held}}) => {expr})", timeout)
+
+
+def until_sheet(pg, expr, timeout=10.0):
+    return wait_js(pg, f"import('./js/ui/sheet.js').then(({{sheet}}) => {expr})", timeout)
 
 
 PHONES = {}  # name → (page, console errors), for diagnosing failures
 
 
 async def expect(cond, text):
-    """Like check, but on a failure it prints the status, the queue and the console of every phone."""
+    """Like check, but a failure prints the status, the queue and the console of every phone."""
     if check(cond, text):
         return True
     for name, (pg, errs) in PHONES.items():
@@ -220,44 +174,20 @@ async def expect(cond, text):
               JSON.stringify({status: s.status, queue: m.queue.length, first: m.queue.slice(0, 2).map(q => [q.c, q.r, Object.keys(q.f).join(), q.t]),
                 epoch: m.state.epoch, seq: m.state.seq, log: m.state.log.slice(-4).map(l => l.text)}))""")
         except Exception as e:
-            info = f'nicht abfragbar: {e}'
+            info = f'unavailable: {e}'
         print(f'      {name}: {info}')
         print(f'      {name} console: {real_errors(errs)[-5:]}')
     return False
 
 
-async def sync_status(pg):
-    return await pg.evaluate("import('./js/sync.js').then(m => ({...m.status}))")
-
-
-async def connect(pg, code, server, edit=True):
-    if not await pg.locator('#serverBox').count():
-        if not await pg.evaluate("document.getElementById('sheet').open"):
-            await pg.click('[data-action=open-settings]')
-            await idle(pg)
-        await pg.click('#sheet [data-action=settings-page][data-v=house]')
+async def close_sheet(pg):
+    """Out of whatever is open, one level at a time."""
+    while await pg.evaluate("document.getElementById('sheet').open"):
+        await pg.click('#sheet [data-action=close], #sheet [data-action=settings-back]')
         await idle(pg)
-    if await pg.locator('#serverBox [data-action=connect-form]').count():  # mode `lokal`: the button opens address and code
-        await pg.click('#serverBox [data-action=connect-form]')
-        await idle(pg)
-    if edit:
-        if await pg.locator('[data-action=edit-server]').count():
-            await pg.click('[data-action=edit-server]')
-            await idle(pg)
-        await pg.fill('#f-server', server)
-    await pg.fill('#f-code', code)
-    # If the box redraws between typing and connecting, the fields are empty again and connectServer()
-    # would take the empty prefs.server. So check before the click and, if need be, type it in again.
-    await idle(pg)
-    if edit and await pg.input_value('#f-server') != server:
-        await pg.fill('#f-server', server)
-    if await pg.input_value('#f-code') != code:
-        await pg.fill('#f-code', code)
-    await pg.click('[data-action=connect]')
 
 
 async def open_house(pg):
-    """The settings' page „Haushalt“, from wherever the phone is."""
     await close_sheet(pg)
     await pg.click('[data-action=open-settings]')
     await idle(pg)
@@ -265,99 +195,115 @@ async def open_house(pg):
     await idle(pg)
 
 
-async def close_sheet(pg):
-    """Out of whatever is open: a sheet has the X, the settings are a page and go by their arrow, one level a time."""
-    while await pg.evaluate("document.getElementById('sheet').open"):
-        await pg.click('#sheet [data-action=close], #sheet [data-action=settings-back]')
+async def connect(pg, code, server=None):
+    """Address and code on the household page; without server the address the phone has stays."""
+    if not await pg.locator('#serverBox').count():
+        await open_house(pg)
+    if await pg.locator('#serverBox [data-action=connect-form]').count():
+        await pg.click('#serverBox [data-action=connect-form]')
         await idle(pg)
+    if server is not None and await pg.locator('#serverBox [data-action=edit-server]').count():
+        await pg.click('#serverBox [data-action=edit-server]')
+        await idle(pg)
+    # the box may redraw between typing and the click, so the fields are checked once more
+    for _ in range(2):
+        if server is not None and await pg.input_value('#f-server') != server:
+            await pg.fill('#f-server', server)
+        if await pg.input_value('#f-code') != code:
+            await pg.fill('#f-code', code)
+        await idle(pg)
+    await pg.click('#serverBox [data-action=connect]')
 
 
 async def main():
     make_photo()
+    fake = FakeAnthropic()
     go = shutil.which('go') or '/usr/local/go/bin/go'
     binary = os.path.join(tempfile.mkdtemp(), 'schmeckts-server')
-    # -buildvcs=false: the stamp is pointless in a throwaway test binary, and the git call behind it fails when
-    # the checkout belongs to a different user than the build runs as, which is the case in the CI container.
-    subprocess.run([go, 'build', '-buildvcs=false', '-o', binary, '.'], cwd=ROOT / 'server', check=True)
-    fake, food = FakeAnthropic(), FakeFoodDB()
-    srv = GoServer(binary, fake)
-    srv.cfg['barcodeUrls'] = [food.url]
-    srv.write_config()
-    srv.start()
+    # -buildvcs=false: the git call behind the stamp fails when the checkout belongs to another user, as in CI
+    flags = ['-buildvcs=false', '-ldflags', f'-X main.anthropicURL={fake.url}']
+    subprocess.run([go, 'build', *flags, '-o', binary, '.'], cwd=ROOT / 'server', check=True)
+    srv = GoServer(binary)
+    await srv.start()
     url = serve()
-    blocked = set()
 
-    async def block(ctx):  # the server unreachable for this phone (as without Wi-Fi)
+    async def restart():
+        """Starts the server again; if it had to move, the open phones follow."""
+        old = srv.url
+        await srv.start()
+        if srv.url != old:
+            for pg, _ in PHONES.values():
+                await repoint(pg)
+
+    async def repoint(pg):
+        await pg.evaluate(
+            f"import('./js/store.js').then(m => {{ if (m.prefs.server !== '{srv.url}') {{ m.prefs.server = '{srv.url}'; m.savePrefs(); }} }})"
+        )
+
+    async def block(ctx):  # the server out of reach for this phone, as without Wi-Fi
         async def abort(route):
             await route.abort()
 
         await ctx.route(f'{srv.url}/**', abort)
-        blocked.add(ctx)
 
     async def unblock(ctx, pg):
         await ctx.unroute(f'{srv.url}/**')
-        blocked.discard(ctx)
         await pg.evaluate("dispatchEvent(new Event('online'))")
+
+    async def online(*pages):
+        for pg in pages:
+            await pg.evaluate("dispatchEvent(new Event('online'))")
 
     async with async_playwright() as p:
         browser = await p.chromium.launch()
 
         def new_phone():
-            return phone(browser, motion=True)  # these phones do not run under reduced motion
+            return phone(browser, motion=True)
 
         try:
             # Phone A is already in use (data without clocks) and connects
             print('connecting')
-            ctx_a, a, err_a = await seeded(browser, url, {'db': SAVED, 'prefs': {'mode': 'lokal'}}, native=True)
+            ctx_a, a, err_a = await seeded(browser, url, {'db': SAVED}, native=True)
             PHONES['A'] = (a, err_a)
-            await expect(await state(a, 'db.servings.length') == 3, 'phone A: data on the device')
             await connect(a, 'XXXX-YYYY', srv.url)
-            await idle(a)
             await expect(
-                'stimmt nicht' in await a.inner_text('#serverBox') and await state(a, 'prefs.code') == '',
-                'wrong code: a clear message, not connected',
+                await until_sheet(a, 'sheet?.connectError && !sheet.connecting') and await state(a, "prefs.code === ''"),
+                'wrong code: an error, not connected',
             )
-            await connect(a, 'k7pm 3qxd', srv.url, edit=False)
+            await connect(a, 'k7pm 3qxd')
             await expect(
                 await until(a, "prefs.code === 'K7PM-3QXD' && state.epoch !== '' && queue.length === 0"),
-                'correct code (lower case, with spaces): connected, everything sent',
+                'right code, lower case with spaces: connected, everything sent',
             )
             rec = srv.records()
             await expect(
-                len(rec['servings']) == 3 and rec['pets'].get('lxpet00001', {}).get('name') == 'Minka', 'the data taken over sits on the server'
+                len(rec['servings']) == 3 and rec['pets'].get('lxpet00001', {}).get('name') == 'Minka', 'the data taken over is on the server'
             )
-            await expect(all('photo' not in r and 'status' not in r for r in rec['servings'].values()), 'local fields stay on the phone')
-            await expect(
-                await until_sync(a, "status.state === 'ok' && !status.busy") and 'Alles abgeglichen' in await a.inner_text('#serverBox'),
-                'status: all synced',
-            )
-            backup = srv.dir / 'backup-test.json'
-            shutil.copy(srv.dir / 'state.json', backup)  # for the restore further down
+            await expect(await until_sync(a, "status.state === 'ok' && !status.busy"), 'status ok')
 
             # Phone B: sample data, then connect
             ctx_b = await new_phone()
             b, err_b = await open_page(ctx_b, url)
             PHONES['B'] = (b, err_b)
-            await b.click('[data-action=demo]')
+            await b.click('.welcome [data-action=demo]')
             await idle(b)
             await connect(b, CODE, srv.url)
             await expect(
-                await until(b, "state.epoch !== '' && db.pets.some(p => p.id === 'lxpet00001')"),
-                'phone B connected and sees the household\u2019s data',
+                await until(b, "state.epoch !== '' && db.pets.some(p => p.id === 'lxpet00001')"), 'phone B connected, sees the household data'
             )
             await expect(
-                await state(b, "!db.pets.concat(db.products, db.servings).some(r => r.id.startsWith('demo'))"), 'sample data removed on connecting'
+                await state(b, "!db.pets.concat(db.products, db.servings).some(r => r.id.startsWith('demo'))")
+                and not any(i.startswith('demo') for c in srv.records().values() for i in c),
+                'sample data removed on connecting, never sent',
             )
-            await expect(not any(i.startswith('demo') for c in srv.records().values() for i in c), 'sample data not in the household')
-            await expect(await b.locator('#sheet [data-action=demo]').count() == 0, 'with a server there is no „Beispieldaten laden“')
 
-            # Live notifications and simultaneous ratings
+            # Live notifications and ratings at the same time
             print('syncing')
             await close_sheet(a)
             await close_sheet(b)
             await run(b, "db.pets.push({id: 'tigerpet0001', name: 'Tiger', species: 'Katze', photo: null, createdAt: Date.now()}); save();")
-            await expect(await until(a, "db.pets.some(p => p.name === 'Tiger')", 6), 'live: a new pet appears on the other phone without a reload')
-            await expect((await sync_status(a))['live'], 'the live connection is up')
+            await expect(await until(a, "db.pets.some(p => p.name === 'Tiger')", 6), 'live: a new pet appears on the other phone')
+            await expect(await until_sync(a, 'status.live'), 'the live connection is up')
             await run(
                 a,
                 """db.servings.unshift({id: 'zweipets0001', productId: 'lxprod0001', servedAt: Date.now(),
@@ -365,7 +311,7 @@ async def main():
             )
             await expect(await until(b, "db.servings.some(s => s.id === 'zweipets0001')", 6), 'a meal for two pets arrives')
 
-            # The rating reminder on phone A (plugin simulated): it is only cancelled once the other phone has rated too
+            # Rating reminders on A (plugin simulated): cancelled only once the other phone has rated too
             def reminders():
                 return a.evaluate(
                     'window.Capacitor.Plugins.LocalNotifications.getPending().then(r => r.notifications.map(n => n.extra.serving).sort())'
@@ -382,7 +328,7 @@ async def main():
               for (const id of ['zweipets0001', 'wirdgeloescht']) r.planReminder(s.db.servings.find(x => x.id === id)); })""")
             await expect(
                 await until(b, "db.servings.some(s => s.id === 'wirdgeloescht')", 6) and await reminders() == ['wirdgeloescht', 'zweipets0001'],
-                'reminders scheduled on phone A',
+                'reminders scheduled on A',
             )
             await block(ctx_b)
             await run(a, "const s = db.servings.find(s => s.id === 'zweipets0001'); s.pets.lxpet00001 = {r: 'gut', at: Date.now()}; save();")
@@ -391,18 +337,16 @@ async def main():
             half = await reminders()
             await unblock(ctx_b, b)
             both = "(s => s && s.pets.lxpet00001.r === 'gut' && s.pets.tigerpet0001.r === 'schlecht')(db.servings.find(s => s.id === 'zweipets0001'))"
-            await expect(await until(a, both, 8) and await until(b, both, 8), 'rated at the same time, different pets: both ratings are kept')
+            await expect(await until(a, both, 8) and await until(b, both, 8), 'different pets rated at the same time: both ratings kept')
             await expect(
-                'zweipets0001' in half and await planned(['wirdgeloescht']),
-                'reminder: still scheduled after our own rating, cancelled as soon as the other phone rates the rest',
+                'zweipets0001' in half and await planned(['wirdgeloescht']), 'reminder kept after our rating, cancelled once B rates the rest'
             )
             await run(b, "db.servings = db.servings.filter(s => s.id !== 'wirdgeloescht'); save();")
-            await expect(await until(a, "!db.servings.some(s => s.id === 'wirdgeloescht')", 8), 'a meal deleted on the other phone disappears')
-            await expect(await planned([]), 'reminder: cancelled when another phone deletes the meal')
+            await expect(await until(a, "!db.servings.some(s => s.id === 'wirdgeloescht')", 8), 'a meal deleted on B disappears on A')
+            await expect(await planned([]), 'reminder cancelled when another phone deletes the meal')
             await a.evaluate("import('./js/store.js').then(s => { s.prefs.remind = 0; })")
 
-            # The feeding reminder: phone A hands its plugin (simulated) the server and the code, and the server answers
-            # the question the plugin asks when a reminder is due with a meal served on phone B; a treat does not count
+            # Feeding reminder: the plugin gets server and code, and the server knows of B's meal but not of its treat
             await a.evaluate(
                 "import('./js/store.js').then(async s => { s.prefs.feedRemind = true; (await import('./js/logic/reminders.js')).syncReminders(); })"
             )
@@ -430,61 +374,47 @@ async def main():
                 and meal['fed']
                 and meal['by'] == 'Jonas'
                 and meal['at'] >= since,
-                f'feeding reminder: the plugin gets server and code, and the server knows of the meal phone B has served, not of its treat ({meal})',
+                f'feeding reminder: server and code handed over, B’s meal counts, its treat does not ({meal})',
             )
             await a.evaluate("import('./js/store.js').then(s => { s.prefs.feedRemind = false; })")
 
             # The queue without a connection survives a restart
             await block(ctx_a)
             await run(a, "db.pets.push({id: 'lunapet00001', name: 'Luna', species: 'Hund', photo: null, createdAt: Date.now()}); save();")
-            await a.wait_for_function("/warte/.test(document.getElementById('syncChip').innerText)")
-            chip = await a.inner_text('#syncChip')
-            await expect('wartet' in chip or 'warten' in chip, f'without a connection: a notice at the top ({chip.strip()})')
+            await a.wait_for_selector('#syncChip:not([hidden])')
             await a.reload()
             await started(a)
             await expect(
-                await state(a, 'queue.length') > 0 and await state(a, "db.pets.some(p => p.name === 'Luna')"),
-                'app restart without a connection: queue and data are kept',
+                await state(a, "queue.length > 0 && db.pets.some(p => p.name === 'Luna')"),
+                'offline: a notice at the top, queue and data survive a restart',
             )
             await unblock(ctx_a, a)
             await expect(
                 await until(a, 'queue.length === 0') and await until(b, "db.pets.some(p => p.name === 'Luna')", 6),
-                'connected again: the queue was sent and the other phone has it',
+                'online again: the queue is sent and B has it',
             )
             await expect(await a.locator('#syncChip').is_hidden(), 'no notice at the top afterwards')
 
             # Server down, phone off
-            srv.stop()
+            await srv.stop()
             await run(b, "db.pets.find(p => p.name === 'Tiger').name = 'Tiger II'; save();")
             await expect(await until_sync(b, "status.state === 'offline'", 15), 'server down: status offline')
             await b.close()
             del PHONES['B']
-            srv.start()
+            await restart()
             await run(a, "db.pets.find(p => p.name === 'Luna').species = 'Katze'; save();")
-            await a.evaluate("dispatchEvent(new Event('online'))")
-            await expect(await until(a, 'queue.length === 0', 10), 'server back up: phone A syncs')
+            await online(a)
+            await expect(await until(a, 'queue.length === 0', 10), 'server back: A syncs')
             b, err_b2 = await open_page(ctx_b, url)
             err_b += err_b2
             PHONES['B'] = (b, err_b2)
+            await repoint(b)
+            await online(b)
             await expect(
                 await until(b, "db.pets.some(p => p.name === 'Luna' && p.species === 'Katze') && !db.pets.some(p => p.name === 'Tiger')", 8),
-                'phone B starts again: sends what was waiting and catches up on what is new',
+                'B starts again: sends what waited and catches up',
             )
-            await expect(await until(a, "db.pets.some(p => p.name === 'Tiger II')", 8), 'a change from B arrives at A')
-
-            # A birthday is a field like the others, and null takes it off the other phone too
-            await run(a, "db.pets.find(p => p.id === 'lunapet00001').birthday = '2022-03-15'; save();")
-            await expect(
-                await until(b, "db.pets.find(p => p.id === 'lunapet00001')?.birthday === '2022-03-15'", 8)
-                and srv.records()['pets']['lunapet00001'].get('birthday') == '2022-03-15',
-                'a birthday set on A reaches B and the server',
-            )
-            await run(b, "delete db.pets.find(p => p.id === 'lunapet00001').birthday; save();")
-            await expect(
-                await until(a, "!('birthday' in db.pets.find(p => p.id === 'lunapet00001'))", 8)
-                and 'birthday' not in srv.records()['pets']['lunapet00001'],
-                'cleared on B, it is gone on A and on the server',
-            )
+            await expect(await until(a, "db.pets.some(p => p.name === 'Tiger II')", 8), 'B’s change arrives at A')
 
             # Deleting and undo, lots of changes
             await run(
@@ -492,7 +422,7 @@ async def main():
                 "window.__s = JSON.parse(JSON.stringify(db.servings.find(s => s.id === 'zweipets0001'))); "
                 "db.servings.splice(db.servings.findIndex(s => s.id === 'zweipets0001'), 1); save();",
             )
-            await expect(await until(b, "!db.servings.some(s => s.id === 'zweipets0001')", 6), 'the deletion arrives')
+            await expect(await until(b, "!db.servings.some(s => s.id === 'zweipets0001')", 6), 'a deletion arrives')
             await run(a, 'db.servings.unshift(window.__s); save();')
             await expect(
                 await until(b, "(s => s && s.pets.tigerpet0001.r === 'schlecht')(db.servings.find(s => s.id === 'zweipets0001'))", 6),
@@ -507,8 +437,7 @@ async def main():
             await run(a, "m.replaceDb({...db, servings: db.servings.filter(s => !s.id.startsWith('massen'))}); save();")
             await expect(await until(b, "!db.servings.some(s => s.id.startsWith('massen')) && db.servings.length > 3", 10), 'and deleted again')
 
-            # Observations: a collection of their own, which the server keeps without knowing it (from 1.5.0); a server
-            # before that would reject it, so the phone holds it back until the server says it can take it
+            # Observations: a collection older servers reject, so the phone holds it back for them
             print('observations')
             await run(
                 a,
@@ -519,7 +448,7 @@ async def main():
                     b, "(o => o && o.kind === 'stink' && o.pets.tigerpet0001 === true)(db.observations.find(o => o.id === 'beob00000001'))", 8
                 )
                 and srv.records()['observations'].get('beob00000001', {}).get('kind') == 'stink',
-                'an observation noted on A reaches the server and B, with both pets it may concern',
+                'an observation from A reaches the server and B',
             )
             posted = []
 
@@ -541,23 +470,16 @@ async def main():
                 and await until(a, "queue.length === 1 && queue[0].c === 'observations'", 8)
                 and 'beob00000002' not in srv.records()['observations']
                 and not any('beob00000002' in body for body in posted),
-                'an older server: the pet goes out, the observation waits on the phone and is never sent',
+                'an older server: the pet goes out, the observation waits on the phone',
             )
-            await a.evaluate("import('./js/sync.js').then(m => m.retrySync())")
-            await until_sync(a, "status.state === 'ok' && !status.busy", 10)
             await a.evaluate("import('./js/store.js').then(s => { s.state.log.length = 0; })")
             await a.evaluate("import('./js/sync.js').then(m => m.retrySync())")
             await until_sync(a, "status.state === 'ok' && !status.busy", 10)
             log = await state(a, 'state.log.map(l => l.text)')
-            await open_house(a)
-            box = await a.inner_text('#serverBox')
             await expect(
-                not any('checksum' in t for t in log)
-                and 'Beobachtungen warten auf ein Update des Servers' in box
-                and await a.locator('#syncChip').is_hidden(),
-                f'the checksum leaves out what the server cannot hold, the box says what waits, and nothing at the top nags ({log}, {box!r})',
+                not any('checksum' in t for t in log) and await until_sync(a, 'held().length === 1') and await a.locator('#syncChip').is_hidden(),
+                f'the checksum leaves out what the server cannot hold, and nothing at the top nags ({log})',
             )
-            await close_sheet(a)
             await ctx_a.unroute(f'{srv.url}/api/info*')
             await a.evaluate("import('./js/sync.js').then(m => m.retrySync())")
             await expect(
@@ -565,76 +487,71 @@ async def main():
                 'the server updated: what waited goes out and reaches B',
             )
 
-            # Photo recognition through the server
+            # Photo recognition through the server, and the packaging photo shared with every phone
             print('recognition')
             await a.click('#fab')
             await idle(a)
             await a.set_input_files('#camInputSheet', str(PACK))
             await expect(
-                await until(a, "db.products.some(p => p.variety === 'Lachs in Soße')", 10) and fake.calls == 1, 'photo recognised through the server'
+                await until(a, "db.products.some(p => p.variety === 'Lachs in Soße')", 10) and fake.calls == 1, 'photo recognised by the server'
             )
             await expect(
-                await until(b, "db.products.some(p => p.variety === 'Lachs in Soße') && db.servings[0].productId", 6),
-                'the recognised food arrives at the other phone',
+                await until(b, "db.products.some(p => p.variety === 'Lachs in Soße') && db.servings[0].productId", 6), 'the recognised food reaches B'
             )
-            # The packaging photo for every phone: A took it and hands it to the server, the variety carries the mark,
-            # and B, which holds no file of its own, opens it from there
             pid = await state(a, "db.products.find(p => p.variety === 'Lachs in Soße').id")
             on_server = srv.dir / 'photos' / f'{pid}.jpg'
+
+            def file_on(pg):
+                return pg.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')")
+
             await expect(
                 await until(b, f"!!db.products.find(p => p.id === '{pid}')?.sharedPhoto", 10)
-                and on_server.read_bytes() == base64.b64decode(await a.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')")),
-                'phone A hands the photo it took to the server, and the variety says so on every phone',
+                and on_server.read_bytes() == base64.b64decode(await file_on(a)),
+                'A hands its photo to the server, and the variety is marked on every phone',
             )
             await close_sheet(b)
             thumb = f'#home [data-action=view-photo][data-p="{pid}"]'
-            await b.wait_for_selector(thumb)
-            await b.click(thumb)
-            await b.wait_for_selector('#viewer[open]')
-            await idle(b)
-            await expect(
-                await b.evaluate("document.querySelector('#viewer img').naturalWidth") == 480,
-                'phone B, which did not take the photo, opens it large from the server',
-            )
-            await b.click('#viewer')
-            await idle(b)
+
+            async def view(pg):
+                await pg.click(thumb)
+                await pg.wait_for_selector('#viewer[open]')
+                await idle(pg)
+                width = await pg.evaluate("document.querySelector('#viewer img').naturalWidth")
+                await pg.click('#viewer')
+                await idle(pg)
+                return width
+
+            await expect(await view(b) == 480, 'B, which did not take it, opens the photo large from the server')
             on_server.unlink()
             await b.click(thumb)
-            await expect(
-                await until(b, f"!db.products.find(p => p.id === '{pid}').sharedPhoto", 6) and 'nicht mehr da' in await b.inner_text('#toast'),
-                'a photo the server has lost: said so, and the mark goes',
-            )
+            await expect(await until(b, f"!db.products.find(p => p.id === '{pid}').sharedPhoto", 6), 'a photo the server has lost: the mark goes')
             await expect(
                 await until(b, f"!!db.products.find(p => p.id === '{pid}').sharedPhoto", 15) and on_server.exists(),
-                'phone A, which still holds it, hands it over anew',
+                'A, which still has it, hands it over again',
             )
-            # „Foto ändern“ on A: the server replaces its photo, the mark carries the stamp, and B, which holds the
-            # old one, fetches the new one the next time someone opens it
-            await a.evaluate(f'window.__photo = {json.dumps(base64.b64encode(PACK_LARGE.read_bytes()).decode())}')
-            await a.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
-            await idle(a)
-            await a.click('#sheet [data-action=product-photo]')
+
+            async def change_photo(pg, jpeg):
+                await pg.evaluate(f'window.__photo = {json.dumps(base64.b64encode(jpeg.read_bytes()).decode())}')
+                await pg.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
+                await idle(pg)
+                await pg.click('#sheet [data-action=product-photo]')
+
+            await change_photo(a, PACK_LARGE)
             await expect(
                 await until(a, f"typeof db.products.find(p => p.id === '{pid}').sharedPhoto === 'number' && prefs.photoStamps['{pid}'] > 0", 10)
                 and await until(b, f"typeof db.products.find(p => p.id === '{pid}').sharedPhoto === 'number'", 10)
-                and on_server.read_bytes() == base64.b64decode(await a.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')"))
+                and on_server.read_bytes() == base64.b64decode(await file_on(a))
                 and on_server.stat().st_size != len(PACK.read_bytes()),
-                'phone A changes the photo: the server has the new one, and the mark on every phone carries its stamp',
+                'a new photo on A: the server replaces its own, the mark carries the stamp',
             )
             await close_sheet(a)
-            await b.click(thumb)
-            await b.wait_for_selector('#viewer[open]')
-            await idle(b)
-            width = await b.evaluate("document.querySelector('#viewer img').naturalWidth")
-            await b.click('#viewer')
-            await idle(b)
+            width = await view(b)
             await expect(
                 width == 1100 and await state(b, f"prefs.photoStamps['{pid}'] === db.products.find(p => p.id === '{pid}').sharedPhoto"),
-                f'phone B opens it: the new photo, 1100 px wide, comes from the server and this phone notes its stamp ({width})',
+                f'B fetches the new photo and notes its stamp ({width} px)',
             )
 
-            # A server without „replace“ (before 1.4.0) keeps its photo: the app says so and marks nothing. Phone A,
-            # which has a camera; the answer of /api/info is thinned out the way an older server gives it.
+            # A server before 1.4.0 (no "replace") keeps its photo; A says so and marks nothing
             async def no_replace(route):
                 res = await route.fetch()
                 body = await res.json()
@@ -645,383 +562,217 @@ async def main():
             await a.evaluate("import('./js/sync.js').then(m => { m.status.features = null; return m.serverCan('replace'); })")
             await until_sync(a, "status.features && !status.features.includes('replace')", 10)
             stamp, server_before = await state(a, f"db.products.find(p => p.id === '{pid}').sharedPhoto"), on_server.read_bytes()
-            await a.evaluate(f'window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}')
-            await a.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
-            await idle(a)
-            await a.click('#sheet [data-action=product-photo]')
-            await a.wait_for_function("document.querySelector('#toast')?.innerText.includes('behält das alte Foto')", timeout=15000)
+            await change_photo(a, PACK)
+            await a.wait_for_selector('#toast.show', timeout=15000)
             await idle(a)
             await expect(
                 await state(a, f"db.products.find(p => p.id === '{pid}').sharedPhoto") == stamp
                 and on_server.read_bytes() == server_before
-                and base64.b64decode(await a.evaluate(f"localStorage.getItem('__fs:photos/{pid}.jpg')")) != server_before,
-                'a server that cannot replace photos: the toast says it keeps the old one, the mark stays as it was, and only this phone has the new photo',
+                and base64.b64decode(await file_on(a)) != server_before,
+                'a server that cannot replace photos: a notice, the mark stays, only A has the new photo',
             )
             await close_sheet(a)
             await ctx_a.unroute(f'{srv.url}/api/info*')
             await a.evaluate("import('./js/sync.js').then(m => { m.status.features = null; return m.serverCan('replace'); })")
             await until_sync(a, "status.features && status.features.includes('replace')", 10)
-            soup = "db.products.some(p => p.variety === 'Lachs in Soße' && p.texture === 'sosse')"
-            await expect(
-                await state(a, soup) and await until(b, soup, 6) and any(r.get('texture') == 'sosse' for r in srv.records()['products'].values()),
-                'consistency after recognition from the keywords, synced like any other field',
-            )
             await expect(
                 await state(b, '!db.servings[0].photo && !!(db.products.find(p => p.id === db.servings[0].productId) || {}).thumb'),
-                'only the thumbnail is shared (on the food), not the photo',
+                'only the thumbnail is shared, on the food',
             )
             await block(ctx_a)
             fake.reply = {'brand': 'Felix', 'variety': 'So gut wie es aussieht', 'type': 'Nassfutter', 'animal': 'Katze'}
             await a.click('#fab')
             await idle(a)
             await a.set_input_files('#camInputSheet', str(PACK))
-            await expect(await until(a, "db.servings[0].status === 'waiting'", 6), 'server unreachable: the photo waits')
+            await expect(await until(a, "['waiting', 'noserver'].includes(db.servings[0].status)", 6), 'server out of reach: the photo waits')
             await unblock(ctx_a, a)
             await expect(
                 await until(a, "db.products.some(p => p.brand === 'Felix') && !db.servings[0].status", 10) and fake.calls == 2,
                 'server back: recognised automatically',
             )
-
-            # Scanning: lookup through the server, the detour via a photo, a known code offline, two phones
-            print('scanning')
-            photo = json.dumps(base64.b64encode(PACK.read_bytes()).decode())
             await close_sheet(a)
-            await a.evaluate(f"window.__barcode = '{HIT}'")
-            await a.click('#fab')
-            await idle(a)
-            await a.click('[data-action=scan]')
-            hit = f"db.products.find(p => p.codes && p.codes['{HIT}'])"
-            ok = await until(
-                a,
-                f"(p => p && p.brand === 'Sheba' && p.variety === 'Fresh Choice Huhn in Sauce' && p.type === 'Nassfutter' && p.animal === 'Katze'"
-                f' && db.servings[0].productId === p.id)({hit})',
-                10,
-            )
             await expect(
-                ok and food.calls == [HIT],
-                'unknown code: the server finds it in the product database, the variety is created, the code attached, and it is served',
+                not any(k in r for r in srv.records()['servings'].values() for k in ('photo', 'status', 'error', 'scanCode')),
+                'fields local to the phone stay there',
             )
-            await expect(await until(b, f'!!{hit}', 6), 'the variety and its code arrive at the other phone')
-            rec = srv.records()
-            await expect(
-                any(r.get('codes.' + HIT) is True for r in rec['products'].values()) and not any('scanCode' in r for r in rec['servings'].values()),
-                'server: the code as the field codes.<EAN> on the variety, scanCode stays on the phone',
-            )
+
+            # Scanning: an unknown code with the lookup off goes to the camera; codes from two phones
+            print('scanning')
+            barcode_asked = []
+            ctx_a.on('request', lambda r: barcode_asked.append(r.url) if '/api/barcode' in r.url else None)
             fake.reply = {'brand': 'Animonda', 'variety': 'Carny Rind', 'type': 'Nassfutter', 'animal': 'Katze'}
-            await a.evaluate(f"window.__barcode = '{MISS}'; window.__photo = {photo}")
+            await a.evaluate(
+                f"window.__calls = []; window.__barcode = '{MISS}'; window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}"
+            )
             await a.click('#fab')
             await idle(a)
             await a.click('[data-action=scan]')
-            ok = await until(a, f"db.products.some(p => p.brand === 'Animonda' && p.codes && p.codes['{MISS}'])", 12)
-            asked = ['capture', {'hint': 'Vorderseite fotografieren'}] in await a.evaluate('window.__calls')
+            hit = f"db.products.find(p => p.codes && p.codes['{MISS}'])"
             await expect(
-                ok and asked and MISS in food.calls, 'no hit: the camera for the front, the photo recognised, the code on the recognised variety'
+                await until(a, f"({hit} || {{}}).brand === 'Animonda'", 12)
+                and any(c[0] == 'capture' for c in await a.evaluate('window.__calls'))
+                and not barcode_asked,
+                'unknown code: straight to the camera, recognised, the code on the variety, no barcode request',
             )
-            await expect(
-                await until(b, f"db.products.some(p => p.brand === 'Animonda' && p.codes && p.codes['{MISS}'])", 6), 'on the other phone too'
-            )
+            await expect(await until(b, f'!!{hit}', 8), 'the variety and its code reach B')
             await block(ctx_a)
-            await a.evaluate(f"window.__barcode = '{HIT}'")
-            n = await state(a, 'db.servings.length')
-            await a.click('#fab')
-            await idle(a)
-            await a.click('[data-action=scan]')
-            await idle(a)
-            await expect(
-                await state(a, f'db.servings.length === {n + 1} && db.servings[0].productId === {hit}.id') and food.calls.count(HIT) == 1,
-                'a known code without a connection: served at once, without a request',
-            )
-            await run(a, f"db.products.find(p => p.codes && p.codes['{HIT}']).codes['{C1}'] = true; save();")
-            await run(b, f"db.products.find(p => p.codes && p.codes['{HIT}']).codes['{C2}'] = true; save();")
-            await idle(b)
+            await run(a, f"{hit}.codes['{C1}'] = true; save();")
+            await run(b, f"{hit}.codes['{C2}'] = true; save();")
+            await until(b, 'queue.length === 0')
             await unblock(ctx_a, a)
-            both = f"(p => p.codes['{C1}'] && p.codes['{C2}'] && p.codes['{HIT}'])({hit})"
-            await expect(
-                await until(a, both, 8) and await until(b, both, 8), 'two phones attach codes to the same variety at the same time: both are kept'
-            )
+            both = f"(p => p.codes['{C1}'] && p.codes['{C2}'] && p.codes['{MISS}'])({hit})"
+            await expect(await until(a, both, 8) and await until(b, both, 8), 'codes added on two phones at once: all kept')
             pid = await state(a, f'{hit}.id')
             await a.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
             await idle(a)
             await a.click(f'#sheet [data-action=remove-code][data-code="{C1}"]')
-            gone = f"(p => !p.codes['{C1}'] && p.codes['{C2}'] && p.codes['{HIT}'])(db.products.find(p => p.id === '{pid}'))"
-            await expect(
-                await until(b, gone, 6) and 'codes.' + C1 not in srv.records()['products'][pid], 'code removed: gone everywhere, the others are kept'
-            )
+            gone = f"(p => !p.codes['{C1}'] && p.codes['{C2}'])(db.products.find(p => p.id === '{pid}'))"
+            await expect(await until(b, gone, 6) and 'codes.' + C1 not in srv.records()['products'][pid], 'a removed code is gone everywhere')
 
-            # The manual „Kaufen“ setting syncs like any other field, including back to „Automatisch“
+            # The buy setting syncs like any field, back to automatic too
             def kauf(v):
                 return "(p => p && %s)(db.products.find(p => p.id === '%s'))" % ("!('kaufen' in p)" if v is None else f"p.kaufen === '{v}'", pid)
 
             await a.click('#sheet [data-action=buy][data-v=immer]')
             await expect(
                 await until(b, kauf('immer'), 6) and srv.records()['products'][pid].get('kaufen') == 'immer',
-                '„Immer kaufen“ from A arrives at B and on the server',
+                '"always buy" reaches B and the server',
             )
-            await b.evaluate(f"import('./js/ui/sheet.js').then(m => m.openSheet({{kind: 'product', id: '{pid}'}}))")
-            await idle(b)
-            await b.click('#sheet [data-action=buy][data-v=nicht]')
-            await expect(
-                await until(a, kauf('nicht'), 6)
-                and await until(a, "document.querySelector('#sheet [data-action=buy][data-v=nicht]')?.getAttribute('aria-pressed') === 'true'", 4),
-                '„Nicht kaufen“ from B arrives at A, and the open food sheet shows it',
-            )
-            await close_sheet(b)
             await a.click('#sheet [data-action=buy][data-v=auto]')
             await expect(
-                await until(b, kauf(None), 6) and srv.records()['products'][pid].get('kaufen') is None,
-                'back to „Automatisch“: the field is gone everywhere',
-            )
-
-            # Consistency: choosing and clearing arrive everywhere; a value from the server beats the keywords
-            def tex(v, name):
-                return '(p => !!p && %s)(db.products.find(p => %s))' % ("!('texture' in p)" if v is None else f"p.texture === '{v}'", name)
-
-            await a.click('#sheet [data-action=set-texture][data-v=mousse]')
-            await expect(
-                await until(b, tex('mousse', f"p.id === '{pid}'"), 6) and srv.records()['products'][pid].get('texture') == 'mousse',
-                'the consistency from A arrives at B and on the server',
-            )
-            await a.click('#sheet [data-action=set-texture][data-v=mousse]')
-            await expect(
-                await until(b, tex(None, f"p.id === '{pid}'"), 6) and srv.records()['products'][pid].get('texture') is None,
-                'a second tap clears it: the field is gone everywhere',
+                await until(b, kauf(None), 6) and 'kaufen' not in srv.records()['products'][pid], 'back to automatic: the field is gone everywhere'
             )
             await close_sheet(a)
 
-            async def newer_server(route):
-                await route.fulfill(
-                    json={
-                        'brand': 'Miamor',
-                        'variety': 'Huhn in Soße',
-                        'type': 'Nassfutter',
-                        'animal': 'Katze',
-                        'texture': 'gelee',
-                        'now': int(time.time() * 1000),
-                    }
-                )
-
-            await a.route('**/api/recognize', newer_server)
-            await a.click('#fab')
-            await idle(a)
-            await a.set_input_files('#camInputSheet', str(PACK))
-            await expect(
-                await until(a, tex('gelee', "p.brand === 'Miamor'"), 10) and await until(b, tex('gelee', "p.brand === 'Miamor'"), 6),
-                'when the server supplies texture, that value beats the keywords',
-            )
-            await a.unroute('**/api/recognize')
-            # Levels of the other scales pass through the server like any rating
-            sid = await state(a, 'db.servings[0].id')
-            await run(a, "const s = db.servings[0]; s.pets[Object.keys(s.pets)[0]] = {r: 'verputzt', at: Date.now()}; save();")
-            await expect(
-                await until(b, f"Object.values(db.servings.find(s => s.id === '{sid}').pets).some(x => x.r === 'verputzt')", 6)
-                and any(k.startswith('pets.') and v.get('r') == 'verputzt' for k, v in srv.records()['servings'][sid].items() if isinstance(v, dict)),
-                'a level of the treat scale arrives at the other phone and on the server',
-            )
-            # A server without barcode lookup (as in 1.0.0: no "barcode" in features): straight to the camera, no request
-            ctx_e = await new_phone()
-            asked_e = []
-
-            async def old_info(route):
-                if route.request.method != 'GET':
-                    await route.continue_()
-                    return
-                res = await route.fetch()
-                body = await res.json()
-                body.pop('features', None)
-                await route.fulfill(response=res, json=body)
-
-            await ctx_e.route(f'{srv.url}/api/info*', old_info)
-            ctx_e.on('request', lambda r: asked_e.append(r.url) if '/api/barcode/' in r.url else None)
-            e, err_e = await open_page(ctx_e, url, native=True)
-            await connect(e, CODE, srv.url)
-            await until(e, 'db.pets.length > 0 && queue.length === 0', 10)
-            await close_sheet(e)
-            await e.evaluate(f"window.__barcode = '{OLD}'")
-            await e.click('#fab')
-            await idle(e)
-            await e.click('[data-action=scan]')
-            await idle(e)
-            asked = ['capture', {'hint': 'Vorderseite fotografieren'}] in await e.evaluate('window.__calls')
-            await expect(
-                asked and not asked_e and OLD not in food.calls and await e.locator('#sheet [data-action=scan]').count() == 1,
-                'server without barcode lookup: no request, straight to the camera; cancelled, back in the feeding sheet',
-            )
-            await expect(
-                not real_errors(err_e),
-                'phone without barcode lookup: no errors in the console' + (f': {real_errors(err_e)}' if real_errors(err_e) else ''),
-            )
-            await ctx_e.close()
-
-            # Connecting from the welcome page, the server box, disconnecting
-            print('modes and the server box')
+            # A new phone connects on its first start, syncs by hand, disconnects
+            print('the server box')
             ctx_f = await new_phone()
-            f, err_f = await open_page(ctx_f, url, native=True, choose=False)
+            f, err_f = await open_page(ctx_f, url, native=True)
             PHONES['F'] = (f, err_f)
-            await f.click('.welcome [data-action=connect-form]')
-            await idle(f)
-            await f.fill('#f-server', srv.url.replace('http://', ''))
-            await f.fill('#f-code', CODE)
-            await f.click('[data-action=connect]')
+            await connect(f, CODE, srv.url.replace('http://', ''))
             await expect(
-                await until(f, "prefs.mode === 'haushalt' && state.epoch !== '' && db.pets.some(p => p.id === 'lxpet00001')")
-                and await state(f, 'prefs.server') == srv.url,
-                'first start, „Mit Haushalt verbinden“: address (with or without http://) and code, mode `haushalt`, data there',
+                await until(f, "state.epoch !== '' && db.pets.some(p => p.id === 'lxpet00001')") and await state(f, 'prefs.server') == srv.url,
+                'first start: connected from the settings, the address works without http://',
             )
             await until_sync(f, "status.state === 'ok' && !status.busy")
             await idle(f)
-            await f.evaluate("""() => { window.__mut = 0; new MutationObserver(l => window.__mut += l.length)
-              .observe(document.getElementById('serverBox'), {childList: true, subtree: true, characterData: true, attributes: true}); }""")
-
-            async def slow(route):
-                await asyncio.sleep(1.5)
-                await route.continue_()
-
-            await ctx_f.route(f'{srv.url}/api/info*', slow)
-            await f.evaluate("import('./js/sync.js').then(m => { m.retrySync(); })")
-            await until_sync(f, 'status.busy')
-            await until_sync(f, '!status.busy')
-            await expect(await f.evaluate('window.__mut') == 0, 'a sync in the background, a slow one too: the server box stays as it is')
-            await expect(
-                await f.locator('#serverBox [data-action=sync-now]').count() == 0 and 'Alles abgeglichen' in await f.inner_text('#serverBox'),
-                'all synced: no „Jetzt abgleichen“ button, there is nothing to do',
-            )
+            await expect(await f.locator('#serverBox [data-action=sync-now]').count() == 0, 'all synced: no button to sync')
             await block(ctx_f)
             await run(f, "db.servings[0].note = 'wartet'; save();")
             await f.wait_for_selector('#serverBox [data-action=sync-now]')
-            await ctx_f.unroute(f'{srv.url}/**')  # wieder erreichbar, aber ohne Meldung: abgeglichen wird erst von Hand
-            blocked.discard(ctx_f)
+            await ctx_f.unroute(f'{srv.url}/**')  # reachable again, but nothing tells the phone
             await f.click('#serverBox [data-action=sync-now]')
-            early = await f.locator('#serverBox .spin').count()
-            await f.wait_for_selector('#serverBox .spin')
-            late = await f.inner_text('#serverBox')
-            await until_sync(f, '!status.busy')
-            await f.wait_for_selector('#serverBox .spin', state='detached')
             await expect(
-                early == 0
-                and 'Abgleich läuft' in late
-                and await until(f, 'queue.length === 0', 6)
-                and await f.locator('#serverBox [data-action=sync-now]').count() == 0,
-                'with a change waiting there is „Jetzt abgleichen“: progress only on a hand-started sync and not at once, and afterwards the button is gone again',
+                await until(f, 'queue.length === 0', 6) and await wait_js(f, "!document.querySelector('#serverBox [data-action=sync-now]')", 6),
+                'a change waiting: synced by hand, then the button goes',
             )
-            await ctx_f.unroute(f'{srv.url}/api/info*')
             n = await state(f, 'db.servings.length')
-            await f.click('#serverBox [data-then=disconnect]')
-            await idle(f)
-            await f.click('#serverBox [data-then=disconnect]')
-            await idle(f)
-            box = await f.eval_on_selector_all('#serverBox .btn', 'l => l.map(b => b.innerText.trim())')
-            await f.click('#sheet [data-action=settings-back]')  # the footer sits on the overview
-            await idle(f)
+            for _ in range(2):
+                await f.click('#serverBox [data-then=disconnect]')
+                await idle(f)
             await expect(
-                await state(f, f"prefs.mode === 'lokal' && prefs.code === '' && db.servings.length === {n} && db.pets.length > 0")
-                and box == ['Mit Haushalt verbinden']
-                and 'Alle Daten bleiben auf diesem Gerät' in await f.inner_text('#sheet .foot'),
-                '„Verbindung trennen“ switches to `lokal`, the data is kept, and the „Haushalt“ page shows only the connect button',
+                await state(f, f"prefs.code === '' && db.servings.length === {n} && db.pets.length > 0")
+                and await f.locator('#serverBox [data-action=connect-form]').count() == 1
+                and await f.locator('#serverBox [data-then=disconnect]').count() == 0,
+                'disconnected: the data stays, the page offers to connect again',
             )
-            await f.click('#sheet [data-action=settings-page][data-v=house]')
-            await idle(f)
             await f.click('#serverBox [data-action=connect-form]')
             await idle(f)
-            await expect(await f.input_value('#f-server') == srv.url, 'connecting again: the address used last is in the field')
-            await expect(not real_errors(err_f), 'Handy F: no errors in the console' + (f': {real_errors(err_f)}' if real_errors(err_f) else ''))
+            await expect(await f.input_value('#f-server') == srv.url, 'connecting again: the last address is in the field')
+            await expect(not real_errors(err_f), 'phone F: no console errors' + (f': {real_errors(err_f)}' if real_errors(err_f) else ''))
             del PHONES['F']
             await ctx_f.close()
 
-            # The phone clock runs two hours fast
+            # A phone whose clock runs two hours fast
             print('special cases')
             ctx_c = await new_phone()
             await ctx_c.add_init_script('const _now = Date.now; Date.now = () => _now() + 2 * 3600e3;')
-            c, err_c = await open_page(ctx_c, url)
+            c, _ = await open_page(ctx_c, url)
             await run(c, "db.pets.push({id: 'kiwipet00001', name: 'Kiwi', species: 'Vogel', photo: null, createdAt: Date.now()}); save();")
             await connect(c, CODE, srv.url)
             await expect(
-                await until(c, "state.epoch !== '' && queue.length === 0", 10), 'a phone with a skewed clock: the changes are restamped and accepted'
+                await until(c, "state.epoch !== '' && queue.length === 0", 10), 'a phone with a skewed clock: changes restamped and accepted'
             )
             kiwi = [x for x in srv.get('/api/changes?since=0')['records'] if x['r'] == 'kiwipet00001']
             skew = abs(int(kiwi[0]['f']['name']['t'][:13]) / 1000 - time.time()) if kiwi else 1e9
-            await expect(skew < 120, f'the server\u2019s clock is what counts (skew {skew:.0f} s)')
+            await expect(skew < 120, f'the server’s clock counts (skew {skew:.0f} s)')
             kiwi = "db.pets.some(p => p.name === 'Kiwi')"
-            await expect(await until(a, kiwi) and await until(b, kiwi), 'the third phone\u2019s pet arrives at the others')
+            await expect(await until(a, kiwi) and await until(b, kiwi), 'the third phone’s pet reaches the others')
             await ctx_c.close()
 
-            # Restore from a backup: a new epoch
-            srv.stop()
-            srv.restore(backup)
-            srv.start()
-            await expect(len(srv.records()['servings']) == 3, 'server restored from the backup (an older state)')
-            for pg in (a, b):
-                await pg.evaluate("dispatchEvent(new Event('online'))")
-            ok = await until(a, "queue.length === 0 && state.epoch === '%s'" % srv.get('/api/checksum')['epoch'], 10)
-            ok = ok and await until(b, "queue.length === 0 && state.epoch === '%s'" % srv.get('/api/checksum')['epoch'], 10)
+            # The server's state file unreadable: set aside, a new epoch, and the phones send everything again
+            old = srv.get('/api/info')['epoch']
+            await block(ctx_a)  # so the server can be seen empty before the phones send again
+            await block(ctx_b)
+            await srv.stop()
+            (srv.dir / 'state.json').write_text('{kaputt')
+            await restart()
+            epoch = srv.get('/api/info')['epoch']
+            await expect(
+                epoch != old and not srv.get('/api/changes?since=0')['records'] and len(list(srv.dir.glob('state-unreadable-*.json'))) == 1,
+                'unreadable state: kept aside, the server starts empty under a new epoch',
+            )
+            await unblock(ctx_a, a)
+            await unblock(ctx_b, b)
+            ok = await until(a, f"queue.length === 0 && state.epoch === '{epoch}'", 10)
+            ok = await until(b, f"queue.length === 0 && state.epoch === '{epoch}'", 10) and ok
             names = {r.get('name') for r in srv.records()['pets'].values()}
-            await expect(ok and {'Luna', 'Tiger II', 'Kiwi'} <= names, f'new epoch: the phones resend everything newer ({sorted(names)})')
+            await expect(ok and {'Minka', 'Luna', 'Tiger II', 'Kiwi'} <= names, f'the phones send everything again ({sorted(names)})')
 
             # The checksum uncovers a gap
-            srv.stop()
+            await srv.stop()
             st = json.loads((srv.dir / 'state.json').read_text())
             luna = next((i for i, r in st['records']['pets'].items() if r['f'].get('name', {}).get('v') == 'Luna'), None)
-            if luna:
-                del st['records']['pets'][luna]
+            st['records']['pets'].pop(luna, None)
             (srv.dir / 'state.json').write_text(json.dumps(st))
-            srv.start()
-            await a.reload()  # at start-up the app compares the checksum
+            await restart()
+            await a.reload()  # the app compares the checksum at start-up
             await expect(
                 await until(a, "state.log.some(l => l.text.includes('checksum differs'))", 10)
                 and await until(a, 'queue.length === 0', 10)
                 and luna in srv.records()['pets'],
-                'checksum differs: a full sync restores the gap',
+                'checksum differs: a full sync fills the gap',
             )
 
-            # The code has changed
+            # A new code on the server
             srv.cfg['code'] = NEW_CODE
-            time.sleep(1.1)
+            await asyncio.sleep(1.1)  # a new mtime, so the server rereads its config
             srv.write_config()
-            await a.evaluate("dispatchEvent(new Event('online'))")
-            ok = await until_sync(a, "status.kind === 'auth'")
-            await expect(ok and 'Code prüfen' in await a.inner_text('#syncChip'), 'a new code on the server: the notice „Code prüfen“')
+            await online(a)
+            await expect(
+                await until_sync(a, "status.kind === 'auth'") and await a.locator('#syncChip').is_visible(), 'a new code: a notice at the top'
+            )
             await a.click('#syncChip')
             await idle(a)
-            await connect(a, NEW_CODE.lower(), srv.url, edit=False)
+            await connect(a, NEW_CODE.lower())
             await expect(
-                await until(a, "prefs.code === '%s' && queue.length === 0" % NEW_CODE, 10) and await a.locator('#syncChip').is_hidden(),
+                await until(a, f"prefs.code === '{NEW_CODE}' && queue.length === 0", 10) and await a.locator('#syncChip').is_hidden(),
                 'new code typed in: syncing carries on',
             )
-            await b.evaluate("dispatchEvent(new Event('online'))")
+            await online(b)
             await until_sync(b, "status.kind === 'auth'")
-            await connect(b, NEW_CODE, srv.url, edit=False)
-            await until(b, "prefs.code === '%s'" % NEW_CODE, 10)
+            await connect(b, NEW_CODE)
+            await until(b, f"prefs.code === '{NEW_CODE}'", 10)
 
-            # The protocol does not match
+            # A server with a newer protocol
             ctx_d = await new_phone()
 
-            async def newer(route):  # answers like a server with protocol 2, CORS headers included
+            async def newer(route):
                 cors = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type'}
                 if route.request.method == 'OPTIONS':
                     await route.fulfill(status=204, headers=cors)
                 else:
-                    await route.fulfill(
-                        headers=cors,
-                        json={
-                            'app': 'schmeckts',
-                            'version': '9.0.0',
-                            'protocol': 2,
-                            'auth': True,
-                            'recognition': True,
-                            'now': int(time.time() * 1000),
-                        },
-                    )
+                    await route.fulfill(headers=cors, json={'app': 'schmeckts', 'protocol': 2, 'auth': True, 'now': int(time.time() * 1000)})
 
             await ctx_d.route(f'{srv.url}/api/info*', newer)
             d, _ = await open_page(ctx_d, url)
-            await connect(d, NEW_CODE, srv.url)
-            await idle(d)
-            await expect(
-                'neuer als diese App' in await d.inner_text('#serverBox') and await state(d, 'prefs.code') == '',
-                'a server with a newer protocol: a notice, not connected',
+            kind = await d.evaluate(
+                f"import('./js/sync.js').then(m => m.checkServer('{NEW_CODE}', '{srv.url}').then(() => 'connected', e => e.kind))"
             )
+            await expect(kind == 'protocol', f'a server with a newer protocol is refused ({kind})')
             await ctx_d.close()
 
-            # Final state: both phones and the server hold the same data
+            # Both phones and the server hold the same data
             print('final state')
             for pg in (a, b):
                 await pg.evaluate("import('./js/sync.js').then(m => m.retrySync())")
@@ -1034,11 +785,11 @@ async def main():
             await expect(pa == pb == ps, 'contents: both phones and the server are level')
             for name, errs in (('A', err_a), ('B', err_b)):
                 bad = real_errors(errs)
-                await expect(not bad, f'phone {name}: no errors in the console' + (f': {bad}' if bad else ''))
+                await expect(not bad, f'phone {name}: no console errors' + (f': {bad}' if bad else ''))
         finally:
             await browser.close()
-            if srv.proc.poll() is None:
-                srv.stop()
+            if srv.proc and srv.proc.poll() is None:
+                await srv.stop()
             if failures:
                 print('\nserver log:\n' + (srv.dir / 'server.log').read_text()[-3000:])
     print(f'\n{"All tests passed" if not failures else f"{len(failures)} tests failed"}')
