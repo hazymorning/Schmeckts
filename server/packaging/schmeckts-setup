@@ -19,7 +19,7 @@ show() {
   code=$(printf '%s\n' "$OUT" | sed -n 's/^Code: *//p')
   addr=$(printf '%s\n' "$OUT" | sed -n 's/^Adresse: *//p')  # the server's output is German
   rest=$(printf '%s\n' "$OUT" | grep -v '^Code:\|^Adresse:' | sed '/^$/d' | esc)
-  zenity --info --title="$TITLE" --width=440 --icon=schmeckts --ok-label="Fertig" --text="Adresse
+  zenity --info --title="$TITLE" --width=440 --icon-name=schmeckts --ok-label="Fertig" --text="Adresse
 <span size='large' weight='bold'>$(printf '%s' "$addr" | esc)</span>
 
 Haushaltscode
@@ -28,22 +28,18 @@ Haushaltscode
 $rest"
 }
 
-CHOICE=$(zenity --question --switch --title="$TITLE" --width=460 --icon=schmeckts \
+# --icon-name works in zenity 3 and, deprecated but still accepted, in zenity 4
+CHOICE=$(zenity --question --switch --title="$TITLE" --width=460 --icon-name=schmeckts \
   --text="Was möchtest du tun?" \
-  --extra-button="Einrichten" --extra-button="Verbindungsdaten" \
-  --extra-button="Übersicht" --extra-button="Neuer Code")
+  --extra-button="Einrichten" --extra-button="Verbindungsdaten" --extra-button="Neuer Code")
 
 case "$CHOICE" in
   Einrichten)
     KEY=$(zenity --entry --hide-text --title="$TITLE" --width=480 --ok-label="Speichern" \
-      --text="Anthropic-API-Schlüssel einfügen (beginnt mit sk-ant-).\nIst schon einer eingetragen und soll bleiben, das Feld leer lassen.") || exit 0
+      --text="Optional, nur für die Foto-Erkennung: Anthropic-API-Schlüssel einfügen (beginnt mit sk-ant-).\nOhne Foto-Erkennung, oder wenn der eingetragene Schlüssel bleiben soll, das Feld leer lassen.") || exit 0
     if admin setup <<< "$KEY"; then show; else error; fi ;;
   Verbindungsdaten)
     if admin connection; then show; else error; fi ;;
-  Übersicht)
-    if admin overview; then
-      printf '%s\n' "$OUT" | zenity --text-info --title="$TITLE: Übersicht" --width=780 --height=560 --font="Monospace 10" --ok-label="Schließen"
-    else error; fi ;;
   "Neuer Code")
     zenity --question --title="$TITLE" --width=440 --ok-label="Neuen Code erzeugen" --cancel-label="Abbrechen" \
       --text="Danach funktioniert der alte Code nicht mehr. Alle Handys im Haushalt müssen den neuen Code einmal eingeben." || exit 0

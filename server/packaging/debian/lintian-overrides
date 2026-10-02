@@ -1,6 +1,0 @@
-# Deliberate choices for a small package distributed outside the Debian archive
-schmeckts-server: statically-linked-binary [usr/bin/schmeckts-server]
-schmeckts-server: maintainer-script-calls-systemctl *
-schmeckts-server: no-manual-page *
-schmeckts-server: bogus-mail-host *
-schmeckts-server: bogus-mail-host-in-debian-changelog *

@@ -44,14 +44,11 @@ def test_signing_key():
             check(got.getvalue().strip() == 'geheim-123' and back.read_bytes() == jks.read_bytes(), f'signing key round trip ({name})')
 
 
-def test_ratings():
-    config = (WWW / 'js/config.js').read_text(encoding='utf-8')
-    block = re.search(r'export const RATINGS = \{(.*?)\n\};', config, re.S)
-    app = dict(re.findall(r"(\w+):\s*\{\s*label:\s*'([^']+)'", block.group(1) if block else ''))
-    go = (ROOT / 'server/overview.go').read_text(encoding='utf-8')
-    names = re.search(r'var ratingNames = map\[string\]string\{(.*?)\n\}', go, re.S)
-    server = dict(re.findall(r'"(\w+)":\s*"([^"]+)"', names.group(1) if names else ''))
-    check(len(app) == 14 and app == server, f'the server labels every rating as the app does {sorted(set(app.items()) ^ set(server.items()))}')
+def test_server_version():
+    version = (ROOT / 'server/VERSION').read_text(encoding='utf-8').strip()
+    changelog = re.match(r'schmeckts-server \(([^)]+)\)', (ROOT / 'server/packaging/debian/changelog').read_text(encoding='utf-8'))
+    metainfo = re.search(r'<release version="([^"]+)"', (ROOT / 'server/packaging/de.schmeckts.server.metainfo.xml').read_text(encoding='utf-8'))
+    check(changelog and metainfo and changelog[1] == metainfo[1] == version, f'server {version}: VERSION, changelog and metainfo agree')
 
 
 def test_prompt():
@@ -63,6 +60,6 @@ def test_prompt():
     )
 
 
-for test in (test_version_code, test_signing_key, test_ratings, test_prompt):
+for test in (test_version_code, test_signing_key, test_server_version, test_prompt):
     test()
 sys.exit(1 if failures else 0)

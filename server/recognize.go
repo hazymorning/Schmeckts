@@ -24,9 +24,10 @@ const (
 )
 
 var (
-	foodTypes   = []string{"Nassfutter", "Trockenfutter", "Snack", "Sonstiges"}
-	animalKinds = []string{"Katze", "Hund", "Kaninchen", "Vogel", "Nager", "Andere"}
-	jsonObject  = regexp.MustCompile(`(?s)\{.*\}`)
+	anthropicURL = "https://api.anthropic.com" // tests point it elsewhere
+	foodTypes    = []string{"Nassfutter", "Trockenfutter", "Snack", "Sonstiges"}
+	animalKinds  = []string{"Katze", "Hund", "Kaninchen", "Vogel", "Nager", "Andere"}
+	jsonObject   = regexp.MustCompile(`(?s)\{.*\}`)
 )
 
 type Recognition struct {
@@ -95,9 +96,9 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 	})
 	ctx, cancel := context.WithTimeout(ctx, recognizeTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.anthropicURL()+"/v1/messages", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicURL+"/v1/messages", bytes.NewReader(body))
 	if err != nil {
-		return out, &recognizeError{http.StatusBadGateway, "Die Adresse von Anthropic ist falsch eingestellt."}
+		return out, err
 	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("x-api-key", cfg.APIKey)
@@ -147,23 +148,23 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 func CheckKey(ctx context.Context, cfg Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.anthropicURL()+"/v1/models", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, anthropicURL+"/v1/models", nil)
 	if err != nil {
-		return because("Die Adresse von Anthropic lässt sich nicht verwenden", err)
+		return err
 	}
 	req.Header.Set("x-api-key", cfg.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersion)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return say("Anthropic ist nicht erreichbar. Besteht eine Internetverbindung?")
+		return errors.New("Anthropic ist nicht erreichbar. Besteht eine Internetverbindung?")
 	}
 	res.Body.Close()
 	switch res.StatusCode {
 	case 200:
 		return nil
 	case 401, 403:
-		return say("Anthropic hat den Schlüssel abgelehnt. Bitte auf platform.claude.com prüfen und neu kopieren.")
+		return errors.New("Anthropic hat den Schlüssel abgelehnt. Bitte auf platform.claude.com prüfen und neu kopieren.")
 	default:
-		return sayf("Anthropic antwortet mit HTTP %d. Bitte später nochmal versuchen.", res.StatusCode)
+		return fmt.Errorf("Anthropic antwortet mit HTTP %d. Bitte später nochmal versuchen.", res.StatusCode)
 	}
 }

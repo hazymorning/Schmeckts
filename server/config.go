@@ -22,12 +22,10 @@ const (
 )
 
 type Config struct {
-	APIKey       string   `json:"apiKey,omitempty"`
-	Code         string   `json:"code,omitempty"`
-	Model        string   `json:"model,omitempty"`
-	Port         int      `json:"port,omitempty"`
-	AnthropicURL string   `json:"anthropicUrl,omitempty"` // tests only
-	BarcodeURLs  []string `json:"barcodeUrls,omitempty"`  // tests only
+	APIKey string `json:"apiKey,omitempty"`
+	Code   string `json:"code,omitempty"`
+	Model  string `json:"model,omitempty"`
+	Port   int    `json:"port,omitempty"`
 }
 
 func (c Config) model() string {
@@ -42,13 +40,6 @@ func (c Config) port() int {
 		return c.Port
 	}
 	return defaultPort
-}
-
-func (c Config) anthropicURL() string {
-	if c.AnthropicURL != "" {
-		return strings.TrimRight(c.AnthropicURL, "/")
-	}
-	return "https://api.anthropic.com"
 }
 
 // normCode makes input such as "k7pm 3qxd" or "K7PM-3QXD" comparable.
@@ -98,7 +89,7 @@ func writeConfig(dir string, c Config) error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(filepath.Join(dir, configFile), append(data, '\n'), 0o600)
+	return writeAtomic(filepath.Join(dir, configFile), append(data, '\n'))
 }
 
 // ConfigHolder rereads config.json when it changes, so setup needs no restart.

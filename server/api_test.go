@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -18,10 +17,10 @@ const testCode = "K7PM-3QXD"
 
 var jpeg = base64.StdEncoding.EncodeToString([]byte{0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3})
 
-func newTestAPI(t *testing.T, anthropic string) *API {
+func newTestAPI(t *testing.T) *API {
 	t.Helper()
 	dir := t.TempDir()
-	if err := writeConfig(dir, Config{Code: testCode, APIKey: "sk-ant-test", AnthropicURL: anthropic}); err != nil {
+	if err := writeConfig(dir, Config{Code: testCode, APIKey: "sk-ant-test"}); err != nil {
 		t.Fatal(err)
 	}
 	s, err := OpenStore(dir)
@@ -32,9 +31,15 @@ func newTestAPI(t *testing.T, anthropic string) *API {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := NewAPI(s, NewConfigHolder(dir), OpenBarcodes(dir), photos)
+	a := NewAPI(s, NewConfigHolder(dir), photos)
 	a.now = func() time.Time { return now }
 	return a
+}
+
+func useAnthropic(t *testing.T, url string) {
+	old := anthropicURL
+	anthropicURL = url
+	t.Cleanup(func() { anthropicURL = old })
 }
 
 func call(a *API, method, path, code string, body any) (int, map[string]any, http.Header) {
@@ -56,7 +61,7 @@ func call(a *API, method, path, code string, body any) (int, map[string]any, htt
 }
 
 func TestOnlyFromTheHomeNetwork(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	for addr, want := range map[string]int{"8.8.8.8:1": 403, "192.168.178.30:1": 200, "10.8.0.2:1": 200, "100.70.1.2:1": 200, "[::1]:1": 200, "[2001:db8::1]:1": 403} {
 		req := httptest.NewRequest("GET", "/api/info", nil)
 		req.RemoteAddr = addr
@@ -69,7 +74,7 @@ func TestOnlyFromTheHomeNetwork(t *testing.T) {
 }
 
 func TestCorsForTheApp(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	status, _, h := call(a, "OPTIONS", "/api/changes", "", nil)
 	if status != 204 || h.Get("Access-Control-Allow-Origin") != "*" || !strings.Contains(h.Get("Access-Control-Allow-Headers"), "Authorization") {
 		t.Fatalf("preflight: %d %v", status, h)
@@ -77,7 +82,7 @@ func TestCorsForTheApp(t *testing.T) {
 }
 
 func TestHouseholdCode(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	if s, _, _ := call(a, "GET", "/api/changes", "", nil); s != 401 {
 		t.Fatalf("without a code: %d", s)
 	}
@@ -90,17 +95,23 @@ func TestHouseholdCode(t *testing.T) {
 	if s, _, _ := call(a, "GET", "/api/changes", testCode, nil); s != 429 {
 		t.Fatalf("after %d failed attempts: %d, expected a pause", failLimit, s)
 	}
+	a.now = func() time.Time { return now.Add(failWindow) }
+	if s, _, _ := call(a, "GET", "/api/changes", testCode, nil); s != 200 || len(a.fails) != 0 {
+		t.Fatalf("after the pause: %d, %d addresses still remembered", s, len(a.fails))
+	}
+	if s, _, _ := call(a, "GET", "/api/changes?code="+testCode, "", nil); s != 401 {
+		t.Fatalf("code in the query outside /api/events: %d", s)
+	}
 }
 
 func TestInfo(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	_, out, _ := call(a, "GET", "/api/info", "", nil)
 	if out["app"] != "schmeckts" || out["protocol"] != float64(1) || out["auth"] != nil || out["recognition"] != true {
 		t.Fatalf("without a code: %v", out)
 	}
-	features, _ := out["features"].([]any)
-	if !slices.Contains(features, any("replace")) {
-		t.Fatalf("the features say that a photo can be replaced: %v", out["features"])
+	if f, _ := json.Marshal(out["features"]); string(f) != `["fed","photo","replace","collections"]` {
+		t.Fatalf("features = %s", f)
 	}
 	_, out, _ = call(a, "GET", "/api/info", testCode, nil)
 	if out["auth"] != true {
@@ -113,7 +124,7 @@ func TestInfo(t *testing.T) {
 }
 
 func TestSyncBetweenTwoPhones(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	ms := now.UnixMilli()
 	status, res, _ := call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("anna0001", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"name": "Minka", "_del": false}),
@@ -145,7 +156,7 @@ func TestSyncBetweenTwoPhones(t *testing.T) {
 }
 
 func TestRejectedChangesAreReported(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	future := now.Add(time.Hour).UnixMilli()
 	_, res, _ := call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("zukunft1", "pets", "pet1", clock(future, 0, "anna"), map[string]any{"name": "x"}),
@@ -157,7 +168,7 @@ func TestRejectedChangesAreReported(t *testing.T) {
 }
 
 func TestChecksum(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	_, before, _ := call(a, "GET", "/api/checksum", testCode, nil)
 	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("summe001", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}),
@@ -178,7 +189,7 @@ func TestChecksum(t *testing.T) {
 }
 
 func TestLiveNotifications(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	srv := httptest.NewServer(a.Handler())
 	defer srv.Close()
 	res, err := http.Get(srv.URL + "/api/events?code=" + testCode)
@@ -230,7 +241,8 @@ func TestRecognition(t *testing.T) {
 	var sent map[string]any
 	fake := fakeAnthropic(t, 200, "```json\n{\"brand\":\"Sheba \",\"variety\":\"Lachs in Soße\",\"type\":\"nassfutter\",\"animal\":\"Einhorn\"}\n```", &sent)
 	defer fake.Close()
-	a := newTestAPI(t, fake.URL)
+	useAnthropic(t, fake.URL)
+	a := newTestAPI(t)
 	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("prod0001", "products", "prod1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"brand": "Felix", "variety": "Huhn in Gelee", "createdAt": 1}),
 	}})
@@ -249,7 +261,8 @@ func TestRecognition(t *testing.T) {
 func TestRecognitionErrorsAndCostBrake(t *testing.T) {
 	fake := fakeAnthropic(t, 401, "", nil)
 	defer fake.Close()
-	a := newTestAPI(t, fake.URL)
+	useAnthropic(t, fake.URL)
+	a := newTestAPI(t)
 	if s, out, _ := call(a, "POST", "/api/recognize", testCode, map[string]any{"image": jpeg}); s != 502 || !strings.Contains(out["error"].(string), "abgelehnt") {
 		t.Fatalf("rejected key: %d %v", s, out)
 	}
@@ -269,7 +282,7 @@ func TestRecognitionErrorsAndCostBrake(t *testing.T) {
 }
 
 func TestRecognitionWithoutAKey(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	writeConfig(a.cfg.dir, Config{Code: testCode})
 	a.cfg.mtime = time.Time{}
 	if s, _, _ := call(a, "POST", "/api/recognize", testCode, map[string]any{"image": jpeg}); s != 503 {
@@ -282,10 +295,12 @@ func TestCheckingTheKey(t *testing.T) {
 	defer ok.Close()
 	bad := fakeAnthropic(t, 401, "", nil)
 	defer bad.Close()
-	if err := CheckKey(t.Context(), Config{APIKey: "sk-ant-test", AnthropicURL: ok.URL}); err != nil {
+	useAnthropic(t, ok.URL)
+	if err := CheckKey(t.Context(), Config{APIKey: "sk-ant-test"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckKey(t.Context(), Config{APIKey: "sk-ant-test", AnthropicURL: bad.URL}); err == nil || !strings.Contains(err.Error(), "abgelehnt") {
+	useAnthropic(t, bad.URL)
+	if err := CheckKey(t.Context(), Config{APIKey: "sk-ant-test"}); err == nil || !strings.Contains(err.Error(), "abgelehnt") {
 		t.Fatalf("rejected key: %v", err)
 	}
 }
@@ -301,21 +316,8 @@ func TestCodeFormat(t *testing.T) {
 
 func itoa(n int64) string { b, _ := json.Marshal(n); return string(b) }
 
-const brokenURL = "http://192.168.178.9\u007f:8486" // url.Parse refuses the control character
-
-func TestBrokenAnthropicAddress(t *testing.T) {
-	a := newTestAPI(t, brokenURL)
-	s, out, _ := call(a, "POST", "/api/recognize", testCode, map[string]any{"image": jpeg})
-	if s != 502 || out["error"] != "Die Adresse von Anthropic ist falsch eingestellt." {
-		t.Fatalf("%d %v", s, out)
-	}
-	if err := CheckKey(t.Context(), Config{APIKey: "sk-ant-test", AnthropicURL: brokenURL}); err == nil {
-		t.Fatal("a broken address has to be an error")
-	}
-}
-
 func TestFedSince(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	ms := now.UnixMilli()
 	serve := func(id, product, by string, at int64, extra map[string]any) Change {
 		f := map[string]any{"productId": product, "servedAt": at, "by": by, "pets": map[string]any{"pet1": map[string]any{"r": nil}}, "_del": false}
@@ -356,7 +358,7 @@ func TestFedSince(t *testing.T) {
 }
 
 func TestPhotos(t *testing.T) {
-	a := newTestAPI(t, "")
+	a := newTestAPI(t)
 	ms := now.UnixMilli()
 	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("change-lachs", "products", "lachs001", clock(ms, 0, "anna"), map[string]any{"variety": "Lachs", "_del": false}),

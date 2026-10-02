@@ -1,3 +1,14 @@
+schmeckts-server (1.6.0) unstable; urgency=medium
+
+  * The server only syncs the phones and recognises packaging photos:
+    barcode lookup, the overview, backups and restore are gone. An
+    unreadable state file is set aside and the phones send their data
+    again.
+  * The API key is optional in the setup window.
+  * A clean shutdown waits for running requests.
+
+ -- Schmeckts <schmeckts@localhost>  Fri, 02 Oct 2026 15:00:00 +0200
+
 schmeckts-server (1.5.0) unstable; urgency=medium
 
   * The server keeps any kind of data the app sends, named like the
@@ -8,14 +19,14 @@ schmeckts-server (1.5.0) unstable; urgency=medium
     three every app knows, so an older app still finds its data level.
   * The overview counts the entries of such collections.
 
- -- Schmeckts <schmeckts@localhost>  Sat, 03 Oct 2026 12:00:00 +0200
+ -- Schmeckts <schmeckts@localhost>  Fri, 02 Oct 2026 14:00:00 +0200
 
 schmeckts-server (1.4.2) unstable; urgency=medium
 
   * The overview calls the level between half eaten and only the sauce
     „Nur bissl“, as the app does now.
 
- -- Schmeckts <schmeckts@localhost>  Fri, 02 Oct 2026 20:00:00 +0200
+ -- Schmeckts <schmeckts@localhost>  Fri, 02 Oct 2026 12:00:00 +0200
 
 schmeckts-server (1.4.1) unstable; urgency=medium
 

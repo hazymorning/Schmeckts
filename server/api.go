@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,25 +27,23 @@ const (
 	failWindow      = 10 * time.Minute
 	recognizeBurst  = 10 // cost brake for the paid API
 	recognizeEvery  = 90 * time.Second
-	barcodeBurst    = 30 // go easy on the free databases
-	barcodeEvery    = 10 * time.Second
 	pingEvery       = 25 * time.Second
 )
 
 var cgnat = netip.MustParsePrefix("100.64.0.0/10") // used by some VPNs
 
 type API struct {
-	store    *Store
-	cfg      *ConfigHolder
-	barcodes *Barcodes
-	photos   *Photos
-	now      func() time.Time
+	store  *Store
+	cfg    *ConfigHolder
+	photos *Photos
+	now    func() time.Time
 
 	mu         sync.Mutex
 	fails      map[string][]time.Time
 	subs       map[chan struct{}]struct{}
 	recognizes bucket
-	lookups    bucket
+	closing    chan struct{}
+	closeOnce  sync.Once
 }
 
 // bucket is a token bucket: burst in a row, then one per every.
@@ -71,11 +70,16 @@ func (b *bucket) take(now time.Time) bool {
 	return true
 }
 
-func NewAPI(store *Store, cfg *ConfigHolder, barcodes *Barcodes, photos *Photos) *API {
-	return &API{store: store, cfg: cfg, barcodes: barcodes, photos: photos, now: time.Now, fails: map[string][]time.Time{},
+func NewAPI(store *Store, cfg *ConfigHolder, photos *Photos) *API {
+	return &API{store: store, cfg: cfg, photos: photos, now: time.Now, fails: map[string][]time.Time{},
 		subs:       map[chan struct{}]struct{}{},
 		recognizes: newBucket(recognizeBurst, recognizeEvery),
-		lookups:    newBucket(barcodeBurst, barcodeEvery)}
+		closing:    make(chan struct{})}
+}
+
+// Close ends the event streams, which would otherwise keep a graceful shutdown waiting.
+func (a *API) Close() {
+	a.closeOnce.Do(func() { close(a.closing) })
 }
 
 func (a *API) allow(b *bucket) bool {
@@ -92,7 +96,6 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/checksum", a.auth(a.checksum))
 	mux.HandleFunc("GET /api/events", a.auth(a.events))
 	mux.HandleFunc("POST /api/recognize", a.auth(a.recognize))
-	mux.HandleFunc("GET /api/barcode/{code}", a.auth(a.barcode))
 	mux.HandleFunc("GET /api/fed", a.auth(a.fed))
 	mux.HandleFunc("POST /api/photo/{id}", a.auth(a.putPhoto))
 	mux.HandleFunc("GET /api/photo/{id}", a.auth(a.getPhoto))
@@ -148,21 +151,25 @@ func givenCode(r *http.Request) string {
 	if v, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
 		return v
 	}
-	return r.URL.Query().Get("code")
+	if r.URL.Path == "/api/events" { // EventSource cannot send headers
+		return r.URL.Query().Get("code")
+	}
+	return ""
 }
 
 func (a *API) checkCode(r *http.Request) (status int, msg string) {
 	ip := remoteAddr(r).String()
 	now := a.now()
 	a.mu.Lock()
-	recent := a.fails[ip][:0]
-	for _, t := range a.fails[ip] {
-		if now.Sub(t) < failWindow {
-			recent = append(recent, t)
+	for k, ts := range a.fails {
+		ts = slices.DeleteFunc(ts, func(t time.Time) bool { return now.Sub(t) >= failWindow })
+		if len(ts) == 0 {
+			delete(a.fails, k)
+		} else {
+			a.fails[k] = ts
 		}
 	}
-	a.fails[ip] = recent
-	locked := len(recent) >= failLimit
+	locked := len(a.fails[ip]) >= failLimit
 	a.mu.Unlock()
 	if locked {
 		return http.StatusTooManyRequests, "Zu viele falsche Versuche. Bitte in zehn Minuten nochmal."
@@ -194,7 +201,7 @@ func (a *API) info(w http.ResponseWriter, r *http.Request) {
 	epoch, seq := a.store.Seq()
 	out := map[string]any{"app": "schmeckts", "version": version, "protocol": protocolVersion,
 		"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "recognition": a.cfg.Get().APIKey != "",
-		"features": []string{"barcode", "fed", "photo", "replace", "collections"}}
+		"features": []string{"fed", "photo", "replace", "collections"}}
 	if givenCode(r) != "" {
 		status, msg := a.checkCode(r)
 		out["auth"] = status == http.StatusOK
@@ -306,6 +313,8 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-a.closing:
+			return
 		case <-ch:
 			if !send() {
 				return
@@ -348,25 +357,6 @@ func (a *API) recognize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
-}
-
-func (a *API) barcode(w http.ResponseWriter, r *http.Request) {
-	code, ok := NormalizeCode(r.PathValue("code"))
-	if !ok {
-		fail(w, http.StatusBadRequest, "Das ist kein gültiger Barcode.")
-		return
-	}
-	if !a.allow(&a.lookups) {
-		fail(w, http.StatusTooManyRequests, "Gerade sehr viele Abfragen. Bitte kurz warten.")
-		return
-	}
-	p, err := a.barcodes.Lookup(r.Context(), a.cfg.Get(), code, a.now())
-	if err != nil {
-		log.Printf("Barcode %s: %v", code, err)
-		fail(w, http.StatusBadGateway, "Die Produktdatenbank ist gerade nicht erreichbar.")
-		return
-	}
-	writeJSON(w, http.StatusOK, p)
 }
 
 func (a *API) fed(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,5 @@
 [Unit]
 Description=Schmeckt’s? household server
-Documentation=man:schmeckts-server
 After=network-online.target
 Wants=network-online.target
 

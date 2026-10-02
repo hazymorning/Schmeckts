@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -129,18 +130,6 @@ func TestInvalidChangesAreRejected(t *testing.T) {
 	}
 }
 
-func TestLocalFieldsStayOnThePhone(t *testing.T) {
-	s, _ := openTemp(t)
-	mustApply(t, s, chg("ffffffff1", "servings", "srv1", clock(now.UnixMilli(), 0, "anna"),
-		map[string]any{"photo": "data:image/jpeg;base64,xyz", "status": "recognizing", "note": "hallo"}))
-	if field(s, "servings", "srv1", "photo") != "<fehlt>" || field(s, "servings", "srv1", "status") != "<fehlt>" {
-		t.Fatal("photo and status must not reach the server")
-	}
-	if field(s, "servings", "srv1", "note") != `"hallo"` {
-		t.Fatal("note missing")
-	}
-}
-
 func TestIdenticalAfterRestart(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("gggggggg1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
@@ -158,7 +147,7 @@ func TestIdenticalAfterRestart(t *testing.T) {
 func TestWriteFailureRollsBack(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("hhhhhhhh1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
-	os.Mkdir(filepath.Join(dir, stateFile+".tmp"), 0o700) // makes the write fail
+	os.RemoveAll(dir) // makes the write fail
 	_, _, _, err := s.Apply([]Change{chg("hhhhhhhh2", "pets", "pet1", clock(now.UnixMilli()+1, 0, "anna"), map[string]any{"name": "Kater"})}, now)
 	if err == nil {
 		t.Fatal("a write failure must be reported, or the phone would drop the change")
@@ -171,40 +160,78 @@ func TestWriteFailureRollsBack(t *testing.T) {
 	}
 }
 
-func TestCorruptedFileUsesBackup(t *testing.T) {
+func TestUnreadableFileIsSetAside(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("iiiiiiii1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
-	if err := s.Backup(now); err != nil {
-		t.Fatal(err)
-	}
 	oldEpoch, _ := s.Seq()
 	os.WriteFile(filepath.Join(dir, stateFile), []byte("{kaputt"), 0o600)
 	s2, err := OpenStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if field(s2, "pets", "pet1", "name") != `"Minka"` {
-		t.Fatal("the backup must be loaded")
+	if e, seq := s2.Seq(); e == oldEpoch || seq != 0 {
+		t.Fatal("an unreadable file means starting empty under a new epoch")
 	}
-	if e, _ := s2.Seq(); e == oldEpoch {
-		t.Fatal("after loading a backup a new epoch is needed")
-	}
-	if m, _ := filepath.Glob(filepath.Join(dir, "state.defekt-*.json")); len(m) != 1 {
-		t.Fatal("the corrupted file must be set aside")
+	if m, _ := filepath.Glob(filepath.Join(dir, "state-unreadable-*.json")); len(m) != 1 {
+		t.Fatal("the unreadable file must be kept aside")
 	}
 }
 
-func TestBackupsAreRotated(t *testing.T) {
+func TestPruneSeen(t *testing.T) {
 	s, dir := openTemp(t)
-	for d := 0; d < 35; d++ {
-		if err := s.Backup(now.AddDate(0, 0, d)); err != nil {
+	mustApply(t, s, chg("pruned01", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
+	if err := s.PruneSeen(now.Add(keepSeen - time.Hour)); err != nil || len(s.st.Seen) != 1 {
+		t.Fatalf("too early: %v %v", err, s.st.Seen)
+	}
+	if err := s.PruneSeen(now.Add(keepSeen + time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if s2, _ := OpenStore(dir); len(s2.st.Seen) != 0 || field(s2, "pets", "pet1", "name") != `"Minka"` {
+		t.Fatalf("old change ids are forgotten, the data stays: %v", s2.st.Seen)
+	}
+}
+
+func TestSinceWhileApplying(t *testing.T) {
+	s, _ := openTemp(t)
+	ms := now.UnixMilli()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := range 200 {
+			if _, _, _, err := s.Apply([]Change{chg(fmt.Sprintf("race%04d", i), "pets", "pet1", clock(ms+int64(i), 0, "anna"), map[string]any{"name": i})}, now); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+	}()
+	for range 200 {
+		_, _, recs := s.Since(0)
+		json.Marshal(recs)
+	}
+	wg.Wait()
+}
+
+func TestConcurrentWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "photo.jpg")
+	var wg sync.WaitGroup
+	errs := make(chan error, 20)
+	for i := range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- writeAtomic(path, []byte{byte(i)})
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	s.Backup(now.AddDate(0, 0, 34)) // the same day again
-	files, _ := filepath.Glob(filepath.Join(dir, backupDir, "state-*.json"))
-	if len(files) != keepBackups {
-		t.Fatalf("%d Backups, erwartet %d", len(files), keepBackups)
+	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(path), ".*.tmp")); len(left) != 0 {
+		t.Fatalf("temporary files left: %v", left)
 	}
 }
 

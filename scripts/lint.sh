@@ -32,7 +32,8 @@ run 'go vet' bash -c "cd server && '$GO' vet ./..."
 
 run 'ruff check' ruff check --quiet tests scripts design
 run 'ruff format' ruff format --quiet --check tests scripts design
-run shellcheck shellcheck scripts/*.sh server/build-deb.sh .claude/hooks/*.sh
+run shellcheck shellcheck scripts/*.sh server/build-deb.sh server/packaging/schmeckts-setup \
+  server/packaging/debian/postinst server/packaging/debian/prerm server/packaging/debian/postrm .claude/hooks/*.sh
 run 'text style' python3 scripts/text-style.py
 
 # The browser suites run in Playwright's image; its tag has to be the playwright version tests run with.

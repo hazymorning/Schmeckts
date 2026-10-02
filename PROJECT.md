@@ -118,8 +118,8 @@ Save locally first, then send. The server confirms after writing to disk. Sendin
 - **Queue.** Stays until the server confirms it in `ok`. `rejected` with `reason: "invalid"` is dropped and logged,
   with `"clock"` the app restamps and sends again. At most 500 changes and 12 MB per request.
 - **Catching up.** `GET /api/changes?since=<seq>&epoch=<epoch>` returns changed records in full,
-  `{c, r, s, f: {field: {v, t}}}`. On a different epoch (a restore) the server sends everything and the app resends
-  every field it holds with a newer clock.
+  `{c, r, s, f: {field: {v, t}}}`. On a different epoch (the server set an unreadable state aside and started empty)
+  the server sends everything and the app resends every field it holds with a newer clock.
 - **Checksum.** SHA-256 over the sorted lines `collection/id/field@clock\n` of the collections asked for. Compared
   whenever the queue is empty, at most every five minutes; a mismatch triggers a full sync.
 - **Manual exchange** (`logic/exchange.js`, no server needed): a file with our clocks and the records changed since
@@ -127,8 +127,8 @@ Save locally first, then send. The server confirms after writing to disk. Sendin
 
 ## Server API
 
-All requests except `/api/info` need `Authorization: Bearer <code>` (`/api/events` takes `?code=`). Errors are
-`{"error": "<German message>"}`. Requests are only accepted from private address ranges.
+All requests except `/api/info` need `Authorization: Bearer <code>`; only `/api/events` takes `?code=` instead.
+Errors are `{"error": "<German message>"}`. Requests are only accepted from private address ranges.
 
 | Request | Purpose |
 |---|---|
@@ -137,7 +137,6 @@ All requests except `/api/info` need `Authorization: Bearer <code>` (`/api/event
 | `GET /api/events` | server-sent events with the newest sequence number |
 | `GET /api/checksum?c=` | checksum over the collections named |
 | `POST /api/recognize` | photo in, `{brand, variety, type, animal}` out; the API key lives only on the server |
-| `GET /api/barcode/<code>` | lookup in Open Pet Food Facts and Open Food Facts |
 | `GET /api/fed?since=<ms>` | whether a meal was served since then (server 1.2.0) |
 | `POST`/`GET /api/photo/<variety>` | the shared packaging photo (1.3.0; replacing from 1.4.0) |
 

@@ -23,7 +23,6 @@ for ARCH in amd64 arm64; do
   install -D -m 0644 "$HERE/packaging/de.schmeckts.server.metainfo.xml" "$PKG/usr/share/metainfo/de.schmeckts.server.metainfo.xml"
   install -D -m 0644 "$HERE/packaging/debian/copyright" "$PKG/usr/share/doc/schmeckts-server/copyright"
   gzip -9n -c "$HERE/packaging/debian/changelog" > "$PKG/usr/share/doc/schmeckts-server/changelog.gz"
-  install -D -m 0644 "$HERE/packaging/debian/lintian-overrides" "$PKG/usr/share/lintian/overrides/schmeckts-server"
   install -d "$PKG/DEBIAN"
   install -m 0755 "$HERE/packaging/debian/postinst" "$HERE/packaging/debian/prerm" "$HERE/packaging/debian/postrm" "$PKG/DEBIAN/"
   SIZE="$(du -sk --exclude=DEBIAN "$PKG" | cut -f1)"
