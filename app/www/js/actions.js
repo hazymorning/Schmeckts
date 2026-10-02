@@ -3,7 +3,7 @@ import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
-import {db, prefs, save, savePrefs} from './store.js';
+import {db, hideHint, prefs, save, savePrefs} from './store.js';
 import {ServerError} from './api.js';
 import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
@@ -360,8 +360,7 @@ const ACTIONS = {
     update();
   },
   'hide-hint'(el) {
-    if (!prefs.hiddenHints.includes(el.dataset.v)) prefs.hiddenHints.push(el.dataset.v);
-    savePrefs();
+    hideHint(el.dataset.v);
     haptic('select');
     update();
   },

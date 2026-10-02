@@ -1,7 +1,7 @@
 // the photo stays on this phone, only the preview is synced
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
-import {esc} from '../text.js';
+import {addSentence, esc} from '../text.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
@@ -52,7 +52,7 @@ function withMilestone(msg) {
     fresh.includes(`meals:${m.meals}`) && `Zum ${m.meals}. Mal gefüttert!`,
     fresh.includes(`sorts:${m.sorts}`) && `${m.sorts} Sorten probiert!`,
   ].filter(Boolean);
-  return notes.length ? `${msg}${/[.!?…]$/.test(msg) ? '' : '.'} ${notes.join(' ')}` : msg;
+  return notes.length ? addSentence(msg, notes.join(' ')) : msg;
 }
 function served(id) {
   haptic('success');

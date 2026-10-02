@@ -623,6 +623,15 @@ dialog.sheet::after {
 .toast > span {
   margin: var(--space-1h) var(--space-2) var(--space-1h) 0;
 }
+.toast.long {
+  flex-wrap: wrap;
+}
+.toast.long > span {
+  flex: 1 1 60%;
+}
+.toast.long button {
+  margin-left: auto;
+}
 .toast button {
   display: flex;
   align-items: center;

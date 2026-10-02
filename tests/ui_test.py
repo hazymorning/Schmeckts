@@ -2045,8 +2045,12 @@ async def test_observations(browser, url):
     ROW = '[data-sec=hist] [data-action=open-observation]'
     named, mau = await pg.locator(f'{CHIP}[data-v=tired]').inner_text(), await state(pg, 'db.pets[0].name')
     check(await pg.locator(CHIP).count() == 4 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
+    await tap(pg, '[data-action=observe][data-v=tired]')
+    tired = await pg.inner_text('#toast > span')
+    await tap(pg, '#toast [data-action=undo]')
     await tap(pg, '[data-action=observe][data-v=stink]')
     after, pet_ = await pg.evaluate(OBS), await state(pg, 'db.pets[0].id')
+    told = await pg.inner_text('#toast > span')
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
@@ -2057,6 +2061,11 @@ async def test_observations(browser, url):
     await tap(pg, '#toast [data-action=undo]')
     check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
     await tap(pg, '[data-action=observe][data-v=hungry]')
+    again = await pg.inner_text('#toast > span')
+    check(
+        'Vorlieben' not in tired and 'Vorlieben' in told and 'Vorlieben' not in again and 'tipp:beobachtung' in await state(pg, 'prefs.hiddenHints'),
+        f'the first note the preferences weigh says once where it shows up later, a tired day is not one ({tired} / {told} / {again})',
+    )
     await tap(pg, ROW)
     KINDS = "[...document.querySelectorAll('#sheet [data-action=set-observation-kind][aria-pressed=true]')].map(c => c.dataset.v)"
     check(
@@ -2104,6 +2113,27 @@ async def test_observations(browser, url):
     await idle(pg)
     left = await pg.evaluate(OBS)
     check(len(left) == count - 1 and not [o for o in left if T in o[1]], 'a pet deleted: gone from the observations, those of it alone too')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
+async def test_toast_time(browser, url):
+    print('a toast stays until it can be read: the usual time, longer for a long text')
+    ctx = await phone(browser)
+    await fixed_clock(ctx)
+    pg, errors = await open_page(ctx, url)
+
+    async def lasts(msg, undo=True):
+        await pg.evaluate("([m, u]) => import('./js/ui/toast.js').then(t => t.toast(m, u ? () => {} : null))", [msg, undo])
+        ms = 0
+        while await pg.evaluate("document.getElementById('toast').classList.contains('show')") and ms < 20000:
+            await pg.clock.run_for(100)
+            ms += 100
+        return ms
+
+    short, plain = await lasts('Hunger notiert.'), await lasts('Hunger notiert.', False)
+    long = await lasts('Stunk notiert. Fenster auf! ' + 'Ein langer Satz, der etwas länger zu lesen ist. ' * 3)
+    check(plain < short < long and long - short > 1500, f'short with undo, short without, long: {short} {plain} {long} ms')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2447,6 +2477,7 @@ run_tests(
         'crop': test_crop,
         'popup': test_popup,
         'observations': test_observations,
+        'toast-time': test_toast_time,
         'mood': test_mood,
         'camera': test_camera,
         'no-camera': test_no_camera,

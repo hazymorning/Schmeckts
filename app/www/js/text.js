@@ -11,6 +11,7 @@ export const norm = s =>
 export const andList = (l, and = 'und') =>
   l.length > 1 ? l.slice(0, -1).join(', ') + ` ${and} ` + l.at(-1) : l[0] || '';
 export const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+export const addSentence = (text, more) => `${text}${/[.!?…]$/.test(text) ? '' : '.'} ${more}`;
 // filler words, German and English, that carry no meaning on their own
 export const SMALL = new Set(
   'und oder mit ohne in im am an auf aus bei fur von vor zu zum zur neu the and with for'.split(' '),

@@ -80,7 +80,7 @@ server.
 | `observations[].kind` | `happy` `stink` `hungry` `tired` | unknown kinds from newer phones are kept |
 | `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
-| `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>` | hints hidden on this phone |
+| `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung` | hints hidden on this phone; `tipp:beobachtung`: the first observation's toast said what it is for |
 | `prefs.milestones` | `meals:100`, `sorts:10` | milestones already shown |
 | exchange file `kind` | `exchange` | written by „Änderungen teilen“ |
 

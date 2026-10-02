@@ -257,6 +257,11 @@ export function save() {
 export function savePrefs() {
   persist('prefs');
 }
+export function hideHint(key) {
+  if (prefs.hiddenHints.includes(key)) return;
+  prefs.hiddenHints.push(key);
+  savePrefs();
+}
 
 const mealOf = fields => ({productId: JSON.parse(fields.productId ?? 'null')});
 function diff() {
