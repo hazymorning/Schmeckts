@@ -314,6 +314,21 @@ test('a feeding run: a person feeding day after day up to the last day fed on, f
   );
 });
 
+test('a feeding run counts local days, also far east of UTC', () => {
+  process.env.TZ = 'Pacific/Auckland';
+  try {
+    const by = (d, who) => meal(`${pad(d)} 08:00`, who);
+    const run = glance(
+      household(['nass'], [by(10, 'Ben'), by(9, 'Ben'), by(8, 'Ben'), by(7, 'Jonas')]),
+      ['A'],
+      at('2026-06-10T12:00'),
+    ).feedRun;
+    assert.deepEqual(run, {name: 'Ben', days: 3, other: 'Jonas'});
+  } finally {
+    process.env.TZ = 'Europe/Berlin';
+  }
+});
+
 test('a look back: the variety served exactly a year ago', () => {
   const g = list => glance(household(['nass', 'alt'], list), ['A'], NOW).lookback;
   assert.deepEqual(
@@ -594,5 +609,164 @@ test('the lines: at least three ways of saying every kind, two sentences at most
   assert.equal(
     fill('In {days} hat {pet} Geburtstag.', {days: '3 Tagen', pet: 'Mau'}),
     'In 3 Tagen hat Mau Geburtstag.',
+  );
+});
+
+test('the overview card: the moment picks the first sentence, news of the day the second, else kinds and asides take turns', async () => {
+  // views/overview.js reaches for the page as it loads; in Node a stub answers every such call
+  const stub = new Proxy(function () {}, {
+    get: (_, k) => (k === 'then' ? undefined : k === Symbol.toPrimitive ? () => '' : stub),
+    apply: () => stub,
+  });
+  Object.assign(globalThis, {window: globalThis, document: stub, matchMedia: stub, addEventListener: () => {}});
+  const {replaceDb} = await import('../app/www/js/store.js');
+  const {momentOf, overviewLines} = await import('../app/www/js/views/overview.js');
+  const {pick: byDay} = await import('../app/www/js/glance.js');
+  const DAY = 864e5,
+    T = at('2026-06-09T12:00'); // an odd day number: a kind's day, the next one an aside's
+  const pets = [{id: 'minka00001', name: 'Minka', species: 'Katze', createdAt: 1}];
+  replaceDb({
+    version: 3,
+    pets,
+    products: ['Lachs', 'Rind'].map(v => ({
+      id: v.toLowerCase() + '00001',
+      brand: 'Sheba',
+      variety: v,
+      type: 'Nassfutter',
+      codes: {},
+    })),
+    servings: [],
+  });
+  const say = (kind, values, days = 0) => fill(byDay(LINES[kind], T + days * DAY), values);
+  const lead = (moment, values, days = 0) => fill(byDay(LEADS[moment], T + days * DAY), values);
+  const lines = text =>
+    text
+      .split('<span class="ov-line">')
+      .slice(1)
+      .map(x => x.replace(/<\/span>\s*$/, '').replace(/<[^>]*>/g, ''));
+  const last = {id: 'last', productId: 'lachs00001', by: 'Anna', servedAt: T - 3 * 36e5, pets: {minka00001: {r: null}}};
+  const none = {
+    premiere: null,
+    idea: null,
+    feeders: [],
+    week: {meals: 0, sorts: 0},
+    streak: 0,
+    first: null,
+    sorts: 0,
+    anniversary: null,
+    record: {meals: 0, streak: 0},
+    shift: null,
+    sameMinute: false,
+    feedRun: null,
+    weekday: null,
+    lookback: null,
+    milestone: {n: 100, left: 40},
+    next: {at: 1110},
+  };
+  const g = {
+    ...none,
+    last,
+    meals: 2,
+    snacks: 1,
+    feeders: [
+      {name: 'Anna', n: 6},
+      {name: 'Jonas', n: 4},
+    ],
+    week: {meals: 12, sorts: 4},
+    streak: 12,
+    idea: {id: 'rind00001', days: 12},
+  };
+  const one = (x, base = g) => lines(overviewLines({...base, ...x}, pets, T, null).text);
+
+  let memory = null;
+  const days = [];
+  for (let i = 0; i < 5; i++) {
+    const r = overviewLines({...g, last: {...last, servedAt: last.servedAt + i * DAY}}, pets, T + i * DAY, memory);
+    memory = r.memory;
+    days.push(lines(r.text));
+  }
+  const asides = i => factsOn('Katze', new Date(T + i * DAY), false, 'wait').map(f => f.text);
+  days.forEach((d, i) =>
+    assert.deepEqual(d[0], lead('later', {meal: 'Abendessen', time: '18:30', at: '9:00', by: ' von Anna'}, i)),
+  );
+  assert.deepEqual(
+    [days[0][1], days[2][1], days[4][1]],
+    [
+      say('duel', {first: 'Anna', n: 6, m: 4, second: 'Jonas'}),
+      say('streak', {since: '12 Tagen', days: '12 Tage'}, 2),
+      say('idea', {sort: 'Rind', days: 12}, 4),
+    ],
+  );
+  assert.ok(asides(1).includes(days[1][1]) && asides(3).includes(days[3][1]) && days[1][1] !== days[3][1]);
+  assert.deepEqual(
+    [memory.day, memory.kind, memory.fact, memory.kinds, memory.facts.map(f => f.day)],
+    ['2026-06-13', 'idea', null, ['duel', 'streak', 'idea'], ['2026-06-10', '2026-06-12']],
+  );
+
+  const news = [
+    [{premiere: 'lachs00001'}, say('premiereLast', {})],
+    [{premiere: 'rind00001'}, say('premiere', {sort: 'Rind'})],
+    [{milestone: {n: 100, left: 3}}, say('milestone', {n: '3×', m: '100. Mal'})],
+    [{snacks: 4}, say('snacks', {n: '4 Snacks', grip: 'Minka hat euch im Griff.'})],
+    [{anniversary: 1, first: {at: 0, days: 30, meals: 62}}, say('anniversary', {span: 'einem Monat', n: 62})],
+    [{record: {meals: 0, streak: 23}}, say('recordStreak', {days: '23 Tage'})],
+    [{record: {meals: 4, streak: 0}, meals: 4}, say('recordDay', {n: '4 Mahlzeiten'})],
+    [{shift: {at: 435, diff: -40}}, say('earlier', {meal: 'Frühstück', span: '40 Minuten'})],
+    [{shift: {at: 1110, diff: 95}}, say('later', {meal: 'Abendessen', span: 'eineinhalb Stunden'})],
+    [{sameMinute: true}, say('sameMinute', {})],
+  ];
+  for (const [x, want] of news) assert.deepEqual(one(x), [days[0][0], want]);
+  assert.deepEqual(one({next: {at: 1110, due: true}}), [
+    lead('due', {what: 'Lachs', at: '9:00', by: ' von Anna', meal: 'Abendessen'}),
+    say('waiting', {names: 'Minka', wartet: 'wartet', uebt: 'übt', hat: 'hat', sitzt: 'sitzt'}),
+  ]);
+  assert.deepEqual(one({next: {at: 435, tomorrow: true}}), [
+    lead('done', {at: '9:00', by: ' von Anna', meal: 'Frühstück', time: '7:15'}),
+    days[0][1],
+  ]);
+
+  const bare = {...g, ...none};
+  const kinds = [
+    [
+      {feedRun: {name: 'Ben', days: 5, other: 'Jonas'}},
+      say('feedRun', {name: 'Ben', days: '5 Tage', since: '5 Tagen', other: 'Jonas'}),
+    ],
+    [
+      {weekday: {at: 435, mine: 525, later: true, weekday: 6}},
+      say('weekday', {weekday: 'Samstags', day: 'Samstag', meal: 'Frühstück', shift: 'später', time: '8:45'}),
+    ],
+    [{lookback: 'lachs00001'}, say('lookback', {sort: 'Lachs'})],
+    [{sorts: 14}, say('sorts', {n: '14 Sorten'})],
+    [{first: {at: 0, days: 43, meals: 100}}, say('days', {since: '43 Tagen', days: '43 Tage', n: 43})],
+    [
+      {
+        feeders: [
+          {name: 'Anna', n: 5},
+          {name: 'Jonas', n: 5},
+        ],
+      },
+      say('duelTie', {score: '5 zu 5', first: 'Anna', second: 'Jonas'}),
+    ],
+  ];
+  for (const [x, want] of kinds) assert.equal(one(x, bare)[1], want);
+
+  const t = h => at(`2026-06-09T${h}`),
+    fed = {servedAt: t('07:20')},
+    before = {servedAt: t('07:20') - DAY};
+  assert.deepEqual(
+    [
+      momentOf({last: null}, t('12:00')),
+      momentOf({last: fed, next: {at: 1110, due: true}}, t('19:00')),
+      momentOf({last: before, next: {at: 435, due: true}}, t('07:30')),
+      momentOf({last: fed, next: {at: 1110}}, t('07:40')),
+      momentOf({last: fed, next: {at: 1110}}, t('10:00')),
+      momentOf({last: before, next: {at: 435}}, t('06:30')),
+      momentOf({last: fed, next: {at: 435, tomorrow: true}}, t('21:00')),
+      momentOf({last: before, next: {at: 435}}, t('02:00')),
+      momentOf({last: fed, next: null}, t('12:00')),
+      momentOf({last: before, next: null}, t('12:00')),
+      momentOf({last: {servedAt: t('07:20') - 3 * DAY}, next: {at: 435}}, t('12:00')),
+    ],
+    ['none', 'due', 'dueFirst', 'fresh', 'later', 'morning', 'done', 'night', 'today', 'yesterday', 'older'],
   );
 });

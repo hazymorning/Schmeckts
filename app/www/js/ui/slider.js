@@ -17,7 +17,7 @@ export const sliderCls = (r, scale, pointing = false) =>
 
 const stops = slider => [...slider.querySelectorAll('.slider-track button')];
 // r null: back to the saved level, unless the keyboard is on one
-export function showLevel(slider, r) {
+function showLevel(slider, r) {
   const scale = stops(slider).map(b => b.dataset.r),
     on = r || slider.querySelector('.slider-track button:focus-visible')?.dataset.r,
     shown = on || slider.dataset.r || null,

@@ -9,6 +9,7 @@ import pathlib
 import re
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 from common import ROOT, WWW, check, failures
 
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -60,6 +61,28 @@ def test_prompt():
     )
 
 
-for test in (test_version_code, test_signing_key, test_server_version, test_prompt):
+def test_android():
+    a = '{http://schemas.android.com/apk/res/android}'
+    res = ROOT / 'app/native/res'
+    root = ET.parse(res / 'xml/shortcuts.xml').getroot()
+    links = [x.find('intent').get(a + 'data') for x in root.findall('shortcut')]
+    labels = {'@string/' + n for n in re.findall(r'name="(\w+)"', (res / 'values/strings_shortcuts.xml').read_text())}
+    ok = all(
+        (res / f'drawable/{x.get(a + "icon").split("/")[1]}.xml').exists()
+        and {x.get(a + 'shortcutShortLabel'), x.get(a + 'shortcutLongLabel')} <= labels
+        and x.find('intent').get(a + 'targetClass') == 'de.schmeckts.app.MainActivity'
+        for x in root.findall('shortcut')
+    )
+    check(links == ['schmeckts://feed', 'schmeckts://scan', 'schmeckts://photo'] and ok, f'shortcuts with icons and labels {links}')
+    prep = (ROOT / 'scripts/prepare.py').read_text()
+    main = (ROOT / 'app/native/java/de/schmeckts/app/MainActivity.java').read_text()
+    check(
+        all(x in prep for x in ('android:scheme="schmeckts"', '@xml/shortcuts', 'barcode_ui', '.FeedReceiver', 'BOOT_COMPLETED'))
+        and all(f'registerPlugin({x}.class)' in main for x in ('PhotoPlugin', 'FeedReminderPlugin')),
+        'manifest patches and plugins registered',
+    )
+
+
+for test in (test_version_code, test_signing_key, test_android, test_server_version, test_prompt):
     test()
 sys.exit(1 if failures else 0)

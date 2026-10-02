@@ -150,7 +150,7 @@ SCAN = """() => { const bad = [];
 async def test_views(browser, url, scheme):
     pictures = make_pictures()
     ctx = await phone(browser, scheme)
-    pg, errors = await open_page(ctx, url, choose=False)
+    pg, errors = await open_page(ctx, url)
     await pg.evaluate('document.fonts.ready')
     bad = []
 
@@ -245,7 +245,7 @@ async def test_views(browser, url, scheme):
     await scan()
     full = await phone(browser, scheme)
     await full.add_init_script("Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };")
-    pg2, _ = await open_page(full, url, scheme, choose=False)
+    pg2, _ = await open_page(full, url, scheme)
     bad.extend(await pg2.evaluate(SCAN))
     await full.close()
     check(not bad, f'all visible text at 4.5:1 and in Figtree or Faustina ({scheme}) {bad}')

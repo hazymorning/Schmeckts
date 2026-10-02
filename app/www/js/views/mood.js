@@ -2,7 +2,7 @@
 import {$} from '../dom.js';
 import {db, prefs} from '../store.js';
 
-export function moodPhoto() {
+function moodPhoto() {
   if (!prefs.backdrop) return '';
   const pet = db.pets.length === 1 ? db.pets[0] : db.pets.find(p => p.id === prefs.activePet);
   return pet?.photo || '';
