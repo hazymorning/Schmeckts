@@ -375,7 +375,7 @@ export function evidenceOf(x) {
   if (!x.n) return 'Noch nicht bewertet';
   const levels = Object.keys(x.counts).sort((a, b) => RATINGS[b].score - RATINGS[a].score);
   if (levels.length === 1) return cap(`${times(x.n, x.n)} ${RATINGS[levels[0]].said}`);
-  if (x.n === 2) return `Einmal ${RATINGS[levels[0]].said}, einmal ${RATINGS[levels[1]].said}`;
+  if (x.n === 2) return `Einmal ${once([RATINGS[levels[0]].said, RATINGS[levels[1]].said]).join(', einmal ')}`;
   const sides = SIDES.map(([on, word]) => {
     const l = levels.filter(r => on(RATINGS[r].score));
     return {k: l.reduce((a, r) => a + x.counts[r], 0), said: l.length === 1 ? RATINGS[l[0]].said : word};
@@ -383,7 +383,16 @@ export function evidenceOf(x) {
     .filter(side => side.k)
     .sort((a, b) => b.k - a.k);
   if (sides[0].k * 2 > x.n) return cap(`${times(sides[0].k, x.n)} ${sides[0].said}`);
-  return `Mal so, mal so: ${sides.map(side => `${side.k}× ${side.said}`).join(', ')}`;
+  return `Mal so, mal so: ${once(sides.map(side => side.said))
+    .map((said, i) => `${sides[i].k}× ${said}`)
+    .join(', ')}`;
+}
+// a closing word all phrases share is said once, at the end: „einmal fast alles, einmal die Hälfte gefressen“
+function once(phrases) {
+  const end = ' ' + phrases.at(-1).split(' ').at(-1);
+  return phrases.every(p => p.endsWith(end))
+    ? phrases.map((p, i) => (i < phrases.length - 1 ? p.slice(0, -end.length) : p))
+    : phrases;
 }
 export const lower = t => t.charAt(0).toLowerCase() + t.slice(1);
 // when only some pets decided the verdict, only their ratings are told
