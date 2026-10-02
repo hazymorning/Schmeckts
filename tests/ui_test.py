@@ -111,7 +111,7 @@ async def test_tour(browser, url, scheme='light'):
     await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     current = await pg.evaluate(CURRENT)
-    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item[data-action=open-serving]', 'l => l.map(b => b.dataset.id)')
     check(shown == current and len(shown) >= 1, f'the history shows the meals of the current day ({len(shown)})')
     await shot(pg, f'{scheme}-unfolded')
     await settings(pg)
@@ -465,7 +465,7 @@ async def test_cards(browser, url):
     await idle(pg)
     # History: the calendar and the meals of the current day
     current = await pg.evaluate(CURRENT)
-    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item', 'l => l.map(b => b.dataset.id)')
+    shown = await pg.eval_on_selector_all('[data-sec=hist] .tl-item[data-action=open-serving]', 'l => l.map(b => b.dataset.id)')
     check(
         await pg.locator('[data-sec=hist] .cal').is_visible()
         and await pg.locator('[data-sec=hist] .tl-node').first.is_visible()
@@ -4690,8 +4690,8 @@ async def test_popup(browser, url):
     await idle(pg)
     await pg.evaluate("document.getElementById('sheetBody').scrollTop = 900")
     await idle(pg)
-    visible = "[...document.querySelectorAll('#sheet .tl-item')].findIndex(b => { const r = b.getBoundingClientRect(); return r.top > 120 && r.bottom < 700; })"
-    item = pg.locator('#sheet .tl-item').nth(await pg.evaluate(visible))
+    visible = "[...document.querySelectorAll('#sheet .tl-item[data-action=open-serving]')].findIndex(b => { const r = b.getBoundingClientRect(); return r.top > 120 && r.bottom < 700; })"
+    item = pg.locator('#sheet .tl-item[data-action=open-serving]').nth(await pg.evaluate(visible))
     await item.click()
     await idle(pg)
     over = await pg.evaluate(POPUP)
