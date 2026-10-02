@@ -23,8 +23,8 @@ const CHECK_EVERY = 5 * 60e3,
   INFO_EVERY = 10 * 60e3;
 
 export const isConnected = () => !!prefs.code;
-// not known to be out of reach: nothing waits on a server the last sync could not reach
-export const reachable = () => isConnected() && (status.state === 'ok' || status.state === 'wait');
+// nothing waits on a server the last sync could not reach
+export const reachable = () => isConnected() && status.state !== 'offline';
 // an older server rejects collections it does not know, so changes to those wait in the queue; checksum likewise
 const serverColls = () => (status.features?.includes('collections') ? COLLECTIONS : BASE);
 const sendable = x => serverColls().includes(x.c);

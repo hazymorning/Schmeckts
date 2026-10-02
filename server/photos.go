@@ -43,12 +43,12 @@ func (p *Photos) Get(id string) ([]byte, error) {
 	return os.ReadFile(p.file(id))
 }
 
-func (p *Photos) Sweep(varieties map[string]bool) {
+func (p *Photos) Sweep(deleted map[string]bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	files, _ := filepath.Glob(filepath.Join(p.dir, "*.jpg"))
 	for _, f := range files {
-		if !varieties[strings.TrimSuffix(filepath.Base(f), ".jpg")] {
+		if deleted[strings.TrimSuffix(filepath.Base(f), ".jpg")] {
 			os.Remove(f)
 		}
 	}

@@ -94,8 +94,9 @@ its own usage data to Google.
 Connected (`prefs.code` set), everything is still saved on the phone first and the server is one more peer:
 
 - Changes wait in the queue until the server confirms them. Offline nothing is lost and nothing waits for it.
-- Photo recognition: the server is asked first while „Fotos über den Server erkennen“ is on; if it fails, the
-  phone's own reading follows (`identify()` in `recognize.js` keeps the whole chain).
+- Photo recognition: the server is asked first while „Fotos über den Server erkennen“ is on, it has a key and the
+  last sync reached it; otherwise, or if it fails, the phone reads the photo itself (`identify()` in `recognize.js`
+  keeps the whole chain).
 - Feeding reminders ask the server whether anyone has fed already, and remind as usual when it does not answer.
 - Packaging photos are shared through the server so other phones can show them large.
 - „Verbindung trennen“ keeps all data on the phone.
@@ -170,10 +171,11 @@ are named constants at the top of `smart.js`, `glance.js` and `views/overview.js
 
 ## Working
 
-- **Setup for tests:** Node 22, Python 3 with `pip install -r tests/requirements.txt` (Playwright with its Chromium),
-  Go. `scripts/lint.sh` installs the npm packages. `scripts/setup-build-env.sh` (JDK, Android SDK) is only needed to
-  build the APK, `scripts/prepare.py` then generates `app/android`. After changing the app icon,
-  `design/render-icons.py` draws the Android 7 launcher icons in `app/native/res` again.
+- **Setup for tests:** Node 22, Go, Python 3 with `pip install -r tests/requirements.txt` and, where no Chromium is
+  installed yet, `python3 -m playwright install chromium`. `scripts/lint.sh` installs the npm packages.
+- **Build:** `scripts/setup-build-env.sh` (JDK, Android SDK), then `scripts/build-apk.sh <key file>` generates
+  `app/android` with `scripts/prepare.py` and builds the signed APK; `server/build-deb.sh` the server packages. After
+  changing the app icon, `design/render-icons.py` draws the Android 7 launcher icons in `app/native/res` again.
 - **Checks:** `scripts/lint.sh` (ESLint, Prettier, gofmt, go vet, ruff, shellcheck, `scripts/text-style.py`).
 - **Tests:** `scripts/test.sh [go node files storage design perf ui sync]`. `tests/*.test.js` test pure modules in Node,
   the Python suites drive the app in Chromium with simulated plugins, `sync_test.py` runs phones against the real

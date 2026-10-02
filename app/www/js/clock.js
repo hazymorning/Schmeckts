@@ -10,7 +10,7 @@ export function randomId(len = 16) {
   return Array.from(crypto.getRandomValues(new Uint8Array(len)), b => abc[b % 36]).join('');
 }
 
-const serverNow = () => Date.now() + clockState.offset;
+export const serverNow = () => Date.now() + clockState.offset;
 
 export function stamp() {
   const t = serverNow();

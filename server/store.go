@@ -380,12 +380,13 @@ func (s *Store) Variety(id string) bool {
 	return rec != nil && string(rec.F["_del"].V) != "true"
 }
 
-func (s *Store) Varieties() map[string]bool {
+// Deleted varieties. Unknown ones do not count: after a reset the phones bring them back.
+func (s *Store) DeletedVarieties() map[string]bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := map[string]bool{}
 	for id, rec := range s.st.Records["products"] {
-		if string(rec.F["_del"].V) != "true" {
+		if string(rec.F["_del"].V) == "true" {
 			out[id] = true
 		}
 	}

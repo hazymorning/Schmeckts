@@ -1,5 +1,6 @@
 // barcodes reach a variety only in linkProduct, so a multipack grows and a wrong variety takes its code with it
 import {uid} from '../fields.js';
+import {serverNow} from '../clock.js';
 import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
 import {db, dbFound, loadError, prefs, save, savePrefs} from '../store.js';
 import {setAside} from '../disk.js';
@@ -16,7 +17,7 @@ import {
   serverStamp,
   sweepPhotos,
 } from '../photos.js';
-import {request} from '../api.js';
+import {ServerError, request} from '../api.js';
 import {isConnected, serverCan, status} from '../sync.js';
 import {report} from '../report.js';
 import {memLines} from '../recognize.js';
@@ -136,7 +137,7 @@ export function replaceProductPhoto(pid, img) {
   if (!p) return;
   replacePhotoFile(pid, resize(img, 1100, 0.82).split(',')[1]);
   p.thumb = cropSquare(img, 200, 0.76);
-  prefs.photoStamps[pid] = Date.now();
+  prefs.photoStamps[pid] = Math.max(serverNow(), serverStamp(p) + 1); // newer than the household's, whatever the clocks say
   save();
   savePrefs();
   if (isConnected()) sharePhotos();
@@ -149,36 +150,40 @@ const newerHere = () => db.products.filter(p => p.sharedPhoto && (prefs.photoSta
 let sharing = false,
   toldOld = false;
 const refused = new Set();
+// one photo to the server. A refused photo or an unreadable file is skipped from then on; anything else on the
+// server's side ends the round, and the next contact tries again.
+async function upload(id) {
+  try {
+    const image = await photoData(id);
+    if (!image) return false;
+    await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
+    return true;
+  } catch (e) {
+    if (e instanceof ServerError && e.kind !== 'bad') throw e;
+    if (!(e instanceof ServerError)) report('reading a photo to share', e);
+    refused.add(id);
+    return false;
+  }
+}
 export async function sharePhotos() {
   if (sharing) return;
   sharing = true;
   try {
-    const replaced = newerHere();
+    const replaced = newerHere().filter(p => !refused.has(p.id));
     if (replaced.length && !(await serverCan('replace'))) {
       if (status.features && !toldOld) toast('Der Server behält das alte Foto, bis er aktualisiert ist.');
       toldOld ||= !!status.features;
       if (!status.features) return; // out of reach: tried again on the next contact
     } else
-      for (const p of replaced) {
-        const image = await photoData(p.id);
-        if (!image) continue;
-        await request('POST', '/api/photo/' + p.id, {body: {image}, timeout: 60e3});
-        p.sharedPhoto = prefs.photoStamps[p.id];
-        save();
-      }
+      for (const p of replaced)
+        if (await upload(p.id)) {
+          p.sharedPhoto = prefs.photoStamps[p.id];
+          save();
+        }
     if (!(await serverCan('photo'))) return;
     for (const {id} of db.products.filter(x => !x.sharedPhoto && keptPhoto(x.id) && !refused.has(x.id))) {
-      const image = await photoData(id);
-      if (!image) continue;
-      try {
-        await request('POST', '/api/photo/' + id, {body: {image}, timeout: 60e3});
-      } catch (e) {
-        if (e.kind !== 'bad') throw e;
-        refused.add(id); // no JPEG, too large, or a variety the server does not know
-        continue;
-      }
       const p = getProduct(id);
-      if (p && !p.sharedPhoto) {
+      if ((await upload(id)) && p && !p.sharedPhoto) {
         p.sharedPhoto = prefs.photoStamps[id] || true;
         save();
       }

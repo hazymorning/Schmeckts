@@ -162,8 +162,6 @@ async def test_views(browser, url, scheme):
         await idle(pg)
 
     await scan()
-    if await pg.locator('[data-action=mode-local]').count():
-        await tap('[data-action=mode-local]')
     logo = await pg.eval_on_selector_all(
         '.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0])"
     )

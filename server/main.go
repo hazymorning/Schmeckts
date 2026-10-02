@@ -82,7 +82,7 @@ func serve(dir string) error {
 			if err := store.PruneSeen(time.Now()); err != nil {
 				log.Printf("pruning change ids failed: %v", err)
 			}
-			photos.Sweep(store.Varieties())
+			photos.Sweep(store.DeletedVarieties())
 			select {
 			case <-ctx.Done():
 				return

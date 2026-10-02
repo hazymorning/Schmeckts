@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -401,8 +403,14 @@ func TestPhotos(t *testing.T) {
 	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("change-lachs-weg", "products", "lachs001", clock(ms+1, 0, "anna"), map[string]any{"_del": true}),
 	}})
-	a.photos.Sweep(a.store.Varieties())
+	a.photos.Sweep(a.store.DeletedVarieties())
 	if s, _, _ := call(a, "GET", "/api/photo/lachs001", testCode, nil); s != 404 {
 		t.Fatalf("a variety that is gone takes its photo along: %d", s)
+	}
+	reset, _ := OpenStore(t.TempDir())
+	a.photos.Put("thun0001", []byte{0xFF, 0xD8, 0xFF, 1})
+	a.photos.Sweep(reset.DeletedVarieties())
+	if _, err := os.Stat(filepath.Join(a.photos.dir, "thun0001.jpg")); err != nil {
+		t.Fatalf("an empty store after a reset keeps the photos: %v", err)
 	}
 }

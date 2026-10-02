@@ -19,10 +19,10 @@ Read `PROJECT.md` before changing stored data, sync, storage or the server.
 
 ## Commands
 
-- Cloud sessions get the test tools from `.claude/hooks/session-start.sh`. Elsewhere: Node 22, Go, and
-  `pip install -r tests/requirements.txt`.
+- Cloud sessions get the test tools from `.claude/hooks/session-start.sh`. Elsewhere: Node 22, Go,
+  `pip install -r tests/requirements.txt` and `python3 -m playwright install chromium`.
 - `scripts/lint.sh` before every push.
 - `scripts/test.sh <suites>` while working, only what the change touches: `node` for pure modules (`smart`, `glance`,
   `ocr`, `derive`), `ui design` for views and CSS, `storage sync go` for store, sync and server, `files` for
   packaging and versions. All suites before pushing.
-- `scripts/setup-build-env.sh` and `scripts/prepare.py` only to build the APK.
+- `scripts/setup-build-env.sh` and `scripts/build-apk.sh` only to build the APK.
