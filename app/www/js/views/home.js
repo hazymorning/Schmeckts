@@ -3,7 +3,7 @@ import {settled} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, dayStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
-import {observationOf, RATINGS} from '../config.js';
+import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {diary, getPet, getProduct, model, observedPets, pendingServings, pname, servingPets} from '../derive.js';
@@ -136,6 +136,7 @@ function homeHTML() {
   if (!m) html += stepsHTML();
   else
     html +=
+      newsHTML() +
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m) +
@@ -225,6 +226,16 @@ function hintHTML(m) {
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
+}
+
+// the newest news, never beside sample data
+function newsHTML() {
+  const n = NEWS[0],
+    [setting, offWhy] = n?.off || [],
+    off = setting && !prefs[setting];
+  if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
+  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
+    <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${off ? `<button class="btn primary" data-action="open-settings">Einstellungen öffnen</button>` : ''}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
 const SHOP_SHOWN = 3;

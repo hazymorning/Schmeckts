@@ -1139,6 +1139,54 @@ async def test_reminder_buttons(browser, url):
     await ctx.close()
 
 
+NEWS = "import('./js/config.js').then(c => c.NEWS.map(n => 'neu:' + n.v))"
+CARD = '[data-sec=news]'
+
+
+async def test_news(browser, url):
+    print('news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    keys = await pg.evaluate(NEWS)
+    await tap(pg, '.welcome [data-action=add-pet]')
+    await pg.fill('#f-name', 'Minka')
+    await tap(pg, '[data-action=save-pet]')
+    await pg.reload()
+    await started(pg)
+    hidden = await state(pg, 'prefs.hiddenHints')
+    check(keys and all(k in hidden for k in keys) and await pg.locator(CARD).count() == 0, f'a new phone has seen all news {hidden}')
+    await ctx.close()
+
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
+    check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
+    check(await pg.locator(f'{CARD} [data-action=open-settings]').count() == 1, 'the reminder is off: the card leads to the settings')
+    await tap(pg, f'{CARD} [data-action=open-settings]')
+    check(await pg.evaluate(LEVEL) == [True, 'settings', None, None], 'there it is switched on')
+    await back(pg)
+    await tap(pg, f'{CARD} [data-action=hide-hint]')
+    await pg.reload()
+    await started(pg)
+    check(await pg.locator(CARD).count() == 0, 'hidden, also after a restart')
+    await ctx.close()
+
+    demo = {**SAVED, 'pets': [pet('demopet0001', 'Mau')], 'servings': [{**x, 'pets': {'demopet0001': {'r': 'gut'}}} for x in SAVED['servings']]}
+    ctx, pg, errors = await seeded(browser, url, {'db': demo}, native=True)
+    check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
+    await ctx.close()
+
+    now = int(time.time() * 1000)
+    ctx, pg, errors = await seeded(browser, url, {'db': household_with_ratings(now), 'prefs': {'remind': 180}}, native=True)
+    shown = await pg.locator(CARD).count() == 1 and await pg.locator(f'{CARD} [data-action=open-settings]').count() == 0
+    await pg.evaluate(ASK, ['einzeln0001', ['minka00001'], 'lachs00001'])
+    await pg.wait_for_function(f'{NOTES}.length')
+    n = (await pg.evaluate(NOTES))[0]
+    await pg.evaluate("n => window.__tapNote({actionId: 'top', notification: n})", n)
+    await idle(pg)
+    check(shown and await pg.locator(CARD).count() == 0, 'reminder on: no way to the settings; rating from a reminder hides the news')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_feed_remind(browser, url):
     print('feeding reminder: the usual times handed to our own plugin, with the server when connected')
     ctx, pg, errors = await one_pet(browser, url, timezone_id='Europe/Berlin')
@@ -2581,6 +2629,7 @@ run_tests(
         'suggestions': test_suggestions,
         'reminder': test_reminders,
         'reminder-buttons': test_reminder_buttons,
+        'news': test_news,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
         'birthday': test_birthday,

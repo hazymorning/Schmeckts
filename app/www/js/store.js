@@ -2,7 +2,7 @@
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
 import {report} from './report.js';
-import {tidyRemind} from './config.js';
+import {DEMO, NEWS, tidyRemind} from './config.js';
 import {addDays, dayKey} from './dates.js';
 import {MEMORY} from './glance.js';
 import {milestones} from './smart.js';
@@ -211,6 +211,8 @@ async function load() {
   if (fixed) persist('db', 'sync');
   if (prefs.activePet !== 'all' && !db.pets.some(x => x.id === prefs.activePet)) prefs.activePet = 'all';
   prefs.milestones ||= milestones(db).reached; // first run: what is reached counts as seen
+  // news are for an update: a phone without pets of its own has seen them all
+  if (!db.pets.some(x => !x.id.startsWith(DEMO))) for (const n of NEWS) hideHint('neu:' + n.v);
 }
 function ensureClocks() {
   let n = 0;
@@ -262,6 +264,7 @@ export function hideHint(key) {
   prefs.hiddenHints.push(key);
   savePrefs();
 }
+export const usedNews = use => NEWS.filter(n => n.use === use).forEach(n => hideHint('neu:' + n.v));
 
 const mealOf = fields => ({productId: JSON.parse(fields.productId ?? 'null')});
 function diff() {

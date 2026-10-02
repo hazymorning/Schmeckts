@@ -3,7 +3,7 @@ import {clockStr} from '../dates.js';
 import {FeedReminder, Notifications} from '../native.js';
 import {report} from '../report.js';
 import {RATINGS, REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
-import {db, prefs, savePrefs} from '../store.js';
+import {db, prefs, savePrefs, usedNews} from '../store.js';
 import {caughtUp, isConnected, reachable} from '../sync.js';
 import {fedToday, feedReminders, quickRatings} from '../smart.js';
 import {getPet, getProduct, getServing, petNames, pname} from '../derive.js';
@@ -173,6 +173,7 @@ export function startReminders() {
       pid = notification?.extra?.pet;
     if (!s) return;
     if (RATINGS[actionId] && s.pets[pid] && !s.pets[pid].r && rateMeal(s.id, pid, actionId)) {
+      usedNews('rate-reminder');
       update();
       renderSheet();
     } else openSheet({kind: 'serving', id: s.id});
