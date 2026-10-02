@@ -6,7 +6,8 @@ import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
 import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
-import {cropSquare, fileToImage, memPhotos, readable, resize} from '../images.js';
+import {cropSquare, fileToImage, memPhotos, photoOf, readable, resize} from '../images.js';
+import {textSquare} from '../ocr.js';
 import {keepPhoto} from '../photos.js';
 import {milestones} from '../smart.js';
 import {identify, memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
@@ -250,6 +251,7 @@ async function recognizeServing(id, sharp = '') {
   } catch (e) {
     report('recognition', e);
   }
+  const thumb = found.read && (await textThumb(b64, found.read));
   if (running.get(id) !== b64) return; // superseded by a new photo
   running.delete(id);
   readingSince.delete(id);
@@ -257,9 +259,24 @@ async function recognizeServing(id, sharp = '') {
   if (!cur) return;
   if (cur.productId)
     settle(cur); // named meanwhile, here or on another phone
-  else takeResult(cur, found, house);
+  else {
+    if (thumb) cur.thumb = thumb; // first, as linking hands the thumbnail on to the variety
+    takeResult(cur, found, house);
+  }
   save();
   refreshServing(id);
+}
+
+// the square around the packaging's text; null keeps the centre square
+async function textThumb(b64, read) {
+  try {
+    const img = await photoOf(b64),
+      square = textSquare(read, img.width, img.height);
+    return square && cropSquare(img, 200, 0.76, square);
+  } catch (e) {
+    report('the thumbnail around the text', e);
+    return null;
+  }
 }
 
 function takeResult(s, found, house) {

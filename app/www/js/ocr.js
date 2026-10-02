@@ -34,6 +34,11 @@ const MARGIN = 0.25; // added on each side, as a share of the crop's width and h
 const OVERLAP = 0.6; // of the smaller box
 const INSIDE = 0.9; // a line the crop cuts through keeps its first reading
 
+// The thumbnail of a packaging photo is the square around its text (feeding.js).
+export const CLOSEST = 0.5; // of the photo's short side; closer in, a thumbnail shows print instead of a packaging
+const ROOM = 0.15; // added on each side, as a share of the text's longer edge
+const SAME_SHAPE = 0.02; // aspect ratios further apart are another photo, or the same one turned
+
 const EMPTY = {brand: '', variety: '', type: '', animal: ''};
 const QUANTITY =
   /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
@@ -328,13 +333,7 @@ export function focusOf(read, products = []) {
   const across = l => Math.min(l.box.right, main.box.right) > Math.max(l.box.left, main.box.left);
   const above = page.lines.filter(l => l.cy < main.box.top && across(l)).sort((a, b) => b.cy - a.cy)[0];
   const below = page.lines.filter(l => l.cy > main.box.bottom && across(l)).sort((a, b) => a.cy - b.cy)[0];
-  const lines = [main, above, below].filter(Boolean);
-  const box = {
-    left: Math.min(...lines.map(l => l.box.left)),
-    top: Math.min(...lines.map(l => l.box.top)),
-    right: Math.max(...lines.map(l => l.box.right)),
-    bottom: Math.max(...lines.map(l => l.box.bottom)),
-  };
+  const box = around([main, above, below].filter(Boolean));
   const [dx, dy] = [MARGIN * (box.right - box.left), MARGIN * (box.bottom - box.top)];
   const width = read.width || Math.max(...page.lines.map(l => l.box.right)),
     height = read.height || Math.max(...page.lines.map(l => l.box.bottom));
@@ -345,6 +344,39 @@ export function focusOf(read, products = []) {
     bottom: Math.min(height, Math.ceil(box.bottom + dy)),
   };
 }
+
+/* {x, y, side} in the pixels of the same photo at width × height; null with too little text, or for a reading of
+   the photo turned */
+export function textSquare(read, width, height) {
+  if (!read?.lines || !read.width || !read.height || !width || !height) return null;
+  if (Math.abs((width * read.height) / (height * read.width) - 1) > SAME_SHAPE) return null;
+  const page = {mid: median(read.lines.map(l => l.h)), tilt: median(read.lines.map(l => l.tilt || 0))};
+  const text = read.lines.filter(l => /\p{L}{2}/u.test(l.text) && !noise(l, page));
+  if (text.length < 2) return null;
+  const s = width / read.width,
+    all = around(text),
+    short = Math.min(width, height),
+    wanted = s * (1 + 2 * ROOM) * Math.max(all.right - all.left, all.bottom - all.top),
+    side = Math.round(Math.min(short, Math.max(CLOSEST * short, wanted)));
+  const tall = median(text.map(l => l.h)),
+    large = around(text.filter(l => l.h >= tall));
+  // centred on the text; when it cannot hold all of it, the larger print stays in
+  const start = (from, to, keepFrom, keepTo, size) => {
+    const mid = Math.min(Math.max((s * (from + to)) / 2, s * keepTo - side / 2), s * keepFrom + side / 2);
+    return Math.round(Math.min(size - side, Math.max(0, mid - side / 2)));
+  };
+  return {
+    x: start(all.left, all.right, large.left, large.right, width),
+    y: start(all.top, all.bottom, large.top, large.bottom, height),
+    side,
+  };
+}
+const around = lines => ({
+  left: Math.min(...lines.map(l => l.box.left)),
+  top: Math.min(...lines.map(l => l.box.top)),
+  right: Math.max(...lines.map(l => l.box.right)),
+  bottom: Math.max(...lines.map(l => l.box.bottom)),
+});
 
 // crop: the area read again, in photo pixels, plus the scale it was enlarged by
 export function joinReadings(first, second, crop) {

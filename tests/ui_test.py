@@ -1690,6 +1690,37 @@ async def test_recognize(browser, url):
     await ctx.close()
 
 
+async def test_text_thumb(browser, url):
+    print('a packaging photo read on the phone: the thumbnail shows the square around the text, the middle without places')
+    ctx, pg, errors = await one_pet(browser, url)
+    # the test photo is orange with a cream label in its middle; a corner of the thumbnail shows either
+    CORNERS = [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+
+    async def corners():
+        got = await pg.evaluate(PIXEL, [await state(pg, 'db.servings[0].thumb'), CORNERS])
+        return [got['w'], ['cream' if p != 'red' and int(p.split(',')[1]) > 180 else 'orange' for p in got['px']]]
+
+    await pg.evaluate("window.__ocrText = 'Sheba\\nHuhn in Gelee'")
+    await snap(pg, done='!!db.servings[0]?.guess')
+    middle = await corners()
+    await tap(pg, '[data-action=close]')
+    # in the top left of the label, in the pixels of the large photo as it is read (2400 x 1800)
+    lines = [('Whiskas', 350, 500, 1000, 650), ('Rind in Gelee', 350, 700, 1250, 850)]
+    blocks = [{'lines': [{'text': t, 'boundingBox': {'left': x0, 'top': y0, 'right': x1, 'bottom': y1}}]} for t, x0, y0, x1, y1 in lines]
+    await pg.evaluate('r => { window.__ocrResult = r; }', {'text': 'Whiskas\nRind in Gelee', 'blocks': blocks})
+    await snap(pg, PACK_LARGE, done='db.servings.length === 2 && !!db.servings[0].guess')  # the new meal, not the first one
+    moved = await corners()
+    check(
+        middle == [200, ['orange'] * 4] and moved == [200, ['orange', 'orange', 'cream', 'cream']],
+        f'read without places: the middle; with them: up and to the left, where the text stands {middle} {moved}',
+    )
+    thumb = await state(pg, 'db.servings[0].thumb')
+    await tap(pg, '[data-action=save-name]')
+    check(await state(pg, "db.products.find(p => p.brand === 'Whiskas')?.thumb") == thumb, 'the variety named from it has that thumbnail')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_discard(browser, url):
     print('a meal broken off after the photo: deleted from naming or its card, with undo, also while it is read')
     ctx, pg, errors = await one_pet(browser, url)
@@ -2637,6 +2668,7 @@ run_tests(
         'network': test_network,
         'scanning': test_scan,
         'recognition': test_recognize,
+        'text-thumb': test_text_thumb,
         'discard': test_discard,
         'pack-lines': test_pack_lines,
         'known-photo': test_known_photo,

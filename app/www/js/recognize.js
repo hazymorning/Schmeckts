@@ -56,8 +56,8 @@ const STEPS = [
         // a known variety counts like a barcode hit, unless the server reads photos
         known = !photoByServer() && pack.known ? getProduct(pack.known) : null;
       const hit = known ? {products: [known]} : asDetails(pack);
-      // tidied like the fields, so a chip and its field agree
-      return hit && {...hit, lines: packLines(read, '', db.products), brands: packBrands(read, db.products)};
+      // tidied like the fields, so a chip and its field agree; read places the thumbnail
+      return hit && {...hit, read, lines: packLines(read, '', db.products), brands: packBrands(read, db.products)};
     },
   },
 ];
