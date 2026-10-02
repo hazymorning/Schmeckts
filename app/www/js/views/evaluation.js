@@ -25,6 +25,7 @@ import {
   lead,
   likesList,
   lower,
+  obsThumb,
   since,
   strip,
   thumbOf,
@@ -272,7 +273,7 @@ function observedCard(x) {
     ...kinds.map(k => {
       const o = observationOf(k.kind);
       return told(
-        lead(o.icon),
+        obsThumb(k.kind),
         `${o.label}, <b>${often(k.n)}</b> in den letzten vier Wochen.`,
         `Zuletzt ${since(k.last, now)}${k.before ? `, in den acht Wochen davor ${often(k.before)}` : ''}.`,
       );
@@ -281,7 +282,7 @@ function observedCard(x) {
       const o = observationOf(l.kind);
       return toldBtn(
         l.id,
-        lead(o.icon),
+        obsThumb(l.kind),
         `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
         `${cap(o.after)} nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten, nach den anderen Sorten nach <b>${l.other.hit} von ${l.other.n}</b>.`,
       );
@@ -350,7 +351,7 @@ function patternCard(m, x) {
       ? likesList(m, {...first, groups: [first.groups[0], first.groups.at(-1)]})
       : toldList(habits.slice(0, HABITS).map(h => habitRow(h, db.pets.length > 1 && !m.pet)));
   return `<section class="card"><h2>Worauf es ankommt</h2>${tips.length ? say(`Neues am ehesten ${andList(tips)} probieren.`) : ''}${body}
-    <button class="card-btn" data-action="open-level" data-v="profile">Alles, worauf es ankommt${icon('chevron')}</button></section>`;
+    <button class="card-btn" data-action="open-level" data-v="profile">Mehr dazu${icon('chevron')}</button></section>`;
 }
 
 const TRIALS = 3;

@@ -310,7 +310,7 @@ async def test_flow(browser, url):
     await pg.fill('#f-brand', 'Sheba')
     await pg.fill('#f-variety', 'Lachs in Soße')
     await tap(pg, '[data-action=save-name]')
-    rates = pg.locator('#sheet .pet-rate')
+    rates = pg.locator('#sheet .slider')
     await rates.nth(0).locator('[data-r=gut]').click(force=True)
     await idle(pg)
     await rates.nth(1).locator('[data-r=sosse]').click(force=True)
@@ -892,7 +892,7 @@ async def test_reminders(browser, url):
     for i in range(s['pets']):
         if i:
             half = len(await pending())
-        await pg.click(f'#sheet .pet-rate:nth-child({i + 1} of .pet-rate) [data-r=top]', force=True)
+        await pg.locator('#sheet .slider').nth(i).locator('[data-r=top]').click(force=True)
         await debounced(pg)
     check(half == 1 and await pending() == [] and any(c[0]['id'] == n['id'] for c in await calls(pg, 'cancelNotes')), 'cancelled once all pets rated')
     t0 = await pg.evaluate(PLAN, ['ohnesorte001', 2, None])
@@ -1702,7 +1702,7 @@ async def test_rephoto(browser, url):
 
 
 PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const p = s.db.products.find(x => x.id === pid);
-  return [document.querySelector('#sheet .prod-card .thumb, #sheet .name-photo')?.getAttribute('src')?.slice(-32) ?? null, (p.thumb || '').slice(-32),
+  return [document.querySelector('#sheet .prod .thumb, #sheet .name-photo')?.getAttribute('src')?.slice(-32) ?? null, (p.thumb || '').slice(-32),
     (localStorage.getItem('__fs:photos/' + pid + '.jpg') || '').slice(-32), p.sharedPhoto ?? null]; })"""
 
 
@@ -1987,23 +1987,19 @@ async def test_observations(browser, url):
     before = await pg.evaluate(OBS)
     CHIP = '#home .overview [data-action=observe]'
     ROW = '[data-sec=hist] [data-action=open-observation]'
-    await tap(pg, '[data-action=observe-open]')
-    chips = await pg.locator(CHIP).count()
-    await tap(pg, '[data-action=observe-open]')
-    check(chips > 0 and await pg.locator(CHIP).count() == 0 and await pg.evaluate(OBS) == before, 'the chips fold open and shut, nothing noted')
-    await tap(pg, '[data-action=observe-open]')
+    named, mau = await pg.locator(f'{CHIP}[data-v=tired]').inner_text(), await state(pg, 'db.pets[0].name')
+    check(await pg.locator(CHIP).count() == 3 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
     await tap(pg, '[data-action=observe][data-v=stink]')
     after, pet_ = await pg.evaluate(OBS), await state(pg, 'db.pets[0].id')
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
-        and await pg.locator(CHIP).count() == 0
+        and await pg.locator(CHIP).count() == 3
         and await pg.locator(ROW).count() == 1,
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary {after[0]}',
     )
     await tap(pg, '#toast [data-action=undo]')
     check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
-    await tap(pg, '[data-action=observe-open]')
     await tap(pg, '[data-action=observe][data-v=hungry]')
     await tap(pg, ROW)
     KINDS = "[...document.querySelectorAll('#sheet [data-action=set-observation-kind][aria-pressed=true]')].map(c => c.dataset.v)"
@@ -2032,17 +2028,19 @@ async def test_observations(browser, url):
     check(over == ['report', 'observation'], 'in the history page it opens over the page')
     await back(pg)
     await change(pg, f"s.db.pets.push({{id: '{T}', name: 'Tiger', species: 'Katze', photo: null, createdAt: Date.now()}})")
-    await tap(pg, '[data-action=observe-open]')
+    named = await pg.locator(f'{CHIP}[data-v=tired]').inner_text()
     await tap(pg, '[data-action=observe][data-v=stink]')
     both = (await pg.evaluate(OBS))[0][1]
     await tap(pg, ROW)
     await tap(pg, f'#sheet [data-action=toggle-observation-pet][data-id={T}]')
     narrowed = (await pg.evaluate(OBS))[0][1]
     await tap(pg, f'#sheet [data-action=toggle-observation-pet][data-id={pet_}]')
-    check(both == sorted([pet_, T]) and narrowed == [pet_] and (await pg.evaluate(OBS))[0][1] == [pet_], 'for all pets, narrowed, at least one')
+    check(
+        both == sorted([pet_, T]) and narrowed == [pet_] and (await pg.evaluate(OBS))[0][1] == [pet_] and mau not in named,
+        f'for all pets, narrowed, at least one; the tired chip names no single pet ({named})',
+    )
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, f'[data-action=filter][data-id={T}]')
-    await tap(pg, '[data-action=observe-open]')
     await tap(pg, '[data-action=observe][data-v=hungry]')
     check((await pg.evaluate(OBS))[0][:2] == ['hungry', [T]], 'with a pet chosen: noted for that pet')
     count = len(await pg.evaluate(OBS))
@@ -2262,7 +2260,7 @@ async def test_photo_viewer(browser, url):
     )
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, '.pend-head')
-    from_file = await viewed(pg, '#sheet .prod-card > .photo-btn')
+    from_file = await viewed(pg, '#sheet .prod .photo-btn')
     await tap(pg, '#viewer')
     await closed(pg)
     await tap(pg, '#sheet .prod-edit')

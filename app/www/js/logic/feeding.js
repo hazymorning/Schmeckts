@@ -39,7 +39,7 @@ export function serveProduct(pid, scanCode = '') {
   const msg = `${pname(p)} serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}`;
   update();
   scrollTop();
-  toast(withMilestone(msg), () => undoServe(s.id));
+  toast(withMilestone(msg), () => undoServe(s.id), {ic: 'bowl'});
 }
 // each milestone is announced once per device
 function withMilestone(msg) {
@@ -166,6 +166,7 @@ export async function servePhoto(file, scanCode = '') {
       `Serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}${local ? '' : '. Sorte wird erkannt …'}`,
     ),
     () => undoServe(s.id),
+    {ic: 'bowl'},
   );
   // the large copy for reading is made only once the meal is on screen
   (local ? readable(img) : Promise.resolve(''))
@@ -312,7 +313,10 @@ function recognized(s, p) {
   linkProduct(s, p);
   const naming = sheet?.kind === 'serving' && sheet.id === s.id;
   (naming ? closeSheet() : Promise.resolve()).then(() =>
-    toast(`<b>${esc(pname(p))}</b> erkannt und serviert`, () => unrecognize(s.id, p.id, was), true),
+    toast(`<b>${esc(pname(p))}</b> erkannt und serviert`, () => unrecognize(s.id, p.id, was), {
+      ic: 'bowl',
+      html: true,
+    }),
   );
 }
 // undoes the recognition, not the meal; a photo keepPhoto() wrote stays, it shows the right packaging

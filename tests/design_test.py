@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, open_page, phone, run_tests, set_theme
 
 RATING = ('--good', '--mid', '--sauce', '--bad')
+OBSERVED = ('--stink', '--hungry', '--tired')
 TEXT_PAIRS = (
     [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')]
     + [
@@ -19,9 +20,9 @@ TEXT_PAIRS = (
         ('--bad', '--bad-soft'),
         ('--bad', '--surface'),
     ]
-    + [('--ink', r + '-soft') for r in RATING]
+    + [('--ink', r + '-soft') for r in RATING + OBSERVED]
 )
-ICON_PAIRS = [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')]
+ICON_PAIRS = [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')] + [(o, o + '-soft') for o in OBSERVED]
 TOKENS = (
     """(names) => { const rgb = """
     + RGB
@@ -41,7 +42,7 @@ async def test_palette(browser, url):
         low = [f'{fg} on {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in TEXT_PAIRS if contrast(c[fg], c[bg]) < 4.5]
         check(not low, f'text tokens at least 4.5:1 ({theme}) {low}')
         low = [f'{fg} on {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
-        check(not low, f'rating colours as icons at least 3:1 ({theme}) {low}')
+        check(not low, f'rating and observation colours as icons at least 3:1 ({theme}) {low}')
     check(not errors, f'no errors in the console {errors}')
     await ctx.close()
 
@@ -169,9 +170,6 @@ async def test_views(browser, url, scheme):
     check(logo == [[want, True]], f'welcome logo for the {scheme} scheme {logo}')
     await tap('[data-action=demo]')
     await scan()
-    await tap('[data-action=observe-open]')
-    await scan()
-    await tap('[data-action=observe-open]')
     await tap('[data-sec=evaluation] [data-action=open-evaluation]')
     await scan()
     await tap('#sheet [data-action=open-level][data-v=profile]')
@@ -224,8 +222,6 @@ async def test_views(browser, url, scheme):
     # ::backdrop is no element, so the reduced-motion rule has to name it
     dimming = await pg.evaluate("getComputedStyle(document.getElementById('sheet'), '::backdrop').animationDuration")
     check(float(dimming.rstrip('s')) < 0.01, f'reduced motion reaches the sheet dimming ({scheme}, {dimming})')
-    appearance = await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance')
-    check(appearance == 'none', f'the time field draws no second arrow on Android ({appearance})')
     await tap('[data-action=close]')
     await pg.click('.pend .slider-track button', force=True)  # the level takes no pointer, the track does
     await pg.wait_for_selector('#toast [data-action=undo]')

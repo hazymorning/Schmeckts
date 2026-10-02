@@ -13,7 +13,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {toggleObserve, toggleOverview, update} from './views/home.js';
+import {update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -143,16 +143,17 @@ const ACTIONS = {
   'open-pet'(el) {
     openPet(el.dataset.id);
   },
-  'toggle-overview'() {
-    haptic('select');
-    toggleOverview();
-  },
-  'observe-open'() {
-    haptic('select');
-    toggleObserve();
-  },
   observe(el) {
     observe(el.dataset.v);
+  },
+  // without showPicker() (WebView before 99) the field takes the focus and the keyboard
+  pick(el) {
+    const f = el.querySelector('input');
+    try {
+      f.showPicker();
+    } catch {
+      f.focus();
+    }
   },
   'open-observation'(el) {
     openSheet({kind: 'observation', id: el.dataset.id});
@@ -542,11 +543,6 @@ document.addEventListener('input', e => {
   if (t.hasAttribute('data-search')) renderServeHits(t.value);
 });
 document.addEventListener('keydown', e => {
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button][data-action]')) {
-    e.preventDefault();
-    e.target.click();
-    return;
-  }
   if (e.key !== 'Enter' || !sheet || e.target.tagName !== 'INPUT') return;
   if (e.target.id === 'f-server' && $('#f-code') && !$('#f-code').value) {
     e.preventDefault();
@@ -568,7 +564,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.hasAttribute('data-remind')) return renderSheet();
+  if (t.hasAttribute('data-remind') || t.id === 'f-birthday') return renderSheet();
   if (t.dataset.obsTime && t.value) return setObservationTime(t.dataset.obsTime, new Date(t.value).getTime());
   if (!t.dataset.time || !t.value) return;
   const s = getServing(t.dataset.time),

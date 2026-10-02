@@ -1,5 +1,5 @@
 import {$, reduceMotion} from '../dom.js';
-import {settled, slideHeight} from '../motion.js';
+import {settled} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, weekStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
@@ -29,7 +29,7 @@ import {
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
-import {observeChips, overviewHTML} from './overview.js';
+import {overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
 
 export function update() {
@@ -61,8 +61,8 @@ export function scrollTop() {
   window.scrollTo({top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
 }
 
-// fresh: meal id to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets
-export const homeView = {fresh: null, open: {}, held: new Map(), observing: false};
+// fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets
+export const homeView = {fresh: null, held: new Map()};
 
 function renderPets() {
   const el = $('#pets');
@@ -113,31 +113,10 @@ export function renderHome() {
   renderFab();
   renderSyncChip();
   renderMood();
+  const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
   $('#home').innerHTML = homeHTML();
+  if (rail) $('#home .obs').scrollLeft = rail;
   homeView.fresh = null;
-}
-export function toggleOverview() {
-  const sec = $('#home .overview'),
-    top = sec && $('.ov-top', sec),
-    p = sec && $('p', sec);
-  if (!p) return;
-  const open = (homeView.open.overview = !homeView.open.overview),
-    h0 = p.offsetHeight;
-  sec.classList.toggle('open', open);
-  top.setAttribute('aria-expanded', String(open));
-  slideHeight(p, h0);
-}
-export function toggleObserve() {
-  const sec = $('#home .overview'),
-    body = sec && $('#fold-observe', sec),
-    btn = sec && $('[data-action=observe-open]', sec);
-  if (!body || !btn) return;
-  const open = (homeView.observing = !homeView.observing),
-    h0 = body.offsetHeight;
-  body.innerHTML = open ? observeChips() : '';
-  btn.textContent = open ? 'Abbrechen' : 'Beobachtung notieren';
-  btn.setAttribute('aria-expanded', String(open));
-  slideHeight(body, h0);
 }
 function homeHTML() {
   const banner = loadError
@@ -149,7 +128,7 @@ function homeHTML() {
   const open = new Set(pendingServings()),
     pend = db.servings.filter(s => open.has(s) || (homeView.held.has(s.id) && rateRows(s).length)),
     m = db.servings.length ? model() : null;
-  let html = banner + (m ? overviewHTML(m, homeView.open.overview, homeView.observing) : '');
+  let html = banner + (m ? overviewHTML(m) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
   else
@@ -165,8 +144,8 @@ const welcomeHTML = () => `<div class="welcome">
   <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
   <h2>Was schmeckt deinem Tier?</h2>
   <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie der Napf aussah. So siehst du bald, was wirklich ankommt.</p>
-  <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Erstes Tier anlegen</button>
-    ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Mit Beispieldaten ansehen</button>`}
+  <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Tier anlegen</button>
+    ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Beispieldaten ansehen</button>`}
   </div></div>`;
 
 const stepsHTML = () => `<section class="card" style="view-transition-name:sec-steps"><h2>So geht’s</h2>
@@ -254,7 +233,7 @@ function shopHTML(m) {
     .map(e => shopRow(m, e))
     .join('');
   return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2><ul class="list shop">${rows}</ul>
-    <button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button></section>`;
+    <button class="card-btn" data-action="open-shop">Einkaufsliste${icon('chevron')}</button></section>`;
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

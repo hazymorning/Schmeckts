@@ -139,6 +139,15 @@
   --sauce-soft: light-dark(#e2dcd4, #3e392e);
   --bad: light-dark(#8f3f43, #d98c8e);
   --bad-soft: light-dark(#e9dcd9, #3e342f);
+  /* observations, quieter than the ratings and apart from them */
+  --stink: light-dark(#36676a, #8cc3c3);
+  --stink-soft: light-dark(#dae6e5, #2c3a3b);
+  --hungry: light-dark(#87496b, #d9a0bf);
+  --hungry-soft: light-dark(#efe0e8, #3c2f37);
+  --tired: light-dark(#4e5888, #a9b1de);
+  --tired-soft: light-dark(#e2e3ef, #2f3240);
+
+  --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 
   /* Derived from the palette's values only */
   --seg-on: light-dark(#fafaf6, #3b3c34); /* light --surface, dark --line */
@@ -228,6 +237,13 @@
 @keyframes pop {
   35% {
     transform: scale(1.06);
+  }
+}
+@keyframes badgeIn {
+  0%,
+  20% {
+    opacity: 0;
+    transform: scale(0.4);
   }
 }
 @keyframes bowlFill {

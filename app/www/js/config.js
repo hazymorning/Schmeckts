@@ -204,9 +204,10 @@ export function flavoursOf(text) {
 export const OBSERVATIONS = {
   stink: {
     icon: 'o_stink',
+    button: 'Heftiger Stunk!',
     chip: 'Stunk',
     label: 'Heftiger Stunk',
-    said: 'Oha, heftiger Stunk! Ist notiert',
+    said: 'Stunk notiert. Fenster auf!',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -214,15 +215,24 @@ export const OBSERVATIONS = {
   },
   hungry: {
     icon: 'o_hungry',
+    button: 'Heute extra hungrig',
     chip: 'Hunger',
     label: 'Großer Hunger',
-    said: 'Großer Hunger, ist notiert',
+    said: 'Hunger notiert. Der Napf ist gewarnt.',
     about: 'meal',
     within: 3,
     window: 'in den drei Stunden',
     after: 'innerhalb von drei Stunden',
   },
-  tired: {icon: 'o_tired', chip: 'Müde', label: 'Müder Tag', said: 'Müder Tag, ist notiert', about: 'day'},
+  // {pet}: the name, or "Bande" for several
+  tired: {
+    icon: 'o_tired',
+    button: 'Müde {pet}',
+    chip: 'Müde',
+    label: 'Müder Tag',
+    said: 'Müdigkeit notiert. Gähn.',
+    about: 'day',
+  },
 };
 export const observationOf = kind =>
   OBSERVATIONS[kind] || {icon: 'sparkle', chip: 'Beobachtung', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
