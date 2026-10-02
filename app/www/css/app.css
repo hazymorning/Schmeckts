@@ -673,8 +673,8 @@ dialog.sheet.page .sheet-body {
   gap: var(--space-hair);
   padding: var(--space-1);
   border-radius: var(--radius-full);
-  background: var(--surface-2);
-}
+  background: var(--surface-2) linear-gradient(90deg, var(--wash));
+} /* the levels' soft colours as a faint wash, from the good end to the bad one (views/parts.js) */
 .slider-track button {
   flex: 1 1 0;
   min-width: 0;
@@ -1251,7 +1251,7 @@ dialog.sheet.page .sheet-body {
 .mini {
   border-radius: 50%;
   box-shadow:
-    0 0 0 var(--stroke) var(--surface),
+    0 0 0 var(--stroke) var(--ground, var(--surface)),
     0 0 0 calc(2 * var(--stroke)) var(--c, var(--line));
 }
 .spin {
@@ -1343,12 +1343,13 @@ dialog.sheet.page .sheet-body {
   margin-bottom: var(--space-hair);
 }
 /* On „Verlauf“ the day line stays under the bar while its meals scroll past (views/sheets.js marks it .stuck, which
-   CSS cannot match). On the home page, where at most one day is shown, it scrolls with its card. */
+   CSS cannot match), on the page ground like the bar. On the home page, where at most one day is shown, it scrolls
+   with its card. */
 .days .tl-date {
   position: sticky;
   top: var(--stick);
   z-index: var(--z-sticky);
-  background: var(--surface);
+  background: var(--bg);
 }
 .tl-date b {
   font: var(--type-subheading);
@@ -1415,23 +1416,23 @@ dialog.sheet.page .sheet-body {
   height: 12px;
   border-radius: 50%;
   background: var(--c, var(--faint));
-  box-shadow: 0 0 0 var(--stroke) var(--surface);
+  box-shadow: 0 0 0 var(--stroke) var(--ground, var(--surface));
 }
 .tl-node i.open {
-  background: var(--surface);
+  background: var(--ground, var(--surface));
   box-shadow:
     inset 0 0 0 var(--stroke) var(--faint),
-    0 0 0 var(--stroke) var(--surface);
+    0 0 0 var(--stroke) var(--ground, var(--surface));
 }
 .tl-note {
   font-style: italic;
 }
-/* Overview: two lines ending in „…“; unfolded, the whole text (Views) */
+/* Overview: three lines ending in „…“; unfolded, the whole text (Views) */
 .overview p {
   margin: 0;
   font: var(--type-small);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1600,44 +1601,27 @@ dialog.sheet.page .sheet-body {
   flex: none;
 }
 
-/* „Auswertung“ on the home page (views/evaluation.js): the top and the biggest flop side by side, each a column you
-   tap, centred: what it is, the packaging, the name, the brand and the strip. No fill and no frame; a hairline parts
-   the two (Views). A column without a variety is no button and says why. */
-.pole {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-  padding: var(--inset-row);
-  text-align: center;
-}
-.pole-role {
-  font: var(--type-caption-strong);
-  color: var(--muted);
-}
-.pole > b {
-  font: var(--type-body-strong);
-  color: var(--ink);
-}
-.pole > small {
-  font: var(--type-small);
-  color: var(--muted);
-}
-/* A place in Top 5 and Flop 5 („Auswertung“): its figure in Faustina in the row's leading column, and under it „neu“
-   where the variety came onto its side within the last 30 days, as a chart marks a new entry */
-.place {
+/* A place in Top 5 and Flop 5 („Vorlieben“): its figure on the packaging's upper left corner, filled in the colour of
+   its side and cut out of the card by a ring, as a medal hangs on a picture */
+.ranked {
+  position: relative;
   flex: 0 0 auto;
-  width: var(--pic-s);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font: var(--type-heading);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  display: grid;
 }
-.place > small {
+.place {
+  position: absolute;
+  top: calc(-1 * var(--space-1));
+  left: calc(-1 * var(--space-1));
+  min-width: var(--pic-xs);
+  height: var(--pic-xs);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
   font: var(--type-caption-strong);
-  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  background: var(--c);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
 
 /* == Views == */
@@ -1672,7 +1656,7 @@ dialog.sheet.page .sheet-body {
   color: var(--faint);
 }
 
-/* Overview: the picture on the left, the name and the text about the day on the right in two lines ending in „…“;
+/* Overview: the picture on the left, the name and the text about the day on the right in three lines ending in „…“;
    unfolded (.open) and while folding (.animating) the whole text is there, and the card is as tall as it. */
 .overview {
   display: flex;
@@ -1775,46 +1759,43 @@ dialog.sheet.page .sheet-body {
 .told li {
   align-items: flex-start;
 }
-/* „Auswertung“ on the home page: top and flop in two equal columns, a hairline between them and the text kept off it;
-   the packaging, the name over at most two lines and the strip a little apart */
-.poles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: var(--space-1) 0 var(--space-hair);
+/* „Vorlieben“ on the home page: a row for the top and one for the flop, the side named in its colour before the
+   brand; a side without a variety shows the empty sketch where the packaging would be and says why in full */
+.t-main small .side {
+  color: var(--c);
 }
-.pole + .pole {
-  border-left: var(--divider);
-}
-.pole > :is(.pole-role, b, small) {
-  margin: 0 var(--space-2);
-}
-.pole > :is(.thumb, .sk) {
-  margin: var(--space-2) 0;
-}
-.pole > .sk {
+.sides > .row > .sk {
   color: var(--faint);
 }
-.pole > b {
-  text-wrap: balance;
-  hyphens: auto;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.sides > .row small {
+  white-space: normal;
 }
-.pole > .strip {
-  margin-top: var(--space-2);
+/* Its page opens with the pets, laid out as the overview is: the picture on the left, the names and what they like
+   best beside it */
+.portrait {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3h);
 }
-/* the brand on one line, so two long names still keep the card under 300px; the reason of an empty column in full */
-button.pole > small {
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.portrait > .ov-pic,
+.portrait-text {
+  margin-bottom: var(--space-2h);
+} /* with the card's 8px at the bottom that makes 18px, as at the top */
+.portrait-text {
+  flex: 1;
+  min-width: 0;
 }
-.pole > small {
-  overflow-wrap: anywhere;
+.portrait h2 {
+  margin: 0 0 var(--space-hair);
+}
+.portrait .say {
+  margin: 0;
+}
+/* The two lists' headings lead with their picture in the side's colour, a heart and the bowl left standing */
+.card h2 > .ic {
+  margin-right: var(--space-2);
+  vertical-align: -0.125em;
+  color: var(--c);
 }
 /* Its page: a variety's name over at most two lines and what its ratings say in full under it; a told line that opens
    its variety, the words taking the room the strip at its end leaves */
@@ -1875,9 +1856,12 @@ button.pole > small {
   margin: var(--space-3h) 0 var(--space-2h);
   text-align: center;
 } /* 14px at the top: the margin collapses with the heading's 4px, which left 6px */
-.card.days .cal {
+.days {
+  --ground: var(--bg); /* what the dots on the line and the pets' rings cut out of: the page ground, not a card */
+}
+.days .cal {
   margin-top: 0;
-} /* that card has no heading, so the calendar starts at the card's own padding */
+} /* on its page the calendar stands right under the title, which keeps its own distance */
 /* A meal on the timeline: the time, the dot on the line and the picture sit closer than a row's gap */
 .tl-item {
   gap: 0;
@@ -1905,10 +1889,8 @@ button.pole > small {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-/* „Verlauf“, „Auswertung“, „Einkaufen“ and „Vorlieben“: cards on the page ground, as far apart as the ones on the home
-   page */
-dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"], [data-kind="profile"])
-  .page-title {
+/* „Verlauf“, „Vorlieben“ and „Einkaufen“: cards on the page ground, as far apart as the ones on the home page */
+dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"]) .page-title {
   margin-bottom: var(--space-3h);
 }
 .btn-col {
@@ -2131,7 +2113,6 @@ body,
 .photo-btn,
 .prod-edit,
 .pend-head,
-.pole,
 .day,
 .sw,
 .sw::after,
@@ -2167,19 +2148,7 @@ dialog.sheet.dragging {
 :is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
-:is(
-  .icon-btn,
-  .chip,
-  .pet,
-  .day.has,
-  button.ov-pic,
-  button.pole,
-  .photo-btn,
-  .pet-photo,
-  .shutter,
-  .sync-chip,
-  .fab
-):active {
+:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {

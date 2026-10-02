@@ -112,7 +112,7 @@ async def test_palette(browser, url):
             len(stops) == 6
             and all(near(c, PALETTE[r][k], 1) for c, r in zip(stops, tones))
             and all(all(near(c, PALETTE[r][k], 1) for c in cs) for cs, r in zip(shown, tones)),
-            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Fast leer“ both --good, „Halb gegessen“ and „Nur anfangs“ both --mid ({theme})',
+            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Fast leer“ both --good, „Halb gegessen“ and „Nur bissl“ both --mid ({theme})',
         )
     check(
         await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
@@ -388,12 +388,12 @@ def test_rules_static():
         frames and not loud,
         f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}',
     )
-    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask and the
-    # loading shimmer, a mask only in the mood picture
+    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask, the
+    # loading shimmer and the faint wash of the rating slider's track, a mask only in the mood picture
     shades = sorted({(sel, p) for sel, decls in css_rules(css['app.css']) for p, v in decls if 'gradient' in v or 'mask' in p})
     check(
-        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background')],
-        f'no fade at an edge: gradients only in .mood and .skel, a mask only in .mood ({shades})',
+        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background'), ('.slider-track', 'background')],
+        f"no fade at an edge: gradients only in .mood, .skel and the slider's track, a mask only in .mood ({shades})",
     )
     focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
     ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
@@ -406,7 +406,7 @@ def test_rules_static():
     )
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .place, .thumb'
+FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .thumb'
 
 
 # The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
@@ -416,7 +416,6 @@ INSETS = {
     '.group': '4px 16px',
     '.row': '10px 0px',
     '.pend': '10px 0px',
-    '.pole': '10px 0px',
     '.card-btn': '10px 0px',
     '.box': '12px',
     '.banner': '12px',
@@ -485,13 +484,13 @@ STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i
       dots.every(d => box(d) === cal),
       rated.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
 
-# The card „Auswertung“: its height, the two columns' widths, whether the thumbnails stand level, and whether the line
-# between the columns runs exactly between them
-POLES = """() => { const c = document.querySelector('[data-sec=evaluation]'), r = e => e.getBoundingClientRect(),
-    sides = [...c.querySelectorAll('.pole')], pics = sides.map(s => s.querySelector('.thumb, .sk'));
-  return {height: Math.round(r(c).height), widths: sides.map(s => Math.round(r(s).width * 2) / 2),
-    level: Math.abs(r(pics[0]).top - r(pics[1]).top) < 0.5,
-    line: getComputedStyle(sides[1]).borderLeftWidth === '1px' && getComputedStyle(sides[0]).borderLeftWidth === '0px'}; }"""
+# The card „Vorlieben“: its height, and whether its two rows read as the rows of „Einkaufen“ do: the packaging in the
+# same column and as large, the names starting on one line, the strips ending on one
+SIDES = """() => { const c = document.querySelector('[data-sec=evaluation]'), shop = document.querySelector('[data-sec=shop] .row'), r = e => e.getBoundingClientRect();
+  const rows = [...c.querySelectorAll('.sides > li > .row')], at = (row, sel) => r(row.querySelector(sel)), near = (a, b) => Math.abs(a - b) < 0.5;
+  return {height: Math.round(r(c).height), rows: rows.length,
+    same: rows.every(row => near(at(row, '.thumb').left, at(shop, '.thumb').left) && near(at(row, '.thumb').width, at(shop, '.thumb').width)
+      && near(at(row, '.t-main').left, at(shop, '.t-main').left) && near(at(row, '.strip').right, at(shop, '.strip').right))}; }"""
 
 
 async def test_rules(browser, url):
@@ -545,38 +544,38 @@ async def test_rules(browser, url):
         first = want.replace('|H2|', '|BUTTON|')  # overview: the picture on the left, the heading beside it
         check(
             layout['app'] == ['600px', '18px', '18px']
-            and len(layout['cards']) == 7
+            and len(layout['cards']) == 6
             and layout['cards'][0] == first
             and all(c == want for c in layout['cards'][1:])
-            and layout['gaps'] == [14] * 6,
+            and layout['gaps'] == [14] * 5,
             f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
         )
         order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
         check(
-            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Auswertung', 'Einkaufen', 'Vorlieben'],
-            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Auswertung“, „Einkaufen“, „Vorlieben“ ({scheme}: {order})',
+            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Vorlieben', 'Einkaufen'],
+            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Vorlieben“, „Einkaufen“ ({scheme}: {order})',
         )
-        poles = await pg.evaluate(POLES)
+        sides = await pg.evaluate(SIDES)
         check(
-            200 <= poles['height'] <= 300 and poles['widths'][0] == poles['widths'][1] and poles['level'] and poles['line'],
-            f'„Auswertung“ ({scheme}): between 200 and 300px tall, top and flop in two equal columns, the packaging level, a hairline between them ({poles})',
+            200 <= sides['height'] <= 300 and sides['rows'] == 2 and sides['same'],
+            f'„Vorlieben“ ({scheme}): between 200 and 300px tall, the top and the flop in two rows laid out as the rows of „Einkaufen“ ({sides})',
         )
         await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
         await idle(pg)
-        await scan()  # „Auswertung“
+        await scan()  # „Vorlieben“
         strips = await pg.evaluate(STRIPS)
         places = await pg.eval_on_selector_all(
             '#sheet .place', 'l => l.map(p => Math.round(p.getBoundingClientRect().left + p.getBoundingClientRect().width / 2))'
         )
         check(
             len(strips) >= 7 and all(x == [True, True, True, True] for x in strips) and len(places) >= 6 and len(set(places)) == 1,
-            f'„Auswertung“ ({scheme}): every strip as on „Einkaufen“, hollow dots after it for the ratings still missing; the places centred on one line ({len(strips)} strips, {places})',
+            f'„Vorlieben“ ({scheme}): every strip as on „Einkaufen“, hollow dots after it for the ratings still missing; the places centred on one line ({len(strips)} strips, {places})',
         )
+        await pg.click('#sheet [data-action=open-level][data-v=profile]')
+        await idle(pg)
+        await scan()  # „Worauf es ankommt“
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
-        await pg.click('[data-sec=profile] [data-action=open-profile]')
-        await idle(pg)
-        await scan()  # „Vorlieben“
         await pg.click('#sheet [data-action=settings-back]')
         await idle(pg)
         await pg.click('[data-sec=shop] [data-action=open-shop]')
@@ -1277,7 +1276,6 @@ PADDING = {
     '.group': 'var(--inset-group)',
     '.row': 'var(--inset-row)',
     '.pend': 'var(--inset-row)',
-    '.pole': 'var(--inset-row)',
     '.card-btn': 'var(--inset-row)',
     '.box': 'var(--inset-box)',
     '.banner': 'var(--inset-box)',
@@ -1472,7 +1470,7 @@ def test_strip():
 
 
 def test_overview_card():
-    """The overview shows two lines of its text and unfolds with a tap: the clamp in app.css says two, the Views
+    """The overview shows three lines of its text and unfolds with a tap: the clamp in app.css says three, the Views
     section lets the whole text out for .open and while folding, views/home.js does the folding, and nothing fixes
     the card's height."""
     js = (WWW / 'js/views/home.js').read_text(encoding='utf-8')
@@ -1480,12 +1478,12 @@ def test_overview_card():
     block = {one for _, sel, p, v in app_decls() if p == 'display' and v == 'block' for one in sel.split(', ')}
     fixed = [f'{sel} {p}:{v}' for _, sel, p, v in app_decls() if sel.startswith('.overview') and p in ('height', 'min-height', 'max-height')]
     check(
-        ('.overview p', '2') in clamp
+        ('.overview p', '3') in clamp
         and {'.overview.open p', '.overview p.animating'} <= block
         and 'export function toggleOverview()' in js
         and 'slideHeight(p, h0)' in js
         and not fixed,
-        f'the overview: two lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
+        f'the overview: three lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
     )
 
 

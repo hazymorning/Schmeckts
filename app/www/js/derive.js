@@ -55,9 +55,9 @@ function refresh(now) {
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-/* „Vorlieben“ as the model stands: the groups per comparison, and apart from them the habits in the order the home
-   page shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating eagerly at first. The home page
-   asks for them only while there is nothing to compare, since Abwechslung reads every meal. */
+/* „Worauf es ankommt“ as the model stands: the groups per comparison, and apart from them the habits in the order its
+   card on „Vorlieben“ shows the first two of: the sauce licked off, Abwechslung, Neuheit and eating only a little. The
+   card asks for them only while there is nothing to compare, since Abwechslung reads every meal. */
 export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
 export const habitsModel = () =>
   cached('habits', [prefs.activePet], () => {
@@ -66,7 +66,7 @@ export const habitsModel = () =>
       of = kind => eaten.filter(h => h.kind === kind);
     return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
   });
-/* „Auswertung“: the sides of the ranked varieties, for its card on the home page and the first cards of its page, and
+/* „Vorlieben“: the sides of the ranked varieties, for its card on the home page and the first cards of its page, and
    the rest of the page only when it opens: what moved, how it goes per pet, what it depends on, what to serve next,
    what it rests on, and when each variety was last served within the filter */
 export const rankingModel = () => cached('ranking', [prefs.activePet], now => ranking(model(), now));

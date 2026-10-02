@@ -647,7 +647,7 @@ test('profile by consistency: the texture field, the keywords only when it is mi
   );
 });
 
-test('habits: „nur die Soße“ and „nur anfangs“ from two varieties where it happened at least half of the time', () => {
+test('habits: „nur die Soße“ and „nur bissl“ from two varieties where it happened at least half of the time', () => {
   const E = 'eager';
   const db = household(
     ['A'],
@@ -665,7 +665,7 @@ test('habits: „nur die Soße“ and „nur anfangs“ from two varieties where
         ],
       },
     ],
-    'c rated once does not count; „nur anfangs“ with one variety is no habit',
+    'c rated once does not count; „nur bissl“ with one variety is no habit',
   );
   const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, E])]);
   assert.deepEqual(
@@ -921,7 +921,7 @@ test('Neuheit: one line per pet in the filter, none for a pet with too few varie
   assert.deepEqual(novel(both, {activePet: 'B'}, ['A', 'B']), [['B', 'anlauf', 1, 5, 12, 16]]);
 });
 
-/* „Auswertung“ */
+/* „Vorlieben“ */
 const ids = list => list.map(e => (e.e || e).id);
 const sides = (db, prefs, now = NOW) => {
   const r = ranking(model(db, prefs, now), now);
@@ -935,7 +935,7 @@ const sides = (db, prefs, now = NOW) => {
   };
 };
 
-test('Auswertung: the side comes from the verdict, treats and dry food are left out, nothing is in both lists or padded', () => {
+test('Vorlieben: the side comes from the verdict, treats and dry food are left out, nothing is in both lists or padded', () => {
   const db = household(
     ['A'],
     [
@@ -973,7 +973,7 @@ test('Auswertung: the side comes from the verdict, treats and dry food are left 
   });
 });
 
-test('Auswertung: a side from a verdict, „Geht so“ by its majority and on average less than half eaten', () => {
+test('Vorlieben: a side from a verdict, „Geht so“ by its majority and on average less than half eaten', () => {
   const side = (counts, verdict) =>
     sideOf({
       n: Object.values(counts).reduce((a, k) => a + k, 0),
@@ -998,7 +998,7 @@ test('Auswertung: a side from a verdict, „Geht so“ by its majority and on av
   );
 });
 
-test('Auswertung: evidence beats luck, the verdict’s own first, and the worst flop first', () => {
+test('Vorlieben: evidence beats luck, the verdict’s own first, and the worst flop first', () => {
   assert.deepEqual(
     [likingOf({n: 3, counts: {top: 3}}), likingOf({n: 8, counts: {top: 8}}), likingOf({n: 2, counts: {schlecht: 2}})],
     [80, 90, 25],
@@ -1051,7 +1051,7 @@ test('Einkaufen: the verdict’s own before „Gemischt“ and a setting by hand
   );
 });
 
-test('Auswertung: the varieties rated at all, and whether all of their ratings lie beyond the window', () => {
+test('Vorlieben: the varieties rated at all, and whether all of their ratings lie beyond the window', () => {
   const r = list => {
     const x = ranking(model(household(['A'], ['p1', 'p2'], list)), NOW);
     return [x.rated, x.stale];
@@ -1068,7 +1068,7 @@ test('Auswertung: the varieties rated at all, and whether all of their ratings l
   );
 });
 
-test('Auswertung with two pets: „Gemischt“ stands apart, and a pet chosen decides on its own', () => {
+test('Vorlieben with two pets: „Gemischt“ stands apart, and a pet chosen decides on its own', () => {
   const db = household(
     ['Minka', 'Tiger'],
     ['both', 'split', 'minka'],
@@ -1098,7 +1098,7 @@ test('Auswertung with two pets: „Gemischt“ stands apart, and a pet chosen de
   });
 });
 
-test('Auswertung: flat where the varieties differ no more than chance would make them', () => {
+test('Vorlieben: flat where the varieties differ no more than chance would make them', () => {
   const flat = list => ranking(model(household(['A'], ['a', 'b', 'c', 'd'], list)), NOW).flat;
   const alike = ['a', 'b', 'c', 'd'].flatMap(id => rate(id, 'A', [T, M, T, M, T, M, T, M], 10)),
     apart = [
@@ -1110,7 +1110,7 @@ test('Auswertung: flat where the varieties differ no more than chance would make
   assert.deepEqual([flat(alike), flat(apart), flat(alike.slice(0, 24))], [true, false, false]);
 });
 
-test('Auswertung: varieties still tried, new within 60 days, mostly good so far, the closest to a verdict first', () => {
+test('Vorlieben: varieties still tried, new within 60 days, mostly good so far, the closest to a verdict first', () => {
   const db = household(
     ['A'],
     ['one', 'two', 'left', 'old', {id: 'no', kaufen: 'nicht'}, 'settled'],

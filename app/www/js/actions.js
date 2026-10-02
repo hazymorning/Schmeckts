@@ -162,15 +162,12 @@ const ACTIONS = {
   'open-evaluation'() {
     openSheet({kind: 'evaluation'});
   },
-  // a page one level below the page that is open, such as „Vorlieben“ from „Auswertung“; back returns to it
+  // a page one level below the page that is open, such as „Worauf es ankommt“ from „Vorlieben“; back returns to it
   'open-level'(el) {
     openPage(el.dataset.v);
   },
   'open-shop'() {
     openSheet({kind: 'shop'});
-  },
-  'open-profile'() {
-    openSheet({kind: 'profile'});
   },
   'open-server'() {
     openSheet({kind: 'settings', page: 'house'});

@@ -185,7 +185,7 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     })
     .sort((a, b) => b.score - a.score || b.n - a.n);
   const byId = new Map(sorts.map(e => [e.id, e]));
-  let repeats = null; // worked out the first time it is asked for: only „Vorlieben“ reads it
+  let repeats = null; // worked out the first time it is asked for: only „Worauf es ankommt“ reads it
   return {
     pet,
     pets: pet ? [pet] : petIds,
@@ -199,10 +199,10 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
   };
 }
 
-/* „Vorlieben“: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“).
+/* „Worauf es ankommt“: what holds across varieties, never one variety's verdict told again (that is „Einkaufen“).
    Comparisons by consistency, flavour and brand, each within one food type: a group counts with at least two
    varieties rated at least twice each, and groups are measured by how often they went down well. Then two habits,
-   „nur die Soße geleckt“ and „nur anfangs gefressen“, where at least two varieties show it at least half of the time, and
+   „nur die Soße geleckt“ and „nur ein bissl gefressen“, where at least two varieties show it at least half of the time, and
    whether a pet likes a change. */
 const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
 const sauceShare = x => shareOf(x, 'sosse');
@@ -254,7 +254,7 @@ function groupOf(key, l) {
   return {key, ids: l.map(e => e.id), n, good, share: good / n, low: Math.min(...shares), high: Math.max(...shares)};
 }
 
-/* How varieties are eaten: „nur die Soße geleckt“ and „nur anfangs gefressen“ where at least two varieties rated at least twice
+/* How varieties are eaten: „nur die Soße geleckt“ and „nur ein bissl gefressen“ where at least two varieties rated at least twice
    show it at least half of the time, naming up to three, the most pronounced first. [{kind, sorts: [{id, k, n}]}] */
 export function habits(m) {
   const out = [],
@@ -408,7 +408,7 @@ function hints(sorts, appetites, pet, prefs) {
 }
 
 /* Groups for „Einkaufen“ and the shopping list: „Nachkaufen“ (with „Gemischt“), best first, „Nicht mehr kaufen“,
-   the clearest first, both by likingOf() as on „Auswertung“ and the verdict's own first, „Geht so“ and „Noch zu wenig
+   the clearest first, both by likingOf() as on „Vorlieben“ and the verdict's own first, „Geht so“ and „Noch zu wenig
    bewertet“. The manual
    setting decides the group, and varieties without a rating in the filter only show up with one; a variety whose
    ratings are all older than the window stands under „Noch zu wenig bewertet“. */
@@ -425,7 +425,7 @@ export function shopGroups(m) {
   return g;
 }
 
-/* „Auswertung“: what the ratings say about the meals, ranked and told in words, within the pet filter. Treats and dry
+/* „Vorlieben“: what the ratings say about the meals, ranked and told in words, within the pet filter. Treats and dry
    food are left out everywhere on it: a treat is nearly always eaten, and dry food stands in the bowl all day, so
    neither says much beside a meal. */
 export const UNRANKED = ['Snack', 'Trockenfutter'];
@@ -707,7 +707,7 @@ export function nextUp(m, now, r, last, slow) {
   };
 }
 
-/* „Worauf es ankommt“: the comparisons of „Vorlieben“ (profile()) of the ranked types whose best and weakest group lie
+/* „Worauf es ankommt“ on „Vorlieben“: the comparisons of its page (profile()) of the ranked types whose best and weakest group lie
    GAP apart, the clear ones first, then the widest, one per dimension, at most PATTERNS. Their words follow the same
    rule as there, so the two pages never disagree. */
 const PATTERNS = 2;
@@ -720,7 +720,7 @@ export function patterns(dims) {
     .slice(0, PATTERNS);
 }
 
-/* What the lists of „Auswertung“ rest on: the window's ratings of the settled varieties within the filter, the oldest
+/* What the lists of „Vorlieben“ rest on: the window's ratings of the settled varieties within the filter, the oldest
    of them, and the types left out that have ratings within it. {n, first, left: [type]} */
 export function basis(m, r) {
   let n = 0,

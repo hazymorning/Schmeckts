@@ -7,7 +7,7 @@ import {RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.
 import {db, queue} from '../store.js';
 import {status} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
-import {GOOD, NO, rateCls, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {sliderCls, thumbHTML} from '../ui/slider.js';
@@ -65,13 +65,17 @@ export function rateSlider(s, pid) {
           `<button class="${rateCls(r)}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}">${icon('r_' + r)}</button>`,
       )
       .join(''),
+    // a faint wash in the levels' colours, each centred on its column, so the scale reads from good to bad
+    wash = scale
+      .map((r, i) => `var(--${rateTone(r)}-soft) ${(((i + 0.5) / scale.length) * 100).toFixed(1)}%`)
+      .join(', '),
     words = scale
       .map((r, i) => {
         const [first, second] = RATINGS[r].short.split(' ');
         return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${second}</small></span>`;
       })
       .join('');
-  return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
+  return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
     <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;
 }
 /* The two ends of a scale, under the counters of the food sheet */
@@ -181,7 +185,7 @@ export function calendarHTML(list) {
    right: the ratings the verdict rests on, at most STRIP of them, and a „+“ in front where there are more, beyond
    STRIP or older than the window, as the calendar puts it after its dots. What they say in words is its label, so
    nothing rests on colour. {keys, more}: the rating keys oldest first and whether older ones lie beyond (ratingsIn()
-   in smart.js). open: the ratings a verdict still lacks, as the calendar's hollow dots after them („Auswertung“).
+   in smart.js). open: the ratings a verdict still lacks, as the calendar's hollow dots after them („Vorlieben“).
    Nothing without a rating. */
 const STRIP = 8;
 export function strip({keys, more}, open = 0) {
@@ -259,14 +263,14 @@ export const toldList = rows => (rows.length ? `<ul class="list told">${rows.joi
 export const toldBtn = (id, pic, say, why = '', end = '') =>
   `<li><button class="row" data-action="open-product" data-id="${id}">${pic}<span class="said">${say}${why ? `<small class="hint why">${why}</small>` : ''}</span>${end}</button></li>`;
 
-/* The name of a comparison of „Vorlieben“, with the food type in brackets except for wet food: „Konsistenz“,
+/* The name of a comparison of „Worauf es ankommt“, with the food type in brackets except for wet food: „Konsistenz“,
    „Geschmack (Trockenfutter)“, „Marke“, and for treats „Snack-Art“, which names the type already */
 const DIMENSION = {konsistenz: 'Konsistenz', geschmack: 'Geschmack', marke: 'Marke'};
 const dimName = d =>
   d.kind === 'konsistenz' && d.type !== TYPES[0]
     ? TEXTURES[d.type].title
     : DIMENSION[d.kind] + (d.type === TYPES[0] ? '' : ` (${d.type})`);
-/* A habit of „Vorlieben“ as a told line: how varieties are eaten, the varieties in bold and how often under them; or
+/* A habit of „Worauf es ankommt“ as a told line: how varieties are eaten, the varieties in bold and how often under them; or
    whether a pet likes a change, and whether new food goes down well at first or needs a while, each with the pet's
    picture and name where several pets are shown at once */
 const upTo = (k, n) => (k < n ? `${k} von ${n}` : `alle ${n}`);
@@ -275,7 +279,7 @@ export function habitRow(h, several) {
   if (h.kind === 'sosse' || h.kind === 'eager')
     return told(
       lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
-      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur anfangs gefressen, dann bleibt der Rest stehen'}.`,
+      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
       esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
   const pet = several ? getPet(h.pet) : null,
@@ -296,14 +300,14 @@ export function habitRow(h, several) {
     `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst <b>${upTo(h.other.good, h.other.n)}</b>.`,
   );
 }
-/* A group of „Vorlieben“, on its page and in its card on the home page: the group, how often it went down well in
+/* A group of „Worauf es ankommt“, on its page and in its card on „Vorlieben“: the group, how often it went down well in
    words, the strip of its ratings, and „deutlich“ where it is an end of a clear comparison. Not a button: there is
    nothing behind it yet. g: a group of profile() in smart.js within the model m */
 const groupRow = (m, g, clear) =>
   `<li class="row"><span class="t-main"><span class="t-top"><b>${esc(g.key)}</b>${clear ? '<span class="badge">deutlich</span>' : ''}</span>
     <small>${cap(`${times(g.good, g.n)} gut gefressen`)}</small></span>${strip(ratingsIn(m, g.ids))}</li>`;
 
-/* A comparison of „Vorlieben“ under its name, its groups ranked, the two ends marked where it is clear */
+/* A comparison of „Worauf es ankommt“ under its name, its groups ranked, the two ends marked where it is clear */
 export const likesList = (m, d) =>
   `<h3 class="label grp">${dimName(d)}</h3><ul class="list likes">${d.groups
     .map((g, i) => groupRow(m, g, d.clear && (i === 0 || i === d.groups.length - 1)))
