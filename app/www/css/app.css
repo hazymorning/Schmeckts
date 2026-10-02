@@ -1864,6 +1864,10 @@ dialog.sheet::after {
 .tile + .tile {
   margin-top: var(--space-2);
 }
+/* nothing on that side yet: only the kicker and the icon keep the tone */
+.tile.empty {
+  background: var(--raise);
+}
 .tile-ic {
   display: grid;
   place-items: center;

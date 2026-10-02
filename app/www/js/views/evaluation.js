@@ -65,8 +65,15 @@ function lapse(at, now) {
         ? 'über einem Jahr'
         : `${Math.floor(days / 365)} Jahren`;
 }
+const forPet = (t, several) => (several ? ` für ${esc(getPet(t.pet).name)}` : '');
 const needs = (t, several) =>
-  `noch ${t.need === 1 ? 'einmal' : 'zweimal'}${several ? ` für ${esc(getPet(t.pet).name)}` : ''} servieren und bewerten, dann steht’s fest`;
+  `noch ${t.need === 1 ? 'einmal' : 'zweimal'}${forPet(t, several)} servieren und bewerten, dann steht’s fest`;
+// lists, with their empty sides, show once a side or a settled variety exists
+const listed = r => r.top.length || r.flop.length || (r.settled && !r.stale);
+// the variety an empty Leibgericht side names, so „Als Nächstes“ leaves it out
+const candidate = r => (r.top.length || r.stale ? null : r.trials[0]);
+const onTheWay = (t, several) => `Auf gutem Weg: ${named(t.e)}, noch ${t.need}×${forPet(t, several)} bewerten`;
+const noneYet = r => `Bisher kommt keine Sorte${r.split.length ? ' bei allen' : ''} richtig gut an.`;
 function waiting(m, r) {
   if (r.stale)
     return 'Die letzten Bewertungen sind über ein halbes Jahr alt. Nach ein paar neuen steht hier wieder, was ankommt.';
@@ -77,33 +84,36 @@ function waiting(m, r) {
 }
 
 const TILE = {top: 'Leibgericht', flop: 'Ladenhüter'};
-// the best and the worst variety, each on its tone's ground
-function sideTile(r, e, side) {
-  const kicker = TILE[side],
-    ic = SIDE[side][0];
-  if (!e) {
-    const [title, why] =
-      side === 'top'
-        ? ['Noch kein Leibgericht', `Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`]
-        : r.settled < 3
-          ? ['Noch kein Ladenhüter', 'Dafür ist noch zu wenig bewertet.']
-          : r.settled === r.top.length
-            ? ['Kein Ladenhüter', 'Alles, was feststeht, kommt gut an.']
-            : ['Kein Ladenhüter', 'Keine Sorte bleibt meist stehen.'];
-    return `<div class="tile"><span class="tile-ic">${icon(ic)}</span><span class="t-main"><b>${title}</b><small>${why}</small></span></div>`;
+// the best and the worst variety, each on its tone's ground; an empty side keeps its kicker on a plain ground
+function sideTile(m, r, e, side) {
+  const [ic, tone] = SIDE[side],
+    inner = (title, sub) =>
+      `<span class="tile-ic">${icon(ic)}</span><span class="t-main"><small class="kicker">${TILE[side]}</small><b>${title}</b><small>${sub}</small></span>`;
+  if (e) {
+    const p = e.product,
+      brand = brandOf(p),
+      said = saidOf(e, side),
+      label = `${TILE[side]}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.`;
+    return `<button class="tile ${tone}" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}">${inner(esc(pname(p)), esc(cap([brand, lower(said)].filter(Boolean).join(', '))))}</button>`;
   }
-  const p = e.product,
-    brand = brandOf(p),
-    said = saidOf(e, side),
-    label = `${kicker}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.`;
-  return `<button class="tile ${SIDE[side][1]}" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="tile-ic">${icon(ic)}</span>
-    <span class="t-main"><small class="kicker">${kicker}</small><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(', ')))}</small></span></button>`;
+  const t = side === 'top' && candidate(r);
+  if (t)
+    return `<button class="tile empty ${tone}" data-action="open-product" data-id="${t.e.id}">${inner('Noch keins', onTheWay(t, m.pets.length > 1))}</button>`;
+  const [title, why] =
+    side === 'top'
+      ? ['Noch keins', noneYet(r)]
+      : r.settled < 3
+        ? ['Noch keiner', 'Dafür ist noch zu wenig bewertet.']
+        : r.settled === r.top.length
+          ? ['Keiner', 'Alles, was feststeht, kommt gut an.']
+          : ['Keiner', 'Keine Sorte bleibt meist stehen.'];
+  return `<div class="tile empty ${tone}">${inner(title, why)}</div>`;
 }
 export function evaluationCard(m) {
   const r = rankingModel();
   if (!r.rated) return '';
   let body;
-  if (r.top.length || r.flop.length) body = sideTile(r, r.top[0], 'top') + sideTile(r, r.flop[0], 'flop');
+  if (r.top.length || r.flop.length) body = sideTile(m, r, r.top[0], 'top') + sideTile(m, r, r.flop[0], 'flop');
   else {
     const t = r.stale ? null : r.trials[0],
       next = t
@@ -129,9 +139,9 @@ function portraitHTML(m, r) {
       `Von ${n} Sorten ${k > 1 ? 'kommen' : 'kommt'} ${k ? few + (k === 1 ? 'eine' : k) : 'keine'} meist gut an.`,
     said = [];
   if (!k && !r.flop.length) said.push(waiting(m, r));
-  else if (n >= JUDGE && k * 3 >= n * 2)
-    said.push(`${who} ${several ? 'fressen' : 'frisst'} fast alles gern: ${good()}`);
-  else if (n >= JUDGE && k * 3 <= n) said.push(`${who} ${several ? 'sind' : 'ist'} wählerisch: ${good('nur ')}`);
+  else if (n < JUDGE) said.push(`Bisher ${n === 1 ? 'steht erst eine Sorte' : `stehen erst ${n} Sorten`} fest.`);
+  else if (k * 3 >= n * 2) said.push(`${who} ${several ? 'fressen' : 'frisst'} fast alles gern: ${good()}`);
+  else if (k * 3 <= n) said.push(`${who} ${several ? 'sind' : 'ist'} wählerisch: ${good('nur ')}`);
   else said.push(good());
   if (!k && !r.flop.length && !r.settled && !r.stale)
     said.push('Ab drei Bewertungen einer Sorte steht hier, was am besten ankommt und was stehen bleibt.');
@@ -170,7 +180,7 @@ function listsHTML(m, r, x) {
       'Noch nichts bewertet',
       say('Bewerte ein paar Mahlzeiten, dann steht hier, was ankommt und was nicht.'),
     );
-  if (!r.top.length && !r.flop.length && (r.stale || !r.settled)) return ''; // the first card says why
+  if (!listed(r)) return ''; // the first card says why
   const top = r.top.slice(0, PLACES),
     flop = r.flop.slice(0, PLACES);
   const tops = top.length
@@ -181,7 +191,7 @@ function listsHTML(m, r, x) {
       )
     : card(
         listTitle('top', 'Noch kein Leibgericht'),
-        say(`Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`),
+        candidate(r) ? toldList([trialRow(m, candidate(r), true)]) : say(noneYet(r)),
       );
   const flops = flop.length
     ? card(listTitle('flop', 'Ladenhüter'), places(m, x, flop, 'flop'))
@@ -350,6 +360,17 @@ function patternCard(m, x) {
 }
 
 const TRIALS = 3;
+// a variety still in its trial, with the ratings it has and the ones it lacks; best: the one closest to Leibgericht
+function trialRow(m, t, best = false) {
+  const several = m.pets.length > 1;
+  return toldBtn(
+    t.e.id,
+    lead('sparkle'),
+    `${best ? onTheWay(t, several) : `${named(t.e)} ${needs(t, several)}`}.`,
+    esc(`Bisher ${lower(evidenceOf(t.e))}.`),
+    strip(ratingsIn(m, [t.e.id]), several ? 0 : t.need),
+  );
+}
 function nextCard(m, r, x) {
   const now = Date.now(),
     several = m.pets.length > 1,
@@ -366,16 +387,8 @@ function nextCard(m, r, x) {
       ),
     );
   }
-  for (const t of r.trials.slice(0, TRIALS))
-    rows.push(
-      toldBtn(
-        t.e.id,
-        lead('sparkle'),
-        `${named(t.e)} ${needs(t, several)}.`,
-        esc(`Bisher ${lower(evidenceOf(t.e))}.`),
-        strip(ratingsIn(m, [t.e.id]), several ? 0 : t.need),
-      ),
-    );
+  const trials = r.trials.slice(listed(r) && candidate(r) ? 1 : 0);
+  for (const t of trials.slice(0, TRIALS)) rows.push(trialRow(m, t));
   for (const v of x.next.retry)
     rows.push(
       toldBtn(
@@ -385,7 +398,7 @@ function nextCard(m, r, x) {
         `${esc(getPet(v.pet).name)} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
       ),
     );
-  const more = r.trials.length - TRIALS;
+  const more = trials.length - TRIALS;
   return rows.length
     ? card(
         'Als Nächstes',

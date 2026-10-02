@@ -606,10 +606,35 @@ async def test_evaluation(browser, url):
     check(await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet?.kind, m.sheet?.id])") == ['product', pid], 'a row opens its food sheet')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    told = await pg.evaluate(
+        "[document.querySelector('#sheet .portrait .say').textContent, [...document.querySelectorAll('#sheet .ranks b')].map(b => b.textContent)]"
+    )
+    check(told[1] and not any(name in told[0] for name in told[1]), f'the portrait names none of the varieties the lists below show {told}')
     await tap(pg, '#sheet [data-action=open-level][data-v=profile]')
     level = await pg.evaluate(LEVEL)
     await back(pg)
     check(level == [True, 'evaluation', 'profile', None] and await pg.evaluate(LEVEL) == [True, 'evaluation', None, None], 'a level and back')
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
+async def test_candidate(browser, url):
+    print('no Leibgericht yet: its empty side names the variety closest to it, which „Als Nächstes“ then leaves out')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    rated = [('ladenhueter', ['schlecht', 'schlecht', 'mittel']), ('naechste1', ['top', 'gut']), ('naechste2', ['top'])]
+    await load(
+        pg,
+        [pet(M)],
+        [product(i, 'Sheba', i.capitalize()) for i, _ in rated],
+        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated) for n, r in enumerate(levels)],
+    )
+    tile = await pg.eval_on_selector('[data-sec=evaluation] .tile', "t => [t.tagName, t.dataset.id ?? null, !!t.querySelector('.kicker')]")
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    named = await pg.eval_on_selector_all('#sheetBody [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
+    check(tile == ['BUTTON', 'naechste1', True], f'the empty Leibgericht tile keeps its kicker and opens the closest variety {tile}')
+    check(named == ['naechste1', 'ladenhueter', 'naechste2'], f'its card names it before the Ladenhüter, „Als Nächstes“ only the others {named}')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
@@ -2369,6 +2394,7 @@ run_tests(
         'history': test_home_history,
         'report': test_report,
         'evaluation': test_evaluation,
+        'candidate': test_candidate,
         'scales': test_scales,
         'slide': test_slide,
         'texture': test_texture,
