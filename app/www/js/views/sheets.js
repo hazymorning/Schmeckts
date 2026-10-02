@@ -43,6 +43,7 @@ import {
   group,
   habitRow,
   head,
+  labelled,
   lead,
   likesList,
   main,
@@ -55,6 +56,7 @@ import {
   scaleEnds,
   segmented,
   shopRow,
+  sideIcon,
   since,
   strip,
   thumbOf,
@@ -71,6 +73,8 @@ const prodRow = (s, p, inner, action, label) =>
   hasPhoto(s, p)
     ? `<div class="row set-row">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="${action}" aria-label="${label}">${inner}${icon('pencil', 'chev')}</button></div>`
     : `<button class="row set-row" data-action="${action}" aria-label="${label}">${thumbOf(s, p, 'xl')}${inner}${icon('pencil', 'chev')}</button>`;
+// removing sits well below the main button, so neither is taken for the other
+const apart = btn => `<div class="apart">${btn}</div>`;
 const photoLabel = p => (hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen');
 const photoLink = p =>
   `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${photoLabel(p)}</button>`;
@@ -123,12 +127,12 @@ function viewObservation() {
   const kind = observationOf(o.kind),
     ids = Object.keys(o.pets).filter(id => getPet(id)),
     before = mealsBefore(db, o).map(s => getProduct(s.productId)),
-    names = [...new Set(before.filter(Boolean).map(p => `<b>${esc(pname(p))}</b>`))],
+    names = [...new Set(before.filter(Boolean).map(p => esc(pname(p))))],
     weighed =
       kind.about !== 'meal'
         ? ''
         : names.length
-          ? `<p class="hint mt-s">${cap(kind.window)} davor gab es ${andList(names)}.</p>`
+          ? `<p class="hint mt-s">${cap(kind.window)} davor gab es <b>${andList(names)}</b>.</p>`
           : `<p class="hint mt-s">${cap(kind.window)} davor ist keine Mahlzeit eingetragen.</p>`;
   const kinds = `<div class="chips">${Object.entries(OBSERVATIONS)
     .map(
@@ -190,7 +194,7 @@ function viewName() {
   if (patient) return top + fieldSkeleton + fieldSkeleton; // same height as the fields, so nothing jumps
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
     said = read.length
-      ? `<p class="say read-note">Gelesen: ${read.map(x => `<b>${esc(x)}</b>`).join(', ')}. Passt das?</p>`
+      ? `<p class="say read-note">Gelesen: <b>${esc(read.join(', '))}</b>. Passt das?</p>`
       : serving?.status === 'noserver' && !product
         ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.</p>`
         : '',
@@ -208,16 +212,17 @@ function viewName() {
     <label class="label" for="f-variety">Sorte</label>
     <input id="f-variety" class="field" data-field="variety" value="${esc(s.variety)}" placeholder="z. B. Lachs in Soße" autocomplete="off" enterkeyhint="done">
     <div class="suggest" id="lineChips"></div>
-    ${group('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
-    ${textureChips(s)}
-    <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !product ? deleteMealBtn(serving.id) : ''}</div>`;
+    ${labelled('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
+    ${textureChips(s, '', labelled)}
+    <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button></div>
+    ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
 }
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
 // x: a variety, or the sheet itself while naming
-function textureChips(x, note = '') {
+function textureChips(x, note = '', wrap = group) {
   const t = TEXTURES[typeOf(x)];
   return t
-    ? group(
+    ? wrap(
         t.title,
         `<div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}`,
       )
@@ -329,8 +334,8 @@ function hitList(text, words) {
 
 const KAUFEN = [
   ['auto', 'Automatisch'],
-  ['immer', 'Immer kaufen'],
-  ['nicht', 'Nicht kaufen'],
+  ['immer', 'Nachkaufen'],
+  ['nicht', 'Nicht mehr kaufen'],
 ];
 const verdictPetRow = (pet, x) =>
   `<div class="row verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
@@ -406,8 +411,8 @@ function viewProduct() {
     ${noticed(p)}
     ${hist ? group('Verlauf', `<ul class="list plist">${hist}</ul>`, '') : ''}
     ${codes.length ? group('Barcodes', `<ul class="list plist">${codes.map(barcodeRow).join('')}</ul>`, '') : ''}
-    <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Servieren</button>
-    ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
+    <div class="mt"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Servieren</button></div>
+    ${apart(armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen', {cls: 'quiet'}))}`;
 }
 
 // at: id of the day to open at
@@ -416,16 +421,16 @@ export const reportState = at => ({kind: 'report', at});
 const shopList = (m, list) =>
   list.length ? `<ul class="list shop">${list.map(e => shopRow(m, e)).join('')}</ul>` : '';
 const unclear = g => [...g.geht, ...g.neu];
-const FOLDS = {
-  nicht: {label: 'Anzeigen', inner: () => shopList(model(), shopGroups(model()).nicht)},
-  unklar: {label: 'Anzeigen', inner: () => shopList(model(), unclear(shopGroups(model())))},
-};
+const FOLDS = {nicht: g => g.nicht, unklar: unclear};
+const FOLDED = 3; // rows a fold shows before the rest
+const foldLabel = (list, open) => (open ? 'Weniger' : `Alle ${list.length} zeigen`);
 function foldBox(key) {
-  const inner = FOLDS[key].inner(),
+  const m = model(),
+    list = FOLDS[key](shopGroups(m)),
     open = !!sheet.open?.[key];
-  if (!inner) return '';
-  return `<div class="card-body fold" id="fold-${key}">${open ? inner : ''}</div>
-    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${open ? 'Weniger' : FOLDS[key].label}</button>`;
+  if (list.length <= FOLDED) return shopList(m, list);
+  return `${shopList(m, list.slice(0, FOLDED))}<div class="card-body fold" id="fold-${key}">${open ? shopList(m, list.slice(FOLDED)) : ''}</div>
+    <button class="card-btn" data-action="fold" data-v="${key}" aria-expanded="${open}" aria-controls="fold-${key}">${foldLabel(list, open)}</button>`;
 }
 
 function viewReport() {
@@ -449,35 +454,33 @@ export function foldPart(key) {
     body = $('#fold-' + key, sheetBody),
     btn = $(`[data-action=fold][data-v="${key}"]`, sheetBody);
   if (!f || !body || !btn) return;
-  const open = !sheet.open?.[key],
+  const m = model(),
+    list = f(shopGroups(m)),
+    open = !sheet.open?.[key],
     h0 = body.offsetHeight;
   sheet.open = {...sheet.open, [key]: open};
-  body.innerHTML = open ? f.inner() : '';
-  btn.textContent = open ? 'Weniger' : f.label;
+  body.innerHTML = open ? shopList(m, list.slice(FOLDED)) : '';
+  btn.textContent = foldLabel(list, open);
   btn.setAttribute('aria-expanded', String(open));
   slideHeight(body, h0);
   drawn.set(sheetBody, VIEWS[sheet.kind]()); // so the next redraw sees nothing new
 }
-const sorts = (n, one, many) => (n === 1 ? `1 Sorte ${one}` : `${n} Sorten ${many}`);
 function viewShop() {
   const m = model(),
     g = shopGroups(m),
     types = TYPES.map(t => [t, g.nachkaufen.filter(e => typeOf(e.product) === t)]).filter(([, l]) => l.length),
-    open = unclear(g).length;
+    share = types.length
+      ? `<button class="icon-btn" data-action="share-list" aria-label="Liste teilen">${icon('share')}</button>`
+      : '';
   const buy = types.length
-    ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('') +
-      `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Liste teilen</button></div>`
+    ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('')
     : '<p class="hint card-line">Noch nichts zum Nachkaufen, erst mal probieren.</p>';
-  return `${head('Einkaufen' + forWhom(m.pet))}
-    <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
+  return `${head('Einkaufen' + forWhom(m.pet), 'settings-back', share)}
+    <section class="card"><h2>${sideIcon('top')}Nachkaufen</h2>${buy}</section>${
       g.nicht.length
-        ? `<section class="card"><h2>Lieber nicht</h2><p class="say card-line">${sorts(g.nicht.length, 'bleibt', 'bleiben')} meist stehen.</p>${foldBox('nicht')}</section>`
+        ? `<section class="card"><h2>${sideIcon('flop')}Nicht mehr kaufen</h2>${foldBox('nicht')}</section>`
         : ''
-    }${
-      open
-        ? `<section class="card"><h2>Noch unklar</h2><p class="say card-line">${sorts(open, 'ist', 'sind')} noch unklar.</p>${foldBox('unklar')}</section>`
-        : ''
-    }`;
+    }${unclear(g).length ? `<section class="card"><h2>Noch unklar</h2>${foldBox('unklar')}</section>` : ''}`;
 }
 
 function viewProfile() {
@@ -579,8 +582,8 @@ function viewPet() {
       'set-group',
     )}
     ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
-    <div class="mt btn-col"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button>
-    ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
+    <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button></div>
+    ${editing ? apart(armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
 }
 
 const VIEWS = {

@@ -12,18 +12,19 @@ const FULL =
   '<path d="M5.4 11c.8-2.7 3.5-4.4 6.6-4.4s5.8 1.7 6.6 4.4z" fill="currentColor" fill-opacity=".3"/>' +
   BOWL +
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
+// How much is left in the bowl tells the levels apart: a film, half, nearly full. Only a scale's best level has a heart.
+// surface: the fill's top edge and right side
+const LEFT = surface =>
+  `<path d="${surface}a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".4" stroke="none"/>`;
+const FILM = LEFT('M5.86 16.6h12.28l-.19.8') + BOWL;
+const HALF = LEFT('M5.47 15h13.05l-.58 2.4') + BOWL;
+const MOST = LEFT('M4.97 12.9h14.06l-1.08 4.5') + BOWL;
+const FEED = BOWL + '<path d="M12 5.2v3.6M10.2 7h3.6"/>';
 const I = {
   r_top: BOWL + HEART,
-  r_gut:
-    '<path d="M5.69 15.9h12.62l-.36 1.5a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
-    BOWL,
-  r_mittel:
-    '<path d="M5.3 14.3h13.4l-.75 3.1a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
-    BOWL,
-  r_eager:
-    '<path d="M5.08 13.4h13.84l-.97 4a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".35" stroke="none"/>' +
-    BOWL +
-    '<path d="M12 9.4c-1.8-1.1-3.6-2.6-3.6-4.3a1.75 1.75 0 0 1 3.6-.8 1.75 1.75 0 0 1 3.6.8c0 1.7-1.8 3.2-3.6 4.3z"/><path d="M12 4.3l-.9 1.8 1.4 1-.5 2.3"/>',
+  r_gut: FILM,
+  r_mittel: HALF,
+  r_eager: MOST,
   r_sosse:
     BOWL +
     DOT(9, 15.4) +
@@ -32,8 +33,8 @@ const I = {
     '<path d="M12 2.8c1.2 1.5 2.1 2.7 2.1 3.8a2.1 2.1 0 0 1-4.2 0c0-1.1.9-2.3 2.1-3.8z"/>',
   r_schlecht: FULL,
   r_gern: BOWL + HEART,
-  r_normal: BOWL,
-  r_wenig: '<path d="M5.4 11c1.2-1.6 3.6-2.5 6.6-2.5s5.4.9 6.6 2.5z" fill="currentColor" fill-opacity=".3"/>' + BOWL,
+  r_normal: FILM,
+  r_wenig: MOST,
   r_liegen: FULL,
   r_verputzt: TREAT + ABOVE(HEART),
   r_spaeter: TREAT + ABOVE(LATER),
@@ -43,10 +44,11 @@ const I = {
     DOT(17.8, 8.2) +
     DOT(19.6, 11.4),
   r_unberuehrt: TREAT + '<path d="M16.3 5.8h4.6"/>',
+  // fill: what the feeding button animates
   bowl:
     '<path class="fill" fill="currentColor" stroke="none" d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>' +
-    BOWL +
-    '<path d="M12 5.2v3.6M10.2 7h3.6"/>',
+    FEED,
+  feed: FEED,
   barcode:
     '<path d="M4 8.5V6.3A2.3 2.3 0 0 1 6.3 4h2.2M15.5 4h2.2A2.3 2.3 0 0 1 20 6.3v2.2M20 15.5v2.2a2.3 2.3 0 0 1-2.3 2.3h-2.2M8.5 20H6.3A2.3 2.3 0 0 1 4 17.7v-2.2"/><path d="M8 8.5v7M10.6 8.5v7M13.4 8.5v7M16 8.5v7"/>',
   camera:

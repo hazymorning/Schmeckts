@@ -1,6 +1,6 @@
 // Building blocks shared by the views
 import {andList, cap, esc} from '../text.js';
-import {DAY, addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
+import {DAY, addDays, ago, clockStr, dayKey, dayLabel, dayStart} from '../dates.js';
 import {icon} from '../icons.js';
 import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -61,8 +61,8 @@ export function rateSlider(s, pid) {
       .join(', '),
     words = scale
       .map((r, i) => {
-        const [first, second] = RATINGS[r].short.split(' ');
-        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${second}</small></span>`;
+        const [first, ...rest] = RATINGS[r].short.split(' ');
+        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${rest.join(' ')}</small></span>`;
       })
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
@@ -91,12 +91,15 @@ export const closeBtn = `<button class="icon-btn" data-action="close" aria-label
 export const deleteMealBtn = id =>
   `<button class="btn quiet" data-action="delete-serving" data-id="${id}">${icon('trash')}Eintrag löschen</button>`;
 /* Sheet or page head, decided by the state so one view can be both. back: for a step that is not a level of its
-   own, such as cropping. */
-export const head = (title, back = 'settings-back') =>
+   own, such as cropping. end: a button at the end of the bar. */
+export const head = (title, back = 'settings-back', end = '') =>
   isPage(sheet)
-    ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span></div>
+    ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span>${end}</div>
     <h2 class="page-title">${title}</h2>`
-    : `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>`;
+    : `<div class="sh-head"><h2>${title}</h2>${end}${closeBtn}</div>`;
+// a card's heading with the way to its page at its end; label, for screen readers, starts with the visible word
+export const cardHead = (title, action, label, more = 'Alle', v = '') =>
+  `<div class="card-head"><h2>${title}</h2><button class="more" data-action="${action}"${v ? ` data-v="${v}"` : ''} aria-label="${label}">${more}${icon('chevron')}</button></div>`;
 export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
 // option: [value, label, icon?, action?]
 export const segmented = (action, options, current) =>
@@ -136,6 +139,15 @@ function servingNode(s) {
     : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
   return `<i class="${cls}"></i>`;
 }
+// its height is the points, averaged over the pets on it
+function servingBar(s) {
+  const rs = servingPets(s)
+    .map(pid => rOf(s.pets[pid]))
+    .filter(Boolean);
+  if (!rs.length) return '<i class="open"></i>';
+  const v = rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length;
+  return `<i class="${rs.every(r => r === rs[0]) ? rateCls(rs[0]) : scoreCls(v)}" style="--v:${v / 100}"></i>`;
+}
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 // two weeks from last Monday, or with week the seven days up to today in one row
 export function calendarHTML(list, week = false) {
@@ -157,16 +169,16 @@ export function calendarHTML(list, week = false) {
       items = byDay.get(k) || [],
       isToday = k === todayKey;
     if (i < 7) names += `<span class="wd">${WEEKDAYS[(d.getDay() + 6) % 7]}</span>`;
-    const dots = items.slice(0, 3).map(servingNode).join('') + (items.length > 3 ? '<b>+</b>' : '');
+    const bars = items.slice(0, 3).map(servingBar).join('') + (items.length > 3 ? '<b>+</b>' : '');
     const label = dayLabel(d.getTime()) + (items.length ? ', ' + fedLabel(items) : ', nichts eingetragen');
-    cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="dots">${dots}</span></button>`;
+    cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="bars">${bars}</span></button>`;
     if (isToday) future = true;
     d.setDate(d.getDate() + 1);
   }
   return `<div class="cal">${names}${cells}</div>`;
 }
 /* {keys, more}: from ratingsIn(), oldest first. open: ratings the verdict still lacks, drawn hollow. The label says
-   it in words, so nothing rests on colour. */
+   it in words. */
 const STRIP = 8;
 export function strip({keys, more}, open = 0) {
   if (!keys.length) return '';
@@ -175,9 +187,9 @@ export function strip({keys, more}, open = 0) {
   const said =
     evidenceOf({n: keys.length, counts}) +
     (open ? `, noch ${open === 1 ? 'eine Bewertung' : 'zwei Bewertungen'} offen` : '');
-  return `<span class="dots strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
+  return `<span class="bars strip" role="img" aria-label="${esc(said)}">${more || keys.length > STRIP ? '<b>+</b>' : ''}${keys
     .slice(-STRIP)
-    .map(r => `<i class="${rateCls(r)}"></i>`)
+    .map(r => `<i class="${rateCls(r)}" style="--v:${RATINGS[r].score / 100}"></i>`)
     .join('')}${'<i class="open"></i>'.repeat(open)}</span>`;
 }
 export function dayGroups(list) {
@@ -195,7 +207,7 @@ function observationItem(o, multiHouse, fresh) {
     ids = observedPets(o),
     meta = [multiHouse || ids.length > 1 ? whoObserved(ids) : '', o.by ? 'von ' + o.by : ''].filter(Boolean).join(', ');
   return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
-        <span class="tl-time">${timeStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
+        <span class="tl-time">${clockStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
         <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
 // anchors: day ids the calendar jumps to; fresh: id of the entry just made
@@ -220,7 +232,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
               ? 'Wird gelesen …'
               : 'Unbekanntes Futter';
         return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-serving" data-id="${s.id}">
-        <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
+        <span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
         ${resultBadges(s, true)}</button></li>`;
       })
@@ -239,6 +251,9 @@ export function shopRow(m, e) {
     ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 
+// the two sides, on „Vorlieben“ and when buying, always with this icon in this tone
+export const SIDE = {top: ['champ', 'r-good'], flop: ['flop', 'r-bad']};
+export const sideIcon = side => icon(...SIDE[side]);
 // say and why are HTML; the caller escapes user text
 export const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 export const main = (title, sub = '', id = '') =>
@@ -247,10 +262,14 @@ export const under = html => `<div class="set-under">${html}</div>`;
 // a card under its label, as in the settings: set-group for rows with icons, pad for anything else
 export const group = (label, html, cls = 'pad') =>
   `${label ? `<span class="label">${label}</span>` : ''}<div class="group ${cls}">${html}</div>`;
+// without the card, where fields stand on the ground beside it
+export const labelled = (label, html) => `<span class="label">${label}</span>${html}`;
 // the whole row opens the picker; field: the invisible native input, shown: its value as we say it
 export const pickRow = (ic, title, sub, shown, field) =>
   `<div class="row set-row pick-row" data-action="pick">${lead(ic)}${main(title, sub)}<span class="pick-val">${shown}</span>${icon('chevron', 'chev')}${field}</div>`;
-export const obsThumb = kind => `<span class="thumb m toned o-${kind}">${icon(observationOf(kind).icon)}</span>`;
+// an icon in place of a picture, where products have their photo and pets their avatar: always a circle
+export const sign = (ic, tone = '') => `<span class="sign ${tone}">${icon(ic)}</span>`;
+export const obsThumb = kind => sign(observationOf(kind).icon, `o-${kind}`);
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
@@ -268,26 +287,26 @@ export function habitRow(h, several) {
   const name = id => pname(getProduct(id));
   if (h.kind === 'sosse' || h.kind === 'eager')
     return told(
-      lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
-      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
+      sign(h.kind === 'sosse' ? 'drop' : 'r_eager'),
+      `Bei <b>${esc(andList(h.sorts.map(x => name(x.id))))}</b> ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
       esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
   const pet = several ? getPet(h.pet) : null,
     who = pet ? `<b>${esc(pet.name)}</b> ` : '';
   if (h.kind === 'neugier' || h.kind === 'anlauf')
     return told(
-      pet ? avatar(pet, 's') : lead('sparkle'),
+      pet ? avatar(pet) : sign('sparkle'),
       h.kind === 'neugier'
         ? `${who}${pet ? 'ist neugierig' : 'Neugierig'}: Neues kommt erst gut an, dann lässt es nach.`
         : `${who}${pet ? 'braucht' : 'Braucht'} Anlauf: beim ersten Mal bleibt öfter was übrig als später.`,
-      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach <b>${h.later.good} von ${h.later.n} Mal</b>.`,
+      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach ${h.later.good} von ${h.later.n} Mal.`,
     );
   return told(
-    pet ? avatar(pet, 's') : lead('repeat'),
+    pet ? avatar(pet) : sign('repeat'),
     h.kind === 'abwechslung'
       ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.`
       : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte kurz hintereinander kommt besser an.`,
-    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst <b>${upTo(h.other.good, h.other.n)}</b>.`,
+    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst ${upTo(h.other.good, h.other.n)}.`,
   );
 }
 // not a button, nothing opens from it yet. g: a group of profile() in smart.js
@@ -340,10 +359,9 @@ export function syncChip() {
 }
 
 export function since(t, now) {
-  const day = dayStart(now),
-    clock = () => timeStr(t).replace(/^0(?=\d:)/, '');
-  if (t >= day) return `heute um ${clock()}`;
-  if (t >= addDays(day, -1)) return `gestern um ${clock()}`;
+  const day = dayStart(now);
+  if (t >= day) return `heute um ${clockStr(t)}`;
+  if (t >= addDays(day, -1)) return `gestern um ${clockStr(t)}`;
   const days = Math.round((day - dayStart(t)) / DAY);
   if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
   return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
@@ -361,7 +379,7 @@ export function evidenceOf(x) {
   if (!x.n) return 'Noch nicht bewertet';
   const levels = Object.keys(x.counts).sort((a, b) => RATINGS[b].score - RATINGS[a].score);
   if (levels.length === 1) return cap(`${times(x.n, x.n)} ${RATINGS[levels[0]].said}`);
-  if (x.n === 2) return `Einmal ${RATINGS[levels[0]].said}, einmal ${RATINGS[levels[1]].said}`;
+  if (x.n === 2) return `Einmal ${once([RATINGS[levels[0]].said, RATINGS[levels[1]].said]).join(', einmal ')}`;
   const sides = SIDES.map(([on, word]) => {
     const l = levels.filter(r => on(RATINGS[r].score));
     return {k: l.reduce((a, r) => a + x.counts[r], 0), said: l.length === 1 ? RATINGS[l[0]].said : word};
@@ -369,7 +387,16 @@ export function evidenceOf(x) {
     .filter(side => side.k)
     .sort((a, b) => b.k - a.k);
   if (sides[0].k * 2 > x.n) return cap(`${times(sides[0].k, x.n)} ${sides[0].said}`);
-  return `Mal so, mal so: ${sides.map(side => `${side.k}× ${side.said}`).join(', ')}`;
+  return `Mal so, mal so: ${once(sides.map(side => side.said))
+    .map((said, i) => `${sides[i].k}× ${said}`)
+    .join(', ')}`;
+}
+// a closing word all phrases share is said once, at the end: „einmal fast alles, einmal die Hälfte gefressen“
+function once(phrases) {
+  const end = ' ' + phrases.at(-1).split(' ').at(-1);
+  return phrases.every(p => p.endsWith(end))
+    ? phrases.map((p, i) => (i < phrases.length - 1 ? p.slice(0, -end.length) : p))
+    : phrases;
 }
 export const lower = t => t.charAt(0).toLowerCase() + t.slice(1);
 // when only some pets decided the verdict, only their ratings are told

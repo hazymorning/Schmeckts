@@ -110,6 +110,8 @@
   --pic-xl: 56px;
   --pic-xxl: 72px;
   --pic-xxxl: 112px;
+  --meter: 16px; /* a rating bar at full points; the lowest is as tall as it is wide */
+  --meter-w: 4px;
 
   --hairline: 1px;
   --stroke: 2px; /* every emphasised line */
@@ -119,7 +121,8 @@
   --dim: 0.35; /* days to come */
   --busy: 0.6;
   --mood: 0.16; /* 0.26 in dark, below */
-  --mood-filter: saturate(0.85);
+  --mood-blur: 24px;
+  --mood-filter: saturate(0.85) blur(var(--mood-blur));
   --blur-edge: 6px; /* what scrolls under the status bar */
 
   --bg: light-dark(#eeede7, #1b1c17);
@@ -153,13 +156,14 @@
 
   --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 
-  /* Derived from the palette's values only */
+  /* Derived from the palette's values. Dimming and shadows in dark take #0b0c09, darker than --bg: a sheet has --bg
+     as its ground and would lose its edge over a page dimmed in --bg. */
   --seg-on: light-dark(#fafaf6, #3b3c34); /* light --surface, dark --line */
   --toast-action: light-dark(#a9b283, #4a5134); /* the other mode's accent */
-  --backdrop: light-dark(#25261f66, #1b1c17b3); /* --ink at 40 % in light, --bg at 70 % in dark */
-  --shadow-low: 0 1px 4px light-dark(#25261f1a, #1b1c174d); /* resting lift */
+  --backdrop: light-dark(#25261f66, #0b0c09b3); /* --ink at 40 % in light, at 70 % in dark */
+  --shadow-low: 0 1px 4px light-dark(#25261f1a, #0b0c094d); /* resting lift */
   --shadow-high:
-    0 14px 34px -14px light-dark(#25261f4d, #1b1c17a6), 0 2px 6px light-dark(#25261f14, #1b1c1759); /* what floats */
+    0 14px 34px -14px light-dark(#25261f4d, #0b0c09a6), 0 2px 6px light-dark(#25261f14, #0b0c0959); /* what floats */
 }
 :root[data-theme="light"] {
   color-scheme: light;

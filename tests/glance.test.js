@@ -570,16 +570,10 @@ test('the lines: at least three ways of saying every kind, two sentences at most
   // With the aside, the card holds three lines at 393px: the lead takes half of it with a usual name and time
   const usual = {
     what: 'Lachs',
-    at: '7:10',
     by: '',
-    for: '',
-    ago: 'vor 20 Minuten',
-    Ago: 'Vor 20 Minuten',
     meal: 'Abendessen',
     time: '18:30',
-    so: 'schon',
-    both: 'zwei Mahlzeiten',
-    Names: 'Minka',
+    span: '3 Stunden',
     hat: 'hat',
     names: 'Minka',
     wartet: 'wartet',
@@ -587,7 +581,6 @@ test('the lines: at least three ways of saying every kind, two sentences at most
     freut: 'freut',
     ist: 'ist',
     since: 'vor 3 Tagen',
-    evening: 'Abend ',
   };
   for (const [kind, list] of Object.entries(LEADS))
     for (const t of list) assert.ok(fill(t, usual).length <= 46, `${kind}: ${fill(t, usual)}`);
@@ -711,15 +704,19 @@ test('the overview card: the moment picks the first sentence, news of the day th
     [{premiere: 'lachs00001'}, say('premiereLast', {})],
     [{premiere: 'rind00001'}, say('premiere', {sort: 'Rind'})],
     [{milestone: {n: 100, left: 3}}, say('milestone', {n: '3×', m: '100. Mal'})],
-    [{snacks: 4}, say('snacks', {n: '4 Snacks', grip: 'Minka hat euch im Griff.'})],
+    [{snacks: 4}, say('snacks', {grip: 'Minka hat euch im Griff.'})],
     [{anniversary: 1, first: {at: 0, days: 30, meals: 62}}, say('anniversary', {span: 'einem Monat', n: 62})],
     [{record: {meals: 0, streak: 23}}, say('recordStreak', {days: '23 Tage'})],
-    [{record: {meals: 4, streak: 0}, meals: 4}, say('recordDay', {n: '4 Mahlzeiten'})],
+    [{record: {meals: 4, streak: 0}, meals: 4}, say('recordDay', {})],
     [{shift: {at: 435, diff: -40}}, say('earlier', {meal: 'Frühstück', span: '40 Minuten'})],
     [{shift: {at: 1110, diff: 95}}, say('later', {meal: 'Abendessen', span: 'eineinhalb Stunden'})],
     [{sameMinute: true}, say('sameMinute', {})],
   ];
   for (const [x, want] of news) assert.deepEqual(one(x), [days[0][0], want]);
+  const shown = [{}, {next: {at: 1110, due: true}}, {next: {at: 435, tomorrow: true}}, {next: null}];
+  shown.push({last: {...last, servedAt: T - 20 * 6e4}}, {last: {...last, servedAt: T - DAY}, next: null});
+  for (const x of shown)
+    assert.ok(!/Lachs|9:00|Anna/.test(one(x)[0]), `the cards below show the meal, the lead does not: ${one(x)[0]}`);
   assert.deepEqual(one({next: {at: 1110, due: true}}), [
     lead('due', {what: 'Lachs', at: '9:00', by: ' von Anna', meal: 'Abendessen'}),
     say('waiting', {names: 'Minka', wartet: 'wartet', uebt: 'übt', hat: 'hat', sitzt: 'sitzt'}),
@@ -753,6 +750,16 @@ test('the overview card: the moment picks the first sentence, news of the day th
     ],
   ];
   for (const [x, want] of kinds) assert.equal(one(x, bare)[1], want);
+  const twice = x =>
+    overviewLines(x, pets, T, null)
+      .text.split(/[.!?](?=\s|<|$)/)
+      .filter(s => s.split('<b>').length > 2);
+  for (const x of [
+    ...news.map(([n]) => ({...g, ...n})),
+    ...kinds.map(([k]) => ({...bare, ...k})),
+    ...shown.map(v => ({...g, ...v})),
+  ])
+    assert.deepEqual(twice(x), [], 'at most one bold per sentence');
 
   const t = h => at(`2026-06-09T${h}`),
     fed = {servedAt: t('07:20')},

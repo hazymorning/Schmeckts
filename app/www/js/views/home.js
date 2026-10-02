@@ -23,6 +23,8 @@ import {
   photoThumb,
   rateSlider,
   shopRow,
+  sideIcon,
+  cardHead,
   syncChip,
   thumbOf,
   times,
@@ -135,7 +137,7 @@ function homeHTML() {
   else
     html +=
       hintHTML(m) +
-      `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
+      `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m) +
       shopHTML(m);
   return html;
@@ -144,7 +146,7 @@ function homeHTML() {
 const welcomeHTML = () => `<div class="welcome">
   <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
   <h2>Was schmeckt deinem Tier?</h2>
-  <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie der Napf aussah. So siehst du bald, was wirklich ankommt.</p>
+  <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie viel dein Tier gefressen hat. So siehst du bald, was wirklich ankommt.</p>
   <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Tier anlegen</button>
     ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Beispieldaten ansehen</button>`}
   </div></div>`;
@@ -185,9 +187,9 @@ function pendingHTML(list) {
 
 const HINT_TITLES = {
   appetit: 'Appetit',
-  stop: 'Nicht mehr kaufen?',
+  stop: `${sideIcon('flop')}Nicht mehr kaufen?`,
   sosse: 'Frisst meist nur die Soße',
-  liebling: 'Neuer Liebling',
+  liebling: `${sideIcon('top')}Nachkaufen?`,
 };
 const sortName = p => (p.variety && p.brand ? `${p.variety} von ${p.brand}` : pname(p));
 function hintHTML(m) {
@@ -219,7 +221,7 @@ function hintHTML(m) {
     [say, btns] =
       h.kind === 'stop'
         ? [`${name} kommt nicht gut an.`, set('nicht', 'Nicht mehr kaufen') + hide]
-        : [`${name} kommt gut an.`, set('immer', 'Immer kaufen') + hide];
+        : [`${name} kommt gut an.`, set('immer', 'Nachkaufen') + hide];
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
@@ -233,8 +235,7 @@ function shopHTML(m) {
     .slice(0, SHOP_SHOWN)
     .map(e => shopRow(m, e))
     .join('');
-  return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2><ul class="list shop">${rows}</ul>
-    <button class="card-btn" data-action="open-shop">Einkaufsliste${icon('chevron')}</button></section>`;
+  return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop">${cardHead('Einkaufen', 'open-shop', 'Alle Sorten zum Einkaufen')}<ul class="list shop">${rows}</ul></section>`;
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing
@@ -265,7 +266,6 @@ function historyHTML() {
       ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
       : recent.length || db.servings.some(s => servingPets(s).length)
         ? `<p class="hint empty"><span>Heute noch nichts serviert, der Napf langweilt sich.</span></p>`
-        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert, der Napf wartet auf seine Premiere.</span></p>`) +
-    `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
+        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert, der Napf wartet auf seine Premiere.</span></p>`)
   );
 }

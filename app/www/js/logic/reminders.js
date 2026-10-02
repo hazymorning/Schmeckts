@@ -1,5 +1,5 @@
 // no exact alarms: the app does not hold that permission
-import {timeStr} from '../dates.js';
+import {clockStr} from '../dates.js';
 import {FeedReminder, Notifications} from '../native.js';
 import {report} from '../report.js';
 import {REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
@@ -19,7 +19,7 @@ function notice(s) {
   return {
     id: idOf(s.id),
     title: 'Wie war’s?',
-    body: `${p ? pname(p) : 'Futter von ' + timeStr(s.servedAt)} für ${petNames(Object.keys(s.pets))}`,
+    body: `${p ? pname(p) : 'Futter von ' + clockStr(s.servedAt)} für ${petNames(Object.keys(s.pets))}`,
     schedule: {at: new Date(at), allowWhileIdle: true},
     isExactNotification: false,
     extra: {serving: s.id, at},

@@ -467,6 +467,32 @@ async def test_shop(browser, url):
     await ctx.close()
 
 
+async def test_shop_folds(browser, url):
+    print('„Einkaufen“: what is no longer bought shows its first three at once, the rest behind one tap')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    left = [f'stehen{i:04d}' for i in range(5)]
+    await load(
+        pg,
+        [pet(M)],
+        [product(i, 'Sheba', f'Sorte {n}') for n, i in enumerate([*left, 'unklar0001'])],
+        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5, {M: 'schlecht'}) for i in left for n in range(2)]
+        + [meal('unklar0001-0', 'unklar0001', now - 864e5, {M: 'mittel'})],
+    )
+    await open_sheet(pg, kind='shop')
+    ROWS = "s => document.querySelector(s).closest('.card').querySelectorAll('.shop > li').length"
+    shut = await pg.evaluate(ROWS, '#sheet [data-action=fold][data-v=nicht]')
+    await tap(pg, '#sheet [data-action=fold][data-v=nicht]')
+    rows = [shut, await pg.evaluate(ROWS, '#sheet [data-action=fold][data-v=nicht]'), await pg.evaluate(ROWS, '#sheet [data-id=unklar0001]')]
+    check(
+        rows == [3, 5, 1] and await pg.locator('#sheet [data-action=fold][data-v=unklar]').count() == 0,
+        f'three at once, the rest after a tap; a short list has nothing to unfold {rows}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 M, T = 'minka00001', 'tiger00001'
 BRANDS = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Rinti', 'Bozita', 'Schesir']
 
@@ -606,10 +632,38 @@ async def test_evaluation(browser, url):
     check(await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet?.kind, m.sheet?.id])") == ['product', pid], 'a row opens its food sheet')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    told = await pg.evaluate(
+        "[document.querySelector('#sheet .portrait .say').textContent, [...document.querySelectorAll('#sheet .ranks b')].map(b => b.textContent)]"
+    )
+    check(told[1] and not any(name in told[0] for name in told[1]), f'the portrait names none of the varieties the lists below show {told}')
+    ranked = await pg.eval_on_selector_all('#sheet .ranks', "l => l.map(o => [o.children.length, o.querySelectorAll('.place').length])")
+    check(ranked and all(n == shown for n, shown in ranked), f'every row of a longer list shows its place {ranked}')
     await tap(pg, '#sheet [data-action=open-level][data-v=profile]')
     level = await pg.evaluate(LEVEL)
     await back(pg)
     check(level == [True, 'evaluation', 'profile', None] and await pg.evaluate(LEVEL) == [True, 'evaluation', None, None], 'a level and back')
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
+async def test_candidate(browser, url):
+    print('no Leibgericht yet: its empty side names the variety closest to it, which „Als Nächstes“ then leaves out')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    rated = [('ladenhueter', ['schlecht', 'schlecht', 'mittel']), ('naechste1', ['top', 'gut']), ('naechste2', ['top'])]
+    await load(
+        pg,
+        [pet(M)],
+        [product(i, 'Sheba', i.capitalize()) for i, _ in rated],
+        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated) for n, r in enumerate(levels)],
+    )
+    tile = await pg.eval_on_selector('[data-sec=evaluation] .tile', "t => [t.tagName, t.dataset.id ?? null, !!t.querySelector('.kicker')]")
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    named = await pg.eval_on_selector_all('#sheetBody [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
+    check(tile == ['BUTTON', 'naechste1', True], f'the empty Leibgericht tile keeps its kicker and opens the closest variety {tile}')
+    check(named == ['naechste1', 'ladenhueter', 'naechste2'], f'its card names it before the Ladenhüter, „Als Nächstes“ only the others {named}')
+    check(await pg.locator('#sheet .ranks .place').count() == 0, 'a list of one shows no place')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
@@ -2366,9 +2420,11 @@ run_tests(
         'buying': test_buying,
         'cards': test_cards,
         'shop': test_shop,
+        'shop-folds': test_shop_folds,
         'history': test_home_history,
         'report': test_report,
         'evaluation': test_evaluation,
+        'candidate': test_candidate,
         'scales': test_scales,
         'slide': test_slide,
         'texture': test_texture,

@@ -96,6 +96,7 @@ strong {
 }
 .btn .ic,
 .card-btn .ic,
+.more .ic,
 .chip .ic,
 .seg button .ic,
 .toast button .ic,
@@ -149,8 +150,10 @@ strong {
   --cs: var(--happy-soft);
 }
 
-/* only the alpha in the mask gradient matters */
+/* Only the alpha in the mask gradient matters. A layer of its own, so the blur below is drawn once and not with every
+   redraw of the cards over it. */
 .mood {
+  will-change: transform;
   position: absolute;
   top: 0;
   left: 0;
@@ -161,11 +164,13 @@ strong {
   -webkit-mask-image: linear-gradient(to bottom, var(--ink) 35%, transparent);
   mask-image: linear-gradient(to bottom, var(--ink) 35%, transparent);
 }
+/* out of focus, so it reads as a mood rather than a faded picture; the edges reach past the box, or the blur would
+   lighten them */
 .mood img {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: calc(-2 * var(--mood-blur));
+  width: calc(100% + 4 * var(--mood-blur));
+  height: calc(100% + 4 * var(--mood-blur));
   object-fit: cover;
   opacity: var(--mood);
   filter: var(--mood-filter);
@@ -448,7 +453,7 @@ dialog.sheet.page .sheet-body {
   min-width: 0;
   margin: 0;
 }
-.sh-head .icon-btn {
+.sh-head .icon-btn:last-child {
   margin-right: calc(-1 * var(--space-3));
 }
 .sh-head .icon-btn.lead {
@@ -467,8 +472,11 @@ dialog.sheet.page .sheet-body {
   padding: 0 var(--gutter);
   background: var(--bg);
 }
-.head .icon-btn {
+.head .icon-btn:first-child {
   margin-left: calc(-1 * var(--space-3));
+}
+.head .icon-btn:last-child:not(:first-child) {
+  margin-right: calc(-1 * var(--space-3));
 }
 /* shown once the page title has scrolled under the bar */
 .bar-title {
@@ -693,14 +701,16 @@ dialog.sheet::after {
   position: relative;
   cursor: pointer;
 }
+/* the title keeps its width; a long value such as a date wraps instead */
+.pick-row > .t-main {
+  flex: 1 0 auto;
+}
 .pick-val {
   flex: 0 1 auto;
   min-width: 0;
   font: var(--type-body);
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: right;
 }
 .pick-in {
   position: absolute;
@@ -911,7 +921,7 @@ dialog.sheet::after {
   font: var(--type-body);
 }
 .field::placeholder {
-  color: var(--faint);
+  color: var(--muted);
 }
 .field:focus {
   outline: none;
@@ -1060,6 +1070,20 @@ dialog.sheet::after {
   vertical-align: middle;
   margin-right: var(--space-1h);
 }
+/* The way from a card to its page, at the end of the heading. The tap area reaches into the card's padding above,
+   so the heading line keeps its height. */
+.more {
+  display: flex;
+  align-items: center;
+  gap: var(--space-hair);
+  flex: 0 0 auto;
+  min-height: var(--tap);
+  margin: calc(-1 * var(--space-3h)) calc(-1 * var(--space-3)) calc(-1 * var(--space-1h)) 0;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-m);
+  font: var(--type-small-strong);
+  color: var(--accent-ink);
+}
 /* --space-3 above the line, so what ends the card does not sit on it */
 .card-btn {
   display: flex;
@@ -1091,8 +1115,10 @@ dialog.sheet::after {
   margin-left: calc(-1 * var(--space-1));
   color: var(--c);
 }
+/* a meal still to rate asks for it, in the tone of what can be tapped */
 .badge.open {
-  color: var(--muted);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 .badge.ic-only {
   min-height: 0;
@@ -1233,9 +1259,17 @@ dialog.sheet::after {
   color: var(--ink);
   box-shadow: inset 0 0 0 var(--stroke) var(--c);
 }
-.srv-ic .ic {
-  width: var(--icon);
-  height: var(--icon);
+/* An icon in place of a picture, the size of a small thumbnail: always a circle, in its tone when it has one. Products
+   keep the rounded square, pets their avatar. */
+.sign {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--pic-m);
+  height: var(--pic-m);
+  border-radius: 50%;
+  background: var(--cs, var(--raise));
+  color: var(--c, var(--muted));
 }
 /* takes the picture's shape, so the focus ring follows it */
 .photo-btn {
@@ -1332,7 +1366,7 @@ dialog.sheet::after {
   display: block;
   width: var(--pic-xxxl);
   height: var(--pic-xxxl);
-  margin: var(--space-1) auto var(--space-2);
+  margin: var(--space-4h) auto var(--space-2); /* 24 under the page title with its 6 */
   cursor: pointer;
   border-radius: 50%;
 }
@@ -1393,7 +1427,7 @@ dialog.sheet::after {
 
 .cal .wd {
   font: var(--type-caption-strong);
-  color: var(--faint);
+  color: var(--muted);
   margin-bottom: var(--space-1);
 }
 .day {
@@ -1412,16 +1446,17 @@ dialog.sheet::after {
   place-items: center;
   font: var(--type-small);
   font-variant-numeric: tabular-nums;
-  color: var(--faint);
+  color: var(--muted);
 }
 .day.has .dn {
   color: var(--ink);
   font: var(--type-small-strong);
   font-variant-numeric: tabular-nums;
 }
+/* a ring in ink: today is no action, and an accent fill sat as a second green beside the good bars */
 .day.today .dn {
-  background: var(--accent);
-  color: var(--on-accent);
+  box-shadow: inset 0 0 0 var(--stroke) var(--ink);
+  color: var(--ink);
   font: var(--type-small-strong);
   font-variant-numeric: tabular-nums;
 }
@@ -1492,12 +1527,14 @@ dialog.sheet::after {
 .tl-item {
   border-radius: var(--radius-m);
 }
+/* right-aligned, so 7:05 and 19:30 line up at the minutes */
 .tl-time {
   width: var(--tl-time);
   min-width: 0;
   flex: 0 0 auto;
   font: var(--type-small-strong);
   font-variant-numeric: tabular-nums;
+  text-align: right;
   color: var(--muted);
 }
 .tl-node {
@@ -1667,27 +1704,31 @@ dialog.sheet::after {
   font: var(--type-body-strong);
   font-variant-numeric: tabular-nums;
 }
-.dots {
+/* Ratings as small bars: the height is the points (--v, 0 to 1), the tone only backs it up. An open rating is an
+   empty slot at full height. */
+.bars {
   display: flex;
-  gap: var(--space-1);
-  height: 6px;
-  align-items: center;
+  align-items: flex-end;
+  gap: var(--space-hair);
+  height: var(--meter);
 }
-.dots i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.bars i {
+  width: var(--meter-w);
+  height: calc(var(--meter-w) + var(--v, 0) * (var(--meter) - var(--meter-w)));
+  border-radius: var(--radius-full);
   background: var(--c, var(--faint));
 }
-.dots i.open {
+.bars i.open {
+  height: var(--meter);
   background: none;
-  box-shadow: inset 0 0 0 var(--stroke) var(--faint);
+  box-shadow: inset 0 0 0 var(--hairline) var(--muted);
 }
-.dots b {
+.bars b {
+  align-self: center;
   font: var(--type-caption-strong);
-  color: var(--faint);
+  color: var(--muted);
 }
-.dots.strip {
+.bars.strip {
   flex: none;
 }
 
@@ -1732,10 +1773,23 @@ dialog.sheet::after {
 .prod {
   --lead: var(--pic-xl);
 }
+/* the line's room above the capitals is trimmed, so the inset to the heading looks as wide as at the sides; older
+   WebViews skip it */
 .card h2 {
   text-wrap: balance;
+  text-box: trim-start cap alphabetic;
   margin: 0 0 var(--space-1);
   color: var(--ink);
+}
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+}
+.card-head h2 {
+  margin: 0;
 }
 /* flow-root, so the children's margins count towards the height and the animation does not jump */
 .card-body {
@@ -1860,6 +1914,10 @@ dialog.sheet::after {
 .tile + .tile {
   margin-top: var(--space-2);
 }
+/* nothing on that side yet: only the kicker and the icon keep the tone */
+.tile.empty {
+  background: var(--raise);
+}
 .tile-ic {
   display: grid;
   place-items: center;
@@ -1882,8 +1940,9 @@ dialog.sheet::after {
   font: var(--type-caption-strong);
   color: var(--c);
 }
-.tile + .card-btn {
-  margin-top: var(--space-3h);
+/* with the card's 8px foot this makes 18, as at the top */
+.tile:last-child {
+  margin-bottom: var(--space-2h);
 }
 .portrait {
   display: flex;
@@ -1966,7 +2025,7 @@ dialog.sheet::after {
   text-align: center;
 }
 .days {
-  --ground: var(--bg); /* the dots' cut-out colour: the page ground, not a card */
+  --ground: var(--bg); /* the nodes' cut-out colour: the page ground, not a card */
 }
 .days .cal {
   margin-top: 0;
@@ -1974,7 +2033,7 @@ dialog.sheet::after {
 .tl-item {
   gap: 0;
 }
-.tl-item .thumb {
+.tl-item :is(.thumb, .sign) {
   margin: 0 var(--space-3) 0 var(--space-2);
 }
 .tl-item .t-main {
@@ -2005,6 +2064,9 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 }
 .mt {
   margin-top: var(--space-6);
+}
+.apart {
+  margin-top: var(--space-7);
 }
 .mt-s {
   margin-top: var(--space-2h);
@@ -2176,6 +2238,7 @@ body,
 .box,
 .btn,
 .card-btn,
+.more,
 .chip,
 .seg button,
 .field,
@@ -2217,7 +2280,7 @@ dialog.sheet.dragging {
 :is(button.row, button.box, button.tile, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
-:is(.icon-btn, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
+:is(.icon-btn, .more, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
   transform: scale(var(--press));
 }
 :is(.icon-btn, .day.has):active {
