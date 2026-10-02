@@ -171,15 +171,17 @@ are named constants at the top of `smart.js`, `glance.js` and `views/overview.js
 ## Working
 
 - **Setup for tests:** Node 22, Python 3 with `pip install -r tests/requirements.txt` (Playwright with its Chromium),
-  Go. `scripts/test.sh` fetches the fonts, `scripts/lint.sh` the npm packages. `scripts/setup-build-env.sh` (JDK,
-  Android SDK) is only needed to build the APK.
+  Go. `scripts/lint.sh` installs the npm packages. `scripts/setup-build-env.sh` (JDK, Android SDK) is only needed to
+  build the APK, `scripts/prepare.py` then generates `app/android`. After changing the app icon,
+  `design/render-icons.py` draws the Android 7 launcher icons in `app/native/res` again.
 - **Checks:** `scripts/lint.sh` (ESLint, Prettier, gofmt, go vet, ruff, shellcheck, `scripts/text-style.py`).
-- **Tests:** `scripts/test.sh [go node storage design perf ui sync]`. `tests/*.test.js` test pure modules in Node,
+- **Tests:** `scripts/test.sh [go node files storage design perf ui sync]`. `tests/*.test.js` test pure modules in Node,
   the Python suites drive the app in Chromium with simulated plugins, `sync_test.py` runs phones against the real
   server. `tests/fixtures/ocr/` holds real packaging readings; `schmeckts://ocr-dump` exports a new one from the phone.
 - **CI:** `.github/workflows/tests.yml` on pull requests and on `main`. The browser suites run in Playwright's image,
   whose tag must match the Playwright pin in `tests/requirements.txt` (`lint.sh` checks it).
-- **Release:** raise the version in `app/package.json`, merge, publish a GitHub release tagged `v<version>`.
+- **Release:** raise the version in `app/package.json` (and the server's in `server/VERSION`, `debian/changelog` and
+  the metainfo when it changed), merge, publish a GitHub release tagged `v<version>`.
   `release.yml` runs the tests, builds the signed APK (secret `SCHMECKTS_SIGNING_KEY`) as `schmeckts.apk` and the
   server packages, and attaches them. The README links to `releases/latest/download/schmeckts.apk`.
 - **Signing key:** always the same one, or updates over an installed app fail. `schmeckts-signing-key.txt`

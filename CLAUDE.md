@@ -23,6 +23,6 @@ Read `PROJECT.md` before changing stored data, sync, storage or the server.
   `pip install -r tests/requirements.txt`.
 - `scripts/lint.sh` before every push.
 - `scripts/test.sh <suites>` while working, only what the change touches: `node` for pure modules (`smart`, `glance`,
-  `ocr`, `derive`), `ui design` for views and CSS, `storage sync go` for store, sync and server. All suites before
-  pushing.
-- `scripts/setup-build-env.sh` only to build the APK.
+  `ocr`, `derive`), `ui design` for views and CSS, `storage sync go` for store, sync and server, `files` for
+  packaging and versions. All suites before pushing.
+- `scripts/setup-build-env.sh` and `scripts/prepare.py` only to build the APK.

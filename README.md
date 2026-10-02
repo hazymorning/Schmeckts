@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-8.0%2B-58603F?logo=android&logoColor=white&labelColor=25261F" alt="Android 8.0 oder neuer">
+  <img src="https://img.shields.io/badge/Android-7.0%2B-58603F?logo=android&logoColor=white&labelColor=25261F" alt="Android 7.0 oder neuer">
   <img src="https://img.shields.io/badge/App--Sprache-Deutsch-58603F?labelColor=25261F" alt="App-Sprache: Deutsch">
 </p>
 
