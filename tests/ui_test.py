@@ -682,10 +682,14 @@ async def test_shop(browser, url):
     await pg.click(f'#sheet [data-action=open-product][data-id="{kaese}"]')
     await idle(pg)
     check(
-        await pg.evaluate("document.getElementById('sheet').dataset.kind") == 'product' and await pg.inner_text('#sheet .sh-head h2') == 'Käse',
-        'a row opens the food sheet, which tells the ratings in words',
+        await pg.evaluate("[document.getElementById('sheet').dataset.kind, document.getElementById('popup').dataset.kind]") == ['shop', 'product']
+        and await pg.inner_text('#popup .sh-head h2') == 'Käse',
+        'a row opens the food sheet over the page, which tells the ratings in words',
     )
-    await pg.click('#sheet [data-action=close]')
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    check(await pg.evaluate(SHOP_PAGE) == kept, 'closed again: the page as it was, the fold still open')
+    await pg.click('#sheet [data-action=settings-back]')
     await idle(pg)
     # One rating: nothing to buy yet, so the home page has no card, while the page still says so; nothing rated: no
     # card either
@@ -4673,6 +4677,131 @@ async def test_sheet(browser, url):
     await ctx.close()
 
 
+POPUP = """() => { const d = id => document.getElementById(id);
+  return {page: d('sheet').open ? d('sheet').dataset.kind : null, popup: d('popup').open ? d('popup').dataset.kind : null,
+    title: d('popupBody').querySelector('.sh-head h2')?.textContent ?? null, y: d('sheetBody').scrollTop,
+    locked: document.body.classList.contains('locked'), toast: d('toast').parentNode.id || d('toast').parentNode.tagName}; }"""
+
+
+async def test_popup(browser, url):
+    print('a sheet opened from a page lies over it, and closing it or going back leads to the page as it was')
+    ctx = await phone(browser, motion=True)
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.click('[data-action=demo]')
+    await idle(pg)
+    await pg.click('[data-action=open-report]')
+    await idle(pg)
+    await pg.evaluate("document.getElementById('sheetBody').scrollTop = 900")
+    await idle(pg)
+    visible = "[...document.querySelectorAll('#sheet .tl-item')].findIndex(b => { const r = b.getBoundingClientRect(); return r.top > 120 && r.bottom < 700; })"
+    item = pg.locator('#sheet .tl-item').nth(await pg.evaluate(visible))
+    await item.click()
+    await idle(pg)
+    over = await pg.evaluate(POPUP)
+    check(
+        over['page'] == 'report' and over['popup'] == 'serving' and over['title'] == 'Wie war’s?' and over['y'] == 900,
+        f'a meal tapped in „Verlauf“: its sheet rises over the page, which stays scrolled where it was ({over})',
+    )
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    shut = await pg.evaluate(POPUP)
+    await item.click()
+    await idle(pg)
+    await pg.evaluate('window.__back({canGoBack: true})')
+    await idle(pg)
+    back = await pg.evaluate(POPUP)
+    await item.click()
+    await idle(pg)
+    await pg.go_back()
+    await idle(pg)
+    gesture = await pg.evaluate(POPUP)
+    check(
+        all(x['page'] == 'report' and not x['popup'] and x['y'] == 900 and x['locked'] for x in (shut, back, gesture)),
+        f'the X, Android’s back button and the back gesture each close only the sheet: „Verlauf“ is there as it was ({shut}, {back}, {gesture})',
+    )
+    # Rated over the page: the sheet closes by itself after its moment, and the page shows the rating
+    open_meal = await pg.evaluate("""() => { const b = [...document.querySelectorAll('#sheet .tl-item')].find(b => b.querySelector('.badge')?.textContent.trim() === 'offen');
+      b?.scrollIntoView({block: 'center'}); return b?.dataset.id ?? null; }""")
+    await idle(pg)
+    y = await pg.evaluate("document.getElementById('sheetBody').scrollTop")
+    await pg.click(f'#sheet .tl-item[data-id="{open_meal}"]')
+    await idle(pg)
+    await pg.click('#popup [data-action=rate][data-r=gut]', force=True)
+    await pg.wait_for_function("!document.getElementById('popup').open", timeout=6000)
+    await idle(pg)
+    rated = await pg.evaluate(POPUP)
+    badge = await pg.get_attribute(f'#sheet .tl-item[data-id="{open_meal}"] .badge', 'title')
+    check(
+        rated['page'] == 'report' and not rated['popup'] and rated['y'] == y and badge == 'Fast leer' and rated['toast'] == 'sheet',
+        f'rated over „Verlauf“: the sheet closes by itself, the page shows the rating where it was, and the toast stands on it ({rated}, {badge!r})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    undone = await pg.inner_text(f'#sheet .tl-item[data-id="{open_meal}"] .badge')
+    check(undone.strip() == 'offen', f'„Rückgängig“ on the page takes the rating back there too ({undone!r})')
+    # Deleted over the page: back on it without the meal, and undo brings it back there
+    await pg.click(f'#sheet .tl-item[data-id="{open_meal}"]')
+    await idle(pg)
+    await pg.evaluate("import('./js/logic/editing.js').then(m => m.deleteServing(document.querySelector('#popup [data-action=rate]').dataset.s))")
+    await idle(pg)
+    gone = [await pg.evaluate(POPUP), await pg.locator(f'#sheet .tl-item[data-id="{open_meal}"]').count()]
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    again = await pg.locator(f'#sheet .tl-item[data-id="{open_meal}"]').count()
+    check(
+        gone[0]['page'] == 'report' and not gone[0]['popup'] and gone[1] == 0 and again == 1,
+        f'deleted over „Verlauf“: back on the page without the meal, and „Rückgängig“ puts it back there ({gone}, {again})',
+    )
+    # Served from a page: the meal is to be rated on the home page, so everything closes
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('[data-action=open-evaluation]')
+    await idle(pg)
+    await pg.locator('#sheet [data-action=open-product]').first.click()
+    await idle(pg)
+    product = await pg.evaluate(POPUP)
+    await pg.click('#popup [data-action=close]')
+    await idle(pg)
+    stays = await pg.evaluate(POPUP)
+    await pg.locator('#sheet [data-action=open-product]').first.click()
+    await idle(pg)
+    await pg.click('#popup [data-action=serve]')
+    await idle(pg)
+    served = await pg.evaluate(POPUP)
+    depth = await pg.evaluate('history.state')
+    check(
+        product['page'] == 'evaluation'
+        and product['popup'] == 'product'
+        and stays['page'] == 'evaluation'
+        and not stays['popup']
+        and not served['page']
+        and not served['popup']
+        and not served['locked']
+        and served['toast'] == 'BODY'
+        and not depth,
+        f'„Vorlieben“: a variety opens its food sheet over the page and closes back to it; „Heute servieren“ ends on the home page, with every history entry gone ({product}, {stays}, {served}, {depth})',
+    )
+    # A page asked for while a sheet lies over one takes that sheet away
+    await pg.click('[data-action=open-shop]')
+    await idle(pg)
+    await pg.locator('#sheet [data-action=open-product]').first.click()
+    await idle(pg)
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openSheet({kind: 'settings', page: 'house'}))")
+    await idle(pg)
+    swapped = await pg.evaluate(POPUP)
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    await pg.click('#sheet [data-action=settings-back]')
+    await idle(pg)
+    home = await pg.evaluate(POPUP)
+    check(
+        swapped['page'] == 'settings' and not swapped['popup'] and not home['page'] and not home['locked'],
+        f'a page asked for over a sheet on a page: the sheet goes, the page takes the place, and back leads home ({swapped}, {home})',
+    )
+    check(not real_errors(errors), f'no errors in the console {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_mood(browser, url):
     print('the mood picture on the home page: the pet\u2019s profile picture')
     make_pictures()
@@ -6818,6 +6947,7 @@ run_tests(
         'exchange': test_exchange,
         'crop': test_crop,
         'sheet': test_sheet,
+        'popup': test_popup,
         'mood': test_mood,
         'camera': test_camera,
         'no-camera': test_no_camera,

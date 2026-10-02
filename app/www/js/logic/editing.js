@@ -7,7 +7,7 @@ import {hasLine} from '../ocr.js';
 import {db, save} from '../store.js';
 import {byMe, findProduct, getPet, getProduct, getServing, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
-import {closeSheet, dlg, renderSheet, sheet} from '../ui/sheet.js';
+import {closeAll, closeSheet, renderSheet, sheet, topDialog} from '../ui/sheet.js';
 import {setLevel, untouched} from '../ui/slider.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {homeView, update} from '../views/home.js';
@@ -43,7 +43,7 @@ const undoRating = (sid, pid, prev) => () => {
   cur.pets[pid] = prev;
   save();
   update();
-  if (sheet?.kind === 'serving' && sheet.id === sid) renderSheet();
+  renderSheet(); // the meal's sheet, or the page it was opened from once that sheet has gone
 };
 
 /* Once every pet of a meal is rated, the meal stays where it was rated for a moment, to be read and put right with
@@ -77,7 +77,7 @@ function finish(sid, inSheet) {
   if (!s || !rated(s)) return; // undone in the meantime, or given another pet
   if (inSheet) {
     // not while something is typed there or the sheet has moved on
-    const busy = document.activeElement?.matches('input, textarea') && dlg.contains(document.activeElement);
+    const busy = document.activeElement?.matches('input, textarea') && topDialog()?.contains(document.activeElement);
     if (sheet?.kind === 'serving' && sheet.id === sid && !sheet.step && !busy && !viewerOpen()) closeSheet();
     return;
   }
@@ -120,7 +120,7 @@ function serveNewProduct(details) {
   p.type = details.type;
   applyTexture(p, details);
   save();
-  closeSheet().then(() => serveProduct(p.id));
+  closeAll().then(() => serveProduct(p.id)); // serving ends on the home page, where the meal is rated
 }
 function renameProduct(id, details) {
   const p = getProduct(id);
@@ -168,7 +168,7 @@ export function useProduct(pid) {
     sheet.step = null;
     renderSheet();
     update();
-  } else if (sheet.kind === 'new') closeSheet().then(() => serveProduct(p.id));
+  } else if (sheet.kind === 'new') closeAll().then(() => serveProduct(p.id));
   else if (sheet.kind === 'product') {
     const cur = getProduct(sheet.id);
     if (cur && cur.id !== p.id) {
@@ -202,6 +202,7 @@ export function deleteServing(id) {
       db.servings.sort((a, b) => b.servedAt - a.servedAt);
       save();
       update();
+      renderSheet(); // the page it was deleted from, „Verlauf“
       // Deleted while the photo was being read: that result was dropped meanwhile, so it is read again
       if (!s.productId && (s.status === 'reading' || s.status === 'recognizing')) retryNow(s.id);
     });

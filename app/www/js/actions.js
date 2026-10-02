@@ -13,7 +13,7 @@ import {timing} from './recognize.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
-import {closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
+import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {toggleOverview, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
@@ -202,7 +202,7 @@ const ACTIONS = {
   },
   serve(el) {
     const {id, code} = el.dataset;
-    closeSheet().then(() => serveProduct(id, code));
+    closeAll().then(() => serveProduct(id, code)); // ends on the home page, where the meal is rated, from a page too
   }, // code: from the choice after scanning
   scan() {
     scan();
@@ -488,7 +488,7 @@ export async function openLink(url) {
     toast('Leg zuerst dein Tier an.');
     return true;
   }
-  await closeSheet();
+  await closeAll();
   openSheet({kind: 'feed'});
   await LINKS[path]?.();
   return true;

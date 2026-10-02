@@ -388,7 +388,9 @@ function viewReport() {
   const pet = model().pet,
     all = servingsInFilter();
   histDays = dayGroups(all);
-  const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
+  // the day it opens at has to be there, and drawn again (a sheet over it has gone) the days already shown stay
+  const shown = $('#histBox', sheetBody)?.children.length || 0,
+    upto = Math.max(HIST_PAGE, shown, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0);
   return `${head('Verlauf' + forWhom(pet))}
     <section class="days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
@@ -412,7 +414,7 @@ export function foldPart(key) {
   btn.textContent = open ? 'Weniger' : f.label;
   btn.setAttribute('aria-expanded', String(open));
   slideHeight(body, h0);
-  drawn = VIEWS[sheet.kind](); // what is on the page now, so a redraw with nothing new leaves it alone
+  drawn.set(sheetBody, VIEWS[sheet.kind]()); // what is on the page now, so a redraw with nothing new leaves it alone
 }
 /* „Einkaufen“: a page of up to three cards within the pet filter (shopGroups() in smart.js). What to buy again, by food
    type and the best first, each variety with its ratings as a strip, and the list to share; then, folded away to a
@@ -556,14 +558,18 @@ const VIEWS = {
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
    away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.
-   The boxes the views fill afterwards are drawn every time, because their contents are not part of this comparison. */
-let drawn = '';
-setSheetView(state => {
+   The boxes the views fill afterwards are drawn every time, because their contents are not part of this comparison.
+   Kept per body, the page's and the one of a sheet over it (ui/sheet.js), so the page drawn again once the sheet has
+   gone is left as it was where nothing on it changed. */
+const drawn = new Map();
+setSheetView((state, body) => {
   const html = VIEWS[state.kind](),
-    fresh = html !== drawn || !sheetBody.firstChild; // no children: closed in between
+    fresh = html !== drawn.get(body) || !body.firstChild; // no children: closed in between
   if (fresh) {
-    drawn = html;
-    sheetBody.innerHTML = html;
+    const y = body.scrollTop; // the same level drawn anew stays where it was scrolled to
+    drawn.set(body, html);
+    body.innerHTML = html;
+    body.scrollTop = y;
     if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // hangs listeners on: exactly once per drawing
   }
   if (state.kind === 'settings') paintHouse(fresh);

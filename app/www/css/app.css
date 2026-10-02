@@ -448,7 +448,7 @@ dialog.sheet.page .sheet-body {
   text-overflow: ellipsis;
   opacity: 0;
 }
-#sheet.titled .bar-title {
+dialog.sheet.titled .bar-title {
   opacity: 1;
 }
 /* The edge: one line along the lower edge of what stays at the top, only while something lies under it, and of
@@ -465,11 +465,11 @@ dialog.sheet.page .sheet-body {
   opacity: 0;
   pointer-events: none;
 }
-#sheet.scrolled :is(.grip-zone, .head)::after,
+dialog.sheet.scrolled :is(.grip-zone, .head)::after,
 .days .tl-date.stuck::after {
   opacity: 1;
 }
-#sheet.scrolled:has(.days .tl-date.stuck) .head::after {
+dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   opacity: 0;
 } /* the day line under it draws the line */
 

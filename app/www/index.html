@@ -36,6 +36,10 @@
   <input type="file" id="importInput" accept="application/json,.json" hidden>
   <input type="file" id="exchangeInput" accept="application/json,.json" hidden>
 </dialog>
+<dialog class="sheet" id="popup" aria-label="Details"> <!-- a sheet over a page, so the page stays as it was: ui/sheet.js -->
+  <div class="grip-zone"><div class="grip"></div></div>
+  <div class="sheet-body" id="popupBody"></div>
+</dialog>
 <dialog class="camera fullscreen" id="camera" aria-label="Kamera"> <!-- in-app camera for packaging photos, ui/camera.js -->
   <video autoplay playsinline muted></video>
   <p class="cam-hint" role="status"></p>

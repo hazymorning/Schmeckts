@@ -67,7 +67,7 @@ export function closeViewer() {
   closing = true;
   const mine = run;
   // The thumbnail may have been drawn anew meanwhile (a change from the server): look it up again
-  const box = $('#sheet').open ? $('#sheetBody') : $('#home'),
+  const box = $('#popup').open ? $('#popupBody') : $('#sheet').open ? $('#sheetBody') : $('#home'),
     btn = from && $(`[data-action=view-photo][data-s="${from.s}"][data-p="${from.p}"]`, box),
     thumb = btn && $('img', btn),
     r = thumb?.getBoundingClientRect(),

@@ -11,7 +11,7 @@ import {isConnected} from '../sync.js';
 import {getPet, getProduct, model, pendingServings, pname, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
-import {dlg} from '../ui/sheet.js';
+import {anyOpen} from '../ui/sheet.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {
   avatar,
@@ -42,7 +42,7 @@ export function update() {
     done = true;
     renderHome();
   };
-  if (!document.startViewTransition || reduceMotion.matches || dlg.open || viewerOpen()) return run();
+  if (!document.startViewTransition || reduceMotion.matches || anyOpen() || viewerOpen()) return run();
   try {
     const t = document.startViewTransition(run);
     setTimeout(() => {
