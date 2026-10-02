@@ -1,5 +1,3 @@
-/* Home page: pet bar and cards in a fixed order, the welcome page when there are no pets. Everything evaluated comes
-   from model() in derive.js. */
 import {$, reduceMotion} from '../dom.js';
 import {settled, slideHeight} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
@@ -34,7 +32,6 @@ import {renderMood} from './mood.js';
 import {observeChips, overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
 
-/* Redraw the home page, with a smooth view transition where possible */
 export function update() {
   let done = false;
   const run = () => {
@@ -50,13 +47,13 @@ export function update() {
         try {
           t.skipTransition();
         } catch {
-          /* the transition has already finished: run() right below draws in any case */
+          /* already finished; run() below draws anyway */
         }
         run();
       }
-    }, 400); // safety net
+    }, 400); // in case the transition never calls run()
   } catch {
-    // startViewTransition failed: draw directly, the same page without the animation
+    // draw without the animation
     run();
   }
 }
@@ -64,14 +61,9 @@ export function scrollTop() {
   window.scrollTo({top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
 }
 
-// fresh: id of the meal just served, which slides in on the next draw
-// open: the overview unfolded, which lasts until the app restarts
-// held: meals rated in „Wie war’s?“ that stay there a moment longer (logic/editing.js), each with the pets rated there
-// observing: the overview's chips for an observation folded open
+// fresh: meal id to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets
 export const homeView = {fresh: null, open: {}, held: new Map(), observing: false};
 
-/* Pet bar: the filter, from two pets on. With one pet there is nothing to filter, and pets are managed in the
-   settings. */
 function renderPets() {
   const el = $('#pets');
   if (db.pets.length < 2) {
@@ -96,8 +88,7 @@ function renderFab() {
   fab.hidden = !db.pets.length;
   if (!fab.innerHTML) fab.innerHTML = icon('bowl') + 'Füttern';
 }
-/* On serving: the bowl in the button fills up briefly */
-let fills = 0; // a second serving restarts the bowl: the first run's end must not clear it
+let fills = 0; // a second serving restarts the bowl, so the first run's end must not clear it
 export function fabFill() {
   const fab = $('#fab'),
     run = ++fills;
@@ -107,7 +98,6 @@ export function fabFill() {
   settled(fab, true).then(() => run === fills && fab.classList.remove('filled'));
 }
 
-/* Notice at the top: only when changes are waiting or the sync is stuck */
 export function renderSyncChip() {
   const el = $('#syncChip'),
     c = syncChip();
@@ -126,8 +116,6 @@ export function renderHome() {
   $('#home').innerHTML = homeHTML();
   homeView.fresh = null;
 }
-/* The overview's whole text and back, with a tap on the card: without a redraw, only the class changes, and the
-   height eases as the other cards' folds do */
 export function toggleOverview() {
   const sec = $('#home .overview'),
     top = sec && $('.ov-top', sec),
@@ -139,8 +127,6 @@ export function toggleOverview() {
   top.setAttribute('aria-expanded', String(open));
   slideHeight(p, h0);
 }
-/* „Beobachtung notieren“: the chips fold open in the card above the button, which then says „Abbrechen“, and shut
-   again; only that part is swapped and eases to its height, as a fold on a page does (foldPart() in views/sheets.js) */
 export function toggleObserve() {
   const sec = $('#home .overview'),
     body = sec && $('#fold-observe', sec),
@@ -180,7 +166,7 @@ const welcomeHTML = () => `<div class="welcome">
   <h2>Was schmeckt deinem Tier?</h2>
   <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie der Napf aussah. So siehst du bald, was wirklich ankommt.</p>
   <div class="btn-col">${
-    prefs.mode // exactly two buttons on the first start: the mode
+    prefs.mode // first start: only the mode choice
       ? `<button class="btn primary" data-action="add-pet">${icon('plus')}Erstes Tier anlegen</button>
        ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Mit Beispieldaten ansehen</button>`}`
       : `<button class="btn primary" data-action="mode-local">${icon('phone')}Nur auf diesem Handy</button>
@@ -194,8 +180,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was dein Tier mag und was stehen bleibt.</p></li></ol></section>`;
 
-/* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. A
-   meal without a variety (a photo that missed) can be deleted right here, under its slider, as while naming it. */
+// a pet rated here keeps its row while the meal stays in the card
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
 function pendingHTML(list) {
   const multiHouse = db.pets.length > 1;
@@ -207,7 +192,6 @@ function pendingHTML(list) {
           ids = rateRows(s),
           multi = ids.length > 1;
         const main = `<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 's') : ''}`;
-        // With a large photo on this phone its thumbnail is a button of its own, which opens it
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
@@ -224,7 +208,6 @@ function pendingHTML(list) {
   );
 }
 
-/* Hint: the one with the highest precedence (a sentence, a reason, the buttons) */
 const HINT_TITLES = {
   appetit: 'Appetit',
   stop: 'Nicht mehr kaufen?',
@@ -267,9 +250,6 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
-/* Einkaufen: the first three to buy again, the best first, each with its ratings as a strip, and the way to the whole
-   list on its page (shopGroups() in smart.js). No card while nothing is to be bought again: a shopping list with
-   nothing on it has no use on the home page. */
 const SHOP_SHOWN = 3;
 function shopHTML(m) {
   const g = shopGroups(m);
@@ -282,10 +262,7 @@ function shopHTML(m) {
     <button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button></section>`;
 }
 
-/* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals and observations, or
-   yesterday's while nothing has been served or noted today, each day whole. One pass over the calendar's two weeks,
-   newest first, which stops at its first day, so years of data cost nothing. The button leads to „Verlauf“, where the
-   whole history is. */
+// Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing
 function historyHTML() {
   const now = Date.now(),
     since = addDays(weekStart(now), -7), // the calendar's first day, always before yesterday
@@ -314,7 +291,6 @@ function historyHTML() {
       : recent.length || db.servings.some(s => servingPets(s).length)
         ? `<p class="hint empty"><span>Heute noch nichts serviert.</span></p>`
         : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert.</span></p>`) +
-    // The only way to „Verlauf“, so it reads like the other cards' buttons and says where it leads
     `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
   );
 }

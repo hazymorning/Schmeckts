@@ -1,6 +1,4 @@
-/* The settings: a page of grouped rows, and behind some of them a page of its own. Everything about the household
-   server lives here too, because that is one of those pages. The pet editor is another; its view sits in
-   views/sheets.js, because the same one is a sheet when it is reached from the home page. */
+// Settings and their pages; the pet editor view is in views/sheets.js, since it is also a sheet
 import {$} from '../dom.js';
 import {andList, esc} from '../text.js';
 import {appInfo} from '../native.js';
@@ -17,8 +15,7 @@ const THEMES = [
   ['light', 'Hell', 'sun'],
   ['dark', 'Dunkel', 'moon'],
 ];
-/* The steps of the rating reminder without the 0: „Aus“ is the switch now. „Eigene“ opens a field instead of
-   setting a value, so it carries an action of its own. */
+// no 0 step, the switch turns it off. The own option opens a field, so it has an action of its own
 const OWN_REMIND = 'own';
 const REMIND_OPTIONS = [
   ...REMIND.filter(Boolean).map(m => [String(m), m / 60 + ' Std.']),
@@ -26,8 +23,7 @@ const REMIND_OPTIONS = [
 ];
 const DENIED = 'Benachrichtigungen sind nicht erlaubt';
 
-/* The lines under the two reminders say what the setting does. The rating one says why instead when the phone
-   refused notifications, because then the switch has jumped back on its own (logic/reminders.js). */
+// after a refused permission the switch flips back by itself, so the line says why
 const remindSub = () => (sheet.denied === 'remind' ? DENIED : 'Nach dem Füttern, auf diesem Handy');
 const hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 function feedSub() {
@@ -37,13 +33,8 @@ function feedSub() {
     ? `Meist um ${andList(slots.map(x => hhmm(x.at)))} Uhr`
     : 'Lernt die üblichen Zeiten aus dem Verlauf';
 }
-/* „Haushalt“: the state of the sync in a line, as syncInfo() puts it */
 const houseSub = n => (n.detail ? `${n.title}, ${n.detail.charAt(0).toLowerCase()}${n.detail.slice(1)}` : n.title);
 
-/* A row of a group. Leading 32px: a plain icon in --muted, or the pet's picture. Then the title and under it at
-   most two lines saying what the setting does. Trailing: a switch, a chevron for a page, or nothing. The whole
-   row is the tap target (PROJECT.md, „Settings“). A segment or a field belonging to a row stands under it in the
-   text column, which the group's grid takes care of. */
 const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 const main = (title, sub = '', id = '') =>
   `<span class="t-main"><b>${title}</b>${sub ? `<small${id ? ` id="${id}"` : ''}>${sub}</small>` : ''}</span>`;
@@ -67,7 +58,6 @@ const SERVER_PHOTO = 'Erkennt Marke und Sorte auf dem Packungsfoto. Sonst liest 
 function overview() {
   const house = isConnected(),
     notice = syncInfo();
-  // „Eigene“: chosen, or a stored value that is not one of the steps
   const own = prefs.remind > 0 && (!!sheet.ownRemind || !REMIND.includes(prefs.remind));
   return `${
     loadError
@@ -132,9 +122,6 @@ const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gesp
     <label class="btn soft" for="importInput">${icon('upload')}Backup importieren</label>
   </div>`;
 
-/* Page „Austausch von Hand“: changes as a file to another phone and back. The notes say what goes out.
-   After receiving, the report sits here and, when the other device is missing something, „Antwort senden“
-   (sheet.exchange, see logic/exchange.js). */
 function exchangePage() {
   const ex = sheet?.exchange;
   return `<p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält
@@ -146,8 +133,7 @@ function exchangePage() {
     ${ex ? `<p class="hint note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col mt-s"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
 }
 
-/* Datenschutz: what happens to the data in each of the two modes, and where the word list comes from (the notice the
-   Open Database License asks for, see NOTICE) */
+// the last paragraph is the attribution the ODbL requires, see NOTICE
 const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
@@ -158,9 +144,7 @@ const PRIVACY = [
 ];
 const privacyPage = () => `<div class="privacy">${PRIVACY.map(t => `<p>${t}</p>`).join('')}</div>`;
 
-/* Page „Haushalt“. Mode `lokal`: the „Mit Haushalt verbinden“ button, which opens the fields for address
-   and code. Connected: the state of the sync, „Jetzt abgleichen“ and „Verbindung trennen“. Only the hand-started
-   sync shows progress (sheet.syncing, see actions.js); syncs in the background stay invisible. */
+// only a sync started by hand shows progress; background syncs stay invisible
 function serverSection(notice = syncInfo()) {
   const s = sheet || {};
   const codeRow = `<div class="connect mt-s">
@@ -194,7 +178,7 @@ function serverSection(notice = syncInfo()) {
           : s.syncing === 'shown'
             ? `<button class="btn soft" disabled><span class="spin"></span>Abgleich läuft …</button>`
             : status.state === 'ok' && !queue.length
-              ? '' // all synced: nothing to do
+              ? ''
               : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Jetzt abgleichen</button>`
       }
       ${armBtn('disconnect', 'Verbindung trennen', 'Nochmal tippen: trennen, die Daten bleiben hier', {ic: 'unplug', cls: 'plain'})}</div>`;
@@ -213,11 +197,9 @@ export function viewSettings() {
   return head(page[0]) + page[1]();
 }
 
-/* The household, live: on the overview only the line under its title, on its page the whole box. The box is only
-   rewritten when its visible content changes: status changes with no visible consequence (busy on every short sync)
-   do nothing, and when only the line under the title changes, such as the „zuletzt abgeglichen“ timestamp, only its
-   text is swapped. fresh: right after the page was drawn, when the box is still empty. */
-let boxFrame = ''; // the box as last written, without the line under the title
+/* The box is rewritten only when its visible content changes; when only the detail line changes, only its text is
+   swapped. fresh: the page was just drawn and the box is empty. */
+let boxFrame = ''; // last written box, without the detail line
 export function paintHouse(fresh = false) {
   const notice = syncInfo(),
     row = $('#houseSub');

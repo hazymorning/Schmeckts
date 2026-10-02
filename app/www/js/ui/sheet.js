@@ -1,25 +1,17 @@
-/* Sheets and pages: opening, closing, swiping, the back gesture.
-   A sheet rises from below for one task on top of where you are. A page comes in from the side for a place you
-   go into, fills the screen and takes a level of the history with it (PROJECT.md, „Principles“ 3). Both are the
-   same dialog, because a page is a sheet that fills the screen and moves sideways.
-   A sheet opened from a page rises over it in a second dialog (#popup), so the page stays where it was, scrolled
-   as it was, and closing the sheet or going back leads exactly there. The two are layers: the page below, the sheet
-   on top; `sheet` is the state of the top one, which is what every action works on.
-   What either of them contains is registered by the views through setSheetView(). */
+/* Sheets and pages share one dialog: a page is a sheet that fills the screen and moves sideways. A sheet opened from
+   a page rises over it in a second dialog (#popup), so the page keeps its state and scroll. `sheet` is the state of
+   the top layer, which every action works on. */
 import {$, reduceMotion} from '../dom.js';
 import {settled} from '../motion.js';
 import {dropViewer} from './viewer.js';
 
-/* A layer: its dialog and body, the state of what it shows, the key of the level drawn, its own history entries
-   (one per level) and what openPage() put on the state, taken off again on the way back */
+// depth: this layer's history entries; pageKeys: what openPage() added to the state, removed on the way back
 const layer = (dlg, body) => ({dlg, body, state: null, key: '', depth: 0, pageKeys: [], closing: null});
 const base = layer($('#sheet'), $('#sheetBody')),
   over = layer($('#popup'), $('#popupBody'));
 export const dlg = base.dlg,
-  sheetBody = base.body; // the page's body: only a page needs it by name (the history, the folds)
-export let sheet = null; // the state of what is open on top, null when nothing is
-/* The settings with everything below them, the history, „Vorlieben“ with the level below it and the shopping list are
-   a page; everything else is a sheet. */
+  sheetBody = base.body;
+export let sheet = null; // state of the top layer
 const PAGES = new Set(['settings', 'report', 'evaluation', 'shop']);
 export const isPage = state => PAGES.has(state?.kind);
 const top = () => (over.state ? over : base);
@@ -27,14 +19,11 @@ const sync = () => {
   sheet = top().state;
 };
 export const anyOpen = () => base.dlg.open;
-/* The dialog and the body on top, where a toast, the focus and a photo's thumbnail are looked for */
 export const topDialog = () => (over.dlg.open ? over.dlg : base.dlg.open ? base.dlg : null);
 export const topBody = () => (over.dlg.open ? over.body : base.body);
-let expected = 0; // our own steps back through the history, which the popstate listener leaves alone
+let expected = 0; // our own history steps, which the popstate listener skips
 
-/* The top edge of what is open (PROJECT.md, „Building blocks“, scroll edge): .scrolled while anything lies under
-   the grip or the bar; on a page .titled once its title has gone under the bar, which then shows it. On the dialog,
-   because the grip is outside the scroll box. Reads first, then writes. */
+// classes go on the dialog, since the grip is outside the scroll box. Reads first, then writes
 const markEdge = L => {
   const y = L.body.scrollTop,
     bar = isPage(L.state) ? L.body.querySelector(':scope > .page-bar') : null,
@@ -45,7 +34,7 @@ const markEdge = L => {
 };
 for (const L of [base, over]) L.body.addEventListener('scroll', () => markEdge(L), {passive: true});
 
-/* The toast belongs to the top dialog, or it would lie under that dialog's dimming */
+// the toast must sit in the top dialog, or that dialog's dimming covers it
 function hostToast() {
   const t = $('#toast'),
     host = topDialog() || document.body;
@@ -53,8 +42,7 @@ function hostToast() {
   t.classList.toggle('in-sheet', host !== document.body);
 }
 
-/* Opens what is asked for. A sheet asked for while a page is open rises over it; a page asked for while a sheet lies
-   over a page takes that sheet away first; anything else takes the place of what is open, as it always did. */
+// a sheet over a page rises on top; anything else replaces what is open
 export function openSheet(state) {
   if (!isPage(state) && isPage(base.state) && !base.closing) return openOn(over, state);
   if (over.state) dropLayer(over);
@@ -64,20 +52,20 @@ function openOn(L, state) {
   L.state = state;
   L.pageKeys = [];
   sync();
-  L.dlg.dataset.kind = state.kind; // a page says which one it is, for what only it needs
+  L.dlg.dataset.kind = state.kind;
   L.dlg.classList.toggle('page', isPage(state));
   renderSheet();
   if (!L.dlg.open) {
-    dropViewer(); // a link or a notification: the sheet takes the screen, not a photo under it
+    dropViewer(); // opened from a link or notification over the photo viewer
     L.dlg.classList.remove('closing', 'dragging');
     L.dlg.style.transform = '';
     L.dlg.showModal();
     document.body.classList.add('locked');
-    L.body.scrollTop = 0; // the browser would otherwise remember the last sheet's scroll position
+    L.body.scrollTop = 0; // the browser would otherwise keep the last sheet's scroll
     markEdge(L);
     L.depth = 0;
     push(L);
-    if (state.page) push(L); // opened straight on a page below, so back leads to the overview first
+    if (state.page) push(L); // opened on a sub-page, so back goes to the overview first
     hostToast();
   }
 }
@@ -86,13 +74,11 @@ function push(L) {
     history.pushState({sheet: L.depth + 1}, '');
     L.depth++;
   } catch {
-    /* without an entry of its own the sheet does not answer the back gesture */
+    /* without an entry the sheet ignores the back gesture */
   }
 }
-/* One level deeper: „Haushalt“, „Backup“, the pet editor. It gets a history entry of its own, so the arrow in
-   the head, the Android back button and the back gesture all take the same path, one level at a time.
-   `extra` is what that level needs (the pet being edited); the way back takes exactly those keys off again.
-   Only a page has levels, and only the layer below holds a page. */
+/* Each level gets a history entry, so the arrow, the back button and the back gesture take the same path. extra:
+   keys the level needs, removed again on the way back. */
 export function openPage(page, extra = null) {
   if (!sheet || sheet.page === page || over.state) return;
   base.pageKeys = extra ? Object.keys(extra) : [];
@@ -100,14 +86,11 @@ export function openPage(page, extra = null) {
   push(base);
   renderSheet();
 }
-/* One level back. Through the history wherever there is an entry to drop, so the arrow in the head and the
-   hardware button take exactly the same path. */
 export function backPage() {
   if (base.depth > 1) history.back();
   else stepBack();
 }
-/* Android's back button: out of a level below first, and only on the overview does the sheet close; a sheet over a
-   page closes and leaves the page as it was */
+// Android back button
 export function sheetBack() {
   if (!over.state && sheet?.page) backPage();
   else closeSheet();
@@ -119,11 +102,10 @@ function stepBack() {
   Object.assign(base.state, {page: null, slide: 'back'});
   renderSheet();
 }
-let drawView = () => {}; // set by the sheet views: draws the state into the body given
+let drawView = () => {};
 export function setSheetView(fn) {
   drawView = fn;
 }
-/* Draws what is on top; the page under a sheet is drawn again once that sheet has gone */
 export function renderSheet() {
   const L = top();
   if (!L.state) return;
@@ -132,28 +114,25 @@ export function renderSheet() {
   const how = state.slide;
   state.slide = null;
   if (key === L.key) {
-    drawView(state, L.body); // a change inside the level that is open
+    drawView(state, L.body);
     return markEdge(L);
   }
   const swap = () => {
-    L.dlg.classList.remove('scrolled', 'titled'); // the new level arrives at rest, not fading out of the old one's edge
+    L.dlg.classList.remove('scrolled', 'titled'); // the new level starts at rest, not with the old one's edge
     drawView(state, L.body);
     L.key = key;
     L.body.scrollTop = 0;
     markEdge(L);
     L.body.classList.remove('swap-in');
   };
-  // While it opens, its own entrance covers the change
+  // while it opens, its own entrance covers the change
   if (!L.dlg.open) return swap();
   if (isPage(state)) return slidePage(how, swap);
   swap();
   void L.body.offsetWidth;
   L.body.classList.add('swap-in');
 }
-/* A page moves as a whole: the level you go to comes in from the side while the one you leave goes out the other
-   way. The browser takes the picture of the level being left itself (a view transition on .sheet-body), so no
-   copy of a long page has to be built first, which used to cost the first frame. Where that is not available,
-   and under reduced motion, the page is simply swapped. */
+// the view transition snapshots the old level itself, so no copy of a long page is built
 function slidePage(how, swap) {
   if (!how || reduceMotion.matches || !document.startViewTransition) return swap();
   const root = document.documentElement,
@@ -162,28 +141,25 @@ function slidePage(how, swap) {
   try {
     document.startViewTransition(swap).finished.then(done, done);
   } catch {
-    // the transition did not start: the same step without the movement
+    // step without the movement
     done();
     swap();
   }
 }
 export const isClosing = () => !!(base.closing || over.closing);
 
-/* Closes what is on top: a sheet over a page goes and the page is there again as it was, otherwise the dialog closes
-   and the home page is there. */
 export function closeSheet(fromPop = false) {
   const L = top();
   if (L.closing) return L.closing;
   if (!L.dlg.open) return Promise.resolve();
   return closeLayers([L], fromPop);
 }
-/* Closes everything, the sheet and the page under it: for what ends on the home page, such as serving */
+// for what ends on the home page, such as serving
 export function closeAll() {
   const open = [over, base].filter(L => L.dlg.open && !L.closing);
   return Promise.all([open.length ? closeLayers(open, false) : null, over.closing, base.closing]).then(() => {});
 }
-/* Close only once the layers' history entries are gone as well: a popstate that arrives after the next sheet has
-   opened would close that one */
+// waits for the history entries to go too, or a late popstate would close the next sheet
 function closeLayers(layers, fromPop) {
   const levels = fromPop ? 0 : layers.reduce((n, L) => n + L.depth, 0);
   for (const L of layers) L.depth = 0;
@@ -205,8 +181,7 @@ function closeLayers(layers, fromPop) {
   for (const L of layers) L.closing = done;
   return done;
 }
-/* The layer is gone: its dialog is empty and closed, and what lies under it, a page, is drawn again as it stands now,
-   so what the sheet changed shows there and the rest is left alone */
+// redraws the page underneath, so the sheet's changes show there
 function shut(L) {
   L.dlg.classList.remove('closing', 'page', 'dragging');
   L.dlg.style.transform = '';
@@ -222,7 +197,7 @@ function shut(L) {
   hostToast();
   if (L === over && base.state && !base.closing) renderSheet();
 }
-/* At once and without a step back through the history: a page asked for while a sheet lies over one */
+// at once, without stepping back through the history
 function dropLayer(L) {
   if (L.depth) {
     expected++;
@@ -248,14 +223,14 @@ window.addEventListener('popstate', () => {
 for (const L of [base, over]) {
   L.dlg.addEventListener('cancel', e => {
     e.preventDefault();
-    sheetBack(); // on a page that is one level; a sheet has none and closes
+    sheetBack();
   });
   L.dlg.addEventListener('click', e => {
     if (e.target === L.dlg) closeSheet();
   });
 }
 
-/* Swiping down closes a sheet. A page leaves the way it came, by the arrow or by back, so it does not swipe. */
+// swiping down closes a sheet; a page leaves only by the arrow or back
 for (const L of [base, over]) {
   const d = L.dlg;
   let startY = 0,
@@ -273,7 +248,7 @@ for (const L of [base, over]) {
     try {
       d.setPointerCapture(e.pointerId);
     } catch {
-      /* the pointer is already gone: the swipe ends with the next pointerup */
+      /* pointer already gone; the next pointerup ends the swipe */
     }
   });
   d.addEventListener('pointermove', e => {
@@ -287,7 +262,7 @@ for (const L of [base, over]) {
     d.classList.remove('dragging');
     const v = dy / Math.max(1, performance.now() - t0);
     if (dy > 110 || (v > 0.5 && dy > 24)) closeSheet();
-    else d.style.transform = ''; // back into place: dialog.sheet's transition in app.css
+    else d.style.transform = '';
   };
   d.addEventListener('pointerup', end);
   d.addEventListener('pointercancel', end);

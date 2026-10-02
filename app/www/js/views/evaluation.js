@@ -1,8 +1,4 @@
-/* „Vorlieben“: its card on the home page, a row for the top and one for the biggest flop, and its page, what the
-   ratings of the meals say, the conclusion first, beside the pets' picture. Everything is found in smart.js
-   (ranking(), moves(), trend(), nextUp(), patterns(), basis()), cached in derive.js; this only words it. On the page a
-   variety is a row with its packaging and a finding is one told sentence, and every variety opens its food sheet,
-   where the buying and serving are. */
+// Evaluation card and page. The analysis is in smart.js, this only words it
 import {andList, cap, esc} from '../text.js';
 import {icon, sketch} from '../icons.js';
 import {observationOf, TEXTURES} from '../config.js';
@@ -38,28 +34,24 @@ import {
   whyOf,
 } from './parts.js';
 
-const PLACES = 5; // the owner's „Top 5“ and „Flop 5“
+const PLACES = 5;
 const DAY = 864e5;
-const AWAY = 42 * DAY; // a top not served for this long says so under its name
+const AWAY = 42 * DAY; // a top unserved this long shows since when
 const NUMBERS = ['keine', 'eine', 'zwei', 'drei', 'vier', 'fünf'];
 const brandOf = p => (p.variety ? p.brand : '');
-/* A variety's name inside a sentence, in bold, with its brand where another variety of the household has the same
-   name („Lachs in Soße von Sheba“) */
+// adds the brand where another variety has the same name
 function named(e) {
   const p = e.product,
     twins = db.products.filter(q => pname(q) === pname(p)).length > 1;
   return `<b>${esc(pname(p))}</b>${twins && p.brand ? ` von ${esc(p.brand)}` : ''}`;
 }
-/* What a row's ratings say: those of every pet in the filter, as its strip shows them, where most of them lie on the
-   row's side, good for a top and left or eaten in part for a flop; otherwise only the pets that decide it, named
-   („Bei Minka 3 von 4 Mal nur die Soße geleckt“, whyOf()) */
+// all ratings when most agree with the row's side, otherwise only those of the pets that decide it
 function saidOf(e, side) {
   const good = goodOf(e.counts),
     left = poorOf(e.counts),
     agree = side === 'top' ? good * 2 > e.n : left * 2 > e.n || (e.n - good - left) * 2 > e.n;
   return agree ? evidenceOf(e) : whyOf(e);
 }
-/* How long ago, as people count it, after „vor“ or „seit“: „6 Wochen“, „3 Monaten“, „über einem Jahr“, „2 Jahren“ */
 function lapse(at, now) {
   const days = Math.floor((now - at) / DAY);
   return days < 60
@@ -70,12 +62,8 @@ function lapse(at, now) {
         ? 'über einem Jahr'
         : `${Math.floor(days / 365)} Jahren`;
 }
-/* The variety closest to a verdict, in words: „noch einmal servieren und bewerten“, with several pets „noch einmal für
-   Minka servieren und bewerten“, since a meal alone settles nothing */
 const needs = (t, several) =>
   `noch ${t.need === 1 ? 'einmal' : 'zweimal'}${several ? ` für ${esc(getPet(t.pet).name)}` : ''} servieren und bewerten, dann steht’s fest`;
-/* While no variety stands on either side: why, in one sentence. All ratings beyond the window, the pets disagreeing on
-   everything settled, everything settled in the middle, or nothing settled yet. */
 function waiting(m, r) {
   if (r.stale)
     return 'Die letzten Bewertungen sind über ein halbes Jahr alt. Nach ein paar neuen steht hier wieder, was ankommt.';
@@ -85,10 +73,6 @@ function waiting(m, r) {
   return 'Noch steht keine Sorte fest.';
 }
 
-/* The card: a row for the top and one for the biggest flop, read as a row on „Einkaufen“ is: the packaging, the name,
-   under it the side in its colour and the brand, and the strip; a tap opens the food sheet. A side without a variety
-   keeps its row beside the empty sketch and says why. While no variety is on either side, a sentence says why and
-   names the one closest to a verdict. No card while no ranked variety has a rating within the filter. */
 const ROLE = {top: 'Top-Futter', flop: 'Größter Flop'};
 const SIDE = {top: ['Top', 'r-good'], flop: ['Flop', 'r-bad']};
 function sideRow(m, r, e, side) {
@@ -129,9 +113,6 @@ export function evaluationCard(m) {
     <button class="card-btn" data-action="open-evaluation">Alle Vorlieben${icon('chevron')}</button></section>`;
 }
 
-/* The page's first card, laid out as the overview on the home page is: the pets in the filter, one picture or two
-   overlapping, their names beside it, and what they like best and leave standing in a sentence each, naming the pets
-   it is true of where several are shown. While neither is settled, why. */
 function portraitHTML(m, r) {
   const ids = m.pets,
     several = ids.length > 1,
@@ -164,9 +145,7 @@ function portraitHTML(m, r) {
   return `<section class="card portrait"><span class="ov-pic">${pic}</span><div class="portrait-text"><h2>${esc(petNames(ids))}</h2><p class="say">${said.join(' ')}</p></div></section>`;
 }
 
-/* A place in Top 5 or Flop 5: the packaging with the place on its corner in the side's colour, the name with „neu“
-   beside it where the variety came onto its side within the last 30 days, under it the brand and what its ratings
-   say, for a top not served for a while since when, and the strip */
+// x.moves.fresh: varieties that came onto their side within the last 30 days
 function placeRow(m, x, e, i, side) {
   const p = e.product,
     brand = brandOf(p),
@@ -180,16 +159,12 @@ function placeRow(m, x, e, i, side) {
     <span class="t-main"><span class="t-top"><b>${esc(pname(p))}</b>${fresh ? '<span class="badge">neu</span>' : ''}</span><small>${esc(cap([brand, lower(said), away].filter(Boolean).join(', ')))}</small></span>${strip(ratingsIn(m, [e.id]))}</button></li>`;
 }
 const card = (title, inner) => `<section class="card"><h2>${title}</h2>${inner}</section>`;
-/* A heading of the two lists with its picture in the side's colour: a heart for what goes down well, the bowl left
-   standing for what does not */
 const listTitle = (side, title) => `${icon(side === 'top' ? 'heart' : 'r_schlecht', SIDE[side][1])}${title}`;
 const say = text => `<p class="say card-line">${text}</p>`;
 const hint = text => `<p class="hint card-line">${text}</p>`;
 const places = (m, x, list, side) =>
   `<ol class="list ranks">${list.map((e, i) => placeRow(m, x, e, i, side)).join('')}</ol>`;
-/* Top 5 and Flop 5: never padded with a variety that does not belong there, so the heading says how many there are
-   and, under two to four, a line why there are not five. Over the tops, where the varieties differ no more than chance
-   would make them, that their order may be chance. */
+// never padded to five with varieties that do not belong there
 function listsHTML(m, r, x) {
   if (!r.rated)
     return card(
@@ -223,10 +198,6 @@ function listsHTML(m, r, x) {
   return tops + flops;
 }
 
-/* „Wie läuft’s gerade?“: per pet the last four weeks against the eight before, one line for all of them where nothing
-   changed, and under them the pets with too few ratings for it; then the varieties that went down or up within the
-   month, unless the pet's own line already explains them. With several pets each line leads with the pet's picture,
-   otherwise with which way it goes. */
 function petLine(m, t, several) {
   const pet = getPet(t.pet),
     who = `<b>${esc(pet.name)}</b>`,
@@ -249,7 +220,7 @@ function petLine(m, t, several) {
 }
 const weeks = (recent, before) =>
   `In den letzten vier Wochen <b>${times(recent.good, recent.n)}</b> gut gefressen, in den acht davor <b>${times(before.good, before.n)}</b>.`;
-const MOVED = 2; // varieties told as gone down or up, at most
+const MOVED = 2; // max varieties told as moved
 function trendCard(m, x) {
   const lines = x.trend,
     rows = [];
@@ -263,7 +234,7 @@ function trendCard(m, x) {
       ),
     );
   } else rows.push(...lines.map(t => petLine(m, t, m.pets.length > 1)));
-  // a pet that eats differently with the usual food too explains the varieties going the same way
+  // skip varieties whose move the pet's own change already explains
   const pet = dir => lines.some(t => t.cause === 'tier' && t.dir === dir),
     moved = [
       ...(pet(-1) ? [] : x.moves.cooled.map(v => ['fall', v, 'kommt nicht mehr so gut an wie vor einem Monat'])),
@@ -292,10 +263,6 @@ function trendCard(m, x) {
     : '';
 }
 
-/* „Beobachtungen“: what was noted in the last four weeks, each kind with how often and when last, and the varieties a
-   kind came after clearly more often than after the others (observed() in smart.js), each a told line that opens its
-   food sheet. Beside the ratings, never instead of them: a variety keeps its place and its verdict. No card while
-   nothing was noted in the four weeks and nothing stands out. */
 const often = n => (n === 1 ? 'einmal' : `${n}×`);
 function observedCard(x) {
   const {kinds, links} = x.observed,
@@ -323,9 +290,6 @@ function observedCard(x) {
   return card('Beobachtungen', toldList(rows));
 }
 
-/* „Geschmackssache“: with „Alle“, the varieties the pets disagree on, which is why they stand in neither list, the
-   pets furthest apart first: who likes it and who does not, led by the picture of the one who does, and what every
-   one of them did */
 const SPLIT = 5;
 function splitCard(m, r) {
   if (m.pet || !r.split.length) return '';
@@ -348,15 +312,8 @@ function splitCard(m, r) {
   );
 }
 
-/* „Worauf es ankommt“: the clearest comparisons by consistency, flavour and brand, each in one sentence with what it
-   rests on, „deutlich“ only where its page says so too, and the way to that page with all of them and the habits;
-   before them where to look for something new, only from those clear ones whose best group goes down well. Without
-   such a comparison yet, what the page would show first: the two ends of its clearest comparison, or up to two
-   habits. No card while that page would be empty. */
 const DIM_ICON = {konsistenz: 'layers', geschmack: 'fish', marke: 'tag'};
-/* A consistency inside a sentence („besser als in Soße“, „fester Block“); a flavour or a brand stays as it is written */
 const inText = (d, key) => (d.kind === 'konsistenz' ? key.replace(/^(In|Fester) /, w => w.toLowerCase()) : key);
-/* Where to look on the shelf: „in Soße“, „als Pastete“, „am Stück“, „mit Huhn“, „von Felix“ */
 const SHELF = {
   sosse: 'in Soße',
   gelee: 'in Gelee',
@@ -370,7 +327,7 @@ const lookFor = d => {
   if (d.kind !== 'konsistenz') return `${d.kind === 'geschmack' ? 'mit' : 'von'} ${key}`;
   return SHELF[TEXTURES.Nassfutter.items.find(([, label]) => label === key)?.[0]] || key;
 };
-const HABITS = 2; // habits told without a comparison, at most
+const HABITS = 2; // max habits shown without a comparison
 function patternCard(m, x) {
   const dims = profileModel(),
     habits = dims.length ? [] : habitsModel();
@@ -396,9 +353,6 @@ function patternCard(m, x) {
     <button class="card-btn" data-action="open-level" data-v="profile">Alles, worauf es ankommt${icon('chevron')}</button></section>`;
 }
 
-/* „Als Nächstes“: what to put in the bowl. Favourites not served for a while, varieties a rating or two short of a
-   verdict with the dots still missing after their strip (with one pet in view, where the count is that pet's), and a
-   second chance where the pet needs a while with new food. */
 const TRIALS = 3;
 function nextCard(m, r, x) {
   const now = Date.now(),
@@ -451,8 +405,6 @@ function nextCard(m, r, x) {
     : '';
 }
 
-/* What the lists rest on, under the page's cards: how many ratings since when, which of them count, and the types left
-   out that have ratings */
 const LEFT = {Snack: 'Snacks', Trockenfutter: 'Trockenfutter'};
 function footHTML(m, b) {
   const parts = [];

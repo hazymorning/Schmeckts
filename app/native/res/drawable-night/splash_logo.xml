@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Splash screen, dark: app/www/img/schmeckts-mark-dark.svg, positioned like the app icon's foreground.
-     Paths and colours taken unchanged from the logo file. -->
+<!-- Dark splash: app/www/img/schmeckts-mark-dark.svg, positioned like the icon foreground -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
     <group android:scaleX="0.09403" android:scaleY="0.09403" android:translateX="29.929" android:translateY="28.796">

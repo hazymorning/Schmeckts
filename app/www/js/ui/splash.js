@@ -1,12 +1,10 @@
-/* The native splash screen stays up until the app is ready, so nobody watches the web page being built. It goes
-   when the data is loaded (store.js does that before anything else runs), the home page is drawn, both typefaces
-   are ready and two frames have passed, and in any case after LATEST, whatever failed on the way, so the app
-   cannot hang on the splash. In the browser there is no splash screen and these functions do nothing. */
+/* The native splash stays up until data, home page and fonts are ready, or LATEST at most, so the app cannot hang on
+   it. Does nothing in the browser. */
 import {dur} from '../motion.js';
 import {Native} from '../native.js';
 import {report} from '../report.js';
 
-const LATEST = 2500; // the safety net
+const LATEST = 2500; // ms
 const FACES = ['1em "Figtree"', '1em "Faustina"'];
 
 let gone = false;
@@ -18,10 +16,9 @@ export function hideSplash() {
   Native?.SplashScreen?.hide({fadeOutDuration: dur('fade')}).catch(e => report('splash screen', e));
 }
 
-// Armed as this module loads, which is the first thing main.js does: an error anywhere after that still ends here
+// armed on load, the first thing main.js does, so any later error still ends here
 setTimeout(hideSplash, LATEST);
 
-/* Called once the home page has been drawn. */
 export function hideSplashWhenReady() {
   ready().catch(e => {
     report('start', e);

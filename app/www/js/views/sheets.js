@@ -1,6 +1,4 @@
-/* Contents of the sheets: meal, naming, feeding (with the choice after scanning), food, pet (with cropping of
-   the profile picture) and evaluation. The settings are a page and live in views/settings.js; the pet editor is
-   one of its pages as well, drawn by the same view. */
+// Sheet and page contents; the settings page is in views/settings.js
 import {$, reduceMotion} from '../dom.js';
 import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
@@ -63,18 +61,13 @@ import {
 import {paintHouse, viewSettings} from './settings.js';
 import {viewEvaluation} from './evaluation.js';
 
-/* The pieces of „Wie war’s?“: the variety as a card that leads to naming, one rating row per pet, and in a
-   household the chips that say who was served. */
 const servingCard = (s, p) => {
   const main = `<span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span>`;
-  // With a large photo on this phone its thumbnail opens it, and the rest of the card leads to naming
+  // with the full photo on this phone, the thumbnail opens it
   return hasPhoto(s, p)
     ? `<div class="box prod-card">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="edit-name" aria-label="Futter ändern">${main}</button></div>`
     : `<button class="box prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'xl')}${main}</button>`;
 };
-/* „Foto ändern“ under a variety's card, „Foto hinzufügen“ while it has no photo: in the meal's sheet, where a meal is
-   opened from the home page, in the food sheet, and under the photo while naming or renaming it (reshootProduct()
-   in logic/feeding.js) */
 const photoLink = p =>
   `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen'}</button>`;
 const petRateRow = (s, pid, multi) =>
@@ -108,9 +101,6 @@ function viewServing() {
     <div class="mt">${deleteMealBtn(s.id)}</div>`;
 }
 
-/* An observation, opened from the diary: what it was (the same chips, the one it is pressed), whom it concerns where
-   there are several pets, when it was noted and by whom, and what it is weighed against: the meals before it, for a
-   kind about meals. Every change takes effect at once; „Eintrag löschen“ as with a meal, undone from the toast. */
 function viewObservation() {
   const o = getObservation(sheet.id);
   if (!o)
@@ -153,7 +143,6 @@ function viewObservation() {
 function viewName() {
   const s = sheet;
   const serving = s.kind === 'serving' ? getServing(s.id) : null,
-    // the variety renamed, or the meal's: its photo is the one shown and changed here
     product = s.kind === 'product' ? getProduct(s.id) : getProduct(serving?.productId);
   const title =
     s.kind === 'new'
@@ -166,7 +155,7 @@ function viewName() {
   const photo = product?.thumb || serving?.photo || serving?.thumb,
     large = hasPhoto(serving, product),
     reading = serving?.status === 'reading',
-    // while the phone reads, a skeleton stands in for the fields; once that has taken READ_PATIENCE, the empty fields
+    // skeleton fields while reading, until READ_PATIENCE runs out
     patient = reading && Date.now() - (readingSince.get(serving.id) || 0) < READ_PATIENCE;
   let note = '';
   const retry = label =>
@@ -187,9 +176,7 @@ function viewName() {
           : `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">`
         : ''
     }${note}`;
-  if (patient) return top + fieldSkeleton + fieldSkeleton; // as tall as label and field, so nothing jumps
-  // What the phone read, as a sentence to confirm, or that there was nothing to read; and a new photo, for a meal
-  // still without a variety, or the variety's photo to change, as under its card
+  if (patient) return top + fieldSkeleton + fieldSkeleton; // same height as the fields, so nothing jumps
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
     said = read.length
       ? `<p class="say read-note">Gelesen: ${read.map(x => `<b>${esc(x)}</b>`).join(', ')}. Passt das?</p>`
@@ -215,19 +202,14 @@ function viewName() {
     ${textureChips(s)}
     <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !product ? deleteMealBtn(serving.id) : ''}</div>`;
 }
-/* A field still to come: a label's line and a field's block, shimmering, no input */
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
-/* Consistency or treat type of variety x (the sheet itself while naming): single choice, for types that have one */
+// x: a variety, or the sheet itself while naming
 function textureChips(x, note = '') {
   const t = TEXTURES[typeOf(x)];
   return t
     ? `<div class="tex"><span class="label">${t.title}</span><div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}</div>`
     : '';
 }
-/* What the phone read off the packaging, as chips under the field each one is for: the brands under „Marke“, the
-   lines under „Sorte“ with their label. Only the phone's own reading has them (recognize.js), they live in memory
-   only. The pressed chip is the one the field holds exactly; a tap sets the field to a chip or, on the pressed one,
-   clears it (logic/editing.js). For a screen reader a chip names its field. */
 const chipsOf = (field, list, value) =>
   `<div class="chips">${list
     .map(
@@ -235,8 +217,7 @@ const chipsOf = (field, list, value) =>
         `<button class="chip" aria-pressed="${hasLine(value, l)}" data-action="pack-line" data-field="${field}" data-v="${esc(l)}" aria-label="${field === 'brand' ? 'Marke' : 'Sorte'}: ${esc(l)}">${esc(l)}</button>`,
     )
     .join('')}</div>`;
-/* The boxes that follow the fields while naming, each drawn on its own so the fields keep their focus: „Meinst du?“
-   or „Schon mal gehabt?“ above the fields, the brands read under „Marke“, the lines read under „Sorte“ */
+// each box is drawn on its own, so the fields keep their focus
 export function renderSuggestions() {
   const box = $('#suggest');
   if (!box || !sheet) return;
@@ -253,7 +234,7 @@ export function renderSuggestions() {
   } else if (serving && !serving.productId) {
     hits = quickProducts(4).map(x => x.product);
     title = 'Schon mal gehabt?';
-  } // one-tap suggestion
+  }
   box.innerHTML =
     (hits.length ? `<span class="label">${title}</span>` : '') +
     hits
@@ -272,21 +253,14 @@ export function renderSuggestions() {
       : '';
 }
 
-/* Feeding: barcode and photo as equally wide buttons; „Füttern beginnt mit“ hides one of them and the other takes
-   the full width. Below them the most recently fed varieties, at most SUGGEST, since more only distract from the
-   two buttons; with more known varieties the search field follows, whose hits (at most HITS) take the place of the
-   suggestions.
-   sheet.busy: the notice while scanning,
-   sheet.code: the scanned code currently in play (the choice, or the photo button takes it over) */
+// few suggestions, more would only distract from the two buttons
 const SUGGEST = 3,
   HITS = 8;
 const CTA = {
   barcode: `<button class="box cta primary" data-action="scan">${icon('barcode')}<span><b>Barcode</b><small>scannen</small></span></button>`,
   foto: `<button class="box cta soft" data-action="photo">${icon('camera')}<span><b>Foto</b><small>aufnehmen</small></span></button>`,
 };
-/* A variety to serve, the row being the button: the name over up to two lines, under it the brand and when it was
-   last served within the pet filter („Catz Finefood, heute um 13:14“, „noch nie serviert“ for a search hit), and at
-   the end the strip of its ratings, as a row on „Einkaufen“ ends. entries: [{product, at}] (derive.js) */
+// entries: [{product, at}]
 function serveRows(entries, code = '') {
   const now = Date.now(),
     m = model();
@@ -319,13 +293,11 @@ function viewFeed() {
     </div>
     <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
 }
-/* The varieties most recently served, at most SUGGEST of them */
 const quickList = entries =>
   entries.length
     ? `<span class="label">Schon mal gehabt</span><ul class="list plist">${serveRows(entries.slice(0, SUGGEST))}</ul>`
     : '';
-/* Search in the feeding sheet: the hits take the place of the suggestions, at most HITS. Only this one box is
-   rewritten, so the search field neither moves nor loses the focus; the distances above it hang on .serve. */
+// rewrites only the list box, so the search field keeps its place and focus
 export function renderServeHits(text) {
   const box = $('#serveList');
   if (!box) return;
@@ -342,8 +314,6 @@ function hitList(text, words) {
     <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neues Futter eintippen</button>`;
 }
 
-/* Food sheet, section „Kaufen“: the manual setting (Automatisch, Immer kaufen, Nicht kaufen), below it the computed
-   verdict with what the ratings say in words, and one line per pet where there are several */
 const KAUFEN = [
   ['auto', 'Automatisch'],
   ['immer', 'Immer kaufen'],
@@ -360,13 +330,10 @@ function kaufenHTML(e) {
     ${pets.map(pet => verdictPetRow(pet, e.pets[pet.id])).join('')}</div>`;
 }
 
-/* The pieces of the food sheet, each one a row or a block of its own */
 const productCard = (p, served) =>
   `<div class="box prod-card">${photoThumb(null, p, 'xl')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
     <small>${esc([p.type, `${served}× serviert`].filter(Boolean).join(', '))}</small></span>
     <button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>`;
-/* One counter per level of the variety's scale, levels from another scale that still occur after them: the level's
-   icon with how often it was chosen, and the ends of the row under it as under the rating scale */
 const countsRow = (levels, counts) =>
   `<div class="tally"><div class="counts">${levels
     .map(
@@ -383,9 +350,8 @@ const barcodeRow = c =>
   `<li class="row"><span class="t-main"><b class="num">${esc(c)}</b></span>
     <button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">
     ${icon('close')}</button></li>`;
-const MEALS_SHOWN = 12; // the rest of the history is in „Verlauf“
-/* What was noted after the variety's meals, of every pet and within the last half year (observedAfter() in smart.js):
-   „Danach notiert: heftiger Stunk nach 2 von 5 Mahlzeiten.“ Counts only; whether that stands out is for „Vorlieben“. */
+const MEALS_SHOWN = 12; // the rest is on the history page
+// counts only; whether they stand out is for the evaluation
 function noticed(p) {
   const after = observedAfter(
     db,
@@ -407,7 +373,7 @@ function viewProduct() {
     e = sortOf(p.id),
     counts = e.house.counts;
   const scale = scaleOf(p),
-    levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // other levels that occur come after them
+    levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // levels from another scale that still occur
   const codes = Object.keys(p.codes || {}).sort();
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
@@ -424,12 +390,9 @@ function viewProduct() {
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
-/* „Verlauf“: a page of one card, the calendar and under it every meal there has ever been, within the pet filter.
-   sheet.at: the id of the day it opens at, coming from a calendar */
+// at: id of the day to open at
 export const reportState = at => ({kind: 'report', at});
 
-/* The parts of a page that fold open under a .card-btn and shut again (foldPart()), each with the word on its button
-   and what it holds; nothing of it where it would hold nothing */
 const shopList = (m, list) =>
   list.length ? `<ul class="list shop">${list.map(e => shopRow(m, e)).join('')}</ul>` : '';
 const unclear = g => [...g.geht, ...g.neu];
@@ -449,7 +412,7 @@ function viewReport() {
   const pet = model().pet,
     all = servingsInFilter();
   histDays = dayGroups(diary(all, observationsInFilter()));
-  // the day it opens at has to be there, and drawn again (a sheet over it has gone) the days already shown stay
+  // a redraw keeps the days already shown, and the day it opens at must be among them
   const shown = $('#histBox', sheetBody)?.children.length || 0,
     upto = Math.max(HIST_PAGE, shown, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0);
   return `${head('Verlauf' + forWhom(pet))}
@@ -460,9 +423,7 @@ function viewReport() {
         : `<p class="hint empty"><span>Noch nichts serviert.</span></p>`
     }</section>`;
 }
-/* Folding a part of the page open or shut, kept while the page is open (sheet.open): only that part is swapped and
-   eases to its new height (--dur-step, --ease-out), at once under reduced motion, so the rest of the page and the
-   button stay where they are. */
+// swaps only the fold, so the rest of the page and the button stay put
 export function foldPart(key) {
   const f = FOLDS[key],
     body = $('#fold-' + key, sheetBody),
@@ -475,12 +436,8 @@ export function foldPart(key) {
   btn.textContent = open ? 'Weniger' : f.label;
   btn.setAttribute('aria-expanded', String(open));
   slideHeight(body, h0);
-  drawn.set(sheetBody, VIEWS[sheet.kind]()); // what is on the page now, so a redraw with nothing new leaves it alone
+  drawn.set(sheetBody, VIEWS[sheet.kind]()); // so the next redraw sees nothing new
 }
-/* „Einkaufen“: a page of up to three cards within the pet filter (shopGroups() in smart.js). What to buy again, by food
-   type and the best first, each variety with its ratings as a strip, and the list to share; then, folded away to a
-   line each, what mostly stays in the bowl, the clearest first, and what is not clear yet. A manual setting decides
-   where a variety stands and shows the pin. */
 const sorts = (n, one, many) => (n === 1 ? `1 Sorte ${one}` : `${n} Sorten ${many}`);
 function viewShop() {
   const m = model(),
@@ -503,9 +460,6 @@ function viewShop() {
     }`;
 }
 
-/* „Worauf es ankommt“, a level of „Vorlieben“: a page of two cards within the pet filter (profileModel() in
-   derive.js). What goes down well, each comparison under its name with its groups ranked (likesList()); then the
-   habits. Without any comparison yet, a sentence that says so. */
 function viewProfile() {
   const m = model(),
     dims = profileModel(),
@@ -523,8 +477,7 @@ function viewProfile() {
     }`;
 }
 
-/* A day tapped in the calendar of this page: the list grows until that day is drawn and a page of days under it
-   as well, because only then can the day reach the top of the screen. */
+// draws a page of days past the target, otherwise it cannot scroll to the top
 export function jumpToDay(key) {
   const at = histDays.findIndex(g => g.key === key);
   if (at < 0) return;
@@ -538,14 +491,11 @@ export function jumpToDay(key) {
   $('#d-' + key, sheetBody)?.scrollIntoView({behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start'});
 }
 
-/* The history grows as you scroll instead of laying out years of meals in one go: HIST_PAGE days at a time,
-   appended below. How many are already there is what the box says, so a redraw cannot get it out of step. */
+// The history grows as you scroll. The box's child count is the state, so a redraw cannot get it out of step
 const HIST_PAGE = 10;
 let histDays = [];
 const histHTML = (pet, from, to) =>
   dayBlocks(histDays.slice(from, to), {multiHouse: db.pets.length > 1 && !pet, anchors: true});
-/* Appends pages as long as less than a screen is left below: while scrolling, and once after drawing, in the frame
-   after it so that the page is on screen first. */
 function growHistory() {
   const box = $('#histBox');
   if (!box || sheet?.kind !== 'report' || box.children.length >= histDays.length) return;
@@ -559,13 +509,11 @@ function growHistory() {
 }
 sheetBody.addEventListener('scroll', growHistory, {passive: true});
 
-/* The day line sticks under the bar while its meals scroll past, and carries the edge's line only while it does.
-   CSS has no way to tell whether an element is stuck, so the observer works it out: a line that no longer sits
-   fully inside the box below the bar, and pokes out at its top rather than its bottom, is parked there. The 0
-   threshold also catches a jump straight into that place. Watched again whenever the history grows. */
+/* CSS cannot tell whether a sticky element is stuck, so this marks day lines poking out at the top of the box
+   below the bar. The 0 threshold also catches a jump straight into place. */
 let stuck = null;
 function watchDays() {
-  const top = parseFloat(getComputedStyle(sheetBody).getPropertyValue('--stick')) || 0; // resolved while hidden too
+  const top = parseFloat(getComputedStyle(sheetBody).getPropertyValue('--stick')) || 0; // resolves while hidden too
   stuck?.disconnect();
   stuck = new IntersectionObserver(
     entries =>
@@ -577,8 +525,6 @@ function watchDays() {
   for (const line of sheetBody.querySelectorAll('.days .tl-date')) stuck.observe(line);
 }
 
-/* Cropping the profile picture: a square stage with a round cut-out like the profile picture, and a slider to zoom.
-   mountCrop() hangs the image in after drawing. */
 const viewCrop = () => `${head('Foto zuschneiden', 'crop-cancel')}
     <div class="crop" id="cropStage" aria-label="Ausschnitt verschieben"></div>
     <label class="label" for="f-zoom">Zoom</label>
@@ -611,28 +557,24 @@ const VIEWS = {
   new: viewName,
   product: viewProduct,
   pet: viewPet,
-  // The pet editor is a page of the settings when it is reached from there, and the same view serves it
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
-  // „Worauf es ankommt“ opens as a level of „Vorlieben“, so back returns there
+  // the profile is a level of the evaluation, so back returns there
   evaluation: () => (sheet.page === 'profile' ? viewProfile() : viewEvaluation()),
   shop: viewShop,
 };
-/* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
-   away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.
-   The boxes the views fill afterwards are drawn every time, because their contents are not part of this comparison.
-   Kept per body, the page's and the one of a sheet over it (ui/sheet.js), so the page drawn again once the sheet has
-   gone is left as it was where nothing on it changed. */
+/* An unchanged view is left alone: a sync redraws every open sheet, and rewriting would lose decoded photos, scroll
+   position and focus. Kept per body, page and sheet. Boxes filled afterwards are not compared and always redrawn. */
 const drawn = new Map();
 setSheetView((state, body) => {
   const html = VIEWS[state.kind](),
     fresh = html !== drawn.get(body) || !body.firstChild; // no children: closed in between
   if (fresh) {
-    const y = body.scrollTop; // the same level drawn anew stays where it was scrolled to
+    const y = body.scrollTop;
     drawn.set(body, html);
     body.innerHTML = html;
     body.scrollTop = y;
-    if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // hangs listeners on: exactly once per drawing
+    if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // adds listeners, so once per drawing only
   }
   if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
@@ -643,7 +585,7 @@ setSheetView((state, body) => {
   if (state.at) {
     const at = state.at;
     state.at = null;
-    // Only inside the page, which holds the day anchors
+    // only the page holds the day anchors
     requestAnimationFrame(() => $('#' + at, sheetBody)?.scrollIntoView({block: 'start'}));
-  } // opened at a given day
+  }
 });

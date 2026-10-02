@@ -1,23 +1,19 @@
-/* The packaging photo, large (PROJECT.md, „Building blocks“, photo viewer): full screen and always dark like the
-   camera, the photo whole and as large as it fits. It grows out of the thumbnail that was tapped and goes back into
-   it, a view transition in which only the photo moves and the ground fades; under reduced motion it simply
-   appears. A tap anywhere, back and Escape close it. No history entry, the same as the camera. */
+// Full-screen packaging photo. No history entry, like the camera
 import {$, reduceMotion} from '../dom.js';
 import {report} from '../report.js';
 import {darkBars} from './theme.js';
 
 const dlg = $('#viewer'),
   img = $('img', dlg);
-let opening = false, // loading and growing: taps and back wait for it
+let opening = false, // taps and back wait while it opens
   closing = false,
   closeLater = false, // back arrived while it was opening
-  run = 0, // counts the openings, so one that dropViewer() cut short does not go on
-  from = null; // the meal and variety of the thumbnail it grew out of, to find that again when it closes
+  run = 0, // so an opening cut short by dropViewer() does not go on
+  from = null; // to find the thumbnail again on close
 
 export const viewerOpen = () => opening || closing || dlg.open;
 
-/* load() resolves to the photo as a data URL, or null; btn is the thumbnail's button.
-   true: open, false: nothing to show, null: already open or opening, or cut short. */
+// load(): a data URL or null. Returns true: open, false: nothing to show, null: busy or cut short
 export async function openViewer(load, btn) {
   if (viewerOpen()) return null;
   const mine = ++run;
@@ -56,7 +52,7 @@ export async function openViewer(load, btn) {
   return true;
 }
 
-/* true when it took the back button */
+// true when it took the back button
 export function closeViewer() {
   if (opening) {
     closeLater = true;
@@ -66,7 +62,7 @@ export function closeViewer() {
   if (!dlg.open) return false;
   closing = true;
   const mine = run;
-  // The thumbnail may have been drawn anew meanwhile (a change from the server): look it up again
+  // the thumbnail may have been redrawn by a sync, so look it up again
   const box = $('#popup').open ? $('#popupBody') : $('#sheet').open ? $('#sheetBody') : $('#home'),
     btn = from && $(`[data-action=view-photo][data-s="${from.s}"][data-p="${from.p}"]`, box),
     thumb = btn && $('img', btn),
@@ -75,12 +71,11 @@ export function closeViewer() {
   zoom(img, seen, () => {
     if (mine !== run) return;
     shut();
-    // Focus goes back to the thumbnail; the one it came from may have been replaced by a redraw
     const at = document.activeElement;
     if (btn && (!at || at === document.body || !at.isConnected || dlg.contains(at))) btn.focus({preventScroll: true});
   }).then(() => {
     if (mine !== run) return;
-    img.removeAttribute('src'); // the decoded photo is let go
+    img.removeAttribute('src'); // frees the decoded photo
     closing = false;
   });
   return true;
@@ -91,8 +86,7 @@ function shut() {
   darkBars(false);
 }
 
-/* At once and without a step: something else takes the screen (a sheet or the camera from a link or a
-   notification), which must not open underneath it */
+// something else takes the screen, and the viewer must not open beneath it
 export function dropViewer() {
   if (!viewerOpen()) return;
   run++;
@@ -101,9 +95,7 @@ export function dropViewer() {
   opening = closing = closeLater = false;
 }
 
-/* One step between the thumbnail and the photo: the two share the name `photo` for the length of the step, the
-   dialog's ground is `viewer` and only fades. Every name is taken off again afterwards, so no later redraw of the
-   home page captures anything of it. */
+// names are cleared afterwards, so a later home page transition captures none of it
 function zoom(a, b, change) {
   if (reduceMotion.matches || !document.startViewTransition) return Promise.resolve(change());
   const root = document.documentElement,

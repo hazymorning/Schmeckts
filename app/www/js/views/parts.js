@@ -1,5 +1,4 @@
-/* Recurring building blocks of the views: avatars, thumbnails, the rating slider, the strip of rating dots, the rows of
-   „Einkaufen“ and „Vorlieben“, lines told in a card, sync status. */
+// Building blocks shared by the views
 import {andList, cap, esc} from '../text.js';
 import {addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
@@ -24,36 +23,28 @@ export function thumbOf(s, p, cls = '') {
   const letter = (p.brand || p.variety || '?').trim().charAt(0).toUpperCase();
   return `<span class="thumb ${cls}">${esc(letter)}</span>`;
 }
-/* A thumbnail that opens the packaging photo large (ui/viewer.js) where this phone holds it; otherwise the plain one */
 export const photoThumb = (s, p, cls = '') =>
   hasPhoto(s, p)
     ? `<button class="photo-btn" data-action="view-photo" data-s="${s?.id || ''}" data-p="${p?.id || ''}" aria-label="Foto vergrößern">${thumbOf(s, p, cls)}</button>`
     : thumbOf(s, p, cls);
 export function nameBlock(s, p, inSheet = false) {
   if (s.status === 'recognizing' || s.status === 'reading')
-    // the server is recognising, or the phone is reading the text
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
   if (!p) {
-    // What the phone read is a guess to confirm, in the usual colour; the server's way keeps its words and tone
     const read = s.guess?.variety || s.guess?.brand,
       sub = read
         ? `Vermutlich <b>${esc(read)}</b>, tippen zum Bestätigen`
         : {waiting: 'Wird erkannt, sobald der Server erreichbar ist', failed: 'Nicht erkannt, tippen zum Benennen'}[
             s.status
           ] || 'Tippen zum Benennen';
-    return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver (mode `lokal`): without the error tone
+    return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver is local mode, not an error
   }
-  // In the sheet the exact time is in the „Serviert“ field right below, so the food type goes here instead
+  // in the sheet the time field sits right below, so show the type instead
   const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
-/* The rating slider: the variety's scale as one track from the best level to the worst, a button for each with its
-   icon in its colour, and under each the level in two words, one over the other. Once the meal holds a level, the
-   thumb stands on it, ringed in its colour, and its column takes the colour. While a finger is on the slider, the
-   thumb lifts onto the level under it and that column lights up (ui/slider.js). A level
-   stored from another scale (the type has changed) stands above the slider as a badge until one of its own replaces
-   it. The buttons are for the keyboard and a screen reader. */
+// A level from another scale (the type changed) shows as a badge above the slider
 export function rateSlider(s, pid) {
   const scale = scaleOf(getProduct(s.productId)),
     cur = rOf(s.pets[pid]),
@@ -65,7 +56,6 @@ export function rateSlider(s, pid) {
           `<button class="${rateCls(r)}" data-action="rate" data-s="${s.id}" data-p="${pid}" data-r="${r}" aria-pressed="${r === cur}" aria-label="${RATINGS[r].label}">${icon('r_' + r)}</button>`,
       )
       .join(''),
-    // a faint wash in the levels' colours, each centred on its column, so the scale reads from good to bad
     wash = scale
       .map((r, i) => `var(--${rateTone(r)}-soft) ${(((i + 0.5) / scale.length) * 100).toFixed(1)}%`)
       .join(', '),
@@ -78,7 +68,6 @@ export function rateSlider(s, pid) {
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
     <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;
 }
-/* The two ends of a scale, under the counters of the food sheet */
 export const scaleEnds = levels =>
   `<p class="ends"><span>${RATINGS[levels[0]].label}</span><span>${RATINGS[levels.at(-1)].label}</span></p>`;
 export function resultBadges(s, compact = false) {
@@ -98,26 +87,18 @@ export function resultBadges(s, compact = false) {
     .join('')}</span>`;
 }
 export const closeBtn = `<button class="icon-btn" data-action="close" aria-label="Schließen">${icon('close')}</button>`;
-/* Deleting a meal that has no variety yet, at the end of „Wie war’s?“, of naming it and under its slider on the home
-   page: one tap, undone from the toast, because arming is only for what cannot be undone */
+// no arming: it can be undone from the toast
 export const deleteMealBtn = id =>
   `<button class="btn quiet" data-action="delete-serving" data-id="${id}">${icon('trash')}Eintrag löschen</button>`;
-/* The head of what is open. A sheet carries its title and the X; a page carries the back arrow on a bar that stays
-   at the top, with the title under it in the style of the header. Once that title has gone under the bar, the bar
-   shows it small beside the arrow (ui/sheet.js); the h2 stays the heading, so that copy is hidden from a screen
-   reader. Which of the two it is comes from the state, not from the view, so the pet editor reads as a sheet from
-   the home page and as a page in the settings. `back` is for a step that is not a level of its own, such as
-   cropping. */
+/* Sheet or page head, decided by the state so one view can be both. back: for a step that is not a level of its
+   own, such as cropping. */
 export const head = (title, back = 'settings-back') =>
   isPage(sheet)
     ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span></div>
     <h2 class="page-title">${title}</h2>`
     : `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>`;
-/* „für Mau“ after the title of a page, as the pet filter stands; nothing with one pet */
 export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
-/* A segmented control: one equally wide button per option, the current one pressed. An option is
-   [value, label] and may carry an icon and an action of its own. „Eigene“ in the rating reminder is one such,
-   because it opens a field instead of setting a value. */
+// option: [value, label, icon?, action?]
 export const segmented = (action, options, current) =>
   `<div class="seg">${options
     .map(
@@ -130,9 +111,7 @@ export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = 
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;
 }
 
-/* History, on the home page as in the evaluation: the meals by calendar day, newest first, and the observations among
-   them. „2 Mahlzeiten, 1 Snack“: a treat is not a meal; everything else, including what is still unknown, counts
-   as one. „1 Beobachtung“ after them. */
+// treats are not meals; anything else, unknown food included, counts as one
 export function fedLabel(items) {
   const fed = items.filter(x => !isObservation(x)),
     seen = items.length - fed.length,
@@ -146,10 +125,8 @@ export function fedLabel(items) {
     .filter(Boolean)
     .join(', ');
 }
-/* Who an observation concerns: „Minka“, and where it is not clear which of them it was „Minka oder Tiger“ */
 export const whoObserved = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean), 'oder');
 export function servingNode(s) {
-  // a dot in the rating's colour, hollow = still open
   const rs = servingPets(s)
     .map(pid => rOf(s.pets[pid]))
     .filter(Boolean);
@@ -159,8 +136,6 @@ export function servingNode(s) {
     : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
   return `<i class="${cls}"></i>`;
 }
-/* Verlauf: a two-week calendar of the meals handed in, on the home page as on the history page. A day with
-   meals leads to them, the days to come are faint, and today carries the accent. */
 export function calendarHTML(list) {
   const byDay = new Map();
   for (const s of list) {
@@ -186,12 +161,8 @@ export function calendarHTML(list) {
   }
   return `<div class="cal">${cells}</div>`;
 }
-/* Ratings as a strip of the calendar's dots, each in its rating's colour, the oldest on the left and the newest on the
-   right: the ratings the verdict rests on, at most STRIP of them, and a „+“ in front where there are more, beyond
-   STRIP or older than the window, as the calendar puts it after its dots. What they say in words is its label, so
-   nothing rests on colour. {keys, more}: the rating keys oldest first and whether older ones lie beyond (ratingsIn()
-   in smart.js). open: the ratings a verdict still lacks, as the calendar's hollow dots after them („Vorlieben“).
-   Nothing without a rating. */
+/* {keys, more}: from ratingsIn(), oldest first. open: ratings the verdict still lacks, drawn hollow. The label says
+   it in words, so nothing rests on colour. */
 const STRIP = 8;
 export function strip({keys, more}, open = 0) {
   if (!keys.length) return '';
@@ -215,8 +186,6 @@ export function dayGroups(list) {
   }
   return groups;
 }
-/* An observation in the diary: its time, a plain dot on the line, its icon where a meal has its packaging, what it was
-   and who it concerns; a tap opens it, to put it right or delete it */
 function observationItem(o, multiHouse) {
   const kind = observationOf(o.kind),
     ids = observedPets(o),
@@ -225,7 +194,7 @@ function observationItem(o, multiHouse) {
         <span class="tl-time">${timeStr(o.at)}</span><span class="tl-node"><i></i></span><span class="thumb m">${icon(kind.icon || 'sparkle')}</span>
         <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
-/* anchors: ids for the days of the history page, where a calendar jumps to; fresh: the meal just served */
+// anchors: day ids the calendar jumps to; fresh: id of the meal just served
 export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}) {
   return groups
     .map(
@@ -256,9 +225,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
     .join('');
 }
 
-/* A variety to buy, on „Einkaufen“ and in its card on the home page: the thumbnail, the variety and under it the
-   brand, for „Gemischt“ the pets it is for, its ratings as a strip and the pin where it was set by hand. A tap opens
-   the food sheet, which tells the ratings in words. e: a variety of the model m */
+// e: a variety of the model m
 export function shopRow(m, e) {
   const p = e.product,
     mixed = !e.kaufen && e.choice === 'gemischt' ? `nur für ${petNames(e.yes)}` : '',
@@ -268,27 +235,20 @@ export function shopRow(m, e) {
     ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 
-/* A line of a card, told like the rest of the app: a plain icon or the pet's picture, a sentence with what it is
-   about in bold, and under it in words what it rests on, its figures in bold as well. Both are HTML: whatever came
-   from a person is escaped by the caller. */
+// say and why are HTML; the caller escapes user text
 export const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
-/* A told line about one variety, which opens its food sheet like a row on „Einkaufen“; end: what closes the row */
 export const toldBtn = (id, pic, say, why = '', end = '') =>
   `<li><button class="row" data-action="open-product" data-id="${id}">${pic}<span class="said">${say}${why ? `<small class="hint why">${why}</small>` : ''}</span>${end}</button></li>`;
 
-/* The name of a comparison of „Worauf es ankommt“, with the food type in brackets except for wet food: „Konsistenz“,
-   „Geschmack (Trockenfutter)“, „Marke“, and for treats „Snack-Art“, which names the type already */
+// no bracket for wet food (TYPES[0]); other types' textures have a title of their own
 const DIMENSION = {konsistenz: 'Konsistenz', geschmack: 'Geschmack', marke: 'Marke'};
 const dimName = d =>
   d.kind === 'konsistenz' && d.type !== TYPES[0]
     ? TEXTURES[d.type].title
     : DIMENSION[d.kind] + (d.type === TYPES[0] ? '' : ` (${d.type})`);
-/* A habit of „Worauf es ankommt“ as a told line: how varieties are eaten, the varieties in bold and how often under them; or
-   whether a pet likes a change, and whether new food goes down well at first or needs a while, each with the pet's
-   picture and name where several pets are shown at once */
 const upTo = (k, n) => (k < n ? `${k} von ${n}` : `alle ${n}`);
 export function habitRow(h, several) {
   const name = id => pname(getProduct(id));
@@ -316,24 +276,20 @@ export function habitRow(h, several) {
     `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst <b>${upTo(h.other.good, h.other.n)}</b>.`,
   );
 }
-/* A group of „Worauf es ankommt“, on its page and in its card on „Vorlieben“: the group, how often it went down well in
-   words, the strip of its ratings, and „deutlich“ where it is an end of a clear comparison. Not a button: there is
-   nothing behind it yet. g: a group of profile() in smart.js within the model m */
+// not a button, nothing opens from it yet. g: a group of profile() in smart.js
 const groupRow = (m, g, clear) =>
   `<li class="row"><span class="t-main"><span class="t-top"><b>${esc(g.key)}</b>${clear ? '<span class="badge">deutlich</span>' : ''}</span>
     <small>${cap(`${times(g.good, g.n)} gut gefressen`)}</small></span>${strip(ratingsIn(m, g.ids))}</li>`;
 
-/* A comparison of „Worauf es ankommt“ under its name, its groups ranked, the two ends marked where it is clear */
 export const likesList = (m, d) =>
   `<h3 class="label grp">${dimName(d)}</h3><ul class="list likes">${d.groups
     .map((g, i) => groupRow(m, g, d.clear && (i === 0 || i === d.groups.length - 1)))
     .join('')}</ul>`;
 
-/* Sync status in words, for the settings and the notice at the top */
 const waitingText = n => (n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '');
 const ERROR_TITLE = {auth: 'Code stimmt nicht mehr', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
 const CHIP_ERROR = {auth: 'Code prüfen', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
-/* What waits for a newer server (sync.js), named by its kind */
+// collections held back until the server is updated
 const HELD = {observations: 'Beobachtungen'};
 function heldText() {
   const kinds = [...new Set(held().map(x => HELD[x.c] || 'Neue Einträge'))];
@@ -361,7 +317,6 @@ export function syncInfo() {
     detail: wait ? wait + ', wird gesendet …' : later ? `Abgeglichen. ${later}.` : 'Alles abgeglichen',
   };
 }
-/* At the top next to the settings, only when something is waiting or stuck */
 export function syncChip() {
   const st = status,
     n = pending().length;
@@ -370,8 +325,7 @@ export function syncChip() {
   return null;
 }
 
-/* When something was, as people say it: „heute um 13:14“, „gestern um 19:22“, „vorgestern“, „vor 3 Tagen“, „am 12.
-   September“, the time without a leading zero. mark wraps the time, so the overview can set it in bold. */
+// mark wraps the time, so the overview can set it in bold
 export function since(t, now, mark = x => x) {
   const day = dayStart(now),
     clock = () => mark(timeStr(t).replace(/^0(?=\d:)/, ''));
@@ -381,14 +335,10 @@ export function since(t, now, mark = x => x) {
   if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
   return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
 }
-/* „k von n Mal“ as people say it: „einmal“, „beide Male“, „alle 3 Mal“, „2 von 3 Mal“ */
 export const times = (k, n) =>
   n === 1 ? 'einmal' : k < n ? `${k} von ${n} Mal` : n === 2 ? 'beide Male' : `alle ${n} Mal`;
-/* What the ratings of a variety say, in words and never as a percentage, so that its verdict explains itself:
-   „Alle 3 Mal sofort leer“, „Einmal fast leer, einmal halb gegessen“, „4 von 5 Mal gut gefressen“, „2 von 3 Mal
-   nur die Soße geleckt“, „Mal so, mal so: 2× gut gefressen, 2× kaum gefressen“. The ratings fall on a side, good
-   (from GOOD points), poor (under NO) or in between; the side most of them are on is named, with its level where
-   only one level makes it up. x: {n, counts} */
+/* Ratings in words, never as a percentage. Each falls on a side (good, poor, between); the majority side is named,
+   by its level if it holds only one. x: {n, counts} */
 const SIDES = [
   [v => v >= GOOD, 'gut gefressen'],
   [v => v < NO, 'kaum gefressen'],
@@ -408,11 +358,8 @@ export function evidenceOf(x) {
   if (sides[0].k * 2 > x.n) return cap(`${times(sides[0].k, x.n)} ${sides[0].said}`);
   return `Mal so, mal so: ${sides.map(side => `${side.k}× ${side.said}`).join(', ')}`;
 }
-/* The same after a comma: „Felix, alle 3 Mal gut gefressen“ */
 export const lower = t => t.charAt(0).toLowerCase() + t.slice(1);
-/* The words under a variety's verdict. In a household whose verdict rests on some of the pets only, it says theirs,
-   „Bei Minka alle 3 Mal gut gefressen“, since the others' ratings did not decide it; otherwise what all its ratings
-   in the pet filter say. e: a variety of the model */
+// when only some pets decided the verdict, only their ratings are told
 export function whyOf(e) {
   const by = e.verdict === 'nachkaufen' ? e.yes : e.verdict === 'nicht' ? e.no : [];
   if (!by.length || by.length === Object.keys(e.pets).length) return evidenceOf(e);
@@ -423,7 +370,5 @@ export function whyOf(e) {
   }
   return `Bei ${petNames(by)} ${lower(evidenceOf(x))}`;
 }
-/* A variety's verdict as text; in a household „Gemischt“ with the pets' names,
-   e.g. „Gemischt: Minka ja, Tiger nein“ */
 export const verdictLabel = x =>
   x.verdict === 'gemischt' ? `Gemischt: ${petNames(x.yes)} ja, ${petNames(x.no)} nein` : VERDICTS[x.verdict];

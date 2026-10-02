@@ -1,5 +1,5 @@
-/* Our own camera for packaging photos. openCamera(hint) returns the photo as a blob, null on „Abbrechen“, and
-   throws without a camera or the permission: the caller then falls back to the camera app. */
+/* Own camera for packaging photos. Resolves to a blob, or null when cancelled; throws without camera or permission,
+   so the caller can fall back to the camera app. */
 import {$} from '../dom.js';
 import {READ_MAX} from '../images.js';
 import {report} from '../report.js';
@@ -8,18 +8,19 @@ import {darkBars} from './theme.js';
 import {dropViewer} from './viewer.js';
 
 const WANT = {audio: false, video: {facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080}}};
-let close = null; // closes the open camera, null when closed
+let close = null; // null while closed
 
+// for the back button
 export const closeCamera = () => {
   if (!close) return false;
   close(null);
   return true;
-}; // for the back button
+};
 
 export async function openCamera(hint) {
   if (close) return null;
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Keine Kamera in dieser Umgebung.');
-  const stream = await navigator.mediaDevices.getUserMedia(WANT); // asks for the permission the first time
+  const stream = await navigator.mediaDevices.getUserMedia(WANT);
   const dlg = $('#camera'),
     video = $('video', dlg);
   $('.cam-hint', dlg).innerHTML = esc(hint);
@@ -34,7 +35,7 @@ export async function openCamera(hint) {
     close = blob => {
       close = null;
       stream.getTracks().forEach(t => t.stop());
-      video.srcObject = null; // release it at once
+      video.srcObject = null; // release the camera at once
       dlg.removeEventListener('click', tap);
       dlg.removeEventListener('cancel', cancel);
       document.removeEventListener('visibilitychange', hidden);
@@ -42,11 +43,10 @@ export async function openCamera(hint) {
       darkBars(false);
       resolve(blob);
     };
-    /* The shutter: the preview stands still at that moment, then a photo from the sensor at the size the text is
-       read at (ImageCapture), which the video's 1920 × 1080 does not reach; failing that the frame on screen. */
+    // ImageCapture reaches the size text is read at, the 1920 x 1080 video does not
     let taking = false;
     const shoot = async () => {
-      if (!video.videoWidth || taking) return; // no frame yet, or already taking one
+      if (!video.videoWidth || taking) return;
       taking = true;
       video.pause();
       const frame = await new Promise(done => {
@@ -57,8 +57,8 @@ export async function openCamera(hint) {
         c.toBlob(done, 'image/jpeg', 0.92);
       });
       const photo = await sharpPhoto(stream).catch(e => {
-        if (close) report('the photo from the sensor', e); // closed meanwhile: that is what stopped it
-        return null; // the frame will do, as it did before
+        if (close) report('the photo from the sensor', e); // if closed meanwhile, that is what stopped it
+        return null;
       });
       close?.(photo || frame);
     };
@@ -77,9 +77,7 @@ export async function openCamera(hint) {
   });
 }
 
-/* A photo from the camera's sensor instead of the video's frame, where the WebView can take one: as close to READ_MAX
-   on its long edge as the camera offers (a size out of its range is refused), without the flash. null where it
-   cannot. */
+// a size outside the camera's range is refused, so clamp READ_MAX to it
 async function sharpPhoto(stream) {
   const track = stream.getVideoTracks()[0];
   if (!window.ImageCapture || !track) return null;

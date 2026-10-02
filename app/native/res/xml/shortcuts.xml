@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Static app shortcuts (long-press on the icon). The deep links schmeckts://feed, schmeckts://scan and
-     schmeckts://photo open the app in the same place, from Quick Shortcut Maker or Tasker too, on a cold start
-     and while the app is running. -->
+<!-- the schmeckts:// deep links also work from Tasker and the like, on a cold start too -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:shortcutId="feed"

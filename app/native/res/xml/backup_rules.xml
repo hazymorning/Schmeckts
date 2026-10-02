@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 7 and 8 know only one rule for cloud backup and transfer: back nothing up.
-     From Android 9 on, xml-v28/backup_rules.xml applies. -->
+<!-- Android 7 and 8 have one rule for backup and transfer alike, so nothing is backed up -->
 <full-backup-content>
     <exclude domain="root" path="." />
     <exclude domain="file" path="." />

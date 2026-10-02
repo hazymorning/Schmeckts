@@ -17,23 +17,18 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * The feeding reminders the app has set (FeedReminderPlugin): one inexact alarm each, as the rating reminder has,
- * and the decision when one goes off. With a household server it first asks whether a meal has been served since
- * the hour before the usual time (FeedCheck): if so, on whichever phone, it stays quiet; if the server knows of
- * none, the text says so. Without a server, or when it cannot be reached, it reminds as it always did.
- * After the phone restarts, or the app is updated, the alarms are set again from what was stored.
+ * One inexact alarm per reminder. With a household server it first asks FeedCheck whether a meal was served on any
+ * phone and stays quiet if so; without an answer it reminds anyway.
  */
 public class FeedReceiver extends BroadcastReceiver {
     static final String ACTION = "de.schmeckts.app.FEED_REMINDER";
     private static final String PREFS = "feed_reminder";
     private static final String CHANNEL = "feed";
 
-    /** Keeps the set the app handed over, for the alarms and for setting them again after a restart. */
     static void store(Context context, JSONObject set) {
         prefs(context).edit().putString("set", set.toString()).apply();
     }
 
-    /** One alarm per reminder still ahead; the alarms of the set before are cancelled first. */
     static void arm(Context context) {
         AlarmManager alarms = context.getSystemService(AlarmManager.class);
         SharedPreferences prefs = prefs(context);
@@ -53,7 +48,6 @@ public class FeedReceiver extends BroadcastReceiver {
         prefs.edit().putString("armed", armed.toString()).apply();
     }
 
-    /** Takes back reminders already shown, whose meal the app has seen served since. */
     static void dismiss(Context context, JSONArray ids) {
         for (int i = 0; ids != null && i < ids.length(); i++) NotificationManagerCompat.from(context).cancel(ids.optInt(i));
     }
@@ -61,10 +55,10 @@ public class FeedReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (!ACTION.equals(intent.getAction())) {
-            arm(context); // the phone has started, or the app was updated
+            arm(context); // boot or app update
             return;
         }
-        PendingResult result = goAsync(); // asking the server takes longer than a receiver may block
+        PendingResult result = goAsync(); // the server call takes longer than a receiver may block
         new Thread(() -> {
             try {
                 remind(context, intent.getIntExtra("id", 0), intent.getLongExtra("since", 0));
@@ -80,11 +74,11 @@ public class FeedReceiver extends BroadcastReceiver {
         for (int i = 0; list != null && i < list.length(); i++) {
             if (list.optJSONObject(i) != null && list.optJSONObject(i).optInt("id") == id) r = list.optJSONObject(i);
         }
-        if (r == null) return; // no longer wanted: the app has changed its mind since the alarm was set
+        if (r == null) return; // removed since the alarm was set
         String server = set.optString("server"), code = set.optString("code"), body = r.optString("body");
         if (!server.isEmpty() && !code.isEmpty()) {
             Boolean fed = FeedCheck.fed(server, code, since);
-            if (Boolean.TRUE.equals(fed)) return; // served on another phone: nothing to remind of
+            if (Boolean.TRUE.equals(fed)) return;
             if (Boolean.FALSE.equals(fed)) body = r.optString("sure", body);
         }
         show(context, id, r.optString("title"), body);
@@ -97,7 +91,7 @@ public class FeedReceiver extends BroadcastReceiver {
                 new NotificationChannel(CHANNEL, "Ans Füttern erinnern", NotificationManager.IMPORTANCE_DEFAULT)
             );
         }
-        // A tap opens the feeding sheet through the app's own link, on a cold start too
+        // the app's own link, so a tap works on a cold start too
         Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse("schmeckts://feed"), context, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         PendingIntent tap = PendingIntent.getActivity(
@@ -117,7 +111,7 @@ public class FeedReceiver extends BroadcastReceiver {
         try {
             NotificationManagerCompat.from(context).notify(id, note.build());
         } catch (SecurityException e) {
-            // the permission was taken back in the Android settings; the switch in the app asks again when turned on
+            // permission revoked in Android settings; the app's switch asks again
         }
     }
 
@@ -134,7 +128,7 @@ public class FeedReceiver extends BroadcastReceiver {
         try {
             return new JSONObject(prefs(context).getString("set", "{}"));
         } catch (Exception e) {
-            return new JSONObject(); // unreadable: nothing is set
+            return new JSONObject(); // unreadable: treat as nothing set
         }
     }
 }

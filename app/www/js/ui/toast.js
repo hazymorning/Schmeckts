@@ -1,5 +1,3 @@
-/* A short message at the bottom, optionally with „Rückgängig“. Replaces confirmation prompts. html: the message is
-   markup already, escaped by the caller, for a name in bold. */
 import {$} from '../dom.js';
 import {esc} from '../text.js';
 import {icon} from '../icons.js';
@@ -7,9 +5,10 @@ import {topDialog} from './sheet.js';
 
 export let toastUndo = null;
 let toastTimer = null;
+// html: msg is markup, escaped by the caller
 export function toast(msg, undo, html = false) {
   const el = $('#toast');
-  const host = topDialog() || document.body; // the top dialog, or it would lie under that dialog's dimming
+  const host = topDialog() || document.body; // or the dialog's dimming covers it
   if (el.parentNode !== host) host.appendChild(el);
   el.classList.toggle('in-sheet', host !== document.body);
   el.classList.toggle('plain', !undo);
