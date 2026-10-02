@@ -136,7 +136,9 @@ function servingNode(s) {
     : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
   return `<i class="${cls}"></i>`;
 }
-export function calendarHTML(list) {
+const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+// two weeks from last Monday, or with week the seven days up to today in one row
+export function calendarHTML(list, week = false) {
   const byDay = new Map();
   for (const s of list) {
     const k = dayKey(s.servedAt);
@@ -145,21 +147,23 @@ export function calendarHTML(list) {
   }
   const d = new Date();
   d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7); // Monday of the previous week
+  d.setDate(d.getDate() - (week ? 6 : ((d.getDay() + 6) % 7) + 7));
   const todayKey = dayKey(Date.now());
-  let cells = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<span class="wd">${w}</span>`).join(''),
+  let names = '',
+    cells = '',
     future = false;
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < (week ? 7 : 14); i++) {
     const k = dayKey(d.getTime()),
       items = byDay.get(k) || [],
       isToday = k === todayKey;
+    if (i < 7) names += `<span class="wd">${WEEKDAYS[(d.getDay() + 6) % 7]}</span>`;
     const dots = items.slice(0, 3).map(servingNode).join('') + (items.length > 3 ? '<b>+</b>' : '');
     const label = dayLabel(d.getTime()) + (items.length ? ', ' + fedLabel(items) : ', nichts eingetragen');
     cells += `<button class="day${items.length ? ' has' : ''}${isToday ? ' today' : ''}${future ? ' future' : ''}" ${items.length ? `data-action="jump-day" data-day="${k}"` : 'disabled'} aria-label="${esc(label)}"><span class="dn">${d.getDate()}</span><span class="dots">${dots}</span></button>`;
     if (isToday) future = true;
     d.setDate(d.getDate() + 1);
   }
-  return `<div class="cal">${cells}</div>`;
+  return `<div class="cal">${names}${cells}</div>`;
 }
 /* {keys, more}: from ratingsIn(), oldest first. open: ratings the verdict still lacks, drawn hollow. The label says
    it in words, so nothing rests on colour. */

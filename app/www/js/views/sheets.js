@@ -440,7 +440,7 @@ function viewReport() {
     ${
       histDays.length
         ? `<div id="histBox">${histHTML(pet, 0, upto)}</div>`
-        : `<p class="hint empty"><span>Noch nichts serviert.</span></p>`
+        : `<p class="hint empty"><span>Noch nichts serviert, der Napf wartet auf seine Premiere.</span></p>`
     }</section>`;
 }
 // swaps only the fold, so the rest of the page and the button stay put
@@ -467,7 +467,7 @@ function viewShop() {
   const buy = types.length
     ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('') +
       `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Liste teilen</button></div>`
-    : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>';
+    : '<p class="hint card-line">Noch nichts zum Nachkaufen, erst mal probieren.</p>';
   return `${head('Einkaufen' + forWhom(m.pet))}
     <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
       g.nicht.length

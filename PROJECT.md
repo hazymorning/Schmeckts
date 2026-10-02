@@ -77,7 +77,7 @@ server.
 | `products[].texture` | `sosse` `gelee` `pastete` `mousse` `block` `suppe`, treats `knusprig` `weich` `creme` `milch` `stick` `kau` | consistency or treat type |
 | `products[].kaufen` | `immer`, `nicht`, absent | set by hand, beats the computed verdict |
 | `products[].sharedPhoto` | `true` or a number (ms) | the server holds the large photo; a number stamps a replaced one |
-| `observations[].kind` | `stink` `hungry` `tired` | unknown kinds from newer phones are kept |
+| `observations[].kind` | `happy` `stink` `hungry` `tired` | unknown kinds from newer phones are kept |
 | `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
 | `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>` | hints hidden on this phone |

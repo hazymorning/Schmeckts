@@ -36,7 +36,7 @@ export function serveProduct(pid, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  const msg = `${pname(p)} serviert${db.pets.length > 1 ? ' für ' + petNames(ids) : ''}`;
+  const msg = `${pname(p)} serviert. Guten Appetit, ${petNames(ids)}!`;
   update();
   scrollTop();
   toast(withMilestone(msg), () => undoServe(s.id), {ic: 'bowl'});

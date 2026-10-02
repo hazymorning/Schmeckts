@@ -1,7 +1,7 @@
 import {$, reduceMotion} from '../dom.js';
 import {settled} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
-import {addDays, dayKey, weekStart} from '../dates.js';
+import {addDays, dayKey, dayStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
 import {observationOf, RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
@@ -116,6 +116,7 @@ export function renderHome() {
   const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
   $('#home').innerHTML = homeHTML();
   if (rail) $('#home .obs').scrollLeft = rail;
+  $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
 }
 function homeHTML() {
@@ -128,7 +129,7 @@ function homeHTML() {
   const open = new Set(pendingServings()),
     pend = db.servings.filter(s => open.has(s) || (homeView.held.has(s.id) && rateRows(s).length)),
     m = db.servings.length ? model() : null;
-  let html = banner + (m ? overviewHTML(m) : '');
+  let html = banner + (m ? overviewHTML(m, homeView.fresh) : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
   else
@@ -239,7 +240,7 @@ function shopHTML(m) {
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing
 function historyHTML() {
   const now = Date.now(),
-    since = addDays(weekStart(now), -7), // the calendar's first day, always before yesterday
+    since = addDays(dayStart(now), -6), // the calendar's first day, always before yesterday
     today = dayKey(now),
     yesterday = dayKey(addDays(now, -1)),
     recent = [],
@@ -259,12 +260,12 @@ function historyHTML() {
     shown = diary(days[day], seen[day]),
     multiHouse = db.pets.length > 1 && prefs.activePet === 'all';
   return (
-    calendarHTML(recent) +
+    calendarHTML(recent, true) +
     (shown.length
       ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
       : recent.length || db.servings.some(s => servingPets(s).length)
-        ? `<p class="hint empty"><span>Heute noch nichts serviert.</span></p>`
-        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert.</span></p>`) +
+        ? `<p class="hint empty"><span>Heute noch nichts serviert, der Napf langweilt sich.</span></p>`
+        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert, der Napf wartet auf seine Premiere.</span></p>`) +
     `<button class="card-btn" data-action="open-report">Ganzer Verlauf${icon('chevron')}</button>`
   );
 }

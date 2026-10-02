@@ -1,7 +1,7 @@
 // Evaluation card and page. The analysis is in smart.js, this only words it
 import {andList, cap, esc} from '../text.js';
 import {DAY} from '../dates.js';
-import {icon, sketch} from '../icons.js';
+import {icon} from '../icons.js';
 import {observationOf, TEXTURES} from '../config.js';
 import {db} from '../store.js';
 import {
@@ -76,31 +76,33 @@ function waiting(m, r) {
 
 const ROLE = {top: 'Top-Futter', flop: 'Größter Flop'};
 const SIDE = {top: ['Top', 'r-good'], flop: ['Flop', 'r-bad']};
-function sideRow(m, r, e, side) {
+const TILE = {top: ['Leibgericht', 'champ'], flop: ['Ladenhüter', 'flop']};
+// the best and the worst variety, each on its tone's ground
+function sideTile(r, e, side) {
+  const [kicker, ic] = TILE[side];
   if (!e) {
     const [title, why] =
       side === 'top'
-        ? ['Noch kein Top-Futter', `Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`]
+        ? ['Noch kein Leibgericht', `Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`]
         : r.settled < 3
-          ? ['Noch kein Flop', 'Dafür ist noch zu wenig bewertet.']
+          ? ['Noch kein Ladenhüter', 'Dafür ist noch zu wenig bewertet.']
           : r.settled === r.top.length
-            ? ['Kein Flop', 'Alles, was feststeht, kommt gut an.']
-            : ['Kein Flop', 'Keine Sorte bleibt meist stehen.'];
-    return `<li class="row">${sketch('empty', 'l')}<span class="t-main"><b>${title}</b><small>${why}</small></span></li>`;
+            ? ['Kein Ladenhüter', 'Alles, was feststeht, kommt gut an.']
+            : ['Kein Ladenhüter', 'Keine Sorte bleibt meist stehen.'];
+    return `<div class="tile"><span class="tile-ic">${icon(ic)}</span><span class="t-main"><b>${title}</b><small>${why}</small></span></div>`;
   }
   const p = e.product,
     brand = brandOf(p),
-    [word, tone] = SIDE[side],
-    label = `${ROLE[side]}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${saidOf(e, side)}.`;
-  return `<li><button class="row" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}">${thumbOf(null, p)}
-    <span class="t-main"><b>${esc(pname(p))}</b><small><b class="side ${tone}">${word}</b>${brand ? ` · ${esc(brand)}` : ''}</small></span>${strip(ratingsIn(m, [e.id]))}</button></li>`;
+    said = saidOf(e, side),
+    label = `${ROLE[side]}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.`;
+  return `<button class="tile ${SIDE[side][1]}" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="tile-ic">${icon(ic)}</span>
+    <span class="t-main"><small class="kicker">${kicker}</small><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(', ')))}</small></span></button>`;
 }
 export function evaluationCard(m) {
   const r = rankingModel();
   if (!r.rated) return '';
   let body;
-  if (r.top.length || r.flop.length)
-    body = `<ul class="list sides">${sideRow(m, r, r.top[0], 'top')}${sideRow(m, r, r.flop[0], 'flop')}</ul>`;
+  if (r.top.length || r.flop.length) body = sideTile(r, r.top[0], 'top') + sideTile(r, r.flop[0], 'flop');
   else {
     const t = r.stale ? null : r.trials[0],
       next = t
@@ -160,7 +162,7 @@ function placeRow(m, x, e, i, side) {
     <span class="t-main"><span class="t-top"><b>${esc(pname(p))}</b>${fresh ? '<span class="badge">neu</span>' : ''}</span><small>${esc(cap([brand, lower(said), away].filter(Boolean).join(', ')))}</small></span>${strip(ratingsIn(m, [e.id]))}</button></li>`;
 }
 const card = (title, inner) => `<section class="card"><h2>${title}</h2>${inner}</section>`;
-const listTitle = (side, title) => `${icon(side === 'top' ? 'heart' : 'r_schlecht', SIDE[side][1])}${title}`;
+const listTitle = (side, title) => `${icon(TILE[side][1], SIDE[side][1])}${title}`;
 const say = text => `<p class="say card-line">${text}</p>`;
 const hint = text => `<p class="hint card-line">${text}</p>`;
 const places = (m, x, list, side) =>

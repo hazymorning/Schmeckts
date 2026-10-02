@@ -10,10 +10,14 @@ const FACES = ['1em "Figtree"', '1em "Faustina"'];
 let gone = false;
 const frame = () => new Promise(done => requestAnimationFrame(() => done()));
 
+// the cards rise in turn as it fades, the jump to their start hidden under it
 export function hideSplash() {
-  if (gone) return;
+  if (gone || !Native?.SplashScreen) return;
   gone = true;
-  Native?.SplashScreen?.hide({fadeOutDuration: dur('fade')}).catch(e => report('splash screen', e));
+  const root = document.documentElement;
+  root.classList.add('arrive');
+  setTimeout(() => root.classList.remove('arrive'), dur('long'));
+  Native.SplashScreen.hide({fadeOutDuration: dur('fade')}).catch(e => report('splash screen', e));
 }
 
 // armed on load, the first thing main.js does, so any later error still ends here

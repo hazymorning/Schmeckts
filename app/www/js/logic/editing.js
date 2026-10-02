@@ -28,7 +28,7 @@ export function rate(el) {
   const disc = setLevel(el.closest('.slider'), r),
     pet = getPet(pid);
   toast(
-    `${RATINGS[r].label} gespeichert${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}`,
+    `${RATINGS[r].label}${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}. ${RATINGS[r].cheer}`,
     undoRating(s.id, pid, prev),
     {ic: 'r_' + r, tone: rateCls(r)},
   );

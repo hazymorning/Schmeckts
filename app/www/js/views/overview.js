@@ -5,7 +5,7 @@ import {addDays, dayStart, timeStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
 import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
-import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
+import {getObservation, getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
 import {dayNumber, glance, pick, takeTurn} from '../glance.js';
 import {factsOn, fill, LEADS, LINES} from './facts.js';
 import {avatar, since} from './parts.js';
@@ -96,10 +96,8 @@ const ASIDE = {
 };
 
 function leadLine(g, pets, now, moment) {
-  if (moment === 'none') {
-    const all = subject(pets.map(x => x.id));
-    return sayLead('none', now, {names: all.names, wartet: all.verb('wartet', 'warten')});
-  }
+  const all = subject(pets.map(x => x.id));
+  if (moment === 'none') return sayLead('none', now, {names: all.names, wartet: all.verb('wartet', 'warten')});
   const last = g.last,
     p = getProduct(last.productId),
     treat = p && typeOf(p) === 'Snack',
@@ -120,23 +118,27 @@ function leadLine(g, pets, now, moment) {
     time: next ? b(clock(next.at)) : '',
     since: b(since(last.servedAt, now)),
     evening: new Date(last.servedAt).getHours() >= 17 ? 'Abend ' : '',
+    names: all.names,
+    wartet: all.verb('wartet', 'warten'),
+    findet: all.verb('findet', 'finden'),
+    freut: all.verb('freut', 'freuen'),
+    ist: all.verb('ist', 'sind'),
+    hat: all.verb('hat', 'haben'),
   };
   if (moment === 'fresh') return sayLead(treat ? 'freshTreat' : 'fresh', now, values);
   if (moment === 'today') {
-    const all = subject(pets.map(x => x.id)),
-      both = [
-        g.meals && count(g.meals, 'Mahlzeit', 'Mahlzeiten', 'eine'),
-        g.snacks && count(g.snacks, 'Snack', 'Snacks', 'einen'),
-      ]
-        .filter(Boolean)
-        .map(b)
-        .join(' und ');
+    const both = [
+      g.meals && count(g.meals, 'Mahlzeit', 'Mahlzeiten', 'eine'),
+      g.snacks && count(g.snacks, 'Snack', 'Snacks', 'einen'),
+    ]
+      .filter(Boolean)
+      .map(b)
+      .join(' und ');
     return sayLead('today', now, {
       ...values,
       so: g.meals ? 'schon' : 'bisher nur',
       both,
       Names: all.names,
-      hat: all.verb('hat', 'haben'),
     });
   }
   return sayLead(moment, now, values);
@@ -259,18 +261,21 @@ export function overviewLines(g, pets, now, memory) {
   // a birthday today goes first, except at feeding time
   const first = leadLine(g, pets, now, moment),
     order = g.birthday?.today && news && moment !== 'due' && moment !== 'dueFirst' ? [more, first] : [first, more];
-  return {text: order.filter(Boolean).map(line).join(' '), memory: kept};
+  return {text: order.filter(Boolean).map(line).join(' '), memory: kept, moment};
 }
-// always at hand, so noting takes one tap; who: the pet's name, or the whole bunch
-const observeRail = who =>
+// always at hand, so noting takes one tap; who: the pet's name, or the whole bunch; just: the kind just noted
+const observeRail = (who, just) =>
   `<div class="rail obs" role="group" aria-label="Beobachtung notieren">${Object.entries(OBSERVATIONS)
     .map(
       ([k, o]) =>
-        `<button class="chip toned o-${k}" data-action="observe" data-v="${k}" aria-label="${o.label} notieren">${icon(o.icon)}${o.button.replace('{pet}', who)}</button>`,
+        `<button class="chip toned o-${k}" data-action="observe" data-v="${k}" aria-label="${o.label} notieren"><i class="disc${k === just ? ' pop' : ''}">${icon(o.icon)}</i>${o.button.replace('{pet}', who)}</button>`,
     )
     .join('')}</div>`;
+const SLEEP = new Set(['night', 'lastNight']),
+  DUE = new Set(['due', 'dueFirst']);
 
-export function overviewHTML(m) {
+// noted: the entry just made, so the chip just tapped can answer
+export function overviewHTML(m, noted = null) {
   const pets = m.pet ? [getPet(m.pet)] : db.pets,
     one = pets.length === 1 ? pets[0] : null,
     now = Date.now();
@@ -281,18 +286,23 @@ export function overviewHTML(m) {
       now,
       flops,
     ),
-    {text, memory} = overviewLines(g, pets, now, prefs.overview);
+    {text, memory, moment} = overviewLines(g, pets, now, prefs.overview);
   if (memory !== prefs.overview) {
     prefs.overview = memory;
     savePrefs();
   }
-  const pic = one
-    ? `<button class="ov-pic" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'xxl')}</button>`
-    : `<span class="ov-pic">${pets
-        .slice(0, 2)
-        .map(p => avatar(p, 'l pair'))
-        .join('')}</span>`;
-  return `<section class="card overview" data-sec="overview" style="view-transition-name:sec-overview">
+  // a party hat on a birthday, sleepy z's at night
+  const party = g.birthday?.today,
+    mood = party ? ' party' : SLEEP.has(moment) ? ' sleepy' : '',
+    hat = party ? `<i class="hat">${icon('hat')}</i>` : '',
+    pic = one
+      ? `<button class="ov-pic${mood}" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'xxl')}${hat}</button>`
+      : `<span class="ov-pic${mood}">${pets
+          .slice(0, 2)
+          .map(p => avatar(p, 'l pair'))
+          .join('')}${hat}</span>`,
+    just = noted && getObservation(noted)?.kind;
+  return `<section class="card overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
     <div class="ov-top">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
-    ${observeRail(one ? esc(one.name) : 'Bande')}</section>`;
+    ${observeRail(one ? esc(one.name) : 'Bande', just)}</section>`;
 }
