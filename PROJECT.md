@@ -56,7 +56,7 @@ is allowed (`app/native/res/xml`).
 
 ```js
 db = { version: 3,
-  pets:         [{ id, name, species, photo, birthday, createdAt }],
+  pets:         [{ id, name, nicknames, species, photo, birthday, createdAt }],
   products:     [{ id, brand, variety, type, animal, texture, thumb, lastPets, createdAt, codes: { [ean]: true }, kaufen, sharedPhoto }],
   servings:     [{ id, productId, servedAt, note, by, thumb,
                    pets: { [petId]: { r: <key from RATINGS>|null, at, by } },
@@ -77,7 +77,7 @@ server.
 | `products[].texture` | `sosse` `gelee` `pastete` `mousse` `block` `suppe`, treats `knusprig` `weich` `creme` `milch` `stick` `kau` | consistency or treat type |
 | `products[].kaufen` | `immer`, `nicht`, absent | set by hand, beats the computed verdict |
 | `products[].sharedPhoto` | `true` or a number (ms) | the server holds the large photo; a number stamps a replaced one |
-| `observations[].kind` | `happy` `stink` `hungry` `tired` | unknown kinds from newer phones are kept |
+| `observations[].kind` | `happy` `stink` `hungry` `tired` `vomit` | unknown kinds from newer phones are kept |
 | `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
 | `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung`, `neu:<version>` | hints hidden on this phone; `tipp:beobachtung`: the first observation Vorlieben weighs said what it is for; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`) |

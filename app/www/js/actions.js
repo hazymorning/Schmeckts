@@ -32,7 +32,17 @@ import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
-import {closeCrop, deletePet, editing, openPet, petState, savePet, setPetPhoto} from './logic/pets.js';
+import {
+  addNick,
+  closeCrop,
+  deletePet,
+  dropNick,
+  editing,
+  openPet,
+  petState,
+  savePet,
+  setPetPhoto,
+} from './logic/pets.js';
 import {exportData, exportReading, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 import {
@@ -179,11 +189,9 @@ const ACTIONS = {
   'open-evaluation'() {
     openSheet({kind: 'evaluation'});
   },
+  // the shopping list's folds start closed each time
   'open-level'(el) {
-    openPage(el.dataset.v);
-  },
-  'open-shop'() {
-    openSheet({kind: 'shop'});
+    openPage(el.dataset.v, {open: null});
   },
   'open-server'() {
     openSheet({kind: 'settings', page: 'house'});
@@ -384,18 +392,17 @@ const ACTIONS = {
   'save-pet'() {
     savePet();
   },
+  'add-nick'() {
+    addNick();
+  },
+  'drop-nick'(el) {
+    dropNick(el.dataset.v);
+  },
   'crop-apply'() {
     closeCrop(true);
   },
   'crop-cancel'() {
     closeCrop(false);
-  },
-  backdrop() {
-    prefs.backdrop = !prefs.backdrop;
-    savePrefs();
-    haptic('select');
-    renderSheet();
-    update();
   },
   lookup() {
     prefs.lookup = !prefs.lookup;
@@ -547,6 +554,9 @@ document.addEventListener('keydown', e => {
   } else if (e.target.id === 'f-remind') {
     e.preventDefault();
     e.target.blur();
+  } else if (e.target.id === 'f-nick') {
+    e.preventDefault();
+    addNick();
   } else if (editing(sheet)) {
     e.preventDefault();
     savePet();

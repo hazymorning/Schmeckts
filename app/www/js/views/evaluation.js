@@ -5,6 +5,7 @@ import {icon} from '../icons.js';
 import {observationOf, TEXTURES} from '../config.js';
 import {db} from '../store.js';
 import {
+  calledNames,
   evaluationModel,
   getPet,
   getProduct,
@@ -15,7 +16,7 @@ import {
   profileModel,
   rankingModel,
 } from '../derive.js';
-import {GOOD, goodOf, poorOf, ratingsIn} from '../smart.js';
+import {GOOD, goodOf, poorOf, ratingsIn, shopGroups} from '../smart.js';
 import {
   avatar,
   cardHead,
@@ -28,6 +29,7 @@ import {
   obsThumb,
   SIDE,
   sideIcon,
+  shopRow,
   sign,
   since,
   strip,
@@ -51,6 +53,8 @@ function nameOf(e) {
 }
 const named = e => `<b>${nameOf(e)}</b>`;
 const petsOf = ids => esc(petNames(ids)); // in a sentence that already has its bold
+// a pet on its own goes by any of its names; beside others by its own, so they stay apart
+const petName = (m, id, place) => (m.pets.length > 1 ? getPet(id).name : calledNames([id], place));
 // all ratings when most agree with the row's side, otherwise only those of the pets that decide it
 function saidOf(e, side) {
   const good = goodOf(e.counts),
@@ -81,8 +85,8 @@ function waiting(m, r) {
   if (r.stale)
     return 'Die letzten Bewertungen sind über ein halbes Jahr alt. Nach ein paar neuen steht hier wieder, was ankommt.';
   if (r.settled && !r.mid.length)
-    return `${esc(petNames(m.pets.filter(pid => r.split.some(e => e.pets[pid]?.n))))} sind sich bei allem, was feststeht, nicht einig.`;
-  if (r.settled) return 'Was feststeht, kommt mal so, mal so an.';
+    return `${esc(petNames(m.pets.filter(pid => r.split.some(e => e.pets[pid]?.n))))} sind sich bisher bei keiner Sorte einig.`;
+  if (r.settled) return 'Bisher ist keine Sorte ein klarer Treffer oder Reinfall.';
   return 'Noch steht keine Sorte fest.';
 }
 
@@ -109,14 +113,23 @@ function sideTile(m, r, e, side) {
         ? ['Noch keiner', 'Dafür ist noch zu wenig bewertet.']
         : r.settled === r.top.length
           ? ['Keiner', 'Alles, was feststeht, kommt gut an.']
-          : ['Keiner', 'Keine Sorte bleibt meist stehen.'];
+          : ['Keiner', 'Keine Sorte bleibt regelmäßig stehen.'];
   return `<div class="tile empty ${tone}">${inner(title, why)}</div>`;
 }
+const SHOP_SHOWN = 3;
+const shopRows = (m, list) =>
+  `<ul class="list shop">${list
+    .slice(0, SHOP_SHOWN)
+    .map(e => shopRow(m, e))
+    .join('')}</ul>`;
+// without a ranking, as for a pet on dry food only, the card shows what to buy again
 export function evaluationCard(m) {
-  const r = rankingModel();
-  if (!r.rated) return '';
+  const r = rankingModel(),
+    buy = r.rated ? [] : shopGroups(m).nachkaufen;
+  if (!r.rated && !buy.length) return '';
   let body;
-  if (r.top.length || r.flop.length) body = sideTile(m, r, r.top[0], 'top') + sideTile(m, r, r.flop[0], 'flop');
+  if (!r.rated) body = `<h3 class="label grp">Nachkaufen</h3>${shopRows(m, buy)}`;
+  else if (r.top.length || r.flop.length) body = sideTile(m, r, r.top[0], 'top') + sideTile(m, r, r.flop[0], 'flop');
   else {
     const t = r.stale ? null : r.trials[0],
       next = t
@@ -135,7 +148,7 @@ function portraitHTML(m, r) {
   const ids = m.pets,
     several = ids.length > 1,
     pets = ids.map(getPet),
-    who = esc(petNames(ids)),
+    who = esc(several ? '' : petName(m, ids[0], 'portrait')),
     k = r.top.length,
     n = r.settled,
     good = (few = '') =>
@@ -204,14 +217,18 @@ function listsHTML(m, r, x) {
       ? card(listTitle('flop', 'Noch kein Ladenhüter'), say('Dafür ist noch zu wenig bewertet.'))
       : card(
           listTitle('flop', 'Kein Ladenhüter'),
-          say(r.settled === r.top.length ? 'Alles, was feststeht, kommt gut an.' : 'Keine Sorte bleibt meist stehen.'),
+          say(
+            r.settled === r.top.length
+              ? 'Alles, was feststeht, kommt gut an.'
+              : 'Keine Sorte bleibt regelmäßig stehen.',
+          ),
         );
   return tops + flops;
 }
 
 function petLine(m, t, several) {
   const pet = getPet(t.pet),
-    who = `<b>${esc(pet.name)}</b>`,
+    who = `<b>${esc(petName(m, t.pet, 'trend'))}</b>`,
     worse = t.dir < 0,
     behind = t.behind?.length
       ? ` Das liegt wohl an <b>${andList(t.behind.map(id => nameOf(m.byId.get(id))))}</b>.`
@@ -242,7 +259,7 @@ function trendCard(m, x) {
     rows.push(
       told(
         sign('paw'),
-        `Bei ${petsOf(lines.map(t => t.pet))} läuft’s wie gehabt.`,
+        `Bei ${lines.length > 1 ? petsOf(lines.map(t => t.pet)) : esc(petName(m, lines[0].pet, 'trend'))} läuft’s wie gehabt.`,
         weeks(sum('recent'), sum('before')),
       ),
     );
@@ -266,7 +283,7 @@ function trendCard(m, x) {
   return rows.length
     ? card(
         'Wie läuft’s gerade?',
-        toldList(rows) + (few.length ? hint(`Für ${petsOf(few)} reicht es noch nicht für einen Vergleich.`) : ''),
+        toldList(rows) + (few.length ? hint(`Bei ${petsOf(few)} reicht es noch nicht für einen Vergleich.`) : ''),
       )
     : '';
 }
@@ -291,7 +308,7 @@ function observedCard(x) {
         l.id,
         obsThumb(l.kind),
         `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
-        `${cap(o.after)} nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten, nach den anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
+        `Nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten ${o.after}, bei anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
       );
     }),
   ];
@@ -356,7 +373,7 @@ function patternCard(m, x) {
     : first
       ? likesList(m, {...first, groups: [first.groups[0], first.groups.at(-1)]})
       : toldList(habits.slice(0, HABITS).map(h => habitRow(h, db.pets.length > 1 && !m.pet)));
-  return `<section class="card">${cardHead('Worauf es ankommt', 'open-level', 'Mehr dazu', 'Mehr', 'profile')}${tips.length ? say(`Neues am ehesten <b>${andList(tips)}</b> probieren.`) : ''}${body}</section>`;
+  return `<section class="card">${cardHead('Worauf es ankommt', 'open-level', 'Mehr dazu', 'Mehr', 'profile')}${tips.length ? say(`Neues probierst du am besten <b>${andList(tips)}</b>.`) : ''}${body}</section>`;
 }
 
 const TRIALS = 3;
@@ -395,7 +412,7 @@ function nextCard(m, r, x) {
         v.id,
         sign('repeat'),
         `${named(m.byId.get(v.id))} blieb beim ersten Mal stehen.`,
-        `${esc(getPet(v.pet).name)} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
+        `${esc(petName(m, v.pet, 'next'))} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
       ),
     );
   const more = trials.length - TRIALS;
@@ -425,19 +442,27 @@ function footHTML(m, b) {
         ...(first.getFullYear() === new Date().getFullYear() ? {} : {year: 'numeric'}),
       });
     parts.push(
-      `Die Listen beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, je Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
+      `Leibgerichte und Ladenhüter beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, pro Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
     );
   }
   if (b.left.length)
     parts.push(
-      `${andList(b.left.map(t => LEFT[t]))} ${b.left.length > 1 || b.left[0] === 'Snack' ? 'zählen' : 'zählt'} hier nicht mit.`,
+      `${andList(b.left.map(t => LEFT[t]))} ${b.left.length > 1 || b.left[0] === 'Snack' ? 'zählen' : 'zählt'} dabei nicht mit.`,
     );
   return parts.length ? `<p class="hint foot">${parts.join(' ')}</p>` : '';
 }
+
+function shopCard(m) {
+  const buy = shopGroups(m).nachkaufen;
+  return buy.length
+    ? `<section class="card">${cardHead('Einkaufen', 'open-level', 'Alle Sorten zum Einkaufen', 'Alle', 'shop')}${shopRows(m, buy)}</section>`
+    : '';
+}
+const shopBtn = `<button class="icon-btn" data-action="open-level" data-v="shop" aria-label="Einkaufen">${icon('cart')}</button>`;
 
 export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet))}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
 }

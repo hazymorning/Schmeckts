@@ -260,11 +260,14 @@ async def test_tour(browser, url):
     check(await state(pg, 'db.servings.length') == before + 1, 'a known variety served')
     await tap(pg, '.pend [data-action=rate][data-r=gut]', force=True)  # the button takes no pointer, the track does
     check(await state(pg, 'Object.values(db.servings[0].pets)[0].r') == 'gut', 'rated with one tap')
-    check(await pg.locator('[data-sec=shop] .shop li').count() == 3, 'three varieties to buy on the home page')
-    await tap(pg, '[data-sec=shop] [data-action=open-shop]')
-    check(await pg.locator('#sheet .shop li').count() >= 3, 'shopping page opens')
-    await back(pg)
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    last = await pg.eval_on_selector('#sheetBody', "b => [...b.querySelectorAll('section.card')].at(-1).querySelectorAll('.shop li').length")
+    await tap(pg, '#sheet .card [data-action=open-level][data-v=shop]')
+    check(
+        last == 3 and await pg.locator('#sheet .shop li').count() >= 3,
+        'three varieties to buy on the last card of „Vorlieben“, all of them on its level',
+    )
+    await back(pg)
     await tap(pg, '#sheet [data-action=open-level][data-v=profile]')
     check(await pg.locator('#sheet .likes li').count() >= 4, 'comparisons page opens')
     await back(pg, 2)
@@ -277,7 +280,7 @@ async def test_tour(browser, url):
         'Haushalt: only the way in',
     )
     await back(pg, 2)
-    await tap(pg, '[data-sec=shop] [data-action=open-product]')
+    await tap(pg, '[data-sec=evaluation] button.tile')
     check(await pg.evaluate(LEVEL) == [True, 'product', None, None], 'food sheet opens')
     await tap(pg, '[data-action=close]')
     await tap(pg, '.tl [data-action=open-serving]')
@@ -445,10 +448,19 @@ async def test_cards(browser, url):
 
 
 async def test_shop(browser, url):
-    print('„Einkaufen“: the list shared as derive builds it, a row opens its food sheet over the page')
+    print('„Einkaufen“: a level of „Vorlieben“ from the bar, the list shared as derive builds it, a row opens its food sheet over the page')
     ctx, pg, errors = await demo(browser, url, permissions=['clipboard-read', 'clipboard-write'])
     want = await pg.evaluate("import('./js/derive.js').then(d => d.shoppingList())")
-    await tap(pg, '[data-sec=shop] [data-action=open-shop]')
+    check(await pg.locator('#home .shop').count() == 0, 'nothing of it on the home page')
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    await tap(pg, '#sheet .head [data-action=open-level][data-v=shop]')
+    level = await pg.evaluate(LEVEL)
+    await back(pg)
+    check(
+        level == [True, 'evaluation', 'shop', None] and await pg.evaluate(LEVEL) == [True, 'evaluation', None, None],
+        f'the cart in the bar opens it as a level, back returns to „Vorlieben“ {level}',
+    )
+    await tap(pg, '#sheet .head [data-action=open-level][data-v=shop]')
     await tap(pg, '#sheet [data-action=share-list]')
     check(await pg.evaluate('navigator.clipboard.readText()') == want['text'], 'without a share menu the list goes to the clipboard')
     await pg.evaluate('navigator.share = o => { window.__shared = o; return Promise.resolve(); }')
@@ -460,7 +472,7 @@ async def test_shop(browser, url):
     over = [await pg.evaluate(kinds), await pg.evaluate(LEVEL)]
     await tap(pg, '#popup [data-action=close]')
     check(
-        over == [['shop', True], [True, 'product', None, None]] and await pg.evaluate(kinds) == ['shop', False],
+        over == [['evaluation', True], [True, 'product', None, None]] and await pg.evaluate(kinds) == ['evaluation', False],
         f'a row opens over the page and closes back {over}',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
@@ -480,7 +492,7 @@ async def test_shop_folds(browser, url):
         [meal(f'{i}-{n}', i, now - (n + 1) * 864e5, {M: 'schlecht'}) for i in left for n in range(2)]
         + [meal('unklar0001-0', 'unklar0001', now - 864e5, {M: 'mittel'})],
     )
-    await open_sheet(pg, kind='shop')
+    await open_sheet(pg, kind='evaluation', page='shop')
     ROWS = "s => document.querySelector(s).closest('.card').querySelectorAll('.shop > li').length"
     shut = await pg.evaluate(ROWS, '#sheet [data-action=fold][data-v=nicht]')
     await tap(pg, '#sheet [data-action=fold][data-v=nicht]')
@@ -494,6 +506,29 @@ async def test_shop_folds(browser, url):
 
 
 M, T = 'minka00001', 'tiger00001'
+
+
+async def test_dry_food(browser, url):
+    print('only dry food rated: no ranking, the „Vorlieben“ card still leads to what to buy again')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    await load(
+        pg,
+        [pet(M)],
+        [product('trocken0001', 'Josera', 'Huhn', 'Trockenfutter')],
+        [meal(f'meal{i}', 'trocken0001', now - (i + 1) * 864e5, {M: 'gern'}) for i in range(3)],
+    )
+    rows = await pg.eval_on_selector_all('[data-sec=evaluation] .shop [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    check(
+        rows == ['trocken0001'] and await pg.locator('#sheet .card [data-action=open-level][data-v=shop]').count() == 1,
+        f'the card on the home page and the last card of the page name it {rows}',
+    )
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
 BRANDS = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Rinti', 'Bozita', 'Schesir']
 
 
@@ -692,6 +727,22 @@ async def test_scales(browser, url):
     await tap(pg, '#sheet [data-r=liegen]', force=True)
     check(await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r") == 'liegen', 'a tap replaces a level from another scale')
     check(await until(pg, f'!{OPEN}', 5), 'every pet rated: the sheet closes')
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
+async def test_slider_words(browser, url):
+    print('the words under each scale stay whole at 360px')
+    ctx = await phone(browser, width=360)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    foods = [product('nass0001'), product('trocken0001', 'Josera', 'Huhn', 'Trockenfutter'), product('snack0001', 'Dreamies', 'Käse', 'Snack')]
+    await load(pg, [pet(M)], foods, [meal(f'meal{i}', p['id'], now - (i + 1) * 36e5, {M: None}) for i, p in enumerate(foods)])
+    broken = await pg.evaluate("""[...document.querySelectorAll('.pend .slider-names > span > *')].filter(w => {
+      const r = document.createRange(); r.selectNodeContents(w);
+      return r.getClientRects().length > 1 || r.getBoundingClientRect().width > w.clientWidth; }).map(w => w.textContent)""")
+    scales = await pg.locator('.pend .slider').count()
+    check(scales == 3 and broken == [], f'no word broken or cut on any of the three scales {broken}')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
@@ -1159,10 +1210,9 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
-    check(await pg.locator(f'{CARD} [data-action=open-settings]').count() == 1, 'the reminder is off: the card leads to the settings')
-    await tap(pg, f'{CARD} [data-action=open-settings]')
-    check(await pg.evaluate(LEVEL) == [True, 'settings', None, None], 'there it is switched on')
-    await back(pg)
+    await tap(pg, f'{CARD} [data-action=open-pet]')
+    check(await pg.evaluate(LEVEL) == [True, 'pet', None, None], 'the card leads to where the novelty is')
+    await tap(pg, '#sheet [data-action=close]')
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -1183,15 +1233,12 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
     await ctx.close()
 
-    now = int(time.time() * 1000)
-    ctx, pg, errors = await seeded(browser, url, {'db': household_with_ratings(now), 'prefs': {'remind': 180}}, native=True)
-    shown = await pg.locator(CARD).count() == 1 and await pg.locator(f'{CARD} [data-action=open-settings]').count() == 0
-    await pg.evaluate(ASK, ['einzeln0001', ['minka00001'], 'lachs00001'])
-    await pg.wait_for_function(f'{NOTES}.length')
-    n = (await pg.evaluate(NOTES))[0]
-    await pg.evaluate("n => window.__tapNote({actionId: 'top', notification: n})", n)
-    await idle(pg)
-    check(shown and await pg.locator(CARD).count() == 0, 'reminder on: no way to the settings; rating from a reminder hides the news')
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
+    shown = await pg.locator(CARD).count() == 1
+    await tap(pg, f'{CARD} [data-action=open-pet]')
+    await pg.fill('#f-nick', 'Mimi')
+    await tap(pg, '[data-action=save-pet]')
+    check(shown and await pg.locator(CARD).count() == 0, 'a nickname saved: the news has done its job')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -1292,6 +1339,56 @@ async def test_petbar(browser, url):
     await idle(pg)
     check(await pg.locator('#pets').is_hidden(), 'back to one pet: no bar')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
+async def test_nicknames(browser, url):
+    print('nicknames: added with Enter or the button, each once, a typed one kept on saving; the home card uses them in turn')
+    ctx, pg, errors = await one_pet(browser, url, native=False)
+    NICKS = "[...document.querySelectorAll('#nicks .chip')].map(c => c.textContent)"
+    stored = 'db.pets[0].nicknames ?? null'
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    for name in ('Mimi', 'mimi', 'Minka'):
+        await pg.fill('#f-nick', name)
+        await pg.press('#f-nick', 'Enter')
+    focused = await pg.evaluate('document.activeElement?.id ?? null')
+    await pg.fill('#f-nick', 'Schnurrli')
+    await tap(pg, '#sheet [data-action=add-nick]')
+    chips = await pg.evaluate(NICKS)
+    await pg.fill('#f-nick', 'Minki')
+    await tap(pg, '[data-action=save-pet]')
+    check(
+        chips == ['Mimi', 'Schnurrli'] and await state(pg, stored) == ['Mimi', 'Schnurrli', 'Minki'],
+        f'each name once, never the pet’s own, one typed but not added comes along {chips}',
+    )
+    check(focused == 'f-nick', 'Enter keeps the field and its keyboard')
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    await tap(pg, '#nicks [data-action=drop-nick][data-v=Schnurrli]')
+    await tap(pg, '[data-action=save-pet]')
+    check(await state(pg, stored) == ['Mimi', 'Minki'], 'a tap on one removes it')
+    await back(pg)
+    await change(
+        pg,
+        "s.db.products.push({id: 'sorte00001', brand: 'Sheba', variety: 'Lachs', type: 'Nassfutter', codes: {}, createdAt: 1}); s.db.servings.unshift({id: 'meal000001', productId: 'sorte00001', servedAt: Date.parse('2026-05-31T08:00:00+02:00'), note: '', pets: {[s.db.pets[0].id]: {r: 'gut', at: 1}}})",
+    )
+    await fixed_clock(ctx)
+    heads = []
+    for day in range(1, 8):
+        await pg.clock.set_fixed_time(f'2026-06-{day:02d}T12:00:00+02:00')
+        await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome())")
+        heads.append(await pg.inner_text('.overview h2'))
+    check(
+        all(any(n in h for n in ('Minka', 'Mimi', 'Minki')) for h in heads) and any('Mimi' in h or 'Minki' in h for h in heads),
+        f'the heading names the pet each day, now and then by a nickname {heads}',
+    )
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    for name in ('Mimi', 'Minki'):
+        await tap(pg, f'#nicks [data-action=drop-nick][data-v={name}]')
+    await tap(pg, '[data-action=save-pet]')
+    check(await state(pg, "!('nicknames' in db.pets[0])"), 'all removed: the field goes')
+    check(not errors, f'no errors {errors}')
     await ctx.close()
 
 
@@ -2226,7 +2323,8 @@ async def test_popup(browser, url):
         and not await pg.evaluate('history.state'),
         f'a variety over „Vorlieben“ closes back to it; serving from it ends on the home page, history cleared {served}',
     )
-    await tap(pg, '[data-action=open-shop]')
+    await tap(pg, '[data-action=open-evaluation]')
+    await tap(pg, '#sheet .head [data-action=open-level][data-v=shop]')
     await pg.locator('#sheet [data-action=open-product]').first.click()
     await idle(pg)
     await open_sheet(pg, kind='settings', page='house')
@@ -2251,8 +2349,8 @@ async def test_observations(browser, url):
     before = await pg.evaluate(OBS)
     CHIP = '#home .overview [data-action=observe]'
     ROW = '[data-sec=hist] [data-action=open-observation]'
-    named, mau = await pg.locator(f'{CHIP}[data-v=tired]').inner_text(), await state(pg, 'db.pets[0].name')
-    check(await pg.locator(CHIP).count() == 4 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
+    words = await pg.eval_on_selector_all(CHIP, 'l => l.map(c => c.textContent.trim())')
+    check(len(words) == 5 and all(len(w.split()) == 1 for w in words), f'the chips always at hand, one short word each {words}')
     await tap(pg, '[data-action=observe][data-v=tired]')
     tired = await pg.inner_text('#toast > span')
     await tap(pg, '#toast [data-action=undo]')
@@ -2262,7 +2360,7 @@ async def test_observations(browser, url):
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
-        and await pg.locator(CHIP).count() == 4
+        and await pg.locator(CHIP).count() == 5
         and await pg.locator(ROW).count() == 1,
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary {after[0]}',
     )
@@ -2301,17 +2399,13 @@ async def test_observations(browser, url):
     check(over == ['report', 'observation'], 'in the history page it opens over the page')
     await back(pg)
     await change(pg, f"s.db.pets.push({{id: '{T}', name: 'Tiger', species: 'Katze', photo: null, createdAt: Date.now()}})")
-    named = await pg.locator(f'{CHIP}[data-v=tired]').inner_text()
     await tap(pg, '[data-action=observe][data-v=stink]')
     both = (await pg.evaluate(OBS))[0][1]
     await tap(pg, ROW)
     await tap(pg, f'#sheet [data-action=toggle-observation-pet][data-id={T}]')
     narrowed = (await pg.evaluate(OBS))[0][1]
     await tap(pg, f'#sheet [data-action=toggle-observation-pet][data-id={pet_}]')
-    check(
-        both == sorted([pet_, T]) and narrowed == [pet_] and (await pg.evaluate(OBS))[0][1] == [pet_] and mau not in named,
-        f'for all pets, narrowed, at least one; the tired chip names no single pet ({named})',
-    )
+    check(both == sorted([pet_, T]) and narrowed == [pet_] and (await pg.evaluate(OBS))[0][1] == [pet_], 'for all pets, narrowed, at least one')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, f'[data-action=filter][data-id={T}]')
     await tap(pg, '[data-action=observe][data-v=hungry]')
@@ -2347,7 +2441,7 @@ async def test_toast_time(browser, url):
 
 
 async def test_mood(browser, url):
-    print('the mood picture: the chosen pet’s photo; switched off it stays off after a restart')
+    print('the mood picture: the chosen pet’s photo, always, with no switch for it')
     make_pictures()
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
@@ -2362,20 +2456,13 @@ async def test_mood(browser, url):
     await change(pg, "s.db.pets = s.db.pets.slice(0, 1); s.prefs.activePet = 'all'")
     check(await pg.evaluate(MOOD) == minka[-40:], 'one pet: its photo')
     await settings(pg)
-    await tap(pg, '[data-action=backdrop]')
-    await back(pg)
-    off = [await state(pg, 'prefs.backdrop'), await pg.evaluate(MOOD)]
-    await pg.reload()
-    await started(pg)
-    check(off == [False, None] and await pg.evaluate(MOOD) is None, 'switched off: no picture, also after a restart')
+    check(await pg.locator('#sheet [data-action=backdrop]').count() == 0, 'no switch for it in the settings')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
-    old = []
-    for v in ('card', 'off'):  # values stored by 1.1.0
-        ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'backdrop': v}})
-        old.append(await state(pg, 'prefs.backdrop'))
-        await ctx.close()
-    check(old == [True, False], f'older stored values carried over {old}')
+    db = {**SAVED, 'pets': [{**SAVED['pets'][0], 'photo': minka}]}
+    ctx, pg, errors = await seeded(browser, url, {'db': db, 'prefs': {'backdrop': False}})
+    check(await pg.evaluate(MOOD) == minka[-40:] and await state(pg, "!('backdrop' in prefs)"), 'switched off before: shown now, the setting gone')
+    await ctx.close()
 
 
 async def test_camera(browser, url):
@@ -2659,11 +2746,13 @@ run_tests(
         'cards': test_cards,
         'shop': test_shop,
         'shop-folds': test_shop_folds,
+        'dry-food': test_dry_food,
         'history': test_home_history,
         'report': test_report,
         'evaluation': test_evaluation,
         'candidate': test_candidate,
         'scales': test_scales,
+        'slider-words': test_slider_words,
         'slide': test_slide,
         'texture': test_texture,
         'suggestions': test_suggestions,
@@ -2672,6 +2761,7 @@ run_tests(
         'news': test_news,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
+        'nicknames': test_nicknames,
         'birthday': test_birthday,
         'local': test_local,
         'network': test_network,

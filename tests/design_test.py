@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, open_page, phone, run_tests, set_theme
 
 RATING = ('--good', '--mid', '--sauce', '--bad')
-OBSERVED = ('--happy', '--stink', '--hungry', '--tired')
+OBSERVED = ('--happy', '--stink', '--hungry', '--tired', '--vomit')
 TEXT_PAIRS = (
     [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')]
     + [
@@ -184,9 +184,9 @@ async def test_views(browser, url, scheme):
     await tap('#sheet [data-action=open-level][data-v=profile]')
     await scan()
     await tap('#sheet [data-action=settings-back]')
-    await tap('#sheet [data-action=settings-back]')
-    await tap('[data-sec=shop] [data-action=open-shop]')
+    await tap('#sheet .head [data-action=open-level][data-v=shop]')
     await scan()
+    await tap('#sheet [data-action=settings-back]')
     await tap('#sheet [data-action=settings-back]')
     await tap('[data-action=open-settings]')
     await scan()
@@ -199,7 +199,7 @@ async def test_views(browser, url, scheme):
     await scan()
     await tap('[data-action=close]')
     await pg.evaluate("import('./js/store.js').then(s => { for (const p of s.db.products) p.codes = {...p.codes, '4001234567890': true}; })")
-    await tap('[data-sec=shop] [data-action=open-product]')
+    await tap('[data-sec=evaluation] button.tile')
     await scan()
     await tap('[data-action=close]')
     await tap('.tl [data-action=open-serving]')

@@ -149,6 +149,10 @@ strong {
   --c: var(--happy);
   --cs: var(--happy-soft);
 }
+.o-vomit {
+  --c: var(--vomit);
+  --cs: var(--vomit-soft);
+}
 
 /* Only the alpha in the mask gradient matters. A layer of its own, so the blur below is drawn once and not with every
    redraw of the cards over it. */
@@ -810,7 +814,7 @@ dialog.sheet::after {
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
   gap: var(--space-hair);
   margin: 0 var(--space-1);
-  font: var(--type-caption-strong);
+  font: var(--type-level-strong);
   color: var(--muted);
   text-align: center;
 }
@@ -823,7 +827,7 @@ dialog.sheet::after {
 }
 .slider-names small {
   margin-top: var(--space-hair);
-  font: var(--type-caption);
+  font: var(--type-level);
   hyphens: auto;
   overflow-wrap: anywhere;
 }
@@ -2092,7 +2096,7 @@ dialog.sheet::after {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"]) .page-title,
+dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title,
 .page-title:has(+ #serverBox > .srv) {
   margin-bottom: var(--space-3h);
 }
@@ -2192,6 +2196,15 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 }
 .fold > .list {
   border-top: var(--divider);
+}
+.nicks:not(:empty) {
+  margin-bottom: var(--space-3);
+}
+.nicks .chip {
+  padding-right: var(--space-3);
+}
+.nicks .chip .ic {
+  color: var(--muted);
 }
 .photo-hint {
   display: block;

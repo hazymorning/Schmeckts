@@ -35,9 +35,9 @@ Unsere Katze ist wählerisch. Manches ist sofort weg, anderes wird nur kurz besc
 - *Vorlieben*: Lieblingssorten, Ladenhüter, welche Marken und Geschmacksrichtungen gut ankommen und was als Nächstes in den Napf kann.
 - *Einkaufen*: was sich nachzukaufen lohnt und was eher nicht. Die Liste kannst du verschicken.
 - *Verlauf*: alle Mahlzeiten, Tag für Tag.
-- *Beobachtungen*: Gute Laune, großer Hunger, müder Tag oder heftiger Stunk? Ein Tipp, und es ist notiert. Die App zeigt dir, ob so was nach einer bestimmten Sorte öfter vorkommt.
+- *Beobachtungen*: Gute Laune, großer Hunger, müder Tag, heftiger Stunk oder Erbrechen? Ein Tipp, und es ist notiert. Die App zeigt dir, ob so was nach einer bestimmten Sorte öfter vorkommt.
 - Auf Wunsch Erinnerungen ans Füttern und ans Bewerten. Bewerten geht dann oft direkt in der Benachrichtigung.
-- Mehrere Tiere, auch Hunde, Kaninchen oder Vögel.
+- Mehrere Tiere, auch Hunde, Kaninchen oder Vögel, gern mit Spitznamen.
 - Backup für den Umzug aufs neue Handy.
 
 <!-- Der QR-Code springt hierher (…#how-to-install). Nicht löschen. -->

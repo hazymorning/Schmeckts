@@ -2,19 +2,23 @@
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
 import {dayKey} from '../dates.js';
+import {norm} from '../text.js';
 import {haptic} from '../native.js';
-import {db, prefs, save, savePrefs} from '../store.js';
-import {getPet} from '../derive.js';
+import {db, prefs, save, savePrefs, usedNews} from '../store.js';
+import {getPet, namesOf} from '../derive.js';
 import {cropSquare, fileToImage} from '../images.js';
 import {cropRect, cropStart} from '../ui/crop.js';
 import {toast} from '../ui/toast.js';
 import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
+import {renderNicks} from '../views/sheets.js';
 
 // as a page, exactly these keys are taken off again on the way back
 export const petState = p => ({
   id: p?.id || null,
   name: p?.name || '',
+  nicknames: namesOf(p).slice(1),
+  nick: '', // typed, not yet added
   species: p?.species || 'Katze',
   photo: p?.photo || null,
   birthday: p?.birthday || '',
@@ -67,6 +71,32 @@ export function closeCrop(apply) {
   renderSheet();
 }
 
+const NICKS = 6;
+const sameName = (a, b) => norm(a) === norm(b);
+// quiet: while saving, which takes a nickname typed but not added along
+export function addNick(quiet = false) {
+  const s = sheet,
+    nick = (s.nick || '').trim().replace(/\s+/g, ' ');
+  if (!nick) return;
+  const known = [s.name, ...s.nicknames].some(n => sameName(n, nick));
+  if (!known && s.nicknames.length >= NICKS) {
+    if (!quiet) toast('Sechs Spitznamen sind genug.');
+    return;
+  }
+  if (!known) s.nicknames.push(nick);
+  s.nick = '';
+  if (quiet) return;
+  const field = $('#f-nick');
+  if (field) field.value = '';
+  haptic('select');
+  renderNicks();
+}
+export function dropNick(nick) {
+  sheet.nicknames = sheet.nicknames.filter(n => n !== nick);
+  haptic('select');
+  renderNicks();
+}
+
 export function savePet() {
   const s = sheet,
     name = (s.name || '').trim();
@@ -83,9 +113,15 @@ export function savePet() {
   }
   const isNew = !s.id,
     p = isNew ? {id: uid(), createdAt: Date.now()} : getPet(s.id) || {};
+  addNick(true);
+  const nicknames = s.nicknames.filter(n => !sameName(n, name));
   Object.assign(p, {name, species: s.species, photo: s.photo || null});
   if (birthday) p.birthday = birthday;
   else delete p.birthday; // removed on the other phones too
+  if (nicknames.length) {
+    p.nicknames = nicknames;
+    usedNews('nicknames');
+  } else delete p.nicknames;
   if (isNew) db.pets.push(p);
   save();
   haptic('success');

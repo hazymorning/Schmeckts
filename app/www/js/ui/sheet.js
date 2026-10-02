@@ -11,7 +11,7 @@ const base = layer($('#sheet'), $('#sheetBody')),
   over = layer($('#popup'), $('#popupBody'));
 export const sheetBody = base.body;
 export let sheet = null; // state of the top layer
-const PAGES = new Set(['settings', 'report', 'evaluation', 'shop']);
+const PAGES = new Set(['settings', 'report', 'evaluation']);
 export const isPage = state => PAGES.has(state?.kind);
 const top = () => (over.state ? over : base);
 const sync = () => {

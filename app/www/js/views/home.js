@@ -6,8 +6,18 @@ import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {diary, getPet, getProduct, model, observedPets, pendingServings, pname, servingPets} from '../derive.js';
-import {hintKey, shopGroups} from '../smart.js';
+import {
+  calledNames,
+  diary,
+  getPet,
+  getProduct,
+  model,
+  observedPets,
+  pendingServings,
+  pname,
+  servingPets,
+} from '../derive.js';
+import {hintKey} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {anyOpen} from '../ui/sheet.js';
 import {viewerOpen} from '../ui/viewer.js';
@@ -22,7 +32,6 @@ import {
   nameBlock,
   photoThumb,
   rateSlider,
-  shopRow,
   sideIcon,
   cardHead,
   syncChip,
@@ -139,8 +148,7 @@ function homeHTML() {
       newsHTML() +
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
-      evaluationCard(m) +
-      shopHTML(m);
+      evaluationCard(m);
   return html;
 }
 
@@ -205,7 +213,7 @@ function hintHTML(m) {
   let say, why, btns;
   if (h.kind === 'appetit') {
     [say, why, btns] = [
-      `${esc(pet.name)} frisst seit ein paar Tagen schlechter als sonst.`,
+      `${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.`,
       `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
         (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => lower(observationOf(k).label)))}.` : ''),
       hide,
@@ -213,7 +221,7 @@ function hintHTML(m) {
   } else if (h.kind === 'sosse') {
     const x = e.pets[h.pet];
     [say, why, btns] = [
-      `${esc(pet.name)} frisst bei ${name} meist nur die Soße.`,
+      `${esc(calledNames([pet.id], 'hint'))} frisst bei ${name} meist nur die Soße.`,
       cap(`${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}`),
       hide,
     ];
@@ -228,25 +236,20 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
+// with several pets the editor is reached through the settings
+const goTo = ([where, label]) =>
+  where === 'pet' && db.pets.length === 1
+    ? `<button class="btn primary" data-action="open-pet" data-id="${db.pets[0].id}">${label}</button>`
+    : `<button class="btn primary" data-action="open-settings">${label}</button>`;
 // the newest news, never beside sample data
 function newsHTML() {
   const n = NEWS[0],
     [setting, offWhy] = n?.off || [],
     off = setting && !prefs[setting];
   if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
+  const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
   return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
-    <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${off ? `<button class="btn primary" data-action="open-settings">Einstellungen öffnen</button>` : ''}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
-}
-
-const SHOP_SHOWN = 3;
-function shopHTML(m) {
-  const g = shopGroups(m);
-  if (!g.nachkaufen.length) return '';
-  const rows = g.nachkaufen
-    .slice(0, SHOP_SHOWN)
-    .map(e => shopRow(m, e))
-    .join('');
-  return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop">${cardHead('Einkaufen', 'open-shop', 'Alle Sorten zum Einkaufen')}<ul class="list shop">${rows}</ul></section>`;
+    <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

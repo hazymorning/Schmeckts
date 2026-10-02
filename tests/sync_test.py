@@ -303,6 +303,13 @@ async def main():
             await close_sheet(b)
             await run(b, "db.pets.push({id: 'tigerpet0001', name: 'Tiger', species: 'Katze', photo: null, createdAt: Date.now()}); save();")
             await expect(await until(a, "db.pets.some(p => p.name === 'Tiger')", 6), 'live: a new pet appears on the other phone')
+            await run(b, "db.pets.find(p => p.id === 'tigerpet0001').nicknames = ['Tigi', 'Mietz']; save();")
+            await expect(
+                await until(a, "db.pets.find(p => p.id === 'tigerpet0001')?.nicknames?.join() === 'Tigi,Mietz'", 6),
+                'nicknames reach the other phone as a list',
+            )
+            await run(a, "delete db.pets.find(p => p.id === 'tigerpet0001').nicknames; save();")
+            await expect(await until(b, "!('nicknames' in db.pets.find(p => p.id === 'tigerpet0001'))", 6), 'and go there too when all are removed')
             await expect(await until_sync(a, 'status.live'), 'the live connection is up')
             await run(
                 a,

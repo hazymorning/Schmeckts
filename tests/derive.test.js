@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 // without storage has not, so it keeps everything in memory
 globalThis.window = globalThis;
 const {prefs, replaceDb} = await import('../app/www/js/store.js');
-const {shoppingList} = await import('../app/www/js/derive.js');
+const derive = await import('../app/www/js/derive.js');
+const {shoppingList} = derive;
 
 const DAY = 864e5;
 /* meals: [variety, {pet: rating}], one a day up to yesterday, newest first as the app keeps them */
@@ -90,4 +91,42 @@ test('the shopping list: only what to buy again, one block per food type, the be
 test('the shopping list with nothing to buy yet: the title alone', () => {
   household([['lachs', 'Sheba', 'Lachs in Soße', 'Nassfutter']], [['lachs', {minka: 'top'}]]);
   assert.deepEqual(listFor('all'), {title: 'Einkaufen für Minka und Tiger', text: 'Einkaufen für Minka und Tiger'});
+});
+
+test('nicknames: a pet on its own goes by each of its names in turn, the same in one place all day', () => {
+  const {calledNames, callName, namesOf} = derive;
+  replaceDb({
+    version: 3,
+    pets: [
+      {
+        id: 'minka00001',
+        name: 'Minka',
+        nicknames: ['Mimi', 'Schnurrli', 'Minka', 7, ''],
+        species: 'Katze',
+        createdAt: 1,
+      },
+      {id: 'tiger00001', name: 'Tiger', nicknames: 'Tigi', species: 'Katze', createdAt: 2},
+    ],
+    products: [],
+    servings: [],
+  });
+  assert.deepEqual(namesOf(derive.getPet('minka00001')), ['Minka', 'Mimi', 'Schnurrli'], 'each name once');
+  assert.deepEqual(
+    namesOf(derive.getPet('tiger00001')),
+    ['Tiger'],
+    'what another phone sent that is no list is left out',
+  );
+  const noon = new Date('2026-10-02T12:00').getTime(),
+    week = Array.from({length: 7}, (_, i) => calledNames(['minka00001'], 'line', noon + i * DAY));
+  assert.ok(
+    ['Mimi', 'Schnurrli'].every(n => week.includes(n)) && week.includes('Minka'),
+    `each name in a week ${week}`,
+  );
+  assert.equal(calledNames(['minka00001'], 'line', noon + 3 * 36e5), week[0], 'the same later that day');
+  assert.equal(callName(derive.getPet('minka00001'), 'meal0001'), callName(derive.getPet('minka00001'), 'meal0001'));
+  assert.equal(
+    calledNames(['minka00001', 'tiger00001'], 'line', noon),
+    'Minka und Tiger',
+    'several by their own names',
+  );
 });

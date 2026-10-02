@@ -273,12 +273,11 @@ export function flavoursOf(text) {
 }
 /* Keys are stored in the data; a kind from a newer app version is kept and shown generically. 'meal' weighs it
    against the meals in the `within` hours before (a stink takes a day to come through, hunger means the last meal
-   did not last), 'day' only against the day. */
-// button: {pet} is the name, or "Bande" for several
+   did not last, what does not agree comes back up within hours), 'day' only against the day. The home card's rail
+   keeps this order, the most frequent first. */
 export const OBSERVATIONS = {
   happy: {
     icon: 'o_happy',
-    button: 'Happy {pet}',
     chip: 'Happy',
     label: 'Gute Laune',
     said: 'Gute Laune notiert. Herrlich!',
@@ -289,7 +288,6 @@ export const OBSERVATIONS = {
   },
   stink: {
     icon: 'o_stink',
-    button: 'Heftiger Stunk!',
     chip: 'Stunk',
     label: 'Heftiger Stunk',
     said: 'Stunk notiert. Fenster auf!',
@@ -300,7 +298,6 @@ export const OBSERVATIONS = {
   },
   hungry: {
     icon: 'o_hungry',
-    button: 'Heute extra hungrig',
     chip: 'Hunger',
     label: 'Großer Hunger',
     said: 'Hunger notiert. Der Napf ist gewarnt.',
@@ -311,11 +308,20 @@ export const OBSERVATIONS = {
   },
   tired: {
     icon: 'o_tired',
-    button: 'Müde {pet}',
     chip: 'Müde',
     label: 'Müder Tag',
     said: 'Müdigkeit notiert. Gähn.',
     about: 'day',
+  },
+  vomit: {
+    icon: 'o_vomit',
+    chip: 'Erbrochen',
+    label: 'Erbrechen',
+    said: 'Erbrechen notiert. Gute Besserung!',
+    about: 'meal',
+    within: 6,
+    window: 'in den sechs Stunden',
+    after: 'innerhalb von sechs Stunden',
   },
 };
 export const observationOf = kind =>
@@ -333,8 +339,16 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
-   it needs and what to say while that is off. */
+   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor. */
 export const NEWS = [
+  {
+    v: '0.26.0',
+    use: 'nicknames',
+    title: 'Neu: Spitznamen',
+    say: 'Im Profil deines Tieres kannst du jetzt Spitznamen eintragen. Die App nennt es dann mal so, mal so.',
+    why: 'Einkaufen ist umgezogen und steht jetzt ganz unten bei „Vorlieben“.',
+    go: ['pet', 'Eintragen'],
+  },
   {
     v: '0.25.0',
     use: 'rate-reminder',

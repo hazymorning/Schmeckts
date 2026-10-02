@@ -147,7 +147,7 @@ function viewObservation() {
         ? group(
             'Bemerkt bei',
             petChips('toggle-observation-pet', o.pets) +
-              (ids.length > 1 ? `<p class="hint mt-s">Bei ${esc(whoObserved(ids))}: offen, wer es war.</p>` : ''),
+              (ids.length > 1 ? `<p class="hint mt-s">Ob es ${esc(whoObserved(ids))} war, ist offen.</p>` : ''),
           )
         : ''
     }
@@ -586,9 +586,28 @@ function viewPet() {
         ),
       'set-group',
     )}
+    ${group(
+      'Spitznamen',
+      `<div class="chips nicks" id="nicks"></div>
+      <div class="connect"><input id="f-nick" class="field" data-field="nick" value="${esc(s.nick)}" placeholder="z. B. Mausi" maxlength="24" autocomplete="off" autocapitalize="words" enterkeyhint="done" aria-label="Spitzname">
+        <button class="btn soft" data-action="add-nick" aria-label="Spitzname hinzufügen">${icon('plus')}</button></div>
+      <p class="hint mt-s">Die App nennt dein Tier dann mal so, mal so.</p>`,
+    )}
     ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
     <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button></div>
     ${editing ? apart(armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
+}
+
+// drawn on their own, so the field keeps its focus and keyboard while names are added
+export function renderNicks() {
+  const box = $('#nicks');
+  if (!box || !sheet?.nicknames) return;
+  box.innerHTML = sheet.nicknames
+    .map(
+      n =>
+        `<button class="chip" data-action="drop-nick" data-v="${esc(n)}" aria-label="${esc(n)} entfernen">${esc(n)}${icon('close')}</button>`,
+    )
+    .join('');
 }
 
 const VIEWS = {
@@ -600,9 +619,8 @@ const VIEWS = {
   pet: viewPet,
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
-  // the profile is a level of the evaluation, so back returns there
-  evaluation: () => (sheet.page === 'profile' ? viewProfile() : viewEvaluation()),
-  shop: viewShop,
+  // profile and shopping list are levels of the evaluation, so back returns there
+  evaluation: () => (sheet.page === 'profile' ? viewProfile() : sheet.page === 'shop' ? viewShop() : viewEvaluation()),
 };
 /* An unchanged view is left alone: a sync redraws every open sheet, and rewriting would lose decoded photos, scroll
    position and focus. Kept per body, page and sheet. Boxes filled afterwards are not compared and always redrawn. */
@@ -623,6 +641,7 @@ setSheetView((state, body) => {
   }
   if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
+  if (state.kind === 'pet' || state.page === 'pet') renderNicks();
   if (state.kind === 'report') {
     watchDays();
     requestAnimationFrame(growHistory);
