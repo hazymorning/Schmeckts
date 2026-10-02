@@ -97,7 +97,7 @@ export const head = (title, back = 'settings-back', end = '') =>
     ? `<div class="head page-bar"><button class="icon-btn" data-action="${back}" aria-label="Zurück">${icon('back')}</button><span class="bar-title" aria-hidden="true">${title}</span>${end}</div>
     <h2 class="page-title">${title}</h2>`
     : `<div class="sh-head"><h2>${title}</h2>${end}${closeBtn}</div>`;
-// a card's heading with the way to its page at its end; label names that page for screen readers
+// a card's heading with the way to its page at its end; label, for screen readers, starts with the visible word
 export const cardHead = (title, action, label, more = 'Alle', v = '') =>
   `<div class="card-head"><h2>${title}</h2><button class="more" data-action="${action}"${v ? ` data-v="${v}"` : ''} aria-label="${label}">${more}${icon('chevron')}</button></div>`;
 export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');

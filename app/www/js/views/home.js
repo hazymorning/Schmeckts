@@ -137,7 +137,7 @@ function homeHTML() {
   else
     html +=
       hintHTML(m) +
-      `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Ganzer Verlauf')}${historyHTML()}</section>` +
+      `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m) +
       shopHTML(m);
   return html;
@@ -235,7 +235,7 @@ function shopHTML(m) {
     .slice(0, SHOP_SHOWN)
     .map(e => shopRow(m, e))
     .join('');
-  return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop">${cardHead('Einkaufen', 'open-shop', 'Ganze Einkaufsliste')}<ul class="list shop">${rows}</ul></section>`;
+  return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop">${cardHead('Einkaufen', 'open-shop', 'Alle Sorten zum Einkaufen')}<ul class="list shop">${rows}</ul></section>`;
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

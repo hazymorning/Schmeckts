@@ -453,7 +453,7 @@ dialog.sheet.page .sheet-body {
   min-width: 0;
   margin: 0;
 }
-.sh-head .icon-btn {
+.sh-head .icon-btn:last-child {
   margin-right: calc(-1 * var(--space-3));
 }
 .sh-head .icon-btn.lead {
