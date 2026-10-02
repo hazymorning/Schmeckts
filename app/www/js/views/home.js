@@ -146,7 +146,7 @@ function homeHTML() {
 const welcomeHTML = () => `<div class="welcome">
   <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
   <h2>Was schmeckt deinem Tier?</h2>
-  <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie der Napf aussah. So siehst du bald, was wirklich ankommt.</p>
+  <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie viel dein Tier gefressen hat. So siehst du bald, was wirklich ankommt.</p>
   <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Tier anlegen</button>
     ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Beispieldaten ansehen</button>`}
   </div></div>`;
