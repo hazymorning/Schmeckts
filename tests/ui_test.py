@@ -260,11 +260,14 @@ async def test_tour(browser, url):
     check(await state(pg, 'db.servings.length') == before + 1, 'a known variety served')
     await tap(pg, '.pend [data-action=rate][data-r=gut]', force=True)  # the button takes no pointer, the track does
     check(await state(pg, 'Object.values(db.servings[0].pets)[0].r') == 'gut', 'rated with one tap')
-    check(await pg.locator('[data-sec=shop] .shop li').count() == 3, 'three varieties to buy on the home page')
-    await tap(pg, '[data-sec=shop] [data-action=open-shop]')
-    check(await pg.locator('#sheet .shop li').count() >= 3, 'shopping page opens')
-    await back(pg)
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    last = await pg.eval_on_selector('#sheetBody', "b => [...b.querySelectorAll('section.card')].at(-1).querySelectorAll('.shop li').length")
+    await tap(pg, '#sheet .card [data-action=open-level][data-v=shop]')
+    check(
+        last == 3 and await pg.locator('#sheet .shop li').count() >= 3,
+        'three varieties to buy on the last card of „Vorlieben“, all of them on its level',
+    )
+    await back(pg)
     await tap(pg, '#sheet [data-action=open-level][data-v=profile]')
     check(await pg.locator('#sheet .likes li').count() >= 4, 'comparisons page opens')
     await back(pg, 2)
@@ -277,7 +280,7 @@ async def test_tour(browser, url):
         'Haushalt: only the way in',
     )
     await back(pg, 2)
-    await tap(pg, '[data-sec=shop] [data-action=open-product]')
+    await tap(pg, '[data-sec=evaluation] button.tile')
     check(await pg.evaluate(LEVEL) == [True, 'product', None, None], 'food sheet opens')
     await tap(pg, '[data-action=close]')
     await tap(pg, '.tl [data-action=open-serving]')
@@ -445,10 +448,19 @@ async def test_cards(browser, url):
 
 
 async def test_shop(browser, url):
-    print('„Einkaufen“: the list shared as derive builds it, a row opens its food sheet over the page')
+    print('„Einkaufen“: a level of „Vorlieben“ from the bar, the list shared as derive builds it, a row opens its food sheet over the page')
     ctx, pg, errors = await demo(browser, url, permissions=['clipboard-read', 'clipboard-write'])
     want = await pg.evaluate("import('./js/derive.js').then(d => d.shoppingList())")
-    await tap(pg, '[data-sec=shop] [data-action=open-shop]')
+    check(await pg.locator('#home .shop').count() == 0, 'nothing of it on the home page')
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    await tap(pg, '#sheet .head [data-action=open-level][data-v=shop]')
+    level = await pg.evaluate(LEVEL)
+    await back(pg)
+    check(
+        level == [True, 'evaluation', 'shop', None] and await pg.evaluate(LEVEL) == [True, 'evaluation', None, None],
+        f'the cart in the bar opens it as a level, back returns to „Vorlieben“ {level}',
+    )
+    await tap(pg, '#sheet .head [data-action=open-level][data-v=shop]')
     await tap(pg, '#sheet [data-action=share-list]')
     check(await pg.evaluate('navigator.clipboard.readText()') == want['text'], 'without a share menu the list goes to the clipboard')
     await pg.evaluate('navigator.share = o => { window.__shared = o; return Promise.resolve(); }')
@@ -460,7 +472,7 @@ async def test_shop(browser, url):
     over = [await pg.evaluate(kinds), await pg.evaluate(LEVEL)]
     await tap(pg, '#popup [data-action=close]')
     check(
-        over == [['shop', True], [True, 'product', None, None]] and await pg.evaluate(kinds) == ['shop', False],
+        over == [['evaluation', True], [True, 'product', None, None]] and await pg.evaluate(kinds) == ['evaluation', False],
         f'a row opens over the page and closes back {over}',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
@@ -480,7 +492,7 @@ async def test_shop_folds(browser, url):
         [meal(f'{i}-{n}', i, now - (n + 1) * 864e5, {M: 'schlecht'}) for i in left for n in range(2)]
         + [meal('unklar0001-0', 'unklar0001', now - 864e5, {M: 'mittel'})],
     )
-    await open_sheet(pg, kind='shop')
+    await open_sheet(pg, kind='evaluation', page='shop')
     ROWS = "s => document.querySelector(s).closest('.card').querySelectorAll('.shop > li').length"
     shut = await pg.evaluate(ROWS, '#sheet [data-action=fold][data-v=nicht]')
     await tap(pg, '#sheet [data-action=fold][data-v=nicht]')
@@ -494,6 +506,29 @@ async def test_shop_folds(browser, url):
 
 
 M, T = 'minka00001', 'tiger00001'
+
+
+async def test_dry_food(browser, url):
+    print('only dry food rated: no ranking, the „Vorlieben“ card still leads to what to buy again')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    await load(
+        pg,
+        [pet(M)],
+        [product('trocken0001', 'Josera', 'Huhn', 'Trockenfutter')],
+        [meal(f'meal{i}', 'trocken0001', now - (i + 1) * 864e5, {M: 'gern'}) for i in range(3)],
+    )
+    rows = await pg.eval_on_selector_all('[data-sec=evaluation] .shop [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    check(
+        rows == ['trocken0001'] and await pg.locator('#sheet .card [data-action=open-level][data-v=shop]').count() == 1,
+        f'the card on the home page and the last card of the page name it {rows}',
+    )
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
 BRANDS = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Rinti', 'Bozita', 'Schesir']
 
 
@@ -2242,7 +2277,8 @@ async def test_popup(browser, url):
         and not await pg.evaluate('history.state'),
         f'a variety over „Vorlieben“ closes back to it; serving from it ends on the home page, history cleared {served}',
     )
-    await tap(pg, '[data-action=open-shop]')
+    await tap(pg, '[data-action=open-evaluation]')
+    await tap(pg, '#sheet .head [data-action=open-level][data-v=shop]')
     await pg.locator('#sheet [data-action=open-product]').first.click()
     await idle(pg)
     await open_sheet(pg, kind='settings', page='house')
@@ -2668,6 +2704,7 @@ run_tests(
         'cards': test_cards,
         'shop': test_shop,
         'shop-folds': test_shop_folds,
+        'dry-food': test_dry_food,
         'history': test_home_history,
         'report': test_report,
         'evaluation': test_evaluation,

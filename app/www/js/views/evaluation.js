@@ -15,7 +15,7 @@ import {
   profileModel,
   rankingModel,
 } from '../derive.js';
-import {GOOD, goodOf, poorOf, ratingsIn} from '../smart.js';
+import {GOOD, goodOf, poorOf, ratingsIn, shopGroups} from '../smart.js';
 import {
   avatar,
   cardHead,
@@ -28,6 +28,7 @@ import {
   obsThumb,
   SIDE,
   sideIcon,
+  shopRow,
   sign,
   since,
   strip,
@@ -112,11 +113,20 @@ function sideTile(m, r, e, side) {
           : ['Keiner', 'Keine Sorte bleibt meist stehen.'];
   return `<div class="tile empty ${tone}">${inner(title, why)}</div>`;
 }
+const SHOP_SHOWN = 3;
+const shopRows = (m, list) =>
+  `<ul class="list shop">${list
+    .slice(0, SHOP_SHOWN)
+    .map(e => shopRow(m, e))
+    .join('')}</ul>`;
+// without a ranking, as for a pet on dry food only, the card shows what to buy again
 export function evaluationCard(m) {
-  const r = rankingModel();
-  if (!r.rated) return '';
+  const r = rankingModel(),
+    buy = r.rated ? [] : shopGroups(m).nachkaufen;
+  if (!r.rated && !buy.length) return '';
   let body;
-  if (r.top.length || r.flop.length) body = sideTile(m, r, r.top[0], 'top') + sideTile(m, r, r.flop[0], 'flop');
+  if (!r.rated) body = `<h3 class="label grp">Nachkaufen</h3>${shopRows(m, buy)}`;
+  else if (r.top.length || r.flop.length) body = sideTile(m, r, r.top[0], 'top') + sideTile(m, r, r.flop[0], 'flop');
   else {
     const t = r.stale ? null : r.trials[0],
       next = t
@@ -425,19 +435,27 @@ function footHTML(m, b) {
         ...(first.getFullYear() === new Date().getFullYear() ? {} : {year: 'numeric'}),
       });
     parts.push(
-      `Die Listen beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, je Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
+      `Leibgerichte und Ladenhüter beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, pro Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
     );
   }
   if (b.left.length)
     parts.push(
-      `${andList(b.left.map(t => LEFT[t]))} ${b.left.length > 1 || b.left[0] === 'Snack' ? 'zählen' : 'zählt'} hier nicht mit.`,
+      `${andList(b.left.map(t => LEFT[t]))} ${b.left.length > 1 || b.left[0] === 'Snack' ? 'zählen' : 'zählt'} dabei nicht mit.`,
     );
   return parts.length ? `<p class="hint foot">${parts.join(' ')}</p>` : '';
 }
+
+function shopCard(m) {
+  const buy = shopGroups(m).nachkaufen;
+  return buy.length
+    ? `<section class="card">${cardHead('Einkaufen', 'open-level', 'Alle Sorten zum Einkaufen', 'Alle', 'shop')}${shopRows(m, buy)}</section>`
+    : '';
+}
+const shopBtn = `<button class="icon-btn" data-action="open-level" data-v="shop" aria-label="Einkaufen">${icon('cart')}</button>`;
 
 export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet))}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
 }

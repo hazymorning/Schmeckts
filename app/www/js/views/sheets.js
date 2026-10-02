@@ -600,9 +600,8 @@ const VIEWS = {
   pet: viewPet,
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
-  // the profile is a level of the evaluation, so back returns there
-  evaluation: () => (sheet.page === 'profile' ? viewProfile() : viewEvaluation()),
-  shop: viewShop,
+  // profile and shopping list are levels of the evaluation, so back returns there
+  evaluation: () => (sheet.page === 'profile' ? viewProfile() : sheet.page === 'shop' ? viewShop() : viewEvaluation()),
 };
 /* An unchanged view is left alone: a sync redraws every open sheet, and rewriting would lose decoded photos, scroll
    position and focus. Kept per body, page and sheet. Boxes filled afterwards are not compared and always redrawn. */

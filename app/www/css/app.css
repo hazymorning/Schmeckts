@@ -2092,7 +2092,7 @@ dialog.sheet::after {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"]) .page-title,
+dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title,
 .page-title:has(+ #serverBox > .srv) {
   margin-bottom: var(--space-3h);
 }

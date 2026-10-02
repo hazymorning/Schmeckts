@@ -179,11 +179,9 @@ const ACTIONS = {
   'open-evaluation'() {
     openSheet({kind: 'evaluation'});
   },
+  // the shopping list's folds start closed each time
   'open-level'(el) {
-    openPage(el.dataset.v);
-  },
-  'open-shop'() {
-    openSheet({kind: 'shop'});
+    openPage(el.dataset.v, {open: null});
   },
   'open-server'() {
     openSheet({kind: 'settings', page: 'house'});
