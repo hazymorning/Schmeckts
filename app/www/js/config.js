@@ -18,7 +18,7 @@ export const RATINGS = {
     short: 'Fast alles',
     said: 'fast alles gefressen',
     score: 80,
-    cheer: 'Fast wie geleckt.',
+    cheer: 'Beinah wie geleckt.',
   },
   mittel: {
     label: 'Die Hälfte gefressen',
@@ -39,7 +39,7 @@ export const RATINGS = {
     short: 'Nur Soße',
     said: 'nur die Soße geleckt',
     score: 30,
-    cheer: 'Die Soße war der Star.',
+    cheer: 'Der Rest war Deko.',
   },
   schlecht: {
     label: 'Fast nix gefressen',

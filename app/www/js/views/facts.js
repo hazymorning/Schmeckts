@@ -769,8 +769,8 @@ export const LEADS = {
     'Der erste Napf des Tages ist überfällig.',
   ],
   fresh: [
-    'Guten Appetit, {names}!',
-    'Frisch aufgetischt, guten Appetit!',
+    'Mahlzeit, {names}!',
+    'Frisch aufgetischt, ran an den Napf!',
     '{names} {hat} jetzt erst mal zu tun.',
     'Der Napf ist voll, jetzt heißt es schmatzen.',
   ],
@@ -845,7 +845,7 @@ export const LINES = {
   ],
   birthdaySoon: [
     'In {days} hat {pet} Geburtstag.',
-    'Noch {days}, dann hat {pet} Geburtstag.',
+    'In {days} feiert {pet} Geburtstag.',
     'In {days} hat {pet} Geburtstag, Geschenk zum Fressen?',
   ],
   birthdayTomorrow: [

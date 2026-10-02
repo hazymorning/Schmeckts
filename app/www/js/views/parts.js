@@ -123,9 +123,9 @@ function fedLabel(items) {
     snacks = fed.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length,
     meals = fed.length - snacks;
   return [
-    meals && (meals === 1 ? '1 Mahlzeit' : meals + ' Mahlzeiten'),
-    snacks && (snacks === 1 ? '1 Snack' : snacks + ' Snacks'),
-    seen && (seen === 1 ? '1 Beobachtung' : seen + ' Beobachtungen'),
+    meals && (meals === 1 ? '1\u00a0Mahlzeit' : meals + '\u00a0Mahlzeiten'),
+    snacks && (snacks === 1 ? '1\u00a0Snack' : snacks + '\u00a0Snacks'),
+    seen && (seen === 1 ? '1\u00a0Beobachtung' : seen + '\u00a0Beobachtungen'),
   ]
     .filter(Boolean)
     .join(', ');
@@ -289,7 +289,7 @@ export function habitRow(h, several) {
     return told(
       sign(h.kind === 'sosse' ? 'drop' : 'r_eager'),
       `Bei <b>${esc(andList(h.sorts.map(x => name(x.id))))}</b> ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
-      esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
+      esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))) + '.',
     );
   const pet = several ? getPet(h.pet) : null,
     who = pet ? `<b>${esc(pet.name)}</b> ` : '';
@@ -320,7 +320,7 @@ export const likesList = (m, d) =>
     .join('')}</ul>`;
 
 const waitingText = n => (n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '');
-const ERROR_TITLE = {auth: 'Code stimmt nicht mehr', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
+const ERROR_TITLE = {auth: 'Code prüfen', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
 const CHIP_ERROR = {auth: 'Code prüfen', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
 // collections held back until the server is updated
 const HELD = {observations: 'Beobachtungen'};
@@ -331,8 +331,7 @@ function heldText() {
 export function syncInfo() {
   const st = status,
     wait = waitingText(pending().length);
-  if (st.state === 'off')
-    return {tone: 'off', title: 'Nicht verbunden', detail: 'Alle Daten bleiben auf diesem Gerät.'};
+  if (st.state === 'off') return {tone: 'off', title: 'Nicht verbunden', detail: ''}; // the foot says where the data stays
   if (st.state === 'error') return {tone: 'bad', title: ERROR_TITLE[st.kind] || 'Abgleich gestört', detail: st.message};
   if (st.state === 'offline')
     return {
@@ -388,7 +387,7 @@ export function evidenceOf(x) {
     .sort((a, b) => b.k - a.k);
   if (sides[0].k * 2 > x.n) return cap(`${times(sides[0].k, x.n)} ${sides[0].said}`);
   return `Mal so, mal so: ${once(sides.map(side => side.said))
-    .map((said, i) => `${sides[i].k}× ${said}`)
+    .map((said, i) => `${sides[i].k}×\u00a0${said}`)
     .join(', ')}`;
 }
 // a closing word all phrases share is said once, at the end: „einmal fast alles, einmal die Hälfte gefressen“

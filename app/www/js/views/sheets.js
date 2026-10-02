@@ -384,7 +384,10 @@ function noticed(p) {
         'Danach notiert',
         toldList(
           after.map(x =>
-            told(obsThumb(x.kind), `${observationOf(x.kind).label} nach <b>${x.hit} von ${x.n}</b> Mahlzeiten`),
+            told(
+              obsThumb(x.kind),
+              `${observationOf(x.kind).label} nach <b>${x.hit}&nbsp;von&nbsp;${x.n}</b>&nbsp;Mahlzeiten`,
+            ),
           ),
         ),
         '',

@@ -26,7 +26,7 @@ export function observe(kind) {
   homeView.fresh = o.id;
   update();
   const seen = observationOf(kind),
-    said = db.pets.length > 1 ? `${seen.label} bei ${whoObserved(ids)} notiert` : seen.said,
+    said = db.pets.length > 1 ? seen.said.replace(' notiert', ` bei ${whoObserved(ids)} notiert`) : seen.said,
     first = seen.about === 'meal' && !prefs.hiddenHints.includes(EXPLAINED); // Vorlieben weighs only those
   if (first) hideHint(EXPLAINED);
   toast(

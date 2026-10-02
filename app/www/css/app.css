@@ -398,6 +398,10 @@ dialog.sheet::backdrop {
   padding: var(--space-1) var(--gutter)
     calc(var(--space-7) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
+/* showModal() focuses the scroller when a sheet opens without a tap; a ring there would only be a bar under the grip */
+.sheet-body:focus-visible {
+  outline: none;
+}
 dialog.sheet.page {
   inset: 0;
   width: 100%;
@@ -972,6 +976,17 @@ dialog.sheet::after {
 .search .field {
   padding-left: var(--field-room);
 }
+/* the WebView's own clear button is blue; this one is drawn like the close icon */
+.search .field::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--icon-s);
+  height: var(--icon-s);
+  background: var(--muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M6.5 6.5l11 11M17.5 6.5l-11 11'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  cursor: pointer;
+}
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1345,8 +1360,8 @@ dialog.sheet::after {
   display: flex;
   gap: var(--space-2h);
   overflow-x: auto;
-  padding: var(--space-2h) var(--space-1) var(--space-3h);
-  margin: 0 calc(-1 * var(--space-1));
+  padding: var(--space-2h) var(--gutter) var(--space-3h);
+  margin: 0 calc(-1 * var(--gutter));
   scrollbar-width: none;
 }
 .pets::-webkit-scrollbar {
@@ -1497,6 +1512,7 @@ dialog.sheet::after {
 }
 .tl-date {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2h);
@@ -1514,6 +1530,7 @@ dialog.sheet::after {
   font: var(--type-subheading);
 }
 .tl-date span {
+  margin-left: auto;
   font: var(--type-small);
   color: var(--muted);
 }
@@ -1645,7 +1662,7 @@ dialog.sheet::after {
   width: 100%;
   max-width: 340px;
   aspect-ratio: 1;
-  margin: var(--space-1) auto 0;
+  margin: var(--space-4h) auto 0;
   border-radius: var(--radius-l);
   overflow: hidden;
   background: var(--surface-2);
@@ -1850,9 +1867,6 @@ dialog.sheet::after {
 }
 .overview h2 {
   margin: 0 0 var(--space-hair);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pend-head,
@@ -1884,7 +1898,9 @@ dialog.sheet::after {
   margin: var(--space-hair) 0 0;
 }
 .shop .t-main small,
-.likes .t-main small {
+.likes .t-main small,
+.verdict-pet .t-main small,
+.tl-item .t-main small {
   white-space: normal;
 }
 .told .why {
@@ -2076,7 +2092,8 @@ dialog.sheet::after {
   margin: 0 0 var(--space-1h);
   color: var(--ink);
 }
-dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"]) .page-title {
+dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind="shop"]) .page-title,
+.page-title:has(+ #serverBox > .srv) {
   margin-bottom: var(--space-3h);
 }
 .btn-col {

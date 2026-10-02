@@ -46,6 +46,7 @@ import {
 async function connectServer() {
   if (sheet?.kind !== 'settings' || sheet.connecting) return;
   Object.assign(sheet, {connecting: true, connectError: ''});
+  document.activeElement?.blur(); // a focused field keeps the box from being redrawn
   renderSheet();
   try {
     const found = await checkServer(sheet.code, sheet.server ?? prefs.server);

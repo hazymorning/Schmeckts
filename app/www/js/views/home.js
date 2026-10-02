@@ -154,7 +154,7 @@ const welcomeHTML = () => `<div class="welcome">
 
 const stepsHTML = () => `<section class="card" style="view-transition-name:sec-steps"><h2>So geht’s</h2>
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
-  <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. Marke und Sorte liest die App von der Packung.</p></li>
+  <li class="row"><span class="n">1</span><p class="hint"><b>Zur Futterzeit</b> auf „Füttern“ tippen und die Packung fotografieren. Marke und Sorte liest die App von der Packung.</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was dein Tier mag und was stehen bleibt.</p></li></ol></section>`;
 

@@ -87,7 +87,7 @@ async function allowed(wanted, which) {
   } catch (e) {
     report('notification permission', e);
   }
-  if (!ok) toast('Benachrichtigungen sind nicht erlaubt.');
+  if (!ok && sheet?.kind !== 'settings') toast('Benachrichtigungen sind nicht erlaubt.'); // there the switch's line says it
   if (sheet) {
     if (ok) delete sheet.denied;
     else sheet.denied = which;

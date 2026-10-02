@@ -13,9 +13,9 @@ import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} fro
 import {sheet} from '../ui/sheet.js';
 
 const THEMES = [
-  ['system', 'System', 'auto'],
-  ['light', 'Hell', 'sun'],
-  ['dark', 'Dunkel', 'moon'],
+  ['system', 'System'],
+  ['light', 'Hell'],
+  ['dark', 'Dunkel'],
 ];
 // no 0 step, the switch turns it off. The own option opens a field, so it has an action of its own
 const OWN_REMIND = 'own';
@@ -34,7 +34,8 @@ function feedSub() {
     ? `Meist gegen ${andList(slots.map(x => quarterStr(x.at)))} Uhr`
     : 'Lernt die üblichen Zeiten aus dem Verlauf';
 }
-const houseSub = n => (n.detail ? `${n.title}, ${n.detail.charAt(0).toLowerCase()}${n.detail.slice(1)}` : n.title);
+const houseSub = n =>
+  n.detail && !n.title.endsWith('…') ? `${n.title}, ${n.detail.charAt(0).toLowerCase()}${n.detail.slice(1)}` : n.title;
 
 const chev = icon('chevron', 'chev');
 const pageRow = (page, ic, title, sub = '', id = '') =>
@@ -48,8 +49,8 @@ const petRow = p =>
   `<button class="row set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p, 's')}${main(esc(p.name), esc(p.species))}${chev}</button>`;
 const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(title)}</div>`;
 
-const LOOKUP = 'Fragt bei unbekannten Barcodes nach, nur mit der Nummer';
-const SERVER_PHOTO = 'Erkennt Marke und Sorte auf dem Packungsfoto. Sonst liest das Handy den Text selbst.';
+const LOOKUP = 'Schlägt unbekannte Barcodes nach, nur mit der Nummer';
+const SERVER_PHOTO = 'Erkennt Marke und Sorte. Sonst liest das Handy selbst.';
 
 function overview() {
   const house = isConnected(),
@@ -77,7 +78,7 @@ function overview() {
           ? under(
               segmented('remind', REMIND_OPTIONS, own ? OWN_REMIND : String(prefs.remind)) +
                 (own
-                  ? `<label class="label" for="f-remind">Stunden nach dem Füttern</label>
+                  ? `<label class="label" for="f-remind">Stunden, 1 bis ${REMIND_MAX_H}</label>
               <input id="f-remind" class="field" type="number" inputmode="numeric" min="1" max="${REMIND_MAX_H}" step="1" value="${prefs.remind / 60}" data-remind enterkeyhint="done">`
                   : ''),
             )
@@ -138,7 +139,7 @@ function exchangePage() {
 const PRIVACY = [
   'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann die Produktsuche im Internet unter „Scannen“, sie ist aus: Sie fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Netz. Mehr kann die Produktsuche im Internet unter „Scannen“, die anfangs aus ist. Sie fragt bei unbekannten Barcodes zwei freie Produktdatenbanken, übertragen wird nur die Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',
   'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt deine Einträge als Datei an ein anderes Handy weiter, ohne Server.',
   'Beim Lesen einer Packung berichtigt das Handy falsch gelesene Wörter mit einer Wortliste. Sie enthält Informationen aus Open Pet Food Facts, die hier unter der Open Database License (ODbL) verfügbar gemacht werden.',
