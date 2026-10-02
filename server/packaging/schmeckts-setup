@@ -1,13 +1,10 @@
 #!/bin/bash
-# Setup window for the Schmeckt's server. Opened from the application menu.
-# The actual work is done by "schmeckts-server" with administrator rights (pkexec asks for the password).
-# The window's own wording is German, like the app.
+# Setup dialog from the application menu; schmeckts-server does the work through pkexec.
 TITLE="Schmeckt’s-Server"
 
 esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-# Run schmeckts-server as administrator; the output ends up in OUT.
-# pkexec returns 126 or 127 when the password prompt is cancelled or authorisation fails; exit without a dialog.
+# Output goes to OUT. pkexec exits 126 or 127 when the password prompt is cancelled or refused.
 admin() {
   OUT=$(pkexec /usr/bin/schmeckts-server "$@" 2>&1)
   local rc=$?
@@ -17,7 +14,6 @@ admin() {
 
 error() { zenity --error --title="$TITLE" --width=440 --text="$(printf '%s' "$OUT" | esc)"; }
 
-# Address and code first and large, so they are easy to copy down; the state after that
 show() {
   local code addr rest
   code=$(printf '%s\n' "$OUT" | sed -n 's/^Code: *//p')

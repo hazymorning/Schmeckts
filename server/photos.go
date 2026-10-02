@@ -1,9 +1,6 @@
 package main
 
-// Packaging photos: the large photo a phone took of a variety, kept here so that every phone in the household can
-// show it, not only the one that took it. One file per variety in photos/ beside the data, never part of the synced
-// data nor of a backup. A photo sent for a variety replaces the one before (from 1.4.0; until then the first one
-// stayed), and a variety that is gone takes its photo along.
+// Packaging photos, one file per variety in photos/, kept out of the synced data and the backups.
 
 import (
 	"bytes"
@@ -30,17 +27,14 @@ func (p *Photos) file(id string) string {
 	return filepath.Join(p.dir, id+".jpg")
 }
 
-// Put keeps the photo of a variety, in place of the one it had.
 func (p *Photos) Put(id string, jpeg []byte) error {
 	return writeAtomic(p.file(id), jpeg, 0o600)
 }
 
-// Get is the photo of a variety, an error without one.
 func (p *Photos) Get(id string) ([]byte, error) {
 	return os.ReadFile(p.file(id))
 }
 
-// Sweep removes the photos of the varieties that are gone.
 func (p *Photos) Sweep(varieties map[string]bool) {
 	files, _ := filepath.Glob(filepath.Join(p.dir, "*.jpg"))
 	for _, f := range files {

@@ -1,7 +1,6 @@
 package main
 
-// The overview for "sudo schmeckts-server overview": the stored data as readable text.
-// The output is German, like the app.
+// The stored data as readable text, for "schmeckts-server overview".
 
 import (
 	"encoding/json"
@@ -14,8 +13,7 @@ import (
 	"time"
 )
 
-// Every level of every scale, with the wording the app uses (RATINGS in app/www/js/config.js). The key alone
-// decides the wording, so the two lists must not drift apart: tests/design_test.py compares them.
+// Must match RATINGS in app/www/js/config.js; tests/design_test.py compares them.
 var ratingNames = map[string]string{
 	"top": "Sofort leer", "gut": "Fast leer", "mittel": "Halb gegessen", "eager": "Nur bissl",
 	"sosse": "Soße geleckt", "schlecht": "Kaum angerührt",
@@ -57,7 +55,7 @@ func when(t, now time.Time) string {
 	}
 }
 
-// Overview summarises the stored data. dir is only used for the date of the last backup.
+// Overview uses dir only for the date of the last backup.
 func Overview(st state, dir string, now time.Time) string {
 	var b strings.Builder
 	pets, products, servings := st.Records["pets"], st.Records["products"], st.Records["servings"]
@@ -107,7 +105,7 @@ func Overview(st state, dir string, now time.Time) string {
 	fmt.Fprintf(&b, "Tiere       %3d  %s\n", len(petNames), strings.Join(petNames, ", "))
 	fmt.Fprintf(&b, "Futter      %3d  davon %d mit Barcode\n", productCount, len(withCode))
 	fmt.Fprintf(&b, "Mahlzeiten  %3d\n", len(meals))
-	// Collections of newer apps, which the server keeps without knowing what they mean: only how many entries
+	// collections of newer apps: the count only
 	others := []string{}
 	for c := range st.Records {
 		if !slices.Contains(baseColls, c) {
@@ -156,7 +154,7 @@ func Overview(st state, dir string, now time.Time) string {
 		b.WriteString("\nFutter mit Barcode\n" + strings.Join(withCode, "\n") + "\n")
 	}
 
-	// Devices: the latest change per device id from the field clocks, with the name from "by" where known
+	// devices from the field clocks, named after "by" where known
 	type device struct {
 		last  int64
 		name  string

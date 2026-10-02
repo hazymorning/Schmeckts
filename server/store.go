@@ -1,14 +1,7 @@
 package main
 
-// Storage: every record with one clock per field, persisted in a JSON file.
-//
-// A change sets individual fields of a record. Per field the larger timestamp wins
-// (a hybrid clock as sortable text, see clockPattern). "_del" is an ordinary field:
-// true = deleted, false = restored. Every accepted change increments the running
-// number (seq); devices fetch "everything since N".
-//
-// The file is replaced in full and atomically on every change (write, fsync, rename).
-// A crash mid-write always leaves either the old or the new version behind.
+// Records with one clock per field; per field the larger clock wins. "_del" is an ordinary field
+// (true deleted, false restored). Each accepted change bumps seq, and devices fetch everything since N.
 
 import (
 	"crypto/rand"
@@ -36,12 +29,11 @@ const (
 	maxFutureSkew = 10 * time.Minute     // changes from the future are rejected
 	maxFieldBytes = 512 << 10
 	maxFields     = 64
-	maxColls      = 16 // collections the server keeps at most, the three below included
+	maxColls      = 16 // baseColls included
 )
 
 var (
-	// The collections every app knows. The server takes any other the app sends as well, named like these, so a new
-	// kind of data in the app needs no new server: it keeps its fields and clocks without knowing what they mean.
+	// other collections matching collRe are kept as well, so a new kind of data in the app needs no new server
 	baseColls    = []string{"pets", "products", "servings"}
 	collRe       = regexp.MustCompile(`^[a-z][A-Za-z0-9]{1,23}$`)
 	localOnly    = map[string]bool{"photo": true, "status": true, "error": true, "autoPets": true, "scanCode": true} // stay on the phone
@@ -57,7 +49,7 @@ type Field struct {
 }
 
 type Record struct {
-	S int64            `json:"s"` // number of the last accepted change
+	S int64            `json:"s"` // seq of the last accepted change
 	F map[string]Field `json:"f"`
 }
 
@@ -68,7 +60,6 @@ type state struct {
 	Seen    map[string]int64              `json:"seen"` // change id → timestamp in ms
 }
 
-// Change is a change the way a device sends it.
 type Change struct {
 	ID string                     `json:"id"`
 	C  string                     `json:"c"`
@@ -83,7 +74,6 @@ type Rejected struct {
 	Detail string `json:"detail"`
 }
 
-// OutRecord is a record the way devices receive it.
 type OutRecord struct {
 	C string           `json:"c"`
 	R string           `json:"r"`
@@ -113,8 +103,7 @@ func emptyState() state {
 	return st
 }
 
-// OpenStore loads the stored data. If the file is corrupted it is set aside and the newest
-// backup is loaded, under a new epoch, so that every device does a full sync.
+// A corrupted file gives way to the newest backup under a new epoch, so every device resyncs in full.
 func OpenStore(dir string) (*Store, error) {
 	s := &Store{dir: dir}
 	if err := os.MkdirAll(filepath.Join(dir, backupDir), 0o700); err != nil {
@@ -173,7 +162,6 @@ func readState(path string) (state, error) {
 	return st, nil
 }
 
-// writeAtomic replaces a file so that after a crash there is always a complete version.
 func writeAtomic(path string, data []byte, mode os.FileMode) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
@@ -248,9 +236,8 @@ func validate(c Change, now time.Time) *Rejected {
 	return nil
 }
 
-// Apply accepts changes and persists them before returning.
-// ok holds every id the device may drop from its queue (accepted or already known),
-// rejected the permanently invalid ones.
+// Apply persists before it returns. ok holds every id the device may drop from its queue,
+// accepted or already known; rejected holds the invalid ones.
 func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []Rejected, seq int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -300,7 +287,7 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 	}
 	if dirty {
 		if err := s.persist(); err != nil {
-			// Back to the persisted state, so that memory and disk agree
+			// back to the persisted state so memory and disk agree
 			if st, rerr := readState(filepath.Join(s.dir, stateFile)); rerr == nil {
 				s.st = st
 			}
@@ -310,7 +297,6 @@ func (s *Store) Apply(changes []Change, now time.Time) (ok []string, rejected []
 	return ok, rejected, s.st.Seq, nil
 }
 
-// Since returns every record that has changed after the number since.
 func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -326,9 +312,8 @@ func (s *Store) Since(since int64) (epoch string, seq int64, out []OutRecord) {
 	return s.st.Epoch, s.st.Seq, out
 }
 
-// Checksum hashes every field and its clock in the collections named, the three every app knows without any. The app
-// computes it the same way over the collections it knows: SHA-256 over the sorted lines "collection/id/field@clock\n".
-// So an app that does not know a newer collection still finds its own data level with the server's.
+// Checksum must match the app's: SHA-256 over the sorted lines "collection/id/field@clock\n".
+// Without colls it covers baseColls, so an app that lacks a newer collection can still compare.
 func (s *Store) Checksum(colls []string) (epoch string, seq int64, sum string, fields int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -362,7 +347,6 @@ func (s *Store) Seq() (string, int64) {
 	return s.st.Epoch, s.st.Seq
 }
 
-// Products returns the visible food varieties, newest first (for the recognition prompt).
 func (s *Store) Products(limit int) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -392,7 +376,6 @@ func (s *Store) Products(limit int) []string {
 	return names
 }
 
-// Variety says whether a food variety is there, not deleted.
 func (s *Store) Variety(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -400,7 +383,6 @@ func (s *Store) Variety(id string) bool {
 	return rec != nil && string(rec.F["_del"].V) != "true"
 }
 
-// Varieties are the food varieties that are there, deleted ones left out.
 func (s *Store) Varieties() map[string]bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -413,8 +395,7 @@ func (s *Store) Varieties() map[string]bool {
 	return out
 }
 
-// LastMeal is the newest meal served at or after since, treats left out: its time in ms and who served it, 0 and ""
-// without one. A meal whose variety is unknown or gone counts, as it does in the app.
+// LastMeal leaves treats out but, like the app, counts meals of unknown or deleted varieties. at is in ms.
 func (s *Store) LastMeal(since int64) (at int64, by string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -438,8 +419,7 @@ func (s *Store) LastMeal(since int64) (at int64, by string) {
 	return at, by
 }
 
-// Backup writes a copy once a day and keeps the last 30.
-// It also drops change ids older than keepSeen.
+// Backup also drops change ids older than keepSeen.
 func (s *Store) Backup(now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

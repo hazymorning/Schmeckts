@@ -166,7 +166,7 @@ func TestChecksum(t *testing.T) {
 	if before["sum"] == after["sum"] || after["fields"] != float64(1) {
 		t.Fatalf("before %v, after %v", before, after)
 	}
-	// A collection the app knows is named; without ?c= only the three every app knows count
+	// without ?c= only baseColls count
 	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
 		chg("summe002", "observations", "obs1", clock(now.UnixMilli(), 1, "anna"), map[string]any{"kind": "tired"}),
 	}})
@@ -301,9 +301,7 @@ func TestCodeFormat(t *testing.T) {
 
 func itoa(n int64) string { b, _ := json.Marshal(n); return string(b) }
 
-// A wrongly configured address must not bring the server down: without the check in
-// http.NewRequestWithContext the request would be nil and Do would panic.
-const brokenURL = "http://192.168.178.9\u007f:8486" // a control character: url.Parse refuses it
+const brokenURL = "http://192.168.178.9\u007f:8486" // url.Parse refuses the control character
 
 func TestBrokenAnthropicAddress(t *testing.T) {
 	a := newTestAPI(t, brokenURL)
@@ -385,8 +383,8 @@ func TestPhotos(t *testing.T) {
 		want int
 	}{
 		{"/api/photo/rind0001", photo(1), 404},                               // a deleted variety
-		{"/api/photo/unbekannt", photo(1), 404},                              // one the server does not know
-		{"/api/photo/x", photo(1), 400},                                      // no variety's id
+		{"/api/photo/unbekannt", photo(1), 404},                              // unknown variety
+		{"/api/photo/x", photo(1), 400},                                      // not a variety id
 		{"/api/photo/lachs001", map[string]string{"image": "aGFsbG8="}, 400}, // no JPEG
 		{"/api/photo/lachs001", map[string]string{"image": "%%%"}, 400},      // no base64
 		{"/api/photo/lachs001", photo(make([]byte, maxPhotoBytes)...), 413},  // too large

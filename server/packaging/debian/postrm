@@ -1,5 +1,5 @@
 #!/bin/sh
-# After removal: close the firewall rules again. The data is deliberately kept.
+# the data is kept on purpose, even on purge
 set -e
 if [ "$1" = remove ] || [ "$1" = purge ]; then
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then

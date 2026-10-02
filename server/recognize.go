@@ -1,7 +1,6 @@
 package main
 
-// Recognition of a packaging photo through the Anthropic API. Key, model and prompt live
-// on the server alone; the app only sends the photo.
+// Packaging photo recognition through the Anthropic API. Key, model and prompt stay on the server.
 
 import (
 	"bytes"
@@ -37,7 +36,6 @@ type Recognition struct {
 	Animal  string `json:"animal"`
 }
 
-// recognizeError carries a message for the app and the matching HTTP status.
 type recognizeError struct {
 	status int
 	msg    string
@@ -45,9 +43,6 @@ type recognizeError struct {
 
 func (e *recognizeError) Error() string { return e.msg }
 
-// promptText lives in recognize-prompt.txt next to this file, because //go:embed cannot reach outside
-// the package. It is kept nowhere else, neither in this file nor in the app (tests/design_test.py).
-//
 //go:embed recognize-prompt.txt
 var promptText string
 
@@ -80,7 +75,6 @@ func oneOf(v string, allowed []string) string {
 	return ""
 }
 
-// Recognize sends the photo to the Anthropic API and returns brand, variety, type and species.
 func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Recognition, error) {
 	var out Recognition
 	img, err := base64.StdEncoding.DecodeString(b64)
@@ -103,7 +97,6 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.anthropicURL()+"/v1/messages", bytes.NewReader(body))
 	if err != nil {
-		// Only a wrongly configured anthropicUrl gets here; without this the request would be nil and Do would crash.
 		return out, &recognizeError{http.StatusBadGateway, "Die Adresse von Anthropic ist falsch eingestellt."}
 	}
 	req.Header.Set("content-type", "application/json")
@@ -143,14 +136,14 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 	}
 	m := jsonObject.FindString(strings.NewReplacer("```json", "", "```", "").Replace(text.String()))
 	if m == "" || json.Unmarshal([]byte(m), &out) != nil {
-		return Recognition{}, nil // nothing recognised: the app then asks for the name
+		return Recognition{}, nil // nothing recognised, not an error
 	}
 	out.Brand, out.Variety = strings.TrimSpace(out.Brand), strings.TrimSpace(out.Variety)
 	out.Type, out.Animal = oneOf(strings.TrimSpace(out.Type), foodTypes), oneOf(strings.TrimSpace(out.Animal), animalKinds)
 	return out, nil
 }
 
-// CheckKey validates an API key using the free model list.
+// CheckKey asks for the model list, which costs nothing.
 func CheckKey(ctx context.Context, cfg Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()

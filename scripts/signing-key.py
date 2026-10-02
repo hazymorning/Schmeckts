@@ -27,7 +27,7 @@ def create(jks, pwfile):
 
 def read(txt, jks):
     text = open(txt, encoding='utf-8').read()
-    # "Passwort" is what files written before the move to English say; both are accepted.
+    # older files say "Passwort"
     found = re.search(r'^(?:Password|Passwort): (\S+)\s*$', text, re.M)
     if not found or BEGIN not in text:
         sys.exit(f'{txt} is not a signing key file: it needs a "Password:" line and the keystore block.')

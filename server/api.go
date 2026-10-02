@@ -1,21 +1,7 @@
 package main
 
-// HTTP interface. Every path sits under /api/ and responses are JSON.
-//
-//   GET  /api/info                  version, protocol, epoch, server time; with a code also "auth"
-//   GET  /api/changes?since=N       every record with changes after N
-//   POST /api/changes               accept changes: {"changes":[…]}
-//   GET  /api/checksum?c=a,b        checksum over every field and clock of those collections, the three first ones without
-//   GET  /api/events?code=…         live notice of new numbers (server-sent events)
-//   POST /api/recognize             recognise a packaging photo: {"image":"<base64>"}
-//   GET  /api/barcode/<code>        look food up by EAN: {"found", "brand", "variety", "type", "animal"}
-//   GET  /api/fed?since=<ms>        whether a meal has been served since then: {"fed", "at", "by"}
-//   POST /api/photo/<variety>       keep a variety's packaging photo: {"image":"<base64 JPEG>"}, in place of the one before
-//   GET  /api/photo/<variety>       that photo: {"image"}
-//
-// Reachable from private networks only (home network, WireGuard) and only with the household
-// code, as "Authorization: Bearer <code>" or, for /api/events, as ?code=.
-// Error messages are German, like the app.
+// HTTP API, private networks only. The household code comes as "Authorization: Bearer <code>",
+// or as ?code= for /api/events.
 
 import (
 	"encoding/base64"
@@ -36,11 +22,11 @@ const (
 	protocolVersion = 1
 	maxBodyBytes    = 12 << 20
 	maxChanges      = 500
-	failLimit       = 20               // wrong codes per address before it is blocked
-	failWindow      = 10 * time.Minute // the window the wrong codes are counted in
-	recognizeBurst  = 10               // cost brake: this many recognitions in a row,
-	recognizeEvery  = 90 * time.Second // then one per interval after that (40 an hour)
-	barcodeBurst    = 30               // consideration for the free databases
+	failLimit       = 20 // wrong codes per address within failWindow before it is blocked
+	failWindow      = 10 * time.Minute
+	recognizeBurst  = 10 // cost brake for the paid API
+	recognizeEvery  = 90 * time.Second
+	barcodeBurst    = 30 // go easy on the free databases
 	barcodeEvery    = 10 * time.Second
 	pingEvery       = 25 * time.Second
 )
@@ -61,7 +47,7 @@ type API struct {
 	lookups    bucket
 }
 
-// bucket limits how often something may happen: burst in a row, then one per every.
+// bucket is a token bucket: burst in a row, then one per every.
 type bucket struct {
 	burst  float64
 	every  time.Duration
@@ -136,7 +122,7 @@ func fail(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// guard: private addresses only, CORS for the app (which runs under http://localhost), size limit.
+// The CORS headers are for the app, which runs under http://localhost.
 func (a *API) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !privateAddr(remoteAddr(r)) {
@@ -165,7 +151,6 @@ func givenCode(r *http.Request) string {
 	return r.URL.Query().Get("code")
 }
 
-// checkCode checks the household code and blocks an address after too many failed attempts.
 func (a *API) checkCode(r *http.Request) (status int, msg string) {
 	ip := remoteAddr(r).String()
 	now := a.now()
@@ -224,7 +209,7 @@ func (a *API) getChanges(w http.ResponseWriter, r *http.Request) {
 	since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
 	epoch, _ := a.store.Seq()
 	if e := r.URL.Query().Get("epoch"); e != "" && e != epoch {
-		since = 0 // different data (after a restore, for instance): send everything
+		since = 0 // different data, after a restore for instance: send everything
 	}
 	epoch, seq, recs := a.store.Since(since)
 	writeJSON(w, http.StatusOK, map[string]any{"epoch": epoch, "seq": seq, "now": a.now().UnixMilli(), "records": recs})
@@ -264,7 +249,7 @@ func (a *API) postChanges(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) checksum(w http.ResponseWriter, r *http.Request) {
-	var colls []string // nil: the three collections every app knows
+	var colls []string // nil means baseColls
 	if q := r.URL.Query().Get("c"); q != "" {
 		colls = []string{}
 		for _, c := range strings.Split(q, ",") {
@@ -384,9 +369,6 @@ func (a *API) barcode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
-// fed says whether a meal has been served since a moment, and when and by whom the newest one was. A phone asks
-// before its feeding reminder goes off, so nobody is reminded of a meal someone else has already served. Treats do
-// not count, as they do not in the app's feeding times.
 func (a *API) fed(w http.ResponseWriter, r *http.Request) {
 	since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
 	if err != nil || since <= 0 {
@@ -397,9 +379,6 @@ func (a *API) fed(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"fed": at > 0, "at": at, "by": by})
 }
 
-// putPhoto keeps the packaging photo of a variety the server knows, sent by the phone that took it or changed it,
-// in place of the one before. The app sends a photo only where the server has none or where someone changed it
-// („Foto ändern“), never an old one over a newer.
 func (a *API) putPhoto(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {
@@ -430,7 +409,6 @@ func (a *API) putPhoto(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-// getPhoto hands a variety's packaging photo to a phone that does not have it.
 func (a *API) getPhoto(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !recordIDRe.MatchString(id) {

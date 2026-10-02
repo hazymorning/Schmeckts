@@ -23,7 +23,7 @@ func TestNormalisingBarcodes(t *testing.T) {
 	}
 }
 
-// fakeDB stubs an Open Food Facts API; products maps a barcode to the product JSON it returns.
+// products maps a barcode to the product JSON.
 func fakeDB(t *testing.T, products map[string]string, calls *atomic.Int32) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -80,8 +80,8 @@ func TestBarcodeCache(t *testing.T) {
 	db := fakeDB(t, map[string]string{"4006381333931": sheba}, &calls)
 	defer db.Close()
 	a := newBarcodeAPI(t, db.URL)
-	call(a, "GET", "/api/barcode/4006381333931", testCode, nil) // Treffer
-	call(a, "GET", "/api/barcode/96385074", testCode, nil)      // kein Treffer
+	call(a, "GET", "/api/barcode/4006381333931", testCode, nil) // hit
+	call(a, "GET", "/api/barcode/96385074", testCode, nil)      // miss
 	if calls.Load() != 2 {
 		t.Fatalf("%d requests", calls.Load())
 	}
@@ -97,7 +97,6 @@ func TestBarcodeCache(t *testing.T) {
 	if calls.Load() != 3 {
 		t.Fatalf("after 8 days: %d requests, only the miss may have expired", calls.Load())
 	}
-	// The cache survives a restart
 	b := OpenBarcodes(a.cfg.dir)
 	if p, ok := b.cached("4006381333931", now); !ok || p.Brand != "Sheba" {
 		t.Fatal("cache empty after the restart")
@@ -180,7 +179,6 @@ func TestOverview(t *testing.T) {
 	}
 }
 
-// A barcodeUrls entry that url.Parse refuses has to give a 502 without panicking, same as a broken Anthropic address.
 func TestBrokenBarcodeAddress(t *testing.T) {
 	a := newBarcodeAPI(t, brokenURL)
 	if s, out, _ := call(a, "GET", "/api/barcode/4006381333931", testCode, nil); s != 502 || out["error"] == nil {

@@ -1,8 +1,4 @@
-"""Renders from design/schmeckts-app-icon.svg whatever Android will not take as a vector: the launcher icons for
-Android 7 (API 24/25, mipmap-*/ic_launcher.png and ic_launcher_round.png). That file is the whole icon including its
-background. From Android 8 on the adaptive icon from app/native/res (vectors) applies. Needs Python with
-Playwright/Chromium.
-Usage: python3 design/render-icons.py"""
+"""Renders the Android 7 launcher icons from design/schmeckts-app-icon.svg; Android 8 on uses the vectors. Needs Playwright."""
 
 import asyncio
 import pathlib

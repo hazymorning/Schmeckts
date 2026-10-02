@@ -1,15 +1,4 @@
-// Schmeckt's server: shared data and AI recognition for the app on the home network.
-//
-//	schmeckts-server                     start the server (this is how it runs as a system service)
-//	schmeckts-server setup               take the API key from stdin, create a code, show the connection details
-//	schmeckts-server setup --new-code    create a new household code as well
-//	schmeckts-server connection          show the connection details
-//	schmeckts-server overview            show the stored data readably: pets, food, recent meals, devices
-//	schmeckts-server restore <backup.json>   bring the stored data back from a backup
-//	schmeckts-server version
-//
-// The data directory is $STATE_DIRECTORY (set by systemd) or /var/lib/schmeckts.
-// Everything the commands print is German, like the app.
+// Schmeckt's server: shared data and photo recognition for the app on the home network.
 package main
 
 import (
@@ -89,7 +78,7 @@ func serve(dir string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	go func() { // daily backup, checked once an hour, and the photos of varieties that are gone go
+	go func() { // hourly: the daily backup and the photo sweep
 		for {
 			if err := store.Backup(time.Now()); err != nil {
 				log.Printf("backup failed: %v", err)
@@ -129,7 +118,7 @@ func serve(dir string) error {
 	return nil
 }
 
-// ownFiles gives files that root created during setup to the service user.
+// ownFiles hands files that root created during setup to the service user.
 func ownFiles(paths ...string) {
 	u, err := user.Lookup(serviceUser)
 	if err != nil || os.Geteuid() != 0 {
@@ -246,7 +235,6 @@ func running(port int) bool {
 	return res.StatusCode == http.StatusOK
 }
 
-// lanAddress looks for the PC's address on the home network, preferring 192.168.x.x.
 func lanAddress() string {
 	ifaces, _ := net.Interfaces()
 	found := []string{}
@@ -295,7 +283,7 @@ func restore(dir string, args []string) error {
 	if err != nil {
 		return because("Das Backup ist nicht lesbar", err)
 	}
-	st.Epoch = newEpoch() // this makes every phone do a full resync
+	st.Epoch = newEpoch() // makes every phone resync in full
 	usesSystemd := systemctl("is-active", "--quiet", "schmeckts") == nil
 	if usesSystemd {
 		if err := systemctl("stop", "schmeckts"); err != nil {

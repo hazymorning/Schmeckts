@@ -84,12 +84,10 @@ func TestDeleteAndUndo(t *testing.T) {
 	ms := now.UnixMilli()
 	mustApply(t, s, chg("cccccccc1", "pets", "pet1", clock(ms, 0, "anna"), map[string]any{"name": "Minka", "_del": false}))
 	mustApply(t, s, chg("cccccccc2", "pets", "pet1", clock(ms+1000, 0, "anna"), map[string]any{"_del": true}))
-	// A phone was offline and then only changes the name: that does not bring the record back
 	mustApply(t, s, chg("cccccccc3", "pets", "pet1", clock(ms+2000, 0, "jonas"), map[string]any{"name": "Minka II"}))
 	if got := field(s, "pets", "pet1", "_del"); got != "true" {
 		t.Fatalf("_del = %s, a name change must not restore anything", got)
 	}
-	// Undo sets _del to false explicitly
 	mustApply(t, s, chg("cccccccc4", "pets", "pet1", clock(ms+3000, 0, "anna"), map[string]any{"_del": false}))
 	if got := field(s, "pets", "pet1", "_del"); got != "false" {
 		t.Fatalf("_del = %s, undo must restore", got)
@@ -160,7 +158,7 @@ func TestIdenticalAfterRestart(t *testing.T) {
 func TestWriteFailureRollsBack(t *testing.T) {
 	s, dir := openTemp(t)
 	mustApply(t, s, chg("hhhhhhhh1", "pets", "pet1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"name": "Minka"}))
-	os.Mkdir(filepath.Join(dir, stateFile+".tmp"), 0o700) // this makes writing fail
+	os.Mkdir(filepath.Join(dir, stateFile+".tmp"), 0o700) // makes the write fail
 	_, _, _, err := s.Apply([]Change{chg("hhhhhhhh2", "pets", "pet1", clock(now.UnixMilli()+1, 0, "anna"), map[string]any{"name": "Kater"})}, now)
 	if err == nil {
 		t.Fatal("a write failure must be reported, or the phone would drop the change")
@@ -235,8 +233,6 @@ func TestProductsForThePrompt(t *testing.T) {
 	}
 }
 
-// A collection the server has never heard of is kept like the others, so a new kind of data in the app needs no new
-// server; a name of another shape, or one collection too many, is rejected.
 func TestNewCollections(t *testing.T) {
 	s, dir := openTemp(t)
 	ms := now.UnixMilli()
@@ -264,8 +260,7 @@ func TestNewCollections(t *testing.T) {
 	}
 }
 
-// Without collections named, the checksum covers the three every app knows, so an app that does not know a newer
-// one still finds its data level with the server's; named, it covers those.
+// Without colls the checksum covers baseColls only.
 func TestChecksumPerCollection(t *testing.T) {
 	s, _ := openTemp(t)
 	ms := now.UnixMilli()

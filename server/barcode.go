@@ -1,9 +1,6 @@
 package main
 
-// Looks food up by its EAN in Open Pet Food Facts and Open Food Facts.
-// The app only ever asks here; the server remembers the results in barcodes.json
-// (hits for 90 days, misses for 7). The actual code → variety mapping is stored by the app
-// on the food variety (field codes.<EAN>); this lookup is only for unknown codes.
+// EAN lookup in Open Pet Food Facts and Open Food Facts, cached in barcodes.json.
 
 import (
 	"context"
@@ -34,17 +31,16 @@ var (
 	spacesRe           = regexp.MustCompile(`\s+`)
 )
 
-// Product is the result of a lookup, the way the app receives it.
 type Product struct {
 	Found   bool   `json:"found"`
 	Brand   string `json:"brand,omitempty"`
 	Variety string `json:"variety,omitempty"`
 	Type    string `json:"type,omitempty"`
 	Animal  string `json:"animal,omitempty"`
-	At      int64  `json:"at,omitempty"` // in the cache only: when it was looked up
+	At      int64  `json:"at,omitempty"` // ms, set in the cache only
 }
 
-// NormalizeCode accepts only valid EAN-13, EAN-8 and UPC-A. UPC-A becomes EAN-13 with a leading 0.
+// NormalizeCode accepts valid EAN-13, EAN-8 and UPC-A, the last turned into EAN-13.
 func NormalizeCode(raw string) (string, bool) {
 	code := strings.TrimSpace(raw)
 	for _, r := range code {
@@ -69,7 +65,6 @@ func NormalizeCode(raw string) (string, bool) {
 	return code, (10-sum%10)%10 == int(code[len(code)-1]-'0')
 }
 
-// Barcodes looks codes up and remembers the results.
 type Barcodes struct {
 	mu    sync.Mutex
 	dir   string
@@ -79,7 +74,7 @@ type Barcodes struct {
 func OpenBarcodes(dir string) *Barcodes {
 	b := &Barcodes{dir: dir, cache: map[string]Product{}}
 	if raw, err := os.ReadFile(filepath.Join(dir, barcodeFile)); err == nil {
-		json.Unmarshal(raw, &b.cache) // corrupted: stays empty, it is only a cache
+		json.Unmarshal(raw, &b.cache) // a broken file is ignored, it is only a cache
 	}
 	return b
 }
@@ -107,8 +102,7 @@ func (b *Barcodes) remember(code string, p Product) {
 	}
 }
 
-// Lookup returns the result from the cache or asks the databases one after another.
-// If no database is reachable it returns an error and nothing is remembered.
+// Lookup returns an error and remembers nothing when no database answers.
 func (b *Barcodes) Lookup(ctx context.Context, cfg Config, code string, now time.Time) (Product, error) {
 	if p, ok := b.cached(code, now); ok {
 		p.At = 0
@@ -139,14 +133,13 @@ func (b *Barcodes) Lookup(ctx context.Context, cfg Config, code string, now time
 	return Product{Found: false}, nil
 }
 
-// fetchProduct asks one database of the Open Food Facts family (API v2).
 func fetchProduct(ctx context.Context, base, code string) (Product, error) {
 	ctx, cancel := context.WithTimeout(ctx, barcodeTimeout)
 	defer cancel()
 	url := fmt.Sprintf("%s/api/v2/product/%s.json?fields=product_name,product_name_de,brands,categories_tags", base, code)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return Product{}, err // a wrongly configured barcodeUrls; without this the request would be nil
+		return Product{}, err
 	}
 	req.Header.Set("User-Agent", barcodeUserAgent)
 	res, err := http.DefaultClient.Do(req)
@@ -187,7 +180,7 @@ func fetchProduct(ctx context.Context, base, code string) (Product, error) {
 	return Product{Found: true, Brand: brand, Variety: variety, Type: typ, Animal: animal}, nil
 }
 
-// cleanVariety turns "Sheba Fresh Choice Huhn in Sauce 4x50g" into the variety "Fresh Choice Huhn in Sauce".
+// "Sheba Fresh Choice Huhn in Sauce 4x50g" becomes "Fresh Choice Huhn in Sauce".
 func cleanVariety(name, brand string) string {
 	v := quantityRe.ReplaceAllString(name, " ")
 	if brand != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(v)), strings.ToLower(brand)) {
@@ -196,7 +189,6 @@ func cleanVariety(name, brand string) string {
 	return strings.Trim(spacesRe.ReplaceAllString(v, " "), " -–,·|")
 }
 
-// classify derives type and species only when the categories are unambiguous.
 func classify(tags []string) (typ, animal string) {
 	has := func(words ...string) bool {
 		for _, t := range tags {
