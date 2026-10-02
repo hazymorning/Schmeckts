@@ -1,5 +1,3 @@
-/* Date and time in local time; calendar days survive daylight saving changes. */
-
 const rtf = new Intl.RelativeTimeFormat('de', {numeric: 'auto', style: 'short'});
 const pad = n => String(n).padStart(2, '0');
 export const timeStr = t => {
@@ -20,7 +18,7 @@ export const addDays = (t, n) => {
   const d = new Date(t);
   d.setDate(d.getDate() + n);
   return d.getTime();
-}; // calendar days, across daylight saving changes too
+}; // setDate, so a day stays a day across daylight saving changes
 export const weekStart = t => addDays(dayStart(t), -((new Date(t).getDay() + 6) % 7)); // Monday 00:00 local time
 export const toLocalInput = t => `${dayKey(t)}T${timeStr(t)}`;
 export function dayLabel(t) {

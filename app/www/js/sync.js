@@ -1,5 +1,3 @@
-/* Syncing with the server. One cycle: send the queue, catch up on what is new, do a full sync on a different epoch,
-   and compare the checksum whenever the queue is empty. Live notifications only make it quicker. */
 import {PROTOCOL, ServerError, eventsUrl, normCode, normServer, request} from './api.js';
 import {
   ack,
@@ -20,21 +18,18 @@ import {report} from './report.js';
 import {BASE, COLLECTIONS} from './fields.js';
 
 const MAX_CHANGES = 500,
-  MAX_BYTES = 8e6; // the server accepts at most 500 changes and 12 MB per request
+  MAX_BYTES = 8e6; // server limit: 500 changes and 12 MB per request
 const CHECK_EVERY = 5 * 60e3,
   INFO_EVERY = 10 * 60e3;
 
 export const isConnected = () => !!prefs.code;
-/* The collections the server holds: all of ours where it takes any (features "collections", from 1.5.0), otherwise
-   the three every server knows. A change to another one waits in the queue, kept and saved, until the server can take
-   it: an older server would reject it and the change would be lost. The checksum covers the same collections. */
+// an older server rejects collections it does not know, so changes to those wait in the queue; checksum likewise
 const serverColls = () => (status.features?.includes('collections') ? COLLECTIONS : BASE);
 const sendable = x => serverColls().includes(x.c);
-export const pending = () => queue.filter(sendable); // what goes out with the next sync
-export const held = () => queue.filter(x => !sendable(x)); // what waits for a newer server
+export const pending = () => queue.filter(sendable);
+export const held = () => queue.filter(x => !sendable(x));
 
-/* State for the interface. state: off (no server), wait (no contact yet), ok, offline, error.
-   The server reports recognition and features (such as "barcode") in /api/info; null while unknown. */
+// state: off, wait, ok, offline or error; recognition and features are null until /api/info answered
 export const status = {
   state: isConnected() ? 'wait' : 'off',
   kind: '',
@@ -45,7 +40,7 @@ export const status = {
   recognition: null,
   features: null,
 };
-export const syncHooks = {status() {}, reachable() {}}; // interface: draw the status, recognise waiting photos
+export const syncHooks = {status() {}, reachable() {}};
 
 let timer = null,
   running = null,
@@ -142,10 +137,9 @@ const abilities = serverInfo => ({
   features: Array.isArray(serverInfo.features) ? serverInfo.features : [],
 });
 
-/* Can the server do this, "barcode" for instance (from server 1.1.0)? Before the first contact the app asks. */
 export async function serverCan(feature) {
   if (!isConnected()) return false;
-  // Offline, or a server older than 1.1.0: the feature counts as missing, so the failed check is not worth reporting.
+  // offline or an old server: the feature counts as missing, nothing to report
   if (!status.features) await checkInfo(5e3).catch(() => {});
   return !!status.features?.includes(feature);
 }
@@ -156,7 +150,6 @@ function protocolProblem(serverInfo) {
   return '';
 }
 
-/* Sending */
 function batch(limit) {
   const out = [];
   let bytes = 20;
@@ -192,8 +185,7 @@ async function push() {
       if (r.reason === 'clock') {
         restamp(r.id);
         clock++;
-      } // restamp with the corrected time and send again
-      else {
+      } else {
         done.push(r.id);
         log(`change dropped: ${r.detail || r.reason}`);
       }
@@ -204,7 +196,6 @@ async function push() {
   }
 }
 
-/* Catching up */
 async function pull() {
   const known = state.epoch;
   const query = known ? `since=${state.seq}&epoch=${encodeURIComponent(known)}` : 'since=0';
@@ -219,16 +210,15 @@ async function pull() {
   setPosition(res.epoch, res.seq);
 }
 
-/* Self-check */
 async function verify() {
   if (pending().length || Date.now() - checkedAt < CHECK_EVERY) return;
   const colls = serverColls(),
     res = await request('GET', '/api/checksum?c=' + colls.join(','));
   checkedAt = Date.now();
   if (res.epoch !== state.epoch || res.seq !== state.seq) {
-    again = true;
+    again = true; // changed meanwhile, catch up first
     return;
-  } // something new meanwhile: catch up first
+  }
   const mine = await checksum(colls);
   if (pending().length) return;
   if (mine.sum === res.sum) {
@@ -248,7 +238,6 @@ async function verify() {
   await verify();
 }
 
-/* Live notifications */
 function openLive() {
   if (es || !isConnected() || document.hidden || typeof EventSource !== 'function') return;
   es = new EventSource(eventsUrl());
@@ -257,15 +246,15 @@ function openLive() {
     try {
       x = JSON.parse(e.data);
     } catch {
-      return; // unreadable notice: the next cycle catches up anyway
+      return; // the next cycle catches up anyway
     }
     if (!status.live) setStatus({live: true});
     if (x.epoch !== state.epoch || x.seq > state.seq) syncSoon(50);
   });
   es.onerror = () => {
-    closeLive();
+    closeLive(); // no endless retry, the next cycle reconnects
     syncSoon(5e3);
-  }; // no endless retry, the next cycle reconnects
+  };
 }
 function closeLive() {
   if (es) {
@@ -275,8 +264,6 @@ function closeLive() {
   if (status.live) setStatus({live: false});
 }
 
-/* Connecting and disconnecting */
-/* Checks address, protocol and code before anything is taken over. Throws ServerError with a message. */
 export async function checkServer(codeInput, serverInput) {
   const code = normCode(codeInput),
     base = normServer(serverInput);
@@ -297,7 +284,7 @@ export async function checkServer(codeInput, serverInput) {
 }
 
 export function startSession({code, base, serverInfo}) {
-  if (prefs.server && prefs.server !== base) resetSync(); // a different server: do a full sync
+  if (prefs.server && prefs.server !== base) resetSync();
   prefs.server = base;
   prefs.code = code;
   prefs.mode = 'haushalt';
@@ -311,7 +298,6 @@ export function startSession({code, base, serverInfo}) {
   return syncNow();
 }
 
-/* „Jetzt abgleichen“: checks the protocol and the checksum right away too */
 export function retrySync() {
   if (status.kind === 'protocol' || status.kind === 'locked') {
     status.kind = '';
@@ -328,7 +314,7 @@ export function disconnect() {
   prefs.code = '';
   prefs.mode = 'lokal';
   savePrefs();
-  resetSync(); // the data stays on the device; the next connection does a full sync
+  resetSync(); // data stays here; the next connection does a full sync
   setStatus({state: 'off', kind: '', message: '', lastOk: 0, recognition: null, features: null});
 }
 

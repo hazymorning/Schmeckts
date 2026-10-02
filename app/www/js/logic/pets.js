@@ -1,6 +1,4 @@
-/* Creating, editing and deleting pets. The profile picture is cropped (step „crop“) and taken over with
-   „Speichern“. From the home page the editor is a sheet; from the settings it is one of their pages, with a
-   history entry of its own, and saving or removing leads back to the overview. */
+// from the settings the editor is a page with its own history entry, elsewhere a sheet
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
 import {dayKey} from '../dates.js';
@@ -13,7 +11,7 @@ import {toast} from '../ui/toast.js';
 import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 
-/* Everything the editor puts on the state. As a page these are exactly the keys the way back takes off again. */
+// as a page, exactly these keys are taken off again on the way back
 export const petState = p => ({
   id: p?.id || null,
   name: p?.name || '',
@@ -31,7 +29,6 @@ export function openPet(id, inSettings = false) {
   if (inSettings) openPage('pet', petState(p));
   else openSheet({kind: 'pet', ...petState(p)});
 }
-/* Back to where the editor was opened from: in the settings one level up, otherwise out of the sheet. */
 function leave(msg) {
   if (sheet.kind === 'settings') {
     backPage();
@@ -44,7 +41,6 @@ function leave(msg) {
     toast(msg);
   });
 }
-/* Open the crop on a chosen file */
 async function openCrop(load) {
   const s = sheet;
   if (!editing(s)) return;
@@ -52,7 +48,6 @@ async function openCrop(load) {
   try {
     img = await load();
   } catch {
-    // An unreadable file leaves nothing to crop; the toast asks for another photo
     toast('Das Foto ließ sich nicht lesen.');
     return;
   }
@@ -80,7 +75,7 @@ export function savePet() {
     $('#f-name')?.focus();
     return;
   }
-  const birthday = (s.birthday || '').trim(); // „YYYY-MM-DD“ from the date field, so text compares as dates do
+  const birthday = (s.birthday || '').trim(); // YYYY-MM-DD, so text compares like dates
   if (birthday > dayKey(Date.now())) {
     toast('Das Geburtsdatum liegt in der Zukunft.');
     $('#f-birthday')?.focus();
@@ -90,7 +85,7 @@ export function savePet() {
     p = isNew ? {id: uid(), createdAt: Date.now()} : getPet(s.id) || {};
   Object.assign(p, {name, species: s.species, photo: s.photo || null});
   if (birthday) p.birthday = birthday;
-  else delete p.birthday; // absent, and the field goes on the other phones as well
+  else delete p.birthday; // removed on the other phones too
   if (isNew) db.pets.push(p);
   save();
   haptic('success');

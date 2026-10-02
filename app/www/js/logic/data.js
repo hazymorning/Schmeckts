@@ -1,5 +1,4 @@
-/* Exporting and importing a backup, sample data, deleting everything.
-   With a server, import and delete apply to the whole household. Sample data exists only without a server. */
+// with a server, import and delete apply to the whole household
 import {uid} from '../fields.js';
 import {Native, appInfo, haptic} from '../native.js';
 import {report} from '../report.js';
@@ -29,8 +28,7 @@ export function wipe() {
   });
 }
 
-/* A shared file (backup or exchange) stays in the cache until the receiving app has read it:
-   gone on the next start and before the next export */
+// a shared file has to stay in the cache until the receiving app has read it
 export async function clearExports() {
   if (!Native?.Filesystem) return;
   try {
@@ -67,10 +65,7 @@ export async function exportData() {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   toast('Backup gespeichert');
 }
-/* The phone's last reading of a packaging photo as a test fixture for tests/fixtures/ocr (PROJECT.md, „Text
-   recognition“): the plugin's own answer, the size of the photo and, once the meal has been named, what it really
-   was, for a person to check before the file goes into the tests. Only through the deep link schmeckts://ocr-dump,
-   never from the interface, and only while the app has not been closed since: the reading lives in memory. */
+// a fixture for tests/fixtures/ocr; a person checks it before it goes into the tests
 export async function exportReading() {
   const r = lastReading();
   if (!r || !Native?.Filesystem || !Native?.Share) return toast('Noch kein Foto gelesen.');
@@ -83,9 +78,9 @@ export async function exportReading() {
     width: r.width,
     height: r.height,
     ms: r.ms,
-    ...(timing.on ? {timings: timing.ms} : {}), // milliseconds per reading by the long edge (schmeckts://ocr-measure)
+    ...(timing.on ? {timings: timing.ms} : {}),
     expected: {
-      brand: p ? p.brand || '' : null, // null: not named yet, a person fills it in
+      brand: p ? p.brand || '' : null, // null: not named yet, filled in by hand
       variety: p ? p.variety || '' : null,
       type: p?.type || null,
       animal: p?.animal || null,
@@ -93,10 +88,9 @@ export async function exportReading() {
       locked: false,
     },
     result: r.raw,
-    // the part around the variety read a second time: where in the photo, how much larger, and what came out
     ...(r.second ? {second: secondOf(r.second)} : {}),
   };
-  // One field per line: the expectations are read and changed by hand, the plugin's answer is data
+  // one field per line, the expectations get edited by hand
   const json = `{\n${Object.entries(fixture)
     .map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`)
     .join(',\n')}\n}\n`;
@@ -134,14 +128,11 @@ export async function importData(file) {
       });
     });
   } catch {
-    // One message for every broken file; picking another one is all a person can do here
     toast('Diese Datei ist kein gültiges Backup.');
   }
 }
 const demoId = () => DEMO + uid();
-/* One sample pet with eight varieties and their ratings, two people, and the usual feeding times. The data is made
-   up, but it has to look like a phone in use so that „Einkaufen“ has all three cards and „Worauf es ankommt“ is not empty:
-   two varieties in jelly against two pâtés, and two in sauce where only the sauce gets licked. */
+// made up, but it has to look like a phone in use so every evaluation has something to show
 const DEMO_PLAN = [
   ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
   ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],
@@ -153,10 +144,10 @@ const DEMO_PLAN = [
   ['Dreamies', 'Käse', 'Snack', ['verputzt', 'verputzt']],
 ];
 const DEMO_PEOPLE = ['Anna', 'Jonas'];
-const DEMO_SLOTS = [7.25, 18.1, 12.5, 19.4]; // typical feeding times, as hours of the day
-const DEMO_CALM = 6; // the newest meals without weak ratings, so the sample never reports „frisst schlechter“
-const DEMO_RATED_AFTER = 2 * 3600e3; // rated two hours after the meal
-const DEMO_OPEN_AGO = 2 * 3600e3; // the one meal still open was served two hours ago
+const DEMO_SLOTS = [7.25, 18.1, 12.5, 19.4]; // hours of the day
+const DEMO_CALM = 6; // newest meals without weak ratings, so the sample never reports a decline
+const DEMO_RATED_AFTER = 2 * 3600e3;
+const DEMO_OPEN_AGO = 2 * 3600e3;
 const DAY = 864e5;
 
 export function loadDemo() {
@@ -175,20 +166,19 @@ export function loadDemo() {
   });
 }
 
-/* The varieties with their ratings, spread over the days backwards from today */
 function demoMeals(pet) {
   const made = [],
     byBrand = {};
   for (const [brand, variety, type, ratings] of DEMO_PLAN) {
     const p = newProduct({brand, variety, type, animal: 'Katze'}, demoId());
     p.lastPets = [pet.id];
-    byBrand[brand] ??= p; // the first of a brand, Felix: Huhn in Gelee
+    byBrand[brand] ??= p;
     for (const r of ratings)
       made.push({id: demoId(), productId: p.id, servedAt: 0, pets: {[pet.id]: {r, at: null}}, note: ''});
   }
   spreadOverDays(made, pet);
   made[3].note = 'Neue Packung';
-  // One meal from two hours ago, still without a rating, so „Wie war’s?“ is not empty
+  // one unrated meal, so the rating prompt is not empty
   made.push({
     id: demoId(),
     productId: byBrand.Felix.id,
@@ -200,8 +190,7 @@ function demoMeals(pet) {
   return made;
 }
 
-/* A few observations, so the diary and „Vorlieben“ show what they are: a stink in the evening after the newest meal of
-   „Rind Pastete“, and a tired day three days back */
+// so the diary and the preferences have something to show
 function demoObservations(pet, made) {
   const pastete = made.find(s => getProduct(s.productId)?.variety === 'Rind Pastete' && s.servedAt < Date.now() - DAY),
     tired = new Date(Date.now() - 3 * DAY);
@@ -212,8 +201,6 @@ function demoObservations(pet, made) {
   ].filter(Boolean);
 }
 
-/* Two meals a day backwards from yesterday, at the usual times and alternating between the two people.
-   The order is random, except that the newest days carry no weak rating. */
 function spreadOverDays(made, pet) {
   const now = Date.now();
   made.sort(() => Math.random() - 0.5);
@@ -229,8 +216,7 @@ function spreadOverDays(made, pet) {
   });
 }
 
-/* Before connecting: remove the sample data so that none of it reaches the household. That includes meals
-   served only for the sample pet, and food that no other meal uses. */
+// before connecting, so none of the sample reaches the household
 export function purgeDemo() {
   const demo = id => id.startsWith(DEMO);
   const pets = new Set(db.pets.filter(p => demo(p.id)).map(p => p.id));
@@ -247,7 +233,7 @@ export function purgeDemo() {
   const observations = new Set(db.observations.filter(o => demo(o.id) || onlyDemo(o)).map(o => o.id));
   if (!pets.size && !servings.size && !products.size && !observations.size) return;
   purge({pets, products, servings, observations});
-  let touched = false; // keep mixed meals and observations, only take the sample pet out of them
+  let touched = false; // mixed records stay, minus the sample pet
   for (const s of [...db.servings, ...db.observations])
     for (const id of Object.keys(s.pets))
       if (pets.has(id)) {

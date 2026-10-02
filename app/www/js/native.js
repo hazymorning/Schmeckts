@@ -1,4 +1,4 @@
-/* Bridge to Android. In the app the Capacitor plugins are available; in the browser Native is null. */
+// Capacitor plugins in the app; Native is null in the browser
 import {jpegSize, readingOf} from './reading.js';
 import {report} from './report.js';
 
@@ -6,23 +6,20 @@ export const Native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.
 export const appInfo = {version: ''};
 const plugin = name => (Native ? Native[name] || window.Capacitor.registerPlugin?.(name) : null);
 
-/* Haptics in three strengths: selection light, success medium, deletion and errors pronounced */
 const LEVELS = {select: ['LIGHT', 8], success: ['MEDIUM', 16], strong: ['HEAVY', 32]};
 export const haptic = (level = 'select') => {
   const [style, ms] = LEVELS[level] || LEVELS.select;
   try {
-    // Nothing a person could act on depends on haptics, so a phone that cannot or may not vibrate is ignored here.
     Native?.Haptics ? Native.Haptics.impact({style}).catch(() => {}) : navigator.vibrate?.(ms);
   } catch {
-    /* see above */
+    // nothing depends on haptics, a phone that cannot vibrate is ignored
   }
 };
 
-/* Make a file from another app (content:// or file://) readable through Capacitor's own server */
+// a content:// or file:// uri from another app, served through Capacitor
 export const fileUrl = uri => window.Capacitor?.convertFileSrc?.(uri) || uri;
 
-/* Pass text on: through the share menu in the app (Share plugin), navigator.share in the browser, the clipboard
-   otherwise. Returns 'copied' when the text was only copied, 'shared' otherwise. Cancelling is not an error. */
+// 'copied' when it only reached the clipboard; cancelling is not an error
 export async function shareText(title, text) {
   try {
     if (Native?.Share) await Native.Share.share({title, text, dialogTitle: title});
@@ -37,8 +34,7 @@ export async function shareText(title, text) {
   return 'shared';
 }
 
-/* Local notifications for the rating reminder (plugin @capacitor/local-notifications). Simulated in the browser with
-   the page's own notifications: same interface, but scheduling only lasts while the page is open. */
+// browser stand-in: schedules only last while the page is open
 function browserNotifications() {
   const N = window.Notification,
     pending = new Map(),
@@ -77,11 +73,7 @@ function browserNotifications() {
 }
 export const Notifications = plugin('LocalNotifications') || browserNotifications();
 
-/* Our own plugin (app/native/java) for the feeding reminder: set() takes every reminder at once, each {id, at, since,
-   title, body, sure}, with the household server while connected, and the ids of those shown for a time that has
-   been served since (dismiss). When one is due it asks the server whether a meal has been served since `since` and
-   stays quiet if so; a tap opens schmeckts://feed. In the browser the page's own notifications stand in while the
-   page is open, without asking anyone, and a tap reaches the listeners for 'tap'. */
+// browser stand-in for our own plugin, only while the page is open
 function browserFeedReminder() {
   const N = window.Notification,
     timers = [],
@@ -105,24 +97,17 @@ function browserFeedReminder() {
 }
 export const FeedReminder = plugin('FeedReminder') || browserFeedReminder();
 
-/* Our own plugin (app/native/java): starts the camera app when the app's own camera (ui/camera.js) will not run.
-   hint appears briefly above the camera. */
+// our own plugin: the system camera app, for when ui/camera.js will not run
 const Photo = plugin('Photo');
 export const canTakePhoto = () => !!Photo;
 export async function takePhoto(hint) {
-  // the photo as a blob, null on cancel
   if (!Photo) return null;
   const r = await Photo.capture(hint ? {hint} : undefined);
   if (!r?.base64) return null;
   return fetch('data:image/jpeg;base64,' + r.base64).then(x => x.blob());
 }
 
-/* Read text off a photo (plugin @capacitor-mlkit/text-recognition, processImage only, Latin script).
-   Runs on the device, without network and without a key; it needs no camera permission, as the photo comes from
-   the existing flow. The plugin reads from a path, so the photo goes into the private cache and is deleted right
-   after. Returns {text, width, height, lines, ms, raw}: the text, the size of the photo, the lines with their place
-   and size (readingOf() in reading.js), how long the plugin took and its whole answer, which recognize.js keeps in
-   memory for schmeckts://ocr-dump. Empty on any failure. */
+// on-device text recognition; the plugin reads from a path, so the photo passes through the private cache
 const TextReader = plugin('TextRecognition');
 const TEXT_FILE = 'schmeckts-ocr.jpg';
 const UNREAD = {text: '', width: 0, height: 0, lines: [], ms: 0, raw: null};
@@ -147,10 +132,7 @@ export async function readPhoto(b64) {
   }
 }
 
-/* Read a barcode with Google's ready-made scan interface (plugin @capacitor-mlkit/barcode-scanning, scan() only).
-   Google Play services drive the camera for it, without the app's camera permission. If their scanner module is
-   missing, it is installed first and onInstall shows a notice meanwhile. Returns the code read, null on cancel, and
-   throws when scanning does not work on this phone. Simulated in the browser: the code is typed in. */
+// Play services drive the camera, so no camera permission is needed; their module is installed first if missing
 const Scanner = plugin('BarcodeScanner');
 const FORMATS = ['EAN_13', 'EAN_8', 'UPC_A'];
 const INSTALL = {completed: 4, canceled: 3, failed: 5}; // GoogleBarcodeScannerModuleInstallState

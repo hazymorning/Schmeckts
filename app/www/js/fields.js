@@ -1,22 +1,20 @@
-/* Records as fields, the way the server syncs them: every key except id, and maps (MAPS) entry by entry as
-   <map>.<key>. null removes, local fields stay on the phone. Pure functions. */
+// records as the server syncs them: one field per key, maps entry by entry as <map>.<key>, null removes
 import {report} from './report.js';
 
 export const COLLECTIONS = ['pets', 'products', 'servings', 'observations'];
-/* The collections every household server knows. Any other one only a server that says "collections" in its features
-   (from 1.5.0) takes; until then its changes wait in the queue (sync.js). */
+// every server knows these; others need the "collections" feature
 export const BASE = ['pets', 'products', 'servings'];
-const MAPS = {servings: ['pets'], products: ['codes'], observations: ['pets']}; // maps, synced entry by entry
-const LOCAL = new Set(['photo', 'status', 'error', 'autoPets', 'scanCode', 'guess']); // in servings only
+const MAPS = {servings: ['pets'], products: ['codes'], observations: ['pets']};
+const LOCAL = new Set(['photo', 'status', 'error', 'autoPets', 'scanCode', 'guess']);
 const ID_RE = /^[A-Za-z0-9_-]{4,40}$/; // as on the server
-export const validId = id => typeof id === 'string' && ID_RE.test(id); // test(undefined) would otherwise be true
+export const validId = id => typeof id === 'string' && ID_RE.test(id); // test(undefined) would be true
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const FIELD_RE = /^(_del|[A-Za-z][A-Za-z0-9]{0,31})(\.[A-Za-z0-9_-]{1,40})?$/;
-const MAX_FIELD = 500e3; // the server accepts up to 512 KB per field
+const MAX_FIELD = 500e3; // the server takes up to 512 KB per field
 
 const isMap = (c, k) => !!MAPS[c]?.includes(k);
 
-/* Every synced field of a record as JSON text: {field: '"value"'} */
+// {field: '"value"'}, values as JSON text
 export function fieldsOf(c, rec) {
   const out = {};
   const put = (k, v) => {
@@ -43,7 +41,7 @@ export function valueOf(c, rec, k) {
   return (b != null ? rec?.[a]?.[b] : rec?.[a]) ?? null;
 }
 
-/* Sets a field. false: this device does not know the field (a map from a newer version) and does not keep it. */
+// false: a field this device does not know, e.g. a map from a newer version
 export function setField(c, rec, k, v) {
   const [a, b] = splitKey(k);
   if (b != null) {
@@ -58,7 +56,6 @@ export function setField(c, rec, k, v) {
   return true;
 }
 
-/* Record from field values {field: value} */
 export function fromFields(c, id, values) {
   const rec = {id};
   for (const m of MAPS[c] || []) rec[m] = {};
@@ -66,7 +63,6 @@ export function fromFields(c, id, values) {
   return rec;
 }
 
-/* Only complete records show up in the app */
 export const complete = (c, rec) =>
   c === 'servings'
     ? typeof rec.servedAt === 'number' && !!rec.pets

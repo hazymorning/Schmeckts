@@ -1,5 +1,4 @@
-/* Every click runs through data-action and the ACTIONS object. Plus input, the keyboard, the file picker
-   and the deep links schmeckts://feed, schmeckts://scan and schmeckts://photo. Registers itself as it loads. */
+// registers its document listeners on import
 import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
@@ -43,7 +42,6 @@ import {
   toggleObservationPet,
 } from './logic/observations.js';
 
-/* Connecting to the household: check address, protocol and code first, then remove the sample data and sync */
 async function connectServer() {
   if (sheet?.kind !== 'settings' || sheet.connecting) return;
   Object.assign(sheet, {connecting: true, connectError: ''});
@@ -70,14 +68,12 @@ async function connectServer() {
   }
 }
 function disconnectServer() {
-  // switches to mode `lokal`
   disconnect();
   renderSheet();
   update();
   toast('Verbindung getrennt. Die Daten bleiben auf diesem Handy.');
 }
 function openConnect() {
-  // fields for address and code, from the „Haushalt“ page, from elsewhere in the settings or from the welcome page
   if (sheet?.kind === 'settings') {
     sheet.connectForm = true;
     if (sheet.page === 'house') renderSheet();
@@ -85,7 +81,7 @@ function openConnect() {
   } else openSheet({kind: 'settings', page: 'house', connectForm: true});
   requestAnimationFrame(() => $(prefs.server ? '#f-code' : '#f-server')?.focus({preventScroll: true}));
 }
-/* „Jetzt abgleichen“: only this hand-started sync shows progress, and only after 600 ms */
+// progress shows only after 600 ms, so a quick sync does not flicker
 async function syncByHand() {
   const s = sheet;
   if (s?.kind !== 'settings' || s.syncing) return;
@@ -105,7 +101,7 @@ async function syncByHand() {
   }
 }
 
-/* Tap twice instead of a confirmation dialog */
+// tap twice instead of a confirmation dialog
 const ARMED = {'delete-product': deleteProduct, 'delete-pet': deletePet, wipe, disconnect: disconnectServer};
 let armTimer = null;
 function arm(el) {
@@ -131,7 +127,7 @@ function arm(el) {
 const ACTIONS = {
   filter(el) {
     const id = el.dataset.id;
-    if (id !== 'all' && (db.pets.length === 1 || prefs.activePet === id)) return openPet(id); // tapping again = edit
+    if (id !== 'all' && (db.pets.length === 1 || prefs.activePet === id)) return openPet(id); // tapping again edits
     prefs.activePet = id;
     savePrefs();
     haptic('select');
@@ -146,21 +142,21 @@ const ACTIONS = {
   },
   'open-pet'(el) {
     openPet(el.dataset.id);
-  }, // from the overview
+  },
   'toggle-overview'() {
     haptic('select');
     toggleOverview();
-  }, // the overview's whole text and back
+  },
   'observe-open'() {
     haptic('select');
     toggleObserve();
-  }, // „Beobachtung notieren“: the chips fold open, „Abbrechen“ folds them shut
+  },
   observe(el) {
     observe(el.dataset.v);
-  }, // a chip: saved at once
+  },
   'open-observation'(el) {
     openSheet({kind: 'observation', id: el.dataset.id});
-  }, // from the diary, to put it right or delete it
+  },
   'set-observation-kind'(el) {
     setObservationKind(el.dataset.v);
   },
@@ -173,22 +169,20 @@ const ACTIONS = {
   'open-settings'() {
     openSheet({kind: 'settings'});
   },
-  // The settings: one page per group of settings, the back arrow and the Android back button lead to the overview
   'settings-page'(el) {
     haptic('select');
     openPage(el.dataset.v);
   },
   'settings-back'() {
     haptic('select');
-    sheetBack(); // one level, and from the overview out to the home page
+    sheetBack();
   },
   'open-report'(el) {
     openSheet(reportState(el.dataset.v || null));
-  }, // data-v: the day it opens at
+  },
   'open-evaluation'() {
     openSheet({kind: 'evaluation'});
   },
-  // a page one level below the page that is open, such as „Worauf es ankommt“ from „Vorlieben“; back returns to it
   'open-level'(el) {
     openPage(el.dataset.v);
   },
@@ -210,7 +204,7 @@ const ACTIONS = {
     savePrefs();
     haptic('select');
     update();
-  }, // welcome page: „Nur auf diesem Handy“
+  },
   'edit-server'() {
     sheet.editServer = true;
     renderSheet();
@@ -228,29 +222,27 @@ const ACTIONS = {
   },
   serve(el) {
     const {id, code} = el.dataset;
-    closeAll().then(() => serveProduct(id, code)); // ends on the home page, where the meal is rated, from a page too
-  }, // code: from the choice after scanning
+    closeAll().then(() => serveProduct(id, code)); // the meal is rated on the home page
+  },
   scan() {
     scan();
   },
   photo() {
     shootPhoto('', sheet?.kind === 'feed' ? sheet.code : '');
-  }, // the code after scanning, if the photo button takes it over
-  // data-v: what was typed in the feeding sheet's search, when nothing matched it
+  },
   'new-product'(el) {
     openSheet({kind: 'new', brand: '', variety: el.dataset.v || '', type: 'Nassfutter'});
   },
   rate(el) {
     rate(el);
   },
-  // The packaging photo, large, grown out of its thumbnail. A file that can no longer be read is let go, and so is
-  // the mark of a variety whose photo the household server does not have; a server out of reach is only named.
+  // an unreadable file is let go, and so is a sharedPhoto mark the server cannot back up
   async 'view-photo'(el) {
     const s = getServing(el.dataset.s),
       p = getProduct(el.dataset.p);
     let away = null;
-    if (p && !keptPhoto(p.id)) el.setAttribute('aria-busy', 'true'); // fetched from the household server first
-    let stale = null; // the server holds a newer photo than this phone, and could not be reached: the old one stands in
+    if (p && !keptPhoto(p.id)) el.setAttribute('aria-busy', 'true');
+    let stale = null;
     const load = () =>
       photoSrc(s, p, e => {
         stale = e;
@@ -263,7 +255,7 @@ const ACTIONS = {
         .finally(() => el.removeAttribute('aria-busy'));
     if ((await openViewer(load, el)) !== false) {
       if (stale) toast('Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar.');
-      return; // open, or already opening
+      return;
     }
     if (away)
       return toast(
@@ -275,13 +267,13 @@ const ACTIONS = {
     }
     toast('Das Foto ist nicht mehr da.');
     if (sheet) renderSheet();
-    else update(); // the thumbnail is a plain one again
+    else update();
   },
   'open-serving'(el) {
     const s = getServing(el.dataset.id);
     if (!s) return;
     const unknown = !s.productId && s.status !== 'recognizing';
-    openSheet({kind: 'serving', id: s.id, step: unknown ? 'name' : null, ...guessOf(s)}); // the brand and variety that were read are already there
+    openSheet({kind: 'serving', id: s.id, step: unknown ? 'name' : null, ...guessOf(s)});
   },
   'edit-name'() {
     const s = getServing(sheet.id),
@@ -297,23 +289,23 @@ const ACTIONS = {
   },
   rephoto() {
     rephoto();
-  }, // „Neues Foto“ while naming
+  },
   'product-photo'(el) {
     reshootProduct(el.dataset.id);
-  }, // „Foto ändern“ under a variety's card
+  },
   'use-product'(el) {
     useProduct(el.dataset.id);
   },
   'pack-line'(el) {
     setPackLine(el.dataset.field, el.dataset.v);
-  }, // a chip read off the packaging: its field takes it, or is cleared by the pressed one
+  },
   'set-type'(el) {
     sheet.type = el.dataset.v;
     if (!textureOf(sheet, sheet.texture)) delete sheet.texture;
     renderSheet();
-  }, // the texture no longer fits the new type: cleared, so it is asked again
+  },
   'set-texture'(el) {
-    // a second tap clears it (null = none): at once in the food sheet, until „Speichern“ while naming
+    // a second tap clears it; saved at once in the food sheet, on save while naming
     const v = el.dataset.v;
     if (sheet.kind === 'product' && sheet.step !== 'name') {
       toggleTexture(sheet.id, v);
@@ -348,7 +340,7 @@ const ACTIONS = {
   },
   'delete-serving'(el) {
     deleteServing(el.dataset.id || sheet?.id);
-  }, // from the sheet, or from the meal's card on the home page
+  },
   'open-product'(el) {
     openSheet({kind: 'product', id: el.dataset.id});
   },
@@ -360,12 +352,12 @@ const ACTIONS = {
     haptic('select');
     renderSheet();
     update();
-  }, // food sheet, section „Kaufen“
+  },
   'hint-buy'(el) {
     setKaufen(el.dataset.id, el.dataset.v);
     haptic('success');
     update();
-  }, // hint settled, on every device
+  },
   'hide-hint'(el) {
     if (!prefs.hiddenHints.includes(el.dataset.v)) prefs.hiddenHints.push(el.dataset.v);
     savePrefs();
@@ -409,25 +401,24 @@ const ACTIONS = {
     haptic('select');
     renderSheet();
     update();
-  }, // the profile picture behind the header
+  },
   lookup() {
     prefs.lookup = !prefs.lookup;
     savePrefs();
     haptic('select');
     renderSheet();
-  }, // product lookup on the internet, off by default
+  },
   'server-photo'() {
     prefs.serverPhoto = !prefs.serverPhoto;
     savePrefs();
     haptic('select');
     renderSheet();
-  }, // photo recognition through the server, only on this phone, on by default
+  },
   'feed-remind'() {
     haptic('select');
     setFeedRemind(!prefs.feedRemind);
-  }, // reminder to feed at the usual times
+  },
   'remind-on'() {
-    // the switch: on takes the step last chosen, off keeps it for the next time
     haptic('select');
     sheet.ownRemind = false;
     setRemind(prefs.remind ? 0 : remindStep());
@@ -436,9 +427,9 @@ const ACTIONS = {
     haptic('select');
     sheet.ownRemind = false;
     setRemind(+el.dataset.v);
-  }, // rating reminder, asks for the permission
+  },
   'remind-own'() {
-    // „Eigene“: a field for whole hours, starting at the current interval, or 2 hours coming from „Aus“
+    // minutes; 2 h when coming from off
     haptic('select');
     sheet.ownRemind = true;
     setRemind(prefs.remind || 120).then(() => $('#f-remind')?.select());
@@ -456,22 +447,22 @@ const ACTIONS = {
   'share-changes'() {
     haptic('select');
     shareChanges();
-  }, // manual exchange, page „Austausch von Hand“
+  },
   'send-answer'() {
     haptic('select');
     shareChanges(sheet?.exchange?.peer);
-  }, // exactly what the other device is missing
+  },
   demo() {
     loadDemo();
   },
   fold(el) {
     haptic('select');
     foldPart(el.dataset.v);
-  }, // a part of a page, such as „Lieber nicht“ on „Einkaufen“
+  },
   'jump-day'(el) {
     haptic('select');
-    if (sheet?.kind === 'report') return jumpToDay(el.dataset.day); // the page's own calendar scrolls within it
-    openSheet(reportState('d-' + el.dataset.day)); // the home page shows only the current day: the history page opens there
+    if (sheet?.kind === 'report') return jumpToDay(el.dataset.day);
+    openSheet(reportState('d-' + el.dataset.day));
   },
   undo() {
     const u = toastUndo;
@@ -483,18 +474,14 @@ const ACTIONS = {
   },
 };
 
-/* Deep links and app shortcuts: schmeckts://feed opens the feeding sheet, schmeckts://scan starts the scanner in it
-   (logic/scan.js), schmeckts://photo our own camera (shootPhoto in logic/feeding.js). The German names from before
-   the move to English keep working: they sit in people's shortcuts. After „Abbrechen“ the feeding sheet stays open.
-   schmeckts://ocr-dump is for collecting test fixtures and shares the last text read off a photo (logic/data.js),
-   schmeckts://ocr-measure switches the measuring of how long reading takes on and off (recognize.js). */
+// fuettern and foto are the old names, still in people's shortcuts
 const LINKS = {feed: null, fuettern: null, scan, photo: shootPhoto, foto: shootPhoto};
 export async function openLink(url) {
   const raw = String(url || '');
   if (/^(content|file):/i.test(raw)) {
     await receiveUri(raw);
     return true;
-  } // an exchange file from another app
+  }
   const path = raw
     .replace(/^schmeckts:\/*/i, '')
     .replace(/[/?#].*$/, '')
@@ -524,7 +511,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (el && ACTIONS[el.dataset.action]) ACTIONS[el.dataset.action](el);
 });
-// A chip read off the packaging takes no focus: the field being typed in keeps it, and its keyboard stays
+// pack-line chips take no focus, so the field keeps its keyboard
 document.addEventListener('pointerdown', e => {
   if (e.target.closest('[data-action=pack-line]')) e.preventDefault();
 });
@@ -548,7 +535,7 @@ document.addEventListener('input', e => {
     savePrefs();
   }
   if (t.hasAttribute('data-remind')) {
-    // own hours: valid values take effect at once, the field stays put while typing
+    // valid values apply at once, without a redraw that would interrupt typing
     const h = Number(t.value);
     if (Number.isInteger(h) && h >= 1 && h <= REMIND_MAX_H) setRemind(h * 60, false);
   }
@@ -576,7 +563,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.hasAttribute('data-remind')) return renderSheet(); // leaving the field: shows the current value again
+  if (t.hasAttribute('data-remind')) return renderSheet();
   if (t.dataset.obsTime && t.value) return setObservationTime(t.dataset.obsTime, new Date(t.value).getTime());
   if (!t.dataset.time || !t.value) return;
   const s = getServing(t.dataset.time),
@@ -596,9 +583,9 @@ const onFile = (id, fn) =>
     e.target.value = '';
     fn(f);
   });
-onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : '')); // the code after scanning, if the photo button takes it over
-onFile('#camInputName', f => replacePhoto(sheet?.id, f)); // „Neues Foto“ in the browser
-onFile('#camInputProduct', productPhotoFile); // „Foto ändern“ in the browser
+onFile('#camInputSheet', f => servePhoto(f, sheet?.kind === 'feed' ? sheet.code : ''));
+onFile('#camInputName', f => replacePhoto(sheet?.id, f));
+onFile('#camInputProduct', productPhotoFile);
 onFile('#petPhotoInput', setPetPhoto);
 onFile('#importInput', importData);
 onFile('#exchangeInput', receiveFile);

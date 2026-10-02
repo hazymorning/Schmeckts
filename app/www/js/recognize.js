@@ -1,8 +1,4 @@
-/* Recognising a food packaging. The chain sits in one place (identify) and runs cheapest first:
-   known barcode in the household → product lookup on the internet (if allowed) → server (barcode always, the photo
-   only while „Fotos über den Server erkennen“ is on) → on-device text recognition → empty form.
-   Every stage may be skipped, an error moves on to the next; note() tells the interface what is running.
-   Errors from photo recognition through the server carry retry: true when another attempt is worth it. */
+// stages run cheapest first; any may be skipped, and an error moves on to the next
 import {ServerError, request} from './api.js';
 import {SPECIES, TYPES} from './config.js';
 import {readPhoto} from './native.js';
@@ -27,8 +23,7 @@ const RETRY = new Set(['offline', 'busy', 'unavailable', 'server', 'auth', 'lock
 const LOOKING = 'Barcode wird nachgeschlagen …',
   READING = 'Sorte wird erkannt …';
 
-/* One stage: name, its condition, the notice while it runs, what it does. Result {products}, {details} or null;
-   the phone's own reading adds the lines and the brands it read. */
+// run() gives {products}, {details} or null
 const STEPS = [
   {
     name: 'codes',
@@ -55,18 +50,16 @@ const STEPS = [
       if (timing.on && o.sharp) await measure(o, first);
       const read = second ? joinReadings(first, second.read, second) : first;
       const pack = readPack(read, db.products),
-        // one of our own varieties on the packaging: served like a barcode hit, where the phone is the one reading
+        // a known variety counts like a barcode hit, unless the server reads photos
         known = !photoByServer() && pack.known ? getProduct(pack.known) : null;
       const hit = known ? {products: [known]} : asDetails(pack);
-      // the lines and the brands are offered as chips while naming, tidied the same way, so a chip and the field agree
+      // tidied like the fields, so a chip and its field agree
       return hit && {...hit, lines: packLines(read, '', db.products), brands: packBrands(read, db.products)};
     },
   },
 ];
 
-/* The second reading (SECOND_PASS in ocr.js): the part around the variety, enlarged, read again. Only after a first
-   reading that was quick enough and found a line that stands out. {crop, scale, read} or null; anything that goes
-   wrong on the way leaves the first reading as it is. */
+// only after a quick first reading with a line that stands out; a failure leaves the first reading as it is
 async function readAgain(b64, first) {
   const crop = SECOND_PASS && first.raw && first.ms <= SECOND_PASS_MS ? focusOf(first, db.products) : null;
   if (!crop) return null;
@@ -80,35 +73,24 @@ async function readAgain(b64, first) {
   }
 }
 
-/* Whether the server recognises packaging photos: connected, and not switched off under „Scannen“. With the
-   switch off the photo takes the same way as without a household, the phone reading the text itself. */
 export const photoByServer = () => isConnected() && prefs.serverPhoto;
 
-/* What the phone read off a packaging, per meal and in memory only, like the large photo: never stored and never
-   synced. {lines, brands}: while naming, the lines stand as chips under „Sorte“ and the brands under „Marke“
-   (views/sheets.js). */
+// meal → {lines, brands}, memory only
 export const memLines = new Map();
-/* When the phone began reading a meal's packaging, per meal and in memory (logic/feeding.js keeps it): for
-   READ_PATIENCE from then on „Futter benennen“ shows a skeleton in place of the fields, after that the empty fields
-   with the notice that the reading is still on, which then fills only what is still empty (views/sheets.js). */
+// ms the naming sheet shows a skeleton before the empty fields
 export const READ_PATIENCE = 2500;
 export const readingSince = new Map();
 
-/* The phone's last reading of a packaging, in memory only like the lines: the plugin's whole answer, the size of the
-   photo, how long it took and the meal it belongs to. schmeckts://ocr-dump shares it as a test fixture
-   (exportReading() in logic/data.js); nothing else looks at it. */
+// for schmeckts://ocr-dump, which shares it as a test fixture
 let last = null;
 export const lastReading = () => last;
 
-/* How long the plugin takes by the size of the photo, for choosing READ_MAX in images.js (PROJECT.md):
-   schmeckts://ocr-measure switches it on for as long as the app runs, and every photo larger than 1100 or 1800 px is
-   then read at those sizes as well. Written to the console and shared with schmeckts://ocr-dump, never stored.
-   ms: {px: [milliseconds]} */
+// switched on by schmeckts://ocr-measure for this run; ms: {px: [milliseconds]}
 export const timing = {on: false, ms: {}};
 async function measure(o, read) {
   const took = (px, ms) => {
     (timing.ms[px] ||= []).push(ms);
-    console.info(`reading at ${px} px: ${ms} ms`); // the measurement is what this is for, so it goes to the console
+    console.info(`reading at ${px} px: ${ms} ms`);
   };
   const edge = Math.max(read.width, read.height),
     img = await photoOf(o.sharp);
@@ -116,9 +98,7 @@ async function measure(o, read) {
   for (const px of [1100, 1800].filter(n => n < edge)) took(px, (await readPhoto(await readable(img, px))).ms);
 }
 
-/* code: the scanned barcode, photo: the photo as base64, sharp: the same photo larger for reading its text on the
-   phone (images.js, READ_MAX), meal: the meal it is for, note: a short notice for the interface.
-   Returns {source, products|details} or {source:'', error}; the form then stays empty. */
+// sharp: the same photo larger, for reading on the phone; returns {source, products|details} or {source: '', error}
 export async function identify({code = '', photo = '', sharp = '', meal = '', note = () => {}} = {}) {
   const o = {code, photo, sharp, meal};
   let error = null;
@@ -132,7 +112,7 @@ export async function identify({code = '', photo = '', sharp = '', meal = '', no
         return {source: step.name, ...hit};
       }
     } catch (e) {
-      error = e; // kept for the caller: the last error is what the interface explains
+      error = e; // the last error is what the interface explains
       report(`recognition (${step.name})`, e);
     }
   }
@@ -140,7 +120,6 @@ export async function identify({code = '', photo = '', sharp = '', meal = '', no
   return {source: '', error};
 }
 
-/* Bring an answer into the server's shape: without a brand and a variety it does not count */
 function asDetails(hit) {
   const brand = String(hit?.brand || '').trim(),
     variety = String(hit?.variety || '').trim();
@@ -156,13 +135,12 @@ function asDetails(hit) {
   };
 }
 
-/* Server: the lookup for a barcode (from server 1.1.0), AI recognition for a photo. The switch under „Scannen“
-   holds back the photo only; the barcode goes out as it always did. */
+// the photo setting holds back the photo only, the barcode always goes out
 async function fromServer({code, photo}) {
   if (code && (await serverCan('barcode'))) {
     const hit = await lookupBarcode(code).catch(e => {
       report('barcode lookup', e);
-      return null; // the photo recognition below is the next stage
+      return null;
     });
     const found = hit?.found ? asDetails(hit) : null;
     if (found) return found;
@@ -170,7 +148,6 @@ async function fromServer({code, photo}) {
   return photo && prefs.serverPhoto ? asDetails(await recognize(photo)) : null;
 }
 
-/* Photo recognition through the household server: key, model and prompt are configured there. */
 export async function recognize(b64) {
   if (!prefs.code) throw Object.assign(new ServerError('none', 'Kein Server verbunden.'), {retry: false});
   if (status.recognition === false) {
@@ -187,6 +164,5 @@ export async function recognize(b64) {
   }
 }
 
-/* Look up an unknown barcode through the server (Open Pet Food Facts and Open Food Facts).
-   Response {found, brand, variety, type, animal}. The server waits at most 5 seconds per database. */
+// the server waits up to 5 s per database
 export const lookupBarcode = code => request('GET', '/api/barcode/' + encodeURIComponent(code), {timeout: 15e3});

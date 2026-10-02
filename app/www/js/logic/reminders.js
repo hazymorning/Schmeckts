@@ -1,10 +1,4 @@
-/* This phone's reminders, without an exact alarm: the app does not hold that permission.
-   To rate: the serving phone schedules it after serving (LocalNotifications).
-   To feed: at the usual times from the history (feedReminders() in smart.js), if nothing has been served by then.
-   These go to our own plugin (FeedReminder in native.js), which asks the household server when one is due whether
-   a meal has been served since on another phone, and stays quiet if so; a phone in the background does not learn
-   that by itself.
-   syncReminders() reconciles what is scheduled with the data, after changes from other phones too. */
+// no exact alarms: the app does not hold that permission
 import {timeStr} from '../dates.js';
 import {FeedReminder, Notifications} from '../native.js';
 import {report} from '../report.js';
@@ -16,7 +10,8 @@ import {getPet, getProduct, getServing, petNames, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
 
-const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1; // the plugin needs a whole number
+// the plugin needs a whole number
+const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1;
 const isOpen = s => Object.keys(s.pets).some(pid => getPet(pid) && !s.pets[pid].r);
 function notice(s) {
   const p = getProduct(s.productId),
@@ -31,8 +26,7 @@ function notice(s) {
   };
 }
 
-/* A feeding reminder. sure: the text once the household server has said that nothing has been served since `since`,
-   which names the part of the day („Heute Abend ist noch nichts eingetragen.“) */
+// sure: the text once the server confirmed nothing was served since `since`
 const dayPart = at => {
   const h = new Date(at).getHours() + new Date(at).getMinutes() / 60;
   return h < 10.5 ? 'Heute Morgen' : h < 14 ? 'Heute Mittag' : h < 17.5 ? 'Heute Nachmittag' : 'Heute Abend';
@@ -50,9 +44,6 @@ function feedNotice(x) {
   };
 }
 
-/* The two switches under „Erinnerungen“: switching one on asks for the permission, and without it the switch
-   goes back to off and its row says why (`denied` on the state, read by views/settings.js).
-   redraw: false while the field for your own hours is being typed in */
 async function allowed(wanted, which) {
   let ok = false;
   try {
@@ -70,8 +61,7 @@ async function allowed(wanted, which) {
   }
   return ok;
 }
-/* The step last chosen, for as long as the app runs: „Aus“ is the switch now, so nothing stores the value.
-   After a fresh start the switch turns on with REMIND_DEFAULT. */
+// this run only; after a fresh start the switch turns on with REMIND_DEFAULT
 let lastStep = 0;
 export const remindStep = () => lastStep || REMIND_DEFAULT;
 export async function setRemind(minutes, redraw = true) {
@@ -80,7 +70,7 @@ export async function setRemind(minutes, redraw = true) {
   if (prefs.remind) lastStep = prefs.remind;
   savePrefs();
   syncReminders();
-  if (redraw || !ok) renderSheet(); // a full redraw would interrupt the typing in the field for your own hours
+  if (redraw || !ok) renderSheet(); // a full redraw would interrupt typing in the hours field
 }
 export async function setFeedRemind(on) {
   prefs.feedRemind = on && (await allowed(true, 'feed'));
@@ -89,7 +79,6 @@ export async function setFeedRemind(on) {
   renderSheet();
 }
 
-/* after serving on this phone */
 export function planReminder(s) {
   if (!prefs.remind || !isOpen(s) || Date.now() - s.servedAt > REMIND_MAX_AGE) return;
   Notifications.schedule({notifications: [notice(s)]}).catch(e => report('rating reminder', e));
@@ -99,7 +88,7 @@ let timer = null;
 export function syncReminders() {
   clearTimeout(timer);
   timer = setTimeout(reconcile, 250);
-} // batched
+}
 async function reconcile() {
   try {
     const {notifications} = await Notifications.getPending(),
@@ -107,7 +96,7 @@ async function reconcile() {
       plan = [];
     for (const n of notifications) {
       if (n.extra?.feed) {
-        cancel.push({id: n.id}); // a feeding reminder from before 0.11, when they were scheduled here
+        cancel.push({id: n.id}); // feeding reminders belong to the plugin; drop any left here
         continue;
       }
       const s = getServing(n.extra?.serving),
@@ -119,13 +108,11 @@ async function reconcile() {
     if (cancel.length) await Notifications.cancel({notifications: cancel.map(({id}) => ({id}))});
     if (plan.length) await Notifications.schedule({notifications: plan});
   } catch (e) {
-    // Whatever is already scheduled stays as it is; the next reconcile tries again
     report('reminders', e);
   }
   await setFeed();
 }
-/* The feeding reminders, all of them at once and only when something has changed: the plugin replaces what it held.
-   With a household the server and its code go along, so the plugin can ask it. */
+// the plugin replaces what it held and asks the server, when one is due, whether a meal was served since
 let lastFeed = '';
 async function setFeed() {
   const now = Date.now(),
@@ -140,13 +127,12 @@ async function setFeed() {
     await FeedReminder.set(set);
     lastFeed = json;
   } catch (e) {
-    // What was set before stays; the next reconcile tries again
+    // lastFeed stays, so the next reconcile tries again
     report('feeding reminders', e);
   }
 }
 
-/* A tap on the notification, on a cold start too (Capacitor holds the event back until the listener is registered).
-   A feeding reminder opens the feeding sheet through schmeckts://feed in the app, and through 'tap' in the browser. */
+// Capacitor holds a cold-start tap back until the listener is registered
 export function startReminders() {
   Notifications.addListener('localNotificationActionPerformed', ({notification}) => {
     const s = getServing(notification?.extra?.serving);

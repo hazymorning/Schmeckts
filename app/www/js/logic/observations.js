@@ -1,7 +1,4 @@
-/* Observations: what a pet showed that stood out, noted with one tap on a chip of the overview card („Beobachtung
-   notieren“), and put right or deleted later from the diary, where each one opens its sheet. One noted stands for the
-   pets in view: the one chosen in the pet bar, or with „Alle“ every pet, which then means one of them or all, as
-   with a litter box two cats share. Ratings stay what they are; the evaluation reads observations beside them. */
+// noted for all pets, an observation means one of them or all, as with a shared litter box
 import {haptic} from '../native.js';
 import {observationOf} from '../config.js';
 import {uid} from '../fields.js';
@@ -17,7 +14,6 @@ const shown = () =>
 const petSet = ids => Object.fromEntries(ids.map(id => [id, true]));
 const sortObs = () => db.observations.sort((a, b) => b.at - a.at);
 
-/* A chip tapped: saved at once, the chips fold away with the redraw, and the toast says it with „Rückgängig“ */
 export function observe(kind) {
   const ids = shown();
   if (!ids.length) return;
@@ -35,7 +31,6 @@ export function observe(kind) {
   });
 }
 
-/* In its sheet: another kind, takes effect at once */
 export function setObservationKind(kind) {
   const o = getObservation(sheet?.id);
   if (!o || o.kind === kind) return;
@@ -45,7 +40,7 @@ export function setObservationKind(kind) {
   renderSheet();
   update();
 }
-/* In its sheet: whom it concerns. At least one pet stays; several mean it is not clear which of them it was. */
+// several pets mean it is unclear which one it was
 export function toggleObservationPet(pid) {
   const o = getObservation(sheet?.id);
   if (!o) return;
@@ -61,7 +56,6 @@ export function toggleObservationPet(pid) {
   renderSheet();
   update();
 }
-/* In its sheet: when it was, never in the future */
 export function setObservationTime(id, t) {
   const o = getObservation(id);
   if (!o || !Number.isFinite(t)) return;
@@ -72,7 +66,6 @@ export function setObservationTime(id, t) {
   renderSheet();
   update();
 }
-/* „Eintrag löschen“: one tap, undone from the toast, as with a meal */
 export function deleteObservation(id) {
   const o = getObservation(id);
   if (!o) return;
@@ -86,7 +79,7 @@ export function deleteObservation(id) {
       sortObs();
       save();
       update();
-      renderSheet(); // the page it was deleted from, „Verlauf“
+      renderSheet();
     });
   });
 }
