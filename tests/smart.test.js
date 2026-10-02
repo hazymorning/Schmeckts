@@ -1582,6 +1582,11 @@ test('observations: only what the data carry, within the pets asked for', () => 
     'more than a day after it: not about that meal, but the next one',
   );
   assert.deepEqual(
+    [5, 8].map(hours => links([2, 6, 10, 14].map(d => ['vomit', d, ['A'], hours]))),
+    [['lachs'], []],
+    'what comes back up counts within hours of the meal only',
+  );
+  assert.deepEqual(
     observed({...noted(OBS_MEALS, []), observations: undefined}, ['A'], NOW),
     {kinds: [], links: []},
     'data from before observations',

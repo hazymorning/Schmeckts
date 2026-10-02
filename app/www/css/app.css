@@ -149,6 +149,10 @@ strong {
   --c: var(--happy);
   --cs: var(--happy-soft);
 }
+.o-vomit {
+  --c: var(--vomit);
+  --cs: var(--vomit-soft);
+}
 
 /* Only the alpha in the mask gradient matters. A layer of its own, so the blur below is drawn once and not with every
    redraw of the cards over it. */

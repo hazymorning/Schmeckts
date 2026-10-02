@@ -273,12 +273,11 @@ export function flavoursOf(text) {
 }
 /* Keys are stored in the data; a kind from a newer app version is kept and shown generically. 'meal' weighs it
    against the meals in the `within` hours before (a stink takes a day to come through, hunger means the last meal
-   did not last), 'day' only against the day. */
-// button: {pet} is the name, or "Bande" for several
+   did not last, what does not agree comes back up within hours), 'day' only against the day. The home card's rail
+   keeps this order, the most frequent first. */
 export const OBSERVATIONS = {
   happy: {
     icon: 'o_happy',
-    button: 'Happy {pet}',
     chip: 'Happy',
     label: 'Gute Laune',
     said: 'Gute Laune notiert. Herrlich!',
@@ -289,7 +288,6 @@ export const OBSERVATIONS = {
   },
   stink: {
     icon: 'o_stink',
-    button: 'Heftiger Stunk!',
     chip: 'Stunk',
     label: 'Heftiger Stunk',
     said: 'Stunk notiert. Fenster auf!',
@@ -300,7 +298,6 @@ export const OBSERVATIONS = {
   },
   hungry: {
     icon: 'o_hungry',
-    button: 'Heute extra hungrig',
     chip: 'Hunger',
     label: 'Großer Hunger',
     said: 'Hunger notiert. Der Napf ist gewarnt.',
@@ -311,11 +308,20 @@ export const OBSERVATIONS = {
   },
   tired: {
     icon: 'o_tired',
-    button: 'Müde {pet}',
     chip: 'Müde',
     label: 'Müder Tag',
     said: 'Müdigkeit notiert. Gähn.',
     about: 'day',
+  },
+  vomit: {
+    icon: 'o_vomit',
+    chip: 'Erbrochen',
+    label: 'Erbrechen',
+    said: 'Erbrechen notiert. Gute Besserung!',
+    about: 'meal',
+    within: 6,
+    window: 'in den sechs Stunden',
+    after: 'innerhalb von sechs Stunden',
   },
 };
 export const observationOf = kind =>

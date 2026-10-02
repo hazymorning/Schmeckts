@@ -148,7 +148,7 @@
   --sauce-soft: light-dark(#e2dcd4, #3e392e);
   --bad: light-dark(#8f3f43, #d98c8e);
   --bad-soft: light-dark(#e9dcd9, #3e342f);
-  /* observations: four hues the ratings leave free, at one lightness */
+  /* observations: five hues the ratings leave free, at one lightness */
   --stink: light-dark(#257070, #89cccb);
   --stink-soft: light-dark(#d3eeee, #203c3c);
   --hungry: light-dark(#81526d, #dfadc8);
@@ -157,6 +157,8 @@
   --tired-soft: light-dark(#e0e8fb, #2f3649);
   --happy: light-dark(#5a6b3c, #b4c696);
   --happy-soft: light-dark(#e3ecd7, #333a26);
+  --vomit: light-dark(#6d5884, #c8b3e1);
+  --vomit-soft: light-dark(#ece3f7, #3b3245);
 
   --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 

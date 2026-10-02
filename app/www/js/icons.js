@@ -95,6 +95,8 @@ const I = {
     '<path d="M11 19.3s-6.5-4-6.5-8.6A3.5 3.5 0 0 1 11 8.6a3.5 3.5 0 0 1 6.5 2.1c0 4.6-6.5 8.6-6.5 8.6z"/><path d="M18.5 3.5v3M17 5h3"/>',
   o_tired:
     '<path d="M3.8 12.5c2.2 2.6 5 3.9 8.2 3.9s6-1.3 8.2-3.9"/><path d="M6.6 15.3l-1.1 1.9M12 16.4v2.2M17.4 15.3l1.1 1.9"/><path d="M14.5 3.5h4l-4 4.5h4"/>',
+  o_vomit:
+    '<path d="M15.6 8.9A6.6 6.6 0 1 0 12 15.3"/><path d="M7.2 7.6l1.6 1.2-1.6 1.2M12.4 7.6l-1.6 1.2 1.6 1.2"/><path d="M10.7 12.6c1.4.2 2.6.7 3.6 1.6 1.4 1.3 2 3.1 2.4 4.6"/><path d="M14 20.3h6.5"/>',
   hat: '<path d="M6 20.5 12 5.5l6 15z" fill="currentColor" fill-opacity=".22"/><path d="M8.3 14.8l5.4-2.4M7.1 17.8l8.6-3.8"/><circle cx="12" cy="4" r="1.6"/>',
   // the variety that is always eaten up, crowned
   champ:

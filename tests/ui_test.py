@@ -2303,8 +2303,8 @@ async def test_observations(browser, url):
     before = await pg.evaluate(OBS)
     CHIP = '#home .overview [data-action=observe]'
     ROW = '[data-sec=hist] [data-action=open-observation]'
-    named, mau = await pg.locator(f'{CHIP}[data-v=tired]').inner_text(), await state(pg, 'db.pets[0].name')
-    check(await pg.locator(CHIP).count() == 4 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
+    words = await pg.eval_on_selector_all(CHIP, 'l => l.map(c => c.textContent.trim())')
+    check(len(words) == 5 and all(len(w.split()) == 1 for w in words), f'the chips always at hand, one short word each {words}')
     await tap(pg, '[data-action=observe][data-v=tired]')
     tired = await pg.inner_text('#toast > span')
     await tap(pg, '#toast [data-action=undo]')
@@ -2314,7 +2314,7 @@ async def test_observations(browser, url):
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
-        and await pg.locator(CHIP).count() == 4
+        and await pg.locator(CHIP).count() == 5
         and await pg.locator(ROW).count() == 1,
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary {after[0]}',
     )
@@ -2353,17 +2353,13 @@ async def test_observations(browser, url):
     check(over == ['report', 'observation'], 'in the history page it opens over the page')
     await back(pg)
     await change(pg, f"s.db.pets.push({{id: '{T}', name: 'Tiger', species: 'Katze', photo: null, createdAt: Date.now()}})")
-    named = await pg.locator(f'{CHIP}[data-v=tired]').inner_text()
     await tap(pg, '[data-action=observe][data-v=stink]')
     both = (await pg.evaluate(OBS))[0][1]
     await tap(pg, ROW)
     await tap(pg, f'#sheet [data-action=toggle-observation-pet][data-id={T}]')
     narrowed = (await pg.evaluate(OBS))[0][1]
     await tap(pg, f'#sheet [data-action=toggle-observation-pet][data-id={pet_}]')
-    check(
-        both == sorted([pet_, T]) and narrowed == [pet_] and (await pg.evaluate(OBS))[0][1] == [pet_] and mau not in named,
-        f'for all pets, narrowed, at least one; the tired chip names no single pet ({named})',
-    )
+    check(both == sorted([pet_, T]) and narrowed == [pet_] and (await pg.evaluate(OBS))[0][1] == [pet_], 'for all pets, narrowed, at least one')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, f'[data-action=filter][data-id={T}]')
     await tap(pg, '[data-action=observe][data-v=hungry]')

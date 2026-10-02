@@ -223,12 +223,12 @@ export function overviewLines(g, pets, now, memory) {
   const pair = firsts.map(f => [f, seconds.find(s => !sharesWord(f, s))]).find(([, s]) => s) || [firsts[0]];
   return {text: pair.map(line).join(' '), memory: kept, moment};
 }
-// always at hand, so noting takes one tap; who: the pet's name, or the whole bunch; just: the kind just noted
-const observeRail = (who, just) =>
+// always at hand, so noting takes one tap; just: the kind just noted
+const observeRail = just =>
   `<div class="rail obs" role="group" aria-label="Beobachtung notieren">${Object.entries(OBSERVATIONS)
     .map(
       ([k, o]) =>
-        `<button class="chip toned o-${k}" data-action="observe" data-v="${k}" aria-label="${o.label} notieren"><i class="disc${k === just ? ' pop' : ''}">${icon(o.icon)}</i>${o.button.replace('{pet}', who)}</button>`,
+        `<button class="chip toned o-${k}" data-action="observe" data-v="${k}" aria-label="${o.label} notieren"><i class="disc${k === just ? ' pop' : ''}">${icon(o.icon)}</i>${o.chip}</button>`,
     )
     .join('')}</div>`;
 const SLEEP = new Set(['night', 'lastNight']),
@@ -264,5 +264,5 @@ export function overviewHTML(m, noted = null) {
     just = noted && getObservation(noted)?.kind;
   return `<section class="card overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
     <div class="ov-top">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
-    ${observeRail(one ? esc(one.name) : 'Bande', just)}</section>`;
+    ${observeRail(just)}</section>`;
 }

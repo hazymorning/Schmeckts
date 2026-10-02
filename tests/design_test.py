@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, open_page, phone, run_tests, set_theme
 
 RATING = ('--good', '--mid', '--sauce', '--bad')
-OBSERVED = ('--happy', '--stink', '--hungry', '--tired')
+OBSERVED = ('--happy', '--stink', '--hungry', '--tired', '--vomit')
 TEXT_PAIRS = (
     [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')]
     + [
