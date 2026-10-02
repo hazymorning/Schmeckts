@@ -6,8 +6,8 @@ import {OBSERVATIONS, typeOf} from '../config.js';
 import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
 import {getObservation, getPet, getProduct, petNames, pname} from '../derive.js';
-import {dayNumber, glance, pick, takeTurn} from '../glance.js';
-import {factsOn, fill, LEADS, LINES} from './facts.js';
+import {dayNumber, glance, takeTurn} from '../glance.js';
+import {factsOn, fill, LEADS, LINES, sharesWord} from './facts.js';
 import {avatar, since} from './parts.js';
 
 const FRESH = 60; // minutes a meal counts as news
@@ -40,9 +40,10 @@ function spanOf(min) {
 const mealAt = min =>
   min < 630 ? 'Frühstück' : min < 870 ? 'Mittagessen' : min >= 1020 && min < 1290 ? 'Abendessen' : 'Futter';
 const sortName = id => esc(pname(getProduct(id)));
-// pick() goes by the day, so a wording stays the same all day
-const say = (kind, now, values = {}) => fill(pick(LINES[kind], now), values);
-const sayLead = (moment, now, values = {}) => fill(pick(LEADS[moment], now), values);
+// the day's wording first, so it stays the same all day, then the others for when it repeats the other sentence
+const wordings = (list, now, values) => list.map((_, i) => fill(list[(dayNumber(now) + i) % list.length], values));
+const say = (kind, now, values = {}) => wordings(LINES[kind], now, values);
+const sayLead = (moment, now, values = {}) => wordings(LEADS[moment], now, values);
 
 function subject(ids) {
   return {names: esc(petNames(ids)), verb: (one, many) => (ids.length > 1 ? many : one)};
@@ -131,7 +132,7 @@ function message(g, pets, now) {
       grip = `${all.names} ${all.verb('hat', 'haben')} ${g.feeders.length > 1 ? 'euch' : 'dich'} im Griff.`;
     return say('snacks', now, {grip});
   }
-  return '';
+  return null;
 }
 
 const TURN_LINES = {
@@ -186,7 +187,7 @@ function turn(g, now, memory, facts) {
     factDay = dayNumber(now) % 2 === 0 || !kinds.length;
   const took = takeTurn(factDay ? [] : kinds, factDay ? facts.map(f => f.id) : [], memory, now);
   return {
-    text: took.kind ? TURN_LINES[took.kind](g, now) : took.fact ? facts.find(f => f.id === took.fact).text : '',
+    texts: took.kind ? TURN_LINES[took.kind](g, now) : took.fact ? [facts.find(f => f.id === took.fact).text] : [],
     memory: took.memory,
   };
 }
@@ -196,11 +197,11 @@ export function overviewLines(g, pets, now, memory) {
     species = kinds.size === 1 ? [...kinds][0] : null,
     date = new Date(now),
     moment = momentOf(g, now),
-    dated = factsOn(species, date, true)[0]?.text || '',
-    news = (g.last && message(g, pets, now)) || dated;
+    dated = factsOn(species, date, true).map(f => f.text),
+    news = (g.last && message(g, pets, now)) || dated.slice(0, 1);
   let more = news,
     kept = memory;
-  if (!more && (moment === 'due' || moment === 'dueFirst')) {
+  if (!more.length && (moment === 'due' || moment === 'dueFirst')) {
     const all = subject(pets.map(x => x.id));
     more = say('waiting', now, {
       names: all.names,
@@ -209,15 +210,18 @@ export function overviewLines(g, pets, now, memory) {
       hat: all.verb('hat', 'haben'),
       sitzt: all.verb('sitzt', 'sitzen'),
     });
-  } else if (!more) {
+  } else if (!more.length) {
     const took = turn(g, now, memory, factsOn(species, date, false, ASIDE[moment] || null));
-    more = took.text;
+    more = took.texts;
     kept = took.memory;
   }
   // a birthday today goes first, except at feeding time
-  const first = leadLine(g, pets, now, moment),
-    order = g.birthday?.today && news && moment !== 'due' && moment !== 'dueFirst' ? [more, first] : [first, more];
-  return {text: order.filter(Boolean).map(line).join(' '), memory: kept, moment};
+  const lead = leadLine(g, pets, now, moment),
+    [firsts, seconds] =
+      g.birthday?.today && news.length && moment !== 'due' && moment !== 'dueFirst' ? [more, lead] : [lead, more];
+  // the day's wordings; where the second repeats a word of the first, its next wording, else the first's next
+  const pair = firsts.map(f => [f, seconds.find(s => !sharesWord(f, s))]).find(([, s]) => s) || [firsts[0]];
+  return {text: pair.map(line).join(' '), memory: kept, moment};
 }
 // always at hand, so noting takes one tap; who: the pet's name, or the whole bunch; just: the kind just noted
 const observeRail = (who, just) =>

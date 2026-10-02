@@ -6,7 +6,17 @@ import {glance, takeTurn, TURNS} from '../app/www/js/glance.js';
 import {nextMeal, nextMilestone, VERDICTS} from '../app/www/js/smart.js';
 import {RATINGS} from '../app/www/js/config.js';
 import {addDays} from '../app/www/js/dates.js';
-import {FACTS, factsOn, fill, GENERAL, lastSunday, LEADS, LINES, nthSaturday} from '../app/www/js/views/facts.js';
+import {
+  FACTS,
+  factsOn,
+  fill,
+  GENERAL,
+  lastSunday,
+  LEADS,
+  LINES,
+  nthSaturday,
+  sharesWord,
+} from '../app/www/js/views/facts.js';
 
 const at = text => new Date(text).getTime();
 const NOW = at('2026-06-10T12:00');
@@ -608,7 +618,24 @@ test('the lines: at least three ways of saying every kind, two sentences at most
   );
 });
 
-test('the overview card: the moment picks the first sentence, news of the day the second, else kinds and asides take turns', async () => {
+test('two sentences share a word when a content word or a name comes back in any ending; small words, numbers and markup do not count', () => {
+  const same = [
+    ['Heute ist noch nichts eingetragen.', 'Heute stand zum ersten Mal Sheba im Napf.'],
+    ['Seit 3 Stunden ist Ruhe am Napf.', 'Ein zerkratzter Napf merkt sich jeden Geruch.'],
+    ['Der erste Napf des Tages ist überfällig.', 'Seit 12 Tagen schreibst du hier mit.'],
+    ['Mit dem ersten Napf beginnt das Tagebuch.', 'Die erste Mahlzeit stand im Tagebuch.'],
+    ['Guten Appetit, Minka!', 'In 3 Tagen hat <b>Minka</b> Geburtstag.'],
+  ];
+  const apart = [
+    ['Seit 3 Stunden ist Ruhe.', 'Noch <b>3×</b> füttern, dann ist das 100. Mal erreicht.'],
+    ['Die Katze ist satt und der Hund auch.', 'Das Futter ist da, und die Uhr tickt nach.'],
+    ['Gestern gab’s <b>Rind</b>.', 'Heute gab’s <b>Lachs</b>.'],
+  ];
+  for (const [a, b] of same) assert.ok(sharesWord(a, b) && sharesWord(b, a), `${a} | ${b}`);
+  for (const [a, b] of apart) assert.ok(!sharesWord(a, b), `${a} | ${b}`);
+});
+
+test('the overview card: the moment picks the first sentence, news of the day the second, else kinds and asides take turns, never repeating a word of the first', async () => {
   // views/overview.js reaches for the page as it loads; in Node a stub answers every such call
   const stub = new Proxy(function () {}, {
     get: (_, k) => (k === 'then' ? undefined : k === Symbol.toPrimitive ? () => '' : stub),
@@ -709,7 +736,7 @@ test('the overview card: the moment picks the first sentence, news of the day th
     [{record: {meals: 0, streak: 23}}, say('recordStreak', {days: '23 Tage'})],
     [{record: {meals: 4, streak: 0}, meals: 4}, say('recordDay', {})],
     [{shift: {at: 435, diff: -40}}, say('earlier', {meal: 'Frühstück', span: '40 Minuten'})],
-    [{shift: {at: 1110, diff: 95}}, say('later', {meal: 'Abendessen', span: 'eineinhalb Stunden'})],
+    [{shift: {at: 750, diff: 95}}, say('later', {meal: 'Mittagessen', span: 'eineinhalb Stunden'})],
     [{sameMinute: true}, say('sameMinute', {})],
   ];
   for (const [x, want] of news) assert.deepEqual(one(x), [days[0][0], want]);
@@ -760,6 +787,56 @@ test('the overview card: the moment picks the first sentence, news of the day th
     ...shown.map(v => ({...g, ...v})),
   ])
     assert.deepEqual(twice(x), [], 'at most one bold per sentence');
+
+  const onDay = (x, i) => {
+    const s = {...g, ...x},
+      moved = s.last && {...s.last, servedAt: s.last.servedAt + i * DAY};
+    return lines(overviewLines({...s, last: moved}, pets, T + i * DAY, null).text);
+  };
+  const waits = i => lead('later', {meal: 'Abendessen', time: '18:30'}, i),
+    named = [0, 1, 2, 3].find(i => waits(i).includes('Minka')),
+    done = lead('done', {time: '7:15'});
+  assert.ok(sharesWord(done, say('premiere', {sort: 'Rind'})) && sharesWord(done, say('premiere', {sort: 'Rind'}, 1)));
+  assert.deepEqual(
+    one({premiere: 'rind00001', next: {at: 435, tomorrow: true}}),
+    [done, say('premiere', {sort: 'Rind'}, 2)],
+    'the day’s wording of the news repeats the lead, and so does the next: the one after stands in',
+  );
+  assert.deepEqual(
+    onDay({snacks: 4}, named),
+    [waits(named + 1), say('snacks', {grip: 'Minka hat euch im Griff.'}, named)],
+    'every wording of the news names the pet: the lead takes its next wording instead of losing the news',
+  );
+  assert.deepEqual(
+    onDay({birthday: {pet: 'minka00001', today: true, age: 6}}, named),
+    [say('birthdayAge', {pet: 'Minka', age: 6}, named), waits(named + 1)],
+    'a birthday goes first, then a lead that does not name the pet again',
+  );
+  assert.deepEqual(
+    one({shift: {at: 1110, diff: 95}}),
+    [waits(0)],
+    'the evening meal came later and comes next: every pair says Abendessen twice, the lead stands alone',
+  );
+  const moments = [
+      ...shown,
+      {last: {...last, servedAt: T - DAY}, next: {at: 435, due: true}},
+      {last: {...last, servedAt: T - 3 * DAY}, next: null},
+      {last: null},
+    ],
+    birthdays = [{today: true, age: 6}, {today: true, age: null}, {days: 1}, {days: 3}],
+    states = [
+      g,
+      bare,
+      ...news.map(([n]) => n),
+      ...kinds.map(([k]) => ({...bare, ...k})),
+      ...birthdays.map(b => ({birthday: {pet: 'minka00001', ...b}})),
+    ];
+  for (let i = 0; i < 12; i++)
+    for (const m of moments)
+      for (const x of states) {
+        const [first, second] = onDay({...x, ...m}, i);
+        assert.ok(!second || !sharesWord(first, second), `one word twice: ${first} ${second}`);
+      }
 
   const t = h => at(`2026-06-09T${h}`),
     fed = {servedAt: t('07:20')},
