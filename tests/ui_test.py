@@ -4893,10 +4893,10 @@ async def test_observations(browser, url):
     gone = [await pg.evaluate(OBS) == before, await pg.evaluate("document.getElementById('sheet').open")]
     await pg.click('#toast [data-action=undo]')
     await idle(pg)
-    back = await pg.evaluate(OBS)
+    back = [len(await pg.evaluate(OBS)), await state(pg, f"db.observations.find(o => o.id === '{mine}')?.kind ?? null")]
     check(
-        gone == [True, False] and back[0][0] == 'tired' and len(back) == len(before) + 1,
-        f'„Eintrag löschen“: gone with one tap, back with „Rückgängig“ ({gone})',
+        gone == [True, False] and back == [len(before) + 1, 'tired'],
+        f'„Eintrag löschen“: gone with one tap, back with „Rückgängig“ ({gone}, {back})',
     )
     # From „Verlauf“ it opens over the page; „Vorlieben“ tells what was noted
     await pg.click('[data-action=open-report]')
