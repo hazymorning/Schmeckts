@@ -56,7 +56,7 @@ is allowed (`app/native/res/xml`).
 
 ```js
 db = { version: 3,
-  pets:         [{ id, name, species, photo, birthday, createdAt }],
+  pets:         [{ id, name, nicknames, species, photo, birthday, createdAt }],
   products:     [{ id, brand, variety, type, animal, texture, thumb, lastPets, createdAt, codes: { [ean]: true }, kaufen, sharedPhoto }],
   servings:     [{ id, productId, servedAt, note, by, thumb,
                    pets: { [petId]: { r: <key from RATINGS>|null, at, by } },

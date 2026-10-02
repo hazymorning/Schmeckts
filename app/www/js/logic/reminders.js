@@ -6,7 +6,7 @@ import {RATINGS, REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js'
 import {db, prefs, savePrefs, usedNews} from '../store.js';
 import {caughtUp, isConnected, reachable} from '../sync.js';
 import {fedToday, feedReminders, quickRatings} from '../smart.js';
-import {getPet, getProduct, getServing, petNames, pname} from '../derive.js';
+import {callName, getPet, getProduct, getServing, petNames, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
@@ -16,6 +16,9 @@ import {rateMeal} from './rating.js';
 const idOf = sid => [...sid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 1;
 const openPets = s => Object.keys(s.pets).filter(pid => getPet(pid) && !s.pets[pid].r);
 const isOpen = s => openPets(s).length > 0;
+// one pet by any of its names, the same for one reminder, so its text does not change once planned
+const calling = (ids, seed) => (ids.length === 1 ? callName(getPet(ids[0]), seed) : petNames(ids));
+
 // with one pet left to rate, buttons rate it; getPending() leaves out actionTypeId, so extra.rate says which
 let buttons = true;
 function notice(s) {
@@ -26,7 +29,7 @@ function notice(s) {
   return {
     id: idOf(s.id),
     title: 'Wie war’s?',
-    body: `${p ? pname(p) : 'Futter von ' + clockStr(s.servedAt)} für ${petNames(open)}`,
+    body: `${p ? pname(p) : 'Futter von ' + clockStr(s.servedAt)} für ${calling(open, s.id)}`,
     schedule: {at: new Date(at), allowWhileIdle: true},
     isExactNotification: false,
     ...(rate ? {actionTypeId: 'rate:' + rate} : {}),
@@ -65,7 +68,8 @@ const dayPart = at => {
   return h < 10.5 ? 'Heute Morgen' : h < 14 ? 'Heute Mittag' : h < 17.5 ? 'Heute Nachmittag' : 'Heute Abend';
 };
 function feedNotice(x) {
-  const body = `Um diese Zeit gibt es sonst Futter für ${petNames(db.pets.map(p => p.id))}.`;
+  const all = db.pets.map(p => p.id),
+    body = `Um diese Zeit gibt es sonst Futter für ${calling(all, x.key)}.`;
   return {
     id: idOf('feed' + x.key),
     key: x.key,

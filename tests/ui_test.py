@@ -1346,6 +1346,56 @@ async def test_petbar(browser, url):
     await ctx.close()
 
 
+async def test_nicknames(browser, url):
+    print('nicknames: added with Enter or the button, each once, a typed one kept on saving; the home card uses them in turn')
+    ctx, pg, errors = await one_pet(browser, url, native=False)
+    NICKS = "[...document.querySelectorAll('#nicks .chip')].map(c => c.textContent)"
+    stored = 'db.pets[0].nicknames ?? null'
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    for name in ('Mimi', 'mimi', 'Minka'):
+        await pg.fill('#f-nick', name)
+        await pg.press('#f-nick', 'Enter')
+    focused = await pg.evaluate('document.activeElement?.id ?? null')
+    await pg.fill('#f-nick', 'Schnurrli')
+    await tap(pg, '#sheet [data-action=add-nick]')
+    chips = await pg.evaluate(NICKS)
+    await pg.fill('#f-nick', 'Minki')
+    await tap(pg, '[data-action=save-pet]')
+    check(
+        chips == ['Mimi', 'Schnurrli'] and await state(pg, stored) == ['Mimi', 'Schnurrli', 'Minki'],
+        f'each name once, never the pet’s own, one typed but not added comes along {chips}',
+    )
+    check(focused == 'f-nick', 'Enter keeps the field and its keyboard')
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    await tap(pg, '#nicks [data-action=drop-nick][data-v=Schnurrli]')
+    await tap(pg, '[data-action=save-pet]')
+    check(await state(pg, stored) == ['Mimi', 'Minki'], 'a tap on one removes it')
+    await back(pg)
+    await change(
+        pg,
+        "s.db.products.push({id: 'sorte00001', brand: 'Sheba', variety: 'Lachs', type: 'Nassfutter', codes: {}, createdAt: 1}); s.db.servings.unshift({id: 'meal000001', productId: 'sorte00001', servedAt: Date.parse('2026-05-31T08:00:00+02:00'), note: '', pets: {[s.db.pets[0].id]: {r: 'gut', at: 1}}})",
+    )
+    await fixed_clock(ctx)
+    heads = []
+    for day in range(1, 8):
+        await pg.clock.set_fixed_time(f'2026-06-{day:02d}T12:00:00+02:00')
+        await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome())")
+        heads.append(await pg.inner_text('.overview h2'))
+    check(
+        all(any(n in h for n in ('Minka', 'Mimi', 'Minki')) for h in heads) and any('Mimi' in h or 'Minki' in h for h in heads),
+        f'the heading names the pet each day, now and then by a nickname {heads}',
+    )
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    for name in ('Mimi', 'Minki'):
+        await tap(pg, f'#nicks [data-action=drop-nick][data-v={name}]')
+    await tap(pg, '[data-action=save-pet]')
+    check(await state(pg, "!('nicknames' in db.pets[0])"), 'all removed: the field goes')
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
 async def test_birthday(browser, url):
     print('birthday in the pet editor: none in the future, saved, cleared')
     ctx, pg, errors = await one_pet(browser, url, timezone_id='Europe/Berlin')
@@ -2715,6 +2765,7 @@ run_tests(
         'news': test_news,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
+        'nicknames': test_nicknames,
         'birthday': test_birthday,
         'local': test_local,
         'network': test_network,

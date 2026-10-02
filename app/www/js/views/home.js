@@ -6,7 +6,17 @@ import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {diary, getPet, getProduct, model, observedPets, pendingServings, pname, servingPets} from '../derive.js';
+import {
+  calledNames,
+  diary,
+  getPet,
+  getProduct,
+  model,
+  observedPets,
+  pendingServings,
+  pname,
+  servingPets,
+} from '../derive.js';
 import {hintKey} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {anyOpen} from '../ui/sheet.js';
@@ -203,7 +213,7 @@ function hintHTML(m) {
   let say, why, btns;
   if (h.kind === 'appetit') {
     [say, why, btns] = [
-      `${esc(pet.name)} frisst seit ein paar Tagen schlechter als sonst.`,
+      `${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.`,
       `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
         (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => lower(observationOf(k).label)))}.` : ''),
       hide,
@@ -211,7 +221,7 @@ function hintHTML(m) {
   } else if (h.kind === 'sosse') {
     const x = e.pets[h.pet];
     [say, why, btns] = [
-      `${esc(pet.name)} frisst bei ${name} meist nur die Soße.`,
+      `${esc(calledNames([pet.id], 'hint'))} frisst bei ${name} meist nur die Soße.`,
       cap(`${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}`),
       hide,
     ];

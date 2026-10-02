@@ -5,7 +5,18 @@ import {addSentence, esc} from '../text.js';
 import {canTakePhoto, haptic, takePhoto} from '../native.js';
 import {report} from '../report.js';
 import {db, prefs, save, savePrefs} from '../store.js';
-import {byMe, defaultPets, findProduct, getPet, getProduct, getServing, petMap, petNames, pname} from '../derive.js';
+import {
+  byMe,
+  calledNames,
+  defaultPets,
+  findProduct,
+  getPet,
+  getProduct,
+  getServing,
+  petMap,
+  petNames,
+  pname,
+} from '../derive.js';
 import {cropSquare, fileToImage, memPhotos, photoOf, readable, resize} from '../images.js';
 import {textSquare} from '../ocr.js';
 import {keepPhoto} from '../photos.js';
@@ -37,7 +48,7 @@ export function serveProduct(pid, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  const msg = `${pname(p)} serviert. Guten Appetit, ${petNames(ids)}!`;
+  const msg = `${pname(p)} serviert. Guten Appetit, ${calledNames(ids, s.id)}!`;
   update();
   scrollTop();
   toast(withMilestone(msg), () => undoServe(s.id), {ic: 'bowl'});

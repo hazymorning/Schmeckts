@@ -1,5 +1,6 @@
 // Read-only lookups and cached models over the data.
 import {andList, norm} from './text.js';
+import {dayKey} from './dates.js';
 import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
 import {
   analyze,
@@ -50,6 +51,22 @@ export function diary(servings, observations) {
   return out;
 }
 export const petNames = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean));
+// its own name first; data from another phone may hold anything
+export const namesOf = pet => [
+  ...new Set(
+    [pet?.name, ...(Array.isArray(pet?.nicknames) ? pet.nicknames : [])].filter(n => typeof n === 'string' && n.trim()),
+  ),
+];
+const hashOf = text => [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7);
+// a pet goes by its name or a nickname, always the same for one seed
+export function callName(pet, seed) {
+  const names = namesOf(pet);
+  return names.length ? names[hashOf(String(seed)) % names.length] : '';
+}
+/* One pet by any of its names, the same in one place all day and likely another tomorrow. Several by their own
+   names, so they stay apart. */
+export const calledNames = (ids, place, now = Date.now()) =>
+  ids.length === 1 ? callName(getPet(ids[0]), `${place}:${dayKey(now)}`) : petNames(ids);
 
 /* The hour is in the key because some windows are time based. Per-variety sums are kept, and only varieties with
    changed meals are recomputed. */

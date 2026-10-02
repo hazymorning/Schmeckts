@@ -32,7 +32,17 @@ import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
-import {closeCrop, deletePet, editing, openPet, petState, savePet, setPetPhoto} from './logic/pets.js';
+import {
+  addNick,
+  closeCrop,
+  deletePet,
+  dropNick,
+  editing,
+  openPet,
+  petState,
+  savePet,
+  setPetPhoto,
+} from './logic/pets.js';
 import {exportData, exportReading, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
 import {
@@ -382,6 +392,12 @@ const ACTIONS = {
   'save-pet'() {
     savePet();
   },
+  'add-nick'() {
+    addNick();
+  },
+  'drop-nick'(el) {
+    dropNick(el.dataset.v);
+  },
   'crop-apply'() {
     closeCrop(true);
   },
@@ -538,6 +554,9 @@ document.addEventListener('keydown', e => {
   } else if (e.target.id === 'f-remind') {
     e.preventDefault();
     e.target.blur();
+  } else if (e.target.id === 'f-nick') {
+    e.preventDefault();
+    addNick();
   } else if (editing(sheet)) {
     e.preventDefault();
     savePet();

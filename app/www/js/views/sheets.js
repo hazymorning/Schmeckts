@@ -586,9 +586,28 @@ function viewPet() {
         ),
       'set-group',
     )}
+    ${group(
+      'Spitznamen',
+      `<div class="chips nicks" id="nicks"></div>
+      <div class="connect"><input id="f-nick" class="field" data-field="nick" value="${esc(s.nick)}" placeholder="z. B. Mausi" maxlength="24" autocomplete="off" autocapitalize="words" enterkeyhint="done" aria-label="Spitzname">
+        <button class="btn soft" data-action="add-nick" aria-label="Spitzname hinzufügen">${icon('plus')}</button></div>
+      <p class="hint mt-s">Die App nennt dein Tier dann mal so, mal so.</p>`,
+    )}
     ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
     <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button></div>
     ${editing ? apart(armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
+}
+
+// drawn on their own, so the field keeps its focus and keyboard while names are added
+export function renderNicks() {
+  const box = $('#nicks');
+  if (!box || !sheet?.nicknames) return;
+  box.innerHTML = sheet.nicknames
+    .map(
+      n =>
+        `<button class="chip" data-action="drop-nick" data-v="${esc(n)}" aria-label="${esc(n)} entfernen">${esc(n)}${icon('close')}</button>`,
+    )
+    .join('');
 }
 
 const VIEWS = {
@@ -622,6 +641,7 @@ setSheetView((state, body) => {
   }
   if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
+  if (state.kind === 'pet' || state.page === 'pet') renderNicks();
   if (state.kind === 'report') {
     watchDays();
     requestAnimationFrame(growHistory);

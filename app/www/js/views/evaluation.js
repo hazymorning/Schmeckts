@@ -5,6 +5,7 @@ import {icon} from '../icons.js';
 import {observationOf, TEXTURES} from '../config.js';
 import {db} from '../store.js';
 import {
+  calledNames,
   evaluationModel,
   getPet,
   getProduct,
@@ -52,6 +53,8 @@ function nameOf(e) {
 }
 const named = e => `<b>${nameOf(e)}</b>`;
 const petsOf = ids => esc(petNames(ids)); // in a sentence that already has its bold
+// a pet on its own goes by any of its names; beside others by its own, so they stay apart
+const petName = (m, id, place) => (m.pets.length > 1 ? getPet(id).name : calledNames([id], place));
 // all ratings when most agree with the row's side, otherwise only those of the pets that decide it
 function saidOf(e, side) {
   const good = goodOf(e.counts),
@@ -145,7 +148,7 @@ function portraitHTML(m, r) {
   const ids = m.pets,
     several = ids.length > 1,
     pets = ids.map(getPet),
-    who = esc(petNames(ids)),
+    who = esc(several ? '' : petName(m, ids[0], 'portrait')),
     k = r.top.length,
     n = r.settled,
     good = (few = '') =>
@@ -221,7 +224,7 @@ function listsHTML(m, r, x) {
 
 function petLine(m, t, several) {
   const pet = getPet(t.pet),
-    who = `<b>${esc(pet.name)}</b>`,
+    who = `<b>${esc(petName(m, t.pet, 'trend'))}</b>`,
     worse = t.dir < 0,
     behind = t.behind?.length
       ? ` Das liegt wohl an <b>${andList(t.behind.map(id => nameOf(m.byId.get(id))))}</b>.`
@@ -252,7 +255,7 @@ function trendCard(m, x) {
     rows.push(
       told(
         sign('paw'),
-        `Bei ${petsOf(lines.map(t => t.pet))} läuft’s wie gehabt.`,
+        `Bei ${lines.length > 1 ? petsOf(lines.map(t => t.pet)) : esc(petName(m, lines[0].pet, 'trend'))} läuft’s wie gehabt.`,
         weeks(sum('recent'), sum('before')),
       ),
     );
@@ -405,7 +408,7 @@ function nextCard(m, r, x) {
         v.id,
         sign('repeat'),
         `${named(m.byId.get(v.id))} blieb beim ersten Mal stehen.`,
-        `${esc(getPet(v.pet).name)} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
+        `${esc(petName(m, v.pet, 'next'))} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
       ),
     );
   const more = trials.length - TRIALS;

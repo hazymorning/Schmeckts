@@ -5,7 +5,7 @@ import {addDays, dayStart, quarterStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
 import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
-import {getObservation, getPet, getProduct, petNames, pname} from '../derive.js';
+import {calledNames, getObservation, getPet, getProduct, pname} from '../derive.js';
 import {dayNumber, glance, takeTurn} from '../glance.js';
 import {factsOn, fill, LEADS, LINES, sharesWord} from './facts.js';
 import {avatar, since} from './parts.js';
@@ -45,8 +45,9 @@ const wordings = (list, now, values) => list.map((_, i) => fill(list[(dayNumber(
 const say = (kind, now, values = {}) => wordings(LINES[kind], now, values);
 const sayLead = (moment, now, values = {}) => wordings(LEADS[moment], now, values);
 
-function subject(ids) {
-  return {names: esc(petNames(ids)), verb: (one, many) => (ids.length > 1 ? many : one)};
+function subject(pets, now) {
+  const ids = pets.map(p => p.id);
+  return {names: esc(calledNames(ids, 'line', now)), verb: (one, many) => (ids.length > 1 ? many : one)};
 }
 const fresh = (g, now) => g.last && (now - g.last.servedAt) / 6e4 < FRESH;
 
@@ -79,7 +80,7 @@ const ASIDE = {
 };
 
 function leadLine(g, pets, now, moment) {
-  const all = subject(pets.map(x => x.id));
+  const all = subject(pets, now);
   if (moment === 'none') return sayLead('none', now, {names: all.names, wartet: all.verb('wartet', 'warten')});
   const last = g.last,
     p = getProduct(last.productId),
@@ -106,7 +107,7 @@ function leadLine(g, pets, now, moment) {
 function message(g, pets, now) {
   if (g.birthday && (g.birthday.today || g.birthday.days <= BIRTHDAY_SOON)) {
     const {today, days, age} = g.birthday,
-      pet = esc(getPet(g.birthday.pet).name);
+      pet = esc(calledNames([g.birthday.pet], 'line', now));
     if (today) return age ? say('birthdayAge', now, {pet: b(pet), age}) : say('birthdayToday', now, {pet: b(pet)});
     return days === 1 ? say('birthdayTomorrow', now, {pet}) : say('birthdaySoon', now, {pet, days: b(days + ' Tagen')});
   }
@@ -128,7 +129,7 @@ function message(g, pets, now) {
     });
   if (g.sameMinute) return say('sameMinute', now);
   if (g.snacks >= SNACKS) {
-    const all = subject(pets.map(x => x.id)),
+    const all = subject(pets, now),
       grip = `${all.names} ${all.verb('hat', 'haben')} ${g.feeders.length > 1 ? 'euch' : 'dich'} im Griff.`;
     return say('snacks', now, {grip});
   }
@@ -202,7 +203,7 @@ export function overviewLines(g, pets, now, memory) {
   let more = news,
     kept = memory;
   if (!more.length && (moment === 'due' || moment === 'dueFirst')) {
-    const all = subject(pets.map(x => x.id));
+    const all = subject(pets, now);
     more = say('waiting', now, {
       names: all.names,
       wartet: all.verb('wartet', 'warten'),
@@ -234,6 +235,41 @@ const observeRail = just =>
 const SLEEP = new Set(['night', 'lastNight']),
   DUE = new Set(['due', 'dueFirst']);
 
+// Mau’s, Felix’: with the apostrophe the name stays as it is, Mau never turns into Maus
+const whose = name => (/(s|ß|x|z|ce)$/i.test(name) ? `${name}’` : `${name}’s`);
+// whose day the card tells, in a wording that changes from day to day; more than two pets are the Bande
+const HEADS = {
+  one: {
+    any: ['{whose} Tag', '{whose} {weekday}', '{name} heute', 'Ein Tag mit {name}'],
+    weekend: '{whose} Wochenende',
+    night: '{whose} Nacht',
+  },
+  two: {
+    any: ['Der Tag von {names}', '{names} heute', 'Ein Tag mit {names}', '{weekday} bei {names}'],
+    weekend: 'Wochenende bei {names}',
+    night: 'Die Nacht von {names}',
+  },
+  more: {
+    any: ['Der Tag der Bande', 'Die Bande heute', 'Ein Tag mit der Bande', '{weekday} bei der Bande'],
+    weekend: 'Wochenende bei der Bande',
+    night: 'Die Nacht der Bande',
+  },
+};
+export function headOf(pets, g, now, moment) {
+  if (g.birthday?.today) return `${whose(esc(calledNames([g.birthday.pet], 'head', now)))} Geburtstag`;
+  const heads = HEADS[pets.length === 1 ? 'one' : pets.length === 2 ? 'two' : 'more'],
+    day = new Date(now).getDay(),
+    list = SLEEP.has(moment) ? [heads.night] : [...heads.any, ...(day % 6 ? [] : [heads.weekend])],
+    names = esc(
+      calledNames(
+        pets.map(p => p.id),
+        'head',
+        now,
+      ),
+    );
+  return fill(list[dayNumber(now) % list.length], {whose: whose(names), name: names, names, weekday: WEEKDAYS[day]});
+}
+
 // noted: the entry just made, so the chip just tapped can answer
 export function overviewHTML(m, noted = null) {
   const pets = m.pet ? [getPet(m.pet)] : db.pets,
@@ -263,6 +299,6 @@ export function overviewHTML(m, noted = null) {
           .join('')}${hat}</span>`,
     just = noted && getObservation(noted)?.kind;
   return `<section class="card overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
-    <div class="ov-top">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
+    <div class="ov-top">${pic}<div class="ov-text"><h2>${headOf(pets, g, now, moment)}</h2><p>${text}</p></div></div>
     ${observeRail(just)}</section>`;
 }

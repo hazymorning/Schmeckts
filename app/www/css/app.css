@@ -2197,6 +2197,15 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 .fold > .list {
   border-top: var(--divider);
 }
+.nicks:not(:empty) {
+  margin-bottom: var(--space-3);
+}
+.nicks .chip {
+  padding-right: var(--space-3);
+}
+.nicks .chip .ic {
+  color: var(--muted);
+}
 .photo-hint {
   display: block;
   text-align: center;

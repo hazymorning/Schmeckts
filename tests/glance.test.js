@@ -858,3 +858,42 @@ test('the overview card: the moment picks the first sentence, news of the day th
     ['none', 'due', 'dueFirst', 'fresh', 'later', 'morning', 'done', 'night', 'today', 'yesterday', 'older'],
   );
 });
+
+test('the overview heading: whose day it is, a wording a day, the birthday and the night their own', async () => {
+  const {replaceDb} = await import('../app/www/js/store.js');
+  const {headOf} = await import('../app/www/js/views/overview.js');
+  const DAY = 864e5,
+    T = at('2026-10-05T12:00'); // a Monday
+  const pets = [
+    {id: 'mau0000001', name: 'Mau', species: 'Katze', nicknames: ['Mausi']},
+    {id: 'felix00001', name: 'Felix', species: 'Katze'},
+    {id: 'kiwi000001', name: 'Kiwi', species: 'Vogel'},
+  ];
+  replaceDb({version: 3, pets, products: [], servings: [], observations: []});
+  const week = [0, 1, 2, 3, 4, 5, 6].map(i => headOf([pets[0]], {}, T + i * DAY, 'later'));
+  assert.ok(
+    week.every(h => /Mau|Mausi/.test(h) && !/Maus /.test(h)) &&
+      new Set(week).size >= 4 &&
+      week.some(h => h.includes('Mausi')),
+    `each day names the pet, by its nicknames too, never as Maus: ${week}`,
+  );
+  assert.equal(headOf([pets[0]], {}, T + 3 * 36e5, 'done'), week[0], 'the same all day');
+  assert.ok(
+    [0, 1, 2, 3].map(i => headOf([pets[1]], {}, T + i * DAY, 'later')).every(h => !h.includes('Felixs')),
+    'Felix’, never Felixs',
+  );
+  assert.match(headOf([pets[0]], {birthday: {pet: 'mau0000001', today: true}}, T, 'later'), /Geburtstag/);
+  assert.match(
+    headOf(pets.slice(0, 2), {birthday: {pet: 'felix00001', today: true}}, T, 'later'),
+    /^Felix’ Geburtstag$/,
+  );
+  assert.match(headOf([pets[0]], {}, T, 'night'), /Nacht/);
+  assert.ok(
+    [0, 1, 2, 3].map(i => headOf(pets.slice(0, 2), {}, T + i * DAY, 'later')).every(h => h.includes('Mau und Felix')),
+    'two pets by their own names',
+  );
+  assert.ok(
+    [0, 1, 2, 3].map(i => headOf(pets, {}, T + i * DAY, 'later')).every(h => !/Mau|Felix|Kiwi/.test(h)),
+    'more than two: the bunch, no list of names',
+  );
+});
