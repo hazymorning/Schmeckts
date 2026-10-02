@@ -390,13 +390,6 @@ const ACTIONS = {
   'crop-cancel'() {
     closeCrop(false);
   },
-  backdrop() {
-    prefs.backdrop = !prefs.backdrop;
-    savePrefs();
-    haptic('select');
-    renderSheet();
-    update();
-  },
   lookup() {
     prefs.lookup = !prefs.lookup;
     savePrefs();

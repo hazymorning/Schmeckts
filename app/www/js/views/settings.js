@@ -66,9 +66,7 @@ function overview() {
     ${group('Tiere', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Tier hinzufügen'), 'set-group')}
     ${group(
       'Darstellung',
-      labelRow('auto', 'Farbschema') +
-        under(segmented('theme', THEMES, prefs.theme)) +
-        switchRow('backdrop', 'paw', 'Profilbild im Hintergrund', 'Blass oben auf der Startseite', prefs.backdrop),
+      labelRow('auto', 'Farbschema') + under(segmented('theme', THEMES, prefs.theme)),
       'set-group',
     )}
     ${group(

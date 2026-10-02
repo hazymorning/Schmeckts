@@ -2347,7 +2347,7 @@ async def test_toast_time(browser, url):
 
 
 async def test_mood(browser, url):
-    print('the mood picture: the chosen pet’s photo; switched off it stays off after a restart')
+    print('the mood picture: the chosen pet’s photo, always, with no switch for it')
     make_pictures()
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
@@ -2362,20 +2362,13 @@ async def test_mood(browser, url):
     await change(pg, "s.db.pets = s.db.pets.slice(0, 1); s.prefs.activePet = 'all'")
     check(await pg.evaluate(MOOD) == minka[-40:], 'one pet: its photo')
     await settings(pg)
-    await tap(pg, '[data-action=backdrop]')
-    await back(pg)
-    off = [await state(pg, 'prefs.backdrop'), await pg.evaluate(MOOD)]
-    await pg.reload()
-    await started(pg)
-    check(off == [False, None] and await pg.evaluate(MOOD) is None, 'switched off: no picture, also after a restart')
+    check(await pg.locator('#sheet [data-action=backdrop]').count() == 0, 'no switch for it in the settings')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
-    old = []
-    for v in ('card', 'off'):  # values stored by 1.1.0
-        ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'backdrop': v}})
-        old.append(await state(pg, 'prefs.backdrop'))
-        await ctx.close()
-    check(old == [True, False], f'older stored values carried over {old}')
+    db = {**SAVED, 'pets': [{**SAVED['pets'][0], 'photo': minka}]}
+    ctx, pg, errors = await seeded(browser, url, {'db': db, 'prefs': {'backdrop': False}})
+    check(await pg.evaluate(MOOD) == minka[-40:] and await state(pg, "!('backdrop' in prefs)"), 'switched off before: shown now, the setting gone')
+    await ctx.close()
 
 
 async def test_camera(browser, url):

@@ -16,7 +16,6 @@ const defaultPrefs = () => ({
   milestones: null,
   remind: 0,
   feedRemind: false,
-  backdrop: true,
   server: '',
   code: '',
   name: '',
@@ -63,7 +62,7 @@ function tidyPrefs(p) {
   out.remind = tidyRemind(out.remind);
   out.feedRemind = out.feedRemind === true;
   delete out.feedStart;
-  out.backdrop = out.backdrop !== false && out.backdrop !== 'off'; // 'off' is an older stored value
+  delete out.backdrop;
   delete out.closedWeek;
   // null: never set
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null;
