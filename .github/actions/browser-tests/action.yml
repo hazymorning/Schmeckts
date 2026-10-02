@@ -1,5 +1,5 @@
 name: Browser tests
-description: Python packages, Node and the fonts, inside Playwright's image. Dependabot does not raise pins in here.
+description: Python packages and Node, inside Playwright's image. Dependabot does not raise pins in here.
 
 runs:
   using: composite
@@ -10,12 +10,3 @@ runs:
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: '22'
-
-    # keyed on the checksums prepare.py verifies the fonts against
-    - id: fonts
-      shell: bash
-      run: echo "key=$(grep -oE "'[0-9a-f]{64}'" scripts/prepare.py | tr -d "'\n")" >> "$GITHUB_OUTPUT"
-    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: app/www/fonts/*.woff2
-        key: fonts-${{ steps.fonts.outputs.key }}

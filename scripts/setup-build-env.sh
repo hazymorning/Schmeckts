@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# What building the APK needs on Ubuntu 24.04, as root: JDK 21, the Android SDK, Go and shellcheck. Only installs
-# what is missing. The tests do not need it.
+# What building the APK and the server packages needs on Ubuntu 24.04, as root: JDK 21, the Android SDK and Go.
+# Only installs what is missing. The tests do not need it.
 set -euo pipefail
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-if ! command -v javac >/dev/null || ! command -v shellcheck >/dev/null; then
+if ! command -v javac >/dev/null; then
   apt-get update -q >/dev/null
-  apt-get install -y -q openjdk-21-jdk-headless shellcheck >/dev/null
+  apt-get install -y -q openjdk-21-jdk-headless >/dev/null
 fi
 
 if [ ! -x "$SDKM" ]; then
@@ -24,8 +24,5 @@ if ! command -v go >/dev/null && [ ! -x /usr/local/go/bin/go ]; then
   curl -sL "https://go.dev/dl/$V.linux-amd64.tar.gz" | tar -C /usr/local -xz
 fi
 
-command -v ruff >/dev/null || python3 -m pip install --quiet --break-system-packages --requirement "$(dirname "$0")/../tests/requirements.txt"
-
 node -e 'if (+process.versions.node.split(".")[0] < 22) { console.error("Node.js 22 or newer required"); process.exit(1) }'
-python3 -c 'import PIL, playwright' 2>/dev/null || echo "Note: the Python packages Pillow and playwright are missing (needed for icons and tests)"
-echo "Build environment ready: $(javac -version 2>&1), $("${GO:-$(command -v go || echo /usr/local/go/bin/go)}" version | cut -d' ' -f3), Android SDK in $ANDROID_HOME"
+echo "Build environment ready: $(javac -version 2>&1), Android SDK in $ANDROID_HOME"

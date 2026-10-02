@@ -26,11 +26,6 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -39,15 +34,6 @@ jobs:
         with:
           build-root-directory: app/android
           cache-read-only: ${{ github.event_name != 'release' }}
-
-      # design/render-icons.py draws the Android 7 launcher icons in Chromium
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ hashFiles('tests/requirements.txt') }}
-      - run: |
-          python3 -m pip install --requirement tests/requirements.txt
-          python3 -m playwright install --with-deps chromium
 
       - run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.1.0" > /dev/null

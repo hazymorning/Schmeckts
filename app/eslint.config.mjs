@@ -1,13 +1,9 @@
-/* Lint rules for the app's modules and the pure-module tests. Run from the repository root (scripts/lint.sh),
-   which is why the patterns start there; the packages live in app/ next to this file. The app ships without
-   a build step, so this config reports problems and does not rewrite files. */
+// run from the repository root by scripts/lint.sh, hence the paths
 import js from '@eslint/js';
 import globals from 'globals';
 
 const rules = {
   ...js.configs.recommended.rules,
-  'no-unused-vars': 'error',
-  'no-empty': 'error',
   eqeqeq: ['error', 'smart'],
   'prefer-const': 'error',
   'no-shadow': 'error',
@@ -23,7 +19,7 @@ export default [
   },
   {
     files: ['tests/**/*.test.js', 'tests/notes.js'],
-    languageOptions: {ecmaVersion: 2024, sourceType: 'module', globals: {...globals.node, ...globals.nodeBuiltin}},
+    languageOptions: {ecmaVersion: 2024, sourceType: 'module', globals: globals.node},
     linterOptions: {reportUnusedDisableDirectives: 'error'},
     rules,
   },

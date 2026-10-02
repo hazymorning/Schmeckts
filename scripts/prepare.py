@@ -1,34 +1,19 @@
 #!/usr/bin/env python3
-"""Generates whatever is missing of the fonts, the Android project and the Android 7 launcher icons.
+"""Generates the Android project app/android from the Capacitor template and app/native.
 
-Usage: scripts/prepare.py [--fresh | --fonts-only]
+Usage: scripts/prepare.py [--fresh]
 """
 
-import hashlib
 import os
 import pathlib
 import shutil
 import subprocess
 import sys
-import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / 'app'
 ANDROID = APP / 'android'
 MAIN = ANDROID / 'app/src/main'
-
-# the latin subset covers ä, ö, ü, ß and the typographic characters
-FONTS = {
-    'figtree-latin.woff2': (
-        'https://fonts.gstatic.com/s/figtree/v9/_Xms-HUzqDCFdgfMm4S9DaRvzig.woff2',
-        '8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928',
-    ),
-    'faustina-latin.woff2': (
-        'https://fonts.gstatic.com/s/faustina/v23/XLYlIZPxYpJfTbZAFV-_Hcw.woff2',
-        'df206bf23e42149d22847217c70577855c9eebe5ef9d40706199fc9e5bee3450',
-    ),
-}
-
 
 # Android refuses a versionCode below the installed one, and builds before the 0.1.0 version restart reached 10400.
 VERSION_OFFSET = 20000
@@ -36,19 +21,6 @@ VERSION_OFFSET = 20000
 
 def run(*cmd, cwd=ROOT):
     subprocess.run(cmd, cwd=cwd, check=True)
-
-
-def fonts():
-    folder = APP / 'www/fonts'
-    for name, (url, sha) in FONTS.items():
-        path = folder / name
-        if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() == sha:
-            continue
-        data = urllib.request.urlopen(url, timeout=60).read()
-        if hashlib.sha256(data).hexdigest() != sha:
-            sys.exit(f'checksum does not match: {name}')
-        path.write_bytes(data)
-        print('font downloaded:', name)
 
 
 def edit(path, old, new):
@@ -72,8 +44,8 @@ def android(fresh):
     shutil.copytree(APP / 'native/res', MAIN / 'res', dirs_exist_ok=True)
     shutil.copytree(APP / 'native/java', MAIN / 'java', dirs_exist_ok=True)
 
-    # drop the template's splash.png (the Capacitor logo) so drawable/splash.xml applies
-    for png in (MAIN / 'res').glob('drawable*/splash.png'):
+    # drop the template's splash.png (the Capacitor logo) so drawable/splash.xml applies, and its launcher foreground
+    for png in [*(MAIN / 'res').glob('drawable*/splash.png'), *(MAIN / 'res').glob('mipmap-*/ic_launcher_foreground.png')]:
         png.unlink()
     # at minSdk 24 aapt2 keeps only drawable-v24/ over drawable/, so the template's vector would displace our logo
     (MAIN / 'res/drawable-v24/ic_launcher_foreground.xml').unlink(missing_ok=True)
@@ -147,37 +119,6 @@ def android(fresh):
     )
 
     edit(
-        MAIN / 'java/de/schmeckts/app/MainActivity.java',
-        'public class MainActivity extends BridgeActivity {}',
-        'public class MainActivity extends BridgeActivity {\n'
-        '    @Override\n'
-        '    public void onCreate(android.os.Bundle savedInstanceState) {\n'
-        '        registerPlugin(PhotoPlugin.class); // app/native/java, for the „Packung fotografieren“ shortcut\n'
-        '        registerPlugin(FeedReminderPlugin.class); // app/native/java, the feeding reminder\n'
-        '        shared(getIntent());\n'
-        '        super.onCreate(savedInstanceState);\n'
-        '    }\n'
-        '\n'
-        '    @Override\n'
-        '    public void onNewIntent(android.content.Intent intent) {\n'
-        '        shared(intent);\n'
-        '        super.onNewIntent(intent);\n'
-        '    }\n'
-        '\n'
-        '    // A file shared from another app (ACTION_SEND) carries its address in the extra. As ACTION_VIEW\n'
-        '    // Capacitor forwards it as appUrlOpen, and the app opens the receive flow with it.\n'
-        '    private void shared(android.content.Intent intent) {\n'
-        '        if (intent == null || !android.content.Intent.ACTION_SEND.equals(intent.getAction())) return;\n'
-        '        android.os.Parcelable file = intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM);\n'
-        '        if (file instanceof android.net.Uri) {\n'
-        '            intent.setAction(android.content.Intent.ACTION_VIEW);\n'
-        '            intent.setData((android.net.Uri) file);\n'
-        '        }\n'
-        '    }\n'
-        '}',
-    )
-
-    edit(
         MAIN / 'res/values/styles.xml',
         '        <item name="android:background">@drawable/splash</item>\n    </style>',
         '        <item name="android:background">@drawable/splash</item>\n'
@@ -215,7 +156,6 @@ def android(fresh):
     edit(gradle, ":!CVS:!thumbs.db:!picasa.ini:!*~'", ":!CVS:!thumbs.db:!picasa.ini:!*~:!mlkit_barcode_models'")
 
     gradle_wrapper_bin()
-    run(sys.executable, str(ROOT / 'design/render-icons.py'))
     (ANDROID / 'local.properties').write_text(f'sdk.dir={os.environ.get("ANDROID_HOME", "/opt/android-sdk")}\n')
 
 
@@ -228,7 +168,5 @@ def gradle_wrapper_bin():
 
 
 if __name__ == '__main__':
-    fonts()
-    if '--fonts-only' not in sys.argv:
-        android('--fresh' in sys.argv)
+    android('--fresh' in sys.argv)
     print('preparation done')

@@ -2,7 +2,6 @@
 app/node_modules/
 app/android/
 dist/
-app/www/fonts/*.woff2
 __pycache__/
 *.apk
 server/schmeckts

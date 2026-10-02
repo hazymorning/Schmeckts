@@ -11,9 +11,6 @@ for suite in "${SUITES[@]}"; do
 done
 
 GO="$(command -v go || echo /usr/local/go/bin/go)"
-case " ${SUITES[*]} " in
-  *" storage "*|*" design "*|*" perf "*|*" ui "*|*" sync "*) python3 "$ROOT/scripts/prepare.py" --fonts-only ;;
-esac
 
 for suite in "${SUITES[@]}"; do
   case "$suite" in
