@@ -99,8 +99,12 @@ const I = {
   // the variety that is always eaten up, crowned
   champ:
     '<path d="M3.5 12.5h17l-1.5 6a2.3 2.3 0 0 1-2.24 1.75H7.24A2.3 2.3 0 0 1 5 18.5z"/><path d="M7.8 9.5h8.4l.9-5.2-2.9 2.3L12 3.5l-2.2 3.1-2.9-2.3z"/><path d="M20 6.5v2M19 7.5h2"/>',
-  // and the one only a fly still visits
-  flop: '<path d="M3.5 14h17l-1.5 5.8a2.3 2.3 0 0 1-2.24 1.7H7.24A2.3 2.3 0 0 1 5 19.8z"/><circle cx="15" cy="8.3" r="1.6" fill="currentColor" stroke="none"/><path d="M14 6.9c-1.9-2.6-4.2-1.4-3.2.2.6.9 1.9.8 3 .2M16 6.9c1.9-2.6 4.2-1.4 3.2.2-.6.9-1.9.8-3 .2"/><path d="M5.6 11.2c1-2.4 3.4-3.4 6-2.6" stroke-dasharray="0.1 2.1"/>',
+  // and the one left full, with a sad face on the bowl
+  flop:
+    '<path d="M5.2 10.5c.9-3 3.6-4.8 6.8-4.8s5.9 1.8 6.8 4.8z" fill="currentColor" fill-opacity=".3"/><path d="M3.5 10.5h17l-1.5 7.4a2.3 2.3 0 0 1-2.24 1.8H7.24A2.3 2.3 0 0 1 5 17.9z"/>' +
+    DOT(9.4, 13.5) +
+    DOT(14.6, 13.5) +
+    '<path d="M9.8 17.3c1.3-1.2 3.1-1.2 4.4 0"/>',
   heart: '<path d="M12 19.3s-7.2-4.4-7.2-9.4A4 4 0 0 1 12 7.6a4 4 0 0 1 7.2 2.3c0 5-7.2 9.4-7.2 9.4z"/>',
   tag: '<path d="M3.8 11.9V5.3c0-.8.7-1.5 1.5-1.5h6.6l8.4 8.4a1.5 1.5 0 0 1 0 2.1l-6.3 6.3a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/>',
   rise: '<path d="M4 16.5l5-5 3.5 3.5L19.5 8"/><path d="M14.5 8h5v5"/>',
