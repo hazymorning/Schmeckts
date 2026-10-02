@@ -1,5 +1,6 @@
 import {haptic} from '../native.js';
 import {RATINGS} from '../config.js';
+import {rateCls} from '../smart.js';
 import {settled} from '../motion.js';
 import {$} from '../dom.js';
 import {hasLine} from '../ocr.js';
@@ -29,6 +30,7 @@ export function rate(el) {
   toast(
     `${RATINGS[r].label} gespeichert${db.pets.length > 1 && pet ? ' für ' + pet.name : ''}`,
     undoRating(s.id, pid, prev),
+    {ic: 'r_' + r, tone: rateCls(r)},
   );
   showRated(disc, s, pid);
 }

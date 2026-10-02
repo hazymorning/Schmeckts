@@ -40,47 +40,60 @@ import {
   deleteMealBtn,
   evidenceOf,
   forWhom,
+  group,
+  habitRow,
   head,
+  lead,
+  likesList,
+  main,
   nameBlock,
+  obsThumb,
   photoThumb,
+  pickRow,
   rateSlider,
   resultBadges,
   scaleEnds,
   segmented,
   shopRow,
-  lower,
   since,
   strip,
-  whoObserved,
-  habitRow,
-  likesList,
-  toldList,
   thumbOf,
+  told,
+  toldList,
   verdictLabel,
+  whoObserved,
 } from './parts.js';
 import {paintHouse, viewSettings} from './settings.js';
 import {viewEvaluation} from './evaluation.js';
 
-const servingCard = (s, p) => {
-  const main = `<span class="t-main">${nameBlock(s, p, true)}</span><span class="edit">${icon('pencil')}</span>`;
-  // with the full photo on this phone, the thumbnail opens it
-  return hasPhoto(s, p)
-    ? `<div class="box prod-card">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="edit-name" aria-label="Futter ändern">${main}</button></div>`
-    : `<button class="box prod-card" data-action="edit-name" aria-label="Futter ändern">${thumbOf(s, p, 'xl')}${main}</button>`;
-};
+// the variety on top of a sheet; with the full photo on this phone, the thumbnail opens it
+const prodRow = (s, p, inner, action, label) =>
+  hasPhoto(s, p)
+    ? `<div class="row set-row">${photoThumb(s, p, 'xl')}<button class="prod-edit" data-action="${action}" aria-label="${label}">${inner}${icon('pencil', 'chev')}</button></div>`
+    : `<button class="row set-row" data-action="${action}" aria-label="${label}">${thumbOf(s, p, 'xl')}${inner}${icon('pencil', 'chev')}</button>`;
+const photoLabel = p => (hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen');
 const photoLink = p =>
-  `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${hasPhoto(null, p) || p.thumb ? 'Foto ändern' : 'Foto hinzufügen'}</button>`;
-const petRateRow = (s, pid, multi) =>
-  `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}
-    ${rateSlider(s, pid)}</div>`;
-const servedForChips = s =>
-  `<span class="label">Serviert für</span><div class="chips">${db.pets
+  `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${photoLabel(p)}</button>`;
+const photoRow = p =>
+  `<button class="row set-row act" data-action="product-photo" data-id="${p.id}">${lead('camera')}${main(photoLabel(p))}</button>`;
+const prodGroup = (s, p, inner, action, label) =>
+  group('', prodRow(s, p, inner, action, label) + (p ? photoRow(p) : ''), 'set-group prod');
+const petChips = (action, on) =>
+  `<div class="chips">${db.pets
     .map(
       pet =>
-        `<button class="chip" aria-pressed="${!!s.pets[pet.id]}" data-action="toggle-serving-pet" data-id="${pet.id}">
-          ${avatar(pet, 'xs')}${esc(pet.name)}</button>`,
+        `<button class="chip" aria-pressed="${!!on[pet.id]}" data-action="${action}" data-id="${pet.id}">${avatar(pet, 'xs')}${esc(pet.name)}</button>`,
     )
     .join('')}</div>`;
+// the native field is invisible; the row shows its value and opens it
+const timeRow = (title, by, t, field) =>
+  pickRow(
+    'clock',
+    title,
+    by ? 'von ' + esc(by) : '',
+    esc(cap(when(t))),
+    `<input class="pick-in" type="datetime-local" ${field} value="${toLocalInput(t)}" max="${toLocalInput(Date.now())}" aria-label="${title}">`,
+  );
 
 function viewServing() {
   const s = getServing(sheet.id);
@@ -91,13 +104,15 @@ function viewServing() {
   const ids = Object.keys(s.pets).filter(id => getPet(id));
   const multi = db.pets.length > 1;
   return `<div class="sh-head"><h2>Wie war’s?</h2>${closeBtn}</div>
-    ${servingCard(s, p)}${p ? photoLink(p) : ''}
-    ${ids.map(pid => petRateRow(s, pid, multi)).join('')}
-    ${multi ? servedForChips(s) : ''}
-    <label class="label served" for="f-time"><span>Serviert</span>${s.by ? `<span class="hint">von ${esc(s.by)}</span>` : ''}</label>
-    <span class="pick"><input id="f-time" class="field" type="datetime-local" data-time="${s.id}" value="${toLocalInput(s.servedAt)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
-    <label class="label" for="f-note">Notiz</label>
-    <input id="f-note" class="field" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Optional, z. B. neue Packung" autocomplete="off">
+    ${prodGroup(s, p, `<span class="t-main">${nameBlock(s, p, true)}</span>`, 'edit-name', 'Futter ändern')}
+    ${ids.map(pid => group(multi ? esc(getPet(pid).name) : '', rateSlider(s, pid))).join('')}
+    ${multi ? group('Serviert für', petChips('toggle-serving-pet', s.pets)) : ''}
+    ${group(
+      '',
+      timeRow('Serviert', s.by, s.servedAt, `id="f-time" data-time="${s.id}"`) +
+        `<div class="row set-row">${lead('note')}<input id="f-note" class="field bare" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Notiz, z. B. neue Packung" aria-label="Notiz" autocomplete="off"></div>`,
+      'set-group',
+    )}
     <div class="mt">${deleteMealBtn(s.id)}</div>`;
 }
 
@@ -115,28 +130,24 @@ function viewObservation() {
         : names.length
           ? `<p class="hint mt-s">${cap(kind.window)} davor gab es ${andList(names)}.</p>`
           : `<p class="hint mt-s">${cap(kind.window)} davor ist keine Mahlzeit eingetragen.</p>`;
+  const kinds = `<div class="chips">${Object.entries(OBSERVATIONS)
+    .map(
+      ([k, x]) =>
+        `<button class="chip toned o-${k}" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.chip}</button>`,
+    )
+    .join('')}</div>`;
   return `<div class="sh-head"><h2>${esc(kind.label)}</h2>${closeBtn}</div>
-    <span class="label">Beobachtung</span>
-    <div class="chips">${Object.entries(OBSERVATIONS)
-      .map(
-        ([k, x]) =>
-          `<button class="chip" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.chip}</button>`,
-      )
-      .join('')}</div>${weighed}
+    ${group('', kinds + weighed)}
     ${
       db.pets.length > 1
-        ? `<span class="label">Bemerkt bei</span><div class="chips">${db.pets
-            .map(
-              pet =>
-                `<button class="chip" aria-pressed="${!!o.pets[pet.id]}" data-action="toggle-observation-pet" data-id="${pet.id}">${avatar(pet, 'xs')}${esc(pet.name)}</button>`,
-            )
-            .join(
-              '',
-            )}</div>${ids.length > 1 ? `<p class="hint mt-s">Bei ${esc(whoObserved(ids))}: offen, wer es war.</p>` : ''}`
+        ? group(
+            'Bemerkt bei',
+            petChips('toggle-observation-pet', o.pets) +
+              (ids.length > 1 ? `<p class="hint mt-s">Bei ${esc(whoObserved(ids))}: offen, wer es war.</p>` : ''),
+          )
         : ''
     }
-    <label class="label served" for="f-obs-time"><span>Notiert</span>${o.by ? `<span class="hint">von ${esc(o.by)}</span>` : ''}</label>
-    <span class="pick"><input id="f-obs-time" class="field" type="datetime-local" data-obs-time="${o.id}" value="${toLocalInput(o.at)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
+    ${group('', timeRow('Notiert', o.by, o.at, `id="f-obs-time" data-obs-time="${o.id}"`), 'set-group')}
     <div class="mt"><button class="btn quiet" data-action="delete-observation" data-id="${o.id}">${icon('trash')}Eintrag löschen</button></div>`;
 }
 
@@ -197,8 +208,7 @@ function viewName() {
     <label class="label" for="f-variety">Sorte</label>
     <input id="f-variety" class="field" data-field="variety" value="${esc(s.variety)}" placeholder="z. B. Lachs in Soße" autocomplete="off" enterkeyhint="done">
     <div class="suggest" id="lineChips"></div>
-    <span class="label">Art</span>
-    <div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>
+    ${group('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
     ${textureChips(s)}
     <div class="mt btn-col"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button>${serving && !product ? deleteMealBtn(serving.id) : ''}</div>`;
 }
@@ -207,7 +217,10 @@ const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span><
 function textureChips(x, note = '') {
   const t = TEXTURES[typeOf(x)];
   return t
-    ? `<div class="tex"><span class="label">${t.title}</span><div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}</div>`
+    ? group(
+        t.title,
+        `<div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}`,
+      )
     : '';
 }
 const chipsOf = (field, list, value) =>
@@ -277,7 +290,7 @@ function viewFeed() {
   if (pick.length)
     return `<div class="sh-head"><h2>Welche Sorte?</h2>${closeBtn}</div>
     <p class="hint">Dieser Barcode gehört zu mehreren Sorten.</p>
-    <ul class="list plist">${serveRows(withLast(pick), sheet.code)}</ul>`;
+    ${group('', `<ul class="list plist">${serveRows(withLast(pick), sheet.code)}</ul>`, '')}`;
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
     <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
@@ -291,11 +304,11 @@ function viewFeed() {
       }
       <div class="serve-list" id="serveList">${quickList(prods)}</div>
     </div>
-    <button class="btn plain" data-action="new-product">Ohne Foto eintippen</button>`;
+    <button class="btn plain" data-action="new-product">Eintippen</button>`;
 }
 const quickList = entries =>
   entries.length
-    ? `<span class="label">Schon mal gehabt</span><ul class="list plist">${serveRows(entries.slice(0, SUGGEST))}</ul>`
+    ? group('Schon mal gehabt', `<ul class="list plist">${serveRows(entries.slice(0, SUGGEST))}</ul>`, '')
     : '';
 // rewrites only the list box, so the search field keeps its place and focus
 export function renderServeHits(text) {
@@ -308,7 +321,7 @@ function hitList(text, words) {
   const hits = quickProducts()
     .filter(({product: p}) => words.every(w => norm(`${p.brand || ''} ${p.variety || ''}`).includes(w)))
     .slice(0, HITS);
-  if (hits.length) return `<ul class="list plist">${serveRows(hits)}</ul>`;
+  if (hits.length) return group('', `<ul class="list plist">${serveRows(hits)}</ul>`, '');
   const q = esc(text);
   return `<p class="hint empty"><span>Keine Sorte passt zu „${q}“.</span></p>
     <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neues Futter eintippen</button>`;
@@ -326,16 +339,14 @@ const verdictPetRow = (pet, x) =>
 const OLD = 'Die letzten Bewertungen sind über ein halbes Jahr alt.';
 function kaufenHTML(e) {
   const pets = db.pets.length > 1 ? db.pets.filter(pet => e.pets[pet.id]) : [];
-  return `<span class="label">Kaufen</span>
-    ${segmented('buy', KAUFEN, e.kaufen || 'auto')}
+  return group(
+    'Kaufen',
+    `${segmented('buy', KAUFEN, e.kaufen || 'auto')}
     <div class="verdict"><p><b>${esc(verdictLabel(e.house))}</b>${pets.length ? '' : `<span>${esc(e.house.n || !e.total ? evidenceOf(e.house) : OLD)}</span>`}</p>
-    ${pets.map(pet => verdictPetRow(pet, e.pets[pet.id])).join('')}</div>`;
+    ${pets.map(pet => verdictPetRow(pet, e.pets[pet.id])).join('')}</div>`,
+  );
 }
 
-const productCard = (p, served) =>
-  `<div class="box prod-card">${photoThumb(null, p, 'xl')}<span class="t-main"><b>${esc(p.brand || p.variety)}</b>
-    <small>${esc([p.type, `${served}× serviert`].filter(Boolean).join(', '))}</small></span>
-    <button class="icon-btn" data-action="rename-product" aria-label="Umbenennen">${icon('pencil')}</button></div>`;
 const countsRow = (levels, counts) =>
   `<div class="tally"><div class="counts">${levels
     .map(
@@ -362,7 +373,15 @@ function noticed(p) {
     p.id,
   );
   return after.length
-    ? `<p class="hint">Danach notiert: ${after.map(x => `${lower(observationOf(x.kind).label)} nach ${x.hit} von ${x.n} Mahlzeiten`).join(', ')}.</p>`
+    ? group(
+        'Danach notiert',
+        toldList(
+          after.map(x =>
+            told(obsThumb(x.kind), `${observationOf(x.kind).label} nach <b>${x.hit} von ${x.n}</b> Mahlzeiten`),
+          ),
+        ),
+        '',
+      )
     : '';
 }
 
@@ -378,17 +397,16 @@ function viewProduct() {
     levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // levels from another scale that still occur
   const codes = Object.keys(p.codes || {}).sort();
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
+  const about = `<span class="t-main"><b>${esc(p.brand || p.variety)}</b><small>${esc([p.type, `${ss.length}× serviert`].filter(Boolean).join(', '))}</small></span>`;
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
-    ${productCard(p, ss.length)}
-    ${photoLink(p)}
+    ${prodGroup(null, p, about, 'rename-product', 'Umbenennen')}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
-    ${strip(ratingsIn(model(), [p.id]))}
-    ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">${e.total ? OLD : 'Noch nicht bewertet.'}</p>`}
+    ${group('Bewertungen', e.house.n ? countsRow(levels, counts) : `<p class="hint">${e.total ? OLD : 'Noch nicht bewertet.'}</p>`)}
     ${kaufenHTML(e)}
     ${noticed(p)}
-    ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}
-    ${codes.length ? `<span class="label">Barcodes</span><ul class="list plist">${codes.map(barcodeRow).join('')}</ul>` : ''}
-    <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Heute servieren</button>
+    ${hist ? group('Verlauf', `<ul class="list plist">${hist}</ul>`, '') : ''}
+    ${codes.length ? group('Barcodes', `<ul class="list plist">${codes.map(barcodeRow).join('')}</ul>`, '') : ''}
+    <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Servieren</button>
     ${armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen')}</div>`;
 }
 
@@ -448,7 +466,7 @@ function viewShop() {
     open = unclear(g).length;
   const buy = types.length
     ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('') +
-      `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Als Liste teilen</button></div>`
+      `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Liste teilen</button></div>`
     : '<p class="hint card-line">Noch nichts zum Nachkaufen.</p>';
   return `${head('Einkaufen' + forWhom(m.pet))}
     <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
@@ -533,6 +551,11 @@ const viewCrop = () => `${head('Foto zuschneiden', 'crop-cancel')}
     <input id="f-zoom" class="zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1">
     <div class="btn-row"><button class="btn soft" data-action="crop-cancel">Abbrechen</button><button class="btn primary" data-action="crop-apply">${icon('check')}Übernehmen</button></div>`;
 
+// "YYYY-MM-DD" as a local day, not UTC midnight
+const birthdayStr = key => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('de-DE', {day: 'numeric', month: 'long', year: 'numeric'});
+};
 function viewPet() {
   if (sheet.step === 'crop') return viewCrop();
   const s = sheet,
@@ -542,12 +565,20 @@ function viewPet() {
   return `${head(title)}
     <label class="pet-photo" for="petPhotoInput" aria-label="Foto wählen">${av}<span class="cam-badge">${icon('camera')}</span></label>
     <label class="link photo-hint" for="petPhotoInput">${s.photo ? 'Foto ändern' : 'Foto hinzufügen'}</label>
-    <label class="label" for="f-name">Name</label>
-    <input id="f-name" class="field" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done">
-    <label class="label" for="f-birthday">Geburtstag</label>
-    <span class="pick"><input id="f-birthday" class="field" type="date" data-field="birthday" value="${esc(s.birthday)}" max="${dayKey(Date.now())}">${icon('chevron')}</span>
-    <span class="label">Tierart</span>
-    <div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>
+    ${group(
+      '',
+      `<div class="row set-row">${lead('paw')}<label class="t-main" for="f-name"><b>Name</b></label>
+        <input id="f-name" class="field in-row" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done"></div>` +
+        pickRow(
+          'cake',
+          'Geburtstag',
+          '',
+          s.birthday ? esc(birthdayStr(s.birthday)) : 'Optional',
+          `<input id="f-birthday" class="pick-in" type="date" data-field="birthday" value="${esc(s.birthday)}" max="${dayKey(Date.now())}" aria-label="Geburtstag">`,
+        ),
+      'set-group',
+    )}
+    ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
     <div class="mt btn-col"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button>
     ${editing ? armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen') : ''}</div>`;
 }

@@ -102,16 +102,14 @@ strong {
 .badge .ic,
 .box > .ic:last-child,
 .row .chev,
-.prod-card .edit .ic,
 .search .ic,
-.pick .ic,
 .pin .ic,
 .cam-badge .ic {
   width: var(--icon-s);
   height: var(--icon-s);
 }
 .lead {
-  width: var(--pic-s);
+  width: var(--lead, var(--pic-s));
   flex: 0 0 auto;
   display: grid;
   place-items: center;
@@ -133,6 +131,18 @@ strong {
 .r-bad {
   --c: var(--bad);
   --cs: var(--bad-soft);
+}
+.o-stink {
+  --c: var(--stink);
+  --cs: var(--stink-soft);
+}
+.o-hungry {
+  --c: var(--hungry);
+  --cs: var(--hungry-soft);
+}
+.o-tired {
+  --c: var(--tired);
+  --cs: var(--tired-soft);
 }
 
 /* only the alpha in the mask gradient matters */
@@ -277,15 +287,23 @@ body::before {
   margin: 0;
 }
 /* the 4px above and below keep the end rows out of the corners */
+.card,
+.group {
+  --raise: var(--surface-2);
+}
 .group {
   padding: var(--inset-group);
   border-radius: var(--radius-l);
   background: var(--surface);
 }
+/* for chips, a slider, a segment: anything but rows */
+.group.pad {
+  padding: var(--space-4);
+}
 /* a grid, so a segment or field under a row lines up with the row's text */
 .set-group {
   display: grid;
-  grid-template-columns: var(--pic-s) 1fr;
+  grid-template-columns: var(--lead, var(--pic-s)) 1fr;
   column-gap: var(--space-3);
 }
 /* dividers start at the text column, so the icons form a column of their own */
@@ -293,7 +311,7 @@ body::before {
   content: "";
   position: absolute;
   top: 0;
-  left: calc(var(--pic-s) + var(--space-3));
+  left: calc(var(--lead, var(--pic-s)) + var(--space-3));
   right: 0;
   height: var(--hairline);
   background: var(--line);
@@ -318,7 +336,7 @@ dialog.sheet {
   padding: 0;
   border: 0;
   border-radius: var(--radius-l) var(--radius-l) 0 0;
-  background: var(--surface);
+  background: var(--bg);
   color: var(--ink);
   display: flex;
   flex-direction: column;
@@ -526,6 +544,20 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .toast.plain {
   padding-right: var(--gutter);
 }
+.toast.has-ic {
+  padding-left: var(--space-2);
+}
+.toast-ic {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--pic-s);
+  height: var(--pic-s);
+  margin-right: var(--space-1);
+  border-radius: 50%;
+  background: var(--cs, var(--accent-soft));
+  color: var(--c, var(--accent-ink));
+}
 .toast.in-sheet {
   bottom: calc(var(--space-5) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
@@ -589,7 +621,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   width: 100%;
   padding: var(--inset-box);
   border-radius: var(--radius-m);
-  background: var(--surface-2);
+  background: var(--raise);
   color: var(--ink);
   text-align: left;
 }
@@ -600,13 +632,40 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .box > .ic:last-child {
   margin-right: var(--space-hair);
 }
-.prod-card,
 .prod-edit {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--tap);
   text-align: left;
+}
+/* The native field lies invisible over the row; the row opens it and shows the value. Its focus ring is the
+   row's. */
+.pick-row {
+  position: relative;
+  cursor: pointer;
+}
+.pick-val {
+  flex: 0 1 auto;
+  min-width: 0;
+  font: var(--type-body);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pick-in {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.pick-row:has(.pick-in:focus-visible) {
+  outline: var(--stroke) solid var(--accent);
+  outline-offset: var(--stroke);
+  border-radius: var(--radius-s);
 }
 .banner {
   padding: var(--inset-box);
@@ -740,7 +799,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   color: var(--on-accent);
 }
 .btn.soft {
-  background: var(--surface-2);
+  background: var(--raise);
   color: var(--ink);
 }
 .btn.quiet {
@@ -799,7 +858,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   padding: var(--inset-control);
   border-radius: var(--radius-m);
   border: var(--stroke) solid transparent;
-  background: var(--surface-2);
+  background: var(--raise);
   color: var(--ink);
   font: var(--type-body);
 }
@@ -810,6 +869,13 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   outline: none;
   border-color: var(--accent);
   background: var(--surface);
+}
+.field.bare,
+.field.bare:focus {
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
 }
 .field.in-row {
   flex: 0 0 auto;
@@ -843,36 +909,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .search .field {
   padding-left: var(--field-room);
 }
-/* our own arrow; the native control sits invisibly on top and opens the picker */
-.pick {
-  position: relative;
-  display: block;
-}
-/* appearance: none, or Android draws its own arrow beside ours */
-.pick .field {
-  padding-right: var(--field-room);
-  appearance: none;
-  -webkit-appearance: none;
-}
-.pick .field::-webkit-calendar-picker-indicator {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: var(--tap);
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.pick .ic {
-  position: absolute;
-  right: var(--space-3h);
-  top: 50%;
-  transform: translateY(-50%) rotate(90deg);
-  color: var(--muted);
-  pointer-events: none;
-}
 .chip {
   display: inline-flex;
   align-items: center;
@@ -880,7 +916,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   min-height: var(--tap-s);
   padding: var(--inset-compact);
   border-radius: var(--radius-full);
-  background: var(--surface-2);
+  background: var(--raise);
   font: var(--type-small-strong);
 }
 .chip[aria-pressed="true"] {
@@ -893,6 +929,41 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 }
 .chip .av {
   margin-left: calc(-1 * var(--space-2));
+}
+/* Scrolls sideways edge to edge in its card, fading at the edges; the padding keeps the ends in line with the
+   card's text. Only the alpha in the mask gradient matters. */
+.rail {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 0 var(--gutter);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--gutter);
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--ink) var(--gutter),
+    var(--ink) calc(100% - var(--gutter)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--ink) var(--gutter),
+    var(--ink) calc(100% - var(--gutter)),
+    transparent
+  );
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.rail > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  scroll-snap-align: start;
 }
 .seg {
   display: grid;
@@ -1104,6 +1175,19 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .thumb.xl {
   width: var(--pic-xl);
   height: var(--pic-xl);
+}
+/* a chip or picture in its tone's colours: soft ground, coloured icon */
+.toned {
+  background: var(--cs, var(--surface-2));
+}
+.toned .ic {
+  color: var(--c, var(--muted));
+}
+/* chosen: a ring in the tone, quieter than the accent fill */
+.toned[aria-pressed="true"] {
+  background: var(--cs);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 var(--stroke) var(--c);
 }
 .srv-ic .ic {
   width: var(--icon);
@@ -1378,10 +1462,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .overview p {
   margin: 0;
   font: var(--type-small);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 .pet-label {
   display: flex;
@@ -1573,6 +1653,18 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .card + .card {
   margin-top: var(--space-3h);
 }
+.group + .group {
+  margin-top: var(--space-3);
+}
+.group.pad > :first-child {
+  margin-top: 0;
+}
+.group.pad > :last-child {
+  margin-bottom: 0;
+}
+.prod {
+  --lead: var(--pic-xl);
+}
 .card h2 {
   text-wrap: balance;
   margin: 0 0 var(--space-1);
@@ -1600,14 +1692,14 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   display: flex;
   align-items: center;
   gap: var(--space-3h);
-  cursor: pointer;
 }
 .ov-pic,
 .ov-text {
   margin-bottom: var(--space-2h);
 }
-.obs-chips {
-  margin-top: var(--space-2);
+/* with the card's 8px foot this makes 18, as at the top */
+.obs {
+  margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-2h);
 }
 .ov-text {
   flex: 1;
@@ -1618,10 +1710,6 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.overview.open p,
-.overview p.animating {
-  display: block;
 }
 
 .pend-head,
@@ -1639,8 +1727,7 @@ dialog.sheet.scrolled:has(.days .tl-date.stuck) .head::after {
 .pet-rate > .pet-label {
   margin-bottom: var(--space-2);
 }
-.pet-rate + .pet-rate,
-.rephoto + .pet-rate {
+.pet-rate + .pet-rate {
   margin-top: var(--space-4h);
 }
 .pet-rate > .badge {
@@ -1829,9 +1916,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-.tex {
-  margin-bottom: var(--space-4h);
-}
 .cta-row {
   display: grid;
   grid-auto-flow: column;
@@ -1864,27 +1948,9 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.prod-card {
-  margin-bottom: var(--space-4h);
-}
-.served {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-.served .hint {
-  margin: 0;
-}
 .prod-edit {
   flex: 1;
   min-width: 0;
-}
-.prod-card .edit {
-  color: var(--muted);
-  display: grid;
-  place-items: center;
-  margin-right: var(--space-hair);
 }
 .photo-btn:has(> .name-photo) {
   width: 100%;
@@ -1910,9 +1976,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"], [data-kind=
 }
 .sugg > .ic {
   color: var(--faint);
-}
-.sheet-body > .strip {
-  margin-bottom: var(--space-3h);
 }
 .counts {
   display: grid;
@@ -2057,7 +2120,7 @@ dialog.sheet.dragging {
 }
 .toast {
   opacity: 0;
-  transform: translate(-50%, var(--space-3));
+  transform: translate(-50%, var(--space-3)) scale(0.96);
   transition:
     opacity var(--dur-fade) var(--ease-in),
     transform var(--dur-fade) var(--ease-in);
@@ -2068,6 +2131,9 @@ dialog.sheet.dragging {
   transition:
     opacity var(--dur-fade) var(--ease-out),
     transform var(--dur-step) var(--ease-spring);
+}
+.toast.show .toast-ic {
+  animation: badgeIn var(--dur-step) var(--ease-spring) both;
 }
 dialog.sheet[open] {
   animation: sheetIn var(--dur-step) var(--ease-out);

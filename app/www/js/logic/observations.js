@@ -21,14 +21,19 @@ export function observe(kind) {
   db.observations.unshift(o);
   save();
   haptic('success');
-  homeView.observing = false;
+  homeView.fresh = o.id;
   update();
-  toast(`${observationOf(kind).said}${db.pets.length > 1 ? ` für ${whoObserved(ids)}` : ''}.`, () => {
-    db.observations = db.observations.filter(x => x.id !== o.id);
-    save();
-    update();
-    renderSheet();
-  });
+  const seen = observationOf(kind);
+  toast(
+    db.pets.length > 1 ? `${seen.label} bei ${whoObserved(ids)} notiert` : seen.said,
+    () => {
+      db.observations = db.observations.filter(x => x.id !== o.id);
+      save();
+      update();
+      renderSheet();
+    },
+    {ic: seen.icon, tone: 'o-' + kind},
+  );
 }
 
 export function setObservationKind(kind) {

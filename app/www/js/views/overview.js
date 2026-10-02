@@ -261,15 +261,16 @@ export function overviewLines(g, pets, now, memory) {
     order = g.birthday?.today && news && moment !== 'due' && moment !== 'dueFirst' ? [more, first] : [first, more];
   return {text: order.filter(Boolean).map(line).join(' '), memory: kept};
 }
-export const observeChips = () =>
-  `<div class="chips obs-chips">${Object.entries(OBSERVATIONS)
+// always at hand, so noting takes one tap; who: the pet's name, or the whole bunch
+const observeRail = who =>
+  `<div class="rail obs" role="group" aria-label="Beobachtung notieren">${Object.entries(OBSERVATIONS)
     .map(
       ([k, o]) =>
-        `<button class="chip tight" data-action="observe" data-v="${k}" aria-label="${o.label} notieren">${icon(o.icon)}${o.chip}</button>`,
+        `<button class="chip toned o-${k}" data-action="observe" data-v="${k}" aria-label="${o.label} notieren">${icon(o.icon)}${o.button.replace('{pet}', who)}</button>`,
     )
     .join('')}</div>`;
 
-export function overviewHTML(m, open, observing = false) {
+export function overviewHTML(m) {
   const pets = m.pet ? [getPet(m.pet)] : db.pets,
     one = pets.length === 1 ? pets[0] : null,
     now = Date.now();
@@ -291,8 +292,7 @@ export function overviewHTML(m, open, observing = false) {
         .slice(0, 2)
         .map(p => avatar(p, 'l pair'))
         .join('')}</span>`;
-  return `<section class="card overview${open ? ' open' : ''}" data-sec="overview" style="view-transition-name:sec-overview">
-    <div class="ov-top" data-action="toggle-overview" role="button" tabindex="0" aria-expanded="${!!open}">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
-    <div class="card-body fold" id="fold-observe">${observing ? observeChips() : ''}</div>
-    <button class="card-btn" data-action="observe-open" aria-expanded="${observing}" aria-controls="fold-observe">${observing ? 'Abbrechen' : 'Beobachtung notieren'}</button></section>`;
+  return `<section class="card overview" data-sec="overview" style="view-transition-name:sec-overview">
+    <div class="ov-top">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
+    ${observeRail(one ? esc(one.name) : 'Bande')}</section>`;
 }

@@ -7,7 +7,7 @@ import {REMIND, REMIND_MAX_H} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {feedSlots} from '../smart.js';
-import {armBtn, avatar, head, segmented, syncInfo} from './parts.js';
+import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} from './parts.js';
 import {sheet} from '../ui/sheet.js';
 
 const THEMES = [
@@ -35,9 +35,6 @@ function feedSub() {
 }
 const houseSub = n => (n.detail ? `${n.title}, ${n.detail.charAt(0).toLowerCase()}${n.detail.slice(1)}` : n.title);
 
-const lead = ic => `<span class="lead">${icon(ic)}</span>`;
-const main = (title, sub = '', id = '') =>
-  `<span class="t-main"><b>${title}</b>${sub ? `<small${id ? ` id="${id}"` : ''}>${sub}</small>` : ''}</span>`;
 const chev = icon('chevron', 'chev');
 const pageRow = (page, ic, title, sub = '', id = '') =>
   `<button class="row set-row" data-action="settings-page" data-v="${page}">${lead(ic)}${main(title, sub, id)}${chev}</button>`;
@@ -49,8 +46,6 @@ const doRow = (action, ic, title) =>
 const petRow = p =>
   `<button class="row set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p, 's')}${main(esc(p.name), esc(p.species))}${chev}</button>`;
 const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(title)}</div>`;
-const under = html => `<div class="set-under">${html}</div>`;
-const group = (label, rows) => `<span class="label">${label}</span><div class="group set-group">${rows}</div>`;
 
 const LOOKUP = 'Fragt bei unbekannten Barcodes nach, nur mit der Nummer';
 const SERVER_PHOTO = 'Erkennt Marke und Sorte auf dem Packungsfoto. Sonst liest das Handy den Text selbst.';
@@ -66,12 +61,13 @@ function overview() {
         ? ''
         : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`
   }
-    ${group('Tiere', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Tier hinzufügen'))}
+    ${group('Tiere', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Tier hinzufügen'), 'set-group')}
     ${group(
       'Darstellung',
       labelRow('auto', 'Farbschema') +
         under(segmented('theme', THEMES, prefs.theme)) +
         switchRow('backdrop', 'paw', 'Profilbild im Hintergrund', 'Blass oben auf der Startseite', prefs.backdrop),
+      'set-group',
     )}
     ${group(
       'Erinnerungen',
@@ -86,6 +82,7 @@ function overview() {
             )
           : '') +
         switchRow('feed-remind', 'clock', 'Ans Füttern erinnern', feedSub(), prefs.feedRemind, 'feedSub'),
+      'set-group',
     )}
     ${group(
       'Teilen',
@@ -93,6 +90,7 @@ function overview() {
         <input id="f-me" class="field in-row" data-setting="name" value="${esc(prefs.name)}" placeholder="z. B. Anna" autocomplete="off" autocapitalize="words"></div>` +
         pageRow('house', 'house', 'Haushalt', esc(houseSub(notice)), 'houseSub') +
         pageRow('exchange', 'phone', 'Austausch von Hand', 'Änderungen als Datei weitergeben'),
+      'set-group',
     )}
     ${group(
       'Scannen',
@@ -100,12 +98,14 @@ function overview() {
         (house
           ? switchRow('server-photo', 'camera', 'Fotos über den Server erkennen', SERVER_PHOTO, prefs.serverPhoto)
           : ''),
+      'set-group',
     )}
     ${group(
       'Daten',
       pageRow('backup', 'download', 'Backup', 'Sichern und wieder einlesen') +
         (house ? '' : doRow('demo', 'sparkle', 'Beispieldaten laden')) +
         pageRow('privacy', 'shield', 'Datenschutz'),
+      'set-group',
     )}
     <div class="mt btn-col">${
       house
@@ -118,8 +118,8 @@ function overview() {
 const backupPage = () => `<p class="hint">Eine Datei mit allem, was die App gespeichert hat. Ein Import ersetzt die
   Daten auf diesem Handy.</p>
   <div class="btn-col">
-    <button class="btn soft" data-action="export">${icon('download')}Backup exportieren</button>
-    <label class="btn soft" for="importInput">${icon('upload')}Backup importieren</label>
+    <button class="btn soft" data-action="export">${icon('download')}Exportieren</button>
+    <label class="btn soft" for="importInput">${icon('upload')}Importieren</label>
   </div>`;
 
 function exchangePage() {
@@ -127,8 +127,8 @@ function exchangePage() {
   return `<p class="hint">Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält
     nur Einträge, keine Einstellungen.</p>
     <div class="btn-col">
-      <button class="btn soft" data-action="share-changes">${icon('phone')}Änderungen teilen</button>
-      <label class="btn soft" for="exchangeInput">${icon('upload')}Austausch empfangen</label>
+      <button class="btn soft" data-action="share-changes">${icon('phone')}Teilen</button>
+      <label class="btn soft" for="exchangeInput">${icon('upload')}Empfangen</label>
     </div>
     ${ex ? `<p class="hint note" role="status">${esc(ex.text)}</p>${ex.peer ? `<div class="btn-col mt-s"><button class="btn soft" data-action="send-answer">${icon('phone')}Antwort senden</button></div>` : ''}` : ''}`;
 }
@@ -179,7 +179,7 @@ function serverSection(notice = syncInfo()) {
             ? `<button class="btn soft" disabled><span class="spin"></span>Abgleich läuft …</button>`
             : status.state === 'ok' && !queue.length
               ? ''
-              : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Jetzt abgleichen</button>`
+              : `<button class="btn soft" data-action="sync-now">${icon('refresh')}Abgleichen</button>`
       }
       ${armBtn('disconnect', 'Verbindung trennen', 'Nochmal tippen: trennen, die Daten bleiben hier', {ic: 'unplug', cls: 'plain'})}</div>`;
 }

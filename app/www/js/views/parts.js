@@ -186,15 +186,15 @@ export function dayGroups(list) {
   }
   return groups;
 }
-function observationItem(o, multiHouse) {
+function observationItem(o, multiHouse, fresh) {
   const kind = observationOf(o.kind),
     ids = observedPets(o),
     meta = [multiHouse || ids.length > 1 ? whoObserved(ids) : '', o.by ? 'von ' + o.by : ''].filter(Boolean).join(', ');
-  return `<li style="view-transition-name:tl-${o.id};view-transition-class:item"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
-        <span class="tl-time">${timeStr(o.at)}</span><span class="tl-node"><i></i></span><span class="thumb m">${icon(kind.icon || 'sparkle')}</span>
+  return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
+        <span class="tl-time">${timeStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
         <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
-// anchors: day ids the calendar jumps to; fresh: id of the meal just served
+// anchors: day ids the calendar jumps to; fresh: id of the entry just made
 export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}) {
   return groups
     .map(
@@ -202,7 +202,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
     <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
     <ol class="tl">${g.items
       .map(s => {
-        if (isObservation(s)) return observationItem(s, multiHouse);
+        if (isObservation(s)) return observationItem(s, multiHouse, fresh);
         const p = getProduct(s.productId),
           ids = servingPets(s);
         const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : '']
@@ -237,6 +237,16 @@ export function shopRow(m, e) {
 
 // say and why are HTML; the caller escapes user text
 export const lead = ic => `<span class="lead">${icon(ic)}</span>`;
+export const main = (title, sub = '', id = '') =>
+  `<span class="t-main"><b>${title}</b>${sub ? `<small${id ? ` id="${id}"` : ''}>${sub}</small>` : ''}</span>`;
+export const under = html => `<div class="set-under">${html}</div>`;
+// a card under its label, as in the settings: set-group for rows with icons, pad for anything else
+export const group = (label, html, cls = 'pad') =>
+  `${label ? `<span class="label">${label}</span>` : ''}<div class="group ${cls}">${html}</div>`;
+// the whole row opens the picker; field: the invisible native input, shown: its value as we say it
+export const pickRow = (ic, title, sub, shown, field) =>
+  `<div class="row set-row pick-row" data-action="pick">${lead(ic)}${main(title, sub)}<span class="pick-val">${shown}</span>${icon('chevron', 'chev')}${field}</div>`;
+export const obsThumb = kind => `<span class="thumb m toned o-${kind}">${icon(observationOf(kind).icon)}</span>`;
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');

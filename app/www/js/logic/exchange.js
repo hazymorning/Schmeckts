@@ -109,7 +109,7 @@ function check(file) {
   if (!file || typeof file !== 'object') return 'Diese Datei ist kein Schmeckt’s-Austausch.';
   if (file.app !== 'schmeckts' || file.kind !== KIND) {
     return Array.isArray(file.servings)
-      ? 'Das ist ein Backup. Es gehört unter „Daten“ zu „Backup importieren“.'
+      ? 'Das ist ein Backup. Es gehört unter „Daten“ zu „Backup“.'
       : 'Diese Datei ist kein Schmeckt’s-Austausch.';
   }
   if (file.protocol > PROTOCOL) return 'Die Datei kommt von einer neueren App. Bitte diese App aktualisieren.';
