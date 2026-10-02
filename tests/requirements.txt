@@ -1,6 +1,4 @@
-# Exact versions, so that a run here, the CI and a release build all use the same tools.
-# playwright has to match the Chromium of the container image pinned in .github/workflows/tests.yml (build
-# 1194), which is why it is held to the patch level like everything else.
+# Exact versions. playwright has to match the container image in .github/workflows/tests.yml.
 pillow==12.3.0
 playwright==1.56.0
 ruff==0.16.9

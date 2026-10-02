@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# Sets up a fresh build environment (Ubuntu 24.04, as root). Only does what is missing.
-# At the start of a session, after cloning the repository: this script first, then scripts/test.sh
-# Installs: JDK 21 and the Android SDK (platform 36, build tools) for the app, Go and lintian for server and .deb,
-# ruff and the shell checker for scripts/lint.sh (staticcheck that script installs itself, pinned).
-# Assumed: Node.js 22+, Python 3 with Pillow and Playwright (Chromium) for icons and tests.
+# What building the APK needs on Ubuntu 24.04, as root: JDK 21, the Android SDK, Go and shellcheck. Only installs
+# what is missing. The tests do not need it.
 set -euo pipefail
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-if ! command -v javac >/dev/null || ! command -v lintian >/dev/null || ! command -v shellcheck >/dev/null; then
+if ! command -v javac >/dev/null || ! command -v shellcheck >/dev/null; then
   apt-get update -q >/dev/null
-  apt-get install -y -q openjdk-21-jdk-headless lintian shellcheck >/dev/null
+  apt-get install -y -q openjdk-21-jdk-headless shellcheck >/dev/null
 fi
 
 if [ ! -x "$SDKM" ]; then
@@ -27,7 +24,6 @@ if ! command -v go >/dev/null && [ ! -x /usr/local/go/bin/go ]; then
   curl -sL "https://go.dev/dl/$V.linux-amd64.tar.gz" | tar -C /usr/local -xz
 fi
 
-# ruff checks and formats the Python in tests/, scripts/ and design/ (scripts/lint.sh), pinned in tests/requirements.txt
 command -v ruff >/dev/null || python3 -m pip install --quiet --break-system-packages --requirement "$(dirname "$0")/../tests/requirements.txt"
 
 node -e 'if (+process.versions.node.split(".")[0] < 22) { console.error("Node.js 22 or newer required"); process.exit(1) }'
