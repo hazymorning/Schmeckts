@@ -390,7 +390,7 @@ function viewReport() {
   histDays = dayGroups(all);
   const upto = Math.max(HIST_PAGE, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0); // the day it opens at has to be there
   return `${head('Verlauf' + forWhom(pet))}
-    <section class="card days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
+    <section class="days">${calendarHTML(all.filter(s => s.servedAt >= addDays(weekStart(Date.now()), -7)))}
     ${
       histDays.length
         ? `<div id="histBox">${histHTML(pet, 0, upto)}</div>`
@@ -440,15 +440,15 @@ function viewShop() {
     }`;
 }
 
-/* „Vorlieben“: a page of two cards within the pet filter (profileModel() in derive.js). What goes down well, each
-   comparison under its name with its groups ranked (likesList()); then the habits. Without any comparison yet, a
-   sentence that says so. */
+/* „Worauf es ankommt“, a level of „Vorlieben“: a page of two cards within the pet filter (profileModel() in
+   derive.js). What goes down well, each comparison under its name with its groups ranked (likesList()); then the
+   habits. Without any comparison yet, a sentence that says so. */
 function viewProfile() {
   const m = model(),
     dims = profileModel(),
     habits = habitsModel(),
     several = db.pets.length > 1 && !m.pet;
-  return `${head('Vorlieben' + forWhom(m.pet))}
+  return `${head('Worauf es ankommt')}
     <section class="card"><h2>Was ankommt</h2>${
       dims.length
         ? dims.map(d => likesList(m, d)).join('')
@@ -550,10 +550,9 @@ const VIEWS = {
   // The pet editor is a page of the settings when it is reached from there, and the same view serves it
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
-  // „Vorlieben“ opens as a level of „Auswertung“, so back returns there
+  // „Worauf es ankommt“ opens as a level of „Vorlieben“, so back returns there
   evaluation: () => (sheet.page === 'profile' ? viewProfile() : viewEvaluation()),
   shop: viewShop,
-  profile: viewProfile,
 };
 /* An unchanged view is left alone: a change from the server redraws every open sheet, and rewriting it would throw
    away the decoded photos, the scroll position and the focus for nothing. Empty body: freshly opened, always draw.

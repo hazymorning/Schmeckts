@@ -19,7 +19,7 @@ export const RATINGS = {
   top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100},
   gut: {label: 'Fast leer', short: 'Fast leer', said: 'fast leer', score: 80},
   mittel: {label: 'Halb gegessen', short: 'Hälfte übrig', said: 'halb gegessen', score: 50},
-  eager: {label: 'Nur anfangs', short: 'Nur anfangs', said: 'nur anfangs gefressen', score: 40},
+  eager: {label: 'Nur bissl', short: 'Nur bissl', said: 'nur ein bissl gefressen', score: 40},
   sosse: {label: 'Soße geleckt', short: 'Nur Soße', said: 'nur die Soße geleckt', score: 30},
   schlecht: {label: 'Kaum angerührt', short: 'Fast nix', said: 'kaum angerührt', score: 0},
   gern: {label: 'Gern gefressen', short: 'Gern gefressen', said: 'gern gefressen', score: 100},
@@ -167,7 +167,7 @@ export const ANIMAL_WORDS = [
   ['Katze', /katze|kätzchen|kitten|\bcat\b/i],
   ['Hund', /hund|welpe|puppy|\bdog\b/i],
 ];
-/* Flavour groups for „Vorlieben“ (profile() in smart.js) and the keywords of ocr.js. A word matches at its start,
+/* Flavour groups for „Worauf es ankommt“ (profile() in smart.js) and the keywords of ocr.js. A word matches at its start,
    after a space, a comma, an „&“ or a „/“ or at the beginning, so „Elemente“ is no duck and „Herzhaftes“ no heart;
    „Wild“ does not match inside „Wildschwein“, and „Lachs“ not inside „Seelachs“, which is fish. Heart, liver and
    cheese are what a compound ends in as well („Rinderherz“, „Hühnerleber“, „Frischkäse“). A variety may name

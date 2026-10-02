@@ -16,7 +16,7 @@ import (
 // Every level of every scale, with the wording the app uses (RATINGS in app/www/js/config.js). The key alone
 // decides the wording, so the two lists must not drift apart: tests/design_test.py compares them.
 var ratingNames = map[string]string{
-	"top": "Sofort leer", "gut": "Fast leer", "mittel": "Halb gegessen", "eager": "Nur anfangs",
+	"top": "Sofort leer", "gut": "Fast leer", "mittel": "Halb gegessen", "eager": "Nur bissl",
 	"sosse": "Soße geleckt", "schlecht": "Kaum angerührt",
 	"gern": "Gern gefressen", "normal": "Normal gefressen", "wenig": "Wenig gefressen", "liegen": "Liegen gelassen",
 	"verputzt": "Sofort verputzt", "spaeter": "Später gefressen", "angeknabbert": "Nur angeknabbert", "unberuehrt": "Nicht angerührt",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Performance after a rating (saving, then the evaluation and the redraw of the home page) and when opening the
-history page and „Auswertung“, with made-up data spanning 2 and 5 years (2 pets, 2 meals a day, 150 varieties), the
+history page and „Vorlieben“, with made-up data spanning 2 and 5 years (2 pets, 2 meals a day, 150 varieties), the
 CPU throttled 4x. Usage: python3 tests/perf_test.py"""
 
 import datetime
@@ -11,7 +11,7 @@ from common import check, fixed_clock, phone, run_tests, started
 
 LIMIT_MS = 40
 REPORT_MS = 150  # a page is only computed and drawn when it opens
-TUESDAY = datetime.datetime(2026, 6, 9, 10)  # „Auswertung“ reaches back 84 days from here, and its windows 180
+TUESDAY = datetime.datetime(2026, 6, 9, 10)  # „Vorlieben“ reaches back 84 days from here, and its windows 180
 BRANDS = ['Sheba', 'Felix', 'Animonda', 'Miamor', 'Gourmet', 'Whiskas', 'Catz', 'MjAMjAM', 'Bozita', 'Almo']
 FLAVORS = ['Lachs', 'Huhn', 'Rind', 'Pute', 'Ente', 'Thunfisch', 'Lamm', 'Kaninchen', 'Wild', 'Forelle', 'Käse', 'Leber', 'Herz', 'Garnele', 'Kalb']
 TEXTURES = ['in Soße', 'in Gelee', 'Pastete', 'Mousse', 'Filets']
@@ -63,8 +63,8 @@ MEASURE = """async () => { const s = await import('./js/store.js'), h = await im
     out.push([t1 - t0, t2 - t1]); await new Promise(done => setTimeout(done, 50)); }
   return out; }"""
 
-# The history page and „Auswertung“ are only computed when they open: save beforehand so that nothing comes from the
-# cache, „Auswertung“ with everything it says computed anew
+# The history page and „Vorlieben“ are only computed when they open: save beforehand so that nothing comes from the
+# cache, „Vorlieben“ with everything it says computed anew
 OPEN = """async () => { const s = await import('./js/store.js'), sheet = await import('./js/ui/sheet.js'), views = await import('./js/views/sheets.js');
   const out = [];
   for (let i = 0; i < 5; i++) {
@@ -118,7 +118,7 @@ async def test_rating(browser, url):
         shown = statistics.median(x[0] for x in opens)
         check(
             shown < REPORT_MS and all(x[1] == 10 for x in opens),
-            f'{years} years: „Auswertung“ opens in {shown:.0f} ms with Top 5 and Flop 5 (limit {REPORT_MS} ms), {opens[0][2]} cards',
+            f'{years} years: „Vorlieben“ opens in {shown:.0f} ms with Top 5 and Flop 5 (limit {REPORT_MS} ms), {opens[0][2]} cards',
         )
         await ctx.close()
 

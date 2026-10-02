@@ -8,7 +8,7 @@ import {icon, sketch} from '../icons.js';
 import {RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
-import {getPet, getProduct, habitsModel, model, pendingServings, pname, profileModel, servingPets} from '../derive.js';
+import {getPet, getProduct, model, pendingServings, pname, servingPets} from '../derive.js';
 import {hintKey, shopGroups} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {dlg} from '../ui/sheet.js';
@@ -20,8 +20,6 @@ import {
   dayGroups,
   deleteMealBtn,
   evidenceOf,
-  habitRow,
-  likesList,
   lower,
   nameBlock,
   photoThumb,
@@ -30,7 +28,6 @@ import {
   syncChip,
   thumbOf,
   times,
-  toldList,
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
@@ -158,8 +155,7 @@ function homeHTML() {
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist"><h2>Verlauf</h2>${historyHTML()}</section>` +
       evaluationCard(m) +
-      shopHTML(m) +
-      likesHTML(m);
+      shopHTML(m);
   return html;
 }
 
@@ -180,7 +176,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
   <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. ${isConnected() ? 'Marke und Sorte werden erkannt.' : 'Dann Marke und Sorte eintragen.'}</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
-  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Auswertung“, was ankommt und was stehen bleibt, und unter „Vorlieben“, was dein Tier mag.</p></li></ol></section>`;
+  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was dein Tier mag und was stehen bleibt.</p></li></ol></section>`;
 
 /* „Wie war’s?“: only while ratings are still open. A pet rated here keeps its row while the meal is in the card. A
    meal without a variety (a photo that missed) can be deleted right here, under its slider, as while naming it. */
@@ -267,21 +263,6 @@ function shopHTML(m) {
     .join('');
   return `<section class="card" data-sec="shop" style="view-transition-name:sec-shop"><h2>Einkaufen</h2><ul class="list shop">${rows}</ul>
     <button class="card-btn" data-action="open-shop">Einkaufsliste öffnen${icon('chevron')}</button></section>`;
-}
-
-/* Vorlieben: the two clearest rows of the profile, which are the ends of its clearest comparison („deutlich“ first,
-   then the largest gap) under its name; while there is no comparison yet, up to two habits instead. Then the way to
-   the page. No card while the page would be empty (profileModel() in derive.js). */
-const LIKES_SHOWN = 2;
-function likesHTML(m) {
-  const d = [...profileModel()].sort((a, b) => b.clear - a.clear || b.gap - a.gap)[0],
-    habits = d ? [] : habitsModel();
-  if (!d && !habits.length) return '';
-  return `<section class="card" data-sec="profile" style="view-transition-name:sec-profile"><h2>Vorlieben</h2>${
-    d
-      ? likesList(m, {...d, groups: [d.groups[0], d.groups.at(-1)]})
-      : toldList(habits.slice(0, LIKES_SHOWN).map(h => habitRow(h, db.pets.length > 1 && !m.pet)))
-  }<button class="card-btn" data-action="open-profile">Alle Vorlieben${icon('chevron')}</button></section>`;
 }
 
 /* Below the calendar only what is current (PROJECT.md, Cards, „History“): today's meals, or yesterday's while

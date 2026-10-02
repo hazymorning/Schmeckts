@@ -82,7 +82,8 @@ const I = {
   pin: '<path d="M9.2 3.5h5.6l-.9 5.6 3.1 3.3v1.4H7v-1.4l3.1-3.3z"/><path d="M12 13.8v6.7"/>',
   layers: '<path d="M12 4.5l8 4-8 4-8-4z"/><path d="M4 12.3l8 4 8-4"/><path d="M4 16.1l8 4 8-4"/>',
   fish: '<path d="M21 12c-1.7 3-4.5 5-7.8 5-3.4 0-6.1-2-7.7-5 1.6-3 4.3-5 7.7-5 3.3 0 6.1 2 7.8 5z"/><path d="M5.5 12L2.5 8.8v6.4z"/><path d="M16.6 10.9v.2"/>',
-  // „Auswertung“: what a comparison of brands is about, and which way it is going for a pet or a variety
+  // „Vorlieben“: what a pet likes best, what a comparison of brands is about, and which way it is going
+  heart: '<path d="M12 19.3s-7.2-4.4-7.2-9.4A4 4 0 0 1 12 7.6a4 4 0 0 1 7.2 2.3c0 5-7.2 9.4-7.2 9.4z"/>',
   tag: '<path d="M3.8 11.9V5.3c0-.8.7-1.5 1.5-1.5h6.6l8.4 8.4a1.5 1.5 0 0 1 0 2.1l-6.3 6.3a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/>',
   rise: '<path d="M4 16.5l5-5 3.5 3.5L19.5 8"/><path d="M14.5 8h5v5"/>',
   fall: '<path d="M4 7.5l5 5 3.5-3.5 7 7"/><path d="M19.5 11v5h-5"/>',

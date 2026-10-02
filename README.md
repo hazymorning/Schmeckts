@@ -32,9 +32,8 @@ Unsere Katze ist wählerisch. Manche Sorten sind sofort weg, an anderen schnuppe
 
 ## Was noch drin ist
 
-- *Auswertung*: die fünf Sorten, die am besten ankommen, und die, die stehen bleiben; ob dein Tier gerade anders frisst als sonst, worauf es dabei ankommt und was als Nächstes in den Napf kann.
+- *Vorlieben*: die fünf Sorten, die am besten ankommen, und die, die stehen bleiben; ob dein Tier gerade anders frisst als sonst, welche Marken, Konsistenzen und Geschmacksrichtungen ankommen, ob es Abwechslung mag und was als Nächstes in den Napf kann.
 - *Einkaufen*: was gut ankommt und nachgekauft werden kann, nach Futterart, mit den letzten Bewertungen als Punkte. Die Liste lässt sich verschicken.
-- *Vorlieben*: welche Marken, Konsistenzen und Geschmacksrichtungen am besten ankommen, und ob dein Tier Abwechslung mag.
 - *Verlauf*: alle Mahlzeiten, Tag für Tag.
 - Erinnerungen ans Bewerten und ans Füttern, beide erst mal aus.
 - Mehrere Tiere, auch Hunde, Kaninchen oder Vögel, jedes für sich ausgewertet.

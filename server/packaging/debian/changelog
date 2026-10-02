@@ -1,3 +1,10 @@
+schmeckts-server (1.4.2) unstable; urgency=medium
+
+  * The overview calls the level between half eaten and only the sauce
+    „Nur bissl“, as the app does now.
+
+ -- Schmeckts <schmeckts@localhost>  Fri, 02 Oct 2026 20:00:00 +0200
+
 schmeckts-server (1.4.1) unstable; urgency=medium
 
   * The overview names the rating levels as the app does now: „Fast
