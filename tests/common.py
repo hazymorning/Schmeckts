@@ -338,8 +338,7 @@ _pictures = []
 
 
 def make_pictures():
-    """Test photos: four quadrants (red, green, blue, yellow) for cropping, plus two plain ones.
-    Written once: several tests ask for them, and running side by side they must not write over each other."""
+    """Four quadrants (red, green, blue, yellow) for cropping, plus two plain photos, written once per run."""
     from PIL import Image
 
     if _pictures:
@@ -354,6 +353,7 @@ def make_pictures():
         f = out / f'photo{i}.jpg'
         Image.new('RGB', (300, 200), (25 * i, 255 - 25 * i, 120)).save(f, quality=80)
         files.append(str(f))
+    _pictures[:] = files
     return files
 
 

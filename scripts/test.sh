@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-ALL=(go node storage design perf ui sync)
+ALL=(go node files storage design perf ui sync)
 SUITES=("$@")
 [ ${#SUITES[@]} -gt 0 ] || SUITES=("${ALL[@]}")
 for suite in "${SUITES[@]}"; do

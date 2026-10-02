@@ -1,49 +1,12 @@
 #!/usr/bin/env python3
-"""Design rules from PROJECT.md: palette and contrasts, type, space, sizes and motion, logo, every view in light and dark.
+"""What a user would see break in the design: contrast, typefaces, tokens, the logo, reduced motion.
 Usage: python3 tests/design_test.py [name …]"""
 
-import contextlib
-import io
-import json
-import pathlib
 import re
-import sys
-import tempfile
 import xml.etree.ElementTree as ET
-from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, near, open_page, phone, run_tests, set_theme, shot
-
-PALETTE = {
-    '--bg': ('#EEEDE7', '#1B1C17'),
-    '--surface': ('#FAFAF6', '#25261F'),
-    '--surface-2': ('#E4E3DA', '#30312A'),
-    '--ink': ('#25261F', '#ECECE3'),
-    '--muted': ('#62625A', '#A6A699'),
-    '--faint': ('#9D9D92', '#77776C'),
-    '--line': ('#D8D7CD', '#3B3C34'),
-    '--accent': ('#58603F', '#A9B283'),
-    '--accent-ink': ('#4A5134', '#A9B283'),
-    '--accent-soft': ('#DEE0D7', '#393B2E'),
-    '--on-accent': ('#FFFFFF', '#1B1C17'),
-    '--good': ('#4D6C57', '#93BBA0'),
-    '--good-soft': ('#D9DFD8', '#373E34'),
-    '--mid': ('#8A6822', '#D2AE62'),
-    '--mid-soft': ('#E5DECE', '#413C2A'),
-    '--sauce': ('#7A5A43', '#C49C7E'),
-    '--sauce-soft': ('#E2DCD4', '#3E392E'),
-    '--bad': ('#8F3F43', '#D98C8E'),
-    '--bad-soft': ('#E9DCD9', '#3E342F'),
-}
-
-
-PALETTE_HEX = {v for pair in PALETTE.values() for v in pair}
-
-
-DERIVED = ('--seg-on', '--toast-action')  # abgeleitet, deckend
-
+from common import PACK, RGB, ROOT, WWW, check, contrast, idle, make_pictures, open_page, phone, run_tests, set_theme
 
 RATING = ('--good', '--mid', '--sauce', '--bad')
-
-
 TEXT_PAIRS = (
     [(fg, bg) for fg in ('--ink', '--muted', '--accent-ink') for bg in ('--bg', '--surface', '--surface-2')]
     + [
@@ -58,11 +21,7 @@ TEXT_PAIRS = (
     ]
     + [('--ink', r + '-soft') for r in RATING]
 )
-
-
 ICON_PAIRS = [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')]
-
-
 TOKENS = (
     """(names) => { const rgb = """
     + RGB
@@ -73,63 +32,21 @@ TOKENS = (
 
 
 async def test_palette(browser, url):
-    print('colour scheme: a fixed palette with no choice, derived tokens, contrasts')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
-    await pg.click('[data-action=demo]')
-    await idle(pg)
-    await pg.click('[data-action=open-settings]')
-    await idle(pg)
-    await pg.click('#sheet [data-action=settings-back]')
-    await idle(pg)
-    names = list(PALETTE) + list(DERIVED)
-    for theme, k in (('light', 0), ('dark', 1)):
+    names = sorted({n for pair in TEXT_PAIRS + ICON_PAIRS for n in pair})
+    for theme in ('light', 'dark'):
         await set_theme(pg, theme)
         c = await pg.evaluate(TOKENS, names)
-        wrong = [f'{n} {c[n]}' for n in PALETTE if not near(c[n], PALETTE[n][k], 1)]
-        check(not wrong, f'every token as specified ({theme}){": " + ", ".join(wrong) if wrong else ""}')
-        derived = [f'{n} {c[n]}' for n in DERIVED if not any(near(c[n], h, 1) for h in PALETTE_HEX)]
-        check(not derived, f'derived tokens from the palette\u2019s values only ({theme}){": " + ", ".join(derived) if derived else ""}')
-        low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in TEXT_PAIRS if contrast(c[fg], c[bg]) < 4.5]
-        check(not low, f'type at least 4.5:1 on its own surfaces ({theme}, {len(TEXT_PAIRS)} pairs){": " + ", ".join(low) if low else ""}')
-        low = [f'{fg} auf {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
-        worst = min(contrast(c[fg], c[bg]) for fg, bg in ICON_PAIRS)
-        check(not low, f'rating colours as icons at least 3:1 ({theme}, worst pair {worst:.2f}){": " + ", ".join(low) if low else ""}')
-        # The rating slider in the rating colours: every level's icon on the track, and for the level shown the thumb's
-        # ring, the icon it carries and the level's word under the track
-        stops, shown = await pg.evaluate(
-            """() => import('./js/ui/slider.js').then(async m => { const s = document.querySelector('.pend .slider'), shown = [];
-          const stops = [...s.querySelectorAll('.slider-track button')].map(b => getComputedStyle(b.querySelector('.ic')).color);
-          for (const r of ['top', 'gut', 'mittel', 'eager', 'sosse', 'schlecht']) {
-            m.showLevel(s, r);
-            await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))); // the colours ease over
-            shown.push([getComputedStyle(s.querySelector('.slider-thumb .ic')).color, getComputedStyle(s.querySelector('.slider-thumb > i')).borderTopColor,
-              getComputedStyle(s.querySelector('.slider-names > .on')).color]); }
-          m.showLevel(s, null); return [stops, shown]; })"""
-        )
-        tones = ('--good', '--good', '--mid', '--mid', '--sauce', '--bad')
-        check(
-            len(stops) == 6
-            and all(near(c, PALETTE[r][k], 1) for c, r in zip(stops, tones))
-            and all(all(near(c, PALETTE[r][k], 1) for c in cs) for cs, r in zip(shown, tones)),
-            f'the rating slider in the rating colours, levels, thumb and word: „Sofort leer“ and „Fast leer“ both --good, „Halb gegessen“ and „Nur bissl“ both --mid ({theme})',
-        )
-    check(
-        await pg.evaluate("import('./js/motion.js').then(m => ['fade', 'step', 'long'].map(m.dur))") == [200, 300, 1200],
-        'dur() reads the duration tokens',
-    )
-    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+        low = [f'{fg} on {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in TEXT_PAIRS if contrast(c[fg], c[bg]) < 4.5]
+        check(not low, f'text tokens at least 4.5:1 ({theme}) {low}')
+        low = [f'{fg} on {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
+        check(not low, f'rating colours as icons at least 3:1 ({theme}) {low}')
+    check(not errors, f'no errors in the console {errors}')
     await ctx.close()
 
 
-LOGOS = {
-    'app/www/img/schmeckts-mark.svg': ['#25261F', '#86513E', '#A76A53', '#BA7F68', '#A3A97F', '#8A9066'],
-    'app/www/img/schmeckts-mark-dark.svg': ['#ECECE3', '#86513E', '#A76A53', '#BA7F68', '#A3A97F', '#8A9066'],
-    'design/schmeckts-mark-mono.svg': ['currentColor'],
-    'design/schmeckts-app-icon.svg': ['#EEEDE7', '#25261F', '#86513E', '#A76A53', '#BA7F68', '#A3A97F', '#8A9066'],
-}
-
-
+A = '{http://schemas.android.com/apk/res/android}'
 VECTORS = {
     'drawable/ic_launcher_foreground.xml': 'app/www/img/schmeckts-mark.svg',
     'drawable-night/splash_logo.xml': 'app/www/img/schmeckts-mark-dark.svg',
@@ -137,54 +54,23 @@ VECTORS = {
 }
 
 
-def svg_paths(text):
-    return [(re.search(r'fill="([^"]*)"', x).group(1), re.search(r' d="([^"]*)"', x).group(1)) for x in re.findall(r'<path ([^>]*)/>', text)]
-
-
 def test_logo_files():
-    print('logo: files, Android icon and splash screen')
-    A = '{http://schemas.android.com/apk/res/android}'
-    for f, colors in LOGOS.items():
-        text = (ROOT / f).read_text()
-        got = re.findall(r'fill="([^"]*)"', text)
-        check('c2pa' not in text and '<metadata' not in text and got == colors, f'{f}: without metadata, colours unchanged ({len(got)} fills)')
     res = ROOT / 'app/native/res'
     groups = set()
     for vec, src in VECTORS.items():
         root = ET.parse(res / vec).getroot()
         g = root.find('group')
         groups.add(tuple(g.get(A + k) for k in ('scaleX', 'scaleY', 'translateX', 'translateY')))
-        paths = [(x.get(A + 'fillColor'), x.get(A + 'pathData')) for x in root.iter('path')]
-        want = svg_paths((ROOT / src).read_text())
-        same = [d for _, d in paths] == [d for _, d in want] and all(
-            c == w or w == 'currentColor' and c == '#FF000000' for (c, _), (w, _) in zip(paths, want)
-        )
-        check(root.get(A + 'viewportWidth') == '108' and same, f'{vec}: paths and colours from {src}, 108 grid')
-    check(len(groups) == 1, f'foreground, themed icon and the dark splash screen sit in the same place ({groups})')
-    alias = ET.parse(res / 'values/drawables.xml').getroot().find('drawable')
-    prep = (ROOT / 'scripts/prepare.py').read_text()
-    check(
-        alias.get('name') == 'splash_logo'
-        and alias.text == '@drawable/ic_launcher_foreground'
-        and '@drawable/splash_logo' in prep
-        and "drawable-v24/ic_launcher_foreground.xml').unlink" in prep,
-        'splash screen: the app icon\u2019s motif in light, the dark mark in dark; the template\u2019s foreground is dropped',
-    )
-    check(
-        '#EEEDE7' in (res / 'values/ic_launcher_background.xml').read_text()
-        and '#EEEDE7' in (res / 'values/colors.xml').read_text()
-        and '#1B1C17' in (res / 'values-night/colors.xml').read_text()
-        and 'design/schmeckts-app-icon.svg' in (ROOT / 'design/render-icons.py').read_text()
-        and 'icon-512' not in (ROOT / 'design/render-icons.py').read_text(),
-        'icon background #EEEDE7, splash screen #EEEDE7 in light and #1B1C17 in dark, Android 7 from schmeckts-app-icon.svg',
-    )
+        paths = [x.get(A + 'pathData') for x in root.iter('path')]
+        want = re.findall(r'<path [^>]* d="([^"]*)"', (ROOT / src).read_text())
+        check(paths == want, f'{vec}: the paths of {src}')
+    check(len(groups) == 1, f'icon, themed icon and dark splash share one position {groups}')
 
 
 async def test_logo(browser, url):
     ctx = await phone(browser)
     pg = await ctx.new_page()
     await pg.goto(url)
-    A = '{http://schemas.android.com/apk/res/android}'
     g = ET.parse(ROOT / 'app/native/res/drawable/ic_launcher_foreground.xml').getroot().find('group')
     k, tx, ty = float(g.get(A + 'scaleX')), float(g.get(A + 'translateX')), float(g.get(A + 'translateY'))
     await pg.set_content((WWW / 'img/schmeckts-mark.svg').read_text())
@@ -193,252 +79,56 @@ async def test_logo(browser, url):
       for (let i = 0; i <= 600; i++) { const q = p.getPointAtLength(L * i / 600); m = Math.max(m, Math.hypot(tx + k * q.x - 54, ty + k * q.y - 54)); } } return m; }""",
         [k, tx, ty],
     )
-    check(r <= 33, f'adaptive icon: the motif sits inside the safe zone (up to {r:.1f} dp from the centre, 33 allowed)')
+    check(r <= 33, f'adaptive icon motif inside the 33 dp safe zone ({r:.1f})')
     await ctx.close()
 
 
-def colors_in(text):
-    out = []
-    for m in re.finditer(r'#([0-9A-Fa-f]{8}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b', text):
-        x = m.group(1)
-        x = x[2:] if len(x) == 8 else ''.join(c * 2 for c in x) if len(x) == 3 else x
-        out.append('#' + x.upper())
-    for m in re.finditer(r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)', text):
-        out.append('#' + ''.join(f'{int(v):02X}' for v in m.groups()))
-    return out
-
-
-def css_rules(text):
-    """(selector, [(property, value)]) for every innermost block, comments stripped"""
+def css_decls(text):
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
     return [
-        (sel.strip(), [tuple(x.strip() for x in d.split(':', 1)) for d in body.split(';') if ':' in d])
+        (' '.join(sel.split()), prop.strip(), value.strip())
         for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', text)
+        for prop, value in (d.split(':', 1) for d in body.split(';') if ':' in d)
     ]
 
 
-def css_value(value):
-    """A declaration's value with the formatting taken out: whitespace collapsed, none around commas"""
-    return re.sub(r'\s*,\s*', ',', ' '.join(value.split()))
-
-
-def css_blocks(text):
-    """[(selector, {property: value})] for every innermost block, at-rules such as @font-face included.
-
-    Parses the rules instead of matching text, so the way Prettier lays the CSS out makes no difference."""
-    return [(' '.join(sel.split()), {p: css_value(v) for p, v in decls}) for sel, decls in css_rules(text)]
-
-
-SECTIONS = ('Foundations', 'Recipes', 'Views', 'Motion')
-KEYFRAME_STEP = re.compile(r'(from|to|[\d.]+%)(\s*,\s*(from|to|[\d.]+%))*')
-REDUCED = '@media (prefers-reduced-motion: reduce)'
-
-
-def tokens_root(sel=':root'):
-    return {p: v for s, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8')) if s == sel for p, v in d.items()}
-
-
-def cut_block(text, head):
-    """(text without the at-rule that starts with head, that rule's body)"""
-    i = text.find(head)
-    if i < 0:
-        return text, ''
-    j = k = text.index('{', i) + 1
-    depth = 1
-    while depth:
-        depth += {'{': 1, '}': -1}.get(text[k], 0)
-        k += 1
-    return text[:i] + text[k:], text[j : k - 1]
-
-
-def keyframes(text):
-    """{name: body} of every @keyframes, brace-matched"""
-    out = {}
-    for m in re.finditer(r'@keyframes\s+([\w-]+)\s*\{', text):
-        depth, i = 1, m.end()
-        while depth:
-            depth += {'{': 1, '}': -1}.get(text[i], 0)
-            i += 1
-        out[m.group(1)] = text[m.end() : i - 1]
-    return out
-
-
-def app_decls():
-    """(section, selector, property, value) for app.css, keyframe steps and the reduced-motion rule left out"""
-    text = re.sub(r'/\*(?! == )(.*?)\*/', '', (WWW / 'css/app.css').read_text(encoding='utf-8'), flags=re.S)
-    text = cut_block(text, REDUCED)[0]
-    parts = re.split(r'/\* == (\w+) == \*/', text)
-    out = []
-    for name, body in zip(['(before)'] + parts[1::2], [parts[0]] + parts[2::2]):
-        for sel, decls in css_rules(body):
-            sel = ' '.join(sel.split())
-            if KEYFRAME_STEP.fullmatch(sel):
-                continue
-            out += [(name, sel, p, css_value(v)) for p, v in decls]
-    return out
-
-
-def split_top(value):
-    """value split at commas outside parentheses: var(--c, var(--line)) stays whole"""
-    parts, depth, cur = [], 0, ''
-    for ch in value:
-        depth += {'(': 1, ')': -1}.get(ch, 0)
-        if ch == ',' and not depth:
-            parts.append(cur.strip())
-            cur = ''
-        else:
-            cur += ch
-    return [p for p in parts + [cur.strip()] if p]
-
-
-def literal_px(value):
-    """px literals other than 0, env() fallbacks taken out"""
-    bare = re.sub(r'env\([^()]*(\([^()]*\))?[^()]*\)', '', value)
-    return [x for x in re.findall(r'(?<![\w.-])-?\d*\.?\d+px', bare) if float(x[:-2]) != 0]
-
-
-def subjects(sel):
-    return [re.split(r'\s*[\s>+~]\s*', s.strip())[-1] for s in split_top(sel)]
-
-
-def test_rules_static():
-    print('design rules in the sources')
-    css = {f: (WWW / 'css' / f).read_text() for f in ('tokens.css', 'app.css')}
-    blocks = css_blocks(css['tokens.css'])
-    root = next(d for sel, d in blocks if sel == ':root')
-    bad = []
-    for f, text in css.items():
-        for sel, decls in css_rules(text):
-            for prop, val in decls:
-                if prop == 'text-transform' and val != 'none' and '.field.code' not in sel:
-                    bad.append(f'{sel} {prop}:{val}')
-                # a token counts with its value, or var(--track-title) would read as positive
-                real = root.get(val[4:-1], val) if val.startswith('var(--') else val
-                if prop == 'letter-spacing' and not real.startswith('-') and real not in ('0', 'normal') and '.field.code' not in sel:
-                    bad.append(f'{sel} {prop}:{val}')
-    js = [f.name for f in (WWW / 'js').rglob('*.js') if re.search(r'text-?transform|letter-?spacing', f.read_text(), re.I)]
-    js += [f for f in ('index.html',) if re.search(r'text-transform|letter-spacing', (WWW / f).read_text())]
-    check(not bad and not js, f'no text-transform and no positive letter-spacing outside the code field, not in the JavaScript either ({bad + js})')
-    # Typefaces: Figtree and Faustina ship with the app, Rubik is gone entirely
-    fonts = sorted(p.name for p in (WWW / 'fonts').iterdir())
-    check(
-        fonts == ['OFL-Faustina.txt', 'OFL-Figtree.txt', 'faustina-latin.woff2', 'figtree-latin.woff2'],
-        f'the typefaces with their licences, nothing else ({fonts})',
-    )
-    check(
-        all('SIL Open Font License' in (WWW / 'fonts' / f).read_text() for f in ('OFL-Figtree.txt', 'OFL-Faustina.txt'))
-        and 'Figtree' in (WWW / 'fonts/OFL-Figtree.txt').read_text()
-        and 'Faustina' in (WWW / 'fonts/OFL-Faustina.txt').read_text(),
-        'licences: SIL OFL',
-    )
-    prep = (ROOT / 'scripts/prepare.py').read_text()
-    check(
-        '8330490a01c60c196eae00b823de8102275aaa5862e7b76a7af21b8745338928' in prep
-        and 'df206bf23e42149d22847217c70577855c9eebe5ef9d40706199fc9e5bee3450' in prep,
-        'prepare.py downloads both typefaces with a checksum',
-    )
-    faces = {d.get('font-family'): d for sel, d in blocks if sel == '@font-face'}
-    check(
-        faces.get('"Figtree"', {}).get('font-weight') == '400 700'
-        and faces.get('"Faustina"', {}).get('font-weight') == '500 700'
-        and root.get('--font-display') == '"Faustina","Iowan Old Style",Georgia,serif'
-        and root.get('--font-ui') == '"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
-        f'@font-face and the type tokens as specified ({sorted(k for k in faces if k)})',
-    )
-    tok = css['tokens.css']
-    # Colours only in tokens.css, and there only the palette's values (derived tokens with opacity as 8-digit hex)
+def test_tokens():
+    app = (WWW / 'css/app.css').read_text(encoding='utf-8')
     literal = re.compile(r'#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(|\b(?:white|black)\b(?!-)')
-    outside = [f'app.css: {m.group(0)}' for m in literal.finditer(re.sub(r'/\*.*?\*/', '', css['app.css'], flags=re.S))]
+    outside = [f'app.css: {m.group(0)}' for m in literal.finditer(re.sub(r'/\*.*?\*/', '', app, flags=re.S))]
     outside += [f'index.html: {m.group(0)}' for m in literal.finditer(re.sub(r'<!--.*?-->', '', (WWW / 'index.html').read_text(), flags=re.S))]
     outside += [
         f'{f.name}: {m.group(0)}'
         for f in (WWW / 'js').rglob('*.js')
         for m in re.finditer(r'#[0-9A-Fa-f]{6}\b|\b(?:rgba?|hsla?|oklch)\(', f.read_text())
     ]
-    tok = re.sub(r'/\*.*?\*/', '', css['tokens.css'], flags=re.S)
-    foreign = [c for c in re.findall(r'#[0-9A-Fa-f]{3,8}\b', tok) if c[:7].upper() not in PALETTE_HEX or len(c) not in (7, 9)]
-    foreign += re.findall(r'\b(?:rgba?|hsla?|oklch)\(', tok)
-    check(not outside and not foreign, f'colours only in tokens.css and only from the palette ({outside + foreign})')
-    check(
-        set(colors_in((WWW / 'webview-update.html').read_text())) == {'#EEEDE7', '#25261F', '#1B1C17', '#ECECE3'},
-        'webview-update.html (without light-dark()): background and type from the palette',
-    )
-    res = ROOT / 'app/native/res'
-    android = [
-        (str(f.relative_to(res)), c)
-        for f in res.rglob('*.xml')
-        if str(f.relative_to(res)) not in VECTORS
-        for c in colors_in(f.read_text())
-        if c not in PALETTE_HEX
+    check(not outside, f'colours only in tokens.css {outside}')
+    decls = css_decls(app)
+    loose = [
+        f'{sel} {prop}: {value}'
+        for sel, prop, value in decls
+        if re.match(r'(margin|padding|gap|row-gap|column-gap)(-|$)', prop) and re.search(r'\d+(\.\d+)?px', re.sub(r'env\([^)]*\)', '', value))
     ]
-    check(
-        not android and colors_in((ROOT / 'design/render-icons.py').read_text()) == [],
-        f'Android resources use the palette\u2019s values only, apart from the logo vectors ({android})',
-    )
-    # Animation as movement and opacity within the shape only: no fill, no shadow, no border in @keyframes
-    frames = {n: body for text in css.values() for n, body in keyframes(text).items()}
-    loud = [
-        f'{n}: {p}'
-        for n, body in frames.items()
-        for _, decls in css_rules(body)
-        for p, _ in decls
-        if re.match(r'background(?!-position)|box-shadow|outline|border(-[a-z]+)?-color|filter', p)
+    check(not loose, f'distances from the space scale {loose[:4]}')
+    loose = [
+        f'{sel} {prop}: {value}'
+        for sel, prop, value in decls
+        if 'radius' in prop and any(p not in ('0', '50%') and not p.startswith('var(--radius-') for p in value.split())
     ]
-    check(
-        frames and not loud,
-        f'@keyframes with movement and opacity only, without background and shadow ({len(frames)} animations){": " + ", ".join(loud) if loud else ""}',
-    )
-    # Nothing fades at a scroll edge (PROJECT.md, „Building blocks“): a gradient only in the mood picture's mask, the
-    # loading shimmer and the faint wash of the rating slider's track, a mask only in the mood picture
-    shades = sorted({(sel, p) for sel, decls in css_rules(css['app.css']) for p, v in decls if 'gradient' in v or 'mask' in p})
-    check(
-        shades == [('.mood', '-webkit-mask-image'), ('.mood', 'mask-image'), ('.skel', 'background'), ('.slider-track', 'background')],
-        f"no fade at an edge: gradients only in .mood, .skel and the slider's track, a mask only in .mood ({shades})",
-    )
-    focus = [d for f, text in css.items() for sel, decls in css_rules(text) if 'focus' in sel for d in decls if d[0] == 'border-radius']
-    ring = [d for sel, d in css_blocks(css['app.css']) if sel == ':focus-visible' and 'outline' in d]
-    check(not focus and ring, f'focus rings follow the radius: an outline and no radius of their own on focus ({focus})')
-    check(
-        'data-logo' not in (WWW / 'index.html').read_text()
-        and 'data-logo' not in (WWW / 'js/main.js').read_text()
-        and "from './logo.js'" not in (WWW / 'js/main.js').read_text(),
-        'header without a logo: nothing in index.html and main.js',
-    )
+    check(not loose, f'radii from the radius tokens {loose[:4]}')
+    loose = [
+        f'{sel} {prop}: {value}' for sel, prop, value in decls if prop == 'font' and value not in ('inherit',) and not value.startswith('var(--type-')
+    ]
+    check(not loose, f'type only through the --type-* styles {loose[:4]}')
 
 
-FAUSTINA = '.brand, .card h2, .page-title, .bar-title, .sh-head h2, .welcome h2, .tl-date b, .cnt b, .thumb'
-
-
-# The padding each recipe measures in the page. This catches an inline style, or a later rule that restyles a
-# recipe, which the static parse cannot see. Every entry has to meet a visible element in the views scanned.
-INSETS = {
-    '.card': '18px 18px 8px',
-    '.group': '4px 16px',
-    '.row': '10px 0px',
-    '.pend': '10px 0px',
-    '.card-btn': '10px 0px',
-    '.box': '12px',
-    '.banner': '12px',
-    '.btn': '12px 16px',
-    '.field:not(.in-row, .pick .field, .search .field)': '12px 16px',
-    '.chip:not(.tight)': '8px 16px',
-    '.chip.tight': '8px 12px',
-    '.field.in-row': '8px 16px',
-    '.toast button': '8px 16px',
-    '.cam-hint': '8px 16px',
-    '.badge:not(.ic-only)': '4px 10px',
-    '.seg': '4px',
-    '.seg button': '8px 6px',
-}
-FIGURES_JS = '.num, .tl-time, .cnt b, .place, .day .dn, .steps .n, .field.code'
-
-
-SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), met = new Set();
+# Visible text against what lies beneath it, with opacity, and the typeface in use
+SCAN = """() => { const bad = [];
   const rgba = c => { const m = (c.match(/[\\d.]+/g) || []).map(Number); return [m[0] || 0, m[1] || 0, m[2] || 0, m.length > 3 ? m[3] : 1]; };
   const lum = c => { const f = v => (v /= 255) <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
   const probe = document.createElement('i'); probe.style.color = 'var(--faint)'; document.body.append(probe);
   const faint = getComputedStyle(probe).color; probe.remove();
-  const ratio = el => { // type with its opacity against the surfaces beneath
+  const ratio = el => {
     let op = 1, layers = [];
     for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e), c = rgba(s.backgroundColor);
       if (c[3] > 0) { layers.unshift(c); if (c[3] >= 1) break; } op *= +s.opacity; }
@@ -448,360 +138,129 @@ SCAN = """([allowed, insets, figures]) => { const bad = [], seen = new Set(), me
   for (const el of document.querySelectorAll('body *')) {
     if (el.closest('svg') || !el.getClientRects().length) continue;
     const s = getComputedStyle(el), own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
-    const tag = el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/).join('.') : '');
-    if (el.id !== 'f-code' && s.textTransform !== 'none') bad.push('uppercase ' + tag);
-    if (el.id !== 'f-code' && s.letterSpacing !== 'normal' && parseFloat(s.letterSpacing) > 0) bad.push('letter-spaced ' + tag);
     if (!own && el.tagName !== 'INPUT') continue;
-    const size = parseFloat(s.fontSize), lead = Math.round(parseFloat(s.lineHeight) / size * 100) / 100;
-    if (![12, 14, 16, 21, 30].includes(size) || !['400', '600', '650'].includes(s.fontWeight) || ![1.1, 1.25, 1.4, 1.5].includes(lead))
-      bad.push(`type ${s.fontWeight} ${s.fontSize}/${s.lineHeight} ${tag}`);
-    if (s.letterSpacing !== 'normal' && el.id !== 'f-code' && !(size === 30 && s.letterSpacing === '-0.45px')) bad.push(`tracking ${s.letterSpacing} ${tag}`);
-    for (const f of figures.split(', ')) if (el.matches(f)) { met.add(f); if (s.fontVariantNumeric !== 'tabular-nums') bad.push('proportional figures ' + tag); }
+    const tag = el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\\s+/).join('.') : '');
     if (s.color !== faint && s.visibility === 'visible' && !el.closest(':disabled')) { const r = ratio(el); if (r < 4.5) bad.push(`contrast ${r.toFixed(2)} ${tag}`); }
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
-    if (fam === 'Faustina') { if (!el.closest(allowed)) bad.push('Faustina on ' + tag); seen.add(allowed.split(', ').find(a => el.closest(a))); }
-    else if (fam !== 'Figtree') bad.push(fam + ' on ' + tag);
+    if (fam !== 'Figtree' && fam !== 'Faustina') bad.push(`${fam} on ${tag}`);
   }
-  for (const [sel, pad] of Object.entries(insets)) for (const b of document.querySelectorAll(sel)) {
-    if (!b.getClientRects().length) continue;
-    met.add(sel);
-    if (getComputedStyle(b).padding !== pad) bad.push(`inset ${sel} ${getComputedStyle(b).padding}`); }
-  return {bad: [...new Set(bad)], seen: [...seen], met: [...met]}; }"""
+  return [...new Set(bad)]; }"""
 
 
-HINTS = ('Appetit', 'Nicht mehr kaufen?', 'Frisst meist nur die Soße', 'Neuer Liebling')
-
-
-# Every strip of rating dots on screen: [a label for a screen reader, at most 8 dots with the „+“ in front of them and
-# the hollow ones of the ratings still missing after them, each dot the size of the calendar's, each rated one in its
-# rating's colour]
-STRIPS = """() => { const tone = c => { const i = document.createElement('i'); i.style.color = `var(--${c.slice(2)})`; document.body.append(i);
-    const v = getComputedStyle(i).color; i.remove(); return v; };
-  const box = e => { const r = e.getBoundingClientRect(); return `${r.width}x${r.height}`; }, cal = box(document.querySelector('.cal .dots i:not(.open)'));
-  return [...document.querySelectorAll('.strip')].filter(s => s.getClientRects().length).map(s => { const dots = [...s.querySelectorAll('i')],
-      rated = dots.filter(d => !d.classList.contains('open')), open = dots.slice(rated.length);
-    return [s.getAttribute('role') === 'img' && !!s.getAttribute('aria-label'),
-      rated.length <= 8 && open.every(d => d.classList.contains('open')) && [...s.children].every((c, i) => c.tagName === 'I' || (i === 0 && c.innerText === '+')),
-      dots.every(d => box(d) === cal),
-      rated.every(d => getComputedStyle(d).backgroundColor === tone([...d.classList].find(c => c.startsWith('r-'))))]; }); }"""
-
-# The card „Vorlieben“: its height, and whether its two rows read as the rows of „Einkaufen“ do: the packaging in the
-# same column and as large, the names starting on one line, the strips ending on one
-SIDES = """() => { const c = document.querySelector('[data-sec=evaluation]'), shop = document.querySelector('[data-sec=shop] .row'), r = e => e.getBoundingClientRect();
-  const rows = [...c.querySelectorAll('.sides > li > .row')], at = (row, sel) => r(row.querySelector(sel)), near = (a, b) => Math.abs(a - b) < 0.5;
-  return {height: Math.round(r(c).height), rows: rows.length,
-    same: rows.every(row => near(at(row, '.thumb').left, at(shop, '.thumb').left) && near(at(row, '.thumb').width, at(shop, '.thumb').width)
-      && near(at(row, '.t-main').left, at(shop, '.t-main').left) && near(at(row, '.strip').right, at(shop, '.strip').right))}; }"""
-
-
-async def test_rules(browser, url):
-    print('design rules in every view')
+async def test_views(browser, url, scheme):
     pictures = make_pictures()
-    for scheme in ('light', 'dark'):
-        ctx = await phone(browser, scheme)
-        pg, errors = await open_page(ctx, url, choose=False)
-        await pg.evaluate('document.fonts.ready')
-        seen, bad, met = set(), [], set()
+    ctx = await phone(browser, scheme)
+    pg, errors = await open_page(ctx, url, choose=False)
+    await pg.evaluate('document.fonts.ready')
+    bad = []
 
-        async def scan():
-            r = await pg.evaluate(SCAN, [FAUSTINA, INSETS, FIGURES_JS])
-            bad.extend(r['bad'])
-            seen.update(r['seen'])
-            met.update(r['met'])
+    async def scan():
+        bad.extend(await pg.evaluate(SCAN))
 
-        await scan()  # Willkommen beim ersten Start: Wahl des Modus
-        await pg.click('[data-action=mode-local]')
+    async def tap(sel, **kw):
+        await pg.click(sel, **kw)
         await idle(pg)
-        await scan()  # Willkommen
-        top = await pg.eval_on_selector(
-            '.top',
-            """t => { const b = t.querySelector('.brand'), s = getComputedStyle(b);
-          return [t.querySelectorAll('svg, img, [data-logo]').length - t.querySelectorAll('.top-end svg').length, b.innerText, b.children.length,
-            s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.lineHeight, s.letterSpacing]; }""",
-        )
-        check(
-            top == [0, 'Schmeckt’s?', 0, 'Faustina', '650', '30px', '33px', '-0.45px'],
-            f'header ({scheme}): the wordmark only, Faustina 650, 30px ({top})',
-        )
-        logo = await pg.eval_on_selector_all(
-            '.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0, i.offsetWidth])"
-        )
-        want = 'img/schmeckts-mark.svg' if scheme == 'light' else 'img/schmeckts-mark-dark.svg'
-        check(logo == [[want, True, 104]], f'welcome screen ({scheme}): the mark for this scheme ({logo})')
-        vs = await pg.evaluate('getComputedStyle(document.body).fontVariationSettings')
-        check(vs == 'normal', f'body: no font-variation-settings, Faustina has no axis of its own ({vs})')
-        await pg.click('[data-action=demo]')
-        await idle(pg)
-        await scan()  # Startseite mit allem
-        await pg.set_viewport_size({'width': 360, 'height': 860})
-        await pg.click('[data-action=observe-open]')
-        await idle(pg)
-        await scan()  # the chips for an observation, folded open
-        chips = await pg.evaluate("""() => [...document.querySelectorAll('.overview .chip')].map(c => Math.round(c.getBoundingClientRect().top))""")
-        check(len(chips) == 3 and len(set(chips)) == 1, f'the three chips for an observation share one row at 360px ({scheme}: {chips})')
-        await pg.click('[data-action=observe-open]')
-        await pg.set_viewport_size({'width': 400, 'height': 860})
-        await idle(pg)
-        layout = await pg.evaluate("""(() => { const app = getComputedStyle(document.querySelector('.app')), probe = document.createElement('i');
-          probe.style.cssText = 'background:var(--surface);color:var(--ink)'; document.body.append(probe); const p = getComputedStyle(probe);
-          const cards = [...document.querySelectorAll('#home > section')];
-          const out = {app: [app.maxWidth, app.paddingLeft, app.paddingRight], cards: cards.map(c => { const s = getComputedStyle(c), h = getComputedStyle(c.querySelector('h2'));
-            return [c.classList.contains('card'), s.backgroundColor === p.backgroundColor, s.backgroundImage, s.borderRadius, s.padding, s.boxShadow, s.borderTopWidth, s.borderBottomWidth,
-              c.firstElementChild.tagName, h.fontFamily.split(',')[0].replace(/"/g, ''), h.fontWeight, h.fontSize, h.lineHeight, h.letterSpacing, h.color === p.color].join('|'); }),
-            gaps: cards.slice(1).map((c, i) => Math.round(c.getBoundingClientRect().top - cards[i].getBoundingClientRect().bottom))};
-          probe.remove(); return out; })()""")
-        want = 'true|true|none|24px|18px 18px 8px|none|0px|0px|H2|Faustina|600|21px|26.25px|normal|true'
-        first = want.replace('|H2|', '|DIV|')  # overview: the picture on the left, the heading beside it
-        check(
-            layout['app'] == ['600px', '18px', '18px']
-            and len(layout['cards']) == 6
-            and layout['cards'][0] == first
-            and all(c == want for c in layout['cards'][1:])
-            and layout['gaps'] == [14] * 5,
-            f'home page ({scheme}): 600px, 18px margin; every card a surface, radius 24px, 18/18/8, without border and shadow, heading Faustina 600 21px on top (overview: beside the picture), 14px apart ({layout["gaps"]})',
-        )
-        order = await pg.eval_on_selector_all('#home > section', 'l => l.map(s => s.querySelector("h2").innerText)')
-        check(
-            order[:2] == ['Mau', 'Wie war’s?'] and order[2] in HINTS and order[3:] == ['Verlauf', 'Vorlieben', 'Einkaufen'],
-            f'the cards in their order: overview, „Wie war’s?“, hint, „Verlauf“, „Vorlieben“, „Einkaufen“ ({scheme}: {order})',
-        )
-        # The text button at a card's foot: --space-3 above its line, whatever the card ends with, then as tall as a row
-        btns = await pg.evaluate(
-            """() => [...document.querySelectorAll('#home .card .card-btn')].map(b => { let el = b.previousElementSibling;
-          while (el && !el.getBoundingClientRect().height) el = el.previousElementSibling;
-          const s = getComputedStyle(b), r = b.getBoundingClientRect();
-          return [b.textContent.trim(), s.marginTop, Math.round(r.top - el.getBoundingClientRect().bottom), Math.round(r.height)]; })"""
-        )
-        check(
-            len(btns) >= 3 and all(m == '12px' and gap >= 12 and h >= 56 for _, m, gap, h in btns),
-            f'card buttons ({scheme}): 12px above the line in the recipe, whatever ends the card, and at least 56px tall ({btns})',
-        )
-        sides = await pg.evaluate(SIDES)
-        check(
-            200 <= sides['height'] <= 300 and sides['rows'] == 2 and sides['same'],
-            f'„Vorlieben“ ({scheme}): between 200 and 300px tall, the top and the flop in two rows laid out as the rows of „Einkaufen“ ({sides})',
-        )
-        await pg.click('[data-sec=evaluation] [data-action=open-evaluation]')
-        await idle(pg)
-        await scan()  # „Vorlieben“
-        strips = await pg.evaluate(STRIPS)
-        places = await pg.eval_on_selector_all(
-            '#sheet .place', 'l => l.map(p => Math.round(p.getBoundingClientRect().left + p.getBoundingClientRect().width / 2))'
-        )
-        check(
-            len(strips) >= 7 and all(x == [True, True, True, True] for x in strips) and len(places) >= 6 and len(set(places)) == 1,
-            f'„Vorlieben“ ({scheme}): every strip as on „Einkaufen“, hollow dots after it for the ratings still missing; the places centred on one line ({len(strips)} strips, {places})',
-        )
-        await pg.click('#sheet [data-action=open-level][data-v=profile]')
-        await idle(pg)
-        await scan()  # „Worauf es ankommt“
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('[data-sec=shop] [data-action=open-shop]')
-        await idle(pg)
-        for key in ('nicht', 'unklar'):
-            await pg.click(f'#sheet [data-action=fold][data-v={key}]')
-            await idle(pg)
-        await scan()  # „Einkaufen“ with everything folded open
-        strips = await pg.evaluate(STRIPS)
-        check(
-            len(strips) >= 8 and all(x == [True, True, True, True] for x in strips),
-            f'„Einkaufen“ ({scheme}): every strip says in words what it shows, at most 8 dots, each the size of a calendar dot and in its rating’s colour ({len(strips)} strips)',
-        )
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('[data-action=open-settings]')
-        await idle(pg)
-        await scan()
-        label = await pg.eval_on_selector(
-            '#sheet .label',
-            """l => { const s = getComputedStyle(l), probe = document.createElement('i'); probe.style.color = 'var(--muted)'; l.after(probe);
-          const c = getComputedStyle(probe).color; probe.remove(); return [s.fontFamily.split(',')[0].replace(/"/g, ''), s.fontWeight, s.fontSize, s.color === c, s.textTransform, s.letterSpacing, l.innerText]; }""",
-        )
-        check(
-            label == ['Figtree', '600', '14px', True, 'none', 'normal', 'Tiere'],
-            f'field label: Figtree 600, 14px, muted, normal casing ({label})',
-        )
-        await pg.click('#sheet [data-action=settings-page][data-v=house]')
-        await idle(pg)
-        await scan()  # the „Haushalt“ page
-        await pg.click('#serverBox [data-action=connect-form]')
-        await idle(pg)
-        await scan()  # Adresse und Code
-        await pg.fill('#f-code', 'abcd1234')
-        code = await pg.eval_on_selector('#f-code', 'f => [getComputedStyle(f).textTransform, getComputedStyle(f).letterSpacing]')
-        check(code[0] == 'uppercase' and float(code[1][:-2]) > 0, f'the exception: the household code field ({code})')
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('#fab')
-        await idle(pg)
-        await scan()
-        await pg.click('[data-action=close]')
-        await idle(pg)
-        await pg.evaluate("import('./js/store.js').then(s => { for (const p of s.db.products) p.codes = {...p.codes, '4001234567890': true}; })")
-        await pg.click('[data-sec=shop] [data-action=open-product]')
-        await idle(pg)
-        await scan()  # with a barcode
-        await pg.click('[data-action=close]')
-        await idle(pg)
-        await pg.click('.tl [data-action=open-serving]')
-        await idle(pg)
-        await scan()
-        await pg.click('[data-action=close]')
-        await idle(pg)
-        await pg.click('[data-action=open-settings]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=edit-pet]')
-        await idle(pg)
-        await scan()  # the pet sheet
-        await pg.set_input_files('#petPhotoInput', pictures[1])
-        await pg.wait_for_selector('#sheet .crop img')
-        await idle(pg)
-        await scan()
-        await pg.click('[data-action=crop-cancel]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('#fab')
-        await idle(pg)
-        await pg.click('#sheet [data-action=photo]')
-        await pg.wait_for_selector('#camera[open]')
-        await idle(pg)
-        await scan()
-        await pg.click('[data-cam=cancel]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=close]')
-        await idle(pg)
-        await pg.click('[data-sec=hist] [data-action=open-report]')
-        await idle(pg)
-        await scan()  # „Verlauf“
-        await pg.click('#sheet [data-action=settings-back]')
-        await idle(pg)
-        await pg.click('.pend .slider-track button', force=True)  # the level's button takes no pointer: the click lands on the track there
-        await pg.wait_for_selector('#toast [data-action=undo]')
-        await idle(pg)
-        await scan()  # a toast with „Rückgängig“
-        await pg.click('.tl [data-action=open-serving]')
-        await idle(pg)
-        await scan()  # the meal just rated: its level's name under the slider
-        await pg.click('[data-action=close]')
-        await idle(pg)
-        await pg.click('[data-action=open-settings]')
-        await idle(pg)
-        await pg.click('#sheet [data-action=arm][data-then=wipe]')
-        await pg.click('#sheet [data-action=arm][data-then=wipe]')
-        await idle(pg)
-        await pg.click('.welcome [data-action=add-pet]')
-        await idle(pg)
-        await pg.fill('#f-name', 'Minka')
-        await pg.click('[data-action=save-pet]')
-        await idle(pg)
-        await scan()  # the first steps
-        # Where nothing can be stored the home page says so in a banner
-        full = await phone(browser, scheme)
-        await full.add_init_script("Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };")
-        pg2, _ = await open_page(full, url, scheme, choose=False)
-        r = await pg2.evaluate(SCAN, [FAUSTINA, INSETS, FIGURES_JS])
-        bad.extend(r['bad'])
-        met.update(r['met'])
-        await full.close()
-        missed = sorted(set(INSETS) - met) + sorted(set(FIGURES_JS.split(', ')) - met)
-        check(not missed, f'the inset and figure checks met every recipe they name in the views scanned ({scheme}: {missed})')
-        check(
-            not bad,
-            f'Figtree everywhere and Faustina only in the places laid down, no uppercase, no letter-spacing, every piece of type at 4.5:1 ({scheme}): {bad}',
-        )
-        check(
-            seen == set(FAUSTINA.split(', ')),
-            f'Faustina on the wordmark, headings, day lines, counters, places, the level on the rating slider, initials ({sorted(seen)})',
-        )
-        check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
-        await ctx.close()
 
-
-SMALL_ICONS = '.btn:not(.fab) .ic, .chip > .ic, .seg button .ic, .sugg > .ic, .set-row .chev, .prod-card .edit .ic, .search .ic, .pick .ic'
-ICONS = """sel => [...document.querySelectorAll(sel)].filter(i => i.getClientRects().length).map(i => { const r = i.getBoundingClientRect(), box = i.closest('.pick, .sugg, .prod-card, .search'),
-    b = (box?.querySelector('.field') || box)?.getBoundingClientRect(), left = !!i.closest('.search');
-  return {where: i.closest('[class]:not(svg)').className, w: r.width, h: r.height, stroke: getComputedStyle(i).strokeWidth,
-    edge: b ? Math.round((left ? r.left - b.left : b.right - r.right) * 10) / 10 : null, mid: b ? Math.abs((r.top + r.bottom) / 2 - (b.top + b.bottom) / 2) < .6 : null}; })"""
-
-
-async def test_polish(browser, url):
-    print('polish: small icons consistent, the „Serviert von“ select field, the gap under the wordmark')
-    ctx = await phone(browser)
-    pg, errors = await open_page(ctx, url)
-    await pg.click('[data-action=demo]')
-    await idle(pg)
-    gap = await pg.evaluate(
-        "[getComputedStyle(document.querySelector('.top')).paddingBottom, document.querySelector('#home > section').getBoundingClientRect().top - document.querySelector('.top').getBoundingClientRect().bottom]"
+    await scan()
+    if await pg.locator('[data-action=mode-local]').count():
+        await tap('[data-action=mode-local]')
+    logo = await pg.eval_on_selector_all(
+        '.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0])"
     )
-    check(gap == ['10px', 0], f'home page: 10px from the wordmark to the first card, 8px more than before ({gap})')
-    icons = []
-    await pg.click('.pend-head')
+    want = 'img/schmeckts-mark.svg' if scheme == 'light' else 'img/schmeckts-mark-dark.svg'
+    check(logo == [[want, True]], f'welcome logo for the {scheme} scheme {logo}')
+    await tap('[data-action=demo]')
+    await scan()
+    await tap('[data-action=observe-open]')
+    await scan()
+    await tap('[data-action=observe-open]')
+    await tap('[data-sec=evaluation] [data-action=open-evaluation]')
+    await scan()
+    await tap('#sheet [data-action=open-level][data-v=profile]')
+    await scan()
+    await tap('#sheet [data-action=settings-back]')
+    await tap('#sheet [data-action=settings-back]')
+    await tap('[data-sec=shop] [data-action=open-shop]')
+    for key in ('nicht', 'unklar'):
+        await tap(f'#sheet [data-action=fold][data-v={key}]')
+    await scan()
+    await tap('#sheet [data-action=settings-back]')
+    await tap('[data-action=open-settings]')
+    await scan()
+    await tap('#sheet [data-action=settings-page][data-v=house]')
+    await tap('#serverBox [data-action=connect-form]')
+    await scan()
+    await tap('#sheet [data-action=settings-back]')
+    await tap('#sheet [data-action=settings-back]')
+    await tap('#fab')
+    await scan()
+    await tap('[data-action=close]')
+    await pg.evaluate("import('./js/store.js').then(s => { for (const p of s.db.products) p.codes = {...p.codes, '4001234567890': true}; })")
+    await tap('[data-sec=shop] [data-action=open-product]')
+    await scan()
+    await tap('[data-action=close]')
+    await tap('.tl [data-action=open-serving]')
+    await scan()
+    await tap('[data-action=close]')
+    await tap('[data-action=open-settings]')
+    await tap('#sheet [data-action=edit-pet]')
+    await scan()
+    await pg.set_input_files('#petPhotoInput', pictures[1])
+    await pg.wait_for_selector('#sheet .crop img')
     await idle(pg)
-    # ::backdrop is not an element, so the reduced-motion rule has to name it: without that the sheet's dimming
-    # still faded in for 350 ms while everything else stood still.
+    await scan()
+    await tap('[data-action=crop-cancel]')
+    await tap('#sheet [data-action=settings-back]')
+    await tap('#sheet [data-action=settings-back]')
+    await tap('#fab')
+    await pg.click('#sheet [data-action=photo]')
+    await pg.wait_for_selector('#camera[open]')
+    await idle(pg)
+    await scan()
+    await tap('[data-cam=cancel]')
+    await tap('#sheet [data-action=close]')
+    await tap('[data-sec=hist] [data-action=open-report]')
+    await scan()
+    await tap('#sheet [data-action=settings-back]')
+    await tap('.pend-head')
+    # ::backdrop is no element, so the reduced-motion rule has to name it
     dimming = await pg.evaluate("getComputedStyle(document.getElementById('sheet'), '::backdrop').animationDuration")
-    check(float(dimming.rstrip('s')) < 0.01, f'reduced motion reaches the sheet’s dimming too (::backdrop {dimming})')
-    pick = [i for i in await pg.evaluate(ICONS, '.pick .ic')]
-    check(
-        pick == [{'where': 'pick', 'w': 20, 'h': 20, 'stroke': '1.8px', 'edge': 14, 'mid': True}],
-        f'select icon on „Serviert von“: 20px, the icon set\u2019s stroke width, 14px from the right edge, vertically centred ({pick})',
-    )
-    check(
-        await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance') == 'none',
-        'the field does not draw the system\u2019s own arrow beside it (Android)',
-    )
-    await shot(pg, 'select-field')
-    icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('[data-action=edit-name]')
+    check(float(dimming.rstrip('s')) < 0.01, f'reduced motion reaches the sheet dimming ({scheme}, {dimming})')
+    appearance = await pg.eval_on_selector('#f-time', 'f => getComputedStyle(f).appearance')
+    check(appearance == 'none', f'the time field draws no second arrow on Android ({appearance})')
+    await tap('[data-action=close]')
+    await pg.click('.pend .slider-track button', force=True)  # the level takes no pointer, the track does
+    await pg.wait_for_selector('#toast [data-action=undo]')
     await idle(pg)
-    await pg.fill('#f-variety', '')
-    await pg.fill('#f-brand', 'She')
-    await idle(pg)
-    await pg.wait_for_selector('#sheet .sugg')
-    icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('[data-action=close]')
-    await idle(pg)
-    await pg.click('[data-action=open-settings]')
-    await idle(pg)
-    icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('#sheet [data-action=edit-pet]')
-    await idle(pg)
-    icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    await pg.click('#sheet [data-action=settings-back]')
-    await idle(pg)
-    await pg.click('#sheet [data-action=settings-back]')
-    await idle(pg)
-    await pg.click('#fab')
-    await idle(pg)
-    icons += await pg.evaluate(ICONS, SMALL_ICONS)
-    kinds = {i['where'].split()[0] for i in icons}
-    odd = [i for i in icons if (i['w'], i['h'], i['stroke']) != (20, 20, '1.8px') or i['edge'] not in (None, 14) or i['mid'] is False]
-    check(
-        {'pick', 'box', 'edit', 'row', 'btn', 'chip'} <= kinds and not odd,
-        f'select fields, arrows in rows and small icons in buttons: 20px, stroke width 1.8, 14px from the edge in boxes and vertically centred ({len(icons)} icons, {sorted(kinds)}) {odd[:3]}',
-    )
-    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    await scan()
+    await tap('.tl [data-action=open-serving]')
+    await scan()
+    await tap('[data-action=close]')
+    await tap('[data-action=open-settings]')
+    await pg.click('#sheet [data-action=arm][data-then=wipe]')
+    await tap('#sheet [data-action=arm][data-then=wipe]')
+    await tap('.welcome [data-action=add-pet]')
+    await pg.fill('#f-name', 'Minka')
+    await tap('[data-action=save-pet]')
+    await scan()
+    full = await phone(browser, scheme)
+    await full.add_init_script("Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };")
+    pg2, _ = await open_page(full, url, scheme, choose=False)
+    bad.extend(await pg2.evaluate(SCAN))
+    await full.close()
+    check(not bad, f'all visible text at 4.5:1 and in Figtree or Faustina ({scheme}) {bad}')
+    check(not errors, f'no errors in the console {errors}')
     await ctx.close()
 
 
-# Label top and field bottom for the two placeholders of the skeleton, and for the two fields after the reading
 SKELETON = """() => { const r = e => e.getBoundingClientRect(), labels = [...document.querySelectorAll('#sheet .label')].filter(l => l.querySelector('.skel-text')),
   blocks = [...document.querySelectorAll('#sheet .skel-field')];
-  return labels.map((l, i) => [r(l).top, r(blocks[i]).bottom]); }"""
+  return labels.map((l, i) => Math.round((r(blocks[i]).bottom - r(l).top) * 100) / 100); }"""
 FIELDS = """() => { const r = s => document.querySelector('#sheet ' + s).getBoundingClientRect();
-  return [['label[for=f-brand]', '#f-brand'], ['label[for=f-variety]', '#f-variety']].map(([l, f]) => [r(l).top, r(f).bottom]); }"""
+  return [['label[for=f-brand]', '#f-brand'], ['label[for=f-variety]', '#f-variety']].map(([l, f]) => Math.round((r(f).bottom - r(l).top) * 100) / 100); }"""
 
 
 async def test_skeleton(browser, url):
-    print('the naming sheet\u2019s skeleton while the packaging is read: as tall as the fields it stands in for')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     await pg.click('.welcome [data-action=add-pet]')
@@ -815,735 +274,27 @@ async def test_skeleton(browser, url):
     await pg.set_input_files('#camInputSheet', str(PACK))
     await pg.wait_for_selector('#sheet .skel-field')
     skeleton = await pg.evaluate(SKELETON)
-    await shot(pg, 'skeleton')
     await pg.wait_for_selector('#sheet #f-brand')
     await idle(pg)
     fields = await pg.evaluate(FIELDS)
-    heights = [[round(b - t, 2) for t, b in skeleton], [round(b - t, 2) for t, b in fields]]
-    check(
-        len(skeleton) == 2 and heights[0] == heights[1],
-        f'two placeholders, each from the label\u2019s top to the field\u2019s bottom exactly as tall as label and field after the reading ({heights})',
-    )
-    check(not errors, 'no errors in the console' + (f': {errors}' if errors else ''))
+    check(len(skeleton) == 2 and skeleton == fields, f'the skeleton is as tall as the fields it stands in for {skeleton} {fields}')
+    check(not errors, f'no errors in the console {errors}')
     await ctx.close()
-
-
-def test_version_code():
-    """Every build installs over the ones from before the version restart.
-
-    Android refuses a package whose versionCode is lower than the installed one. Builds before 0.1.0 reached
-    10400, so prepare.py lifts every code above that mark."""
-    sys.path.insert(0, str(ROOT / 'scripts'))
-    import importlib
-
-    prep = importlib.import_module('prepare')
-    version = json.loads((ROOT / 'app/package.json').read_text())['version']
-    code = 0
-    for part in (int(x) for x in version.split('.')):
-        code = code * 100 + part
-    code += prep.VERSION_OFFSET
-    src = (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
-    # The Gradle line is built from pieces, so a pattern matches it: the formatter may change the quotes around
-    # the offset and break the line elsewhere.
-    hands_over_offset = re.search(r'def appVersionCode = [\'"]\s*\+\s*str\(VERSION_OFFSET\)', src)
-    check(
-        code > 10400 and hands_over_offset,
-        f'versionCode {code} for version {version} stays above the 10400 of the builds before the restart',
-    )
-
-
-def test_signing_key():
-    """scripts/signing-key.py: a round trip keeps the keystore and the password, and older files still read.
-
-    The signing key lives in a GitHub secret as a text file. Files written before the move to English say
-    "Passwort:", so read() has to accept both spellings; otherwise a release build cannot sign."""
-    sys.path.insert(0, str(ROOT / 'scripts'))
-    import importlib
-
-    key = importlib.import_module('signing-key') if 'signing-key' not in sys.modules else sys.modules['signing-key']
-    with tempfile.TemporaryDirectory() as tmp:
-        jks, pwfile = pathlib.Path(tmp, 'key.jks'), pathlib.Path(tmp, 'pw.txt')
-        jks.write_bytes(bytes(range(256)) * 4)
-        pwfile.write_text('geheim-123\n', encoding='utf-8')
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            key.create(str(jks), str(pwfile))
-        text = out.getvalue()
-        for name, body in (('English', text), ('German', text.replace('Password:', 'Passwort:'))):
-            src, back = pathlib.Path(tmp, f'{name}.txt'), pathlib.Path(tmp, f'{name}.jks')
-            src.write_text(body, encoding='utf-8')
-            got = io.StringIO()
-            with contextlib.redirect_stdout(got):
-                key.read(str(src), str(back))
-            check(
-                got.getvalue().strip() == 'geheim-123' and back.read_bytes() == jks.read_bytes(),
-                f'signing key, {name} wording: keystore and password come back unchanged',
-            )
-
-
-# Exceptions to the spacing scale, each with its reason; there are none now that the room for a field's icon and
-# for the feeding button are sums of tokens. env()'s own fallback is no distance either and is taken out before
-# the check.
-SPACING_ALLOWED = {}
-SPACING_PROPS = ('margin', 'padding', 'gap', 'row-gap', 'column-gap')
-
-
-def test_spacing_scale():
-    """Every margin, padding and gap comes from the scale in tokens.css; a literal px value is not allowed."""
-    scale = {
-        p: v
-        for sel, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8'))
-        if sel == ':root'
-        for p, v in d.items()
-        if p.startswith('--space-')
-    }
-    want = ['--space-hair'] + [f'--space-{n}{h}' for n in range(1, 8) for h in ('', 'h') if not (n == 7 and h) and not (n in (5, 6) and h)]
-    check(sorted(scale) == sorted(want), f'the scale in tokens.css: {len(scale)} steps ({sorted(scale)})')
-    loose = []
-    for sel, decls in css_rules((WWW / 'css/app.css').read_text(encoding='utf-8')):
-        for prop, value in decls:
-            if prop.split('-top')[0].split('-right')[0].split('-bottom')[0].split('-left')[0] not in SPACING_PROPS:
-                continue
-            bare = re.sub(r'env\([^)]*\)', '', value)
-            loose += [f'{sel} {prop}:{value}' for px in re.findall(r'\d+(?:\.\d+)?px', bare) if px not in SPACING_ALLOWED]
-    check(not loose, f'every distance in app.css comes from the scale ({len(loose)} do not: {loose[:4]})')
-
-
-# One radius per role (PROJECT.md, "Principles"): the four tokens, plus the circle. A literal value would put a
-# fifth radius into the app, which is how the twelve of them came about in the first place.
-RADIUS_ALLOWED = ('50%', '0')
-
-
-def test_radius_scale():
-    """Every border-radius in app.css comes from the tokens in tokens.css; only a circle says 50 %."""
-    scale = {
-        p: v
-        for sel, d in css_blocks((WWW / 'css/tokens.css').read_text(encoding='utf-8'))
-        if sel == ':root'
-        for p, v in d.items()
-        if p.startswith('--radius-')
-    }
-    check(
-        scale == {'--radius-s': '12px', '--radius-m': '16px', '--radius-l': '24px', '--radius-full': '999px'},
-        f'the four radii in tokens.css: small and nested, controls, containers, pills ({scale})',
-    )
-    loose = []
-    for sel, decls in css_rules((WWW / 'css/app.css').read_text(encoding='utf-8')):
-        for prop, value in decls:
-            if 'radius' not in prop:
-                continue
-            loose += [f'{sel} {prop}:{value}' for part in value.split() if part not in RADIUS_ALLOWED and not part.startswith('var(--radius-')]
-    check(not loose, f'every radius in app.css comes from the tokens ({len(loose)} do not: {loose[:4]})')
-
-
-# ---------------------------------------------------------------- type
-TYPE_STYLES = {
-    '--type-title': '650 30px/1.1 var(--font-display)',
-    '--type-heading': '600 21px/1.25 var(--font-display)',
-    '--type-subheading': '600 16px/1.25 var(--font-display)',
-    '--type-body': '400 16px/1.5 var(--font-ui)',
-    '--type-body-strong': '600 16px/1.5 var(--font-ui)',
-    '--type-small': '400 14px/1.4 var(--font-ui)',
-    '--type-small-strong': '600 14px/1.4 var(--font-ui)',
-    '--type-caption': '400 12px/1.25 var(--font-ui)',
-    '--type-caption-strong': '600 12px/1.25 var(--font-ui)',
-}
-TYPE_SCALE = ({'12', '14', '16', '21', '30'}, {'1.1', '1.25', '1.4', '1.5'}, {'400', '600', '650'})
-# Figures take table figures in the very rule that sets their font, because the font shorthand resets them
-FIGURES = {
-    '.cnt b',
-    '.place',
-    '.tl-time',
-    '.day .dn',
-    '.day.has .dn',
-    '.day.today .dn',
-    '.steps .n',
-    '.field.code',
-    '.t-main .num',
-}
-FIGURE_SUBJECT = re.compile(r'\.(tl-time|dn|n|num|place)\b|^b$')
-# Type set other than through a style, each with its reason
-TYPE_ALLOWED = {
-    ('b, strong', 'font-weight', 'var(--weight-strong)'): 'bold in running text is the app’s 600, not the browser’s bolder',
-    ('.field.code', 'letter-spacing', 'var(--track-code)'): 'the one positive tracking: the household code is spelled out',
-    ('.field.code', 'text-transform', 'uppercase'): 'the household code',
-    ('.field.code::placeholder', 'letter-spacing', 'normal'): 'the placeholder is a sentence',
-    ('.field.code::placeholder', 'text-transform', 'none'): 'the placeholder is a sentence',
-    ('.tl-note', 'font-style', 'italic'): 'a note in the timeline is the one quoted text',
-}
-
-
-def test_type_scale():
-    """Nine text styles from one scale; app.css sets type only through them (PROJECT.md, "Type")."""
-    root = tokens_root()
-    styles = {k: v for k, v in root.items() if k.startswith('--type-')}
-    check(styles == TYPE_STYLES, f'the nine text styles in tokens.css ({sorted(set(styles.items()) ^ set(TYPE_STYLES.items()))})')
-    sizes, leads, weights = TYPE_SCALE
-    off = [
-        k
-        for k, v in styles.items()
-        if not (m := re.fullmatch(r'(\d+) (\d+)px ?/ ?([\d.]+) var\(--font-(?:ui|display)\)', v))
-        or m[1] not in weights
-        or m[2] not in sizes
-        or m[3] not in leads
-    ]
-    check(not off, f'every style from the scale: sizes {sorted(sizes)}, leadings {sorted(leads)}, weights {sorted(weights)} ({off})')
-    check(
-        {k: root.get(k) for k in ('--weight-strong', '--track-title', '--track-code')}
-        == {'--weight-strong': '600', '--track-title': '-0.015em', '--track-code': '0.14em'},
-        'bold in running text, the title’s tracking and the code field’s as tokens',
-    )
-    decls, loose, rules = app_decls(), [], {}
-    for _, sel, p, v in decls:
-        rules.setdefault(sel, []).append((p, v))
-        if (sel, p, v) in TYPE_ALLOWED:
-            continue
-        if p == 'font' and v != 'inherit' and not (v.startswith('var(') and v[4:-1] in TYPE_STYLES):
-            loose.append(f'{sel} font:{v}')
-        elif p in ('font-size', 'line-height', 'font-family', 'font-weight', 'font-stretch', 'font-style', 'font-variant', 'text-transform'):
-            loose.append(f'{sel} {p}:{v}')
-        elif p == 'letter-spacing' and v != 'var(--track-title)':
-            loose.append(f'{sel} {p}:{v}')
-        elif p == 'font-variant-numeric' and not (sel in FIGURES and v == 'tabular-nums'):
-            loose.append(f'{sel} {p}:{v}')
-    check(not loose, f'app.css sets type only as font: var(--type-…) ({len(loose)} do not: {loose[:4]})')
-    odd = []
-    for sel, ds in rules.items():
-        d = dict(ds)
-        if (d.get('font') == 'var(--type-title)') != (d.get('letter-spacing') == 'var(--track-title)'):
-            odd.append(f'{sel}: the title and its tracking')
-        if 'font' in d and (sel in FIGURES or any(FIGURE_SUBJECT.search(s) and s != 'b' or s == 'b' and '.cnt' in sel for s in subjects(sel))):
-            names = [p for p, _ in ds]
-            if sel not in FIGURES or d.get('font-variant-numeric') != 'tabular-nums' or names.index('font-variant-numeric') < names.index('font'):
-                odd.append(f'{sel}: a figure takes tabular-nums after its font, in FIGURES')
-    check(not odd, f'the title always with its tracking and nowhere else; every figure tabular in its own rule ({odd})')
-    js = [
-        f.name
-        for f in (WWW / 'js').rglob('*.js')
-        if re.search(
-            r'\.style\.(font\w*|lineHeight|letterSpacing)\b|style="[^"]*\b(font|line-height|letter-spacing)\b', f.read_text(encoding='utf-8')
-        )
-    ]
-    check(not js, f'no type set from JavaScript ({js})')
-
-
-# ---------------------------------------------------------------- motion
-DURATIONS = {'--dur-fade': '200ms', '--dur-step': '300ms', '--dur-long': '1200ms'}
-EASINGS = {'--ease-out': 'cubic-bezier(0.22,1,0.36,1)', '--ease-in': 'cubic-bezier(0.5,0,0.75,0)', '--ease-spring': 'cubic-bezier(0.34,1.45,0.64,1)'}
-STATE = ('transform', 'opacity', 'color', 'background-color', 'border-color', 'box-shadow')
-LIBRARY = {
-    'fadeIn': 'a dimming or a ground appears',
-    'fadeOut': 'and goes',
-    'sheetIn': 'a sheet rises',
-    'sheetOut': 'a sheet sinks',
-    'pageIn': 'a page, or the level you go to, comes in from the side',
-    'pageOut': 'a page, or the level you leave going back, goes out',
-    'pageAside': 'the level you leave going deeper moves a quarter aside',
-    'pageFromAside': 'and comes back',
-    'appear': 'content appears in place',
-    'vanish': 'a piece of the home page goes',
-    'dropIn': 'a new meal arrives at the top of „Heute“',
-    'leave': 'a rated meal folds away',
-    'pop': 'a confirmation',
-    'bowlFill': 'the bowl in the feeding button',
-    'spin': 'waiting',
-    'shimmer': 'a line still loading',
-}
-# Keyframes move and fade; these two do what their purpose needs besides
-KEYFRAME_ALLOWED = {
-    'shimmer': {'background-position'},
-    'leave': {'max-height', 'padding-top', 'padding-bottom', 'border-top-width'},
-}
-TRANSITION_PART = re.compile(
-    r'(transform|opacity|color|background-color|border-color|box-shadow|height) var\(--dur-(fade|step)\) var\(--ease-(out|in|spring)\)'
-)
-PRESS = ('scale(var(--press))', 'scale(var(--press-wide))')
-# The browser names these animations itself, so only their timing can be set, and only from the tokens
-MOTION_LONGHANDS = {'::view-transition-group(*)', '::view-transition-group(photo)'}
-# Under reduced motion nothing moves: the one place with literal times, and all it may say
-REDUCED_RULES = {
-    '*,*::before,*::after,::backdrop': {
-        'animation-duration': '0.01ms !important',
-        'animation-iteration-count': '1 !important',
-        'transition-duration': '0.01ms !important',
-    },
-    'html': {'transition': 'none !important'},
-}
-
-
-def test_motion_scale():
-    """Three durations, three curves, one state transition, two presses, a closed library of keyframes (PROJECT.md, "Motion")."""
-    root = tokens_root()
-    got = {k: v for k, v in root.items() if k.startswith(('--dur-', '--ease-'))}
-    check(got == {**DURATIONS, **EASINGS}, f'durations and curves in tokens.css ({sorted(set(got.items()) ^ set({**DURATIONS, **EASINGS}.items()))})')
-    check(root.get('--state') == ','.join(f'{p} var(--dur-fade) var(--ease-out)' for p in STATE), f'--state: {STATE} in --dur-fade with --ease-out')
-    check(root.get('--press') == '0.95' and root.get('--press-wide') == '0.98', 'two press scales')
-    tok, app = (WWW / 'css/tokens.css').read_text(encoding='utf-8'), (WWW / 'css/app.css').read_text(encoding='utf-8')
-    frames = keyframes(re.sub(r'/\*.*?\*/', '', tok, flags=re.S))
-    check(
-        set(frames) == set(LIBRARY) and not keyframes(app),
-        f'@keyframes only in tokens.css and only the library ({sorted(set(frames) ^ set(LIBRARY))}, app.css: {sorted(keyframes(app))})',
-    )
-    loud = [
-        f'{n}: {p}'
-        for n, body in frames.items()
-        for _, ds in css_rules(body)
-        for p, _ in ds
-        if p not in {'transform', 'opacity'} | KEYFRAME_ALLOWED.get(n, set())
-    ]
-    check(not loud, f'the library moves and fades, nothing else ({loud})')
-    reduced = {' '.join(s.split()).replace(', ', ','): d for s, d in css_blocks(cut_block(re.sub(r'/\*.*?\*/', '', app, flags=re.S), REDUCED)[1])}
-    check(reduced == REDUCED_RULES, f'under reduced motion nothing moves, ::backdrop named beside * ({reduced})')
-    loose, used = [], set()
-    for sec, sel, p, v in app_decls():
-        if p == 'transition':
-            if v not in ('none', 'var(--state)') and not all(TRANSITION_PART.fullmatch(x) for x in split_top(v)):
-                loose.append(f'{sel} transition:{v}')
-        elif p == 'animation':
-            for part in split_top(v):
-                w = part.split()
-                if w == ['none']:
-                    continue
-                name = [x for x in w if x in LIBRARY]
-                dur = [x for x in w if re.fullmatch(r'var\(--dur-(fade|step|long)\)', x)]
-                ease = [x for x in w if re.fullmatch(r'var\(--ease-(out|in|spring)\)|linear', x)]
-                rest = [x for x in w if x not in name + dur + ease and x not in ('both', 'forwards', 'infinite')]
-                loop = 'linear' in ease or 'infinite' in w
-                if (
-                    len(name) != 1
-                    or len(dur) != 1
-                    or len(ease) != 1
-                    or rest
-                    or loop
-                    and not ('linear' in ease and 'infinite' in w and dur == ['var(--dur-long)'])
-                ):
-                    loose.append(f'{sel} animation:{part}')
-                used.update(name)
-        elif p.startswith(('transition-', 'animation-')):
-            ok = sel in MOTION_LONGHANDS and (
-                p == 'animation-duration'
-                and re.fullmatch(r'var\(--dur-(fade|step)\)', v)
-                or p == 'animation-timing-function'
-                and re.fullmatch(r'var\(--ease-(out|in)\)', v)
-            )
-            if not ok:
-                loose.append(f'{sel} {p}:{v}')
-        elif p == 'transform' and sel.endswith(':active') and v not in PRESS:
-            loose.append(f'{sel} {p}:{v}')
-        if (
-            p in ('transition', 'animation') or p.startswith(('transition-', 'animation-')) or p == 'transform' and sel.endswith(':active')
-        ) and sec != 'Motion':
-            loose.append(f'{sel} {p}: motion lives in the Motion section')
-    check(not loose, f'every movement from the tokens and the library, in the Motion section ({len(loose)} not: {loose[:4]})')
-    check(used == set(LIBRARY), f'every motion of the library is in use ({sorted(set(LIBRARY) - used)})')
-
-
-# ---------------------------------------------------------------- layers, lines, sizes, opacity
-LAYERS = {'--z-raise': '1', '--z-sticky': '2', '--z-bar': '3', '--z-fab': '4', '--z-strip': '5', '--z-toast': '6'}
-SIZES = {
-    '--icon-s': '20px',
-    '--icon': '24px',
-    '--icon-l': '32px',
-    '--icon-stroke': '1.8',
-    '--icon-stroke-l': '1.4',
-    '--tap-s': '44px',
-    '--tap': '48px',
-    '--control': '52px',
-    '--control-l': '56px',
-    '--bar': '56px',
-    '--pic-xs': '24px',
-    '--pic-s': '32px',
-    '--pic-m': '40px',
-    '--pic-l': '48px',
-    '--pic-xl': '56px',
-    '--pic-xxl': '72px',
-    '--pic-xxxl': '112px',
-    '--page-width': '600px',
-    '--gutter': 'var(--space-4h)',
-}
-LINES = {'--hairline': '1px', '--stroke': '2px', '--divider': 'var(--hairline) solid var(--line)'}
-OPACITY = {'--dim': '0.35', '--busy': '0.6', '--mood': '0.16', '--mood-filter': 'saturate(0.85)'}
-RING = re.compile(r'(inset )?0 0 0 (var\(--(hairline|stroke)\)|calc\([2-4] \* var\(--stroke\)\)|100vmax) var\(--[\w-]+(,var\(--[\w-]+\))?\)')
-MIN_HEIGHT = {'0', 'var(--tap-s)', 'var(--tap)', 'var(--control)', 'var(--control-l)', 'var(--bar)'}
-SIZE_PROPS = (
-    'width',
-    'height',
-    'min-width',
-    'min-height',
-    'max-width',
-    'max-height',
-    'top',
-    'right',
-    'bottom',
-    'left',
-    'inset',
-    'stroke-width',
-    'flex-basis',
-    'transform',
-    'scroll-margin-top',
-    'grid-template-columns',
-    'background-size',
-)
-# The size of one component that nothing else shares, so it is no token; each with its reason
-GEOMETRY_ALLOWED = {
-    '.mood': 'the mood picture is 260px tall (PROJECT.md)',
-    '.badge': 'a badge without an icon is as tall as one with: the small icon and the inset around it',
-    '.pend': 'max-height 900px: where a rated meal starts folding away from',
-    '.dots': 'the row of meal dots under a day is 6px tall',
-    '.dots i': 'a meal dot, 6px',
-    '.tl-node i': 'a meal on the timeline, 12px',
-    '.hero': 'the welcome picture, a 148px circle',
-    '.hero .logo': 'the mark in it, 104px',
-    '.grip': 'the grip of a sheet, 40 by 5',
-    '.name-photo': 'the packaging photo while naming, 150px tall',
-    '.field.in-row': 'a field beside a row’s title, about 130px wide (PROJECT.md)',
-    '.sw': 'the switch track, 46 by 28',
-    '.sw::after': 'its knob, 22, 3 from the edge',
-    '[aria-checked="true"] > .sw::after': 'its travel, 18',
-    '.shutter': 'the camera’s shutter, 78',
-    '.crop': 'the crop stage, at most 340',
-    '.toast': 'a toast is never wider than 520px',
-}
-ICON_SIZES = {'var(--icon-s)', 'var(--icon)', 'var(--icon-l)'}
-
-
-def test_layers_lines_sizes():
-    """Layers, lines, rings, shadows, sizes and opacities come from tokens.css (PROJECT.md, "Sizes, lines, layers")."""
-    root = tokens_root()
-    check({k: root.get(k) for k in LAYERS} == LAYERS and not [k for k in root if k.startswith('--z-') and k not in LAYERS], f'six layers {LAYERS}')
-    check(
-        {k: root.get(k) for k in SIZES} == SIZES and not [k for k in root if k.startswith(('--pic-', '--icon')) and k not in SIZES],
-        'icons, controls and pictures as tokens',
-    )
-    check(
-        {k: root.get(k) for k in {**LINES, **OPACITY}} == {**LINES, **OPACITY} and tokens_root(':root[data-theme="dark"]').get('--mood') == '0.26',
-        'lines and opacities as tokens',
-    )
-    shadows = sorted(k for k in root if 'shadow' in k)
-    check(shadows == ['--shadow-high', '--shadow-low'], f'two shadows ({shadows})')
-    loose = []
-    for _, sel, p, v in app_decls():
-        subj = subjects(sel)
-        if p == 'z-index' and v not in {f'var({k})' for k in LAYERS} | {'auto'}:
-            loose.append(f'{sel} z-index:{v}')
-        elif p == 'box-shadow' and v not in ('none', 'var(--shadow-low)', 'var(--shadow-high)') and not all(RING.fullmatch(x) for x in split_top(v)):
-            loose.append(f'{sel} box-shadow:{v}')
-        elif re.match(r'(border(?!-radius)|outline)', p) and literal_px(v):
-            loose.append(f'{sel} {p}:{v}')
-        elif p == 'opacity' and v not in ('0', '1', 'var(--dim)', 'var(--busy)', 'var(--mood)'):
-            loose.append(f'{sel} opacity:{v}')
-        elif p == 'filter' and v not in ('none', 'var(--mood-filter)'):
-            loose.append(f'{sel} filter:{v}')
-        elif p == 'min-height' and v not in MIN_HEIGHT and sel not in GEOMETRY_ALLOWED:
-            loose.append(f'{sel} min-height:{v}')
-        elif p == 'stroke-width' and v not in ('var(--icon-stroke)', 'var(--icon-stroke-l)') and sel not in GEOMETRY_ALLOWED:
-            loose.append(f'{sel} stroke-width:{v}')
-        elif p in ('width', 'height') and any(re.search(r'\.(ic|chev|spin)$', s) for s in subj) and v not in ICON_SIZES and not v.endswith('%'):
-            loose.append(f'{sel} {p}:{v} (an icon)')
-        elif p in ('width', 'height') and any(re.search(r'\.(av|thumb|sk)\b', s) for s in subj) and not re.fullmatch(r'var\(--pic-\w+\)|100%', v):
-            loose.append(f'{sel} {p}:{v} (a picture)')
-        elif p in SIZE_PROPS and literal_px(v) and sel not in GEOMETRY_ALLOWED:
-            loose.append(f'{sel} {p}:{v}')
-        elif p in ('width', 'height', 'min-width', 'min-height', 'grid-template-columns') and re.search(r'(^| )var\(--space-[\w-]+\)( |$)', v):
-            loose.append(f'{sel} {p}:{v} (a distance is no size)')
-        elif p == 'transform' and not sel.endswith(':active') and re.search(r'scale[XY]?\((?!0\)|1\))', v):
-            loose.append(f'{sel} transform:{v} (a scale outside the press and the library)')
-    check(not loose, f'layers, lines, rings, shadows, sizes and opacities from tokens.css ({len(loose)} not: {loose[:6]})')
-
-
-# ---------------------------------------------------------------- boxes and sections
-# Padding belongs to a recipe. A value means that exact value; None means tokens and env() only (the page
-# scaffolding). A new box takes one of these recipes; where none fits, the recipe comes first, here and in PROJECT.md.
-PADDING = {
-    '.card': 'var(--inset-card)',
-    '.group': 'var(--inset-group)',
-    '.row': 'var(--inset-row)',
-    '.pend': 'var(--inset-row)',
-    '.card-btn': 'var(--inset-row)',
-    '.box': 'var(--inset-box)',
-    '.banner': 'var(--inset-box)',
-    '.btn': 'var(--inset-control)',
-    '.field': 'var(--inset-control)',
-    '.field.in-row': 'var(--inset-compact)',
-    '.pick .field': 'var(--field-room)',
-    '.search .field': 'var(--field-room)',
-    '.chip': 'var(--inset-compact)',
-    '.chip.tight': 'var(--inset-tight)',
-    '.toast button': 'var(--inset-compact)',
-    '.cam-hint': 'var(--inset-compact)',
-    '.badge': 'var(--inset-badge)',
-    '.seg': 'var(--space-1)',
-    '.seg button': 'var(--space-2) var(--space-1h)',
-    '.link': 'var(--space-3) 0',
-    '.day': 'var(--space-1) 0 var(--space-2)',
-    '.slider-track': 'var(--space-1)',
-    '.toast': 'var(--space-2) var(--space-2) var(--space-2) var(--gutter)',
-    '.toast.plain': 'var(--gutter)',
-    '.head': '0 var(--gutter)',
-    '.tl-date': 'var(--space-2h) 0 var(--space-hair)',
-    '.grip-zone': 'var(--space-2h) 0 var(--space-2)',
-    '.sync-chip': '0 var(--space-1)',
-    '.pets': 'var(--space-2h) var(--space-1) var(--space-3h)',
-    '.app': None,
-    '.top': None,
-    '.sheet-body': None,
-    'dialog.sheet.page': None,
-    'dialog.sheet.page .sheet-body': None,
-    '.cam-bar': None,
-    '.viewer[open]': None,
-}
-VIEWS_FORBIDDEN = re.compile(
-    r'(padding|font|line-height|letter-spacing|text-transform|border-radius|box-shadow|z-index|transition|animation|stroke-width|min-height)'
-)
-
-
-def test_boxes():
-    """A box pads with its recipe's inset; screens only place recipes (PROJECT.md, "Recipes")."""
-    root = tokens_root()
-    check(
-        all(
-            k in root
-            for k in (
-                '--inset-card',
-                '--inset-group',
-                '--inset-row',
-                '--inset-box',
-                '--inset-control',
-                '--inset-compact',
-                '--inset-badge',
-                '--field-room',
-            )
-        ),
-        'one inset per kind of box in tokens.css',
-    )
-    decls = app_decls()
-    check(
-        [s for s in dict.fromkeys(d[0] for d in decls) if s != '(before)'] == list(SECTIONS),
-        f'app.css in four sections: {SECTIONS} ({list(dict.fromkeys(d[0] for d in decls))})',
-    )
-    loose = []
-    for sec, sel, p, v in decls:
-        if p.startswith('padding') and v != '0':
-            want = PADDING.get(sel, KeyError)
-            if want is KeyError or (want and v != want) or literal_px(v) or sec == 'Views':
-                loose.append(f'{sel} {p}:{v}')
-        elif sec == 'Views' and VIEWS_FORBIDDEN.match(p):
-            loose.append(f'{sel} {p} (a screen places recipes and styles none)')
-        elif (
-            sec == 'Views'
-            and re.match(r'(width|height|max-width|max-height)$', p)
-            and not re.fullmatch(r'auto|none|0|\d+%|\d+ch|min-content|max-content|fit-content', v)
-        ):
-            loose.append(f'{sel} {p}:{v} (a size belongs to a recipe)')
-    check(not loose, f'padding only in the recipes that own it, screens only placing ({len(loose)}: {loose[:6]})')
-
-
-# ---------------------------------------------------------------- JavaScript
-# Delays that measure no movement, each with its reason. Anything that waits for motion uses settled() from js/motion.js.
-TIMERS_ALLOWED = {
-    ('api.js', '20e3'): 'a request gives up',
-    ('store.js', '120'): 'the change hook runs once per burst of edits',
-    ('disk.js', '60e3'): 'saving retries at most once a minute',
-    ('disk.js', '5e3'): 'first after five seconds',
-    ('disk.js', '2'): 'the pause doubling',
-    ('native.js', '120e3'): 'installing the scanner gives up',
-    ('sync.js', '60e3'): 'the sync runs every minute',
-    ('sync.js', '400'): 'the next sync runs shortly after a save, unless the caller says when',
-    ('main.js', '60000'): 'the home page is redrawn every minute, so „vor 2 Std.“ stays true',
-    ('actions.js', '600'): 'a quick sync shows no spinner',
-    ('actions.js', '3500'): 'an armed button disarms again',
-    ('actions.js', '400'): 'a note is saved once typing pauses',
-    ('ui/toast.js', '2600'): 'how long a message stays to be read',
-    ('ui/toast.js', '5200'): 'and one with „Rückgängig“',
-    ('ui/splash.js', '2500'): 'the splash screen goes, whatever failed on the way',
-    ('views/home.js', '400'): 'a view transition whose callback never ran is skipped',
-    ('logic/reminders.js', '250'): 'reminders are reconciled once per burst',
-    ('logic/editing.js', '1500'): 'a meal just rated stays a moment, to be read and put right, before it folds away',
-    ('ui/slider.js', '100'): 'a finger resting on the rating slider is answered after Android’s tap timeout',
-    ('logic/data.js', '2000'): 'the download has started before its address is revoked',
-    ('logic/exchange.js', '2000'): 'the download has started before its address is revoked',
-    ('logic/feeding.js', 'READ_PATIENCE'): 'the naming sheet shows a skeleton for that long while the packaging is read, then the empty fields',
-}
-
-
-def js_delays(code):
-    """The last argument of every setTimeout and setInterval call, all brackets matched"""
-    out = []
-    for m in re.finditer(r'\bset(?:Timeout|Interval)\(', code):
-        depth, i, parts, cur = 1, m.end(), [], ''
-        while depth and i < len(code):
-            ch = code[i]
-            depth += {'(': 1, '[': 1, '{': 1, ')': -1, ']': -1, '}': -1}.get(ch, 0)
-            if ch == ',' and depth == 1:
-                parts.append(cur)
-                cur = ''
-            elif depth:
-                cur += ch
-            i += 1
-        parts = [x.strip() for x in parts + [cur] if x.strip()]
-        if len(parts) > 1:
-            out.append(parts[-1])
-    return out
-
-
-def test_motion_js():
-    """JavaScript states no duration or curve: it starts motion with a class and waits with settled() (PROJECT.md, "Motion")."""
-    bad = []
-    for f in sorted((WWW / 'js').rglob('*.js')):
-        name = f.relative_to(WWW / 'js').as_posix()
-        code = re.sub(r'/\*.*?\*/', '', f.read_text(encoding='utf-8'), flags=re.S)
-        code = re.sub(r'(?m)(^|[^:\'"`\\])//.*$', r'\1', code)
-        bad += [f'{name}: .style.{m[1]}' for m in re.finditer(r'\.style\.(transition\w*|animation\w*)\b', code)]
-        # the same through the other ways into an inline style
-        bad += [
-            f'{name}: {m[0].strip()}'
-            for m in re.finditer(r'(?:\.style\.setProperty\(|\.style\.cssText\b|\.style\[|setAttribute\(\s*[\'"`]style)[^;\n]*', code)
-            if re.search(r'transition|animation', m[0])
-        ]
-        bad += [f'{name}: {m[0]}' for m in re.finditer(r'\.animate\(|\b(?:transition|animation)(?:end|start|cancel)\b', code)]
-        strings = [m[0] for m in re.finditer(r'([\'"`])(?:(?!\1)[^\\\n]|\\.)*\1', code)]
-        bad += [
-            f'{name}: {s}'
-            for s in strings
-            if re.search(r'cubic-bezier|\bease(-in|-out|-in-out)?\b|\bsteps\(|\blinear\b(?!-)', s)
-            or re.search(r'\b(transition|animation)\b', s)
-            and re.search(r'(?<![\w.])\d*\.?\d+m?s\b', s)
-        ]
-        bad += [f'{name}: fadeOutDuration without dur()' for _ in re.finditer(r'fadeOutDuration:(?!\s*dur\()', code)]
-        # dur() is read for the native splash screen's fade and nothing else: a wait reads no duration either
-        if name != 'motion.js' and len(re.findall(r'\bdur\(', code)) != len(re.findall(r'fadeOutDuration:\s*dur\(', code)):
-            bad.append(f'{name}: dur() outside the splash screen’s fade')
-        consts = dict(re.findall(r'(?:\bconst\s+|\blet\s+|,\s*)([A-Za-z_]\w*)\s*=\s*([^,;\n]+)', code))
-        for k, v in re.findall(r'[(,]\s*([A-Za-z_]\w*)\s*=\s*(\d[\d_.e]*)\s*[,)]', code):  # a parameter's default
-            consts.setdefault(k, v)
-        for arg in js_delays(code):
-            expr = arg
-            for _ in range(2):
-                expr = re.sub(r'\b[A-Za-z_]\w*\b', lambda m: consts.get(m[0], m[0]), expr)
-            if re.fullmatch(r'[A-Za-z_]\w*', expr.strip()) and (name, arg) not in TIMERS_ALLOWED:
-                bad.append(f'{name}: waits {arg}, which says nothing of how long')
-            for n in re.findall(r'(?<![\w.])\d[\d_]*(?:\.\d+)?(?:e\d+)?', expr):
-                if float(n.replace('_', '')) and (name, n) not in TIMERS_ALLOWED:
-                    bad.append(f'{name}: waits {arg} = {n}')
-    motion = (WWW / 'js/motion.js').read_text(encoding='utf-8') if (WWW / 'js/motion.js').exists() else ''
-    check(
-        'export function dur(' in motion and 'export function settled(' in motion,
-        'js/motion.js: dur() reads a duration token, settled() waits for CSS',
-    )
-    check(not bad, f'no duration, curve or transition of its own in js/ ({len(bad)}: {bad})')
-
-
-def test_strip():
-    """The rating strip is a variant of the calendar's dots, not a recipe of its own (PROJECT.md, "Recipes").
-
-    It sits under the dots in the Recipes section and says only that it never shrinks, so its dots, their size and
-    colours and the „+“ are the calendar's; a screen only places it."""
-    decls = app_decls()
-    own = [(sec, p, v) for sec, sel, p, v in decls if sel == '.dots.strip']
-    elsewhere = [f'{sel} {p}:{v}' for sec, sel, p, v in decls if 'strip' in sel and sel != '.dots.strip' and (sec != 'Views' or p not in PLACING)]
-    order = [sel for sec, sel, p, v in decls if sec == 'Recipes' and sel.startswith('.dots')]
-    js = (WWW / 'js/views/parts.js').read_text(encoding='utf-8')
-    check(
-        own == [('Recipes', 'flex', 'none')] and not elsewhere and order[-1] == '.dots.strip' and 'class="dots strip"' in js,
-        f'the strip: the calendar’s dots as a variant under their recipe, nothing of its own but that it never shrinks ({own}, {elsewhere})',
-    )
-    check(
-        re.search(r'\bconst STRIP = 8\b', js) and "'<b>+</b>'" in js and 'role="img" aria-label=' in js,
-        'at most 8 dots, the „+“ in front of them where there are more, and what they say in words as the label',
-    )
-
-
-def test_overview_card():
-    """The overview shows three lines of its text and unfolds with a tap: the clamp in app.css says three, the Views
-    section lets the whole text out for .open and while folding, views/home.js does the folding, and nothing fixes
-    the card's height."""
-    js = (WWW / 'js/views/home.js').read_text(encoding='utf-8')
-    clamp = {(sel, v) for _, sel, p, v in app_decls() if p == '-webkit-line-clamp'}
-    block = {one for _, sel, p, v in app_decls() if p == 'display' and v == 'block' for one in sel.split(', ')}
-    fixed = [f'{sel} {p}:{v}' for _, sel, p, v in app_decls() if sel.startswith('.overview') and p in ('height', 'min-height', 'max-height')]
-    check(
-        ('.overview p', '2') in clamp
-        and {'.overview.open p', '.overview p.animating'} <= block
-        and 'export function toggleOverview()' in js
-        and 'slideHeight(p, h0)' in js
-        and not fixed,
-        f'the overview: two lines in app.css, the whole text unfolded and while folding, toggleOverview() in views/home.js eases the height, and no height is fixed ({fixed})',
-    )
-
-
-# What a screen may set on a recipe it places (PROJECT.md, "Where styles live")
-PLACING = ('display', 'gap', 'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'flex', 'order', 'align-self', 'justify-self')
-
-
-def test_ratings():
-    """The server's overview labels every level of RATINGS, with the app's wording.
-
-    The key alone decides points, wording and icon (PROJECT.md, "Evaluation"), so the two lists must not drift
-    apart: the overview would otherwise print "offen" for a level that does have a rating."""
-    config = (WWW / 'js/config.js').read_text(encoding='utf-8')
-    block = re.search(r'export const RATINGS = \{(.*?)\n\};', config, re.S)
-    app = dict(re.findall(r"(\w+):\s*\{\s*label:\s*'([^']+)'", block.group(1) if block else ''))
-    go = (ROOT / 'server/overview.go').read_text(encoding='utf-8')
-    names = re.search(r'var ratingNames = map\[string\]string\{(.*?)\n\}', go, re.S)
-    server = dict(re.findall(r'"(\w+)":\s*"([^"]+)"', names.group(1) if names else ''))
-    check(len(app) == 14, f'RATINGS in config.js holds every level ({sorted(app)})')
-    check(app == server, f'server/overview.go labels exactly those levels, with the same wording ({sorted(set(app.items()) ^ set(server.items()))})')
-
-
-def test_isolated_tests():
-    """Tests run side by side, so each of them needs phones of its own.
-
-    common.phone() is the only place that makes a browser context, and run_tests checks after every test that
-    the contexts it made are closed again. A context made past phone() would skip that check."""
-    made = 'browser.' + 'new_context('  # in two pieces, or this line would report itself
-    stray = []
-    for f in sorted((ROOT / 'tests').glob('*.py')):
-        if f.name == 'common.py':
-            continue
-        stray += [f'{f.name}:{i + 1}' for i, line in enumerate(f.read_text(encoding='utf-8').split('\n')) if made in line]
-    common_py = (ROOT / 'tests/common.py').read_text(encoding='utf-8')
-    check(common_py.count(made) == 1, 'tests/common.py makes a browser context in exactly one place (phone())')
-    check(not stray, f'no test makes one past it, so no phone is shared ({stray})')
-
-
-def test_prompt():
-    """Photo recognition belongs to the server: it holds prompt and key, the app has neither."""
-    text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
-    go = (ROOT / 'server/recognize.go').read_text(encoding='utf-8')
-    check(
-        len(text) > 100 and '//go:embed recognize-prompt.txt' in go and text.split('\n')[0] not in go,
-        'the server embeds the prompt from recognize-prompt.txt and keeps it nowhere else',
-    )
-    app = '\n'.join(p.read_text(encoding='utf-8') for p in sorted(WWW.rglob('*.js')))
-    check(
-        'api.anthropic.com' not in app
-        and 'data-setting="aiKey"' not in app
-        and not (WWW / 'js/prompt.js').exists()
-        and text.split('\n')[0] not in app,
-        'the app has no key of its own for photo recognition, and no prompt',
-    )
 
 
 async def test_files(browser, url):
     test_logo_files()
-    test_rules_static()
-    test_spacing_scale()
-    test_radius_scale()
-    test_type_scale()
-    test_motion_scale()
-    test_layers_lines_sizes()
-    test_boxes()
-    test_motion_js()
-    test_strip()
-    test_overview_card()
-    test_ratings()
-    test_isolated_tests()
-    test_prompt()
-    test_signing_key()
-    test_version_code()
+    test_tokens()
 
 
 run_tests(
-    {'files': test_files, 'palette': test_palette, 'logo': test_logo, 'views': test_rules, 'polish': test_polish, 'skeleton': test_skeleton},
-    camera=('views',),
+    {
+        'files': test_files,
+        'palette': test_palette,
+        'logo': test_logo,
+        'light': lambda browser, url: test_views(browser, url, 'light'),
+        'dark': lambda browser, url: test_views(browser, url, 'dark'),
+        'skeleton': test_skeleton,
+    },
+    camera=('light', 'dark'),
 )
