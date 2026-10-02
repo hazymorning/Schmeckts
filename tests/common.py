@@ -39,8 +39,10 @@ SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 
 # Google's scanner module is missing and the installation reports itself finished after a moment.
 # Notifications (@capacitor/local-notifications): what is scheduled lives in localStorage.__notes and so survives a
 # reload. The permission is in localStorage.__notifyPermission (otherwise "prompt"), the answer to the request in
-# localStorage.__notifyAnswer (otherwise "granted"). A tap: window.__tapNote({actionId: 'tap', notification}); if
-# sessionStorage.__launchNote is set at load time, it arrives right after the listener registers, as on a cold start.
+# localStorage.__notifyAnswer (otherwise "granted"). A tap: window.__tapNote({actionId: 'tap', notification}), a button
+# the same with the button's id; if sessionStorage.__launchNote is set at load time, it arrives right after the
+# listener registers, as on a cold start. Button types registered collect in localStorage.__actionTypes; as in the
+# plugin, getPending leaves out actionTypeId, and window.__noButtons makes registering fail.
 # Our own feeding reminder keeps the last set it was handed in localStorage.__feed; a tap on one of its reminders opens
 # schmeckts://feed in the app (window.__urlOpen).
 NATIVE = """
@@ -61,7 +63,10 @@ const LocalNotifications = {
   schedule: ({notifications}) => { const list = JSON.parse(JSON.stringify(notifications)); window.__calls.push(['schedule', list]);  // the date as text, as it comes over the bridge
     setNotes([...others(list), ...list]); return Promise.resolve({notifications: list.map(n => ({id: n.id}))}); },
   cancel: ({notifications}) => { window.__calls.push(['cancelNotes', notifications]); setNotes(others(notifications)); return Promise.resolve(); },
-  getPending: () => Promise.resolve({notifications: notes()}),
+  getPending: () => Promise.resolve({notifications: notes().map(({actionTypeId, ...n}) => n)}),
+  registerActionTypes: ({types}) => { window.__calls.push(['registerActionTypes', types]);
+    if (window.__noButtons) return Promise.reject(new Error('not implemented'));
+    localStorage.setItem('__actionTypes', JSON.stringify([...JSON.parse(localStorage.getItem('__actionTypes') || '[]'), ...types])); return Promise.resolve(); },
   addListener: (e, fn) => { if (e === 'localNotificationActionPerformed') { window.__tapNote = fn; const t = sessionStorage.getItem('__launchNote'); if (t) fn(JSON.parse(t)); }
     return Promise.resolve({remove: () => {}}); }
 };

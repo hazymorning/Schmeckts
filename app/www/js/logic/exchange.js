@@ -96,14 +96,13 @@ function apply(text) {
     if (sheet.page === 'exchange') renderSheet();
     else openPage('exchange');
   } else openSheet({kind: 'settings', page: 'exchange', exchange: info});
-  toast(info.text);
 }
 
 const message = (took, back) =>
   `${took ? `${took} ${took === 1 ? 'Änderung' : 'Änderungen'} übernommen.` : 'Nichts Neues dabei.'}` +
   (back
-    ? ` ${back} ${back === 1 ? 'Änderung fehlt' : 'Änderungen fehlen'} auf dem anderen Gerät.`
-    : ' Beide Geräte sind gleich.');
+    ? ` Dem anderen Handy ${back === 1 ? 'fehlt noch eine' : `fehlen noch ${back}`}.`
+    : ' Beide Handys sind gleich.');
 
 function check(file) {
   if (!file || typeof file !== 'object') return 'Diese Datei ist kein Schmeckt’s-Austausch.';

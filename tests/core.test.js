@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {normBarcode} from '../app/www/js/text.js';
-import {guessTexture, TEXTURES, textureOf} from '../app/www/js/config.js';
+import {guessTexture, NEWS, TEXTURES, textureOf} from '../app/www/js/config.js';
 import {fieldsOf, fromFields, setField, validId, valueOf} from '../app/www/js/fields.js';
 import {clockState, measure, observe, rebase, stamp} from '../app/www/js/clock.js';
 
@@ -213,4 +213,25 @@ test('modules: no circular dependencies', () => {
     for (const dep of deps.get(file)) visit(dep, [...path, file]);
   };
   for (const file of deps.keys()) visit(file, []);
+});
+
+test('news: one per release with something to see, newest first, none ahead of the app', () => {
+  const app = JSON.parse(readFileSync(new URL('../app/package.json', import.meta.url))).version,
+    order = v => v.split('.').reduce((n, part) => n * 1000 + +part, 0);
+  const versions = NEWS.map(n => n.v);
+  assert.ok(
+    versions.every(v => /^\d+\.\d+\.\d+$/.test(v)),
+    versions.join(),
+  );
+  assert.deepEqual(
+    [...versions].sort((a, b) => order(b) - order(a)),
+    versions,
+    'newest first',
+  );
+  assert.equal(new Set(versions).size, versions.length);
+  assert.ok(!versions.length || order(versions[0]) <= order(app), `${versions[0]} is not ahead of the app's ${app}`);
+  assert.ok(
+    NEWS.every(n => n.title && n.say && n.use),
+    'each says what is new and how it counts as used',
+  );
 });

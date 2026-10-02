@@ -19,6 +19,7 @@ import {
   observedAfter,
   patterns,
   profile,
+  quickRatings,
   ranking,
   rateCls,
   ratingsIn,
@@ -95,7 +96,7 @@ test('scales: one per food type, every level with its own points, the colour fol
     'r-good',
     'r-good',
     'r-mid',
-    'r-mid',
+    'r-sauce',
     'r-sauce',
     'r-sauce',
     'r-bad',
@@ -1594,4 +1595,38 @@ test('appetite: what was noted about the pet in the same hours comes with the hi
     {id: 'o2', kind: 'stink', at: NOW - 10 * DAY, pets: {A: true}},
   ];
   assert.deepEqual(model(db).hints[0].seen, ['tired']);
+});
+
+test('reminder buttons: the levels most given to this variety by this pet, filled up from its scale, in the scale order', () => {
+  const db = household(
+    ['A', 'B'],
+    [{id: 'nass'}, {id: 'neu'}, {id: 'snack', type: 'Snack'}],
+    [
+      ...rate('nass', 'A', [G, T, G, M, T, G], 1),
+      ...rate('nass', 'B', [X, X, X, X], 2),
+      ...rate('neu', 'A', [S, S, S], 3),
+    ],
+  );
+  const open = (productId, pets = {A: {r: null}}) => ({id: 'open', productId, pets});
+  assert.deepEqual(quickRatings(db, open('nass'), 'A'), [T, G], 'this pet with this variety, best level first');
+  assert.deepEqual(quickRatings(db, open('nass'), 'B'), [X], 'only what was given: one level, no second');
+  assert.deepEqual(quickRatings(db, open('neu'), 'A'), [G, S], 'one level here, filled up with the most given overall');
+  assert.deepEqual(
+    quickRatings(db, open(null), 'A'),
+    [T, G],
+    'unknown food: the pet\u2019s newest ratings across its meals',
+  );
+  assert.deepEqual(quickRatings(db, open('snack'), 'A'), [], 'a treat has its own scale, and none of it was given');
+  assert.deepEqual(quickRatings(db, open('nass'), 'C'), [], 'no ratings, no buttons');
+  const newer = household(
+    ['A'],
+    ['p'],
+    [...rate('p', 'A', [S, M, S, M, S, M, S, M], 1), ...rate('p', 'A', Array(9).fill(T), 30)],
+  );
+  assert.deepEqual(quickRatings(newer, open('p'), 'A'), [M, S], 'only the newest eight count');
+  assert.deepEqual(
+    quickRatings(household(['A'], ['p'], rate('p', 'A', [S, T, M], 1)), open('p'), 'A'),
+    [T, S],
+    'a tie goes to the newer level',
+  );
 });

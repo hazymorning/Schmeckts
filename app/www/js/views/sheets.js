@@ -170,15 +170,17 @@ function viewName() {
   const photo = product?.thumb || serving?.photo || serving?.thumb,
     large = hasPhoto(serving, product),
     reading = serving?.status === 'reading',
+    began = readingSince.get(serving?.id),
+    at = began ? ` data-since="${began}"` : '',
     // skeleton fields while reading, until READ_PATIENCE runs out
-    patient = reading && Date.now() - (readingSince.get(serving.id) || 0) < READ_PATIENCE;
+    patient = reading && Date.now() - (began || 0) < READ_PATIENCE;
   let note = '';
   const retry = label =>
     serving.photo && photoByServer() ? `<button class="link" data-action="retry">${label}</button>` : '';
   if (reading)
-    note = `<p class="hint note"><span class="spin"></span>Packung wird ${patient ? '' : 'noch '}gelesen …</p>`;
+    note = `<p class="hint note"${at}>${icon('wait', 'wait')}Packung wird ${patient ? '' : 'noch '}gelesen …</p>`;
   else if (serving?.status === 'recognizing')
-    note = `<p class="hint note"><span class="spin"></span>Sorte wird erkannt …</p>`;
+    note = `<p class="hint note"${at}>${icon('wait', 'wait')}Sorte wird erkannt …</p>`;
   else if (serving?.status === 'waiting')
     note = `<p class="hint note">${esc(serving.error || 'Wird erkannt, sobald der Server erreichbar ist.')} ${retry('Jetzt versuchen')}</p>`;
   else if (serving?.status === 'failed')
@@ -187,7 +189,7 @@ function viewName() {
     ${
       photo
         ? large
-          ? `<button class="photo-btn" data-action="view-photo" data-s="${serving?.id || ''}" data-p="${product?.id || ''}" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
+          ? `<button class="photo-btn${reading ? ' reading' : ''}"${reading ? at : ''} data-action="view-photo" data-s="${serving?.id || ''}" data-p="${product?.id || ''}" aria-label="Foto vergrößern"><img class="name-photo" src="${esc(photo)}" alt="Foto der Packung"></button>`
           : `<img class="name-photo" src="${esc(photo)}" alt="Foto der Packung">`
         : ''
     }${note}`;
@@ -299,7 +301,7 @@ function viewFeed() {
   const prods = quickProducts();
   return `<div class="sh-head"><h2>Was gibt’s heute?</h2>${closeBtn}</div>
     <div class="cta-row">${CTA.barcode}${CTA.foto}</div>
-    ${sheet.busy ? `<p class="hint note" role="status"><span class="spin"></span>${esc(sheet.busy)}</p>` : ''}
+    ${sheet.busy ? `<p class="hint note" role="status">${icon('wait', 'wait')}${esc(sheet.busy)}</p>` : ''}
     <div class="serve">
       ${
         prods.length > SUGGEST
@@ -382,7 +384,10 @@ function noticed(p) {
         'Danach notiert',
         toldList(
           after.map(x =>
-            told(obsThumb(x.kind), `${observationOf(x.kind).label} nach <b>${x.hit} von ${x.n}</b> Mahlzeiten`),
+            told(
+              obsThumb(x.kind),
+              `${observationOf(x.kind).label} nach <b>${x.hit}&nbsp;von&nbsp;${x.n}</b>&nbsp;Mahlzeiten`,
+            ),
           ),
         ),
         '',
@@ -611,6 +616,10 @@ setSheetView((state, body) => {
     body.innerHTML = html;
     body.scrollTop = y;
     if (state.step === 'crop') mountCrop($('#cropStage'), state.cropImg, state.crop, $('#f-zoom')); // adds listeners, so once per drawing only
+    // a loader drawn again goes on from when the wait began, so it neither hides again nor starts over
+    for (const el of body.querySelectorAll('[data-since]'))
+      for (const a of el.getAnimations({subtree: true}))
+        a.startTime = document.timeline.currentTime - (Date.now() - el.dataset.since);
   }
   if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();

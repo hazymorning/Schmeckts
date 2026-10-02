@@ -2,7 +2,7 @@
 import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
 import {report} from './report.js';
-import {tidyRemind} from './config.js';
+import {DEMO, NEWS, tidyRemind} from './config.js';
 import {addDays, dayKey} from './dates.js';
 import {MEMORY} from './glance.js';
 import {milestones} from './smart.js';
@@ -56,9 +56,10 @@ export function tidy(d) {
 }
 function tidyPrefs(p) {
   const out = {...defaultPrefs(), ...(p && typeof p === 'object' ? p : {})};
-  out.hiddenHints = Array.isArray(out.hiddenHints)
-    ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))].slice(-300)
-    : [];
+  // the newest 300 hidden hints; what is said only once stays, or it would come back
+  const hints = Array.isArray(out.hiddenHints) ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))] : [],
+    once = k => /^(tipp|neu):/.test(k);
+  out.hiddenHints = [...hints.filter(once), ...hints.filter(k => !once(k)).slice(-300)];
   out.remind = tidyRemind(out.remind);
   out.feedRemind = out.feedRemind === true;
   delete out.feedStart;
@@ -211,6 +212,8 @@ async function load() {
   if (fixed) persist('db', 'sync');
   if (prefs.activePet !== 'all' && !db.pets.some(x => x.id === prefs.activePet)) prefs.activePet = 'all';
   prefs.milestones ||= milestones(db).reached; // first run: what is reached counts as seen
+  // news are for an update: a phone without pets of its own has seen them all
+  if (!db.pets.some(x => !x.id.startsWith(DEMO))) for (const n of NEWS) hideHint('neu:' + n.v);
 }
 function ensureClocks() {
   let n = 0;
@@ -257,6 +260,12 @@ export function save() {
 export function savePrefs() {
   persist('prefs');
 }
+export function hideHint(key) {
+  if (prefs.hiddenHints.includes(key)) return;
+  prefs.hiddenHints.push(key);
+  savePrefs();
+}
+export const usedNews = use => NEWS.filter(n => n.use === use).forEach(n => hideHint('neu:' + n.v));
 
 const mealOf = fields => ({productId: JSON.parse(fields.productId ?? 'null')});
 function diff() {

@@ -18,7 +18,7 @@ export const RATINGS = {
     short: 'Fast alles',
     said: 'fast alles gefressen',
     score: 80,
-    cheer: 'Fast wie geleckt.',
+    cheer: 'Beinah wie geleckt.',
   },
   mittel: {
     label: 'Die Hälfte gefressen',
@@ -39,7 +39,7 @@ export const RATINGS = {
     short: 'Nur Soße',
     said: 'nur die Soße geleckt',
     score: 30,
-    cheer: 'Die Soße war der Star.',
+    cheer: 'Der Rest war Deko.',
   },
   schlecht: {
     label: 'Fast nix gefressen',
@@ -330,3 +330,17 @@ export const tidyRemind = m =>
 export const REMIND_MAX_AGE = 10 * 60e3; // older meals get no reminder scheduled
 export const PENDING_WINDOW = 48 * 3600e3; // older open meals no longer ask for a rating
 export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
+
+/* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
+   is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
+   it needs and what to say while that is off. */
+export const NEWS = [
+  {
+    v: '0.25.0',
+    use: 'rate-reminder',
+    title: 'Neu: Schneller bewerten',
+    say: 'In der Erinnerung „Wie war’s?“ bewertest du jetzt mit einem Tipp.',
+    why: 'Gilt sie nur einem Tier, bietet sie gleich an, wie viel es von der Sorte meistens frisst.',
+    off: ['remind', 'Sie ist noch aus. Du schaltest sie in den Einstellungen bei „Ans Bewerten erinnern“ ein.'],
+  },
+];

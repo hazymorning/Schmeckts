@@ -3,7 +3,7 @@ import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
-import {db, prefs, save, savePrefs} from './store.js';
+import {db, hideHint, prefs, save, savePrefs} from './store.js';
 import {ServerError} from './api.js';
 import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
@@ -27,7 +27,8 @@ import {
   serveProduct,
   shootPhoto,
 } from './logic/feeding.js';
-import {deleteProduct, deleteServing, rate, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
+import {deleteProduct, deleteServing, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
+import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
@@ -45,6 +46,7 @@ import {
 async function connectServer() {
   if (sheet?.kind !== 'settings' || sheet.connecting) return;
   Object.assign(sheet, {connecting: true, connectError: ''});
+  document.activeElement?.blur(); // a focused field keeps the box from being redrawn
   renderSheet();
   try {
     const found = await checkServer(sheet.code, sheet.server ?? prefs.server);
@@ -81,21 +83,14 @@ function openConnect() {
   } else openSheet({kind: 'settings', page: 'house', connectForm: true});
   requestAnimationFrame(() => $(prefs.server ? '#f-code' : '#f-server')?.focus({preventScroll: true}));
 }
-// progress shows only after 600 ms, so a quick sync does not flicker
 async function syncByHand() {
   const s = sheet;
   if (s?.kind !== 'settings' || s.syncing) return;
-  s.syncing = 'quiet';
-  const timer = setTimeout(() => {
-    if (sheet === s) {
-      s.syncing = 'shown';
-      paintHouse();
-    }
-  }, 600);
+  s.syncing = 'shown';
+  paintHouse();
   try {
     await retrySync();
   } finally {
-    clearTimeout(timer);
     s.syncing = '';
     if (sheet === s) paintHouse();
   }
@@ -360,8 +355,7 @@ const ACTIONS = {
     update();
   },
   'hide-hint'(el) {
-    if (!prefs.hiddenHints.includes(el.dataset.v)) prefs.hiddenHints.push(el.dataset.v);
-    savePrefs();
+    hideHint(el.dataset.v);
     haptic('select');
     update();
   },

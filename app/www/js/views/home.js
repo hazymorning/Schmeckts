@@ -3,7 +3,7 @@ import {settled} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, dayStart} from '../dates.js';
 import {icon, sketch} from '../icons.js';
-import {observationOf, RATINGS} from '../config.js';
+import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
 import {db, loadError, prefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {diary, getPet, getProduct, model, observedPets, pendingServings, pname, servingPets} from '../derive.js';
@@ -136,6 +136,7 @@ function homeHTML() {
   if (!m) html += stepsHTML();
   else
     html +=
+      newsHTML() +
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m) +
@@ -153,7 +154,7 @@ const welcomeHTML = () => `<div class="welcome">
 
 const stepsHTML = () => `<section class="card" style="view-transition-name:sec-steps"><h2>So geht’s</h2>
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
-  <li class="row"><span class="n">1</span><p class="hint"><b>Beim Füttern</b> auf „Füttern“ tippen und die Packung fotografieren. Marke und Sorte liest die App von der Packung.</p></li>
+  <li class="row"><span class="n">1</span><p class="hint"><b>Zur Futterzeit</b> auf „Füttern“ tippen und die Packung fotografieren. Marke und Sorte liest die App von der Packung.</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
   <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was dein Tier mag und was stehen bleibt.</p></li></ol></section>`;
 
@@ -225,6 +226,16 @@ function hintHTML(m) {
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
+}
+
+// the newest news, never beside sample data
+function newsHTML() {
+  const n = NEWS[0],
+    [setting, offWhy] = n?.off || [],
+    off = setting && !prefs[setting];
+  if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
+  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
+    <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${off ? `<button class="btn primary" data-action="open-settings">Einstellungen öffnen</button>` : ''}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
 const SHOP_SHOWN = 3;

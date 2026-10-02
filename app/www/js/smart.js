@@ -1,5 +1,5 @@
 // The evaluation model. Pure; caching is in derive.js.
-import {flavoursOf, guessTexture, OBSERVATIONS, RATINGS, textureOf, TYPES, typeOf} from './config.js';
+import {flavoursOf, guessTexture, OBSERVATIONS, RATINGS, scaleOf, textureOf, TYPES, typeOf} from './config.js';
 import {DAY, addDays, dayKey, dayStart} from './dates.js';
 
 const HALF_LIFE = 90 * DAY;
@@ -20,7 +20,7 @@ const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
 const MILESTONES = {meals: [50, 100, 250, 500, 1000], sorts: [10, 25, 50]};
 export const rOf = x => (RATINGS[x?.r] ? x.r : null); // unknown values from other devices do not count
 const toneOf = v => (v >= GOOD ? 'good' : v >= NO ? 'mid' : 'bad');
-export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score < NO ? 'sauce' : toneOf(RATINGS[r].score));
+export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score <= NO ? 'sauce' : toneOf(RATINGS[r].score));
 export const scoreCls = v => 'r-' + toneOf(v);
 export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
@@ -700,6 +700,28 @@ export function fedToday(db, now) {
   return feedSlots(db, now)
     .filter(slot => mealsIn(db, atMinute(now, slot.from - FEED.lead) - 1, now).length)
     .map(slot => `${dayKey(now)}|${slot.at}`);
+}
+
+/* The buttons of a rating reminder: the two levels the pet gave this variety most often in its newest ratings,
+   filled up from all its meals of the same scale; in the scale's order. */
+const QUICK = 2;
+export function quickRatings(db, s, pid) {
+  const scale = scaleOf(db.products.find(p => p.id === s.productId)),
+    often = same => {
+      const n = new Map(); // newest first, so the newer level wins a tie
+      let left = WINDOW;
+      for (const x of db.servings) {
+        const r = same(x) && rOf(x.pets[pid]);
+        if (!r || !scale.includes(r)) continue;
+        n.set(r, (n.get(r) || 0) + 1);
+        if (!--left) break;
+      }
+      return [...n].sort((a, b) => b[1] - a[1]).map(([r]) => r);
+    },
+    own = s.productId ? often(x => x.productId === s.productId) : [];
+  return [...new Set([...own, ...often(() => true)])]
+    .slice(0, QUICK)
+    .sort((a, b) => scale.indexOf(a) - scale.indexOf(b));
 }
 
 export function nextMeal(db, now, pets) {

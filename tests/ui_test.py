@@ -1019,6 +1019,183 @@ async def test_reminders(browser, url):
     await ctx.close()
 
 
+NOTES = "JSON.parse(localStorage.getItem('__notes') || '[]')"
+ASK = """([id, pets, productId]) => import('./js/store.js').then(async s => { const x = {id, productId, servedAt: Date.now(), note: '',
+  pets: Object.fromEntries(pets.map(p => [p, {r: null, at: null}]))}; s.db.servings.unshift(x); s.save();
+  (await import('./js/logic/reminders.js')).planReminder(x); })"""
+
+
+def household_with_ratings(now):
+    rated = [('lachs00001', 'top'), ('lachs00001', 'gut'), ('lachs00001', 'top'), ('lachs00001', 'mittel'), ('lachs00001', 'gut')]
+    rated += [('rind000001', 'sosse'), ('rind000001', 'sosse')]
+    return {
+        'version': 3,
+        'pets': [pet('minka00001'), pet('tiger00001', 'Tiger')],
+        'products': [product('lachs00001'), product('rind000001', variety='Rind')],
+        'servings': [meal(f'altmeal00{i}', pid, now - (i + 1) * 864e5, {'minka00001': r}) for i, (pid, r) in enumerate(rated)],
+    }
+
+
+async def test_reminder_buttons(browser, url):
+    print('rating reminder buttons: the levels most given, one open pet only, a button rates, a rated meal opens instead')
+    M, T = 'minka00001', 'tiger00001'
+    db = household_with_ratings(int(time.time() * 1000))
+    ctx, pg, errors = await seeded(browser, url, {'db': db, 'prefs': {'remind': 180}}, native=True)
+
+    async def note(sid):
+        await pg.wait_for_function(f"{NOTES}.some(n => n.extra.serving === '{sid}')")
+        await idle(pg)
+        return next(n for n in await pg.evaluate(NOTES) if n['extra']['serving'] == sid)
+
+    async def reconciled():
+        await pg.evaluate("import('./js/logic/reminders.js').then(m => m.syncReminders())")
+        await pg.wait_for_timeout(600)
+        await idle(pg)
+
+    short = await pg.evaluate("import('./js/config.js').then(c => [c.RATINGS.top.short, c.RATINGS.gut.short])")
+    await pg.evaluate(ASK, ['einzeln0001', [M], 'lachs00001'])
+    n = await note('einzeln0001')
+    calls = [c[0] for c in await pg.evaluate('window.__calls') if c[0] in ('registerActionTypes', 'schedule')]
+    types = await pg.evaluate("JSON.parse(localStorage.getItem('__actionTypes') || '[]')")
+    check(
+        n.get('actionTypeId') == 'rate:top,gut'
+        and n['extra'].get('pet') == M
+        and 'Minka' in n['body']
+        and calls[:2] == ['registerActionTypes', 'schedule']
+        and types == [{'id': 'rate:top,gut', 'actions': [{'id': 'top', 'title': short[0]}, {'id': 'gut', 'title': short[1]}]}],
+        f'one open pet: buttons for the two levels it gives this variety most, registered before scheduling {n} {types}',
+    )
+    before = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'schedule'])
+    await reconciled()
+    after = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'schedule'])
+    check(before == after, 'the plugin hands back no actionTypeId, and a reconcile leaves the reminder alone')
+    await pg.evaluate("n => window.__tapNote({actionId: 'gut', notification: n})", n)
+    await idle(pg)
+    told, undo = await pg.inner_text('#toast > span'), await pg.locator('#toast.show [data-action=undo]').count()
+    rated = await state(pg, f"db.servings.find(s => s.id === 'einzeln0001').pets['{M}'].r")
+    await reconciled()
+    check(
+        rated == 'gut'
+        and undo == 1
+        and not await pg.evaluate(OPEN)
+        and await pg.locator('.pend[data-id=einzeln0001]').count() == 0
+        and not [x for x in await pg.evaluate(NOTES) if x['extra']['serving'] == 'einzeln0001'],
+        f'a button rates the meal with a toast to undo, opens nothing, and the reminder goes ({told})',
+    )
+    await pg.click('#toast [data-action=undo]')
+    await idle(pg)
+    check(await state(pg, f"db.servings.find(s => s.id === 'einzeln0001').pets['{M}'].r") is None, 'undone like a rating in the app')
+    await change(pg, f"s.db.servings.find(x => x.id === 'einzeln0001').pets['{M}'] = {{r: 'top', at: Date.now()}}")
+    await pg.evaluate("n => window.__tapNote({actionId: 'gut', notification: n})", n)
+    await idle(pg)
+    check(
+        await pg.evaluate(LEVEL) == [True, 'serving', None, None]
+        and await state(pg, f"db.servings.find(s => s.id === 'einzeln0001').pets['{M}'].r") == 'top',
+        'rated meanwhile: the button opens the meal and changes nothing',
+    )
+    await pg.click('#sheet [data-action=close]')
+    await idle(pg)
+    await pg.evaluate(ASK, ['zusammen01', [M, T], 'lachs00001'])
+    both = await note('zusammen01')
+    await change(pg, f"s.db.servings.find(x => x.id === 'zusammen01').pets['{T}'] = {{r: 'top', at: Date.now()}}")
+    await reconciled()
+    left = await note('zusammen01')
+    check(
+        'actionTypeId' not in both
+        and 'pet' not in both['extra']
+        and 'Tiger' in both['body']
+        and left.get('actionTypeId') == 'rate:top,gut'
+        and left['extra'].get('pet') == M
+        and 'Tiger' not in left['body'],
+        f'two open pets: no buttons; once one is rated, buttons for the other, and the text names only it {both} {left}',
+    )
+    # a reminder already due that Android has not shown yet, inexact as it is
+    due, served = 'ueberfaellig', await pg.evaluate('Date.now() - 181 * 60000')
+    nid = 7
+    for c in due:
+        nid = (nid * 31 + ord(c)) % 2147483647
+    await change(
+        pg,
+        f"s.db.servings.unshift({{id: '{due}', productId: 'lachs00001', servedAt: {served}, note: '', pets: {{{M}: {{r: null, at: null}}, {T}: {{r: null, at: null}}}}}})",
+    )
+    await pg.evaluate(
+        f"""localStorage.setItem('__notes', JSON.stringify([...JSON.parse(localStorage.getItem('__notes')),
+      {{id: {nid}, title: 'Wie war’s?', body: 'Lachs für Minka und Tiger', extra: {{serving: '{due}', at: {served + 180 * 60000}}}}}]))"""
+    )
+    await change(pg, f"s.db.servings.find(x => x.id === '{due}').pets['{T}'] = {{r: 'gut', at: Date.now()}}")
+    await reconciled()
+    kept = [x['body'] for x in await pg.evaluate(NOTES) if x['id'] == nid]
+    await change(pg, f"s.db.servings.find(x => x.id === '{due}').pets['{M}'] = {{r: 'gut', at: Date.now()}}")
+    await reconciled()
+    check(
+        kept == ['Lachs für Minka und Tiger'] and not [x for x in await pg.evaluate(NOTES) if x['id'] == nid],
+        f'a reminder already due stays when its text would change, and goes once the meal is rated {kept}',
+    )
+    await pg.evaluate('window.__noButtons = true')
+    await pg.evaluate(ASK, ['rindmeal01', [M], 'rind000001'])
+    plain = await note('rindmeal01')
+    check('actionTypeId' not in plain and 'pet' not in plain['extra'], f'buttons refused by the plugin: the reminder comes without {plain}')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
+NEWS = "import('./js/config.js').then(c => c.NEWS.map(n => 'neu:' + n.v))"
+CARD = '[data-sec=news]'
+
+
+async def test_news(browser, url):
+    print('news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used')
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url, native=True)
+    keys = await pg.evaluate(NEWS)
+    await tap(pg, '.welcome [data-action=add-pet]')
+    await pg.fill('#f-name', 'Minka')
+    await tap(pg, '[data-action=save-pet]')
+    await pg.reload()
+    await started(pg)
+    hidden = await state(pg, 'prefs.hiddenHints')
+    check(keys and all(k in hidden for k in keys) and await pg.locator(CARD).count() == 0, f'a new phone has seen all news {hidden}')
+    await ctx.close()
+
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
+    check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
+    check(await pg.locator(f'{CARD} [data-action=open-settings]').count() == 1, 'the reminder is off: the card leads to the settings')
+    await tap(pg, f'{CARD} [data-action=open-settings]')
+    check(await pg.evaluate(LEVEL) == [True, 'settings', None, None], 'there it is switched on')
+    await back(pg)
+    await tap(pg, f'{CARD} [data-action=hide-hint]')
+    await pg.reload()
+    await started(pg)
+    check(await pg.locator(CARD).count() == 0, 'hidden, also after a restart')
+    await ctx.close()
+
+    many = [*keys, 'tipp:beobachtung', *[f'appetit:lxpet00001:2025-{d // 28 + 1:02d}-{d % 28 + 1:02d}' for d in range(330)]]
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'hiddenHints': many}}, native=True)
+    kept = await state(pg, 'prefs.hiddenHints')
+    check(
+        await pg.locator(CARD).count() == 0 and len(kept) == 300 + len(keys) + 1 and all(k in kept for k in [*keys, 'tipp:beobachtung']),
+        'many hidden hints: the oldest go, what is said once stays',
+    )
+    await ctx.close()
+
+    demo = {**SAVED, 'pets': [pet('demopet0001', 'Mau')], 'servings': [{**x, 'pets': {'demopet0001': {'r': 'gut'}}} for x in SAVED['servings']]}
+    ctx, pg, errors = await seeded(browser, url, {'db': demo}, native=True)
+    check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
+    await ctx.close()
+
+    now = int(time.time() * 1000)
+    ctx, pg, errors = await seeded(browser, url, {'db': household_with_ratings(now), 'prefs': {'remind': 180}}, native=True)
+    shown = await pg.locator(CARD).count() == 1 and await pg.locator(f'{CARD} [data-action=open-settings]').count() == 0
+    await pg.evaluate(ASK, ['einzeln0001', ['minka00001'], 'lachs00001'])
+    await pg.wait_for_function(f'{NOTES}.length')
+    n = (await pg.evaluate(NOTES))[0]
+    await pg.evaluate("n => window.__tapNote({actionId: 'top', notification: n})", n)
+    await idle(pg)
+    check(shown and await pg.locator(CARD).count() == 0, 'reminder on: no way to the settings; rating from a reminder hides the news')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_feed_remind(browser, url):
     print('feeding reminder: the usual times handed to our own plugin, with the server when connected')
     ctx, pg, errors = await one_pet(browser, url, timezone_id='Europe/Berlin')
@@ -1519,6 +1696,37 @@ async def test_recognize(browser, url):
     check((await ident(code=SHEBA, photo='AAA'))['source'] == 'codes', 'a code known in the household beats everything')
     await setp(code='', server='', lookup=False)
     check(not real_errors(errors), f'no errors {real_errors(errors)[:2]}')
+    await ctx.close()
+
+
+async def test_text_thumb(browser, url):
+    print('a packaging photo read on the phone: the thumbnail shows the square around the text, the middle without places')
+    ctx, pg, errors = await one_pet(browser, url)
+    # the test photo is orange with a cream label in its middle; a corner of the thumbnail shows either
+    CORNERS = [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+
+    async def corners():
+        got = await pg.evaluate(PIXEL, [await state(pg, 'db.servings[0].thumb'), CORNERS])
+        return [got['w'], ['cream' if p != 'red' and int(p.split(',')[1]) > 180 else 'orange' for p in got['px']]]
+
+    await pg.evaluate("window.__ocrText = 'Sheba\\nHuhn in Gelee'")
+    await snap(pg, done='!!db.servings[0]?.guess')
+    middle = await corners()
+    await tap(pg, '[data-action=close]')
+    # in the top left of the label, in the pixels of the large photo as it is read (2400 x 1800)
+    lines = [('Whiskas', 350, 500, 1000, 650), ('Rind in Gelee', 350, 700, 1250, 850)]
+    blocks = [{'lines': [{'text': t, 'boundingBox': {'left': x0, 'top': y0, 'right': x1, 'bottom': y1}}]} for t, x0, y0, x1, y1 in lines]
+    await pg.evaluate('r => { window.__ocrResult = r; }', {'text': 'Whiskas\nRind in Gelee', 'blocks': blocks})
+    await snap(pg, PACK_LARGE, done='db.servings.length === 2 && !!db.servings[0].guess')  # the new meal, not the first one
+    moved = await corners()
+    check(
+        middle == [200, ['orange'] * 4] and moved == [200, ['orange', 'orange', 'cream', 'cream']],
+        f'read without places: the middle; with them: up and to the left, where the text stands {middle} {moved}',
+    )
+    thumb = await state(pg, 'db.servings[0].thumb')
+    await tap(pg, '[data-action=save-name]')
+    check(await state(pg, "db.products.find(p => p.brand === 'Whiskas')?.thumb") == thumb, 'the variety named from it has that thumbnail')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
 
@@ -2045,8 +2253,12 @@ async def test_observations(browser, url):
     ROW = '[data-sec=hist] [data-action=open-observation]'
     named, mau = await pg.locator(f'{CHIP}[data-v=tired]').inner_text(), await state(pg, 'db.pets[0].name')
     check(await pg.locator(CHIP).count() == 4 and mau in named, f'the chips always at hand, the tired one names the pet ({named})')
+    await tap(pg, '[data-action=observe][data-v=tired]')
+    tired = await pg.inner_text('#toast > span')
+    await tap(pg, '#toast [data-action=undo]')
     await tap(pg, '[data-action=observe][data-v=stink]')
     after, pet_ = await pg.evaluate(OBS), await state(pg, 'db.pets[0].id')
+    told = await pg.inner_text('#toast > span')
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
@@ -2057,6 +2269,11 @@ async def test_observations(browser, url):
     await tap(pg, '#toast [data-action=undo]')
     check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
     await tap(pg, '[data-action=observe][data-v=hungry]')
+    again = await pg.inner_text('#toast > span')
+    check(
+        'Vorlieben' not in tired and 'Vorlieben' in told and 'Vorlieben' not in again and 'tipp:beobachtung' in await state(pg, 'prefs.hiddenHints'),
+        f'the first note the preferences weigh says once where it shows up later, a tired day is not one ({tired} / {told} / {again})',
+    )
     await tap(pg, ROW)
     KINDS = "[...document.querySelectorAll('#sheet [data-action=set-observation-kind][aria-pressed=true]')].map(c => c.dataset.v)"
     check(
@@ -2104,6 +2321,27 @@ async def test_observations(browser, url):
     await idle(pg)
     left = await pg.evaluate(OBS)
     check(len(left) == count - 1 and not [o for o in left if T in o[1]], 'a pet deleted: gone from the observations, those of it alone too')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
+async def test_toast_time(browser, url):
+    print('a toast stays until it can be read: the usual time, longer for a long text')
+    ctx = await phone(browser)
+    await fixed_clock(ctx)
+    pg, errors = await open_page(ctx, url)
+
+    async def lasts(msg, undo=True):
+        await pg.evaluate("([m, u]) => import('./js/ui/toast.js').then(t => t.toast(m, u ? () => {} : null))", [msg, undo])
+        ms = 0
+        while await pg.evaluate("document.getElementById('toast').classList.contains('show')") and ms < 20000:
+            await pg.clock.run_for(100)
+            ms += 100
+        return ms
+
+    short, plain = await lasts('Hunger notiert.'), await lasts('Hunger notiert.', False)
+    long = await lasts('Stunk notiert. Fenster auf! ' + 'Ein langer Satz, der etwas länger zu lesen ist. ' * 3)
+    check(plain < short < long and long - short > 1500, f'short with undo, short without, long: {short} {plain} {long} ms')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2430,6 +2668,8 @@ run_tests(
         'texture': test_texture,
         'suggestions': test_suggestions,
         'reminder': test_reminders,
+        'reminder-buttons': test_reminder_buttons,
+        'news': test_news,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
         'birthday': test_birthday,
@@ -2437,6 +2677,7 @@ run_tests(
         'network': test_network,
         'scanning': test_scan,
         'recognition': test_recognize,
+        'text-thumb': test_text_thumb,
         'discard': test_discard,
         'pack-lines': test_pack_lines,
         'known-photo': test_known_photo,
@@ -2447,6 +2688,7 @@ run_tests(
         'crop': test_crop,
         'popup': test_popup,
         'observations': test_observations,
+        'toast-time': test_toast_time,
         'mood': test_mood,
         'camera': test_camera,
         'no-camera': test_no_camera,

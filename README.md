@@ -36,7 +36,7 @@ Unsere Katze ist wählerisch. Manche Sorten sind sofort weg, an anderen schnuppe
 - *Einkaufen*: was du nachkaufen kannst und was nicht mehr, nach Futterart, mit den letzten Bewertungen als kleine Balken. Die Liste lässt sich verschicken.
 - *Verlauf*: alle Mahlzeiten, Tag für Tag.
 - *Beobachtungen*: Hat dein Tier gute Laune, großen Hunger oder einen müden Tag, oder stinkt es heftig, notierst du das mit einem Tipp auf der Startseite. Die Einträge stehen im Verlauf, und unter *Vorlieben* siehst du, ob so etwas nach einer bestimmten Sorte öfter vorkommt.
-- Erinnerungen ans Bewerten und ans Füttern, beide erst mal aus.
+- Erinnerungen ans Bewerten und ans Füttern, beide erst mal aus. Bei der Erinnerung ans Bewerten reicht oft ein Tipp: Sie bietet an, wie viel dein Tier von der Sorte meistens frisst.
 - Mehrere Tiere, auch Hunde, Kaninchen oder Vögel, jedes für sich ausgewertet.
 - Ein Backup nimmt alles mit aufs neue Handy.
 

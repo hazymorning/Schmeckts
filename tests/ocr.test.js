@@ -6,6 +6,7 @@ import {readdirSync, readFileSync} from 'node:fs';
 import {BRANDS} from '../app/www/js/config.js';
 import {
   cleanText,
+  CLOSEST,
   focusOf,
   hasLine,
   joinReadings,
@@ -16,6 +17,7 @@ import {
   packLines,
   readPack,
   SECOND_PASS,
+  textSquare,
 } from '../app/www/js/ocr.js';
 import {jpegSize, readingOf} from '../app/www/js/reading.js';
 import {norm} from '../app/www/js/text.js';
@@ -620,6 +622,66 @@ test('packaging photos: the part around the variety is read again, and laid over
     {left: 0, top: 50, right: 800, bottom: 310, scale: 1},
   );
   assert.deepEqual(cut.lines.map(l => l.text).sort(), ['Huhn in Gelee', 'Zusammensetzung Fleisch']);
+});
+
+test('packaging photos: the thumbnail is the square around the text, never too close and inside the photo', () => {
+  const inside = (q, width, height) => q.x >= 0 && q.y >= 0 && q.x + q.side <= width && q.y + q.side <= height;
+  // a pixel of rounding either way
+  const holds = (q, b, scale = 1) =>
+    q.x <= b.left * scale + 1 &&
+    q.y <= b.top * scale + 1 &&
+    q.x + q.side >= b.right * scale - 1 &&
+    q.y + q.side >= b.bottom * scale - 1;
+  for (const f of fixtures()) {
+    const read = readingIn(f, SECOND_PASS),
+      short = Math.min(f.width, f.height),
+      q = textSquare(read, f.width, f.height),
+      largest = [...read.lines].sort((a, b) => b.h - a.h)[0];
+    assert.ok(q && inside(q, f.width, f.height), `${f.name}: inside the photo ${JSON.stringify(q)}`);
+    assert.ok(q.side >= CLOSEST * short && q.side <= short, `${f.name}: never too close, at most the short side`);
+    assert.ok(holds(q, largest.box), `${f.name}: the largest print is in it`);
+    assert.equal(textSquare(read, f.height, f.width), null, `${f.name}: a reading of the photo turned gives none`);
+  }
+  const miamor = readingIn(
+    fixtures().find(f => f.name === 'miamor-ragout-royal.json'),
+    SECOND_PASS,
+  );
+  assert.ok(
+    holds(textSquare(miamor, 825, 1100), miamor.lines.find(l => l.text === 'miamor').box),
+    'more text than the square holds: the small print gives way, not the brand',
+  );
+
+  const rows = [
+    ['Sheba', 60, 300, {left: 200}],
+    ['Huhn in Gelee', 40, 380, {left: 200}],
+  ];
+  const read = plugin(rows),
+    q = textSquare(read, 800, 1000),
+    text = {left: 200, top: 300, right: Math.max(...read.lines.map(l => l.box.right)), bottom: 420};
+  assert.ok(holds(q, text) && inside(q, 800, 1000), `the text and some room around it ${JSON.stringify(q)}`);
+  assert.equal(q.side, CLOSEST * 800, 'little text: no closer than the share of the short side');
+  const half = textSquare(read, 400, 500);
+  assert.ok(
+    ['x', 'y', 'side'].every(k => Math.abs(half[k] - q[k] / 2) <= 1),
+    `the same photo smaller: the same square smaller ${JSON.stringify(half)}`,
+  );
+  const stray = [...rows, ['Auri', 30, 60, {left: 40, tilt: 0.5}], ['Rind', 8, 900, {left: 700}]];
+  assert.deepEqual(textSquare(plugin(stray), 800, 1000), q, 'a slanted scrap of the picture and tiny print leave it');
+  const corner = plugin([
+    ['Sheba', 60, 900, {left: 500}],
+    ['Huhn in Gelee', 40, 960, {left: 500}],
+  ]);
+  const edge = textSquare(corner, 800, 1000);
+  assert.ok(
+    inside(edge, 800, 1000) && holds(edge, corner.lines[1].box),
+    `text near an edge: pushed inside ${JSON.stringify(edge)}`,
+  );
+
+  assert.equal(textSquare(read, 1000, 800), null, 'a photo of another shape, or turned: none');
+  assert.equal(textSquare(plugin(rows, 0, 0), 800, 1000), null, 'a reading without its size: none');
+  assert.equal(textSquare(plugin(rows.slice(0, 1)), 800, 1000), null, 'a single line: none');
+  assert.equal(textSquare(plugin([rows[0], ['4 x 85 g', 40, 380]]), 800, 1000), null, 'a figure is no text');
+  assert.equal(textSquare('Sheba\nHuhn in Gelee', 800, 1000), null, 'plain text has no places');
 });
 
 test('packaging photos: four pouches as 0.15.0 read them, put right', () => {

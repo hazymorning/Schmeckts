@@ -769,8 +769,8 @@ export const LEADS = {
     'Der erste Napf des Tages ist überfällig.',
   ],
   fresh: [
-    'Guten Appetit, {names}!',
-    'Frisch aufgetischt, guten Appetit!',
+    'Mahlzeit, {names}!',
+    'Frisch aufgetischt, ran an den Napf!',
     '{names} {hat} jetzt erst mal zu tun.',
     'Der Napf ist voll, jetzt heißt es schmatzen.',
   ],
@@ -836,7 +836,7 @@ export const LINES = {
   birthdayAge: [
     '{pet} wird heute {age}, da darf der Napf voller sein.',
     'Heute wird {pet} {age}, Extra-Leckerli ist Pflicht.',
-    'Alles Gute, {pet} wird heute {age}!',
+    'Alles Gute, {pet} wird {age}!',
   ],
   birthdayToday: [
     '{pet} hat heute Geburtstag, Extra-Leckerli erlaubt.',
@@ -845,7 +845,7 @@ export const LINES = {
   ],
   birthdaySoon: [
     'In {days} hat {pet} Geburtstag.',
-    'Noch {days}, dann hat {pet} Geburtstag.',
+    'In {days} feiert {pet} Geburtstag.',
     'In {days} hat {pet} Geburtstag, Geschenk zum Fressen?',
   ],
   birthdayTomorrow: [
@@ -861,7 +861,7 @@ export const LINES = {
   premiere: [
     '{sort} gab’s heute zum ersten Mal, wie mutig.',
     'Heute stand zum ersten Mal {sort} im Napf.',
-    'Mit {sort} gab’s heute eine echte Premiere.',
+    'Mit {sort} gab’s eine echte Premiere.',
   ],
   milestoneNext: [
     'Das nächste Füttern ist schon das {m} Mal.',
@@ -962,3 +962,24 @@ export const LINES = {
 };
 // values come escaped from the caller
 export const fill = (template, values) => template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
+
+// small words two sentences side by side may share without sounding repetitive
+const STOP = new Set(
+  `der die das dem den des ein eine einen einem einer und oder aber auch noch schon mal nur ist sind war hat haben
+  gibt gab sie dein deine dich dir man sich hier nicht nichts auf aufs aus bei mit von vom zum zur für fürs bis seit
+  nach vor wie was`.split(/\s+/),
+);
+// content words cut to a light stem, so Tag, Tage and Tagen match; numbers do not count, 3 Stunden is not 3 Tage
+const words = text =>
+  new Set(
+    text
+      .replace(/<[^>]*>/g, ' ')
+      .toLowerCase()
+      .split(/[^\p{L}]+/u)
+      .filter(w => w.length > 2 && !STOP.has(w))
+      .map(w => w.replace(/(?<=.{3})(e[nrs]?|[ns])$/, '')),
+  );
+export function sharesWord(a, b) {
+  const seen = words(a);
+  return [...words(b)].some(w => seen.has(w));
+}
