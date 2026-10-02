@@ -23,12 +23,12 @@ import {
   forWhom,
   habitRow,
   head,
-  lead,
   likesList,
   lower,
   obsThumb,
   SIDE,
   sideIcon,
+  sign,
   since,
   strip,
   thumbOf,
@@ -156,8 +156,8 @@ function portraitHTML(m, r) {
   return `<section class="card portrait"><span class="ov-pic">${pic}</span><div class="portrait-text"><h2>${esc(petNames(ids))}</h2><p class="say">${said.join(' ')}</p></div></section>`;
 }
 
-// x.moves.fresh: varieties that came onto their side within the last 30 days
-function placeRow(m, x, e, i, side) {
+// x.moves.fresh: varieties that came onto their side within the last 30 days; place: 0 for the only one
+function placeRow(m, x, e, place, side) {
   const p = e.product,
     brand = brandOf(p),
     said = saidOf(e, side),
@@ -165,16 +165,17 @@ function placeRow(m, x, e, i, side) {
     now = Date.now(),
     at = side === 'top' ? x.last.get(e.id) : 0,
     away = at && now - at >= AWAY ? `zuletzt vor ${lapse(at, now)}` : '',
-    label = `Platz ${i + 1}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.${away ? ` ${cap(away)}.` : ''}${fresh ? ' Neu dabei.' : ''}`;
-  return `<li><button class="row" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="ranked">${thumbOf(null, p)}<span class="place ${SIDE[side][1]}">${i + 1}</span></span>
+    label = `${place ? `Platz ${place}: ` : ''}${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.${away ? ` ${cap(away)}.` : ''}${fresh ? ' Neu dabei.' : ''}`;
+  return `<li><button class="row" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="ranked">${thumbOf(null, p)}${place ? `<span class="place ${SIDE[side][1]}">${place}</span>` : ''}</span>
     <span class="t-main"><span class="t-top"><b>${esc(pname(p))}</b>${fresh ? '<span class="badge">neu</span>' : ''}</span><small>${esc(cap([brand, lower(said), away].filter(Boolean).join(', ')))}</small></span>${strip(ratingsIn(m, [e.id]))}</button></li>`;
 }
 const card = (title, inner) => `<section class="card"><h2>${title}</h2>${inner}</section>`;
 const listTitle = (side, title) => `${sideIcon(side)}${title}`;
 const say = text => `<p class="say card-line">${text}</p>`;
 const hint = text => `<p class="hint card-line">${text}</p>`;
+// a place is only worth showing beside another
 const places = (m, x, list, side) =>
-  `<ol class="list ranks">${list.map((e, i) => placeRow(m, x, e, i, side)).join('')}</ol>`;
+  `<ol class="list ranks">${list.map((e, i) => placeRow(m, x, e, list.length > 1 ? i + 1 : 0, side)).join('')}</ol>`;
 // never padded to five with varieties that do not belong there
 function listsHTML(m, r, x) {
   if (!r.rated)
@@ -225,7 +226,7 @@ function petLine(m, t, several) {
           : t.cause === 'futter'
             ? `${who} frisst zuletzt deutlich ${worse ? 'schlechter' : 'besser'}, bei den gewohnten Sorten aber wie vorher.${behind}`
             : `${who} frisst ${worse ? 'seit ein paar Wochen deutlich schlechter' : 'gerade deutlich besser'}.`;
-  const pic = several ? avatar(pet, 's') : lead(t.kind === 'deutlich' ? (worse ? 'fall' : 'rise') : 'paw');
+  const pic = several ? avatar(pet) : sign(t.kind === 'deutlich' ? (worse ? 'fall' : 'rise') : 'paw');
   return told(pic, text, weeks(t.recent, t.before));
 }
 const weeks = (recent, before) =>
@@ -238,7 +239,7 @@ function trendCard(m, x) {
     const sum = k => ({n: lines.reduce((a, t) => a + t[k].n, 0), good: lines.reduce((a, t) => a + t[k].good, 0)});
     rows.push(
       told(
-        lead('paw'),
+        sign('paw'),
         `Bei ${petsOf(lines.map(t => t.pet))} läuft’s wie gehabt.`,
         weeks(sum('recent'), sum('before')),
       ),
@@ -254,7 +255,7 @@ function trendCard(m, x) {
     rows.push(
       toldBtn(
         v.id,
-        lead(ic),
+        sign(ic),
         `${named(m.byId.get(v.id))} ${text}.`,
         `Davor <b>${times(goodOf(v.before.counts), v.before.n)}</b> gut gefressen, seitdem ${lower(evidenceOf(v.since))}.`,
       ),
@@ -303,7 +304,7 @@ function splitCard(m, r) {
     .map(e =>
       toldBtn(
         e.id,
-        avatar(getPet(e.yes[0]), 's'),
+        avatar(getPet(e.yes[0])),
         `${petsOf(e.yes)} ${e.yes.length > 1 ? 'mögen' : 'mag'} ${named(e)}, ${petsOf(e.no)} nicht.`,
         esc(cap([...e.yes, ...e.no].map(pid => `${getPet(pid).name} ${lower(evidenceOf(e.pets[pid]))}`).join(', '))) +
           '.',
@@ -339,7 +340,7 @@ function patternCard(m, x) {
   const rows = x.patterns.map(d => {
     const [a, z] = [d.groups[0], d.groups.at(-1)];
     return told(
-      lead(DIM_ICON[d.kind]),
+      sign(DIM_ICON[d.kind]),
       d.clear
         ? `<b>${esc(a.key)}</b> kommt deutlich besser an als ${esc(inText(d, z.key))}.`
         : `Bisher kommt <b>${esc(inText(d, a.key))}</b> besser an als ${esc(inText(d, z.key))}.`,
@@ -362,7 +363,7 @@ function trialRow(m, t, best = false) {
   const several = m.pets.length > 1;
   return toldBtn(
     t.e.id,
-    lead('sparkle'),
+    sign('sparkle'),
     `${best ? onTheWay(t, several) : `${named(t.e)} ${needs(t, several)}`}.`,
     esc(`Bisher ${lower(evidenceOf(t.e))}.`),
     strip(ratingsIn(m, [t.e.id]), several ? 0 : t.need),
@@ -378,7 +379,7 @@ function nextCard(m, r, x) {
     rows.push(
       toldBtn(
         v.id,
-        lead('clock'),
+        sign('clock'),
         `${named(m.byId.get(v.id))} gab es seit ${lapse(v.at, now)} nicht mehr.`,
         esc(`Davor ${by}${lower(evidenceOf(v))}.`),
       ),
@@ -390,7 +391,7 @@ function nextCard(m, r, x) {
     rows.push(
       toldBtn(
         v.id,
-        lead('repeat'),
+        sign('repeat'),
         `${named(m.byId.get(v.id))} blieb beim ersten Mal stehen.`,
         `${esc(getPet(v.pet).name)} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
       ),

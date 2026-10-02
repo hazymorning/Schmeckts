@@ -636,6 +636,8 @@ async def test_evaluation(browser, url):
         "[document.querySelector('#sheet .portrait .say').textContent, [...document.querySelectorAll('#sheet .ranks b')].map(b => b.textContent)]"
     )
     check(told[1] and not any(name in told[0] for name in told[1]), f'the portrait names none of the varieties the lists below show {told}')
+    ranked = await pg.eval_on_selector_all('#sheet .ranks', "l => l.map(o => [o.children.length, o.querySelectorAll('.place').length])")
+    check(ranked and all(n == shown for n, shown in ranked), f'every row of a longer list shows its place {ranked}')
     await tap(pg, '#sheet [data-action=open-level][data-v=profile]')
     level = await pg.evaluate(LEVEL)
     await back(pg)
@@ -661,6 +663,7 @@ async def test_candidate(browser, url):
     named = await pg.eval_on_selector_all('#sheetBody [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
     check(tile == ['BUTTON', 'naechste1', True], f'the empty Leibgericht tile keeps its kicker and opens the closest variety {tile}')
     check(named == ['naechste1', 'ladenhueter', 'naechste2'], f'its card names it before the Ladenhüter, „Als Nächstes“ only the others {named}')
+    check(await pg.locator('#sheet .ranks .place').count() == 0, 'a list of one shows no place')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 

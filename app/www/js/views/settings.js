@@ -82,7 +82,7 @@ function overview() {
                   : ''),
             )
           : '') +
-        switchRow('feed-remind', 'clock', 'Ans Füttern erinnern', feedSub(), prefs.feedRemind, 'feedSub'),
+        switchRow('feed-remind', 'feed', 'Ans Füttern erinnern', feedSub(), prefs.feedRemind, 'feedSub'),
       'set-group',
     )}
     ${group(
@@ -162,7 +162,7 @@ function serverSection(notice = syncInfo()) {
       : `<p class="hint">Alle Daten bleiben auf diesem Handy. Verbunden sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen.</p>
         <button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`;
   const needCode = status.kind === 'auth';
-  return `<div class="group srv ${notice.tone}" role="status"><div class="row"><span class="thumb m srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
+  return `<div class="group srv ${notice.tone}" role="status"><div class="row"><span class="sign srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>
     <span class="t-main"><b>${esc(notice.title)}</b><small>${esc(notice.detail)}</small></span></div></div>
     ${
       !needCode

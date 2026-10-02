@@ -43,6 +43,7 @@ import {
   group,
   habitRow,
   head,
+  labelled,
   lead,
   likesList,
   main,
@@ -211,17 +212,17 @@ function viewName() {
     <label class="label" for="f-variety">Sorte</label>
     <input id="f-variety" class="field" data-field="variety" value="${esc(s.variety)}" placeholder="z. B. Lachs in Soße" autocomplete="off" enterkeyhint="done">
     <div class="suggest" id="lineChips"></div>
-    ${group('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
-    ${textureChips(s)}
+    ${labelled('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
+    ${textureChips(s, '', labelled)}
     <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button></div>
     ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
 }
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
 // x: a variety, or the sheet itself while naming
-function textureChips(x, note = '') {
+function textureChips(x, note = '', wrap = group) {
   const t = TEXTURES[typeOf(x)];
   return t
-    ? group(
+    ? wrap(
         t.title,
         `<div class="chips">${t.items.map(([k, label]) => `<button class="chip" aria-pressed="${x.texture === k}" data-action="set-texture" data-v="${k}">${label}</button>`).join('')}</div>${note}`,
       )

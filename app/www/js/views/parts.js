@@ -262,10 +262,14 @@ export const under = html => `<div class="set-under">${html}</div>`;
 // a card under its label, as in the settings: set-group for rows with icons, pad for anything else
 export const group = (label, html, cls = 'pad') =>
   `${label ? `<span class="label">${label}</span>` : ''}<div class="group ${cls}">${html}</div>`;
+// without the card, where fields stand on the ground beside it
+export const labelled = (label, html) => `<span class="label">${label}</span>${html}`;
 // the whole row opens the picker; field: the invisible native input, shown: its value as we say it
 export const pickRow = (ic, title, sub, shown, field) =>
   `<div class="row set-row pick-row" data-action="pick">${lead(ic)}${main(title, sub)}<span class="pick-val">${shown}</span>${icon('chevron', 'chev')}${field}</div>`;
-export const obsThumb = kind => `<span class="thumb m toned o-${kind}">${icon(observationOf(kind).icon)}</span>`;
+// an icon in place of a picture, where products have their photo and pets their avatar: always a circle
+export const sign = (ic, tone = '') => `<span class="sign ${tone}">${icon(ic)}</span>`;
+export const obsThumb = kind => sign(observationOf(kind).icon, `o-${kind}`);
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
@@ -283,7 +287,7 @@ export function habitRow(h, several) {
   const name = id => pname(getProduct(id));
   if (h.kind === 'sosse' || h.kind === 'eager')
     return told(
-      lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
+      sign(h.kind === 'sosse' ? 'drop' : 'r_eager'),
       `Bei <b>${esc(andList(h.sorts.map(x => name(x.id))))}</b> ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
       esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
@@ -291,14 +295,14 @@ export function habitRow(h, several) {
     who = pet ? `<b>${esc(pet.name)}</b> ` : '';
   if (h.kind === 'neugier' || h.kind === 'anlauf')
     return told(
-      pet ? avatar(pet, 's') : lead('sparkle'),
+      pet ? avatar(pet) : sign('sparkle'),
       h.kind === 'neugier'
         ? `${who}${pet ? 'ist neugierig' : 'Neugierig'}: Neues kommt erst gut an, dann lässt es nach.`
         : `${who}${pet ? 'braucht' : 'Braucht'} Anlauf: beim ersten Mal bleibt öfter was übrig als später.`,
       `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach ${h.later.good} von ${h.later.n} Mal.`,
     );
   return told(
-    pet ? avatar(pet, 's') : lead('repeat'),
+    pet ? avatar(pet) : sign('repeat'),
     h.kind === 'abwechslung'
       ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.`
       : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte kurz hintereinander kommt besser an.`,
