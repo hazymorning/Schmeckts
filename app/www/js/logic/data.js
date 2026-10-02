@@ -166,6 +166,8 @@ export function loadDemo() {
   const made = demoMeals(pet);
   db.servings.push(...made);
   db.servings.sort((a, b) => b.servedAt - a.servedAt);
+  db.observations.push(...demoObservations(pet, made));
+  db.observations.sort((a, b) => b.at - a.at);
   save();
   closeSheet().then(() => {
     update();
@@ -196,6 +198,18 @@ function demoMeals(pet) {
     by: 'Anna',
   });
   return made;
+}
+
+/* A few observations, so the diary and „Vorlieben“ show what they are: a stink in the evening after the newest meal of
+   „Rind Pastete“, and a tired day three days back */
+function demoObservations(pet, made) {
+  const pastete = made.find(s => getProduct(s.productId)?.variety === 'Rind Pastete' && s.servedAt < Date.now() - DAY),
+    tired = new Date(Date.now() - 3 * DAY);
+  tired.setHours(15, 10, 0, 0);
+  return [
+    pastete && {id: demoId(), kind: 'stink', at: pastete.servedAt + 5 * 3600e3, pets: {[pet.id]: true}, by: 'Jonas'},
+    {id: demoId(), kind: 'tired', at: tired.getTime(), pets: {[pet.id]: true}, by: 'Anna'},
+  ].filter(Boolean);
 }
 
 /* Two meals a day backwards from yesterday, at the usual times and alternating between the two people.
@@ -230,10 +244,11 @@ export function purgeDemo() {
   const products = new Set(
     db.products.filter(p => !used.has(p.id) && (demo(p.id) || fromDemo.has(p.id))).map(p => p.id),
   );
-  if (!pets.size && !servings.size && !products.size) return;
-  purge({pets, products, servings});
-  let touched = false; // keep mixed meals, only take the sample pet out of them
-  for (const s of db.servings)
+  const observations = new Set(db.observations.filter(o => demo(o.id) || onlyDemo(o)).map(o => o.id));
+  if (!pets.size && !servings.size && !products.size && !observations.size) return;
+  purge({pets, products, servings, observations});
+  let touched = false; // keep mixed meals and observations, only take the sample pet out of them
+  for (const s of [...db.servings, ...db.observations])
     for (const id of Object.keys(s.pets))
       if (pets.has(id)) {
         delete s.pets[id];

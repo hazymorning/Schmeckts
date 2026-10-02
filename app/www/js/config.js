@@ -217,6 +217,38 @@ export function flavoursOf(text) {
 }
 /* Rating reminder in minutes after serving, 0 = off: the REMIND steps, or whole hours of your own from 1 to
    REMIND_MAX_H. tidyRemind turns any stored value into a valid one. */
+/* Observations („Beobachtung notieren“ on the overview card): what a pet showed that stood out. The key lives in the
+   data and never changes, a kind a newer phone added and this one does not know is kept and shown as „Beobachtung“.
+   chip: the word on its chip; label: what the diary says; said: the toast; about: what it is weighed against, 'meal'
+   the meals of the pets concerned within `within` hours before it (`window` names them in its sheet, `after` in
+   „Vorlieben“), 'day' nothing but the day. A stink comes from what
+   went through, so a day back; a hunger right after a meal says that meal did not last. */
+export const OBSERVATIONS = {
+  stink: {
+    icon: 'o_stink',
+    chip: 'Stunk',
+    label: 'Heftiger Stunk',
+    said: 'Oha, heftiger Stunk! Ist notiert',
+    about: 'meal',
+    within: 24,
+    window: 'in den 24 Stunden',
+    after: 'innerhalb eines Tages',
+  },
+  hungry: {
+    icon: 'o_hungry',
+    chip: 'Hunger',
+    label: 'Großer Hunger',
+    said: 'Großer Hunger, ist notiert',
+    about: 'meal',
+    within: 3,
+    window: 'in den drei Stunden',
+    after: 'innerhalb von drei Stunden',
+  },
+  tired: {icon: 'o_tired', chip: 'Müde', label: 'Müder Tag', said: 'Müder Tag, ist notiert', about: 'day'},
+};
+export const observationOf = kind =>
+  OBSERVATIONS[kind] || {icon: 'sparkle', chip: 'Beobachtung', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
+
 export const REMIND = [0, 60, 180, 360];
 export const REMIND_DEFAULT = 180; // what the switch turns on with when nothing was chosen yet
 export const REMIND_MAX_H = 24;

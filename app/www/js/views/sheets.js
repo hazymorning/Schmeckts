@@ -3,15 +3,18 @@
    one of its pages as well, drawn by the same view. */
 import {$, reduceMotion} from '../dom.js';
 import {slideHeight} from '../motion.js';
-import {cap, esc, norm} from '../text.js';
+import {andList, cap, esc, norm} from '../text.js';
 import {addDays, dayKey, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {OBSERVATIONS, observationOf, RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {
+  diary,
+  getObservation,
   getPet,
   getProduct,
   getServing,
+  observationsInFilter,
   habitsModel,
   model,
   profileModel,
@@ -23,7 +26,7 @@ import {
   sortOf,
   withLast,
 } from '../derive.js';
-import {rateCls, ratingsIn, shopGroups, VERDICTS} from '../smart.js';
+import {mealsBefore, observedAfter, rateCls, ratingsIn, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -47,8 +50,10 @@ import {
   scaleEnds,
   segmented,
   shopRow,
+  lower,
   since,
   strip,
+  whoObserved,
   habitRow,
   likesList,
   toldList,
@@ -101,6 +106,48 @@ function viewServing() {
     <label class="label" for="f-note">Notiz</label>
     <input id="f-note" class="field" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Optional, z. B. neue Packung" autocomplete="off">
     <div class="mt">${deleteMealBtn(s.id)}</div>`;
+}
+
+/* An observation, opened from the diary: what it was (the same chips, the one it is pressed), whom it concerns where
+   there are several pets, when it was noted and by whom, and what it is weighed against: the meals before it, for a
+   kind about meals. Every change takes effect at once; „Eintrag löschen“ as with a meal, undone from the toast. */
+function viewObservation() {
+  const o = getObservation(sheet.id);
+  if (!o)
+    return `<div class="sh-head"><h2>Beobachtung</h2>${closeBtn}</div><p class="hint empty">Diesen Eintrag gibt es nicht mehr.</p>`;
+  const kind = observationOf(o.kind),
+    ids = Object.keys(o.pets).filter(id => getPet(id)),
+    before = mealsBefore(db, o).map(s => getProduct(s.productId)),
+    names = [...new Set(before.filter(Boolean).map(p => `<b>${esc(pname(p))}</b>`))],
+    weighed =
+      kind.about !== 'meal'
+        ? ''
+        : names.length
+          ? `<p class="hint mt-s">${cap(kind.window)} davor gab es ${andList(names)}.</p>`
+          : `<p class="hint mt-s">${cap(kind.window)} davor ist keine Mahlzeit eingetragen.</p>`;
+  return `<div class="sh-head"><h2>${esc(kind.label)}</h2>${closeBtn}</div>
+    <span class="label">Beobachtung</span>
+    <div class="chips">${Object.entries(OBSERVATIONS)
+      .map(
+        ([k, x]) =>
+          `<button class="chip" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.chip}</button>`,
+      )
+      .join('')}</div>${weighed}
+    ${
+      db.pets.length > 1
+        ? `<span class="label">Bemerkt bei</span><div class="chips">${db.pets
+            .map(
+              pet =>
+                `<button class="chip" aria-pressed="${!!o.pets[pet.id]}" data-action="toggle-observation-pet" data-id="${pet.id}">${avatar(pet, 'xs')}${esc(pet.name)}</button>`,
+            )
+            .join(
+              '',
+            )}</div>${ids.length > 1 ? `<p class="hint mt-s">Bei ${esc(whoObserved(ids))}: offen, wer es war.</p>` : ''}`
+        : ''
+    }
+    <label class="label served" for="f-obs-time"><span>Notiert</span>${o.by ? `<span class="hint">von ${esc(o.by)}</span>` : ''}</label>
+    <span class="pick"><input id="f-obs-time" class="field" type="datetime-local" data-obs-time="${o.id}" value="${toLocalInput(o.at)}" max="${toLocalInput(Date.now())}">${icon('chevron')}</span>
+    <div class="mt"><button class="btn quiet" data-action="delete-observation" data-id="${o.id}">${icon('trash')}Eintrag löschen</button></div>`;
 }
 
 function viewName() {
@@ -337,6 +384,19 @@ const barcodeRow = c =>
     <button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">
     ${icon('close')}</button></li>`;
 const MEALS_SHOWN = 12; // the rest of the history is in „Verlauf“
+/* What was noted after the variety's meals, of every pet and within the last half year (observedAfter() in smart.js):
+   „Danach notiert: heftiger Stunk nach 2 von 5 Mahlzeiten.“ Counts only; whether that stands out is for „Vorlieben“. */
+function noticed(p) {
+  const after = observedAfter(
+    db,
+    db.pets.map(x => x.id),
+    Date.now(),
+    p.id,
+  );
+  return after.length
+    ? `<p class="hint">Danach notiert: ${after.map(x => `${lower(observationOf(x.kind).label)} nach ${x.hit} von ${x.n} Mahlzeiten`).join(', ')}.</p>`
+    : '';
+}
 
 function viewProduct() {
   const p = getProduct(sheet.id);
@@ -357,6 +417,7 @@ function viewProduct() {
     ${strip(ratingsIn(model(), [p.id]))}
     ${e.house.n ? countsRow(levels, counts) : `<p class="hint empty">Noch nicht bewertet.</p>`}
     ${kaufenHTML(e)}
+    ${noticed(p)}
     ${hist ? `<span class="label">Verlauf</span><ul class="list plist">${hist}</ul>` : ''}
     ${codes.length ? `<span class="label">Barcodes</span><ul class="list plist">${codes.map(barcodeRow).join('')}</ul>` : ''}
     <div class="mt btn-col"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Heute servieren</button>
@@ -387,7 +448,7 @@ function foldBox(key) {
 function viewReport() {
   const pet = model().pet,
     all = servingsInFilter();
-  histDays = dayGroups(all);
+  histDays = dayGroups(diary(all, observationsInFilter()));
   // the day it opens at has to be there, and drawn again (a sheet over it has gone) the days already shown stay
   const shown = $('#histBox', sheetBody)?.children.length || 0,
     upto = Math.max(HIST_PAGE, shown, sheet.at ? histDays.findIndex(g => 'd-' + g.key === sheet.at) + 1 : 0);
@@ -545,6 +606,7 @@ function viewPet() {
 
 const VIEWS = {
   serving: viewServing,
+  observation: viewObservation,
   feed: viewFeed,
   new: viewName,
   product: viewProduct,

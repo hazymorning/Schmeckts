@@ -74,6 +74,7 @@ dort „Code prüfen“, und du tippst den neuen Code einfach dort ein.
 
 - **Backups:** Der Server legt täglich ein Backup an und behält die letzten 30 davon, zu finden unter `/var/lib/schmeckts/backups`. Die Packungsfotos liegen daneben unter `/var/lib/schmeckts/photos` und gehören nicht zum Backup.
 - **Geänderte Fotos:** Ändert jemand in der App das Foto einer Sorte, bekommt der Server das neue, und alle anderen Handys holen es sich beim nächsten Öffnen. Dafür muss der Server mindestens Version 1.4.0 haben.
+- **Beobachtungen:** Was jemand in der App als Beobachtung notiert, teilen die Handys ab Server-Version 1.5.0. Ein älterer Server verliert nichts: Die Einträge warten auf dem Handy, bis der Server aktualisiert ist. Ab 1.5.0 nimmt der Server auch künftige neue Datenarten der App an, ohne selbst ein Update zu brauchen.
 - **Updates:** Doppelklicke einfach wieder auf die neue .deb-Datei, oder nimm im Terminal `sudo apt install ~/Downloads/schmeckts-server_<version>_amd64.deb`. Daten, Code und API-Schlüssel bleiben dabei erhalten.
 - **Übersicht im Terminal:** `sudo schmeckts-server overview`.
 - **Läuft er noch?** Mit `systemctl status schmeckts` siehst du den Zustand und mit `journalctl -u schmeckts -e` die letzten Meldungen.

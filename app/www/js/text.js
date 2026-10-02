@@ -8,7 +8,8 @@ export const norm = s =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-export const andList = l => (l.length > 1 ? l.slice(0, -1).join(', ') + ' und ' + l.at(-1) : l[0] || ''); // “A, B und C”
+export const andList = (l, and = 'und') =>
+  l.length > 1 ? l.slice(0, -1).join(', ') + ` ${and} ` + l.at(-1) : l[0] || ''; // “A, B und C”
 export const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 /* The small words, German and English: what a name is not cut after, and what packaging print says nothing with */
 export const SMALL = new Set(

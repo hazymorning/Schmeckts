@@ -49,6 +49,7 @@
   --inset-box: var(--space-3); /* .box and .banner: 12 all round a filled box */
   --inset-control: var(--space-3) var(--space-4); /* .btn, .field: 12 by 16; the height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* .chip, .field.in-row, the toast's action, .cam-hint: 8 by 16 */
+  --inset-tight: var(--space-2) var(--space-3); /* .chip.tight: 8 by 12, three chips sharing a card's row at 360px */
   --inset-badge: var(--space-1) var(--space-2h); /* .badge: 4 by 10 */
   --field-room: calc(
     var(--space-3h) + var(--icon-s) + var(--space-2h)

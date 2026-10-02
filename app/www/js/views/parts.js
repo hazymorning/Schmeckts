@@ -3,10 +3,10 @@
 import {andList, cap, esc} from '../text.js';
 import {addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
 import {icon} from '../icons.js';
-import {RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
-import {db, queue} from '../store.js';
-import {status} from '../sync.js';
-import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
+import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
+import {db} from '../store.js';
+import {held, pending, status} from '../sync.js';
+import {getPet, getProduct, isObservation, observedPets, petNames, pname, servingPets, timeOf} from '../derive.js';
 import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
@@ -130,19 +130,24 @@ export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = 
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;
 }
 
-/* History, on the home page as in the evaluation: the meals by calendar day, newest first.
-   „2 Mahlzeiten, 1 Snack“: a treat is not a meal; everything else, including what is still unknown, counts
-   as one. */
+/* History, on the home page as in the evaluation: the meals by calendar day, newest first, and the observations among
+   them. „2 Mahlzeiten, 1 Snack“: a treat is not a meal; everything else, including what is still unknown, counts
+   as one. „1 Beobachtung“ after them. */
 export function fedLabel(items) {
-  const snacks = items.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length,
-    meals = items.length - snacks;
+  const fed = items.filter(x => !isObservation(x)),
+    seen = items.length - fed.length,
+    snacks = fed.filter(s => s.productId && typeOf(getProduct(s.productId)) === 'Snack').length,
+    meals = fed.length - snacks;
   return [
     meals && (meals === 1 ? '1 Mahlzeit' : meals + ' Mahlzeiten'),
     snacks && (snacks === 1 ? '1 Snack' : snacks + ' Snacks'),
+    seen && (seen === 1 ? '1 Beobachtung' : seen + ' Beobachtungen'),
   ]
     .filter(Boolean)
     .join(', ');
 }
+/* Who an observation concerns: „Minka“, and where it is not clear which of them it was „Minka oder Tiger“ */
+export const whoObserved = ids => andList(ids.map(id => getPet(id)?.name).filter(Boolean), 'oder');
 export function servingNode(s) {
   // a dot in the rating's colour, hollow = still open
   const rs = servingPets(s)
@@ -203,12 +208,22 @@ export function strip({keys, more}, open = 0) {
 export function dayGroups(list) {
   const groups = [];
   for (const s of list) {
-    const k = dayKey(s.servedAt),
+    const k = dayKey(timeOf(s)),
       g = groups.at(-1);
     if (g && g.key === k) g.items.push(s);
-    else groups.push({key: k, t: s.servedAt, items: [s]});
+    else groups.push({key: k, t: timeOf(s), items: [s]});
   }
   return groups;
+}
+/* An observation in the diary: its time, a plain dot on the line, its icon where a meal has its packaging, what it was
+   and who it concerns; a tap opens it, to put it right or delete it */
+function observationItem(o, multiHouse) {
+  const kind = observationOf(o.kind),
+    ids = observedPets(o),
+    meta = [multiHouse || ids.length > 1 ? whoObserved(ids) : '', o.by ? 'von ' + o.by : ''].filter(Boolean).join(', ');
+  return `<li style="view-transition-name:tl-${o.id};view-transition-class:item"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
+        <span class="tl-time">${timeStr(o.at)}</span><span class="tl-node"><i></i></span><span class="thumb m">${icon(kind.icon || 'sparkle')}</span>
+        <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
 /* anchors: ids for the days of the history page, where a calendar jumps to; fresh: the meal just served */
 export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}) {
@@ -218,6 +233,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
     <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
     <ol class="tl">${g.items
       .map(s => {
+        if (isObservation(s)) return observationItem(s, multiHouse);
         const p = getProduct(s.productId),
           ids = servingPets(s);
         const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : '']
@@ -317,9 +333,15 @@ export const likesList = (m, d) =>
 const waitingText = n => (n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '');
 const ERROR_TITLE = {auth: 'Code stimmt nicht mehr', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
 const CHIP_ERROR = {auth: 'Code prüfen', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
+/* What waits for a newer server (sync.js), named by its kind */
+const HELD = {observations: 'Beobachtungen'};
+function heldText() {
+  const kinds = [...new Set(held().map(x => HELD[x.c] || 'Neue Einträge'))];
+  return kinds.length ? `${andList(kinds)} warten auf ein Update des Servers` : '';
+}
 export function syncInfo() {
   const st = status,
-    wait = waitingText(queue.length);
+    wait = waitingText(pending().length);
   if (st.state === 'off')
     return {tone: 'off', title: 'Nicht verbunden', detail: 'Alle Daten bleiben auf diesem Gerät.'};
   if (st.state === 'error') return {tone: 'bad', title: ERROR_TITLE[st.kind] || 'Abgleich gestört', detail: st.message};
@@ -332,12 +354,17 @@ export function syncInfo() {
         'Bist du im WLAN zu Hause oder ist WireGuard an?',
     };
   if (st.state === 'wait') return {tone: 'ok', title: 'Verbinde …', detail: wait || 'Der Abgleich läuft.'};
-  return {tone: 'ok', title: 'Verbunden', detail: wait ? wait + ', wird gesendet …' : 'Alles abgeglichen'};
+  const later = heldText();
+  return {
+    tone: 'ok',
+    title: 'Verbunden',
+    detail: wait ? wait + ', wird gesendet …' : later ? `Abgeglichen. ${later}.` : 'Alles abgeglichen',
+  };
 }
 /* At the top next to the settings, only when something is waiting or stuck */
 export function syncChip() {
   const st = status,
-    n = queue.length;
+    n = pending().length;
   if (st.state === 'error') return {label: CHIP_ERROR[st.kind] || 'Abgleich gestört', ic: 'alert', bad: true};
   if (st.state === 'offline' && n) return {label: waitingText(n), ic: 'clock', bad: false};
   return null;

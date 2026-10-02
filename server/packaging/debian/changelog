@@ -1,3 +1,15 @@
+schmeckts-server (1.5.0) unstable; urgency=medium
+
+  * The server keeps any kind of data the app sends, named like the
+    others, so a new kind in the app needs no new server; features in
+    /api/info says so with "collections". The first is the app's
+    observations.
+  * /api/checksum?c= covers the collections named, and without it the
+    three every app knows, so an older app still finds its data level.
+  * The overview counts the entries of such collections.
+
+ -- Schmeckts <schmeckts@localhost>  Sat, 03 Oct 2026 12:00:00 +0200
+
 schmeckts-server (1.4.2) unstable; urgency=medium
 
   * The overview calls the level between half eaten and only the sauce

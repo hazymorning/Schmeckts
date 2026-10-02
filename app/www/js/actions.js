@@ -14,7 +14,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {toggleOverview, update} from './views/home.js';
+import {toggleObserve, toggleOverview, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -35,6 +35,13 @@ import {scan} from './logic/scan.js';
 import {closeCrop, deletePet, editing, openPet, petState, savePet, setPetPhoto} from './logic/pets.js';
 import {exportData, exportReading, importData, loadDemo, purgeDemo, wipe} from './logic/data.js';
 import {receiveFile, receiveUri, shareChanges} from './logic/exchange.js';
+import {
+  deleteObservation,
+  observe,
+  setObservationKind,
+  setObservationTime,
+  toggleObservationPet,
+} from './logic/observations.js';
 
 /* Connecting to the household: check address, protocol and code first, then remove the sample data and sync */
 async function connectServer() {
@@ -144,6 +151,25 @@ const ACTIONS = {
     haptic('select');
     toggleOverview();
   }, // the overview's whole text and back
+  'observe-open'() {
+    haptic('select');
+    toggleObserve();
+  }, // „Beobachtung notieren“: the chips fold open, „Abbrechen“ folds them shut
+  observe(el) {
+    observe(el.dataset.v);
+  }, // a chip: saved at once
+  'open-observation'(el) {
+    openSheet({kind: 'observation', id: el.dataset.id});
+  }, // from the diary, to put it right or delete it
+  'set-observation-kind'(el) {
+    setObservationKind(el.dataset.v);
+  },
+  'toggle-observation-pet'(el) {
+    toggleObservationPet(el.dataset.id);
+  },
+  'delete-observation'(el) {
+    deleteObservation(el.dataset.id);
+  },
   'open-settings'() {
     openSheet({kind: 'settings'});
   },
@@ -551,6 +577,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.hasAttribute('data-remind')) return renderSheet(); // leaving the field: shows the current value again
+  if (t.dataset.obsTime && t.value) return setObservationTime(t.dataset.obsTime, new Date(t.value).getTime());
   if (!t.dataset.time || !t.value) return;
   const s = getServing(t.dataset.time),
     ts = new Date(t.value).getTime();

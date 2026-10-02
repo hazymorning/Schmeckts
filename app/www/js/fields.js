@@ -2,8 +2,11 @@
    <map>.<key>. null removes, local fields stay on the phone. Pure functions. */
 import {report} from './report.js';
 
-export const COLLECTIONS = ['pets', 'products', 'servings'];
-const MAPS = {servings: ['pets'], products: ['codes']}; // maps, synced entry by entry
+export const COLLECTIONS = ['pets', 'products', 'servings', 'observations'];
+/* The collections every household server knows. Any other one only a server that says "collections" in its features
+   (from 1.5.0) takes; until then its changes wait in the queue (sync.js). */
+export const BASE = ['pets', 'products', 'servings'];
+const MAPS = {servings: ['pets'], products: ['codes'], observations: ['pets']}; // maps, synced entry by entry
 const LOCAL = new Set(['photo', 'status', 'error', 'autoPets', 'scanCode', 'guess']); // in servings only
 const ID_RE = /^[A-Za-z0-9_-]{4,40}$/; // as on the server
 export const validId = id => typeof id === 'string' && ID_RE.test(id); // test(undefined) would otherwise be true
@@ -64,6 +67,11 @@ export function fromFields(c, id, values) {
 }
 
 /* Only complete records show up in the app */
-export const complete = (c, rec) => c !== 'servings' || (typeof rec.servedAt === 'number' && !!rec.pets);
+export const complete = (c, rec) =>
+  c === 'servings'
+    ? typeof rec.servedAt === 'number' && !!rec.pets
+    : c === 'observations'
+      ? typeof rec.at === 'number' && typeof rec.kind === 'string' && !!rec.pets
+      : true;
 
 export const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);

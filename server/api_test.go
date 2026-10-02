@@ -166,6 +166,15 @@ func TestChecksum(t *testing.T) {
 	if before["sum"] == after["sum"] || after["fields"] != float64(1) {
 		t.Fatalf("before %v, after %v", before, after)
 	}
+	// A collection the app knows is named; without ?c= only the three every app knows count
+	call(a, "POST", "/api/changes", testCode, map[string]any{"changes": []Change{
+		chg("summe002", "observations", "obs1", clock(now.UnixMilli(), 1, "anna"), map[string]any{"kind": "tired"}),
+	}})
+	_, plain, _ := call(a, "GET", "/api/checksum", testCode, nil)
+	_, named, _ := call(a, "GET", "/api/checksum?c=pets,products,servings,observations,bad!name", testCode, nil)
+	if plain["sum"] != after["sum"] || named["fields"] != float64(2) {
+		t.Fatalf("plain %v, named %v", plain, named)
+	}
 }
 
 func TestLiveNotifications(t *testing.T) {

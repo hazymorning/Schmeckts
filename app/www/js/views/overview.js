@@ -11,7 +11,8 @@
    the cards below it are for. */
 import {esc} from '../text.js';
 import {addDays, dayStart, timeStr} from '../dates.js';
-import {typeOf} from '../config.js';
+import {OBSERVATIONS, typeOf} from '../config.js';
+import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
 import {isConnected} from '../sync.js';
 import {getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
@@ -301,10 +302,20 @@ export function overviewLines(g, pets, now, memory) {
 export const overviewText = (g, pets, now = Date.now(), memory = prefs.overview) =>
   overviewLines(g, pets, now, memory).text;
 
-/* The card: a tap on the picture opens the pet, a tap anywhere else unfolds the text and folds it again (open: the
-   state kept in views/home.js). What the line more and the fact of the day chose goes into the memory, so it stays
-   the same all day. */
-export function overviewHTML(m, open) {
+/* The chips for an observation, one per kind, each saving at once (logic/observations.js) */
+export const observeChips = () =>
+  `<div class="chips obs-chips">${Object.entries(OBSERVATIONS)
+    .map(
+      ([k, o]) =>
+        `<button class="chip tight" data-action="observe" data-v="${k}" aria-label="${o.label} notieren">${icon(o.icon)}${o.chip}</button>`,
+    )
+    .join('')}</div>`;
+
+/* The card: a tap on the picture opens the pet, a tap anywhere else on the top unfolds the text and folds it again
+   (open: the state kept in views/home.js). Under it „Beobachtung notieren“, a .card-btn that folds the chips open
+   (observing, toggleObserve() in views/home.js). What the line more and the fact of the day chose goes into the
+   memory, so it stays the same all day. */
+export function overviewHTML(m, open, observing = false) {
   const pets = m.pet ? [getPet(m.pet)] : db.pets,
     one = pets.length === 1 ? pets[0] : null,
     now = Date.now();
@@ -326,5 +337,8 @@ export function overviewHTML(m, open) {
         .slice(0, 2)
         .map(p => avatar(p, 'l pair'))
         .join('')}</span>`;
-  return `<section class="card overview${open ? ' open' : ''}" data-sec="overview" data-action="toggle-overview" aria-expanded="${!!open}" style="view-transition-name:sec-overview">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></section>`;
+  return `<section class="card overview${open ? ' open' : ''}" data-sec="overview" style="view-transition-name:sec-overview">
+    <div class="ov-top" data-action="toggle-overview" aria-expanded="${!!open}">${pic}<div class="ov-text"><h2>${esc(petNames(pets.map(p => p.id)))}</h2><p>${text}</p></div></div>
+    <div class="card-body fold" id="fold-observe">${observing ? observeChips() : ''}</div>
+    <button class="card-btn" data-action="observe-open" aria-expanded="${observing}" aria-controls="fold-observe">${observing ? 'Abbrechen' : 'Beobachtung notieren'}</button></section>`;
 }

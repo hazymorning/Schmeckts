@@ -11,7 +11,7 @@ import {milestones} from './smart.js';
 import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validId, valueOf} from './fields.js';
 
 export {flush, storageOK};
-export const defaults = () => ({version: 3, pets: [], products: [], servings: []});
+export const defaults = () => ({version: 3, pets: [], products: [], servings: [], observations: []});
 const defaultPrefs = () => ({
   theme: 'system',
   hiddenHints: [],
@@ -49,6 +49,8 @@ export function tidy(d) {
     if (s.status === 'reading') s.status = s.photo ? 'noserver' : 'failed'; // reading was interrupted: type it in
   }
   out.servings.sort((a, b) => b.servedAt - a.servedAt);
+  out.observations = out.observations.filter(o => complete('observations', o));
+  out.observations.sort((a, b) => b.at - a.at);
   return out;
 }
 function tidyPrefs(p) {
@@ -186,7 +188,10 @@ const snapshot = () =>
   Object.fromEntries(
     COLLECTIONS.map(c => [c, new Map(db[c].filter(r => validId(r.id)).map(r => [r.id, fieldsOf(c, r)]))]),
   );
-const sortServings = () => db.servings.sort((a, b) => b.servedAt - a.servedAt);
+const sortServings = () => {
+  db.servings.sort((a, b) => b.servedAt - a.servedAt);
+  db.observations.sort((a, b) => b.at - a.at); // newest first, as the meals
+};
 
 async function load() {
   const [d, p, s, q] = await Promise.all(['db', 'prefs', 'sync', 'queue'].map(read));
@@ -520,10 +525,11 @@ export function purge(ids) {
   persist('queue', 'db', 'sync', 'prefs');
 }
 
-/* Checksum as on the server: SHA-256 over the sorted lines "collection/id/field@clock\n" */
-export async function checksum() {
+/* Checksum as on the server: SHA-256 over the sorted lines "collection/id/field@clock\n", over the collections the
+   server holds (sync.js) */
+export async function checksum(colls = COLLECTIONS) {
   const lines = [];
-  for (const c of COLLECTIONS)
+  for (const c of colls)
     for (const [id, clocks] of Object.entries(state.clocks[c]))
       for (const [k, t] of Object.entries(clocks)) lines.push(`${c}/${id}/${k}@${t}\n`);
   lines.sort();
