@@ -23,6 +23,7 @@ import {
   photoThumb,
   rateSlider,
   shopRow,
+  sideIcon,
   syncChip,
   thumbOf,
   times,
@@ -185,9 +186,9 @@ function pendingHTML(list) {
 
 const HINT_TITLES = {
   appetit: 'Appetit',
-  stop: 'Nicht mehr kaufen?',
+  stop: `${sideIcon('flop')}Nicht mehr kaufen?`,
   sosse: 'Frisst meist nur die Soße',
-  liebling: 'Neuer Liebling',
+  liebling: `${sideIcon('top')}Nachkaufen?`,
 };
 const sortName = p => (p.variety && p.brand ? `${p.variety} von ${p.brand}` : pname(p));
 function hintHTML(m) {
@@ -219,7 +220,7 @@ function hintHTML(m) {
     [say, btns] =
       h.kind === 'stop'
         ? [`${name} kommt nicht gut an.`, set('nicht', 'Nicht mehr kaufen') + hide]
-        : [`${name} kommt gut an.`, set('immer', 'Immer kaufen') + hide];
+        : [`${name} kommt gut an.`, set('immer', 'Nachkaufen') + hide];
   }
   return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;

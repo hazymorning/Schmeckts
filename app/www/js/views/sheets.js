@@ -55,6 +55,7 @@ import {
   scaleEnds,
   segmented,
   shopRow,
+  sideIcon,
   since,
   strip,
   thumbOf,
@@ -329,8 +330,8 @@ function hitList(text, words) {
 
 const KAUFEN = [
   ['auto', 'Automatisch'],
-  ['immer', 'Immer kaufen'],
-  ['nicht', 'Nicht kaufen'],
+  ['immer', 'Nachkaufen'],
+  ['nicht', 'Nicht mehr kaufen'],
 ];
 const verdictPetRow = (pet, x) =>
   `<div class="row verdict-pet">${avatar(pet, 'xs')}<span class="t-main"><b>${esc(pet.name)}: ${VERDICTS[x.verdict]}</b>
@@ -469,9 +470,9 @@ function viewShop() {
       `<div class="btn-row"><button class="btn primary" data-action="share-list">${icon('share')}Liste teilen</button></div>`
     : '<p class="hint card-line">Noch nichts zum Nachkaufen, erst mal probieren.</p>';
   return `${head('Einkaufen' + forWhom(m.pet))}
-    <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
+    <section class="card"><h2>${sideIcon('top')}Nachkaufen</h2>${buy}</section>${
       g.nicht.length
-        ? `<section class="card"><h2>Lieber nicht</h2><p class="say card-line">${sorts(g.nicht.length, 'bleibt', 'bleiben')} meist stehen.</p>${foldBox('nicht')}</section>`
+        ? `<section class="card"><h2>${sideIcon('flop')}Nicht mehr kaufen</h2><p class="say card-line">${sorts(g.nicht.length, 'bleibt', 'bleiben')} meist stehen.</p>${foldBox('nicht')}</section>`
         : ''
     }${
       open

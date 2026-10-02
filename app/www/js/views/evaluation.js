@@ -26,6 +26,8 @@ import {
   likesList,
   lower,
   obsThumb,
+  SIDE,
+  sideIcon,
   since,
   strip,
   thumbOf,
@@ -74,12 +76,11 @@ function waiting(m, r) {
   return 'Noch steht keine Sorte fest.';
 }
 
-const ROLE = {top: 'Top-Futter', flop: 'Größter Flop'};
-const SIDE = {top: ['Top', 'r-good'], flop: ['Flop', 'r-bad']};
-const TILE = {top: ['Leibgericht', 'champ'], flop: ['Ladenhüter', 'flop']};
+const TILE = {top: 'Leibgericht', flop: 'Ladenhüter'};
 // the best and the worst variety, each on its tone's ground
 function sideTile(r, e, side) {
-  const [kicker, ic] = TILE[side];
+  const kicker = TILE[side],
+    ic = SIDE[side][0];
   if (!e) {
     const [title, why] =
       side === 'top'
@@ -94,7 +95,7 @@ function sideTile(r, e, side) {
   const p = e.product,
     brand = brandOf(p),
     said = saidOf(e, side),
-    label = `${ROLE[side]}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.`;
+    label = `${kicker}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.`;
   return `<button class="tile ${SIDE[side][1]}" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="tile-ic">${icon(ic)}</span>
     <span class="t-main"><small class="kicker">${kicker}</small><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(', ')))}</small></span></button>`;
 }
@@ -162,7 +163,7 @@ function placeRow(m, x, e, i, side) {
     <span class="t-main"><span class="t-top"><b>${esc(pname(p))}</b>${fresh ? '<span class="badge">neu</span>' : ''}</span><small>${esc(cap([brand, lower(said), away].filter(Boolean).join(', ')))}</small></span>${strip(ratingsIn(m, [e.id]))}</button></li>`;
 }
 const card = (title, inner) => `<section class="card"><h2>${title}</h2>${inner}</section>`;
-const listTitle = (side, title) => `${icon(TILE[side][1], SIDE[side][1])}${title}`;
+const listTitle = (side, title) => `${sideIcon(side)}${title}`;
 const say = text => `<p class="say card-line">${text}</p>`;
 const hint = text => `<p class="hint card-line">${text}</p>`;
 const places = (m, x, list, side) =>
@@ -181,21 +182,21 @@ function listsHTML(m, r, x) {
       list.length > 1 && list.length < PLACES ? hint(`Nur diese ${NUMBERS[list.length]} ${text}.`) : '';
   const tops = top.length
     ? card(
-        listTitle('top', top.length > 1 ? `Top ${top.length}` : 'Top-Futter'),
+        listTitle('top', top.length > 1 ? 'Leibgerichte' : 'Leibgericht'),
         (r.flat ? say('Die Sorten liegen noch so nah beieinander, dass die Reihenfolge Zufall sein kann.') : '') +
           places(m, x, top, 'top') +
           few(top, 'kommen bisher meist gut an'),
       )
-    : card(listTitle('top', 'Top'), say(`Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`));
+    : card(listTitle('top', 'Noch kein Leibgericht'), say(`Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`));
   const flops = flop.length
     ? card(
-        listTitle('flop', flop.length > 1 ? `Flop ${flop.length}` : 'Größter Flop'),
+        listTitle('flop', 'Ladenhüter'),
         places(m, x, flop, 'flop') + few(flop, 'kommen bisher nicht gut an'),
       )
     : r.settled < 3
-      ? card(listTitle('flop', 'Noch kein Flop'), say('Dafür ist noch zu wenig bewertet.'))
+      ? card(listTitle('flop', 'Noch kein Ladenhüter'), say('Dafür ist noch zu wenig bewertet.'))
       : card(
-          listTitle('flop', 'Kein Flop'),
+          listTitle('flop', 'Kein Ladenhüter'),
           say(r.settled === r.top.length ? 'Alles, was feststeht, kommt gut an.' : 'Keine Sorte bleibt meist stehen.'),
         );
   return tops + flops;

@@ -239,6 +239,9 @@ export function shopRow(m, e) {
     ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 
+// the two sides, on „Vorlieben“ and when buying, always with this icon in this tone
+export const SIDE = {top: ['champ', 'r-good'], flop: ['flop', 'r-bad']};
+export const sideIcon = side => icon(...SIDE[side]);
 // say and why are HTML; the caller escapes user text
 export const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 export const main = (title, sub = '', id = '') =>
