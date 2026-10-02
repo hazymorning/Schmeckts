@@ -1,82 +1,47 @@
 name: Tests
 
-# The whole suite on every push and every pull request, split across jobs that run at the same time, plus the
-# style and mistake checks of scripts/lint.sh. Nothing is built here, so no Android SDK and no APK or .deb.
-# No JDK either: ui_test.py only reads PhotoPlugin.java as text.
 on:
-  push:
   pull_request:
-  workflow_call: # the release runs exactly these checks, and only attaches the APK once they are green
+  push:
+    branches: [main]
+  workflow_call:
 
-# A newer push to the same branch cancels the run before it; on main every commit is checked in full.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# The suites that open the app run in Playwright's own image: it has the browser and its system packages
-# already, and "playwright install --with-deps" on every run was the slowest step. The image tag follows the
-# playwright pin in tests/requirements.txt, so the browser and the package match.
+# The browser suites run in Playwright's image, which brings Chromium and its system packages. Its tag has to match
+# the playwright pin in tests/requirements.txt; scripts/lint.sh checks that.
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      # The whole history, because scripts/text-style.py reads the commit messages this branch adds on top of
-      # main, and a shallow checkout has neither main nor the parents of its own tip.
+      # full history: text-style.py reads the commit messages the branch adds on top of main
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
-      - name: Node 22
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
-
-      - name: Python 3
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: tests/requirements.txt
-
-      - name: Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
           cache: false
+      - run: python3 -m pip install --requirement tests/requirements.txt
+      - run: scripts/lint.sh
 
-      # ruff comes from the same pinned list as the test packages; shellcheck ships with the runner.
-      - name: ruff
-        run: python3 -m pip install --requirement tests/requirements.txt
-
-      # ESLint, Prettier, gofmt, go vet, staticcheck, ruff, shellcheck and the text checks. All of them run,
-      # so one job reports everything that fails.
-      - name: Style and mistakes
-        run: scripts/lint.sh
-
-  go:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # The server uses the standard library only and there is no go.sum: no dependency cache.
-      - name: Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: server/go.mod
-          cache: false
-
-      - name: Server tests
-        run: scripts/test.sh go
-
-  # The quick suites together: the pure modules in Node, storage, the design rules and the performance budget.
   quick:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     container:
       image: mcr.microsoft.com/playwright/python:v1.56.0-noble
     steps:
@@ -86,7 +51,7 @@ jobs:
 
   ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     container:
       image: mcr.microsoft.com/playwright/python:v1.56.0-noble
     steps:
@@ -94,18 +59,16 @@ jobs:
       - uses: ./.github/actions/browser-tests
       - run: scripts/test.sh ui
 
-  # Several phones against the real server, so this job needs Go as well
-  sync:
+  server:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     container:
       image: mcr.microsoft.com/playwright/python:v1.56.0-noble
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/browser-tests
-      - name: Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
           cache: false
-      - run: scripts/test.sh sync
+      - run: scripts/test.sh go sync

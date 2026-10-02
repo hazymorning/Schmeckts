@@ -1,16 +1,14 @@
 name: Release
 
-# A published release builds the signed APK and attaches it to the release. Started by hand, the same path
-# builds an APK for trying things out and leaves it as an artifact. The whole suite runs next to the build as
-# its own job (the Tests workflow, itself split across several), and the APK is attached only once both are
-# through.
+# A published release gets the signed APK and the server packages attached once the tests are green. Started by
+# hand, the same builds are left as artifacts.
 on:
   release:
     types: [published]
   workflow_dispatch:
 
 permissions:
-  contents: write # to attach the APK to the release
+  contents: write
 
 jobs:
   tests:
@@ -23,53 +21,37 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Node 22
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
-
-      - name: Python 3
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: tests/requirements.txt
-
-      - name: JDK 21
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
-
-      # Gradle keeps its downloads and its build cache between runs
-      - name: Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           build-root-directory: app/android
           cache-read-only: ${{ github.event_name != 'release' }}
 
-      # design/render-icons.py draws the launcher icons for Android 7 in Chromium, so this build needs a browser
-      # as well. The browser is cached; only the system packages are fetched each time.
-      - name: Chromium for the launcher icons
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # design/render-icons.py draws the Android 7 launcher icons in Chromium
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ hashFiles('tests/requirements.txt') }}
-      - name: Pillow and Playwright
-        run: |
+      - run: |
           python3 -m pip install --requirement tests/requirements.txt
           python3 -m playwright install --with-deps chromium
 
-      # The runner's SDK lives in ANDROID_HOME and build-apk.sh takes it from there. Platform 36 and the build
-      # tools are installed on top; apksigner and aapt2 come with the build tools.
-      - name: Add to the Android SDK
-        run: |
+      - run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.1.0" > /dev/null
 
-      # The version lives only in app/package.json; the release tag is v<version>.
       - name: Check the version
         id: version
         env:
@@ -78,15 +60,11 @@ jobs:
           VERSION="$(node -p "require('./app/package.json').version")"
           if [ -n "$TAG" ] && [ "${TAG#v}" != "$VERSION" ]; then
             echo "Tag $TAG does not match version $VERSION in app/package.json." >&2
-            echo "Raise the version in app/package.json to ${TAG#v} and merge that first, then delete this" >&2
-            echo "release and its tag and publish it again, or name the release v$VERSION." >&2
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # The signing key is written to a file outside the working tree for the build, removed again in every
-      # case and never printed. --tested: the tests run in the job beside this one.
-      - name: Build and sign the APK
+      - name: Build and sign
         env:
           SCHMECKTS_SIGNING_KEY: ${{ secrets.SCHMECKTS_SIGNING_KEY }}
         run: |
@@ -96,29 +74,42 @@ jobs:
           (umask 077; printf '%s' "$SCHMECKTS_SIGNING_KEY" > "$KEY_FILE")
           scripts/build-apk.sh "$KEY_FILE" --tested
 
-      # When started by hand, this is the result; for a release the job below picks it up again.
-      - name: Leave the APK as an artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: schmeckts-${{ steps.version.outputs.version }}
+          name: apk
           path: dist/schmeckts-${{ steps.version.outputs.version }}.apk
           if-no-files-found: error
 
-  # Always under the same name: the README's download button links to releases/latest/download/schmeckts.apk.
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      - run: server/build-deb.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server
+          path: dist/schmeckts-server_*.deb
+          if-no-files-found: error
+
+  # Always as schmeckts.apk: the README links to releases/latest/download/schmeckts.apk.
   attach:
     if: github.event_name == 'release'
-    needs: [tests, apk]
+    needs: [tests, apk, server]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: schmeckts-${{ needs.apk.outputs.version }}
-      - name: Attach the APK to the release
-        env:
+          merge-multiple: true
+      - env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
           VERSION: ${{ needs.apk.outputs.version }}
         run: |
           cp "schmeckts-$VERSION.apk" schmeckts.apk
-          gh release upload "$TAG" schmeckts.apk --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$TAG" schmeckts.apk schmeckts-server_*.deb --clobber --repo "$GITHUB_REPOSITORY"
