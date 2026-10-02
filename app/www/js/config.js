@@ -9,30 +9,42 @@ export const SPECIES = [
 export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1)).i;
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]);
-// keys are stored in the data, never rename them; short has to fit a column of six at 360px
-// cheer: what the confirmation adds
+// Keys are stored in the data, never rename them. Every wording says what the pet ate; short has to fit a column of
+// six at 360px. cheer: what the confirmation adds
 export const RATINGS = {
-  top: {label: 'Sofort leer', short: 'Alles leer', said: 'sofort leer', score: 100, cheer: 'Ratzeputz!'},
-  gut: {label: 'Fast leer', short: 'Fast leer', said: 'fast leer', score: 80, cheer: 'Fast wie geleckt.'},
-  mittel: {label: 'Halb gegessen', short: 'Hälfte übrig', said: 'halb gegessen', score: 50, cheer: 'Halbe-halbe.'},
+  top: {label: 'Alles gefressen', short: 'Alles', said: 'alles gefressen', score: 100, cheer: 'Ratzeputz!'},
+  gut: {
+    label: 'Fast alles gefressen',
+    short: 'Fast alles',
+    said: 'fast alles gefressen',
+    score: 80,
+    cheer: 'Fast wie geleckt.',
+  },
+  mittel: {
+    label: 'Die Hälfte gefressen',
+    short: 'Die Hälfte',
+    said: 'die Hälfte gefressen',
+    score: 50,
+    cheer: 'Halbe-halbe.',
+  },
   eager: {
-    label: 'Nur bissl',
-    short: 'Nur bissl',
+    label: 'Nur ein bissl gefressen',
+    short: 'Ein bissl',
     said: 'nur ein bissl gefressen',
     score: 40,
     cheer: 'Probiert ist probiert.',
   },
   sosse: {
-    label: 'Soße geleckt',
+    label: 'Nur die Soße geleckt',
     short: 'Nur Soße',
     said: 'nur die Soße geleckt',
     score: 30,
     cheer: 'Die Soße war der Star.',
   },
   schlecht: {
-    label: 'Kaum angerührt',
+    label: 'Fast nix gefressen',
     short: 'Fast nix',
-    said: 'kaum angerührt',
+    said: 'fast nix gefressen',
     score: 0,
     cheer: 'Heute lieber nicht.',
   },

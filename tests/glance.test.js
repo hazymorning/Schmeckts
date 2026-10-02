@@ -750,6 +750,16 @@ test('the overview card: the moment picks the first sentence, news of the day th
     ],
   ];
   for (const [x, want] of kinds) assert.equal(one(x, bare)[1], want);
+  const twice = x =>
+    overviewLines(x, pets, T, null)
+      .text.split(/[.!?](?=\s|<|$)/)
+      .filter(s => s.split('<b>').length > 2);
+  for (const x of [
+    ...news.map(([n]) => ({...g, ...n})),
+    ...kinds.map(([k]) => ({...bare, ...k})),
+    ...shown.map(v => ({...g, ...v})),
+  ])
+    assert.deepEqual(twice(x), [], 'at most one bold per sentence');
 
   const t = h => at(`2026-06-09T${h}`),
     fed = {servedAt: t('07:20')},

@@ -126,12 +126,12 @@ function viewObservation() {
   const kind = observationOf(o.kind),
     ids = Object.keys(o.pets).filter(id => getPet(id)),
     before = mealsBefore(db, o).map(s => getProduct(s.productId)),
-    names = [...new Set(before.filter(Boolean).map(p => `<b>${esc(pname(p))}</b>`))],
+    names = [...new Set(before.filter(Boolean).map(p => esc(pname(p))))],
     weighed =
       kind.about !== 'meal'
         ? ''
         : names.length
-          ? `<p class="hint mt-s">${cap(kind.window)} davor gab es ${andList(names)}.</p>`
+          ? `<p class="hint mt-s">${cap(kind.window)} davor gab es <b>${andList(names)}</b>.</p>`
           : `<p class="hint mt-s">${cap(kind.window)} davor ist keine Mahlzeit eingetragen.</p>`;
   const kinds = `<div class="chips">${Object.entries(OBSERVATIONS)
     .map(
@@ -193,7 +193,7 @@ function viewName() {
   if (patient) return top + fieldSkeleton + fieldSkeleton; // same height as the fields, so nothing jumps
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
     said = read.length
-      ? `<p class="say read-note">Gelesen: ${read.map(x => `<b>${esc(x)}</b>`).join(', ')}. Passt das?</p>`
+      ? `<p class="say read-note">Gelesen: <b>${esc(read.join(', '))}</b>. Passt das?</p>`
       : serving?.status === 'noserver' && !product
         ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.</p>`
         : '',

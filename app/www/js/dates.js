@@ -1,10 +1,20 @@
-const rtf = new Intl.RelativeTimeFormat('de', {numeric: 'auto', style: 'short'});
+const rtf = new Intl.RelativeTimeFormat('de', {numeric: 'auto'});
 export const DAY = 864e5;
 const pad = n => String(n).padStart(2, '0');
 export const timeStr = t => {
   const d = new Date(t);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
+// as the app says a time: 7:05, not 07:05
+export const clockStr = t => {
+  const d = new Date(t);
+  return `${d.getHours()}:${pad(d.getMinutes())}`;
+};
+// min: minutes after midnight, to the quarter hour
+export function quarterStr(min) {
+  const m = Math.round(min / 15) * 15;
+  return `${Math.floor(m / 60) % 24}:${pad(m % 60)}`;
+}
 export const dayStart = t => {
   const d = new Date(t);
   d.setHours(0, 0, 0, 0);
@@ -38,7 +48,7 @@ export function when(t) {
       : n === 1
         ? 'gestern'
         : new Date(t).toLocaleDateString('de-DE', {weekday: 'short', day: 'numeric', month: 'short'});
-  return `${d}, ${timeStr(t)} Uhr`;
+  return `${d}, ${clockStr(t)} Uhr`;
 }
 export function ago(t) {
   const d = (t - Date.now()) / 1000,
@@ -47,5 +57,5 @@ export function ago(t) {
   if (a < 3600) return rtf.format(Math.round(d / 60), 'minute');
   if (a < 86400) return rtf.format(Math.round(d / 3600), 'hour');
   if (a < 86400 * 7) return rtf.format(Math.round(d / 86400), 'day');
-  return new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'short'});
+  return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
 }

@@ -1,7 +1,7 @@
 /* Home page overview card: where the day stands for the bowl, then one line that is only true today or a rotating
    aside. Never how a meal went, nor what the cards below already show. */
 import {esc} from '../text.js';
-import {addDays, dayStart} from '../dates.js';
+import {addDays, dayStart, quarterStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
 import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
@@ -25,11 +25,10 @@ const SPANS = {1: 'einem Monat', 3: 'drei Monaten', 6: 'sechs Monaten', 12: 'ein
 const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
 const b = text => `<b>${text}</b>`;
-// min: minutes after midnight
+// min: minutes after midnight; a full hour as „19 Uhr“
 function clock(min) {
-  const m = Math.round(min / 15) * 15,
-    h = Math.floor(m / 60) % 24;
-  return m % 60 ? `${h}:${String(m % 60).padStart(2, '0')}` : `${h} Uhr`;
+  const at = quarterStr(min);
+  return at.endsWith(':00') ? `${at.slice(0, -3)} Uhr` : at;
 }
 const clockOf = min => `${Math.floor(min / 60) % 24}:${String(min % 60).padStart(2, '0')}`;
 function spanOf(min) {

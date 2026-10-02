@@ -1496,12 +1496,14 @@ dialog.sheet::after {
 .tl-item {
   border-radius: var(--radius-m);
 }
+/* right-aligned, so 7:05 and 19:30 line up at the minutes */
 .tl-time {
   width: var(--tl-time);
   min-width: 0;
   flex: 0 0 auto;
   font: var(--type-small-strong);
   font-variant-numeric: tabular-nums;
+  text-align: right;
   color: var(--muted);
 }
 .tl-node {

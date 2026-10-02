@@ -880,7 +880,7 @@ export const LINES = {
   ],
   recordStreak: [
     '{days} am Stück, so lang war die Serie noch nie.',
-    'Mit {days} in Folge stellt das Tagebuch Rekord auf.',
+    '{days} in Folge sind ein neuer Rekord fürs Tagebuch.',
     '{days} ohne Lücke, das gab’s hier noch nie.',
   ],
   recordDay: [

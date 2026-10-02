@@ -1,6 +1,7 @@
 // Settings and their pages; the pet editor view is in views/sheets.js, since it is also a sheet
 import {$} from '../dom.js';
 import {andList, esc} from '../text.js';
+import {quarterStr} from '../dates.js';
 import {appInfo} from '../native.js';
 import {icon} from '../icons.js';
 import {REMIND, REMIND_MAX_H} from '../config.js';
@@ -26,12 +27,11 @@ const DENIED = 'Benachrichtigungen sind nicht erlaubt';
 
 // after a refused permission the switch flips back by itself, so the line says why
 const remindSub = () => (sheet.denied === 'remind' ? DENIED : 'Nach dem Füttern, auf diesem Handy');
-const hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 function feedSub() {
   if (sheet.denied === 'feed') return DENIED;
   const slots = feedSlots(db, Date.now());
   return slots.length
-    ? `Meist um ${andList(slots.map(x => hhmm(x.at)))} Uhr`
+    ? `Meist gegen ${andList(slots.map(x => quarterStr(x.at)))} Uhr`
     : 'Lernt die üblichen Zeiten aus dem Verlauf';
 }
 const houseSub = n => (n.detail ? `${n.title}, ${n.detail.charAt(0).toLowerCase()}${n.detail.slice(1)}` : n.title);

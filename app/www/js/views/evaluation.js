@@ -43,11 +43,13 @@ const AWAY = 42 * DAY; // a top unserved this long shows since when
 const JUDGE = 4; // settled varieties before the portrait calls a pet picky or easy to please
 const brandOf = p => (p.variety ? p.brand : '');
 // adds the brand where another variety has the same name
-function named(e) {
+function nameOf(e) {
   const p = e.product,
     twins = db.products.filter(q => pname(q) === pname(p)).length > 1;
-  return `<b>${esc(pname(p))}</b>${twins && p.brand ? ` von ${esc(p.brand)}` : ''}`;
+  return `${esc(pname(p))}${twins && p.brand ? ` von ${esc(p.brand)}` : ''}`;
 }
+const named = e => `<b>${nameOf(e)}</b>`;
+const petsOf = ids => esc(petNames(ids)); // in a sentence that already has its bold
 // all ratings when most agree with the row's side, otherwise only those of the pets that decide it
 function saidOf(e, side) {
   const good = goodOf(e.counts),
@@ -208,7 +210,9 @@ function petLine(m, t, several) {
   const pet = getPet(t.pet),
     who = `<b>${esc(pet.name)}</b>`,
     worse = t.dir < 0,
-    behind = t.behind?.length ? ` Das liegt wohl an ${andList(t.behind.map(id => named(m.byId.get(id))))}.` : '';
+    behind = t.behind?.length
+      ? ` Das liegt wohl an <b>${andList(t.behind.map(id => nameOf(m.byId.get(id))))}</b>.`
+      : '';
   const text =
     t.kind === 'gleich'
       ? `Bei ${who} läuft’s wie gehabt.`
@@ -225,7 +229,7 @@ function petLine(m, t, several) {
   return told(pic, text, weeks(t.recent, t.before));
 }
 const weeks = (recent, before) =>
-  `In den letzten vier Wochen <b>${times(recent.good, recent.n)}</b> gut gefressen, in den acht davor <b>${times(before.good, before.n)}</b>.`;
+  `In den letzten vier Wochen <b>${times(recent.good, recent.n)}</b> gut gefressen, in den acht davor ${times(before.good, before.n)}.`;
 const MOVED = 2; // max varieties told as moved
 function trendCard(m, x) {
   const lines = x.trend,
@@ -235,7 +239,7 @@ function trendCard(m, x) {
     rows.push(
       told(
         lead('paw'),
-        `Bei ${andList(lines.map(t => `<b>${esc(getPet(t.pet).name)}</b>`))} läuft’s wie gehabt.`,
+        `Bei ${petsOf(lines.map(t => t.pet))} läuft’s wie gehabt.`,
         weeks(sum('recent'), sum('before')),
       ),
     );
@@ -259,12 +263,7 @@ function trendCard(m, x) {
   return rows.length
     ? card(
         'Wie läuft’s gerade?',
-        toldList(rows) +
-          (few.length
-            ? hint(
-                `Für ${andList(few.map(pid => `<b>${esc(getPet(pid).name)}</b>`))} reicht es noch nicht für einen Vergleich.`,
-              )
-            : ''),
+        toldList(rows) + (few.length ? hint(`Für ${petsOf(few)} reicht es noch nicht für einen Vergleich.`) : ''),
       )
     : '';
 }
@@ -289,7 +288,7 @@ function observedCard(x) {
         l.id,
         obsThumb(l.kind),
         `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
-        `${cap(o.after)} nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten, nach den anderen Sorten nach <b>${l.other.hit} von ${l.other.n}</b>.`,
+        `${cap(o.after)} nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten, nach den anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
       );
     }),
   ];
@@ -299,14 +298,13 @@ function observedCard(x) {
 const SPLIT = 5;
 function splitCard(m, r) {
   if (m.pet || !r.split.length) return '';
-  const who = ids => andList(ids.map(pid => `<b>${esc(getPet(pid).name)}</b>`));
   const rows = r.split
     .slice(0, SPLIT)
     .map(e =>
       toldBtn(
         e.id,
         avatar(getPet(e.yes[0]), 's'),
-        `${who(e.yes)} ${e.yes.length > 1 ? 'mögen' : 'mag'} ${named(e)}, ${who(e.no)} nicht.`,
+        `${petsOf(e.yes)} ${e.yes.length > 1 ? 'mögen' : 'mag'} ${named(e)}, ${petsOf(e.no)} nicht.`,
         esc(cap([...e.yes, ...e.no].map(pid => `${getPet(pid).name} ${lower(evidenceOf(e.pets[pid]))}`).join(', '))) +
           '.',
       ),
@@ -343,19 +341,19 @@ function patternCard(m, x) {
     return told(
       lead(DIM_ICON[d.kind]),
       d.clear
-        ? `<b>${esc(a.key)}</b> kommt deutlich besser an als <b>${esc(inText(d, z.key))}</b>.`
-        : `Bisher kam <b>${esc(inText(d, a.key))}</b> besser an als <b>${esc(inText(d, z.key))}</b>.`,
-      `${d.type === 'Nassfutter' ? '' : `${esc(d.type)}: `}${esc(a.key)} <b>${times(a.good, a.n)}</b> gut gefressen, ${esc(inText(d, z.key))} <b>${times(z.good, z.n)}</b>.`,
+        ? `<b>${esc(a.key)}</b> kommt deutlich besser an als ${esc(inText(d, z.key))}.`
+        : `Bisher kommt <b>${esc(inText(d, a.key))}</b> besser an als ${esc(inText(d, z.key))}.`,
+      `${d.type === 'Nassfutter' ? '' : `${esc(d.type)}: `}${esc(a.key)} <b>${times(a.good, a.n)}</b> gut gefressen, ${esc(inText(d, z.key))} ${times(z.good, z.n)}.`,
     );
   });
-  const tips = x.patterns.filter(d => d.clear && d.groups[0].share * 100 >= GOOD).map(d => `<b>${esc(lookFor(d))}</b>`),
+  const tips = x.patterns.filter(d => d.clear && d.groups[0].share * 100 >= GOOD).map(d => esc(lookFor(d))),
     first = [...dims].sort((a, b) => b.clear - a.clear || b.gap - a.gap)[0];
   const body = rows.length
     ? toldList(rows)
     : first
       ? likesList(m, {...first, groups: [first.groups[0], first.groups.at(-1)]})
       : toldList(habits.slice(0, HABITS).map(h => habitRow(h, db.pets.length > 1 && !m.pet)));
-  return `<section class="card"><h2>Worauf es ankommt</h2>${tips.length ? say(`Neues am ehesten ${andList(tips)} probieren.`) : ''}${body}
+  return `<section class="card"><h2>Worauf es ankommt</h2>${tips.length ? say(`Neues am ehesten <b>${andList(tips)}</b> probieren.`) : ''}${body}
     <button class="card-btn" data-action="open-level" data-v="profile">Mehr dazu${icon('chevron')}</button></section>`;
 }
 

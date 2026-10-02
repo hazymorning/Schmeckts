@@ -1,6 +1,6 @@
 // Building blocks shared by the views
 import {andList, cap, esc} from '../text.js';
-import {DAY, addDays, ago, dayKey, dayLabel, dayStart, timeStr} from '../dates.js';
+import {DAY, addDays, ago, clockStr, dayKey, dayLabel, dayStart} from '../dates.js';
 import {icon} from '../icons.js';
 import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -61,8 +61,8 @@ export function rateSlider(s, pid) {
       .join(', '),
     words = scale
       .map((r, i) => {
-        const [first, second] = RATINGS[r].short.split(' ');
-        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${second}</small></span>`;
+        const [first, ...rest] = RATINGS[r].short.split(' ');
+        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${rest.join(' ')}</small></span>`;
       })
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
@@ -204,7 +204,7 @@ function observationItem(o, multiHouse, fresh) {
     ids = observedPets(o),
     meta = [multiHouse || ids.length > 1 ? whoObserved(ids) : '', o.by ? 'von ' + o.by : ''].filter(Boolean).join(', ');
   return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
-        <span class="tl-time">${timeStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
+        <span class="tl-time">${clockStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
         <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
 // anchors: day ids the calendar jumps to; fresh: id of the entry just made
@@ -229,7 +229,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
               ? 'Wird gelesen …'
               : 'Unbekanntes Futter';
         return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-serving" data-id="${s.id}">
-        <span class="tl-time">${timeStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
+        <span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
         ${resultBadges(s, true)}</button></li>`;
       })
@@ -281,7 +281,7 @@ export function habitRow(h, several) {
   if (h.kind === 'sosse' || h.kind === 'eager')
     return told(
       lead(h.kind === 'sosse' ? 'drop' : 'r_eager'),
-      `Bei ${andList(h.sorts.map(x => `<b>${esc(name(x.id))}</b>`))} ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
+      `Bei <b>${esc(andList(h.sorts.map(x => name(x.id))))}</b> ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
       esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))),
     );
   const pet = several ? getPet(h.pet) : null,
@@ -292,14 +292,14 @@ export function habitRow(h, several) {
       h.kind === 'neugier'
         ? `${who}${pet ? 'ist neugierig' : 'Neugierig'}: Neues kommt erst gut an, dann lässt es nach.`
         : `${who}${pet ? 'braucht' : 'Braucht'} Anlauf: beim ersten Mal bleibt öfter was übrig als später.`,
-      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach <b>${h.later.good} von ${h.later.n} Mal</b>.`,
+      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach ${h.later.good} von ${h.later.n} Mal.`,
     );
   return told(
     pet ? avatar(pet, 's') : lead('repeat'),
     h.kind === 'abwechslung'
       ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.`
       : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte kurz hintereinander kommt besser an.`,
-    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst <b>${upTo(h.other.good, h.other.n)}</b>.`,
+    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst ${upTo(h.other.good, h.other.n)}.`,
   );
 }
 // not a button, nothing opens from it yet. g: a group of profile() in smart.js
@@ -352,10 +352,9 @@ export function syncChip() {
 }
 
 export function since(t, now) {
-  const day = dayStart(now),
-    clock = () => timeStr(t).replace(/^0(?=\d:)/, '');
-  if (t >= day) return `heute um ${clock()}`;
-  if (t >= addDays(day, -1)) return `gestern um ${clock()}`;
+  const day = dayStart(now);
+  if (t >= day) return `heute um ${clockStr(t)}`;
+  if (t >= addDays(day, -1)) return `gestern um ${clockStr(t)}`;
   const days = Math.round((day - dayStart(t)) / DAY);
   if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
   return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});

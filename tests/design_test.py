@@ -151,6 +151,9 @@ SCAN = """() => { const bad = [];
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
     if (fam !== 'Figtree' && fam !== 'Faustina') bad.push(`${fam} on ${tag}`);
   }
+  for (const el of document.querySelectorAll('p:not(.slider-names), .said, .why, .told li > span, .tile small'))
+    for (const part of el.innerHTML.split(/[.!?](?=\\s|<|$)/))
+      if ((part.match(/<b>/g) || []).length > 1) bad.push(`two bold in one sentence: ${part.replace(/<[^>]*>/g, '').trim()}`);
   return [...new Set(bad)]; }"""
 
 
@@ -248,7 +251,7 @@ async def test_views(browser, url, scheme):
     pg2, _ = await open_page(full, url, scheme)
     bad.extend(await pg2.evaluate(SCAN))
     await full.close()
-    check(not bad, f'all visible text at 4.5:1 and in Figtree or Faustina ({scheme}) {bad}')
+    check(not bad, f'all visible text at 4.5:1, in Figtree or Faustina, at most one bold per sentence ({scheme}) {bad}')
     check(not errors, f'no errors in the console {errors}')
     await ctx.close()
 
