@@ -40,7 +40,7 @@ import {
 
 const PLACES = 5;
 const AWAY = 42 * DAY; // a top unserved this long shows since when
-const NUMBERS = ['keine', 'eine', 'zwei', 'drei', 'vier', 'fünf'];
+const JUDGE = 4; // settled varieties before the portrait calls a pet picky or easy to please
 const brandOf = p => (p.variety ? p.brand : '');
 // adds the brand where another variety has the same name
 function named(e) {
@@ -117,28 +117,23 @@ export function evaluationCard(m) {
     <button class="card-btn" data-action="open-evaluation">Alle Vorlieben${icon('chevron')}</button></section>`;
 }
 
+// the lists below name the varieties, so this only says how many of all settled ones go down well
 function portraitHTML(m, r) {
   const ids = m.pets,
     several = ids.length > 1,
     pets = ids.map(getPet),
-    names = list => andList(list.map(pid => esc(getPet(pid).name))),
-    top = r.top[0],
-    flop = r.flop[0],
+    who = esc(petNames(ids)),
+    k = r.top.length,
+    n = r.settled,
+    good = (few = '') =>
+      `Von ${n} Sorten ${k > 1 ? 'kommen' : 'kommt'} ${k ? few + (k === 1 ? 'eine' : k) : 'keine'} meist gut an.`,
     said = [];
-  if (top) {
-    const fans = several ? (top.yes.length ? top.yes : ids.filter(pid => top.pets[pid]?.n)) : ids;
-    said.push(`Am liebsten ${fans.length > 1 ? 'mögen' : 'mag'} ${names(fans)} ${named(top)}.`);
-  }
-  if (flop) {
-    const out = several ? (flop.no.length ? flop.no : []) : [];
-    said.push(
-      out.length
-        ? `${names(out)} ${out.length > 1 ? 'lassen' : 'lässt'} ${named(flop)} meist stehen.`
-        : `${named(flop)} bleibt ${top ? 'dagegen ' : ''}meist stehen.`,
-    );
-  }
-  if (!said.length) said.push(waiting(m, r));
-  if (!top && !flop && !r.settled && !r.stale)
+  if (!k && !r.flop.length) said.push(waiting(m, r));
+  else if (n >= JUDGE && k * 3 >= n * 2)
+    said.push(`${who} ${several ? 'fressen' : 'frisst'} fast alles gern: ${good()}`);
+  else if (n >= JUDGE && k * 3 <= n) said.push(`${who} ${several ? 'sind' : 'ist'} wählerisch: ${good('nur ')}`);
+  else said.push(good());
+  if (!k && !r.flop.length && !r.settled && !r.stale)
     said.push('Ab drei Bewertungen einer Sorte steht hier, was am besten ankommt und was stehen bleibt.');
   const pic = several
     ? pets
@@ -177,22 +172,19 @@ function listsHTML(m, r, x) {
     );
   if (!r.top.length && !r.flop.length && (r.stale || !r.settled)) return ''; // the first card says why
   const top = r.top.slice(0, PLACES),
-    flop = r.flop.slice(0, PLACES),
-    few = (list, text) =>
-      list.length > 1 && list.length < PLACES ? hint(`Nur diese ${NUMBERS[list.length]} ${text}.`) : '';
+    flop = r.flop.slice(0, PLACES);
   const tops = top.length
     ? card(
         listTitle('top', top.length > 1 ? 'Leibgerichte' : 'Leibgericht'),
         (r.flat ? say('Die Sorten liegen noch so nah beieinander, dass die Reihenfolge Zufall sein kann.') : '') +
-          places(m, x, top, 'top') +
-          few(top, 'kommen bisher meist gut an'),
+          places(m, x, top, 'top'),
       )
-    : card(listTitle('top', 'Noch kein Leibgericht'), say(`Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`));
+    : card(
+        listTitle('top', 'Noch kein Leibgericht'),
+        say(`Bisher kam keine Sorte${r.split.length ? ' bei allen' : ''} meist gut an.`),
+      );
   const flops = flop.length
-    ? card(
-        listTitle('flop', 'Ladenhüter'),
-        places(m, x, flop, 'flop') + few(flop, 'kommen bisher nicht gut an'),
-      )
+    ? card(listTitle('flop', 'Ladenhüter'), places(m, x, flop, 'flop'))
     : r.settled < 3
       ? card(listTitle('flop', 'Noch kein Ladenhüter'), say('Dafür ist noch zu wenig bewertet.'))
       : card(

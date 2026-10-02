@@ -1,11 +1,11 @@
 /* Home page overview card: where the day stands for the bowl, then one line that is only true today or a rotating
-   aside. Never how a meal went; the cards below cover that. */
-import {cap, esc} from '../text.js';
-import {addDays, dayStart, timeStr} from '../dates.js';
+   aside. Never how a meal went, nor what the cards below already show. */
+import {esc} from '../text.js';
+import {addDays, dayStart} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
 import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
-import {getObservation, getPet, getProduct, petNames, pname, servingPets} from '../derive.js';
+import {getObservation, getPet, getProduct, petNames, pname} from '../derive.js';
 import {dayNumber, glance, pick, takeTurn} from '../glance.js';
 import {factsOn, fill, LEADS, LINES} from './facts.js';
 import {avatar, since} from './parts.js';
@@ -23,24 +23,8 @@ const HOURS_FROM = 90; // minutes
 const HALF = {1: 'eineinhalb', 2: 'zweieinhalb'};
 const SPANS = {1: 'einem Monat', 3: 'drei Monaten', 6: 'sechs Monaten', 12: 'einem Jahr'}; // keyed by months
 const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-const WORDS = [
-  'keine',
-  'eine',
-  'zwei',
-  'drei',
-  'vier',
-  'fünf',
-  'sechs',
-  'sieben',
-  'acht',
-  'neun',
-  'zehn',
-  'elf',
-  'zwölf',
-];
 
 const b = text => `<b>${text}</b>`;
-const count = (n, one, many, article) => (n === 1 ? `${article} ${one}` : `${WORDS[n] || n} ${many}`);
 // min: minutes after midnight
 function clock(min) {
   const m = Math.round(min / 15) * 15,
@@ -48,7 +32,6 @@ function clock(min) {
   return m % 60 ? `${h}:${String(m % 60).padStart(2, '0')}` : `${h} Uhr`;
 }
 const clockOf = min => `${Math.floor(min / 60) % 24}:${String(min % 60).padStart(2, '0')}`;
-const at = t => b(timeStr(t).replace(/^0(?=\d:)/, ''));
 function spanOf(min) {
   if (min < HOURS_FROM) return `${min} Minuten`;
   const halves = Math.round(min / 30),
@@ -101,23 +84,14 @@ function leadLine(g, pets, now, moment) {
   const last = g.last,
     p = getProduct(last.productId),
     treat = p && typeOf(p) === 'Snack',
-    feeder = g.feeders.length > 1 && last.by ? b(esc(last.by)) : '',
-    fed = servingPets(last),
-    some = pets.length > 1 && fed.length < pets.length ? subject(fed) : null,
-    next = g.next,
-    minutes = Math.round((now - last.servedAt) / 6e4),
-    ago = minutes < 2 ? 'gerade eben' : `vor ${b(minutes + ' Minuten')}`;
+    next = g.next;
   const values = {
     what: p ? b(esc(pname(p))) : 'unbenanntes Futter',
-    at: at(last.servedAt),
-    by: feeder ? ` von ${feeder}` : '',
-    for: some ? ` für ${some.names}` : '',
-    ago,
-    Ago: cap(ago),
+    by: g.feeders.length > 1 && last.by ? ` von ${esc(last.by)}` : '',
     meal: next ? mealAt(next.at) : 'Futter',
     time: next ? b(clock(next.at)) : '',
-    since: b(since(last.servedAt, now)),
-    evening: new Date(last.servedAt).getHours() >= 17 ? 'Abend ' : '',
+    since: since(last.servedAt, now),
+    span: b(spanOf(Math.round((now - last.servedAt) / 6e4))),
     names: all.names,
     wartet: all.verb('wartet', 'warten'),
     findet: all.verb('findet', 'finden'),
@@ -125,32 +99,15 @@ function leadLine(g, pets, now, moment) {
     ist: all.verb('ist', 'sind'),
     hat: all.verb('hat', 'haben'),
   };
-  if (moment === 'fresh') return sayLead(treat ? 'freshTreat' : 'fresh', now, values);
-  if (moment === 'today') {
-    const both = [
-      g.meals && count(g.meals, 'Mahlzeit', 'Mahlzeiten', 'eine'),
-      g.snacks && count(g.snacks, 'Snack', 'Snacks', 'einen'),
-    ]
-      .filter(Boolean)
-      .map(b)
-      .join(' und ');
-    return sayLead('today', now, {
-      ...values,
-      so: g.meals ? 'schon' : 'bisher nur',
-      both,
-      Names: all.names,
-    });
-  }
-  return sayLead(moment, now, values);
+  return sayLead(moment === 'fresh' && treat ? 'freshTreat' : moment, now, values);
 }
 
-// First thing only true today, in priority order. counted: the lead already gave the treat count
-function message(g, pets, now, counted) {
+// First thing only true today, in priority order
+function message(g, pets, now) {
   if (g.birthday && (g.birthday.today || g.birthday.days <= BIRTHDAY_SOON)) {
     const {today, days, age} = g.birthday,
       pet = esc(getPet(g.birthday.pet).name);
-    if (today)
-      return age ? say('birthdayAge', now, {pet: b(pet), age: b(age)}) : say('birthdayToday', now, {pet: b(pet)});
+    if (today) return age ? say('birthdayAge', now, {pet: b(pet), age}) : say('birthdayToday', now, {pet: b(pet)});
     return days === 1 ? say('birthdayTomorrow', now, {pet}) : say('birthdaySoon', now, {pet, days: b(days + ' Tagen')});
   }
   if (g.premiere)
@@ -160,10 +117,10 @@ function message(g, pets, now, counted) {
   if (g.milestone && g.milestone.left <= MILESTONE_NEAR)
     return g.milestone.left === 1
       ? say('milestoneNext', now, {m: b(g.milestone.n + '.')})
-      : say('milestone', now, {n: b(g.milestone.left + '×'), m: b(g.milestone.n + '. Mal')});
-  if (g.anniversary) return say('anniversary', now, {span: b(SPANS[g.anniversary]), n: b(g.first.meals)});
+      : say('milestone', now, {n: g.milestone.left + '×', m: b(g.milestone.n + '. Mal')});
+  if (g.anniversary) return say('anniversary', now, {span: b(SPANS[g.anniversary]), n: g.first.meals});
   if (g.record.streak) return say('recordStreak', now, {days: b(g.record.streak + ' Tage')});
-  if (g.record.meals) return say('recordDay', now, {n: b(g.record.meals + ' Mahlzeiten')});
+  if (g.record.meals) return say('recordDay', now);
   if (g.shift)
     return say(g.shift.diff < 0 ? 'earlier' : 'later', now, {
       meal: mealAt(g.shift.at),
@@ -173,7 +130,7 @@ function message(g, pets, now, counted) {
   if (g.snacks >= SNACKS) {
     const all = subject(pets.map(x => x.id)),
       grip = `${all.names} ${all.verb('hat', 'haben')} ${g.feeders.length > 1 ? 'euch' : 'dich'} im Griff.`;
-    return say(counted ? 'snacksCounted' : 'snacks', now, {n: b(g.snacks + ' Snacks'), grip});
+    return say('snacks', now, {grip});
   }
   return '';
 }
@@ -191,7 +148,7 @@ const TURN_LINES = {
   run(g, now) {
     const {name, days, other} = g.feedRun;
     return say(other ? 'feedRun' : 'feedRunAlone', now, {
-      name: b(esc(name)),
+      name: esc(name),
       days: b(days + ' Tage'),
       since: b(days + ' Tagen'),
       other: esc(other),
@@ -207,7 +164,7 @@ const TURN_LINES = {
       time: b(clockOf(mine)),
     });
   },
-  week: (g, now) => say('week', now, {meals: b(g.week.meals + ' Mahlzeiten'), sorts: b(g.week.sorts + ' Sorten')}),
+  week: (g, now) => say('week', now, {meals: b(g.week.meals + ' Mahlzeiten'), sorts: g.week.sorts + ' Sorten'}),
   lookback: (g, now) => say('lookback', now, {sort: b(sortName(g.lookback))}),
   sorts: (g, now) => say('sorts', now, {n: b(g.sorts + ' Sorten')}),
   days: (g, now) =>
@@ -241,7 +198,7 @@ export function overviewLines(g, pets, now, memory) {
     date = new Date(now),
     moment = momentOf(g, now),
     dated = factsOn(species, date, true)[0]?.text || '',
-    news = (g.last && message(g, pets, now, moment === 'today')) || dated;
+    news = (g.last && message(g, pets, now)) || dated;
   let more = news,
     kept = memory;
   if (!more && (moment === 'due' || moment === 'dueFirst')) {

@@ -746,7 +746,8 @@ export function factsOn(species, date, dated = false, moment) {
   return list.filter(f => (!f.months || f.months.includes(month)) && (dated ? on(f) === today : !f.day && fits(f)));
 }
 
-/* The diary below names every meal, so the variety is only named where it is news. Each wording is one natural
+/* The cards below show every meal, when and by whom, so a lead never says that again: it tells where the day stands
+   and what comes next. Only a meal older than the diary on the home page is named. Each wording is one natural
    sentence and says one thing; with the aside, three lines at 393px hold about 100 characters. */
 export const LEADS = {
   none: [
@@ -756,11 +757,10 @@ export const LEADS = {
     'Nach dem ersten Napf geht’s hier richtig los.',
   ],
   due: [
-    'Futterzeit! Zuletzt gab’s {what} um {at}{by}.',
+    'Futterzeit! Das {meal} ist dran.',
     'Jetzt wäre ein guter Moment fürs {meal}.',
-    'Das {meal} ist dran, zuletzt gab’s {what}.',
     '{names} {findet}, es ist Zeit fürs {meal}.',
-    'Seit {at} gab’s nichts, Zeit fürs {meal}.',
+    'Zeit fürs {meal}, der Bauch knurrt schon.',
   ],
   dueFirst: [
     'Futterzeit! Heute gab’s noch nichts.',
@@ -769,24 +769,21 @@ export const LEADS = {
     'Der erste Napf des Tages ist überfällig.',
   ],
   fresh: [
-    '{Ago} gab’s {what}{for}{by}.',
-    '{what} gab’s {ago}{for}{by}.',
-    '{Ago} stand {what} im Napf{for}{by}.',
-    '{Ago} wurde {what} serviert{for}{by}.',
-    '{what} ist frisch serviert{for}{by}.',
+    'Guten Appetit, {names}!',
+    'Frisch aufgetischt, guten Appetit!',
+    '{names} {hat} jetzt erst mal zu tun.',
+    'Der Napf ist voll, jetzt heißt es schmatzen.',
   ],
   freshTreat: [
-    '{Ago} gab’s {what} zum Naschen{for}{by}.',
-    '{what} gab’s {ago} zum Naschen{for}{by}.',
-    'Zum Naschen gab’s {ago} {what}{for}{by}.',
-    'Eben wurde genascht, und zwar {what}{for}{by}.',
+    'Ein Snack zwischendurch muss sein.',
+    '{names} {hat} gerade genascht.',
+    'Zwischendurch ein Häppchen, wie fein.',
   ],
   later: [
     'Das {meal} gibt’s gegen {time}.',
     'Bis zum {meal} gegen {time} ist Pause.',
     'Gegen {time} steht das {meal} an.',
     '{names} {wartet} aufs {meal} gegen {time}.',
-    'Um {at} wurde gefüttert{by}, gegen {time} wieder.',
   ],
   morning: [
     'Gegen {time} gibt’s heute den ersten Napf.',
@@ -804,30 +801,25 @@ export const LEADS = {
   night: [
     'Nachtruhe, das {meal} gibt’s gegen {time}.',
     'Schlafenszeit, der Napf öffnet gegen {time}.',
-    'Bis gegen {time} wird geschlafen.',
-    'Es wird geträumt, gegen {time} gibt’s Futter.',
+    'Bis gegen {time} ist Nachtruhe.',
+    'Süße Träume, gegen {time} gibt’s Futter.',
   ],
-  today: [
-    'Heute gab’s {so} {both}.',
-    '{Names} {hat} heute {so} {both} gehabt.',
-    'Um {at} wurde zuletzt gefüttert{by}.',
-    'Der Tag hat {so} {both} gebracht.',
-  ],
+  today: ['Seit {span} ist Ruhe am Napf.', 'Das letzte Futter ist {span} her.', 'Seit {span} hat der Napf Pause.'],
   yesterday: [
-    'Seit gestern um {at} gab’s nichts mehr.',
     'Heute ist noch nichts eingetragen.',
-    'Gestern um {at} gab’s das letzte Futter{by}.',
     'Heute stand noch nichts im Napf.',
+    '{names} {wartet} heute noch auf den ersten Napf.',
+    'Seit {span} ist Ruhe am Napf.',
   ],
   lastNight: [
-    'Gestern {evening}um {at} gab’s zuletzt {what}{by}.',
-    'Das letzte Futter gab’s gestern {evening}um {at}.',
-    'Zuletzt stand gestern {evening}{what} im Napf.',
+    'Nachtruhe, der Napf hat frei.',
+    'Schlafenszeit, auch für den Napf.',
+    'Es ist Nacht, {names} {ist} im Traumland.',
   ],
   older: [
     'Zuletzt gab’s {since} {what}{by}.',
     'Das letzte Futter stand {since} im Napf.',
-    'Eine Weile ist hier nichts eingetragen worden.',
+    'Eine Weile hat hier niemand was eingetragen.',
   ],
 };
 
@@ -892,9 +884,9 @@ export const LINES = {
     '{days} ohne Lücke, das gab’s hier noch nie.',
   ],
   recordDay: [
-    'Schon {n} heute, so viele gab’s noch nie.',
-    'Mit {n} ist heute ein Rekordtag.',
-    'Heute gab’s {n}, so viele wie nie zuvor.',
+    'So viele Mahlzeiten an einem Tag gab’s noch nie.',
+    'Heute gab’s so viele Mahlzeiten wie noch nie.',
+    'Rekord, an keinem Tag gab’s bisher öfter Futter.',
   ],
   earlier: [
     'Das {meal} war heute {span} früher dran.',
@@ -911,12 +903,7 @@ export const LINES = {
     'Dieselbe Minute wie gestern, die innere Uhr läuft.',
     'Genau wie gestern auf die Minute, fast unheimlich.',
   ],
-  snacksCounted: [
-    'So viele Snacks heute, {grip}',
-    'Snacks über Snacks, {grip}',
-    'Bei so vielen Snacks ist klar, {grip}',
-  ],
-  snacks: ['Schon {n} heute, {grip}', 'Heute gab’s schon {n}, {grip}', '{n} an einem Tag, {grip}'],
+  snacks: ['So viele Snacks heute, {grip}', 'Snacks über Snacks, {grip}', 'Bei so vielen Snacks ist klar, {grip}'],
   duel: [
     '{first} führt im Fütter-Duell gerade {n} zu {m}.',
     '{first} liegt {n} zu {m} vorn, {second}, da geht was!',
