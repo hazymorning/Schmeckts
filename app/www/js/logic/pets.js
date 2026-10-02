@@ -4,7 +4,7 @@ import {uid} from '../fields.js';
 import {dayKey} from '../dates.js';
 import {norm} from '../text.js';
 import {haptic} from '../native.js';
-import {db, prefs, save, savePrefs} from '../store.js';
+import {db, prefs, save, savePrefs, usedNews} from '../store.js';
 import {getPet, namesOf} from '../derive.js';
 import {cropSquare, fileToImage} from '../images.js';
 import {cropRect, cropStart} from '../ui/crop.js';
@@ -118,8 +118,10 @@ export function savePet() {
   Object.assign(p, {name, species: s.species, photo: s.photo || null});
   if (birthday) p.birthday = birthday;
   else delete p.birthday; // removed on the other phones too
-  if (nicknames.length) p.nicknames = nicknames;
-  else delete p.nicknames;
+  if (nicknames.length) {
+    p.nicknames = nicknames;
+    usedNews('nicknames');
+  } else delete p.nicknames;
   if (isNew) db.pets.push(p);
   save();
   haptic('success');

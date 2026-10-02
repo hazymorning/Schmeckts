@@ -339,8 +339,16 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
-   it needs and what to say while that is off. */
+   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor. */
 export const NEWS = [
+  {
+    v: '0.26.0',
+    use: 'nicknames',
+    title: 'Neu: Spitznamen',
+    say: 'Im Profil deines Tieres kannst du jetzt Spitznamen eintragen. Die App nennt es dann mal so, mal so.',
+    why: 'Einkaufen ist umgezogen und steht jetzt ganz unten bei „Vorlieben“.',
+    go: ['pet', 'Eintragen'],
+  },
   {
     v: '0.25.0',
     use: 'rate-reminder',

@@ -236,14 +236,20 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
+// with several pets the editor is reached through the settings
+const goTo = ([where, label]) =>
+  where === 'pet' && db.pets.length === 1
+    ? `<button class="btn primary" data-action="open-pet" data-id="${db.pets[0].id}">${label}</button>`
+    : `<button class="btn primary" data-action="open-settings">${label}</button>`;
 // the newest news, never beside sample data
 function newsHTML() {
   const n = NEWS[0],
     [setting, offWhy] = n?.off || [],
     off = setting && !prefs[setting];
   if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
+  const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
   return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
-    <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${off ? `<button class="btn primary" data-action="open-settings">Einstellungen öffnen</button>` : ''}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
+    <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

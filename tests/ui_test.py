@@ -1210,10 +1210,9 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
-    check(await pg.locator(f'{CARD} [data-action=open-settings]').count() == 1, 'the reminder is off: the card leads to the settings')
-    await tap(pg, f'{CARD} [data-action=open-settings]')
-    check(await pg.evaluate(LEVEL) == [True, 'settings', None, None], 'there it is switched on')
-    await back(pg)
+    await tap(pg, f'{CARD} [data-action=open-pet]')
+    check(await pg.evaluate(LEVEL) == [True, 'pet', None, None], 'the card leads to where the novelty is')
+    await tap(pg, '#sheet [data-action=close]')
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -1234,15 +1233,12 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
     await ctx.close()
 
-    now = int(time.time() * 1000)
-    ctx, pg, errors = await seeded(browser, url, {'db': household_with_ratings(now), 'prefs': {'remind': 180}}, native=True)
-    shown = await pg.locator(CARD).count() == 1 and await pg.locator(f'{CARD} [data-action=open-settings]').count() == 0
-    await pg.evaluate(ASK, ['einzeln0001', ['minka00001'], 'lachs00001'])
-    await pg.wait_for_function(f'{NOTES}.length')
-    n = (await pg.evaluate(NOTES))[0]
-    await pg.evaluate("n => window.__tapNote({actionId: 'top', notification: n})", n)
-    await idle(pg)
-    check(shown and await pg.locator(CARD).count() == 0, 'reminder on: no way to the settings; rating from a reminder hides the news')
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
+    shown = await pg.locator(CARD).count() == 1
+    await tap(pg, f'{CARD} [data-action=open-pet]')
+    await pg.fill('#f-nick', 'Mimi')
+    await tap(pg, '[data-action=save-pet]')
+    check(shown and await pg.locator(CARD).count() == 0, 'a nickname saved: the news has done its job')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
