@@ -1169,6 +1169,15 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'hidden, also after a restart')
     await ctx.close()
 
+    many = [*keys, 'tipp:beobachtung', *[f'appetit:lxpet00001:2025-{d // 28 + 1:02d}-{d % 28 + 1:02d}' for d in range(330)]]
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'hiddenHints': many}}, native=True)
+    kept = await state(pg, 'prefs.hiddenHints')
+    check(
+        await pg.locator(CARD).count() == 0 and len(kept) == 300 + len(keys) + 1 and all(k in kept for k in [*keys, 'tipp:beobachtung']),
+        'many hidden hints: the oldest go, what is said once stays',
+    )
+    await ctx.close()
+
     demo = {**SAVED, 'pets': [pet('demopet0001', 'Mau')], 'servings': [{**x, 'pets': {'demopet0001': {'r': 'gut'}}} for x in SAVED['servings']]}
     ctx, pg, errors = await seeded(browser, url, {'db': demo}, native=True)
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')

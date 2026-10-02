@@ -56,9 +56,10 @@ export function tidy(d) {
 }
 function tidyPrefs(p) {
   const out = {...defaultPrefs(), ...(p && typeof p === 'object' ? p : {})};
-  out.hiddenHints = Array.isArray(out.hiddenHints)
-    ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))].slice(-300)
-    : [];
+  // the newest 300 hidden hints; what is said only once stays, or it would come back
+  const hints = Array.isArray(out.hiddenHints) ? [...new Set(out.hiddenHints.filter(k => typeof k === 'string'))] : [],
+    once = k => /^(tipp|neu):/.test(k);
+  out.hiddenHints = [...hints.filter(once), ...hints.filter(k => !once(k)).slice(-300)];
   out.remind = tidyRemind(out.remind);
   out.feedRemind = out.feedRemind === true;
   delete out.feedStart;
