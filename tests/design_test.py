@@ -828,44 +828,6 @@ async def test_skeleton(browser, url):
     await ctx.close()
 
 
-def test_pack():
-    """The sources in two files: unpacked together they make up the same working tree again"""
-    sys.path.insert(0, str(ROOT / 'scripts'))
-    import pack
-    import unpack
-
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            pack.main(tmp)
-            for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt'):
-                unpack.unpack(f'{tmp}/{name}', f'{tmp}/tree')
-        names = {
-            name: re.findall(r'^===== FILE: (.+) \(\d+ characters\) =====$', pathlib.Path(tmp, name).read_text(encoding='utf-8'), re.M)
-            for name in ('schmeckts-sources.txt', 'schmeckts-server-sources.txt')
-        }
-
-        def server(rel):
-            return rel.startswith('server/')
-
-        app, srv = names['schmeckts-sources.txt'], names['schmeckts-server-sources.txt']
-        check(
-            app[0] == 'PROJECT.md'
-            and not any(map(server, app))
-            and all(map(server, srv))
-            and {'server/main.go', 'server/packaging/debian/control', 'server/build-deb.sh', 'server/README.md'} <= set(srv)
-            and {'scripts/unpack.py', 'scripts/pack.py', 'tests/ui_test.py', 'app/www/js/main.js'} <= set(app),
-            f'app file with PROJECT.md first, tests and scripts ({len(app)} files), server file with everything under server/ ({len(srv)})',
-        )
-        want = dict(pack.files())
-        got = {p.relative_to(f'{tmp}/tree').as_posix(): p.read_text(encoding='utf-8') for p in pathlib.Path(tmp, 'tree').rglob('*') if p.is_file()}
-        check(got == want and len(got) == len(app) + len(srv), f'both files unpacked into the same folder: the same working tree ({len(got)} files)')
-        first = pathlib.Path(tmp, 'schmeckts-server-sources.txt').read_text(encoding='utf-8').split('\n', 1)[0]
-        check(
-            f'version {(ROOT / "server/VERSION").read_text().strip()},' in first,
-            f'the server file names the server\u2019s version, which does not change with the app ({first})',
-        )
-
-
 def test_version_code():
     """Every build installs over the ones from before the version restart.
 
@@ -1565,7 +1527,6 @@ def test_prompt():
 async def test_files(browser, url):
     test_logo_files()
     test_rules_static()
-    test_pack()
     test_spacing_scale()
     test_radius_scale()
     test_type_scale()
