@@ -696,6 +696,22 @@ async def test_scales(browser, url):
     await ctx.close()
 
 
+async def test_slider_words(browser, url):
+    print('the words under each scale stay whole at 360px')
+    ctx = await phone(browser, width=360)
+    pg, errors = await open_page(ctx, url)
+    now = await pg.evaluate('Date.now()')
+    foods = [product('nass0001'), product('trocken0001', 'Josera', 'Huhn', 'Trockenfutter'), product('snack0001', 'Dreamies', 'Käse', 'Snack')]
+    await load(pg, [pet(M)], foods, [meal(f'meal{i}', p['id'], now - (i + 1) * 36e5, {M: None}) for i, p in enumerate(foods)])
+    broken = await pg.evaluate("""[...document.querySelectorAll('.pend .slider-names > span > *')].filter(w => {
+      const r = document.createRange(); r.selectNodeContents(w);
+      return r.getClientRects().length > 1 || r.getBoundingClientRect().width > w.clientWidth; }).map(w => w.textContent)""")
+    scales = await pg.locator('.pend .slider').count()
+    check(scales == 3 and broken == [], f'no word broken or cut on any of the three scales {broken}')
+    check(not errors, f'no errors {errors}')
+    await ctx.close()
+
+
 async def test_slide(browser, url):
     print('rating slider under a finger, the mouse and the keyboard: one rating per gesture, none when scrolling or cancelled')
     ctx, pg, errors = await demo(browser, url, touch=True, width=360, height=800)
@@ -2657,6 +2673,7 @@ run_tests(
         'evaluation': test_evaluation,
         'candidate': test_candidate,
         'scales': test_scales,
+        'slider-words': test_slider_words,
         'slide': test_slide,
         'texture': test_texture,
         'suggestions': test_suggestions,

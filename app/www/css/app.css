@@ -810,7 +810,7 @@ dialog.sheet::after {
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
   gap: var(--space-hair);
   margin: 0 var(--space-1);
-  font: var(--type-caption-strong);
+  font: var(--type-level-strong);
   color: var(--muted);
   text-align: center;
 }
@@ -823,7 +823,7 @@ dialog.sheet::after {
 }
 .slider-names small {
   margin-top: var(--space-hair);
-  font: var(--type-caption);
+  font: var(--type-level);
   hyphens: auto;
   overflow-wrap: anywhere;
 }
