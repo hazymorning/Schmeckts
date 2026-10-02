@@ -260,13 +260,8 @@ export function headOf(pets, g, now, moment) {
   const heads = HEADS[pets.length === 1 ? 'one' : pets.length === 2 ? 'two' : 'more'],
     day = new Date(now).getDay(),
     list = SLEEP.has(moment) ? [heads.night] : [...heads.any, ...(day % 6 ? [] : [heads.weekend])],
-    names = esc(
-      calledNames(
-        pets.map(p => p.id),
-        'head',
-        now,
-      ),
-    );
+    ids = pets.map(p => p.id),
+    names = esc(calledNames(ids, 'head', now));
   return fill(list[dayNumber(now) % list.length], {whose: whose(names), name: names, names, weekday: WEEKDAYS[day]});
 }
 
