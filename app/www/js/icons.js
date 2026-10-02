@@ -12,13 +12,16 @@ const FULL =
   '<path d="M5.4 11c.8-2.7 3.5-4.4 6.6-4.4s5.8 1.7 6.6 4.4z" fill="currentColor" fill-opacity=".3"/>' +
   BOWL +
   '<path d="M9.3 4.6c-.6-.7-.6-1.5 0-2.2M14.7 4.6c-.6-.7-.6-1.5 0-2.2"/>';
-// How much is left in the bowl tells the levels apart: a film, half, nearly full. Only a scale's best level has a heart.
+// How much is left tells the levels apart: a film, half, the heap with a bite out of it, the whole heap. Only a
+// scale's best level has a heart.
 // surface: the fill's top edge and right side
 const LEFT = surface =>
   `<path d="${surface}a1.4 1.4 0 0 1-1.36 1.07H7.41A1.4 1.4 0 0 1 6.05 17.4z" fill="currentColor" fill-opacity=".4" stroke="none"/>`;
 const FILM = LEFT('M5.86 16.6h12.28l-.19.8') + BOWL;
 const HALF = LEFT('M5.47 15h13.05l-.58 2.4') + BOWL;
-const MOST = LEFT('M4.97 12.9h14.06l-1.08 4.5') + BOWL;
+const MOST =
+  '<path d="M5.4 11c.8-2.7 3.5-4.4 6.6-4.4.62 0 1.22.07 1.8.2a3.6 3.6 0 0 0 4.32 3.06c.2.36.36.74.48 1.15z" fill="currentColor" fill-opacity=".3"/>' +
+  BOWL;
 const FEED = BOWL + '<path d="M12 5.2v3.6M10.2 7h3.6"/>';
 const FILL =
   '<path class="fill" fill="currentColor" stroke="none" d="M3.5 11h17l-1.5 6.3a2.3 2.3 0 0 1-2.24 1.77H7.24A2.3 2.3 0 0 1 5 17.3z"/>';

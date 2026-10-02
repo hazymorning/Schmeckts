@@ -114,6 +114,8 @@ export function armBtn(key, label, armedLabel, {ic = 'trash', cls = 'danger'} = 
   return `<button class="btn ${on ? 'armed' : cls}" data-action="arm" data-then="${key}">${icon(ic)}${on ? armedLabel : label}</button>`;
 }
 
+// pets rated in one tone keep it, as Nur Soße and Ein bissl average out below it
+const sameTone = rs => rs.every(r => rateTone(r) === rateTone(rs[0]));
 // treats are not meals; anything else, unknown food included, counts as one
 function fedLabel(items) {
   const fed = items.filter(x => !isObservation(x)),
@@ -134,9 +136,7 @@ function servingNode(s) {
     .map(pid => rOf(s.pets[pid]))
     .filter(Boolean);
   if (!rs.length) return '<i class="open"></i>';
-  const cls = rs.every(r => r === rs[0])
-    ? rateCls(rs[0])
-    : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
+  const cls = sameTone(rs) ? rateCls(rs[0]) : scoreCls(rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length);
   return `<i class="${cls}"></i>`;
 }
 // its height is the points, averaged over the pets on it
@@ -146,7 +146,7 @@ function servingBar(s) {
     .filter(Boolean);
   if (!rs.length) return '<i class="open"></i>';
   const v = rs.reduce((a, r) => a + RATINGS[r].score, 0) / rs.length;
-  return `<i class="${rs.every(r => r === rs[0]) ? rateCls(rs[0]) : scoreCls(v)}" style="--v:${v / 100}"></i>`;
+  return `<i class="${sameTone(rs) ? rateCls(rs[0]) : scoreCls(v)}" style="--v:${v / 100}"></i>`;
 }
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 // two weeks from last Monday, or with week the seven days up to today in one row

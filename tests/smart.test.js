@@ -96,7 +96,7 @@ test('scales: one per food type, every level with its own points, the colour fol
     'r-good',
     'r-good',
     'r-mid',
-    'r-mid',
+    'r-sauce',
     'r-sauce',
     'r-sauce',
     'r-bad',

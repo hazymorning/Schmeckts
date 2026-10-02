@@ -20,7 +20,7 @@ const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
 const MILESTONES = {meals: [50, 100, 250, 500, 1000], sorts: [10, 25, 50]};
 export const rOf = x => (RATINGS[x?.r] ? x.r : null); // unknown values from other devices do not count
 const toneOf = v => (v >= GOOD ? 'good' : v >= NO ? 'mid' : 'bad');
-export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score < NO ? 'sauce' : toneOf(RATINGS[r].score));
+export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score <= NO ? 'sauce' : toneOf(RATINGS[r].score));
 export const scoreCls = v => 'r-' + toneOf(v);
 export const rateCls = r => 'r-' + rateTone(r);
 export const hintKey = h => (h.kind === 'appetit' ? `appetit:${h.pet}:${h.day}` : `${h.kind}:${h.id}`);
