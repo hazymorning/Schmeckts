@@ -6,7 +6,7 @@ import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} f
 import {db} from '../store.js';
 import {held, pending, status} from '../sync.js';
 import {getPet, getProduct, isObservation, observedPets, petNames, pname, servingPets, timeOf} from '../derive.js';
-import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, sideOf, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {sliderCls, thumbHTML} from '../ui/slider.js';
@@ -411,5 +411,7 @@ export function whyOf(e) {
   }
   return `Bei ${petNames(by)} ${lower(evidenceOf(x))}`;
 }
+// what a variety that goes down badly, or that nobody buys any more, has to show for itself when it is served
+export const record = e => (e?.n && (e.choice === 'nicht' || sideOf(e) === 'flop') ? whyOf(e) : '');
 export const verdictLabel = x =>
   x.verdict === 'gemischt' ? `Gemischt: ${petNames(x.yes)} ja, ${petNames(x.no)} nein` : VERDICTS[x.verdict];

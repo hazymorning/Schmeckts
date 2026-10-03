@@ -62,6 +62,7 @@ import {
   photoThumb,
   pickRow,
   rateSlider,
+  record,
   resultBadges,
   scaleEnds,
   segmented,
@@ -296,9 +297,10 @@ function serveRows(entries, code = '') {
     m = model();
   return entries
     .map(({product: p, at}) => {
-      const meta = [p.variety ? p.brand : '', at ? since(at, now) : 'noch nie serviert'].filter(Boolean).join(', ');
+      const meta = [p.variety ? p.brand : '', at ? since(at, now) : 'noch nie serviert'].filter(Boolean).join(', '),
+        past = record(m.byId.get(p.id));
       return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
-        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>${strip(ratingsIn(m, [p.id]))}</button></li>`;
+        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small>${past ? `<small>${esc(past)}</small>` : ''}</span>${strip(ratingsIn(m, [p.id]))}</button></li>`;
     })
     .join('');
 }

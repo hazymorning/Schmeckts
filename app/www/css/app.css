@@ -2156,6 +2156,9 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 .serve-list .empty {
   margin: 0;
 }
+.plist .t-main small {
+  white-space: normal;
+}
 .plist .t-main b {
   white-space: normal;
   display: -webkit-box;
