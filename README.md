@@ -15,7 +15,7 @@
   <a href="#installieren"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1798bb44-ce7c-4fe1-aa79-b14bd7346e2e"><img src="https://github.com/user-attachments/assets/382cc84e-bfce-4891-86fc-8ddd5056eef1" width="292" alt="Installationsanleitung"></picture></a>
 </p>
 
-Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumutung. Also schreibt die App mit, bis klar ist, was ankommt. Die Katze hält das für übertrieben.
+Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumutung. Also schreibt die App mit, bis klar ist, was ankommt.
 
 <p align="center">
   <picture>
