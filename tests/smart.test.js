@@ -6,6 +6,7 @@ import {
   analyze,
   basis,
   feedReminders,
+  feederGap,
   feedSlots,
   habits,
   hintKey,
@@ -1633,5 +1634,92 @@ test('reminder buttons: the levels most given to this variety by this pet, fille
     quickRatings(household(['A'], ['p'], rate('p', 'A', [S, T, M], 1)), open('p'), 'A'),
     [T, S],
     'a tie goes to the newer level',
+  );
+});
+
+test('Bei wem schmeckt’s: the same varieties as often from each person, only a clear gap beyond chance, never from a person serving the better liked ones', () => {
+  // ten days: the same two varieties from both, a with Anna eaten well, with Jonas left
+  const days = (ra, rj, n = 10, sort = ['a', 'b']) =>
+    Array.from({length: n}, (_, i) => [
+      [sort[i % 2], {A: ra(i)}, i + 0.5, 'Anna'],
+      [sort[i % 2], {A: rj(i)}, i + 0.6, 'Jonas'],
+    ]).flat();
+  const gap = meals =>
+    feederGap(
+      household(['A'], ['a', 'b', snackProduct], meals),
+      model(household(['A'], ['a', 'b', snackProduct], meals)),
+      NOW,
+    );
+  const snackProduct = {id: 's', type: 'Snack'};
+  assert.deepEqual(
+    gap(
+      days(
+        () => T,
+        i => (i % 3 ? X : T),
+      ),
+    ),
+    {name: 'Anna', others: ['Jonas'], n: 10, good: 10, theirs: 4},
+    'with Anna all ten eaten well, with Jonas four',
+  );
+  assert.equal(
+    gap(
+      days(
+        () => T,
+        i => (i % 4 ? T : X),
+      ),
+    ),
+    null,
+    'seven against ten is chance',
+  );
+  assert.equal(
+    gap(
+      days(
+        () => T,
+        () => X,
+        4,
+      ),
+    ),
+    null,
+    'four meals each are too few',
+  );
+  assert.equal(
+    gap([
+      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.5, 'Anna']),
+      ...Array.from({length: 12}, (_, i) => ['b', {A: X}, i + 0.6, 'Jonas']),
+    ]),
+    null,
+    'each serving a variety of their own: nothing to compare',
+  );
+  assert.deepEqual(
+    gap([
+      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.5, 'Anna']),
+      ...Array.from({length: 12}, (_, i) => ['b', {A: X}, i + 0.6, 'Anna']),
+      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.7, 'Jonas']),
+      ...Array.from({length: 2}, (_, i) => ['b', {A: X}, i + 0.8, 'Jonas']),
+    ]),
+    null,
+    'Jonas serving the liked one more often does not make him better',
+  );
+  assert.equal(
+    gap(
+      days(
+        () => T,
+        () => X,
+      ).map(m => (m[3] === 'Jonas' ? [...m.slice(0, 3), ''] : m)),
+    ),
+    null,
+    'one person only',
+  );
+  assert.equal(
+    gap(
+      days(
+        () => 'verputzt',
+        () => 'unberuehrt',
+        10,
+        ['s', 's'],
+      ),
+    ),
+    null,
+    'treats do not count',
   );
 });

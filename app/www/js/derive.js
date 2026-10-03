@@ -5,6 +5,7 @@ import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
 import {
   analyze,
   basis,
+  feederGap,
   habits,
   moves,
   nextUp,
@@ -113,6 +114,7 @@ export const evaluationModel = () =>
       patterns: patterns(profileModel()),
       next: nextUp(m, now, r, last, slow),
       observed: observed(db, m.pets, now),
+      feeder: feederGap(db, m, now),
       basis: basis(m, r),
       last,
     };

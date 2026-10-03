@@ -526,6 +526,46 @@ function causeOf(recent, before, dir) {
   return {cause: 'futter', behind};
 }
 
+/* Who served: per variety the newest meals from each side, as many from one as from the other, so serving the
+   better liked varieties more often cannot make a person look better. A gap also needs FEEDER.z pooled standard
+   errors, as in trend(). The person the pets eat best with, or null. */
+const FEEDER = {min: 10, gap: 25, z: 2};
+export function feederGap(db, m, now) {
+  const meal = new Set(db.products.filter(ranks).map(p => p.id)),
+    per = new Map(); // variety → [{by, good}], newest first
+  for (const s of db.servings) {
+    if (s.servedAt <= now - VERDICT_SPAN) break; // the meals are kept newest first
+    const by = (s.by || '').trim();
+    if (s.servedAt > now || !by || !meal.has(s.productId)) continue;
+    for (const pid of m.pets) {
+      const r = rOf(s.pets?.[pid]);
+      if (r)
+        (per.get(s.productId) || per.set(s.productId, []).get(s.productId)).push({by, good: RATINGS[r].score >= GOOD});
+    }
+  }
+  const names = new Set([...per.values()].flatMap(l => l.map(x => x.by)));
+  let best = null;
+  for (const name of names) {
+    let n = 0,
+      good = 0,
+      theirs = 0;
+    for (const list of per.values()) {
+      const mine = list.filter(x => x.by === name),
+        other = list.filter(x => x.by !== name),
+        k = Math.min(mine.length, other.length);
+      n += k;
+      good += mine.slice(0, k).filter(x => x.good).length;
+      theirs += other.slice(0, k).filter(x => x.good).length;
+    }
+    const p = (good + theirs) / (2 * n),
+      se = 100 * Math.sqrt((p * (1 - p) * 2) / n);
+    if (n < FEEDER.min || 100 * (good - theirs) < Math.max(FEEDER.gap, FEEDER.z * se) * n) continue;
+    if (!best || good - theirs > best.good - best.theirs)
+      best = {name, others: [...names].filter(x => x !== name), n, good, theirs};
+  }
+  return best;
+}
+
 /* Sides as they stood MOVE.days ago, worked out the same way as now. A move needs a real change in the good share,
    since drifting across a line on the same ratings is no news; fresh needs MOVE.from settled varieties back then, or
    in a young diary everything would be new. */

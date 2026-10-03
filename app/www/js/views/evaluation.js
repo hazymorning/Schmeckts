@@ -337,6 +337,23 @@ function splitCard(m, r) {
   );
 }
 
+// shows only where several people feed and the pets eat clearly better with one of them
+function feederCard(x) {
+  const f = x.feeder;
+  if (!f) return '';
+  const others = esc(andList(f.others));
+  return card(
+    'Bei wem schmeckt’s?',
+    toldList([
+      told(
+        sign('person'),
+        `Bei <b>${esc(f.name)}</b> schmeckt’s besser als bei ${others}.`,
+        `Dieselben Sorten, gleich oft serviert: bei ${esc(f.name)} <b>${times(f.good, f.n)}</b> gut gefressen, bei ${others} ${times(f.theirs, f.n)}.`,
+      ),
+    ]),
+  );
+}
+
 const DIM_ICON = {konsistenz: 'layers', geschmack: 'fish', marke: 'tag'};
 const inText = (d, key) => (d.kind === 'konsistenz' ? key.replace(/^(In|Fester) /, w => w.toLowerCase()) : key);
 const SHELF = {
@@ -465,5 +482,5 @@ export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${feederCard(x)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
 }
