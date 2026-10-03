@@ -856,6 +856,18 @@ dialog.sheet::after {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
+.stat b,
+.stat small {
+  display: block;
+}
+.stat b {
+  font: var(--type-subheading);
+  font-variant-numeric: tabular-nums;
+}
+.stat small {
+  font: var(--type-caption);
+  color: var(--muted);
+}
 
 .btn {
   display: flex;
@@ -2184,6 +2196,13 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
+}
+/* under the variety's name, as on a trump card */
+.quartet {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0 var(--space-3) calc(var(--lead) + var(--space-3));
 }
 .tally {
   margin: var(--space-2h) 0 var(--space-1);

@@ -26,6 +26,7 @@ import {
   ratingsIn,
   shopGroups,
   sideOf,
+  swings,
   trend,
   variety,
 } from '../app/www/js/smart.js';
@@ -1722,4 +1723,14 @@ test('Bei wem schmeckt’s: the same varieties as often from each person, only a
     null,
     'treats do not count',
   );
+});
+
+test('Quartett: how often the newest ratings of each pet went otherwise than the time before', () => {
+  const m = model(household(['A', 'B'], ['p'], [...rate('p', 'A', [T, X, T, G], 1), ...rate('p', 'B', [M, M], 2)]));
+  assert.deepEqual(
+    swings(m.byId.get('p')),
+    {k: 2, n: 4},
+    'top, fast nix, top, gut: two of three; die Hälfte twice: none of one',
+  );
+  assert.deepEqual(swings(model(household(['A'], ['p'], rate('p', 'A', [T]))).byId.get('p')), {k: 0, n: 0});
 });

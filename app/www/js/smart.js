@@ -64,6 +64,16 @@ export function ratingsIn(m, ids) {
 }
 const countOf = (counts, on) => Object.entries(counts).reduce((a, [r, k]) => a + (on(RATINGS[r].score) ? k : 0), 0);
 export const goodOf = counts => countOf(counts, v => v >= GOOD);
+// how often a pet's newest ratings went otherwise than the time before, of how many times they could have
+export function swings(e) {
+  const out = {k: 0, n: 0};
+  for (const {window: w} of Object.values(e.pets))
+    for (let i = 1; i < w.length; i++) {
+      out.n++;
+      if (toneOf(RATINGS[w[i].r].score) !== toneOf(RATINGS[w[i - 1].r].score)) out.k++;
+    }
+  return out;
+}
 export const poorOf = counts => countOf(counts, v => v < NO);
 // counts ratings instead of using the score, so it agrees with the wording in evidenceOf() (views/parts.js)
 const verdictOf = (n, good, poor) =>
