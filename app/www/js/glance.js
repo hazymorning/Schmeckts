@@ -1,7 +1,7 @@
-// Facts for the overview card. Ratings are never read here: the overview stays out of how a meal went.
-import {typeOf} from './config.js';
+// Facts for the overview card. Of a rating it only reads whether the meal was left.
+import {RATINGS, typeOf} from './config.js';
 import {DAY, addDays, dayKey, dayStart, weekStart} from './dates.js';
-import {feedSlots, nextMeal, nextMilestone} from './smart.js';
+import {feedSlots, nextMeal, nextMilestone, NO, rOf} from './smart.js';
 
 const SPAN = 400 * DAY; // long enough that a streak of over a year still counts
 const IDEA = {span: 90 * DAY, served: 3, after: 10}; // after in days
@@ -11,9 +11,10 @@ const RUN = {least: 3, days: 60};
 const WEEKDAY = {weeks: 8, least: 3, apart: 30}; // least meals on each side, apart in minutes
 const ANNIVERSARY = [1, 3, 6, 12]; // months since the first meal
 const LOOKBACK = 365; // days
+const CALM = {rated: 3}; // days after the newest rating that the days without a meal left still count
 const BIRTHDAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/; // anything else is ignored
 // TURNS is in rank order; MEMORY is how many days a kind or a fact is not repeated
-export const TURNS = ['duel', 'streak', 'idea', 'run', 'weekday', 'week', 'lookback', 'sorts', 'days'];
+export const TURNS = ['duel', 'streak', 'calm', 'idea', 'run', 'weekday', 'week', 'lookback', 'sorts', 'days'];
 export const MEMORY = {kinds: 3, facts: 60};
 
 export const dayNumber = now => Math.round(dayStart(now) / DAY);
@@ -77,7 +78,8 @@ function monthsAfter(t, months) {
 }
 
 /* Treats count as snacks, not meals, as in the history. The streak runs up to yesterday while nothing is served
-   today. Times of day are minutes after midnight; shift.diff is negative when earlier. */
+   today. Times of day are minutes after midnight; shift.diff is negative when earlier. left: the last serving is a
+   meal a pet left. calm: days since a meal was left, the sign on a building site, and the longest such run before. */
 export function glance(db, pets, now, avoid = new Set()) {
   const shown = new Set(pets),
     today = dayStart(now),
@@ -108,6 +110,8 @@ export function glance(db, pets, now, avoid = new Set()) {
       weekday: null,
       lookback: null,
       birthday: nextBirthday(db, shown, now),
+      left: false,
+      calm: null,
     },
     fed = new Map(),
     sorts = new Set(),
@@ -120,9 +124,12 @@ export function glance(db, pets, now, avoid = new Set()) {
     yesterdays = [],
     served = new Set(),
     before = new Set(),
-    regulars = new Map();
+    regulars = new Map(),
+    left = []; // days a meal was left, newest first
   let total = 0,
-    first = null;
+    first = null,
+    rated = null,
+    firstRated = null;
   for (const s of db.servings) {
     if (s.servedAt > now || !Object.keys(s.pets || {}).some(id => shown.has(id))) continue;
     total++;
@@ -131,7 +138,20 @@ export function glance(db, pets, now, avoid = new Set()) {
     if (s.servedAt <= now - SPAN) continue; // older ones only count toward the totals above
     out.last ||= s;
     const key = dayKey(s.servedAt),
-      meal = !snack.has(s.productId);
+      meal = !snack.has(s.productId),
+      rs = meal
+        ? Object.entries(s.pets)
+            .filter(([id]) => shown.has(id))
+            .map(([, x]) => rOf(x))
+            .filter(Boolean)
+        : [];
+    if (rs.length) {
+      const poor = rs.some(r => RATINGS[r].score < NO);
+      if (out.last === s) out.left = poor;
+      if (poor) left.push(dayStart(s.servedAt));
+      rated ??= s.servedAt;
+      firstRated = s.servedAt;
+    }
     days.add(key);
     if (meal) perDay.set(key, (perDay.get(key) || 0) + 1);
     if (s.servedAt >= today) {
@@ -206,6 +226,13 @@ export function glance(db, pets, now, avoid = new Set()) {
     const others = new Set([...out.feeders.map(f => f.name), ...[...fedOn.values()].flatMap(set => [...set])]);
     others.delete(run[0]);
     out.feedRun = {name: run[0], days: run[1], other: others.size ? [...others][0] : null};
+  }
+  if (rated > now - CALM.rated * DAY) {
+    const ends = [...left, dayStart(firstRated)];
+    out.calm = {
+      days: Math.round((today - ends[0]) / DAY),
+      record: Math.max(0, ...ends.slice(1).map((d, i) => Math.round((ends[i] - d) / DAY))),
+    };
   }
   out.next = nextMeal(db, now, pets);
   out.milestone = nextMilestone(db);

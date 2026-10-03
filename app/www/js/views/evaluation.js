@@ -288,7 +288,8 @@ function trendCard(m, x) {
     : '';
 }
 
-const often = n => (n === 1 ? 'einmal' : `${n}×`);
+const OFTEN = 'ein zwei drei vier fünf sechs sieben acht neun zehn elf zwölf'.split(' ');
+const often = n => (OFTEN[n - 1] ? OFTEN[n - 1] + 'mal' : `${n} Mal`);
 function observedCard(x) {
   const {kinds, links} = x.observed,
     now = Date.now();
@@ -307,7 +308,7 @@ function observedCard(x) {
       return toldBtn(
         l.id,
         obsThumb(l.kind),
-        `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
+        `Nach <b>${esc(pname(getProduct(l.id)))}</b> öfter notiert: ${o.label}.`,
         `Nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten ${o.after}, bei anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
       );
     }),
@@ -333,6 +334,23 @@ function splitCard(m, r) {
   return card(
     'Geschmackssache',
     toldList(rows) + (more > 0 ? hint(`Dazu ${more === 1 ? 'eine' : more} weitere.`) : ''),
+  );
+}
+
+// shows only where several people feed and the pets eat clearly better with one of them
+function feederCard(x) {
+  const f = x.feeder;
+  if (!f) return '';
+  const others = esc(andList(f.others));
+  return card(
+    'Bei wem schmeckt’s?',
+    toldList([
+      told(
+        sign('person'),
+        `Bei <b>${esc(f.name)}</b> schmeckt’s besser als bei ${others}.`,
+        `Dieselben Sorten, gleich oft serviert: bei ${esc(f.name)} <b>${times(f.good, f.n)}</b> gut gefressen, bei ${others} ${times(f.theirs, f.n)}.`,
+      ),
+    ]),
   );
 }
 
@@ -464,5 +482,5 @@ export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${feederCard(x)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
 }

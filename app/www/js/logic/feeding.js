@@ -16,6 +16,7 @@ import {
   petMap,
   petNames,
   pname,
+  sortOf,
 } from '../derive.js';
 import {cropSquare, fileToImage, memPhotos, photoOf, readable, resize} from '../images.js';
 import {textSquare} from '../ocr.js';
@@ -26,6 +27,7 @@ import {toast} from '../ui/toast.js';
 import {closeAll, closeSheet, isClosing, openSheet, renderSheet, sheet, topBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
 import {fabFill, homeView, scrollTop, update} from '../views/home.js';
+import {lower, record} from '../views/parts.js';
 import {applyProduct, cleanupProduct, linkProduct, replaceProductPhoto} from './products.js';
 import {planReminder} from './reminders.js';
 
@@ -48,10 +50,15 @@ export function serveProduct(pid, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  const msg = `${pname(p)} serviert. Guten Appetit, ${calledNames(ids, s.id)}!`;
+  const msg = `${pname(p)} serviert. ${onRecord(p) || `Guten Appetit, ${calledNames(ids, s.id)}!`}`;
   update();
   scrollTop();
   toast(withMilestone(msg), () => undoServe(s.id), {ic: 'bowl'});
+}
+// a variety that goes down badly, or that nobody buys any more, shows its record as it is served
+function onRecord(p) {
+  const past = record(sortOf(p.id));
+  return past ? `Laut Akte ${lower(past)}.` : '';
 }
 // each milestone is announced once per device
 function withMilestone(msg) {
@@ -338,9 +345,11 @@ function recognized(s, p) {
     product: {thumb: p.thumb, lastPets: p.lastPets, code: !s.scanCode || !!p.codes?.[s.scanCode]},
   };
   linkProduct(s, p);
-  const naming = sheet?.kind === 'serving' && sheet.id === s.id;
+  const naming = sheet?.kind === 'serving' && sheet.id === s.id,
+    said = `<b>${esc(pname(p))}</b> erkannt und serviert`,
+    past = onRecord(p);
   (naming ? closeSheet() : Promise.resolve()).then(() =>
-    toast(`<b>${esc(pname(p))}</b> erkannt und serviert`, () => unrecognize(s.id, p.id, was), {
+    toast(past ? addSentence(said, esc(past)) : said, () => unrecognize(s.id, p.id, was), {
       ic: 'bowl',
       html: true,
     }),

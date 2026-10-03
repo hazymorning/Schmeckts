@@ -34,7 +34,7 @@ Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumut
 <summary><b>Was noch drin ist</b></summary>
 <br>
 
-- *Vorlieben*: Leibgerichte, Ladenhüter und was als Nächstes in den Napf kann.
+- *Vorlieben*: Leibgerichte, Ladenhüter, jede Sorte als Quartettkarte und was als Nächstes in den Napf kann.
 - *Einkaufen*: was sich nachzukaufen lohnt, als Liste zum Verschicken.
 - *Verlauf*: jede Mahlzeit, Tag für Tag.
 - *Beobachtungen*: von guter Laune bis Erbrechen, mit einem Tipp notiert. Lüften musst du selbst.
@@ -48,7 +48,7 @@ Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumut
 <summary><b>Wenn mehrere Leute füttern</b></summary>
 <br>
 
-Mit *Änderungen teilen* gehen neue Einträge als Datei ans andere Handy, ganz ohne Konto. Ein kleiner [Server](server/) im Heimnetz gleicht die Handys von selbst ab und erkennt Sorten am Foto. Nötig ist er nicht.
+Mit *Änderungen teilen* gehen neue Einträge als Datei ans andere Handy, ganz ohne Konto. Schmeckt es bei jemandem deutlich besser, steht das unter *Vorlieben*. Ein kleiner [Server](server/) im Heimnetz gleicht die Handys von selbst ab und erkennt Sorten am Foto. Nötig ist er nicht.
 
 </details>
 

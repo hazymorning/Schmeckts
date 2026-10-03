@@ -703,6 +703,78 @@ async def test_candidate(browser, url):
     await ctx.close()
 
 
+async def test_record(browser, url):
+    print('a variety’s record: its trump card in the sheet, its tally where it is served, who it goes down best with')
+    ctx = await phone(browser, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-06-12T12:00:00+02:00')
+    now = at('2026-06-12T12:00')
+    rated = {'lachs': ['top', 'top', 'gut'], 'zaeh': ['mittel', 'eager', 'schlecht'], 'nie': ['schlecht', 'schlecht']}
+    await load(
+        pg,
+        [pet(M)],
+        [product('lachs', 'Sheba', 'Lachs in Soße'), product('zaeh', 'Gourmet', 'Rind Pastete'), product('nie', 'Whiskas', 'Huhn')],
+        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated.items()) for n, r in enumerate(levels)]
+        + [meal('offen', 'lachs', now - 2 * 36e5, {M: None})],
+    )
+    check('heute um 10:00' in await pg.inner_text('.pend .t-main small'), 'the open meal says its time as the feeding sheet does')
+    STATS = (
+        "[...document.querySelectorAll('#sheet .quartet .stat')].map(s => [s.querySelector('small').textContent, s.querySelector('b').textContent])"
+    )
+    await open_sheet(pg, kind='product', id='lachs')
+    lachs = await pg.evaluate(STATS)
+    await open_sheet(pg, kind='product', id='zaeh')
+    zaeh = await pg.evaluate(STATS)
+    check(
+        lachs == [['Einsätze', '4'], ['Gut gefressen', '3 von 3'], ['Nur Soße', '0 von 3'], ['Wankelmut', '0 von 2']]
+        and [k for k, _ in zaeh] == ['Einsätze', 'Gut gefressen', 'Wankelmut'],
+        f'a trump card in the sheet, sauce only where there is some {lachs} {zaeh}',
+    )
+    await tap(pg, '#sheet [data-action=close]')
+    await tap(pg, '#fab')
+    rows = await pg.eval_on_selector_all(
+        '#sheet .plist [data-action=serve]', "l => l.map(b => [b.dataset.id, [...b.querySelectorAll('small')].map(x => x.textContent)])"
+    )
+    check(
+        dict(rows).get('zaeh', [None])[1:] == ['2 von 3 Mal nur zum Teil gefressen'] and len(dict(rows)['lachs']) == 1 and 'nie' not in dict(rows),
+        f'a variety that goes down badly shows its record in the list, one that goes down well does not {rows}',
+    )
+    await tap(pg, '#sheet [data-action=close]')
+    await open_sheet(pg, kind='product', id='nie')
+    await tap(pg, '#sheet [data-action=serve]')
+    told = await pg.inner_text('#toast > span')
+    await tap(pg, '#toast [data-action=undo]')
+    await open_sheet(pg, kind='product', id='lachs')
+    await tap(pg, '#sheet [data-action=serve]')
+    plain = await pg.inner_text('#toast > span')
+    check(
+        'Laut Akte beide Male fast nix gefressen' in told and 'Akte' not in plain,
+        f'served all the same, the toast tells the record of one nobody buys any more ({told} / {plain})',
+    )
+    meals = [
+        meal(f'f{d}-{who}', ('lachs', 'zaeh')[d % 2], now - d * 864e5 - h * 36e5, {M: 'top' if who == 'Anna' or d % 3 == 0 else 'sosse'}, by=who)
+        for d in range(1, 15)
+        for who, h in (('Anna', 4), ('Jonas', -6))
+    ]
+    await load(pg, [pet(M)], [product('lachs', 'Sheba', 'Lachs in Soße'), product('zaeh', 'Gourmet', 'Rind Pastete')], meals)
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    card = await pg.evaluate(
+        "[...document.querySelectorAll('#sheet .card')].find(c => c.querySelector('h2')?.textContent === 'Bei wem schmeckt’s?')?.textContent ?? ''"
+    )
+    await back(pg)
+    await load(
+        pg, [pet(M)], [product('lachs', 'Sheba', 'Lachs in Soße'), product('zaeh', 'Gourmet', 'Rind Pastete')], [{**m, 'by': 'Anna'} for m in meals]
+    )
+    await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
+    alone = await pg.locator('#sheet h2', has_text='Bei wem').count()
+    check(
+        'Bei Anna schmeckt’s besser als bei Jonas' in card and 'gleich oft' in card and alone == 0,
+        f'„Bei wem schmeckt’s?“ where several people feed and one clearly does better, never with one person {card}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_scales(browser, url):
     print('rating scales per food type: dry food and treats have their own levels')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
@@ -1210,9 +1282,9 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
-    await tap(pg, f'{CARD} [data-action=open-pet]')
-    check(await pg.evaluate(LEVEL) == [True, 'pet', None, None], 'the card leads to where the novelty is')
-    await tap(pg, '#sheet [data-action=close]')
+    await tap(pg, f'{CARD} [data-action=open-evaluation]')
+    check(await pg.evaluate(LEVEL) == [True, 'evaluation', None, None], 'the card leads to where the novelty is')
+    await tap(pg, '#sheet [data-action=settings-back]')
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -1235,10 +1307,11 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     shown = await pg.locator(CARD).count() == 1
-    await tap(pg, f'{CARD} [data-action=open-pet]')
-    await pg.fill('#f-nick', 'Mimi')
-    await tap(pg, '[data-action=save-pet]')
-    check(shown and await pg.locator(CARD).count() == 0, 'a nickname saved: the news has done its job')
+    await tap(pg, f'{CARD} [data-action=open-evaluation]')
+    await tap(pg, '#sheet [data-action=open-product]')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+    await idle(pg)
+    check(shown and await pg.locator(CARD).count() == 0, 'a variety’s card opened: the news has done its job')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2350,7 +2423,7 @@ async def test_observations(browser, url):
     CHIP = '#home .overview [data-action=observe]'
     ROW = '[data-sec=hist] [data-action=open-observation]'
     words = await pg.eval_on_selector_all(CHIP, 'l => l.map(c => c.textContent.trim())')
-    check(len(words) == 5 and all(len(w.split()) == 1 for w in words), f'the chips always at hand, one short word each {words}')
+    check(len(words) == 5 and all(len(w) <= 11 and len(w.split()) <= 2 for w in words), f'the chips always at hand, short {words}')
     await tap(pg, '[data-action=observe][data-v=tired]')
     tired = await pg.inner_text('#toast > span')
     await tap(pg, '#toast [data-action=undo]')
@@ -2361,8 +2434,9 @@ async def test_observations(browser, url):
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
         and await pg.locator(CHIP).count() == 5
-        and await pg.locator(ROW).count() == 1,
-        f'a chip notes it at once, for the pet and by who noted it, in today’s diary {after[0]}',
+        and await pg.locator(ROW).count() == 1
+        and await pg.inner_text(f'{ROW} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
+        f'a chip notes it at once, for the pet and by who noted it, in today’s diary under the chip’s word {after[0]}',
     )
     await tap(pg, '#toast [data-action=undo]')
     check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
@@ -2751,6 +2825,7 @@ run_tests(
         'report': test_report,
         'evaluation': test_evaluation,
         'candidate': test_candidate,
+        'record': test_record,
         'scales': test_scales,
         'slider-words': test_slider_words,
         'slide': test_slide,

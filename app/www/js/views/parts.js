@@ -6,7 +6,7 @@ import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} f
 import {db} from '../store.js';
 import {held, pending, status} from '../sync.js';
 import {getPet, getProduct, isObservation, observedPets, petNames, pname, servingPets, timeOf} from '../derive.js';
-import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, VERDICTS} from '../smart.js';
+import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, sideOf, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {sliderCls, thumbHTML} from '../ui/slider.js';
@@ -40,7 +40,9 @@ export function nameBlock(s, p, inSheet = false) {
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver is local mode, not an error
   }
   // in the sheet the time field sits right below, so show the type instead
-  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
+  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : since(s.servedAt, Date.now())]
+    .filter(Boolean)
+    .join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
@@ -409,5 +411,7 @@ export function whyOf(e) {
   }
   return `Bei ${petNames(by)} ${lower(evidenceOf(x))}`;
 }
+// what a variety that goes down badly, or that nobody buys any more, has to show for itself when it is served
+export const record = e => (e?.n && (e.choice === 'nicht' || sideOf(e) === 'flop') ? whyOf(e) : '');
 export const verdictLabel = x =>
   x.verdict === 'gemischt' ? `Gemischt: ${petNames(x.yes)} ja, ${petNames(x.no)} nein` : VERDICTS[x.verdict];

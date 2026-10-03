@@ -264,7 +264,12 @@ export function hideHint(key) {
   prefs.hiddenHints.push(key);
   savePrefs();
 }
-export const usedNews = use => NEWS.filter(n => n.use === use).forEach(n => hideHint('neu:' + n.v));
+// true when a news card went
+export function usedNews(use) {
+  const shown = NEWS.filter(n => n.use === use && !prefs.hiddenHints.includes('neu:' + n.v));
+  shown.forEach(n => hideHint('neu:' + n.v));
+  return shown.length > 0;
+}
 
 const mealOf = fields => ({productId: JSON.parse(fields.productId ?? 'null')});
 function diff() {

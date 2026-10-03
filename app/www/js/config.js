@@ -278,9 +278,8 @@ export function flavoursOf(text) {
 export const OBSERVATIONS = {
   happy: {
     icon: 'o_happy',
-    chip: 'Happy',
-    label: 'Gute Laune',
-    said: 'Gute Laune notiert. Herrlich!',
+    label: 'Gut drauf',
+    said: 'Gute Laune notiert. Jetzt bloß nichts falsch machen.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -288,9 +287,8 @@ export const OBSERVATIONS = {
   },
   stink: {
     icon: 'o_stink',
-    chip: 'Stunk',
-    label: 'Heftiger Stunk',
-    said: 'Stunk notiert. Fenster auf!',
+    label: 'Stunk',
+    said: 'Stunk notiert. Die Quelle schweigt.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -298,9 +296,8 @@ export const OBSERVATIONS = {
   },
   hungry: {
     icon: 'o_hungry',
-    chip: 'Hunger',
-    label: 'Großer Hunger',
-    said: 'Hunger notiert. Der Napf ist gewarnt.',
+    label: 'Noch Hunger',
+    said: 'Noch Hunger notiert. Der Napf ist gewarnt.',
     about: 'meal',
     within: 3,
     window: 'in den drei Stunden',
@@ -308,16 +305,14 @@ export const OBSERVATIONS = {
   },
   tired: {
     icon: 'o_tired',
-    chip: 'Müde',
-    label: 'Müder Tag',
-    said: 'Müdigkeit notiert. Gähn.',
+    label: 'Müde',
+    said: 'Müdigkeit notiert. Ab jetzt wird geflüstert.',
     about: 'day',
   },
   vomit: {
     icon: 'o_vomit',
-    chip: 'Erbrochen',
-    label: 'Erbrechen',
-    said: 'Erbrechen notiert. Gute Besserung!',
+    label: 'Erbrochen',
+    said: 'Erbrechen notiert. Hoffentlich war’s das.',
     about: 'meal',
     within: 6,
     window: 'in den sechs Stunden',
@@ -325,7 +320,7 @@ export const OBSERVATIONS = {
   },
 };
 export const observationOf = kind =>
-  OBSERVATIONS[kind] || {icon: 'sparkle', chip: 'Beobachtung', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
+  OBSERVATIONS[kind] || {icon: 'sparkle', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
 
 // rating reminder, minutes after serving, 0 = off
 export const REMIND = [0, 60, 180, 360];
@@ -339,8 +334,17 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
-   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor. */
+   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
+   „Vorlieben“. */
 export const NEWS = [
+  {
+    v: '0.27.0',
+    use: 'quartet',
+    title: 'Neu: Sorten-Quartett',
+    say: 'Tippst du unter „Vorlieben“ auf eine Sorte, zeigt sie ihre Werte wie auf einer Quartettkarte.',
+    why: 'Und beim Servieren nennt die App gleich die Bilanz einer Sorte, die schlecht ankommt.',
+    go: ['evaluation', 'Vorlieben öffnen'],
+  },
   {
     v: '0.26.0',
     use: 'nicknames',

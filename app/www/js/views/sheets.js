@@ -4,7 +4,17 @@ import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {addDays, dayKey, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {OBSERVATIONS, observationOf, RATINGS, scaleOf, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {
+  guessTexture,
+  OBSERVATIONS,
+  observationOf,
+  RATINGS,
+  scaleOf,
+  SPECIES,
+  TEXTURES,
+  TYPES,
+  typeOf,
+} from '../config.js';
 import {db} from '../store.js';
 import {
   diary,
@@ -24,7 +34,7 @@ import {
   sortOf,
   withLast,
 } from '../derive.js';
-import {mealsBefore, observedAfter, rateCls, ratingsIn, shopGroups, VERDICTS} from '../smart.js';
+import {goodOf, mealsBefore, observedAfter, rateCls, ratingsIn, shopGroups, swings, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -52,6 +62,7 @@ import {
   photoThumb,
   pickRow,
   rateSlider,
+  record,
   resultBadges,
   scaleEnds,
   segmented,
@@ -80,8 +91,8 @@ const photoLink = p =>
   `<button class="link rephoto" data-action="product-photo" data-id="${p.id}">${icon('camera')}${photoLabel(p)}</button>`;
 const photoRow = p =>
   `<button class="row set-row act" data-action="product-photo" data-id="${p.id}">${lead('camera')}${main(photoLabel(p))}</button>`;
-const prodGroup = (s, p, inner, action, label) =>
-  group('', prodRow(s, p, inner, action, label) + (p ? photoRow(p) : ''), 'set-group prod');
+const prodGroup = (s, p, inner, action, label, under = '') =>
+  group('', prodRow(s, p, inner, action, label) + under + (p ? photoRow(p) : ''), 'set-group prod');
 const petChips = (action, on) =>
   `<div class="chips">${db.pets
     .map(
@@ -137,7 +148,7 @@ function viewObservation() {
   const kinds = `<div class="chips">${Object.entries(OBSERVATIONS)
     .map(
       ([k, x]) =>
-        `<button class="chip toned o-${k}" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.chip}</button>`,
+        `<button class="chip toned o-${k}" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.label}</button>`,
     )
     .join('')}</div>`;
   return `<div class="sh-head"><h2>${esc(kind.label)}</h2>${closeBtn}</div>
@@ -286,9 +297,10 @@ function serveRows(entries, code = '') {
     m = model();
   return entries
     .map(({product: p, at}) => {
-      const meta = [p.variety ? p.brand : '', at ? since(at, now) : 'noch nie serviert'].filter(Boolean).join(', ');
+      const meta = [p.variety ? p.brand : '', at ? since(at, now) : 'noch nie serviert'].filter(Boolean).join(', '),
+        past = record(m.byId.get(p.id));
       return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
-        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small></span>${strip(ratingsIn(m, [p.id]))}</button></li>`;
+        ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small>${past ? `<small>${esc(past)}</small>` : ''}</span>${strip(ratingsIn(m, [p.id]))}</button></li>`;
     })
     .join('');
 }
@@ -371,6 +383,21 @@ const barcodeRow = c =>
     <button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">
     ${icon('close')}</button></li>`;
 const MEALS_SHOWN = 12; // the rest is on the history page
+const QUIRKS = ['sosse', 'liegen', 'spaeter']; // the level each scale is known for
+// a variety as a trading card: how often it was served, then the same newest ratings as the counts below
+function quartet(p, e, served) {
+  const {n, counts} = e.house,
+    quirk = scaleOf(p).find(r => QUIRKS.includes(r)),
+    sauce = quirk !== 'sosse' || counts.sosse || ['sosse', 'gelee'].includes(p.texture || guessTexture(p)),
+    turns = swings(e),
+    stats = [
+      [served, 'Einsätze'],
+      n && [`${goodOf(counts)} von ${n}`, 'Gut gefressen'],
+      n && quirk && sauce && [`${counts[quirk] || 0} von ${n}`, RATINGS[quirk].short],
+      turns.n && [`${turns.k} von ${turns.n}`, 'Wankelmut'],
+    ].filter(Boolean);
+  return `<div class="set-row quartet">${stats.map(([v, label]) => `<span class="stat"><b>${v}</b><small>${label}</small></span>`).join('')}</div>`;
+}
 // counts only; whether they stand out is for the evaluation
 function noticed(p) {
   const after = observedAfter(
@@ -407,9 +434,9 @@ function viewProduct() {
     levels = [...scale, ...Object.keys(counts).filter(r => !scale.includes(r))]; // levels from another scale that still occur
   const codes = Object.keys(p.codes || {}).sort();
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
-  const about = `<span class="t-main"><b>${esc(p.brand || p.variety)}</b><small>${esc([p.type, `${ss.length}× serviert`].filter(Boolean).join(', '))}</small></span>`;
+  const about = `<span class="t-main"><b>${esc(p.brand || p.variety)}</b><small>${typeOf(p)}</small></span>`;
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
-    ${prodGroup(null, p, about, 'rename-product', 'Umbenennen')}
+    ${prodGroup(null, p, about, 'rename-product', 'Umbenennen', quartet(p, e, ss.length))}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
     ${group('Bewertungen', e.house.n ? countsRow(levels, counts) : `<p class="hint">${e.total ? OLD : 'Noch nicht bewertet.'}</p>`)}
     ${kaufenHTML(e)}
