@@ -288,7 +288,8 @@ function trendCard(m, x) {
     : '';
 }
 
-const often = n => (n === 1 ? 'einmal' : `${n}×`);
+const OFTEN = 'ein zwei drei vier fünf sechs sieben acht neun zehn elf zwölf'.split(' ');
+const often = n => (OFTEN[n - 1] ? OFTEN[n - 1] + 'mal' : `${n} Mal`);
 function observedCard(x) {
   const {kinds, links} = x.observed,
     now = Date.now();

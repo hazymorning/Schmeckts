@@ -40,7 +40,9 @@ export function nameBlock(s, p, inSheet = false) {
     return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver is local mode, not an error
   }
   // in the sheet the time field sits right below, so show the type instead
-  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : ago(s.servedAt)].filter(Boolean).join(', ');
+  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : since(s.servedAt, Date.now())]
+    .filter(Boolean)
+    .join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
