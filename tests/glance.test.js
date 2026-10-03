@@ -13,8 +13,11 @@ import {
   GENERAL,
   lastSunday,
   LEADS,
+  leadsFor,
+  LEFT_LEADS,
   LINES,
   nthSaturday,
+  OWN_LEADS,
   sharesWord,
 } from '../app/www/js/views/facts.js';
 
@@ -81,7 +84,7 @@ test('the week: its meals from Monday on, treats left out, and how many varietie
   );
 });
 
-test('no rating reaches the overview: the glance is the same whatever the meals were rated', () => {
+test('of the ratings the glance knows only whether a meal was left: the rest is the same whatever the meals were rated', () => {
   const meals = [
     ['nass', 'A', '10 07:10', 'Anna', 'top'],
     ['nass', 'A', '09 07:10', 'Anna', 'schlecht'],
@@ -93,8 +96,54 @@ test('no rating reaches the overview: the glance is the same whatever the meals 
       ['nass', 'trocken'],
       meals.map(m => [...m.slice(0, 4), m[4] === 'top' ? null : 'top']),
     );
-  const seen = g => ({...g, last: g.last.id}); // the meal itself carries its ratings, the overview reads its time, variety and person
+  // the meal itself carries its ratings, the overview reads its time, variety and person
+  const seen = g => ({...g, last: g.last.id, left: null, calm: null});
   assert.deepEqual(seen(glance(rated, ['A'], NOW)), seen(glance(other, ['A'], NOW)));
+});
+
+test('a meal left: the last one, and the days since one was with the longest run before, from the first rating on', () => {
+  const rate = (when, r, pet = 'A', id = 'nass') => [id, pet, when, '', r];
+  const g = (list, pets = ['A']) => glance(household(['nass', snack], list), pets, NOW);
+  const week = [
+    rate('01 08:00', 'gut'),
+    rate('03 08:00', 'schlecht'),
+    rate('05 08:00', 'top'),
+    rate('08 08:00', 'sosse'),
+    rate('09 08:00', 'gut'),
+  ];
+  const pick = x => [x.left, x.calm];
+  assert.deepEqual(
+    [
+      pick(g([...week, rate('10 08:00', null)])),
+      pick(g([...week, rate('10 08:00', 'schlecht')])),
+      pick(g([...week, rate('10 08:00', 'eager')])),
+      pick(g(week.filter(m => !['schlecht', 'sosse'].includes(m[4])))),
+    ],
+    [
+      [false, {days: 2, record: 5}],
+      [true, {days: 0, record: 5}],
+      [false, {days: 2, record: 5}],
+      [false, {days: 9, record: 0}],
+    ],
+    'June 3 and 8 left: two days now, five the record; left today starts again; a little is not left; none left, since the first rating',
+  );
+  assert.deepEqual(
+    [
+      pick(g([...week, rate('10 08:00', 'unberuehrt', 'A', 'snack')])),
+      pick(g([...week, rate('10 08:00', 'schlecht', 'B')])),
+      pick(g([...week, rate('10 08:00', 'schlecht', 'B')], ['A', 'B'])),
+      pick(g(week.slice(0, 3))),
+      pick(g([])),
+    ],
+    [
+      [false, {days: 2, record: 5}],
+      [false, {days: 2, record: 5}],
+      [true, {days: 0, record: 5}],
+      [false, null],
+      [false, null],
+    ],
+    'a treat is no meal; only the pets shown; nothing rated for three days or nothing at all: no count',
+  );
 });
 
 test('streak: days in a row up to today, or up to yesterday while nothing has been served today', () => {
@@ -405,7 +454,8 @@ test('the turn: the same choice all day, then the kinds in their order, none of 
       m = r.memory;
       return [r.kind, r.fact];
     });
-  const all = turns(TURNS, three, 10);
+  const all = turns(TURNS, three, TURNS.length + 1),
+    last = TURNS.length;
   assert.deepEqual(
     all.map(t => t[0]),
     [...TURNS, 'duel'],
@@ -418,18 +468,18 @@ test('the turn: the same choice all day, then the kinds in their order, none of 
   );
   assert.deepEqual(
     [m.kinds, m.facts.length],
-    [['sorts', 'days', 'duel'], 10],
+    [['sorts', 'days', 'duel'], last + 1],
     'the memory keeps the last three kinds and every fact shown',
   );
-  const again = takeTurn(TURNS, three, m, on(9));
+  const again = takeTurn(TURNS, three, m, on(last));
   assert.ok(
-    again.kind === 'duel' && again.fact === all[9][1] && again.memory === m,
+    again.kind === 'duel' && again.fact === all[last][1] && again.memory === m,
     'the same day, the same choice, the memory untouched',
   );
-  const changed = takeTurn(['streak', 'week'], three, m, on(9));
+  const changed = takeTurn(['streak', 'week'], three, m, on(last));
   assert.deepEqual(
     [changed.kind, changed.fact, changed.memory.kinds, changed.memory.facts.length],
-    ['streak', all[9][1], ['sorts', 'days', 'streak'], 10],
+    ['streak', all[last][1], ['sorts', 'days', 'streak'], last + 1],
     'a kind that no longer holds later the same day gives way to the next, the fact stays, and the choice of the morning blocks nothing',
   );
   m = null;
@@ -592,7 +642,12 @@ test('the lines: at least three ways of saying every kind, two sentences at most
     ist: 'ist',
     since: 'vor 3 Tagen',
   };
-  for (const [kind, list] of Object.entries(LEADS))
+  const leads = [
+    ...Object.entries(LEADS),
+    ...Object.entries(LEFT_LEADS).map(([kind, list]) => ['left ' + kind, list]),
+    ...Object.entries(OWN_LEADS).flatMap(([species, by]) => Object.entries(by).map(([w, l]) => [`${species} ${w}`, l])),
+  ];
+  for (const [kind, list] of leads)
     for (const t of list) assert.ok(fill(t, usual).length <= 46, `${kind}: ${fill(t, usual)}`);
   for (const [kind, list] of Object.entries(LINES))
     for (const t of list) assert.ok(t.replace(/\{\w+\}/g, 'Wort').length <= 52, `${kind}: ${t}`);
@@ -601,12 +656,13 @@ test('the lines: at least three ways of saying every kind, two sentences at most
   );
   const loose = /\bliebling|\bam liebsten\b|\bkommt\b|\bbewertet\b|\boffen\b|%/i; // what the overview never says either
   const texts = [
-    ...Object.values(LEADS).flat(),
+    ...leads.flatMap(([, list]) => list),
     ...Object.values(LINES).flat(),
     ...[...Object.values(FACTS).flat(), ...GENERAL].map(f => f.text),
   ];
-  for (const [kind, list] of [...Object.entries(LEADS), ...Object.entries(LINES)])
+  for (const [kind, list] of [...Object.entries(LEADS), ...Object.entries(LEFT_LEADS), ...Object.entries(LINES)])
     assert.ok(list.length >= 3, `${kind}: three ways at least`);
+  for (const [kind, list] of Object.entries(LEADS)) assert.ok(list.length >= 6, `${kind}: six leads at least`);
   for (const t of texts) {
     assert.ok(sentences(t).length <= 2 && sentences(t).every(x => (x.match(/!/g) || []).length <= 1), t);
     const low = t.toLowerCase();
@@ -615,6 +671,31 @@ test('the lines: at least three ways of saying every kind, two sentences at most
   assert.equal(
     fill('In {days} hat {pet} Geburtstag.', {days: '3 Tagen', pet: 'Mau'}),
     'In 3 Tagen hat Mau Geburtstag.',
+  );
+});
+
+test('the leads of a species stand beside the general ones, a mixed household or Andere take the general ones, a meal left its own; the night never lasts until the next meal', () => {
+  const has = (list, part) => part.every(t => list.includes(t));
+  assert.ok(
+    has(leadsFor('due', 'Katze', false), [...OWN_LEADS.Katze.due, ...LEADS.due]) &&
+      has(leadsFor('dueFirst', 'Hund', false), OWN_LEADS.Hund.due) &&
+      has(leadsFor('done', 'Nager', false), OWN_LEADS.Nager.evening),
+    'a species by the moment’s `when`: due also when nothing has been served yet, done in the evening',
+  );
+  assert.deepEqual(
+    [leadsFor('due', null, false), leadsFor('due', 'Andere', false), leadsFor('later', 'Katze', false)],
+    [LEADS.due, LEADS.due, LEADS.later],
+    'mixed, Andere, and a moment that waits: the general ones',
+  );
+  assert.deepEqual(
+    [leadsFor('later', 'Katze', true), leadsFor('older', 'Katze', true)],
+    [LEFT_LEADS.later, [...LEADS.older]],
+    'a meal left: its own wordings where a moment has them',
+  );
+  const nights = [...LEADS.night, ...LEFT_LEADS.night, ...Object.values(OWN_LEADS).flatMap(x => x.night || [])];
+  assert.ok(
+    nights.every(t => !/\bbis\b[^.]*\{time\}/i.test(t)),
+    'no night wording runs up to the next meal, which may be at noon',
   );
 });
 
@@ -662,7 +743,7 @@ test('the overview card: the moment picks the first sentence, news of the day th
   });
   const say = (kind, values, days = 0) => fill(byDay(LINES[kind], T + days * DAY), values);
   const who = {names: 'Minka', wartet: 'wartet', findet: 'findet', freut: 'freut', ist: 'ist', hat: 'hat'},
-    lead = (moment, values, days = 0) => fill(byDay(LEADS[moment], T + days * DAY), {...who, ...values});
+    lead = (moment, values, days = 0) => fill(byDay(leadsFor(moment, 'Katze'), T + days * DAY), {...who, ...values});
   const lines = text =>
     text
       .split('<span class="ov-line">')
@@ -764,6 +845,8 @@ test('the overview card: the moment picks the first sentence, news of the day th
       say('weekday', {weekday: 'Samstags', day: 'Samstag', meal: 'Frühstück', shift: 'später', time: '8:45'}),
     ],
     [{lookback: 'lachs00001'}, say('lookback', {sort: 'Lachs'})],
+    [{calm: {days: 12, record: 31}}, say('calm', {n: 12, days: '12 Tage', since: '12 Tagen', record: 31})],
+    [{calm: {days: 40, record: 31}}, say('calmRecord', {n: 40, days: '40 Tage', since: '40 Tagen', record: 31})],
     [{sorts: 14}, say('sorts', {n: '14 Sorten'})],
     [{first: {at: 0, days: 43, meals: 100}}, say('days', {since: '43 Tagen', days: '43 Tage', n: 43})],
     [
@@ -777,6 +860,15 @@ test('the overview card: the moment picks the first sentence, news of the day th
     ],
   ];
   for (const [x, want] of kinds) assert.equal(one(x, bare)[1], want);
+  assert.deepEqual(
+    one({calm: {days: 2, record: 31}}, bare),
+    one({}, bare),
+    'two days without a meal left are no news yet',
+  );
+  assert.ok(
+    LEFT_LEADS.later.map(t => fill(t, {meal: 'Abendessen', time: '18:30'})).includes(one({left: true})[0]),
+    'the last meal left: the lead hints at it',
+  );
   const twice = x =>
     overviewLines(x, pets, T, null)
       .text.split(/[.!?](?=\s|<|$)/)
@@ -794,12 +886,18 @@ test('the overview card: the moment picks the first sentence, news of the day th
     return lines(overviewLines({...s, last: moved}, pets, T + i * DAY, null).text);
   };
   const waits = i => lead('later', {meal: 'Abendessen', time: '18:30'}, i),
-    named = [0, 1, 2, 3].find(i => waits(i).includes('Minka')),
-    done = lead('done', {time: '7:15'});
-  assert.ok(sharesWord(done, say('premiere', {sort: 'Rind'})) && sharesWord(done, say('premiere', {sort: 'Rind'}, 1)));
+    week = [...Array(40).keys()],
+    named = week.find(i => waits(i).includes('Minka') && !waits(i + 1).includes('Minka')),
+    done = i => lead('done', {time: '7:15'}, i),
+    premiere = i => say('premiere', {sort: 'Rind'}, i),
+    taken = week.find(i => sharesWord(done(i), premiere(i)) && sharesWord(done(i), premiere(i + 1)));
+  assert.ok(
+    taken !== undefined && !sharesWord(done(taken), premiere(taken + 2)),
+    'a day whose lead repeats a word of the news, in its wording and the next',
+  );
   assert.deepEqual(
-    one({premiere: 'rind00001', next: {at: 435, tomorrow: true}}),
-    [done, say('premiere', {sort: 'Rind'}, 2)],
+    onDay({premiere: 'rind00001', next: {at: 435, tomorrow: true}}, taken),
+    [done(taken), premiere(taken + 2)],
     'the day’s wording of the news repeats the lead, and so does the next: the one after stands in',
   );
   assert.deepEqual(
@@ -814,8 +912,11 @@ test('the overview card: the moment picks the first sentence, news of the day th
   );
   assert.deepEqual(
     one({shift: {at: 1110, diff: 95}}),
-    [waits(0)],
-    'the evening meal came later and comes next: every pair says Abendessen twice, the lead stands alone',
+    [
+      week.map(waits).find(t => !t.includes('Abendessen')),
+      say('later', {meal: 'Abendessen', span: 'eineinhalb Stunden'}),
+    ],
+    'the evening meal came later and comes next: the lead takes a wording that does not say Abendessen again',
   );
   const moments = [
       ...shown,

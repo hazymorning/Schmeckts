@@ -1,5 +1,6 @@
 /* Home page overview card: where the day stands for the bowl, then one line that is only true today or a rotating
-   aside. Never how a meal went, nor what the cards below already show. */
+   aside. Of how a meal went only a hint when the last one was left, and the days since one was; never what the
+   cards below already show. */
 import {esc} from '../text.js';
 import {addDays, dayStart, quarterStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
@@ -7,12 +8,13 @@ import {icon} from '../icons.js';
 import {db, prefs, savePrefs} from '../store.js';
 import {calledNames, getObservation, getPet, getProduct, pname} from '../derive.js';
 import {dayNumber, glance, takeTurn} from '../glance.js';
-import {factsOn, fill, LEADS, LINES, sharesWord} from './facts.js';
+import {factsOn, fill, leadsFor, LINES, sharesWord, WHEN} from './facts.js';
 import {avatar, since} from './parts.js';
 
 const FRESH = 60; // minutes a meal counts as news
 const NIGHT = 5; // night lasts until this hour
 const STREAK = 5; // days in a row
+const CALM = 3; // days without a meal left
 const MILESTONE_NEAR = 5; // meals left
 const BIRTHDAY_SOON = 3; // days ahead
 const SNACKS = 3;
@@ -43,7 +45,6 @@ const sortName = id => esc(pname(getProduct(id)));
 // the day's wording first, so it stays the same all day, then the others for when it repeats the other sentence
 const wordings = (list, now, values) => list.map((_, i) => fill(list[(dayNumber(now) + i) % list.length], values));
 const say = (kind, now, values = {}) => wordings(LINES[kind], now, values);
-const sayLead = (moment, now, values = {}) => wordings(LEADS[moment], now, values);
 
 function subject(pets, now) {
   const ids = pets.map(p => p.id);
@@ -51,7 +52,7 @@ function subject(pets, now) {
 }
 const fresh = (g, now) => g.last && (now - g.last.servedAt) / 6e4 < FRESH;
 
-// the moment the card speaks of, a key into LEADS and ASIDE
+// the moment the card speaks of, a key into LEADS and WHEN
 export function momentOf(g, now) {
   if (!g.last) return 'none';
   const today = g.last.servedAt >= dayStart(now),
@@ -65,23 +66,11 @@ export function momentOf(g, now) {
   if (g.next && today) return 'done';
   return today ? 'today' : night ? 'lastNight' : 'yesterday';
 }
-// moment -> `when` of a fact; missing means only facts that fit any time
-const ASIDE = {
-  due: 'due',
-  dueFirst: 'due',
-  fresh: 'fresh',
-  later: 'wait',
-  morning: 'wait',
-  today: 'wait',
-  yesterday: 'wait',
-  done: 'evening',
-  night: 'night',
-  lastNight: 'night',
-};
-
-function leadLine(g, pets, now, moment) {
-  const all = subject(pets, now);
-  if (moment === 'none') return sayLead('none', now, {names: all.names, wartet: all.verb('wartet', 'warten')});
+// species: the pets' own, null for a mixed household
+function leadLine(g, pets, now, moment, species) {
+  const all = subject(pets, now),
+    lead = (key, values) => wordings(leadsFor(key, species, g.left), now, values);
+  if (moment === 'none') return lead('none', {names: all.names, wartet: all.verb('wartet', 'warten')});
   const last = g.last,
     p = getProduct(last.productId),
     treat = p && typeOf(p) === 'Snack',
@@ -100,7 +89,7 @@ function leadLine(g, pets, now, moment) {
     ist: all.verb('ist', 'sind'),
     hat: all.verb('hat', 'haben'),
   };
-  return sayLead(moment === 'fresh' && treat ? 'freshTreat' : moment, now, values);
+  return lead(moment === 'fresh' && treat ? 'freshTreat' : moment, values);
 }
 
 // First thing only true today, in priority order
@@ -145,6 +134,15 @@ const TURN_LINES = {
       : say('duelTie', now, {...names, score: b(`${first.n} zu ${second.n}`)});
   },
   streak: (g, now) => say('streak', now, {since: b(g.streak + ' Tagen'), days: b(g.streak + ' Tage')}),
+  calm(g, now) {
+    const {days, record} = g.calm;
+    return say(days > record ? 'calmRecord' : 'calm', now, {
+      n: b(days),
+      days: b(days + ' Tage'),
+      since: b(days + ' Tagen'),
+      record,
+    });
+  },
   idea: (g, now) => say('idea', now, {sort: b(sortName(g.idea.id)), days: g.idea.days}),
   run(g, now) {
     const {name, days, other} = g.feedRun;
@@ -177,6 +175,7 @@ function turn(g, now, memory, facts) {
   const kinds = [
       g.feeders.length > 1 && 'duel',
       g.streak >= STREAK && 'streak',
+      g.calm?.days >= CALM && 'calm',
       g.idea && 'idea',
       g.feedRun?.other && 'run',
       g.weekday && 'weekday',
@@ -212,12 +211,12 @@ export function overviewLines(g, pets, now, memory) {
       sitzt: all.verb('sitzt', 'sitzen'),
     });
   } else if (!more.length) {
-    const took = turn(g, now, memory, factsOn(species, date, false, ASIDE[moment] || null));
+    const took = turn(g, now, memory, factsOn(species, date, false, WHEN[moment] || null));
     more = took.texts;
     kept = took.memory;
   }
   // a birthday today goes first, except at feeding time
-  const lead = leadLine(g, pets, now, moment),
+  const lead = leadLine(g, pets, now, moment, species),
     [firsts, seconds] =
       g.birthday?.today && news.length && moment !== 'due' && moment !== 'dueFirst' ? [more, lead] : [lead, more];
   // the day's wordings; where the second repeats a word of the first, its next wording, else the first's next
@@ -240,26 +239,51 @@ const whose = name => (/(s|ß|x|z|ce)$/i.test(name) ? `${name}’` : `${name}’
 // whose day the card tells, in a wording that changes from day to day; more than two pets are the Bande
 const HEADS = {
   one: {
-    any: ['{whose} Tag', '{whose} {weekday}', '{name} heute', 'Ein Tag mit {name}'],
+    any: [
+      '{whose} Tag',
+      '{whose} {weekday}',
+      '{name} heute',
+      'Ein Tag mit {name}',
+      '{whose} Speiseplan',
+      'Im Dienst von {name}',
+      '{name} hat das Sagen',
+      '{whose} Revier',
+    ],
     weekend: '{whose} Wochenende',
-    night: '{whose} Nacht',
+    night: ['{whose} Nacht', 'Nachtruhe bei {name}'],
   },
   two: {
-    any: ['Der Tag von {names}', '{names} heute', 'Ein Tag mit {names}', '{weekday} bei {names}'],
+    any: [
+      'Der Tag von {names}',
+      '{names} heute',
+      'Ein Tag mit {names}',
+      '{weekday} bei {names}',
+      'Im Dienst von {names}',
+      '{names} haben das Sagen',
+      'Das Revier von {names}',
+    ],
     weekend: 'Wochenende bei {names}',
-    night: 'Die Nacht von {names}',
+    night: ['Die Nacht von {names}', 'Nachtruhe bei {names}'],
   },
   more: {
-    any: ['Der Tag der Bande', 'Die Bande heute', 'Ein Tag mit der Bande', '{weekday} bei der Bande'],
+    any: [
+      'Der Tag der Bande',
+      'Die Bande heute',
+      'Ein Tag mit der Bande',
+      '{weekday} bei der Bande',
+      'Im Dienst der Bande',
+      'Die Bande hat das Sagen',
+      'Das Revier der Bande',
+    ],
     weekend: 'Wochenende bei der Bande',
-    night: 'Die Nacht der Bande',
+    night: ['Die Nacht der Bande', 'Nachtruhe bei der Bande'],
   },
 };
 export function headOf(pets, g, now, moment) {
   if (g.birthday?.today) return `${whose(esc(calledNames([g.birthday.pet], 'head', now)))} Geburtstag`;
   const heads = HEADS[pets.length === 1 ? 'one' : pets.length === 2 ? 'two' : 'more'],
     day = new Date(now).getDay(),
-    list = SLEEP.has(moment) ? [heads.night] : [...heads.any, ...(day % 6 ? [] : [heads.weekend])],
+    list = SLEEP.has(moment) ? heads.night : [...heads.any, ...(day % 6 ? [] : [heads.weekend])],
     ids = pets.map(p => p.id),
     names = esc(calledNames(ids, 'head', now));
   return fill(list[dayNumber(now) % list.length], {whose: whose(names), name: names, names, weekday: WEEKDAYS[day]});
