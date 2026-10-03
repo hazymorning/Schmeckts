@@ -137,7 +137,7 @@ function viewObservation() {
   const kinds = `<div class="chips">${Object.entries(OBSERVATIONS)
     .map(
       ([k, x]) =>
-        `<button class="chip toned o-${k}" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.chip}</button>`,
+        `<button class="chip toned o-${k}" aria-pressed="${o.kind === k}" data-action="set-observation-kind" data-v="${k}">${icon(x.icon)}${x.label}</button>`,
     )
     .join('')}</div>`;
   return `<div class="sh-head"><h2>${esc(kind.label)}</h2>${closeBtn}</div>

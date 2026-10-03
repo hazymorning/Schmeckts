@@ -215,7 +215,7 @@ function hintHTML(m) {
     [say, why, btns] = [
       `${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.`,
       `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
-        (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => lower(observationOf(k).label)))}.` : ''),
+        (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => `„${observationOf(k).label}“`))}.` : ''),
       hide,
     ];
   } else if (h.kind === 'sosse') {

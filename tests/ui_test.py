@@ -2350,7 +2350,7 @@ async def test_observations(browser, url):
     CHIP = '#home .overview [data-action=observe]'
     ROW = '[data-sec=hist] [data-action=open-observation]'
     words = await pg.eval_on_selector_all(CHIP, 'l => l.map(c => c.textContent.trim())')
-    check(len(words) == 5 and all(len(w.split()) == 1 for w in words), f'the chips always at hand, one short word each {words}')
+    check(len(words) == 5 and all(len(w) <= 11 and len(w.split()) <= 2 for w in words), f'the chips always at hand, short {words}')
     await tap(pg, '[data-action=observe][data-v=tired]')
     tired = await pg.inner_text('#toast > span')
     await tap(pg, '#toast [data-action=undo]')
@@ -2361,8 +2361,9 @@ async def test_observations(browser, url):
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
         and await pg.locator(CHIP).count() == 5
-        and await pg.locator(ROW).count() == 1,
-        f'a chip notes it at once, for the pet and by who noted it, in today’s diary {after[0]}',
+        and await pg.locator(ROW).count() == 1
+        and await pg.inner_text(f'{ROW} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
+        f'a chip notes it at once, for the pet and by who noted it, in today’s diary under the chip’s word {after[0]}',
     )
     await tap(pg, '#toast [data-action=undo]')
     check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')

@@ -307,7 +307,7 @@ function observedCard(x) {
       return toldBtn(
         l.id,
         obsThumb(l.kind),
-        `${o.label} kam öfter nach <b>${esc(pname(getProduct(l.id)))}</b>.`,
+        `Nach <b>${esc(pname(getProduct(l.id)))}</b> öfter notiert: ${o.label}.`,
         `Nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten ${o.after}, bei anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
       );
     }),

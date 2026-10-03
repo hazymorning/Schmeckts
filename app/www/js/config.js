@@ -278,9 +278,8 @@ export function flavoursOf(text) {
 export const OBSERVATIONS = {
   happy: {
     icon: 'o_happy',
-    chip: 'Happy',
-    label: 'Gute Laune',
-    said: 'Gute Laune notiert. Herrlich!',
+    label: 'Gut drauf',
+    said: 'Gute Laune notiert. Jetzt bloß nichts falsch machen.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -288,9 +287,8 @@ export const OBSERVATIONS = {
   },
   stink: {
     icon: 'o_stink',
-    chip: 'Stunk',
-    label: 'Heftiger Stunk',
-    said: 'Stunk notiert. Fenster auf!',
+    label: 'Stunk',
+    said: 'Stunk notiert. Die Quelle schweigt.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -298,9 +296,8 @@ export const OBSERVATIONS = {
   },
   hungry: {
     icon: 'o_hungry',
-    chip: 'Hunger',
-    label: 'Großer Hunger',
-    said: 'Hunger notiert. Der Napf ist gewarnt.',
+    label: 'Noch Hunger',
+    said: 'Noch Hunger notiert. Der Napf ist gewarnt.',
     about: 'meal',
     within: 3,
     window: 'in den drei Stunden',
@@ -308,16 +305,14 @@ export const OBSERVATIONS = {
   },
   tired: {
     icon: 'o_tired',
-    chip: 'Müde',
-    label: 'Müder Tag',
-    said: 'Müdigkeit notiert. Gähn.',
+    label: 'Müde',
+    said: 'Müdigkeit notiert. Ab jetzt wird geflüstert.',
     about: 'day',
   },
   vomit: {
     icon: 'o_vomit',
-    chip: 'Erbrochen',
-    label: 'Erbrechen',
-    said: 'Erbrechen notiert. Gute Besserung!',
+    label: 'Erbrochen',
+    said: 'Erbrechen notiert. Hoffentlich war’s das.',
     about: 'meal',
     within: 6,
     window: 'in den sechs Stunden',
@@ -325,7 +320,7 @@ export const OBSERVATIONS = {
   },
 };
 export const observationOf = kind =>
-  OBSERVATIONS[kind] || {icon: 'sparkle', chip: 'Beobachtung', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
+  OBSERVATIONS[kind] || {icon: 'sparkle', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
 
 // rating reminder, minutes after serving, 0 = off
 export const REMIND = [0, 60, 180, 360];
