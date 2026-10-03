@@ -1282,9 +1282,9 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
-    await tap(pg, f'{CARD} [data-action=open-pet]')
-    check(await pg.evaluate(LEVEL) == [True, 'pet', None, None], 'the card leads to where the novelty is')
-    await tap(pg, '#sheet [data-action=close]')
+    await tap(pg, f'{CARD} [data-action=open-evaluation]')
+    check(await pg.evaluate(LEVEL) == [True, 'evaluation', None, None], 'the card leads to where the novelty is')
+    await tap(pg, '#sheet [data-action=settings-back]')
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -1307,10 +1307,11 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     shown = await pg.locator(CARD).count() == 1
-    await tap(pg, f'{CARD} [data-action=open-pet]')
-    await pg.fill('#f-nick', 'Mimi')
-    await tap(pg, '[data-action=save-pet]')
-    check(shown and await pg.locator(CARD).count() == 0, 'a nickname saved: the news has done its job')
+    await tap(pg, f'{CARD} [data-action=open-evaluation]')
+    await tap(pg, '#sheet [data-action=open-product]')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+    await idle(pg)
+    check(shown and await pg.locator(CARD).count() == 0, 'a variety’s card opened: the news has done its job')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 

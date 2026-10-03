@@ -240,7 +240,7 @@ function hintHTML(m) {
 const goTo = ([where, label]) =>
   where === 'pet' && db.pets.length === 1
     ? `<button class="btn primary" data-action="open-pet" data-id="${db.pets[0].id}">${label}</button>`
-    : `<button class="btn primary" data-action="open-settings">${label}</button>`;
+    : `<button class="btn primary" data-action="${where === 'evaluation' ? 'open-evaluation' : 'open-settings'}">${label}</button>`;
 // the newest news, never beside sample data
 function newsHTML() {
   const n = NEWS[0],

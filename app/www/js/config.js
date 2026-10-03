@@ -334,8 +334,17 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
-   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor. */
+   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
+   „Vorlieben“. */
 export const NEWS = [
+  {
+    v: '0.27.0',
+    use: 'quartet',
+    title: 'Neu: Sorten-Quartett',
+    say: 'Tippst du unter „Vorlieben“ auf eine Sorte, zeigt sie ihre Werte wie auf einer Quartettkarte.',
+    why: 'Und beim Servieren nennt die App gleich die Bilanz einer Sorte, die schlecht ankommt.',
+    go: ['evaluation', 'Vorlieben öffnen'],
+  },
   {
     v: '0.26.0',
     use: 'nicknames',

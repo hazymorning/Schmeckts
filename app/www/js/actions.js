@@ -3,7 +3,7 @@ import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
 import {REMIND_MAX_H, textureOf} from './config.js';
-import {db, hideHint, prefs, save, savePrefs} from './store.js';
+import {db, hideHint, prefs, save, savePrefs, usedNews} from './store.js';
 import {ServerError} from './api.js';
 import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
 import {getProduct, getServing} from './derive.js';
@@ -346,6 +346,7 @@ const ACTIONS = {
     deleteServing(el.dataset.id || sheet?.id);
   },
   'open-product'(el) {
+    if (usedNews('quartet')) update();
     openSheet({kind: 'product', id: el.dataset.id});
   },
   'remove-code'(el) {
