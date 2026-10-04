@@ -279,7 +279,7 @@ export const OBSERVATIONS = {
   happy: {
     icon: 'o_happy',
     label: 'Gut drauf',
-    said: 'Gute Laune notiert. Jetzt bloß nichts falsch machen.',
+    said: 'Gute Laune ist notiert. Das hört man gern.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -288,7 +288,7 @@ export const OBSERVATIONS = {
   stink: {
     icon: 'o_stink',
     label: 'Stunk',
-    said: 'Stunk notiert. Die Quelle schweigt.',
+    said: 'Stunk ist notiert. Lüften schadet sicher nicht.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -297,7 +297,7 @@ export const OBSERVATIONS = {
   hungry: {
     icon: 'o_hungry',
     label: 'Noch Hunger',
-    said: 'Noch Hunger notiert. Der Napf ist gewarnt.',
+    said: 'Noch Hunger ist notiert. Vielleicht war die Portion knapp.',
     about: 'meal',
     within: 3,
     window: 'in den drei Stunden',
@@ -306,13 +306,13 @@ export const OBSERVATIONS = {
   tired: {
     icon: 'o_tired',
     label: 'Müde',
-    said: 'Müdigkeit notiert. Ab jetzt wird geflüstert.',
+    said: 'Müdigkeit ist notiert. Ein ruhiger Tag tut gut.',
     about: 'day',
   },
   vomit: {
     icon: 'o_vomit',
     label: 'Erbrochen',
-    said: 'Erbrechen notiert. Hoffentlich war’s das.',
+    said: 'Erbrechen ist notiert. Hoffentlich bleibt es dabei.',
     about: 'meal',
     within: 6,
     window: 'in den sechs Stunden',

@@ -749,7 +749,7 @@ async def test_record(browser, url):
     await tap(pg, '#sheet [data-action=serve]')
     plain = await pg.inner_text('#toast > span')
     check(
-        'Laut Akte beide Male fast nix gefressen' in told and 'Akte' not in plain,
+        'Zuletzt beide Male fast nix gefressen' in told and 'Zuletzt' not in plain,
         f'served all the same, the toast tells the record of one nobody buys any more ({told} / {plain})',
     )
     meals = [
