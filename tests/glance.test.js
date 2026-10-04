@@ -5,7 +5,19 @@ import assert from 'node:assert/strict';
 import {glance} from '../app/www/js/glance.js';
 import {nextMeal} from '../app/www/js/smart.js';
 import {addDays, dayNumber} from '../app/www/js/dates.js';
-import {datedOn, FACTS, factOn, fill, POOLS, sharesWord} from '../app/www/js/views/facts.js';
+import {
+  catOf,
+  DATED,
+  datedOn,
+  FACTS,
+  factOn,
+  fill,
+  formatOn,
+  POOLS,
+  sharesWord,
+  sheetOn,
+  sheetText,
+} from '../app/www/js/views/facts.js';
 
 // views/overview.js reaches for the page as it loads; in Node a stub answers every such call
 const stub = new Proxy(function () {}, {
@@ -13,7 +25,10 @@ const stub = new Proxy(function () {}, {
   apply: () => stub,
 });
 Object.assign(globalThis, {window: globalThis, document: stub, matchMedia: stub, addEventListener: () => {}});
-const {replaceDb} = await import('../app/www/js/store.js');
+// the settings as 0.28 left them, where the store finds them in a browser
+const stored = {'schmeckts-prefs': JSON.stringify({torn: 3})};
+globalThis.localStorage = {getItem: k => stored[k] ?? null, setItem: (k, v) => (stored[k] = v), removeItem: () => {}};
+const {prefs, replaceDb} = await import('../app/www/js/store.js');
 const {headOf, poolOf, sentenceOf, valuesOf} = await import('../app/www/js/views/overview.js');
 
 const at = text => new Date(text).getTime();
@@ -203,7 +218,7 @@ test('the overview pools: none empty, each one the card reaches, every sentence 
   for (const [pool, [g, now]] of Object.entries(STATES)) {
     assert.ok(POOLS[pool].length, `${pool}: not empty`);
     assert.equal(poolOf(g, now), pool);
-    for (const said of POOLS[pool].map(x => fill(x, valuesOf(g, now))))
+    for (const said of POOLS[pool].map(x => fill(x, valuesOf({...g, sex: 'f'}, now))))
       assert.ok(!/[{}]/.test(said), `${pool}: ${said}`);
   }
 });
@@ -228,7 +243,7 @@ test('the overview sentence: a meal left takes its own pool where there is one, 
 
   const [g, now] = STATES.dueFirst,
     head = 'Minkas Tag',
-    list = POOLS.dueFirst.map(x => fill(x, valuesOf(g, now)));
+    list = POOLS.dueFirst.filter(x => !/\{sie\}/i.test(x)).map(x => fill(x, valuesOf(g, now)));
   assert.ok(list.some(s => sharesWord(head, s)) && list.some(s => !sharesWord(head, s)));
   for (let i = 0; i < list.length; i++) {
     const on = addDays(now, i),
@@ -286,56 +301,141 @@ test('the overview heading: whose day it is, a wording a day, the birthday and t
   );
 });
 
-test('the cat calendar: its ids in order, every text once, the months in shape', () => {
+test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is known, she or he as it is', () => {
+  replaceDb(structuredClone(HOME));
+  const shown = (pets, ids) => glance({...household(['nass'], []), pets}, ids, NOW).sex,
+    f = {id: 'A', sex: 'f'},
+    m = {id: 'B', sex: 'm'};
   assert.deepEqual(
-    FACTS.map(f => f.id),
-    FACTS.map((_, i) => `k${String(i + 1).padStart(3, '0')}`),
+    [
+      shown([f], ['A']),
+      shown([m], ['B']),
+      shown([{id: 'A'}], ['A']),
+      shown([{id: 'A', sex: 'x'}], ['A']),
+      shown([f, m], ['A', 'B']),
+      shown([f, m], ['B']),
+    ],
+    ['f', 'm', null, null, null, 'm'],
   );
-  assert.equal(new Set(FACTS.map(f => f.text)).size, FACTS.length);
-  for (const f of FACTS) assert.ok(!f.months || f.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12), f.id);
-});
-
-test('the cat calendar without a sheet torn off: no fact comes again before all others have had their turn, none out of its months, none bound to a day', () => {
-  const every = FACTS.filter(f => !f.day && !f.months).map(f => f.id),
-    last = new Map(),
-    shown = [];
-  for (let i = 0; i < 3 * 365; i++) {
-    const d = new Date(2026, 9, 4 + i, 12),
-      f = factOn(d);
-    assert.ok(!f.day && (!f.months || f.months.includes(d.getMonth() + 1)), `${f.id} on ${d.toDateString()}`);
-    if (last.has(f.id)) {
-      const since = new Set(shown.slice(last.get(f.id) + 1));
-      assert.ok(
-        every.every(id => id === f.id || since.has(id)),
-        `${f.id} again on ${d.toDateString()} before all others`,
-      );
-    }
-    last.set(f.id, shown.length);
-    shown.push(f.id);
+  for (const [pool, [g, now]] of Object.entries(STATES)) {
+    const named = POOLS[pool].filter(x => /\{sie\}/i.test(x)),
+      next = i => ({...g, last: g.last && {...g.last, servedAt: addDays(g.last.servedAt, i)}}),
+      month = sex => [...Array(31).keys()].map(i => sentenceOf({...next(i), sex}, addDays(now, i), '')),
+      as = (Sie, sie) => named.map(x => fill(x, {...valuesOf(g, now), Sie, sie}));
+    assert.ok(!month(null).some(said => as('Sie', 'sie').includes(said) || as('Er', 'er').includes(said)), pool);
+    assert.ok(!named.length || month('f').some(said => as('Sie', 'sie').includes(said)), `${pool}: she`);
+    assert.ok(!named.length || month('m').some(said => as('Er', 'er').includes(said)), `${pool}: he`);
   }
 });
 
-test('the cat calendar: a fact bound to a day comes on that day, the clocks changing on the last Sunday of March and October', () => {
-  const on = (y, m, d) => datedOn(new Date(y, m - 1, d, 12))?.id ?? null;
+const cat = (sex, name = 'Schnurrsula') => ({id: 'cat' + name, name, species: 'Katze', ...(sex && {sex})});
+const SHEETS = [...Object.values(FACTS).flat(), ...DATED];
+
+test('the cat calendar: a format for each weekday, its own id prefix, every text once, a back only on Stimmt’s?, months only in Wissen', () => {
   assert.deepEqual(
-    [
-      on(2026, 8, 8),
-      on(2026, 2, 17),
-      on(2026, 3, 29),
-      on(2026, 10, 25),
-      on(2027, 3, 28),
-      on(2027, 10, 31),
-      on(2026, 12, 31),
-    ],
-    ['k139', 'k140', 'k141', 'k141', 'k141', 'k141', 'k145'],
+    [0, 1, 2, 3, 4, 5, 6].map(i => formatOn(new Date(2026, 9, 4 + i, 12))), // from Sunday
+    ['Wissen', 'Katzenlogik', 'Stimmt’s?', 'Kurios', 'Wissen', 'Flachwitz', 'Sprache'],
   );
-  assert.deepEqual([on(2026, 8, 7), on(2026, 10, 24), on(2027, 3, 29), on(2026, 10, 4)], [null, null, null, null]);
+  const prefixes = [...Object.values(FACTS), DATED].map(list => new Set(list.map(f => f.id.replace(/\d{3}$/, ''))));
+  assert.ok(
+    prefixes.every(p => p.size === 1) && new Set(prefixes.map(p => [...p][0])).size === prefixes.length,
+    'one prefix a format',
+  );
+  assert.equal(new Set(SHEETS.map(f => f.id)).size, SHEETS.length);
+  const texts = SHEETS.flatMap(f => [f.text, f.back, f.m, f.f].filter(Boolean));
+  assert.equal(new Set(texts).size, texts.length);
+  for (const [format, list] of Object.entries(FACTS))
+    for (const f of list) {
+      assert.equal(!!f.back, format === 'Stimmt’s?', f.id);
+      assert.ok(!f.months || (format === 'Wissen' && f.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12)));
+    }
 });
 
-test('the cat calendar: a sheet torn off shows the next fact in season, the one tomorrow brings; each in turn before any comes again', () => {
-  const d = new Date(2026, 9, 14, 12),
-    open = FACTS.filter(f => !f.day && (!f.months || f.months.includes(10)));
-  assert.equal(factOn(d, 1), factOn(new Date(2026, 9, 15, 12)));
-  assert.equal(new Set(open.map((_, n) => factOn(d, n))).size, open.length);
-  assert.equal(factOn(d, open.length), factOn(d));
+test('the cat calendar: on the days of a format its sheets in turn, the same all day, none again before all others, none out of its months', () => {
+  const shown = {};
+  for (let i = 0; i < 3 * 365; i++) {
+    const d = new Date(2026, 9, 4 + i, 12),
+      f = factOn(d);
+    assert.ok(FACTS[formatOn(d)].includes(f), `${f.id} on ${d.toDateString()}`);
+    assert.ok(!f.months || f.months.includes(d.getMonth() + 1), `${f.id} on ${d.toDateString()}`);
+    (shown[formatOn(d)] ||= []).push(f.id);
+  }
+  assert.equal(factOn(new Date(2026, 9, 6, 0, 10)), factOn(new Date(2026, 9, 6, 23, 50)));
+  for (const [format, ids] of Object.entries(shown)) {
+    const every = FACTS[format].filter(f => !f.months).map(f => f.id),
+      last = new Map();
+    ids.forEach((id, n) => {
+      const since = new Set(ids.slice(last.get(id) + 1, n));
+      assert.ok(
+        !last.has(id) || every.every(x => x === id || since.has(x)),
+        `${format}: ${id} again before all others`,
+      );
+      last.set(id, n);
+    });
+  }
+});
+
+test('the cat calendar: a sheet torn off shows the next of its format, the one the format’s next day brings, and leaves the other formats alone', () => {
+  const mon = new Date(2026, 9, 12, 12),
+    tue = new Date(2026, 9, 13, 12),
+    thu = new Date(2026, 9, 15, 12);
+  assert.equal(factOn(mon, {Katzenlogik: 1}), factOn(new Date(2026, 9, 19, 12)));
+  assert.equal(factOn(thu, {Wissen: 1}), factOn(new Date(2026, 9, 18, 12)), 'Thursday, then Sunday');
+  assert.equal(factOn(tue, {Katzenlogik: 5, Wissen: 2}), factOn(tue));
+  for (const [format, d] of [
+    ['Katzenlogik', mon],
+    ['Wissen', thu],
+  ]) {
+    const open = FACTS[format].filter(f => !f.months || f.months.includes(10));
+    assert.equal(new Set(open.map((_, n) => factOn(d, {[format]: n}))).size, open.length, format);
+    assert.equal(factOn(d, {[format]: open.length}), factOn(d), format);
+  }
+});
+
+test('the cat calendar: a sheet bound to a day comes first on that day, the clocks changing on the last Sunday of March and October; torn off, the weekday’s follows', () => {
+  const on = (y, m, d) => datedOn(new Date(y, m - 1, d, 12))?.id ?? null;
+  assert.deepEqual(
+    DATED.filter(f => typeof f.day === 'string').map(f => on(2026, ...f.day.split('-').map(Number))),
+    DATED.filter(f => typeof f.day === 'string').map(f => f.id),
+  );
+  const clocks = DATED.find(f => typeof f.day === 'function').id;
+  assert.deepEqual(
+    [on(2026, 3, 29), on(2026, 10, 25), on(2027, 3, 28), on(2027, 10, 31)],
+    [clocks, clocks, clocks, clocks],
+  );
+  assert.deepEqual([on(2026, 8, 7), on(2026, 10, 24), on(2027, 3, 29), on(2026, 10, 4)], [null, null, null, null]);
+  const sat = new Date(2026, 7, 8, 12);
+  assert.deepEqual(sheetOn(sat, {}), {sheet: datedOn(sat), format: null});
+  assert.deepEqual(sheetOn(sat, {Sprache: 1}, true), {sheet: factOn(sat, {Sprache: 1}), format: 'Sprache'});
+});
+
+test('the cat calendar speaks of the cat only where the household has one cat of known sex: its variant, its name, „dein Kater“', () => {
+  const dog = {id: 'bello00001', name: 'Bello', species: 'Hund', sex: 'm'};
+  assert.deepEqual(
+    [[cat('m')], [cat('f'), dog], [cat('f'), cat('m', 'Tiger')], [cat(null)], [cat('x')], [dog]].map(
+      pets => catOf(pets)?.name ?? null,
+    ),
+    ['Schnurrsula', 'Schnurrsula', null, null, null, null],
+  );
+  const paws = SHEETS.find(f => f.m),
+    nose = SHEETS.find(f => f.text.includes('{deine Katze}'));
+  assert.deepEqual(
+    [sheetText(paws, cat('m')), sheetText(paws, cat('f')), sheetText(paws, null)],
+    [paws.m.replace('{name}', 'Schnurrsula'), paws.f.replace('{name}', 'Schnurrsula'), paws.text],
+  );
+  assert.ok(sheetText(paws, cat('m', '<i>Mo</i>')).includes('&lt;i&gt;Mo&lt;/i&gt;'), 'the name escaped');
+  assert.deepEqual(
+    [sheetText(nose, cat('m')), sheetText(nose, cat('f')), sheetText(nose, null)].map(
+      text => text.match(/dein\w* \w+/)[0],
+    ),
+    ['dein Kater', 'deine Katze', 'deine Katze'],
+  );
+  assert.equal(sheetText({text: '{Deine Katze} weiß das.'}, cat('m')), 'Dein Kater weiß das.');
+  for (const f of SHEETS)
+    for (const c of [null, cat('f'), cat('m')])
+      for (const back of f.back ? [false, true] : [false]) assert.ok(!/[{}]/.test(sheetText(f, c, back)), f.id);
+});
+
+test('the sheets torn off, which 0.28 counted as one number, count for Wissen', () => {
+  assert.deepEqual(prefs.torn, {Wissen: 3});
 });

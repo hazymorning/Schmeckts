@@ -163,10 +163,10 @@
   --happy-soft: light-dark(#e3ecd7, #333a26);
   --vomit: light-dark(#6d5884, #c8b3e1);
   --vomit-soft: light-dark(#ece3f7, #3b3245);
-  /* the calendar sheet: paper in the dark too, only dimmed */
-  --paper: light-dark(#f7f0dd, #cfc4a8);
-  --paper-ink: light-dark(#3a3326, #2b261d);
-  --paper-muted: light-dark(#6b5f45, #574c37);
+  /* the calendar sheet, on night paper in the dark */
+  --paper: light-dark(#f7f0dd, #322d25);
+  --paper-ink: light-dark(#3a3326, #ece3cd);
+  --paper-muted: light-dark(#6b5f45, #ab9f86);
 
   --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 
@@ -330,6 +330,17 @@
   to {
     opacity: 0;
     transform: translateY(-50%) rotate(-5deg);
+  }
+}
+/* the calendar sheet turning over, edge on in between */
+@keyframes turnAway {
+  to {
+    transform: perspective(600px) rotateY(90deg);
+  }
+}
+@keyframes turnBack {
+  from {
+    transform: perspective(600px) rotateY(-90deg);
   }
 }
 @keyframes shimmer {

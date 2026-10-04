@@ -1,5 +1,5 @@
 // What the overview card needs of the day. Of a rating it only reads whether the meal was left.
-import {RATINGS, typeOf} from './config.js';
+import {RATINGS, sexOf, typeOf} from './config.js';
 import {DAY, dayStart} from './dates.js';
 import {nextMeal, NO, rOf} from './smart.js';
 
@@ -27,7 +27,7 @@ function nextBirthday(db, shown, now) {
 }
 
 /* last: the newest serving of the pets shown up to now. left: it is a meal one of them left; a treat is no meal.
-   next: the next usual meal. */
+   next: the next usual meal. sex: of the one pet shown, if known. */
 export function glance(db, pets, now) {
   const shown = new Set(pets),
     last = db.servings.find(s => s.servedAt <= now && Object.keys(s.pets || {}).some(id => shown.has(id))) || null,
@@ -37,5 +37,6 @@ export function glance(db, pets, now) {
     left: !!meal && Object.entries(last.pets).some(([id, x]) => shown.has(id) && RATINGS[rOf(x)]?.score < NO),
     birthday: nextBirthday(db, shown, now),
     next: nextMeal(db, now, pets),
+    sex: pets.length === 1 ? sexOf(db.pets.find(p => p.id === pets[0])) : null,
   };
 }

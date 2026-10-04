@@ -43,7 +43,7 @@ import {
 import {renderMood} from './mood.js';
 import {overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
-import {datedOn, factOn} from './facts.js';
+import {catOf, sheetOn, sheetText} from './facts.js';
 
 export function update() {
   let done = false;
@@ -74,8 +74,9 @@ export function scrollTop() {
   window.scrollTo({top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
 }
 
-// fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets
-export const homeView = {fresh: null, held: new Map()};
+/* fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets;
+   turned: the Stimmt’s? sheet showing its back */
+export const homeView = {fresh: null, held: new Map(), turned: null};
 
 function renderPets() {
   const el = $('#pets');
@@ -142,14 +143,13 @@ function homeHTML() {
   const open = new Set(pendingServings()),
     pend = db.servings.filter(s => open.has(s) || (homeView.held.has(s.id) && rateRows(s).length)),
     m = db.servings.length ? model() : null;
-  let html = banner + (m ? overviewHTML(m, homeView.fresh) : '');
+  let html = banner + (m ? overviewHTML(m, homeView.fresh) + calsheetHTML() : '');
   if (pend.length) html += pendingHTML(pend);
   if (!m) html += stepsHTML();
   else
     html +=
       newsHTML() +
       hintHTML(m) +
-      calsheetHTML() +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m);
   return html;
@@ -244,54 +244,65 @@ const goTo = ([where, label]) =>
   where === 'pet' && db.pets.length === 1
     ? `<button class="btn primary" data-action="open-pet" data-id="${db.pets[0].id}">${label}</button>`
     : `<button class="btn primary" data-action="${where === 'evaluation' ? 'open-evaluation' : 'open-settings'}">${label}</button>`;
-// the newest news, never beside sample data
+// the newest news for this household, never beside sample data
 function newsHTML() {
-  const n = NEWS[0],
+  const cat = calendarOn(),
+    n = NEWS.find(x => x.v === NEWS[0].v && (x.cat == null || x.cat === cat)),
     [setting, offWhy] = n?.off || [],
     off = setting && !prefs[setting];
-  if (
-    !n ||
-    prefs.hiddenHints.includes('neu:' + n.v) ||
-    db.pets.some(p => p.id.startsWith(DEMO)) ||
-    (n.cat && !calendarOn())
-  )
-    return '';
+  if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
   const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
   return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
-// The cat calendar: a fact bound to the day on top, under it one fact a day, moved on by every sheet torn off
+// The cat calendar: a sheet bound to the day on top, under it the weekday's, moved on by every sheet torn off
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
 const datedKey = now => 'blatt:' + dayKey(now); // in hiddenHints: the day's dated sheet is torn off
-function sheetFact(now) {
-  const dated = datedOn(now);
-  return dated && !prefs.hiddenHints.includes(datedKey(now)) ? dated : factOn(now, prefs.torn);
-}
 const short = (d, o) => d.toLocaleDateString('de-DE', o).replace('.', '');
+// ask: a sheet with a back, a Stimmt’s?, still on its front, which the next tap turns over
+function calendar(now) {
+  const {sheet, format} = sheetOn(now, prefs.torn, prefs.hiddenHints.includes(datedKey(now))),
+    back = !!sheet.back && homeView.turned === sheet.id,
+    side = back ? 'Auflösung' : format,
+    d = new Date(now);
+  return {
+    sheet,
+    format,
+    ask: !!sheet.back && !back,
+    html: `<span class="cal-date">${short(d, {weekday: 'short'})} ${d.getDate()}. ${short(d, {month: 'short'})}${side ? ` · ${side}` : ''}</span>
+      <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
+  };
+}
+const label = c => (c.ask ? 'Auflösung zeigen' : 'Nächstes Kalenderblatt');
 function calsheetHTML() {
   if (!calendarOn()) return '';
-  const now = Date.now(),
-    d = new Date(now);
-  return `<aside class="calsheet" role="button" tabindex="0" aria-label="Nächster Katzenfakt" data-action="tear" style="view-transition-name:sec-cal">
-    <span class="cal-date">${short(d, {weekday: 'short'})} ${d.getDate()}. ${short(d, {month: 'short'})}</span><p class="cal-text">${sheetFact(now).text}</p></aside>`;
+  const c = calendar(Date.now());
+  return `<aside class="calsheet" role="button" tabindex="0" aria-label="${label(c)}" data-action="tear" style="view-transition-name:sec-cal">${c.html}</aside>`;
 }
-// the next fact is in place at once; the sheet torn off rises from it and fades
+function paint(el, c) {
+  el.innerHTML = c.html;
+  el.setAttribute('aria-label', label(c));
+}
+// a Stimmt’s? turns over first; then the next sheet is in place at once, the one torn off rises from it and fades
 export function tearSheet(el) {
   const now = Date.now(),
-    old = el.cloneNode(true),
+    c = calendar(now);
+  if (c.ask) return turnSheet(el, c.sheet);
+  const old = el.cloneNode(true),
     news = usedNews('calendar'); // its news card goes once the sheet is gone
-  if (datedOn(now) && !prefs.hiddenHints.includes(datedKey(now))) hideHint(datedKey(now));
-  else {
-    prefs.torn++;
+  if (c.format) {
+    prefs.torn[c.format] = (prefs.torn[c.format] || 0) + 1;
     savePrefs();
-  }
+  } else hideHint(datedKey(now));
   haptic();
-  $('.cal-text', el).textContent = sheetFact(now).text;
+  el.classList.remove('turning', 'turned'); // a turn still running ends with this sheet
+  paint(el, calendar(now));
   if (reduceMotion.matches) return news && update();
   for (const a of ['data-action', 'role', 'tabindex', 'aria-label', 'style']) old.removeAttribute(a);
   old.setAttribute('aria-hidden', 'true');
+  old.classList.remove('turning', 'turned');
   old.classList.add('torn');
   old.style.width = el.offsetWidth + 'px';
   el.before(old);
@@ -299,6 +310,20 @@ export function tearSheet(el) {
     old.remove();
     if (news) update();
   });
+}
+// edge on, halfway through, the back takes the front's place
+function turnSheet(el, sheet) {
+  homeView.turned = sheet.id;
+  haptic();
+  if (reduceMotion.matches) return paint(el, calendar(Date.now()));
+  el.classList.add('turning');
+  settled(el)
+    .then(() => {
+      paint(el, calendar(Date.now()));
+      el.classList.replace('turning', 'turned');
+      return settled(el);
+    })
+    .then(() => el.classList.remove('turned'));
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

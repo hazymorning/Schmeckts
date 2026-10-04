@@ -56,7 +56,7 @@ is allowed (`app/native/res/xml`).
 
 ```js
 db = { version: 3,
-  pets:         [{ id, name, nicknames, species, photo, birthday, createdAt }],
+  pets:         [{ id, name, nicknames, species, sex, photo, birthday, createdAt }],
   products:     [{ id, brand, variety, type, animal, texture, thumb, lastPets, createdAt, codes: { [ean]: true }, kaufen, sharedPhoto }],
   servings:     [{ id, productId, servedAt, note, by, thumb,
                    pets: { [petId]: { r: <key from RATINGS>|null, at, by } },
@@ -79,9 +79,11 @@ server.
 | `products[].sharedPhoto` | `true` or a number (ms) | the server holds the large photo; a number stamps a replaced one |
 | `observations[].kind` | `happy` `stink` `hungry` `tired` `vomit` | unknown kinds from newer phones are kept |
 | `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
+| `pets[].sex` | `f` `m`, absent | female, male, not given |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
 | `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung`, `neu:<version>`, `blatt:<YYYY-MM-DD>` | hints hidden on this phone; `tipp:beobachtung`: the first observation Vorlieben weighs said what it is for; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`); `blatt:` the cat calendar's fact bound to that day torn off |
 | `prefs.milestones` | `meals:100`, `sorts:10` | milestones already shown |
+| `prefs.torn` | `Katzenlogik` `Stimmt’s?` `Kurios` `Wissen` `Flachwitz` `Sprache` | cat calendar sheets torn off on this phone, a count per format; a number from 0.28 counts for `Wissen` |
 | reminder buttons | `actionTypeId` `rate:<key>[,<key>]`, `extra.pet`, `extra.rate`; a button's id is its rating key | Android keeps them with a pending „Wie war’s?“ across updates |
 | exchange file `kind` | `exchange` | written by „Änderungen teilen“ |
 

@@ -70,7 +70,13 @@ function overview() {
       labelRow('auto', 'Farbschema') +
         under(segmented('theme', THEMES, prefs.theme)) +
         (hasCat()
-          ? switchRow('calendar', 'cat', 'Katzenkalender', 'Ein Katzenfakt am Tag auf der Startseite', prefs.calendar)
+          ? switchRow(
+              'calendar',
+              'cat',
+              'Katzenkalender',
+              'Ein Kalenderblatt am Tag auf der Startseite',
+              prefs.calendar,
+            )
           : ''),
       'set-group',
     )}

@@ -27,6 +27,8 @@ TEXT_PAIRS = (
     ]
     + [('--ink', r + '-soft') for r in RATING + OBSERVED]
 )
+# what lies on the page without glaring at it: the calendar sheet is on night paper in the dark
+CALM_PAIRS = [('--paper', '--bg')]
 ICON_PAIRS = (
     [(r, bg) for r in RATING for bg in ('--bg', '--surface', '--surface-2', r + '-soft')]
     + [(o, bg) for o in OBSERVED for bg in ('--bg', '--surface', '--surface-2', o + '-soft')]
@@ -44,7 +46,7 @@ TOKENS = (
 async def test_palette(browser, url):
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
-    names = sorted({n for pair in TEXT_PAIRS + ICON_PAIRS for n in pair})
+    names = sorted({n for pair in TEXT_PAIRS + ICON_PAIRS + CALM_PAIRS for n in pair})
     for theme in ('light', 'dark'):
         await set_theme(pg, theme)
         c = await pg.evaluate(TOKENS, names)
@@ -52,6 +54,8 @@ async def test_palette(browser, url):
         check(not low, f'text tokens at least 4.5:1 ({theme}) {low}')
         low = [f'{fg} on {bg} {contrast(c[fg], c[bg]):.2f}' for fg, bg in ICON_PAIRS if contrast(c[fg], c[bg]) < 3]
         check(not low, f'rating and observation colours as icons at least 3:1 ({theme}) {low}')
+        loud = [f'{a} on {b} {contrast(c[a], c[b]):.2f}' for a, b in CALM_PAIRS if contrast(c[a], c[b]) > 2]
+        check(not loud, f'the calendar sheet at most 2:1 against the page ({theme}) {loud}')
     check(not errors, f'no errors in the console {errors}')
     await ctx.close()
 
