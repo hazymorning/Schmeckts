@@ -727,8 +727,8 @@ async def test_record(browser, url):
     await open_sheet(pg, kind='product', id='zaeh')
     zaeh = await pg.evaluate(STATS)
     check(
-        lachs == [['Einsätze', '4'], ['Gut gefressen', '3 von 3'], ['Nur Soße', '0 von 3'], ['Wankelmut', '0 von 2']]
-        and [k for k, _ in zaeh] == ['Einsätze', 'Gut gefressen', 'Wankelmut'],
+        lachs == [['Einsätze', '4'], ['Gut gefressen', '3 von 3'], ['Nur Soße', '0 von 3'], ['Meinungswechsel', '0 von 2']]
+        and [k for k, _ in zaeh] == ['Einsätze', 'Gut gefressen', 'Meinungswechsel'],
         f'a trump card in the sheet, sauce only where there is some {lachs} {zaeh}',
     )
     await tap(pg, '#sheet [data-action=close]')
@@ -2252,7 +2252,7 @@ async def test_rephoto(browser, url):
 
 
 PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const p = s.db.products.find(x => x.id === pid);
-  return [document.querySelector('#sheet .prod .thumb, #sheet .name-photo')?.getAttribute('src')?.slice(-32) ?? null, (p.thumb || '').slice(-32),
+  return [document.querySelector('#sheet :is(.prod, .quartet) .thumb, #sheet .name-photo')?.getAttribute('src')?.slice(-32) ?? null, (p.thumb || '').slice(-32),
     (localStorage.getItem('__fs:photos/' + pid + '.jpg') || '').slice(-32), p.sharedPhoto ?? null]; })"""
 
 
