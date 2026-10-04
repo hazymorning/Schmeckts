@@ -24,6 +24,7 @@ TEXT_PAIRS = (
         ('--bad', '--surface'),
         ('--paper-ink', '--paper'),
         ('--paper-muted', '--paper'),
+        ('--paper-red', '--paper'),
     ]
     + [('--ink', r + '-soft') for r in RATING + OBSERVED]
 )
@@ -157,7 +158,7 @@ SCAN = """() => { const bad = [];
     const fam = s.fontFamily.split(',')[0].replace(/"/g, '');
     if (fam !== 'Figtree' && fam !== 'Faustina') bad.push(`${fam} on ${tag}`);
   }
-  for (const el of document.querySelectorAll('p:not(.slider-names), .said, .why, .told li > span, .tile small'))
+  for (const el of document.querySelectorAll('p:not(.slider-names), .said, .why, .told li > span'))
     for (const part of el.innerHTML.split(/[.!?](?=\\s|<|$)/))
       if ((part.match(/<b>/g) || []).length > 1) bad.push(`two bold in one sentence: ${part.replace(/<[^>]*>/g, '').trim()}`);
   return [...new Set(bad)]; }"""
@@ -205,7 +206,7 @@ async def test_views(browser, url, scheme):
     await scan()
     await tap('[data-action=close]')
     await pg.evaluate("import('./js/store.js').then(s => { for (const p of s.db.products) p.codes = {...p.codes, '4001234567890': true}; })")
-    await tap('[data-sec=evaluation] button.tile')
+    await tap('[data-sec=evaluation] .picks button')
     await scan()
     await tap('[data-action=close]')
     await tap('.tl [data-action=open-serving]')

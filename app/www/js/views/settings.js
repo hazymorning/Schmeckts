@@ -72,7 +72,7 @@ function overview() {
         (hasCat()
           ? switchRow(
               'calendar',
-              'cat',
+              'calendar',
               'Katzenkalender',
               'Ein Kalenderblatt am Tag auf der Startseite',
               prefs.calendar,

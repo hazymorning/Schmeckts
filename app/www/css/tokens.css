@@ -45,6 +45,7 @@
   --inset-control: var(--space-3) var(--space-4); /* height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* chips, fields in a row, the toast's action */
   --inset-badge: var(--space-1) var(--space-2h);
+  --inset-stamp: 3px 7px 3px 6px; /* the calendar sheet's stamp, a little wider at the end of the word */
   --field-room: calc(
     var(--space-3h) + var(--icon-s) + var(--space-2h)
   ); /* 44: the side of a field that holds an icon */
@@ -54,6 +55,7 @@
   --radius-l: 24px; /* containers */
   --radius-full: 999px;
   --radius-paper: 3px 3px 6px 6px; /* the calendar sheet */
+  --radius-stamp: 6px; /* and its stamp */
 
   /* app.css sets type only as font: var(--type-...) */
   --type-title: 650 30px/1.1 var(--font-display); /* always with --track-title */
@@ -69,11 +71,13 @@
   --type-level: 400 13px/1.25 var(--font-ui);
   --type-level-strong: 600 13px/1.25 var(--font-ui);
   --type-paper: 500 16px/1.35 var(--font-display); /* a fact on the calendar sheet */
-  --type-paper-date: 600 10.5px/1 var(--font-ui); /* in capitals, always with --track-date */
+  --type-paper-day: 600 27px/1 var(--font-display); /* its day, always with --track-title */
+  --type-paper-date: 600 9.5px/1.2 var(--font-ui); /* its weekday and month in capitals, always with --track-caps */
+  --type-stamp: 700 9px/1 var(--font-ui); /* its stamp in capitals, always with --track-caps */
   --weight-strong: 600; /* b and strong in running text */
   --track-title: -0.015em; /* Faustina runs narrow at title size */
   --track-code: 0.14em; /* household code field */
-  --track-date: 0.12em;
+  --track-caps: 0.13em; /* small text in capitals */
 
   /* --dur-fade for changes in place, --dur-step for movement; a dimming takes the duration of what moves on it.
      --ease-out to arrive, --ease-in to leave, --ease-spring to confirm. */
@@ -101,6 +105,7 @@
   --z-strip: 5; /* behind the status bar */
   --z-toast: 6;
 
+  --icon-xs: 12px; /* in the calendar sheet's stamp */
   --icon-s: 20px; /* inside controls */
   --icon: 24px; /* on its own */
   --icon-l: 32px; /* a rating as the content */
@@ -123,6 +128,7 @@
 
   --hairline: 1px;
   --stroke: 2px; /* every emphasised line */
+  --stroke-stamp: 1.5px;
   --divider: var(--hairline) solid var(--line);
 
   /* Opacity */
@@ -167,6 +173,9 @@
   --paper: light-dark(#f7f0dd, #322d25);
   --paper-ink: light-dark(#3a3326, #ece3cd);
   --paper-muted: light-dark(#6b5f45, #ab9f86);
+  --paper-red: light-dark(#a33a2c, #e8907e); /* Sundays and verdicts, as printed on a tear-off calendar */
+  /* a grain just to be felt, specks of up to 7 % black */
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 
   --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 
@@ -179,8 +188,6 @@
   --shadow-low: 0 1px 4px light-dark(#25261f1a, #0b0c094d); /* resting lift */
   --shadow-high:
     0 14px 34px -14px light-dark(#25261f4d, #0b0c09a6), 0 2px 6px light-dark(#25261f14, #0b0c0959); /* what floats */
-  --shadow-paper:
-    0 1px 2px light-dark(#25261f26, #0b0c0926), 0 8px 18px -10px light-dark(#25261f59, #0b0c0959); /* at 15 and 35 % */
   --opaque: #000; /* what a mask keeps */
 }
 :root[data-theme="light"] {
@@ -192,6 +199,17 @@
 }
 
 /* Every @keyframes in the app; app.css defines none */
+@property --rail-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+/* scrolled to its end, a rail no longer fades out */
+@keyframes railEnd {
+  from {
+    --rail-fade: var(--space-7);
+  }
+}
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -341,6 +359,14 @@
 @keyframes turnBack {
   from {
     transform: perspective(600px) rotateY(-90deg);
+  }
+}
+/* the right edge stays put, so the large stamp does not run off the sheet */
+@keyframes stamp {
+  from {
+    opacity: 0.25;
+    scale: 1.6;
+    translate: -30%;
   }
 }
 @keyframes shimmer {

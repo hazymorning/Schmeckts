@@ -243,7 +243,7 @@ test('the overview sentence: a meal left takes its own pool where there is one, 
 
   const [g, now] = STATES.dueFirst,
     head = 'Minkas Tag',
-    list = POOLS.dueFirst.filter(x => !/\{sie\}/i.test(x)).map(x => fill(x, valuesOf(g, now)));
+    list = POOLS.dueFirst.filter(x => !/\{sie\}|\[Katze\]/i.test(x)).map(x => fill(x, valuesOf(g, now)));
   assert.ok(list.some(s => sharesWord(head, s)) && list.some(s => !sharesWord(head, s)));
   for (let i = 0; i < list.length; i++) {
     const on = addDays(now, i),
@@ -328,10 +328,36 @@ test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is kno
   }
 });
 
+test('a sentence is two halves; one marked [Katze] only where every pet shown is a cat', () => {
+  for (const [pool, list] of Object.entries(POOLS))
+    for (const x of list) assert.match(x, /^(\[Katze\] )?[^|[\]]*\S \| \S[^|[\]]*$/, pool);
+  replaceDb(structuredClone(HOME));
+  const kitty = {id: 'A', species: 'Katze'},
+    tom = {id: 'B', species: 'Katze'},
+    dog = {id: 'C', species: 'Hund'},
+    shown = (pets, ids) => glance({...household(['nass'], []), pets}, ids, NOW).cats;
+  assert.deepEqual(
+    [
+      shown([kitty], ['A']),
+      shown([kitty, tom], ['A', 'B']),
+      shown([kitty, dog], ['A', 'C']),
+      shown([kitty, dog], ['A']),
+    ],
+    [true, true, false, true],
+  );
+  for (const [pool, [g, now]] of Object.entries(STATES)) {
+    const marked = POOLS[pool].filter(x => x.startsWith('[Katze] ')).map(x => fill(x.slice(8), valuesOf(g, now))),
+      next = i => ({...g, last: g.last && {...g.last, servedAt: addDays(g.last.servedAt, i)}}),
+      month = cats => [...Array(31).keys()].map(i => sentenceOf({...next(i), cats}, addDays(now, i), ''));
+    assert.ok(!month(false).some(said => marked.includes(said) || said.includes('[')), pool);
+    assert.ok(!marked.length || month(true).some(said => marked.includes(said)), `${pool}: cats`);
+  }
+});
+
 const cat = (sex, name = 'Schnurrsula') => ({id: 'cat' + name, name, species: 'Katze', ...(sex && {sex})});
 const SHEETS = [...Object.values(FACTS).flat(), ...DATED];
 
-test('the cat calendar: a format for each weekday, its own id prefix, every text once, a back only on Stimmt’s?, months only in Wissen', () => {
+test('the cat calendar: a format for each weekday, its own id prefix, every text once, a verdict and a back only on Stimmt’s?, months only in Wissen', () => {
   assert.deepEqual(
     [0, 1, 2, 3, 4, 5, 6].map(i => formatOn(new Date(2026, 9, 4 + i, 12))), // from Sunday
     ['Wissen', 'Katzenlogik', 'Stimmt’s?', 'Kurios', 'Wissen', 'Flachwitz', 'Sprache'],
@@ -346,7 +372,7 @@ test('the cat calendar: a format for each weekday, its own id prefix, every text
   assert.equal(new Set(texts).size, texts.length);
   for (const [format, list] of Object.entries(FACTS))
     for (const f of list) {
-      assert.equal(!!f.back, format === 'Stimmt’s?', f.id);
+      assert.ok(!!f.back === (format === 'Stimmt’s?') && !!f.verdict === !!f.back, f.id);
       assert.ok(!f.months || (format === 'Wissen' && f.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12)));
     }
 });

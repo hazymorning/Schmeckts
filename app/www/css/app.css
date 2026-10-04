@@ -1021,7 +1021,8 @@ dialog.sheet::after {
   margin-left: calc(-1 * var(--space-2));
 }
 /* Scrolls sideways edge to edge in its card, so a chip slides under the card's rim like on a shelf; the padding keeps
-   the ends in line with the card's text */
+   the ends in line with the card's text. While there is more to the right, it fades out there, so a chip cut off
+   there does not look broken; a rail that does not scroll has no timeline and no fade. */
 .rail {
   display: flex;
   gap: var(--space-2);
@@ -1032,6 +1033,10 @@ dialog.sheet::after {
   scroll-snap-type: x mandatory;
   scroll-padding-inline: var(--gutter);
   scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to left, transparent, var(--opaque) var(--rail-fade));
+  mask-image: linear-gradient(to left, transparent, var(--opaque) var(--rail-fade));
+  animation: railEnd linear both;
+  animation-timeline: scroll(self inline);
 }
 .rail::-webkit-scrollbar {
   display: none;
@@ -1632,6 +1637,9 @@ dialog.sheet::after {
   margin: 0;
   font: var(--type-small);
 }
+.overview p > span {
+  display: block;
+}
 .pet-label {
   display: flex;
   align-items: center;
@@ -1797,6 +1805,46 @@ dialog.sheet::after {
   flex: none;
 }
 
+/* the Leibgericht's crown and the Ladenhüter's bowl on the corner of its packaging */
+.medal {
+  position: absolute;
+  right: calc(-1 * var(--space-1));
+  bottom: calc(-1 * var(--space-1));
+  width: var(--pic-xs);
+  height: var(--pic-xs);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--c);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 var(--stroke) var(--surface);
+}
+.medal .ic {
+  width: 75%;
+  height: 75%;
+}
+/* a side of the „Vorlieben“ card: its name in small capitals and its tone, a fine line on to the edge */
+.side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font: var(--type-caption-strong);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--c);
+}
+.side::after {
+  content: "";
+  flex: 1;
+  height: var(--hairline);
+  background: var(--cs);
+}
+.picks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .ranked {
   position: relative;
   flex: 0 0 auto;
@@ -1817,31 +1865,96 @@ dialog.sheet::after {
   color: var(--on-accent);
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
-/* a sheet of a tear-off calendar, its top perforated, on night paper in the dark. The text lines up with a card's,
-   the full width at 360px that every text needs for two lines. */
+/* The tear-off calendar: a pad that thins out over the year, its top sheet perforated, on night paper in the dark. The
+   layers under the sheet hang on the pad, since the sheet's mask cuts away everything outside it. The text lines up
+   with a card's, the full width at 360px that every text needs for two lines. */
+.calpad {
+  position: relative;
+  rotate: -0.7deg;
+}
+.calpad::before,
+.calpad::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: -4px;
+  height: 24px;
+  border-radius: var(--radius-paper);
+  background: var(--paper);
+  filter: brightness(0.9);
+  z-index: -1;
+}
+.calpad::after {
+  left: 10px;
+  right: 10px;
+  bottom: -8px;
+  filter: brightness(0.8);
+  z-index: -2;
+}
+.calpad[data-left="1"]::before,
+.calpad[data-left="1"]::after,
+.calpad[data-left="2"]::after {
+  display: none;
+}
 .calsheet {
   position: relative;
   display: block;
-  padding: var(--space-5) var(--space-3) var(--space-3h);
-  background: var(--paper);
+  padding: var(--space-2h) var(--space-3) var(--space-3h);
+  background: var(--paper-grain), var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
-  rotate: -0.7deg;
-  box-shadow: var(--shadow-paper);
   mask: radial-gradient(circle at 7px 0, transparent 3.2px, var(--opaque) 3.7px) 0 0 / 14px 100% repeat-x;
 }
 /* the mask would cut a ring outside away */
 .calsheet:focus-visible {
   outline-offset: calc(-1 * var(--space-1));
 }
-.cal-date {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-3);
+/* the day large, beside it the weekday over the month, the format's stamp at the end */
+.cal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1h);
+  margin-bottom: var(--space-1);
+}
+.cal-day {
+  min-width: 1.1ch;
+  font: var(--type-paper-day);
+  letter-spacing: var(--track-title);
+}
+.cal-day.red {
+  color: var(--paper-red);
+}
+.cal-dm {
+  display: grid;
   font: var(--type-paper-date);
-  letter-spacing: var(--track-date);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--paper-muted);
+}
+.cal-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  padding: var(--inset-stamp);
+  border: var(--stroke-stamp) solid;
+  border-radius: var(--radius-stamp);
+  color: var(--paper-muted);
+  font: var(--type-stamp);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  rotate: -3deg;
+}
+.cal-stamp .ic {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+.cal-stamp.verdict {
+  color: var(--paper-red);
 }
 /* never under two lines, so tearing off and turning over do not jump */
 .cal-text {
@@ -1855,12 +1968,12 @@ dialog.sheet::after {
   margin: 0;
   color: var(--ink);
 }
-/* the gap above the calendar sheet takes its tilt */
+/* the gap above the calendar takes its tilt, the one below its layers */
 .card + .card,
-.calsheet + .card {
+.calpad + .card {
   margin-top: var(--space-3h);
 }
-.calsheet {
+.calpad {
   margin: var(--space-4) var(--space-1h) 0;
 }
 .group + .group {
@@ -1963,7 +2076,8 @@ dialog.sheet::after {
 .shop .t-main small,
 .likes .t-main small,
 .verdict-pet .t-main small,
-.tl-item .t-main small {
+.tl-item .t-main small,
+.picks .t-main small {
   white-space: normal;
 }
 .told .why {
@@ -1999,51 +2113,6 @@ dialog.sheet::after {
 .steps li,
 .told li {
   align-items: flex-start;
-}
-/* the best and the worst variety on their tone's ground, the icon on a disc of the card's colour */
-.tile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3h);
-  width: 100%;
-  padding: var(--space-3);
-  border-radius: var(--radius-m);
-  background: var(--cs, var(--raise));
-  color: var(--ink);
-  text-align: left;
-}
-.tile + .tile {
-  margin-top: var(--space-2);
-}
-/* nothing on that side yet: only the kicker and the icon keep the tone */
-.tile.empty {
-  background: var(--raise);
-}
-.tile-ic {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: var(--pic-l);
-  height: var(--pic-l);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--c, var(--muted));
-}
-.tile-ic .ic {
-  width: var(--icon-l);
-  height: var(--icon-l);
-  stroke-width: var(--icon-stroke-l);
-}
-.tile .t-main small {
-  white-space: normal;
-}
-.tile .kicker {
-  font: var(--type-caption-strong);
-  color: var(--c);
-}
-/* with the card's 8px foot this makes 18, as at the top */
-.tile:last-child {
-  margin-bottom: var(--space-2h);
 }
 .portrait {
   display: flex;
@@ -2140,14 +2209,14 @@ dialog.sheet::after {
 .tl-item .t-main {
   margin-right: var(--space-2);
 }
-.tl-item .t-main b {
+:is(.tl-item, .picks) .t-main b {
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.tl-item .t-main small {
+:is(.tl-item, .picks) .t-main small {
   margin-top: var(--space-hair);
 }
 
@@ -2354,7 +2423,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 body,
 .card,
 .group,
-.tile,
 .icon-btn,
 .sync-chip,
 .pet,
@@ -2402,7 +2470,7 @@ dialog.sheet.dragging {
 .slider-names > span {
   transition: var(--state);
 }
-:is(button.row, button.box, button.tile, .btn, .card-btn, .prod-edit, .pend-head):active {
+:is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
 :is(.icon-btn, .more, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {
@@ -2543,6 +2611,10 @@ html.step-back::view-transition-new(page) {
 }
 .calsheet.turned {
   animation: turnBack calc(var(--dur-step) / 2) var(--ease-out);
+}
+/* once the back faces up, its verdict is pressed on: large and pale, then small and full */
+.calsheet.turned .verdict {
+  animation: stamp var(--dur-fade) var(--ease-in) calc(var(--dur-step) / 2) both;
 }
 .slider-thumb > .picked,
 .fab.filled {

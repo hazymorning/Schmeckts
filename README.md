@@ -34,10 +34,10 @@ Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumut
 <summary><b>Was noch drin ist</b></summary>
 <br>
 
-- *Vorlieben*: Leibgerichte, Ladenhüter, jede Sorte als Quartettkarte und was als Nächstes in den Napf kann.
+- *Vorlieben*: Leibgerichte und Ladenhüter, auf der Startseite gleich mit Packung, jede Sorte als Quartettkarte und was als Nächstes in den Napf kann.
 - *Einkaufen*: was sich nachzukaufen lohnt, als Liste zum Verschicken.
 - *Verlauf*: jede Mahlzeit, Tag für Tag.
-- *Katzenkalender*: wohnt eine Katze bei dir, gibt’s auf der Startseite jeden Tag ein Blatt. Montags Katzenlogik, dienstags Stimmt’s?, freitags ein Flachwitz.
+- *Katzenkalender*: wohnt eine Katze bei dir, liegt auf der Startseite ein Abreißkalender. Montags Katzenlogik, dienstags Stimmt’s? mit Stempel, freitags ein Flachwitz.
 - *Beobachtungen*: von guter Laune bis Erbrechen, mit einem Tipp notiert. Lüften musst du selbst.
 - Erinnerungen ans Füttern und Bewerten.
 - Mehrere Tiere, mit Geschlecht und Spitznamen, auf die sie genauso wenig hören.

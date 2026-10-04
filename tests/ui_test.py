@@ -281,7 +281,7 @@ async def test_tour(browser, url):
         'Haushalt: only the way in',
     )
     await back(pg, 2)
-    await tap(pg, '[data-sec=evaluation] button.tile')
+    await tap(pg, '[data-sec=evaluation] .picks button')
     check(await pg.evaluate(LEVEL) == [True, 'product', None, None], 'food sheet opens')
     await tap(pg, '[data-action=close]')
     await tap(pg, '.tl [data-action=open-serving]')
@@ -660,11 +660,29 @@ async def test_report(browser, url):
     await ctx.close()
 
 
+# the „Vorlieben“ card: each side's heading and its rows, as [id, sub line, packaging, bars, badge]
+SIDES = """[...document.querySelectorAll('[data-sec=evaluation] .side')].map(h => [h.textContent,
+  [...h.nextElementSibling.querySelectorAll('button')].map(b => [b.dataset.id, b.querySelector('small').textContent,
+    !!b.querySelector('.thumb'), !!b.querySelector('.bars'), b.querySelector('.medal')?.className ?? null])])"""
+
+
 async def test_evaluation(browser, url):
-    print('„Vorlieben“: a row opens its food sheet, the page leads to a level and back')
+    print(
+        '„Vorlieben“: the card shows the packagings that go down well and those left, a row opens its food sheet, the page leads to a level and back'
+    )
     ctx, pg, errors = await demo(browser, url)
-    pid = await pg.get_attribute('[data-sec=evaluation] button.tile', 'data-id')
-    await tap(pg, '[data-sec=evaluation] button.tile')
+    sides = await pg.evaluate(SIDES)
+    rows = [row for _, side in sides for row in side]
+    check(
+        [title for title, _ in sides] == ['Kommt an', 'Bleibt stehen']
+        and all(0 < len(side) <= 2 for _, side in sides)
+        and all(row[2] and row[3] for row in rows)
+        and [[row[4] for row in side] for _, side in sides] == [['medal r-good', None], ['medal r-bad', None]][: len(sides)]
+        and ' · ' in rows[0][1],
+        f'two sides of at most two rows, each with its packaging and its bars, the best crowned and the worst with its bowl {sides}',
+    )
+    pid = rows[0][0]
+    await tap(pg, '[data-sec=evaluation] .picks button')
     check(await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet?.kind, m.sheet?.id])") == ['product', pid], 'a row opens its food sheet')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
@@ -683,23 +701,30 @@ async def test_evaluation(browser, url):
 
 
 async def test_candidate(browser, url):
-    print('no Leibgericht yet: its empty side names the variety closest to it, which „Als Nächstes“ then leaves out')
+    print('no Leibgericht yet: the card names the variety closest to it, which „Als Nächstes“ then leaves out; a side with nothing goes')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     now = await pg.evaluate('Date.now()')
     rated = [('ladenhueter', ['schlecht', 'schlecht', 'mittel']), ('naechste1', ['top', 'gut']), ('naechste2', ['top'])]
-    await load(
-        pg,
-        [pet(M)],
-        [product(i, 'Sheba', i.capitalize()) for i, _ in rated],
-        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated) for n, r in enumerate(levels)],
-    )
-    tile = await pg.eval_on_selector('[data-sec=evaluation] .tile', "t => [t.tagName, t.dataset.id ?? null, !!t.querySelector('.kicker')]")
+    products = [product(i, 'Sheba', i.capitalize()) for i, _ in rated]
+    meals = [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated) for n, r in enumerate(levels)]
+    await load(pg, [pet(M)], products, meals)
+    sides = await pg.evaluate(SIDES)
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
     named = await pg.eval_on_selector_all('#sheetBody [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
-    check(tile == ['BUTTON', 'naechste1', True], f'the empty Leibgericht tile keeps its kicker and opens the closest variety {tile}')
+    check(
+        sides
+        == [
+            ['Kommt an', [['naechste1', 'Sheba · noch 1× bewerten', True, True, None]]],
+            ['Bleibt stehen', [['ladenhueter', 'Sheba · 2 von 3 Mal fast nix gefressen', True, True, 'medal r-bad']]],
+        ],
+        f'the closest variety stands under „Kommt an“ with what it lacks, uncrowned {sides}',
+    )
     check(named == ['naechste1', 'ladenhueter', 'naechste2'], f'its card names it before the Ladenhüter, „Als Nächstes“ only the others {named}')
     check(await pg.locator('#sheet .ranks .place').count() == 0, 'a list of one shows no place')
+    await tap(pg, '#sheet [data-action=settings-back]')
+    await load(pg, [pet(M)], products[:1], meals[:3])
+    check([title for title, _ in await pg.evaluate(SIDES)] == ['Bleibt stehen'], 'nothing that goes down well: only what is left')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
@@ -1307,15 +1332,16 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
     await ctx.close()
 
-    dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}]}
+    days = [int(time.time() * 1000) - (3 - i) * 864e5 for i in range(3)]  # recent enough to rank
+    meals = [{**s, 'servedAt': t, 'pets': {'lxpet00001': {'r': 'gut', 'at': t + 36e5}}} for s, t in zip(SAVED['servings'], days)]
+    dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}], 'servings': meals}
     ctx, pg, errors = await seeded(browser, url, {'db': dog}, native=True)
     title = await pg.locator(f'{CARD} h2').all_inner_texts()
-    await tap(pg, f'{CARD} .btn.primary')
-    await tap(pg, '#sheet [data-action=set-sex][data-v=m]')
-    await tap(pg, '[data-action=save-pet]')
+    await tap(pg, '[data-sec=evaluation] .picks button')
+    await tap(pg, '#sheet [data-action=close]')
     check(
         title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 0,
-        'no cat calendar: the news of its own, into the pet editor, gone once a sex is saved',
+        'no cat calendar: the news of its own, gone once a variety on the card is opened',
     )
     await ctx.close()
 
@@ -1323,10 +1349,11 @@ async def test_news(browser, url):
     await pg.clock.set_fixed_time('2026-10-12T12:00:00+02:00')  # a Monday, whose sheet tears at the first tap
     await pg.evaluate(REDRAW)
     title = await pg.locator(f'{CARD} h2').all_inner_texts()
+    pad = await pg.locator(f'{CARD} h2 .ic').count()
     await tap(pg, '#home .calsheet')
     check(
-        title == [await pg.evaluate(NEWEST, True)] and await pg.locator(CARD).count() == 0,
-        'with the cat calendar its news, gone once a sheet is torn off',
+        title == [await pg.evaluate(NEWEST, True)] and pad == 1 and await pg.locator(CARD).count() == 0,
+        'with the cat calendar its news, under the calendar’s icon, gone once a sheet is torn off',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
@@ -1541,12 +1568,11 @@ async def test_sex(browser, url):
     await ctx.close()
 
 
-# What the overview card fills in, as it writes it; every sentence was measured with each of these
+# What the overview card fills in, as it writes it; every half was measured with each of these
 VALUES = {
     'meal': ['Frühstück', 'Mittagessen', 'Abendessen', 'Futter'],
     'time': ['<b>7 Uhr</b>', '<b>11:45</b>', '<b>18:30</b>'],
     'span': ['<b>45 Minuten</b>', '<b>eineinhalb Stunden</b>', '<b>zweieinhalb Stunden</b>', '<b>10 Stunden</b>'],
-    'since': ['vorgestern', 'vor 6 Tagen', 'am 30. September'],
     'pet': ['<b>Mau</b>', '<b>Prinzessin</b>'],
     'age': ['3', '12'],
     'Sie': ['Sie', 'Er'],
@@ -1567,36 +1593,58 @@ def filled(template):
 
 
 async def test_overview_lines(browser, url):
-    print('the overview card: every sentence of every pool on exactly two lines from 360 to 430px, whatever it names')
+    print('the overview card: every sentence in two lines, each half on one line from 360 to 430px, whatever it names')
     ctx, pg, errors = await demo(browser, url)
     await pg.evaluate('document.fonts.ready')
+    shown = await pg.eval_on_selector_all('.overview p > span', 'l => l.map(s => s.getClientRects().length)')
     pools = await pg.evaluate("import('./js/views/facts.js').then(f => f.POOLS)")
-    texts = [(pool, text) for pool, sentences in pools.items() for s in sentences for text in filled(s)]
+    halves = [
+        (pool, text)
+        for pool, sentences in pools.items()
+        for s in sentences
+        for half in s.removeprefix('[Katze] ').split(' | ')
+        for text in filled(half)
+    ]
     off = []
     for width in (360, 375, 393, 412, 430):
         await pg.set_viewport_size({'width': width, 'height': 860})
-        lines = await pg.evaluate(LINES, ['.overview p', [text for _, text in texts]])
-        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(texts, lines) if n != 2]
-    check(len(texts) > 200 and not off, f'{len(texts)} sentences on two lines at every width {off[:5]}')
+        lines = await pg.evaluate(LINES, ['.overview p > span', [text for _, text in halves]])
+        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(halves, lines) if n != 1]
+    check(shown == [1, 1], f'the day’s sentence in two blocks {shown}')
+    check(len(halves) > 400 and not off, f'{len(halves)} halves on one line at every width {off[:5]}')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
 
 SHEET = "document.querySelector('#home .calsheet .cal-text')?.textContent ?? null"
-HEADER = "document.querySelector('#home .calsheet .cal-date').textContent"
+# the sheet's head: day, weekday, month, stamp, whether the day is red and the stamp a verdict
+HEAD = """(h => [...[...h.querySelectorAll('.cal-day, .cal-dm > span, .cal-stamp')].map(e => e.textContent),
+  h.querySelector('.cal-day').matches('.red'), h.querySelector('.cal-stamp').matches('.verdict')])(document.querySelector('#home .cal-head'))"""
 LABEL = "document.querySelector('#home .calsheet').getAttribute('aria-label')"
-# the day's sheet in facts.js, the dated one or the weekday's after the sheets torn off; back: its back
-FACT = """([dated, torn, back]) => import('./js/views/facts.js').then(f =>
-  (s => (back ? s.back : s.text))(dated ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn)))"""
+# the day's sheet in facts.js, the dated one or the weekday's after the sheets torn off
+FACT = """([dated, torn]) => import('./js/views/facts.js').then(f => dated ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn))"""
 # every text a sheet can show: front and back, the variants and „deine Katze“ for a cat of either sex
 SHEET_TEXTS = """import('./js/views/facts.js').then(f => { const cat = sex => ({name: 'Schnurrsula', species: 'Katze', sex});
   return [...new Set([...Object.values(f.FACTS).flat(), ...f.DATED].flatMap(s => [null, cat('f'), cat('m')]
     .flatMap(c => [f.sheetText(s, c), ...(s.back ? [f.sheetText(s, c, true)] : [])])))]; })"""
+# the stamps a head can carry that make it too wide at 28 Donnerstag September; a verdict has no icon
+WIDE_STAMPS = """() => import('./js/views/facts.js').then(f => { const h = document.querySelector('#home .cal-head'), [day, dm, stamp] = h.children,
+    icon = stamp.querySelector('svg').outerHTML, verdicts = new Set(f.FACTS['Stimmt’s?'].map(s => s.verdict));
+  [day.textContent, dm.children[0].textContent, dm.children[1].textContent] = ['28', 'Donnerstag', 'September'];
+  return [...Object.keys(f.FACTS).map(t => icon + t), icon + 'Heute', ...verdicts]
+    .filter(t => { stamp.innerHTML = t; return h.scrollWidth > h.clientWidth; }); })"""
+# sheets in the pad, the one on top and the layers under it
+LAYERS = "(p => 1 + ['::before', '::after'].filter(x => getComputedStyle(p, x).display !== 'none').length)(document.querySelector('#home .calpad'))"
 REDRAW = "import('./js/views/home.js').then(h => h.renderHome())"
 
 
 async def sheet(pg):
-    return [await pg.evaluate(SHEET), await pg.evaluate(HEADER), await pg.evaluate(LABEL)]
+    return [await pg.evaluate(SHEET), await pg.evaluate(HEAD), await pg.evaluate(LABEL)]
+
+
+async def day_at(pg, when):
+    await pg.clock.set_fixed_time(when)
+    await pg.evaluate(REDRAW)
 
 
 async def test_calendar(browser, url):
@@ -1609,11 +1657,16 @@ async def test_calendar(browser, url):
     lines = await pg.evaluate(LINES, ['#home .cal-text', texts])
     off = [t for t, n in zip(texts, lines) if n > 2]
     check(len(texts) > 300 and not off, f'{len(texts)} texts, none over two lines at 360px {off[:3]}')
-    heading = await pg.evaluate(LINES, ['#home .cal-date', ['Mo 28. Sept · Katzenlogik']])
-    await pg.clock.set_fixed_time('2026-09-28T12:00:00+02:00')  # a Monday
-    await pg.evaluate(REDRAW)
-    order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calsheet') ? 'cal' : e.dataset.sec || '')")
-    check(order.index('cal') == order.index('overview') + 1 and heading == [1], f'right under the overview, the longest heading on one line {order}')
+    wide = await pg.evaluate(WIDE_STAMPS)
+    check(not wide, f'the head on one line at 360px, with 28 Donnerstag September and every stamp {wide}')
+    layers = []
+    for when in ('2026-01-13T12:00:00+01:00', '2026-04-28T12:00:00+02:00', '2026-05-12T12:00:00+02:00', '2026-09-01T12:00:00+02:00'):
+        await day_at(pg, when)
+        layers.append(await pg.evaluate(LAYERS))
+    check(layers == [3, 3, 2, 1], f'the pad thins out over the year: three sheets deep until April, two until August, then one {layers}')
+    await day_at(pg, '2026-09-28T12:00:00+02:00')  # a Monday
+    order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calpad') ? 'cal' : e.dataset.sec || '')")
+    check(order.index('cal') == order.index('overview') + 1, f'right under the overview {order}')
     first = await sheet(pg)
     await tap(pg, '#home .calsheet')
     torn = await pg.evaluate(SHEET)
@@ -1621,14 +1674,14 @@ async def test_calendar(browser, url):
     await pg.keyboard.press('Enter')
     await idle(pg)
     check(
-        first[1].endswith(' · Katzenlogik')
+        first[1] == ['28', 'Montag', 'September', 'Katzenlogik', False, False]
         and first[2] == 'Nächstes Kalenderblatt'
         and [first[0], torn, await pg.evaluate(SHEET), await state(pg, 'prefs.torn')]
-        == [*[await pg.evaluate(FACT, [False, {'Katzenlogik': n}, False]) for n in range(3)], {'Katzenlogik': 2}],
-        f'Monday’s Katzenlogik, a tap or Enter shows the next {first}',
+        == [*[(await pg.evaluate(FACT, [False, {'Katzenlogik': n}]))['text'] for n in range(3)], {'Katzenlogik': 2}],
+        f'Monday’s Katzenlogik with its stamp, a tap or Enter shows the next {first}',
     )
-    await pg.clock.set_fixed_time('2026-09-29T12:00:00+02:00')
-    await pg.evaluate(REDRAW)
+    await day_at(pg, '2026-09-29T12:00:00+02:00')
+    fact = await pg.evaluate(FACT, [False, {}])
     front = await sheet(pg)
     await tap(pg, '#home .calsheet')
     await pg.evaluate(REDRAW)
@@ -1636,29 +1689,29 @@ async def test_calendar(browser, url):
     turned = await state(pg, 'prefs.torn')
     await tap(pg, '#home .calsheet')
     check(
-        front == [await pg.evaluate(FACT, [False, {}, False]), front[1], 'Auflösung zeigen']
-        and front[1].endswith(' · Stimmt’s?')
-        and answer == [await pg.evaluate(FACT, [False, {}, True]), answer[1], 'Nächstes Kalenderblatt']
-        and answer[1].endswith(' · Auflösung')
+        front == [fact['text'], ['29', 'Dienstag', 'September', 'Stimmt’s?', False, False], 'Auflösung zeigen']
+        and answer == [fact['back'], ['29', 'Dienstag', 'September', fact['verdict'], False, True], 'Nächstes Kalenderblatt']
         and turned == {'Katzenlogik': 2}
-        and await sheet(pg) == [await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}, False]), front[1], 'Auflösung zeigen']
+        and await sheet(pg) == [(await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}]))['text'], front[1], 'Auflösung zeigen']
         and await state(pg, 'prefs.torn') == {'Katzenlogik': 2, 'Stimmt’s?': 1},
-        f'Tuesday’s Stimmt’s?: the first tap turns it over to the answer, which stays, the second tears it off {front} {answer}',
+        f'Tuesday’s Stimmt’s?: the first tap turns it over to the verdict stamped above the answer, which stays, the second tears it off {front} {answer}',
     )
-    await pg.clock.set_fixed_time('2026-08-08T12:00:00+02:00')  # a Saturday
-    await pg.evaluate(REDRAW)
+    await day_at(pg, '2026-10-04T12:00:00+02:00')
+    sunday = await pg.evaluate(HEAD)
+    await day_at(pg, '2026-08-08T12:00:00+02:00')  # a Saturday
     dated = await sheet(pg)
     await tap(pg, '#home .calsheet')
     check(
-        dated[0] == await pg.evaluate(FACT, [True, {}, False])
-        and '·' not in dated[1]
-        and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, {}, False])
-        and (await pg.evaluate(HEADER)).endswith(' · Sprache')
+        sunday[0] == '4'
+        and sunday[4]
+        and dated[0] == (await pg.evaluate(FACT, [True, {}]))['text']
+        and dated[1] == ['8', 'Samstag', 'August', 'Heute', True, False]
+        and await sheet(pg) == [(await pg.evaluate(FACT, [False, {}]))['text'], [*dated[1][:3], 'Sprache', True, False], 'Nächstes Kalenderblatt']
         and await state(pg, "prefs.hiddenHints.includes('blatt:2026-08-08')"),
-        f'on its day a dated sheet comes first, with the date alone, under it the weekday’s {dated}',
+        f'red on Sundays and on a day with a sheet of its own, which comes first, stamped „Heute“, under it the weekday’s {sunday} {dated}',
     )
     await pg.evaluate(REDRAW)
-    check(await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, {}, False]), 'torn off, it stays off that day')
+    check(await pg.evaluate(SHEET) == (await pg.evaluate(FACT, [False, {}]))['text'], 'torn off, it stays off that day')
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')
     await back(pg)
@@ -1670,20 +1723,25 @@ async def test_calendar(browser, url):
     await change(pg, "s.db.pets[0].species = 'Hund'")
     await settings(pg)
     check(
-        await pg.locator('#home .calsheet').count() == 0 and await pg.locator('#sheet [data-action=calendar]').count() == 0,
+        await pg.locator('#home .calpad').count() == 0 and await pg.locator('#sheet [data-action=calendar]').count() == 0,
         'no cat: no sheet and no switch',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
     ctx, pg, errors = await demo(browser, url, motion=True)
-    await pg.clock.set_fixed_time('2026-09-29T12:00:00+02:00')  # a Tuesday
-    await pg.evaluate(REDRAW)
+    await day_at(pg, '2026-09-29T12:00:00+02:00')  # a Tuesday
     await idle(pg)
+    fact = await pg.evaluate(FACT, [False, {}])
     await pg.click('#home .calsheet')
     moving = await pg.evaluate("document.querySelector('#home .calsheet').getAnimations().length")
+    await pg.wait_for_selector('#home .calsheet.turned')
+    stamped = await pg.evaluate("document.querySelector('#home .verdict').getAnimations().map(a => a.animationName)")
     await idle(pg)
-    check(moving and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, {}, True]), 'Stimmt’s? turns over, then its answer shows')
+    check(
+        moving and stamped == ['stamp'] and await pg.evaluate(SHEET) == fact['back'],
+        f'Stimmt’s? turns over, its verdict is pressed on, then its answer shows {stamped}',
+    )
     await pg.click('#home .calsheet')
     flying = await pg.evaluate(
         "[...document.querySelectorAll('#home .calsheet')].map(e => [e.matches('.torn'), e.querySelector('.cal-text').textContent])"
@@ -1692,7 +1750,7 @@ async def test_calendar(browser, url):
     check(
         len(flying) == 2
         and flying[0][0]
-        and flying[1] == [False, await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}, False])]
+        and flying[1] == [False, (await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}]))['text']]
         and await pg.locator('#home .calsheet').count() == 1,
         f'the sheet torn off rises over the next one, already in place, and goes {flying}',
     )
@@ -2631,6 +2689,11 @@ async def test_observations(browser, url):
     ROW = '[data-sec=hist] [data-action=open-observation]'
     words = await pg.eval_on_selector_all(CHIP, 'l => l.map(c => c.textContent.trim())')
     check(len(words) == 5 and all(len(w) <= 11 and len(w.split()) <= 2 for w in words), f'the chips always at hand, short {words}')
+    # the scroll timeline moves on with the next frame
+    FADE = """left => new Promise(done => { const rail = document.querySelector('#home .obs'); rail.scrollLeft = left;
+      requestAnimationFrame(() => requestAnimationFrame(() => done(getComputedStyle(rail).getPropertyValue('--rail-fade')))); })"""
+    fades = [await pg.evaluate(FADE, 0), await pg.evaluate(FADE, 10000), await pg.evaluate(FADE, 0)]
+    check(fades[0] == fades[2] != '0px' and fades[1] == '0px', f'the chips fade out at the right while there are more, no longer at the end {fades}')
     await tap(pg, '[data-action=observe][data-v=tired]')
     tired = await pg.inner_text('#toast > span')
     await tap(pg, '#toast [data-action=undo]')

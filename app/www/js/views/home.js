@@ -43,7 +43,7 @@ import {
 import {renderMood} from './mood.js';
 import {overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
-import {catOf, sheetOn, sheetText} from './facts.js';
+import {catOf, datedOn, sheetOn, sheetText} from './facts.js';
 
 export function update() {
   let done = false;
@@ -252,7 +252,7 @@ function newsHTML() {
     off = setting && !prefs[setting];
   if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
   const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
-  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
+  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.ic ? icon(n.ic) : ''}${n.title}</h2>
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
@@ -260,26 +260,38 @@ function newsHTML() {
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
 const datedKey = now => 'blatt:' + dayKey(now); // in hiddenHints: the day's dated sheet is torn off
-const short = (d, o) => d.toLocaleDateString('de-DE', o).replace('.', '');
-// ask: a sheet with a back, a Stimmt’s?, still on its front, which the next tap turns over
+const STAMPS = {
+  Katzenlogik: 'idea',
+  'Stimmt’s?': 'question',
+  Kurios: 'search',
+  Wissen: 'book',
+  Flachwitz: 'grin',
+  Sprache: 'speech',
+};
+const named = (d, part) => d.toLocaleDateString('de-DE', {[part]: 'long'});
+/* ask: a sheet with a back, a Stimmt’s?, still on its front, which the next tap turns over. The day is red on Sundays
+   and on days with a sheet of their own, as on a real tear-off calendar; the back's stamp is the verdict. */
 function calendar(now) {
   const {sheet, format} = sheetOn(now, prefs.torn, prefs.hiddenHints.includes(datedKey(now))),
     back = !!sheet.back && homeView.turned === sheet.id,
-    side = back ? 'Auflösung' : format,
-    d = new Date(now);
+    d = new Date(now),
+    red = !d.getDay() || !!datedOn(now),
+    stamp = back ? sheet.verdict : icon(format ? STAMPS[format] : 'star') + (format ?? 'Heute');
   return {
     sheet,
     format,
     ask: !!sheet.back && !back,
-    html: `<span class="cal-date">${short(d, {weekday: 'short'})} ${d.getDate()}. ${short(d, {month: 'short'})}${side ? ` · ${side}` : ''}</span>
+    html: `<div class="cal-head"><span class="cal-day${red ? ' red' : ''}">${d.getDate()}</span><span class="cal-dm"><span>${named(d, 'weekday')}</span><span>${named(d, 'month')}</span></span><span class="cal-stamp${back ? ' verdict' : ''}">${stamp}</span></div>
       <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
   };
 }
 const label = c => (c.ask ? 'Auflösung zeigen' : 'Nächstes Kalenderblatt');
+// the pad thins out over the year: three sheets deep until April, two until August, then the last one
 function calsheetHTML() {
   if (!calendarOn()) return '';
-  const c = calendar(Date.now());
-  return `<aside class="calsheet" role="button" tabindex="0" aria-label="${label(c)}" data-action="tear" style="view-transition-name:sec-cal">${c.html}</aside>`;
+  const now = Date.now(),
+    c = calendar(now);
+  return `<div class="calpad" data-left="${3 - Math.floor(new Date(now).getMonth() / 4)}" style="view-transition-name:sec-cal"><aside class="calsheet" role="button" tabindex="0" aria-label="${label(c)}" data-action="tear">${c.html}</aside></div>`;
 }
 function paint(el, c) {
   el.innerHTML = c.html;
@@ -300,7 +312,7 @@ export function tearSheet(el) {
   el.classList.remove('turning', 'turned'); // a turn still running ends with this sheet
   paint(el, calendar(now));
   if (reduceMotion.matches) return news && update();
-  for (const a of ['data-action', 'role', 'tabindex', 'aria-label', 'style']) old.removeAttribute(a);
+  for (const a of ['data-action', 'role', 'tabindex', 'aria-label']) old.removeAttribute(a);
   old.setAttribute('aria-hidden', 'true');
   old.classList.remove('turning', 'turned');
   old.classList.add('torn');
@@ -311,7 +323,7 @@ export function tearSheet(el) {
     if (news) update();
   });
 }
-// edge on, halfway through, the back takes the front's place
+// edge on, halfway through, the back takes the front's place and its verdict is stamped on
 function turnSheet(el, sheet) {
   homeView.turned = sheet.id;
   haptic();
@@ -321,7 +333,7 @@ function turnSheet(el, sheet) {
     .then(() => {
       paint(el, calendar(Date.now()));
       el.classList.replace('turning', 'turned');
-      return settled(el);
+      return settled(el, true);
     })
     .then(() => el.classList.remove('turned'));
 }

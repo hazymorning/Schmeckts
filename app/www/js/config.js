@@ -341,8 +341,26 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
    it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
-   „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
+   „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each.
+   ic: an icon before the title. */
 export const NEWS = [
+  {
+    v: '0.30.0',
+    use: 'calendar',
+    cat: true,
+    ic: 'calendar',
+    title: 'Ein richtiger Abreißkalender',
+    say: 'Große Tageszahl, rote Sonntage, und der Block wird übers Jahr dünner.',
+    why: 'Bei Stimmt’s? kommt die Antwort jetzt per Stempel.',
+  },
+  {
+    v: '0.30.0',
+    use: 'variety',
+    cat: false,
+    title: 'Vorlieben auf einen Blick',
+    say: 'Die Karte zeigt jetzt die Packungen, die gut ankommen und die stehen bleiben.',
+    why: 'Mit den Bewertungen daneben, wie im Verlauf.',
+  },
   {
     v: '0.29.0',
     use: 'calendar',
@@ -370,7 +388,7 @@ export const NEWS = [
   },
   {
     v: '0.27.0',
-    use: 'quartet',
+    use: 'variety',
     title: 'Neu: Sorten-Quartett',
     say: 'Tippst du unter „Vorlieben“ auf eine Sorte, zeigt sie ihre Werte wie auf einer Quartettkarte.',
     why: 'Und beim Servieren nennt die App gleich die Bilanz einer Sorte, die schlecht ankommt.',
