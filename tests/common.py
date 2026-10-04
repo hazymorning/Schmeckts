@@ -343,9 +343,10 @@ async def set_theme(pg, theme):
     await idle(pg)
 
 
-# Calm: no transitions running (sheet, cards, toast); endless animations such as the spinner do not count
+# Calm: no transitions running (sheet, cards, toast); endless animations such as the spinner do not count, nor those
+# that follow a scroll position instead of the clock (the chips' fade)
 SETTLED = """!document.querySelector('.animating, .closing, :active-view-transition') && document.getAnimations().every(a =>
-  a.playState !== 'running' || a.effect.getComputedTiming().iterations === Infinity)"""
+  a.playState !== 'running' || a.timeline !== document.timeline || a.effect.getComputedTiming().iterations === Infinity)"""
 
 # The same condition, waited for inside the page: on the animations themselves (animation.finished) instead of
 # asking from the outside every 20 ms, which cost a round trip each time. Two frames at the end, as before, so
@@ -357,7 +358,7 @@ IDLE = (
     + """;
   const deadline = performance.now() + ms, BLIND = 50;
   const frame = () => new Promise(done => requestAnimationFrame(() => done()));
-  const moving = () => document.getAnimations().filter(a => a.playState === 'running'
+  const moving = () => document.getAnimations().filter(a => a.playState === 'running' && a.timeline === document.timeline
     && a.effect.getComputedTiming().iterations !== Infinity);
   for (;;) {
     while (!quiet()) {

@@ -1021,7 +1021,8 @@ dialog.sheet::after {
   margin-left: calc(-1 * var(--space-2));
 }
 /* Scrolls sideways edge to edge in its card, so a chip slides under the card's rim like on a shelf; the padding keeps
-   the ends in line with the card's text */
+   the ends in line with the card's text. While there is more to the right, it fades out there, so a chip cut off
+   there does not look broken; a rail that does not scroll has no timeline and no fade. */
 .rail {
   display: flex;
   gap: var(--space-2);
@@ -1032,6 +1033,10 @@ dialog.sheet::after {
   scroll-snap-type: x mandatory;
   scroll-padding-inline: var(--gutter);
   scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to left, transparent, var(--opaque) var(--rail-fade));
+  mask-image: linear-gradient(to left, transparent, var(--opaque) var(--rail-fade));
+  animation: railEnd linear both;
+  animation-timeline: scroll(self inline);
 }
 .rail::-webkit-scrollbar {
   display: none;

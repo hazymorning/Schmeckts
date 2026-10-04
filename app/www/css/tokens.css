@@ -199,6 +199,17 @@
 }
 
 /* Every @keyframes in the app; app.css defines none */
+@property --rail-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+/* scrolled to its end, a rail no longer fades out */
+@keyframes railEnd {
+  from {
+    --rail-fade: var(--space-7);
+  }
+}
 @keyframes fadeIn {
   from {
     opacity: 0;

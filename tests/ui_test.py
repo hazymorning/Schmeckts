@@ -2687,6 +2687,11 @@ async def test_observations(browser, url):
     ROW = '[data-sec=hist] [data-action=open-observation]'
     words = await pg.eval_on_selector_all(CHIP, 'l => l.map(c => c.textContent.trim())')
     check(len(words) == 5 and all(len(w) <= 11 and len(w.split()) <= 2 for w in words), f'the chips always at hand, short {words}')
+    # the scroll timeline moves on with the next frame
+    FADE = """left => new Promise(done => { const rail = document.querySelector('#home .obs'); rail.scrollLeft = left;
+      requestAnimationFrame(() => requestAnimationFrame(() => done(getComputedStyle(rail).getPropertyValue('--rail-fade')))); })"""
+    fades = [await pg.evaluate(FADE, 0), await pg.evaluate(FADE, 10000), await pg.evaluate(FADE, 0)]
+    check(fades[0] == fades[2] != '0px' and fades[1] == '0px', f'the chips fade out at the right while there are more, no longer at the end {fades}')
     await tap(pg, '[data-action=observe][data-v=tired]')
     tired = await pg.inner_text('#toast > span')
     await tap(pg, '#toast [data-action=undo]')
