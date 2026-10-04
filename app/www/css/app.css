@@ -1800,6 +1800,46 @@ dialog.sheet::after {
   flex: none;
 }
 
+/* the Leibgericht's crown and the Ladenhüter's bowl on the corner of its packaging */
+.medal {
+  position: absolute;
+  right: calc(-1 * var(--space-1));
+  bottom: calc(-1 * var(--space-1));
+  width: var(--pic-xs);
+  height: var(--pic-xs);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--c);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 var(--stroke) var(--surface);
+}
+.medal .ic {
+  width: 75%;
+  height: 75%;
+}
+/* a side of the „Vorlieben“ card: its name in small capitals and its tone, a fine line on to the edge */
+.side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font: var(--type-caption-strong);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--c);
+}
+.side::after {
+  content: "";
+  flex: 1;
+  height: var(--hairline);
+  background: var(--cs);
+}
+.picks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .ranked {
   position: relative;
   flex: 0 0 auto;
@@ -2031,7 +2071,8 @@ dialog.sheet::after {
 .shop .t-main small,
 .likes .t-main small,
 .verdict-pet .t-main small,
-.tl-item .t-main small {
+.tl-item .t-main small,
+.picks .t-main small {
   white-space: normal;
 }
 .told .why {
@@ -2067,51 +2108,6 @@ dialog.sheet::after {
 .steps li,
 .told li {
   align-items: flex-start;
-}
-/* the best and the worst variety on their tone's ground, the icon on a disc of the card's colour */
-.tile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3h);
-  width: 100%;
-  padding: var(--space-3);
-  border-radius: var(--radius-m);
-  background: var(--cs, var(--raise));
-  color: var(--ink);
-  text-align: left;
-}
-.tile + .tile {
-  margin-top: var(--space-2);
-}
-/* nothing on that side yet: only the kicker and the icon keep the tone */
-.tile.empty {
-  background: var(--raise);
-}
-.tile-ic {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: var(--pic-l);
-  height: var(--pic-l);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--c, var(--muted));
-}
-.tile-ic .ic {
-  width: var(--icon-l);
-  height: var(--icon-l);
-  stroke-width: var(--icon-stroke-l);
-}
-.tile .t-main small {
-  white-space: normal;
-}
-.tile .kicker {
-  font: var(--type-caption-strong);
-  color: var(--c);
-}
-/* with the card's 8px foot this makes 18, as at the top */
-.tile:last-child {
-  margin-bottom: var(--space-2h);
 }
 .portrait {
   display: flex;
@@ -2208,14 +2204,14 @@ dialog.sheet::after {
 .tl-item .t-main {
   margin-right: var(--space-2);
 }
-.tl-item .t-main b {
+:is(.tl-item, .picks) .t-main b {
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.tl-item .t-main small {
+:is(.tl-item, .picks) .t-main small {
   margin-top: var(--space-hair);
 }
 
@@ -2422,7 +2418,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 body,
 .card,
 .group,
-.tile,
 .icon-btn,
 .sync-chip,
 .pet,
@@ -2470,7 +2465,7 @@ dialog.sheet.dragging {
 .slider-names > span {
   transition: var(--state);
 }
-:is(button.row, button.box, button.tile, .btn, .card-btn, .prod-edit, .pend-head):active {
+:is(button.row, button.box, .btn, .card-btn, .prod-edit, .pend-head):active {
   transform: scale(var(--press-wide));
 }
 :is(.icon-btn, .more, .chip, .pet, .day.has, button.ov-pic, .photo-btn, .pet-photo, .shutter, .sync-chip, .fab):active {

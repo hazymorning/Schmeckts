@@ -79,7 +79,8 @@ const needs = (t, several) =>
 const listed = r => r.top.length || r.flop.length || (r.settled && !r.stale);
 // the variety an empty Leibgericht side names, so „Als Nächstes“ leaves it out
 const candidate = r => (r.top.length || r.stale ? null : r.trials[0]);
-const onTheWay = (t, several) => `Auf gutem Weg: ${named(t.e)}, noch ${t.need}×${forPet(t, several)} bewerten`;
+const toRate = (t, several) => `noch ${t.need}×${forPet(t, several)} bewerten`;
+const onTheWay = (t, several) => `Auf gutem Weg: ${named(t.e)}, ${toRate(t, several)}`;
 const noneYet = r => `Bisher kommt keine Sorte${r.split.length ? ' bei allen' : ''} richtig gut an.`;
 function waiting(m, r) {
   if (r.stale)
@@ -90,31 +91,28 @@ function waiting(m, r) {
   return 'Noch steht keine Sorte fest.';
 }
 
-const TILE = {top: 'Leibgericht', flop: 'Ladenhüter'};
-// the best and the worst variety, each on its tone's ground; an empty side keeps its kicker on a plain ground
-function sideTile(m, r, e, side) {
-  const [ic, tone] = SIDE[side],
-    inner = (title, sub) =>
-      `<span class="tile-ic">${icon(ic)}</span><span class="t-main"><small class="kicker">${TILE[side]}</small><b>${title}</b><small>${sub}</small></span>`;
-  if (e) {
-    const p = e.product,
-      brand = brandOf(p),
-      said = saidOf(e, side),
-      label = `${TILE[side]}: ${pname(p)}${brand ? ` von ${brand}` : ''}. ${said}.`;
-    return `<button class="tile ${tone}" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}">${inner(esc(pname(p)), esc(cap([brand, lower(said)].filter(Boolean).join(', '))))}</button>`;
-  }
-  const t = side === 'top' && candidate(r);
-  if (t)
-    return `<button class="tile empty ${tone}" data-action="open-product" data-id="${t.e.id}">${inner('Noch keins', onTheWay(t, m.pets.length > 1))}</button>`;
-  const [title, why] =
-    side === 'top'
-      ? ['Noch keins', noneYet(r)]
-      : r.settled < 3
-        ? ['Noch keiner', 'Dafür ist noch zu wenig bewertet.']
-        : r.settled === r.top.length
-          ? ['Keiner', 'Alles, was feststeht, kommt gut an.']
-          : ['Keiner', 'Keine Sorte bleibt regelmäßig stehen.'];
-  return `<div class="tile empty ${tone}">${inner(title, why)}</div>`;
+const PICKS = 2; // varieties a side shows on the card
+const SIDES = {top: ['Kommt an', 'Leibgericht'], flop: ['Bleibt stehen', 'Ladenhüter']};
+/* A variety on the card, as in the history: its packaging, the best of a side marked as its Leibgericht or
+   Ladenhüter, how it went down, its ratings. t: a candidate for Leibgericht, which says what it lacks instead. */
+function sideRow(m, e, side, first, t = null) {
+  const p = e.product,
+    brand = brandOf(p),
+    several = m.pets.length > 1,
+    said = t ? toRate(t, several) : saidOf(e, side),
+    [ic, tone] = SIDE[side],
+    medal = first ? `<span class="medal ${tone}">${icon(ic)}</span>` : '',
+    label = `${first ? `${SIDES[side][1]}: ` : ''}${pname(p)}${brand ? ` von ${brand}` : ''}. ${cap(said)}.`;
+  return `<li><button class="row" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="ranked">${thumbOf(null, p)}${medal}</span>
+    <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(' · ')))}</small></span>${strip(ratingsIn(m, [e.id]), t && !several ? t.need : 0)}</button></li>`;
+}
+// what goes down well and what is left, a side only where it has a variety; without a Leibgericht the closest one
+function sideList(m, r, side) {
+  const t = side === 'top' && candidate(r),
+    rows = t ? [sideRow(m, t.e, side, false, t)] : r[side].slice(0, PICKS).map((e, i) => sideRow(m, e, side, !i));
+  return rows.length
+    ? `<h3 class="side ${SIDE[side][1]}">${SIDES[side][0]}</h3><ul class="picks">${rows.join('')}</ul>`
+    : '';
 }
 const SHOP_SHOWN = 3;
 const shopRows = (m, list) =>
@@ -129,7 +127,7 @@ export function evaluationCard(m) {
   if (!r.rated && !buy.length) return '';
   let body;
   if (!r.rated) body = `<h3 class="label grp">Nachkaufen</h3>${shopRows(m, buy)}`;
-  else if (r.top.length || r.flop.length) body = sideTile(m, r, r.top[0], 'top') + sideTile(m, r, r.flop[0], 'flop');
+  else if (r.top.length || r.flop.length) body = sideList(m, r, 'top') + sideList(m, r, 'flop');
   else {
     const t = r.stale ? null : r.trials[0],
       next = t

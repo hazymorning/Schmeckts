@@ -281,7 +281,7 @@ async def test_tour(browser, url):
         'Haushalt: only the way in',
     )
     await back(pg, 2)
-    await tap(pg, '[data-sec=evaluation] button.tile')
+    await tap(pg, '[data-sec=evaluation] .picks button')
     check(await pg.evaluate(LEVEL) == [True, 'product', None, None], 'food sheet opens')
     await tap(pg, '[data-action=close]')
     await tap(pg, '.tl [data-action=open-serving]')
@@ -660,11 +660,29 @@ async def test_report(browser, url):
     await ctx.close()
 
 
+# the „Vorlieben“ card: each side's heading and its rows, as [id, sub line, packaging, bars, badge]
+SIDES = """[...document.querySelectorAll('[data-sec=evaluation] .side')].map(h => [h.textContent,
+  [...h.nextElementSibling.querySelectorAll('button')].map(b => [b.dataset.id, b.querySelector('small').textContent,
+    !!b.querySelector('.thumb'), !!b.querySelector('.bars'), b.querySelector('.medal')?.className ?? null])])"""
+
+
 async def test_evaluation(browser, url):
-    print('„Vorlieben“: a row opens its food sheet, the page leads to a level and back')
+    print(
+        '„Vorlieben“: the card shows the packagings that go down well and those left, a row opens its food sheet, the page leads to a level and back'
+    )
     ctx, pg, errors = await demo(browser, url)
-    pid = await pg.get_attribute('[data-sec=evaluation] button.tile', 'data-id')
-    await tap(pg, '[data-sec=evaluation] button.tile')
+    sides = await pg.evaluate(SIDES)
+    rows = [row for _, side in sides for row in side]
+    check(
+        [title for title, _ in sides] == ['Kommt an', 'Bleibt stehen']
+        and all(0 < len(side) <= 2 for _, side in sides)
+        and all(row[2] and row[3] for row in rows)
+        and [[row[4] for row in side] for _, side in sides] == [['medal r-good', None], ['medal r-bad', None]][: len(sides)]
+        and ' · ' in rows[0][1],
+        f'two sides of at most two rows, each with its packaging and its bars, the best crowned and the worst with its bowl {sides}',
+    )
+    pid = rows[0][0]
+    await tap(pg, '[data-sec=evaluation] .picks button')
     check(await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet?.kind, m.sheet?.id])") == ['product', pid], 'a row opens its food sheet')
     await tap(pg, '#sheet [data-action=close]')
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
@@ -683,23 +701,30 @@ async def test_evaluation(browser, url):
 
 
 async def test_candidate(browser, url):
-    print('no Leibgericht yet: its empty side names the variety closest to it, which „Als Nächstes“ then leaves out')
+    print('no Leibgericht yet: the card names the variety closest to it, which „Als Nächstes“ then leaves out; a side with nothing goes')
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url)
     now = await pg.evaluate('Date.now()')
     rated = [('ladenhueter', ['schlecht', 'schlecht', 'mittel']), ('naechste1', ['top', 'gut']), ('naechste2', ['top'])]
-    await load(
-        pg,
-        [pet(M)],
-        [product(i, 'Sheba', i.capitalize()) for i, _ in rated],
-        [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated) for n, r in enumerate(levels)],
-    )
-    tile = await pg.eval_on_selector('[data-sec=evaluation] .tile', "t => [t.tagName, t.dataset.id ?? null, !!t.querySelector('.kicker')]")
+    products = [product(i, 'Sheba', i.capitalize()) for i, _ in rated]
+    meals = [meal(f'{i}-{n}', i, now - (n + 1) * 864e5 - k * 36e5, {M: r}) for k, (i, levels) in enumerate(rated) for n, r in enumerate(levels)]
+    await load(pg, [pet(M)], products, meals)
+    sides = await pg.evaluate(SIDES)
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
     named = await pg.eval_on_selector_all('#sheetBody [data-action=open-product]', 'l => l.map(b => b.dataset.id)')
-    check(tile == ['BUTTON', 'naechste1', True], f'the empty Leibgericht tile keeps its kicker and opens the closest variety {tile}')
+    check(
+        sides
+        == [
+            ['Kommt an', [['naechste1', 'Sheba · noch 1× bewerten', True, True, None]]],
+            ['Bleibt stehen', [['ladenhueter', 'Sheba · 2 von 3 Mal fast nix gefressen', True, True, 'medal r-bad']]],
+        ],
+        f'the closest variety stands under „Kommt an“ with what it lacks, uncrowned {sides}',
+    )
     check(named == ['naechste1', 'ladenhueter', 'naechste2'], f'its card names it before the Ladenhüter, „Als Nächstes“ only the others {named}')
     check(await pg.locator('#sheet .ranks .place').count() == 0, 'a list of one shows no place')
+    await tap(pg, '#sheet [data-action=settings-back]')
+    await load(pg, [pet(M)], products[:1], meals[:3])
+    check([title for title, _ in await pg.evaluate(SIDES)] == ['Bleibt stehen'], 'nothing that goes down well: only what is left')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
