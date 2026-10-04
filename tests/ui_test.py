@@ -1332,15 +1332,16 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
     await ctx.close()
 
-    dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}]}
+    days = [int(time.time() * 1000) - (3 - i) * 864e5 for i in range(3)]  # recent enough to rank
+    meals = [{**s, 'servedAt': t, 'pets': {'lxpet00001': {'r': 'gut', 'at': t + 36e5}}} for s, t in zip(SAVED['servings'], days)]
+    dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}], 'servings': meals}
     ctx, pg, errors = await seeded(browser, url, {'db': dog}, native=True)
     title = await pg.locator(f'{CARD} h2').all_inner_texts()
-    await tap(pg, f'{CARD} .btn.primary')
-    await tap(pg, '#sheet [data-action=set-sex][data-v=m]')
-    await tap(pg, '[data-action=save-pet]')
+    await tap(pg, '[data-sec=evaluation] .picks button')
+    await tap(pg, '#sheet [data-action=close]')
     check(
         title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 0,
-        'no cat calendar: the news of its own, into the pet editor, gone once a sex is saved',
+        'no cat calendar: the news of its own, gone once a variety on the card is opened',
     )
     await ctx.close()
 
@@ -1348,10 +1349,11 @@ async def test_news(browser, url):
     await pg.clock.set_fixed_time('2026-10-12T12:00:00+02:00')  # a Monday, whose sheet tears at the first tap
     await pg.evaluate(REDRAW)
     title = await pg.locator(f'{CARD} h2').all_inner_texts()
+    pad = await pg.locator(f'{CARD} h2 .ic').count()
     await tap(pg, '#home .calsheet')
     check(
-        title == [await pg.evaluate(NEWEST, True)] and await pg.locator(CARD).count() == 0,
-        'with the cat calendar its news, gone once a sheet is torn off',
+        title == [await pg.evaluate(NEWEST, True)] and pad == 1 and await pg.locator(CARD).count() == 0,
+        'with the cat calendar its news, under the calendar’s icon, gone once a sheet is torn off',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()

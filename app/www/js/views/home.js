@@ -252,7 +252,7 @@ function newsHTML() {
     off = setting && !prefs[setting];
   if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
   const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
-  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
+  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.ic ? icon(n.ic) : ''}${n.title}</h2>
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 

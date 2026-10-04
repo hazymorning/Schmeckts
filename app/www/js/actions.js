@@ -346,7 +346,7 @@ const ACTIONS = {
     deleteServing(el.dataset.id || sheet?.id);
   },
   'open-product'(el) {
-    if (usedNews('quartet')) update();
+    if (usedNews('variety')) update();
     openSheet({kind: 'product', id: el.dataset.id});
   },
   'remove-code'(el) {
