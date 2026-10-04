@@ -357,7 +357,7 @@ test('a sentence is two halves; one marked [Katze] only where every pet shown is
 const cat = (sex, name = 'Schnurrsula') => ({id: 'cat' + name, name, species: 'Katze', ...(sex && {sex})});
 const SHEETS = [...Object.values(FACTS).flat(), ...DATED];
 
-test('the cat calendar: a format for each weekday, its own id prefix, every text once, a back only on Stimmt’s?, months only in Wissen', () => {
+test('the cat calendar: a format for each weekday, its own id prefix, every text once, a verdict and a back only on Stimmt’s?, months only in Wissen', () => {
   assert.deepEqual(
     [0, 1, 2, 3, 4, 5, 6].map(i => formatOn(new Date(2026, 9, 4 + i, 12))), // from Sunday
     ['Wissen', 'Katzenlogik', 'Stimmt’s?', 'Kurios', 'Wissen', 'Flachwitz', 'Sprache'],
@@ -372,7 +372,7 @@ test('the cat calendar: a format for each weekday, its own id prefix, every text
   assert.equal(new Set(texts).size, texts.length);
   for (const [format, list] of Object.entries(FACTS))
     for (const f of list) {
-      assert.equal(!!f.back, format === 'Stimmt’s?', f.id);
+      assert.ok(!!f.back === (format === 'Stimmt’s?') && !!f.verdict === !!f.back, f.id);
       assert.ok(!f.months || (format === 'Wissen' && f.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12)));
     }
 });

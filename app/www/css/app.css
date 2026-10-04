@@ -1820,31 +1820,96 @@ dialog.sheet::after {
   color: var(--on-accent);
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
-/* a sheet of a tear-off calendar, its top perforated, on night paper in the dark. The text lines up with a card's,
-   the full width at 360px that every text needs for two lines. */
+/* The tear-off calendar: a pad that thins out over the year, its top sheet perforated, on night paper in the dark. The
+   layers under the sheet hang on the pad, since the sheet's mask cuts away everything outside it. The text lines up
+   with a card's, the full width at 360px that every text needs for two lines. */
+.calpad {
+  position: relative;
+  rotate: -0.7deg;
+}
+.calpad::before,
+.calpad::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: -4px;
+  height: 24px;
+  border-radius: var(--radius-paper);
+  background: var(--paper);
+  filter: brightness(0.9);
+  z-index: -1;
+}
+.calpad::after {
+  left: 10px;
+  right: 10px;
+  bottom: -8px;
+  filter: brightness(0.8);
+  z-index: -2;
+}
+.calpad[data-left="1"]::before,
+.calpad[data-left="1"]::after,
+.calpad[data-left="2"]::after {
+  display: none;
+}
 .calsheet {
   position: relative;
   display: block;
-  padding: var(--space-5) var(--space-3) var(--space-3h);
-  background: var(--paper);
+  padding: var(--space-2h) var(--space-3) var(--space-3h);
+  background: var(--paper-grain), var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
-  rotate: -0.7deg;
-  box-shadow: var(--shadow-paper);
   mask: radial-gradient(circle at 7px 0, transparent 3.2px, var(--opaque) 3.7px) 0 0 / 14px 100% repeat-x;
 }
 /* the mask would cut a ring outside away */
 .calsheet:focus-visible {
   outline-offset: calc(-1 * var(--space-1));
 }
-.cal-date {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-3);
+/* the day large, beside it the weekday over the month, the format's stamp at the end */
+.cal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1h);
+  margin-bottom: var(--space-1);
+}
+.cal-day {
+  min-width: 1.1ch;
+  font: var(--type-paper-day);
+  letter-spacing: var(--track-title);
+}
+.cal-day.red {
+  color: var(--paper-red);
+}
+.cal-dm {
+  display: grid;
   font: var(--type-paper-date);
-  letter-spacing: var(--track-date);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--paper-muted);
+}
+.cal-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  padding: var(--inset-stamp);
+  border: var(--stroke-stamp) solid;
+  border-radius: var(--radius-stamp);
+  color: var(--paper-muted);
+  font: var(--type-stamp);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  rotate: -3deg;
+}
+.cal-stamp .ic {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+.cal-stamp.verdict {
+  color: var(--paper-red);
 }
 /* never under two lines, so tearing off and turning over do not jump */
 .cal-text {
@@ -1858,12 +1923,12 @@ dialog.sheet::after {
   margin: 0;
   color: var(--ink);
 }
-/* the gap above the calendar sheet takes its tilt */
+/* the gap above the calendar takes its tilt, the one below its layers */
 .card + .card,
-.calsheet + .card {
+.calpad + .card {
   margin-top: var(--space-3h);
 }
-.calsheet {
+.calpad {
   margin: var(--space-4) var(--space-1h) 0;
 }
 .group + .group {
@@ -2546,6 +2611,10 @@ html.step-back::view-transition-new(page) {
 }
 .calsheet.turned {
   animation: turnBack calc(var(--dur-step) / 2) var(--ease-out);
+}
+/* once the back faces up, its verdict is pressed on: large and pale, then small and full */
+.calsheet.turned .verdict {
+  animation: stamp var(--dur-fade) var(--ease-in) calc(var(--dur-step) / 2) both;
 }
 .slider-thumb > .picked,
 .fab.filled {
