@@ -1817,8 +1817,8 @@ dialog.sheet::after {
   color: var(--on-accent);
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
-/* a sheet of a tear-off calendar, its top perforated; paper in the dark too, only dimmed. The text lines up with a
-   card's, the full width at 360px that every fact needs for two lines. */
+/* a sheet of a tear-off calendar, its top perforated, on night paper in the dark. The text lines up with a card's,
+   the full width at 360px that every text needs for two lines. */
 .calsheet {
   position: relative;
   display: block;
@@ -1826,7 +1826,7 @@ dialog.sheet::after {
   background: var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
-  transform: rotate(-0.7deg);
+  rotate: -0.7deg;
   box-shadow: var(--shadow-paper);
   mask: radial-gradient(circle at 7px 0, transparent 3.2px, var(--opaque) 3.7px) 0 0 / 14px 100% repeat-x;
 }
@@ -1843,7 +1843,9 @@ dialog.sheet::after {
   text-transform: uppercase;
   color: var(--paper-muted);
 }
+/* never under two lines, so tearing off and turning over do not jump */
 .cal-text {
+  min-height: 2lh;
   margin: 0;
   font: var(--type-paper);
 }
@@ -2535,6 +2537,12 @@ html.step-back::view-transition-new(page) {
   position: absolute;
   pointer-events: none;
   animation: tearOff var(--dur-step) var(--ease-in) forwards;
+}
+.calsheet.turning {
+  animation: turnAway calc(var(--dur-step) / 2) var(--ease-in) forwards;
+}
+.calsheet.turned {
+  animation: turnBack calc(var(--dur-step) / 2) var(--ease-out);
 }
 .slider-thumb > .picked,
 .fab.filled {

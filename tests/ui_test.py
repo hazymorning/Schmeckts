@@ -1569,46 +1569,82 @@ async def test_overview_lines(browser, url):
 
 
 SHEET = "document.querySelector('#home .calsheet .cal-text')?.textContent ?? null"
-FACT = "([t, torn]) => import('./js/views/facts.js').then(f => (t ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn)).text)"
+HEADER = "document.querySelector('#home .calsheet .cal-date').textContent"
+LABEL = "document.querySelector('#home .calsheet').getAttribute('aria-label')"
+# the day's sheet in facts.js, the dated one or the weekday's after the sheets torn off; back: its back
+FACT = """([dated, torn, back]) => import('./js/views/facts.js').then(f =>
+  (s => (back ? s.back : s.text))(dated ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn)))"""
+# every text a sheet can show: front and back, the variants and „deine Katze“ for a cat of either sex
+SHEET_TEXTS = """import('./js/views/facts.js').then(f => { const cat = sex => ({name: 'Schnurrsula', species: 'Katze', sex});
+  return [...new Set([...Object.values(f.FACTS).flat(), ...f.DATED].flatMap(s => [null, cat('f'), cat('m')]
+    .flatMap(c => [f.sheetText(s, c), ...(s.back ? [f.sheetText(s, c, true)] : [])])))]; })"""
 REDRAW = "import('./js/views/home.js').then(h => h.renderHome())"
 
 
+async def sheet(pg):
+    return [await pg.evaluate(SHEET), await pg.evaluate(HEADER), await pg.evaluate(LABEL)]
+
+
 async def test_calendar(browser, url):
-    print('the cat calendar: with a cat and its switch on, above the history, every fact on two lines at most, a tap tears the sheet off')
+    print(
+        'the cat calendar: under the overview, every text on two lines at most, a format a weekday, a dated sheet first, Stimmt’s? turned before torn'
+    )
     ctx, pg, errors = await demo(browser, url, width=360, timezone_id='Europe/Berlin')
     await pg.evaluate('document.fonts.ready')
-    facts = await pg.evaluate("import('./js/views/facts.js').then(f => f.FACTS.map(x => x.text))")
-    lines = await pg.evaluate(LINES, ['#home .cal-text', facts])
-    check(not [t for t, n in zip(facts, lines) if n > 2], f'{len(facts)} facts, none over two lines at 360px')
-    await pg.clock.set_fixed_time('2026-10-14T12:00:00+02:00')
+    texts = await pg.evaluate(SHEET_TEXTS)
+    lines = await pg.evaluate(LINES, ['#home .cal-text', texts])
+    off = [t for t, n in zip(texts, lines) if n > 2]
+    check(len(texts) > 300 and not off, f'{len(texts)} texts, none over two lines at 360px {off[:3]}')
+    heading = await pg.evaluate(LINES, ['#home .cal-date', ['Mo 28. Sept · Katzenlogik']])
+    await pg.clock.set_fixed_time('2026-09-28T12:00:00+02:00')  # a Monday
     await pg.evaluate(REDRAW)
-    order = await pg.evaluate(
-        "(l => [l.indexOf('cal'), l.indexOf('hist'), l.indexOf('hint')])([...document.querySelectorAll('#home > *')].map(e => e.matches('.calsheet') ? 'cal' : e.dataset.sec))"
-    )
-    check(order[1] == order[0] + 1 and order[2] < order[0], f'right above the history, under the hints {order}')
-    first = await pg.evaluate(SHEET)
+    order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calsheet') ? 'cal' : e.dataset.sec || '')")
+    check(order.index('cal') == order.index('overview') + 1 and heading == [1], f'right under the overview, the longest heading on one line {order}')
+    first = await sheet(pg)
     await tap(pg, '#home .calsheet')
     torn = await pg.evaluate(SHEET)
     await pg.focus('#home .calsheet')
     await pg.keyboard.press('Enter')
     await idle(pg)
     check(
-        [first, torn, await pg.evaluate(SHEET), await state(pg, 'prefs.torn')]
-        == [await pg.evaluate(FACT, [False, 0]), await pg.evaluate(FACT, [False, 1]), await pg.evaluate(FACT, [False, 2]), 2],
-        f'a tap, or Enter, shows the next fact {first} / {torn}',
+        first[1].endswith(' · Katzenlogik')
+        and first[2] == 'Nächstes Kalenderblatt'
+        and [first[0], torn, await pg.evaluate(SHEET), await state(pg, 'prefs.torn')]
+        == [*[await pg.evaluate(FACT, [False, {'Katzenlogik': n}, False]) for n in range(3)], {'Katzenlogik': 2}],
+        f'Monday’s Katzenlogik, a tap or Enter shows the next {first}',
     )
-    await pg.clock.set_fixed_time('2026-08-08T12:00:00+02:00')
+    await pg.clock.set_fixed_time('2026-09-29T12:00:00+02:00')
     await pg.evaluate(REDRAW)
-    dated = await pg.evaluate(SHEET)
+    front = await sheet(pg)
+    await tap(pg, '#home .calsheet')
+    await pg.evaluate(REDRAW)
+    answer = await sheet(pg)
+    turned = await state(pg, 'prefs.torn')
     await tap(pg, '#home .calsheet')
     check(
-        dated == await pg.evaluate(FACT, [True, 0])
-        and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, 2])
-        and await state(pg, "[prefs.torn, prefs.hiddenHints.includes('blatt:2026-08-08')]") == [2, True],
-        f'on its day a dated fact comes first, under it the day’s own {dated}',
+        front == [await pg.evaluate(FACT, [False, {}, False]), front[1], 'Auflösung zeigen']
+        and front[1].endswith(' · Stimmt’s?')
+        and answer == [await pg.evaluate(FACT, [False, {}, True]), answer[1], 'Nächstes Kalenderblatt']
+        and answer[1].endswith(' · Auflösung')
+        and turned == {'Katzenlogik': 2}
+        and await sheet(pg) == [await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}, False]), front[1], 'Auflösung zeigen']
+        and await state(pg, 'prefs.torn') == {'Katzenlogik': 2, 'Stimmt’s?': 1},
+        f'Tuesday’s Stimmt’s?: the first tap turns it over to the answer, which stays, the second tears it off {front} {answer}',
+    )
+    await pg.clock.set_fixed_time('2026-08-08T12:00:00+02:00')  # a Saturday
+    await pg.evaluate(REDRAW)
+    dated = await sheet(pg)
+    await tap(pg, '#home .calsheet')
+    check(
+        dated[0] == await pg.evaluate(FACT, [True, {}, False])
+        and '·' not in dated[1]
+        and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, {}, False])
+        and (await pg.evaluate(HEADER)).endswith(' · Sprache')
+        and await state(pg, "prefs.hiddenHints.includes('blatt:2026-08-08')"),
+        f'on its day a dated sheet comes first, with the date alone, under it the weekday’s {dated}',
     )
     await pg.evaluate(REDRAW)
-    check(await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, 2]), 'torn off, it stays off that day')
+    check(await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, {}, False]), 'torn off, it stays off that day')
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')
     await back(pg)
@@ -1627,7 +1663,13 @@ async def test_calendar(browser, url):
     await ctx.close()
 
     ctx, pg, errors = await demo(browser, url, motion=True)
+    await pg.clock.set_fixed_time('2026-09-29T12:00:00+02:00')  # a Tuesday
+    await pg.evaluate(REDRAW)
     await idle(pg)
+    await pg.click('#home .calsheet')
+    moving = await pg.evaluate("document.querySelector('#home .calsheet').getAnimations().length")
+    await idle(pg)
+    check(moving and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, {}, True]), 'Stimmt’s? turns over, then its answer shows')
     await pg.click('#home .calsheet')
     flying = await pg.evaluate(
         "[...document.querySelectorAll('#home .calsheet')].map(e => [e.matches('.torn'), e.querySelector('.cal-text').textContent])"
@@ -1636,7 +1678,7 @@ async def test_calendar(browser, url):
     check(
         len(flying) == 2
         and flying[0][0]
-        and flying[1] == [False, await pg.evaluate(FACT, [False, 1])]
+        and flying[1] == [False, await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}, False])]
         and await pg.locator('#home .calsheet').count() == 1,
         f'the sheet torn off rises over the next one, already in place, and goes {flying}',
     )
