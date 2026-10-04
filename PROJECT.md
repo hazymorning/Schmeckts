@@ -148,7 +148,7 @@ The app checks the server's protocol version on connecting. Plain http is allowe
 ## Evaluation
 
 All of it is pure functions in `smart.js` (`analyze()` and what derives from it), cached in `derive.js`. Thresholds
-are named constants at the top of `smart.js`, `glance.js` and `views/overview.js`.
+are named constants at the top of `smart.js` and `views/overview.js`.
 
 - A rating key alone decides points, wording and icon, whatever the variety's type is now. From `GOOD` (70) points a
   meal went down well, under `NO` (40) it was left.

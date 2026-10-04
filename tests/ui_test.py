@@ -3,6 +3,7 @@
 Usage: python3 tests/ui_test.py [name …]"""
 
 import base64
+import itertools
 import json
 import re
 import time
@@ -1493,6 +1494,45 @@ async def test_birthday(browser, url):
     await ctx.close()
 
 
+# What the overview card fills in, as it writes it; every sentence was measured with each of these
+VALUES = {
+    'meal': ['Frühstück', 'Mittagessen', 'Abendessen', 'Futter'],
+    'time': ['<b>7 Uhr</b>', '<b>11:45</b>', '<b>18:30</b>'],
+    'span': ['<b>45 Minuten</b>', '<b>eineinhalb Stunden</b>', '<b>zweieinhalb Stunden</b>', '<b>10 Stunden</b>'],
+    'since': ['vorgestern', 'vor 6 Tagen', 'am 30. September'],
+    'pet': ['<b>Mau</b>', '<b>Prinzessin</b>'],
+    'age': ['3', '12'],
+}
+# each text in a span in the element, as many lines as the span has different tops
+LINES = """([sel, texts]) => { const p = document.querySelector(sel);
+  return texts.map(t => { p.innerHTML = `<span>${t}</span>`; return new Set([...p.firstChild.getClientRects()].map(r => Math.round(r.top))).size; }); }"""
+
+
+def filled(template):
+    keys = sorted(set(re.findall(r'\{(\w+)\}', template)))
+    for combo in itertools.product(*(VALUES[k] for k in keys)):
+        text = template
+        for key, value in zip(keys, combo):
+            text = text.replace('{' + key + '}', value)
+        yield text
+
+
+async def test_overview_lines(browser, url):
+    print('the overview card: every sentence of every pool on exactly two lines from 360 to 430px, whatever it names')
+    ctx, pg, errors = await demo(browser, url)
+    await pg.evaluate('document.fonts.ready')
+    pools = await pg.evaluate("import('./js/views/facts.js').then(f => f.POOLS)")
+    texts = [(pool, text) for pool, sentences in pools.items() for s in sentences for text in filled(s)]
+    off = []
+    for width in (360, 375, 393, 412, 430):
+        await pg.set_viewport_size({'width': width, 'height': 860})
+        lines = await pg.evaluate(LINES, ['.overview p', [text for _, text in texts]])
+        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(texts, lines) if n != 2]
+    check(len(texts) > 200 and not off, f'{len(texts)} sentences on two lines at every width {off[:5]}')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn(en|t)\b')
 TEXTS = """[document.body.innerText, ...[...document.querySelectorAll('[placeholder], [aria-label], [title]')]
   .map(e => [e.placeholder, e.getAttribute('aria-label'), e.title].join(' '))].join('\\n').toLowerCase()"""
@@ -2838,6 +2878,7 @@ run_tests(
         'pets': test_petbar,
         'nicknames': test_nicknames,
         'birthday': test_birthday,
+        'overview-lines': test_overview_lines,
         'local': test_local,
         'network': test_network,
         'scanning': test_scan,

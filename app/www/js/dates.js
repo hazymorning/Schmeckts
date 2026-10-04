@@ -20,6 +20,8 @@ export const dayStart = t => {
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 };
+// counts local days; the same all day
+export const dayNumber = t => Math.round(dayStart(t) / DAY);
 export const dayKey = t => {
   const d = new Date(t);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
