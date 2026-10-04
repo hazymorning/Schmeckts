@@ -58,7 +58,7 @@ export function serveProduct(pid, scanCode = '') {
 // a variety that goes down badly, or that nobody buys any more, shows its record as it is served
 function onRecord(p) {
   const past = record(sortOf(p.id));
-  return past ? `Laut Akte ${lower(past)}.` : '';
+  return past ? `Zuletzt ${lower(past)}.` : '';
 }
 // each milestone is announced once per device
 function withMilestone(msg) {

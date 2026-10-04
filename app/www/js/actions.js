@@ -13,7 +13,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {update} from './views/home.js';
+import {tearSheet, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -417,6 +417,16 @@ const ACTIONS = {
     haptic('select');
     renderSheet();
   },
+  calendar() {
+    prefs.calendar = !prefs.calendar;
+    savePrefs();
+    haptic('select');
+    renderSheet();
+    update();
+  },
+  tear(el) {
+    tearSheet(el);
+  },
   'feed-remind'() {
     haptic('select');
     setFeedRemind(!prefs.feedRemind);
@@ -513,6 +523,13 @@ export async function openLink(url) {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (el && ACTIONS[el.dataset.action]) ACTIONS[el.dataset.action](el);
+});
+// what is a button only by its role takes the keys a button takes
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button][data-action]')) {
+    e.preventDefault();
+    e.target.click();
+  }
 });
 // pack-line chips take no focus, so the field keeps its keyboard
 document.addEventListener('pointerdown', e => {

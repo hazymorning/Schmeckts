@@ -36,7 +36,7 @@ Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumut
 
 - *Vorlieben*: Leibgerichte, Ladenhüter, jede Sorte als Quartettkarte und was als Nächstes in den Napf kann.
 - *Einkaufen*: was sich nachzukaufen lohnt, als Liste zum Verschicken.
-- *Verlauf*: jede Mahlzeit, Tag für Tag.
+- *Verlauf*: jede Mahlzeit, Tag für Tag. Wohnt eine Katze bei dir, liegt darüber ein Abreißkalender mit einem Fakt am Tag.
 - *Beobachtungen*: von guter Laune bis Erbrechen, mit einem Tipp notiert. Lüften musst du selbst.
 - Erinnerungen ans Füttern und Bewerten.
 - Mehrere Tiere, auch mit Spitznamen, auf die sie genauso wenig hören.

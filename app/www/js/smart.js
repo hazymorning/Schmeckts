@@ -787,11 +787,6 @@ export function nextMeal(db, now, pets) {
   return slots.length ? {at: slots[0].at, tomorrow: true} : null;
 }
 
-export function nextMilestone(db) {
-  const n = MILESTONES.meals.find(x => x > db.servings.length);
-  return n ? {n, left: n - db.servings.length} : null;
-}
-
 export function milestones(db) {
   const ids = new Set(db.products.map(p => p.id));
   const count = {

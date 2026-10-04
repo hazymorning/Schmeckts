@@ -3,6 +3,7 @@
 Usage: python3 tests/ui_test.py [name …]"""
 
 import base64
+import itertools
 import json
 import re
 import time
@@ -726,8 +727,8 @@ async def test_record(browser, url):
     await open_sheet(pg, kind='product', id='zaeh')
     zaeh = await pg.evaluate(STATS)
     check(
-        lachs == [['Einsätze', '4'], ['Gut gefressen', '3 von 3'], ['Nur Soße', '0 von 3'], ['Wankelmut', '0 von 2']]
-        and [k for k, _ in zaeh] == ['Einsätze', 'Gut gefressen', 'Wankelmut'],
+        lachs == [['Einsätze', '4'], ['Gut gefressen', '3 von 3'], ['Nur Soße', '0 von 3'], ['Meinungswechsel', '0 von 2']]
+        and [k for k, _ in zaeh] == ['Einsätze', 'Gut gefressen', 'Meinungswechsel'],
         f'a trump card in the sheet, sauce only where there is some {lachs} {zaeh}',
     )
     await tap(pg, '#sheet [data-action=close]')
@@ -748,7 +749,7 @@ async def test_record(browser, url):
     await tap(pg, '#sheet [data-action=serve]')
     plain = await pg.inner_text('#toast > span')
     check(
-        'Laut Akte beide Male fast nix gefressen' in told and 'Akte' not in plain,
+        'Zuletzt beide Male fast nix gefressen' in told and 'Zuletzt' not in plain,
         f'served all the same, the toast tells the record of one nobody buys any more ({told} / {plain})',
     )
     meals = [
@@ -1267,7 +1268,9 @@ CARD = '[data-sec=news]'
 
 
 async def test_news(browser, url):
-    print('news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used')
+    print(
+        'news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used, the cat calendar’s only with a cat'
+    )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     keys = await pg.evaluate(NEWS)
@@ -1282,9 +1285,6 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
-    await tap(pg, f'{CARD} [data-action=open-evaluation]')
-    check(await pg.evaluate(LEVEL) == [True, 'evaluation', None, None], 'the card leads to where the novelty is')
-    await tap(pg, '#sheet [data-action=settings-back]')
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -1305,13 +1305,15 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
     await ctx.close()
 
+    dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}]}
+    ctx, pg, errors = await seeded(browser, url, {'db': dog}, native=True)
+    check(await pg.locator(CARD).count() == 0, 'no cat: no news of the cat calendar')
+    await ctx.close()
+
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     shown = await pg.locator(CARD).count() == 1
-    await tap(pg, f'{CARD} [data-action=open-evaluation]')
-    await tap(pg, '#sheet [data-action=open-product]')
-    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
-    await idle(pg)
-    check(shown and await pg.locator(CARD).count() == 0, 'a variety’s card opened: the news has done its job')
+    await tap(pg, '#home .calsheet')
+    check(shown and await pg.locator(CARD).count() == 0, 'a sheet torn off: the news has done its job')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -1489,6 +1491,121 @@ async def test_birthday(browser, url):
     await pg.fill('#f-birthday', '')
     await tap(pg, '[data-action=save-pet]')
     check(await state(pg, "db.pets.map(p => 'birthday' in p)") == [False, False], 'cleared: the field is dropped')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
+# What the overview card fills in, as it writes it; every sentence was measured with each of these
+VALUES = {
+    'meal': ['Frühstück', 'Mittagessen', 'Abendessen', 'Futter'],
+    'time': ['<b>7 Uhr</b>', '<b>11:45</b>', '<b>18:30</b>'],
+    'span': ['<b>45 Minuten</b>', '<b>eineinhalb Stunden</b>', '<b>zweieinhalb Stunden</b>', '<b>10 Stunden</b>'],
+    'since': ['vorgestern', 'vor 6 Tagen', 'am 30. September'],
+    'pet': ['<b>Mau</b>', '<b>Prinzessin</b>'],
+    'age': ['3', '12'],
+}
+# each text in a span in the element, as many lines as the span has different tops
+LINES = """([sel, texts]) => { const p = document.querySelector(sel);
+  return texts.map(t => { p.innerHTML = `<span>${t}</span>`; return new Set([...p.firstChild.getClientRects()].map(r => Math.round(r.top))).size; }); }"""
+
+
+def filled(template):
+    keys = sorted(set(re.findall(r'\{(\w+)\}', template)))
+    for combo in itertools.product(*(VALUES[k] for k in keys)):
+        text = template
+        for key, value in zip(keys, combo):
+            text = text.replace('{' + key + '}', value)
+        yield text
+
+
+async def test_overview_lines(browser, url):
+    print('the overview card: every sentence of every pool on exactly two lines from 360 to 430px, whatever it names')
+    ctx, pg, errors = await demo(browser, url)
+    await pg.evaluate('document.fonts.ready')
+    pools = await pg.evaluate("import('./js/views/facts.js').then(f => f.POOLS)")
+    texts = [(pool, text) for pool, sentences in pools.items() for s in sentences for text in filled(s)]
+    off = []
+    for width in (360, 375, 393, 412, 430):
+        await pg.set_viewport_size({'width': width, 'height': 860})
+        lines = await pg.evaluate(LINES, ['.overview p', [text for _, text in texts]])
+        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(texts, lines) if n != 2]
+    check(len(texts) > 200 and not off, f'{len(texts)} sentences on two lines at every width {off[:5]}')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
+SHEET = "document.querySelector('#home .calsheet .cal-text')?.textContent ?? null"
+FACT = "([t, torn]) => import('./js/views/facts.js').then(f => (t ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn)).text)"
+REDRAW = "import('./js/views/home.js').then(h => h.renderHome())"
+
+
+async def test_calendar(browser, url):
+    print('the cat calendar: with a cat and its switch on, above the history, every fact on two lines at most, a tap tears the sheet off')
+    ctx, pg, errors = await demo(browser, url, width=360, timezone_id='Europe/Berlin')
+    await pg.evaluate('document.fonts.ready')
+    facts = await pg.evaluate("import('./js/views/facts.js').then(f => f.FACTS.map(x => x.text))")
+    lines = await pg.evaluate(LINES, ['#home .cal-text', facts])
+    check(not [t for t, n in zip(facts, lines) if n > 2], f'{len(facts)} facts, none over two lines at 360px')
+    await pg.clock.set_fixed_time('2026-10-14T12:00:00+02:00')
+    await pg.evaluate(REDRAW)
+    order = await pg.evaluate(
+        "(l => [l.indexOf('cal'), l.indexOf('hist'), l.indexOf('hint')])([...document.querySelectorAll('#home > *')].map(e => e.matches('.calsheet') ? 'cal' : e.dataset.sec))"
+    )
+    check(order[1] == order[0] + 1 and order[2] < order[0], f'right above the history, under the hints {order}')
+    first = await pg.evaluate(SHEET)
+    await tap(pg, '#home .calsheet')
+    torn = await pg.evaluate(SHEET)
+    await pg.focus('#home .calsheet')
+    await pg.keyboard.press('Enter')
+    await idle(pg)
+    check(
+        [first, torn, await pg.evaluate(SHEET), await state(pg, 'prefs.torn')]
+        == [await pg.evaluate(FACT, [False, 0]), await pg.evaluate(FACT, [False, 1]), await pg.evaluate(FACT, [False, 2]), 2],
+        f'a tap, or Enter, shows the next fact {first} / {torn}',
+    )
+    await pg.clock.set_fixed_time('2026-08-08T12:00:00+02:00')
+    await pg.evaluate(REDRAW)
+    dated = await pg.evaluate(SHEET)
+    await tap(pg, '#home .calsheet')
+    check(
+        dated == await pg.evaluate(FACT, [True, 0])
+        and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, 2])
+        and await state(pg, "[prefs.torn, prefs.hiddenHints.includes('blatt:2026-08-08')]") == [2, True],
+        f'on its day a dated fact comes first, under it the day’s own {dated}',
+    )
+    await pg.evaluate(REDRAW)
+    check(await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, 2]), 'torn off, it stays off that day')
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=calendar]')
+    await back(pg)
+    off = await pg.locator('#home .calsheet').count()
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=calendar]')
+    await back(pg)
+    check(off == 0 and await pg.locator('#home .calsheet').count() == 1, 'its switch in the settings takes it away and back')
+    await change(pg, "s.db.pets[0].species = 'Hund'")
+    await settings(pg)
+    check(
+        await pg.locator('#home .calsheet').count() == 0 and await pg.locator('#sheet [data-action=calendar]').count() == 0,
+        'no cat: no sheet and no switch',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+    ctx, pg, errors = await demo(browser, url, motion=True)
+    await idle(pg)
+    await pg.click('#home .calsheet')
+    flying = await pg.evaluate(
+        "[...document.querySelectorAll('#home .calsheet')].map(e => [e.matches('.torn'), e.querySelector('.cal-text').textContent])"
+    )
+    await idle(pg)
+    check(
+        len(flying) == 2
+        and flying[0][0]
+        and flying[1] == [False, await pg.evaluate(FACT, [False, 1])]
+        and await pg.locator('#home .calsheet').count() == 1,
+        f'the sheet torn off rises over the next one, already in place, and goes {flying}',
+    )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2136,7 +2253,7 @@ async def test_rephoto(browser, url):
 
 
 PRODUCT_PHOTO = """pid => import('./js/store.js').then(s => { const p = s.db.products.find(x => x.id === pid);
-  return [document.querySelector('#sheet .prod .thumb, #sheet .name-photo')?.getAttribute('src')?.slice(-32) ?? null, (p.thumb || '').slice(-32),
+  return [document.querySelector('#sheet :is(.prod, .quartet) .thumb, #sheet .name-photo')?.getAttribute('src')?.slice(-32) ?? null, (p.thumb || '').slice(-32),
     (localStorage.getItem('__fs:photos/' + pid + '.jpg') || '').slice(-32), p.sharedPhoto ?? null]; })"""
 
 
@@ -2838,6 +2955,8 @@ run_tests(
         'pets': test_petbar,
         'nicknames': test_nicknames,
         'birthday': test_birthday,
+        'overview-lines': test_overview_lines,
+        'calendar': test_calendar,
         'local': test_local,
         'network': test_network,
         'scanning': test_scan,

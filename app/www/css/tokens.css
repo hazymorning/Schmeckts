@@ -53,6 +53,7 @@
   --radius-m: 16px; /* controls and boxes you tap */
   --radius-l: 24px; /* containers */
   --radius-full: 999px;
+  --radius-paper: 3px 3px 6px 6px; /* the calendar sheet */
 
   /* app.css sets type only as font: var(--type-...) */
   --type-title: 650 30px/1.1 var(--font-display); /* always with --track-title */
@@ -67,9 +68,12 @@
   /* the names under the rating slider, the largest at which every scale's words fit their columns at 360px */
   --type-level: 400 13px/1.25 var(--font-ui);
   --type-level-strong: 600 13px/1.25 var(--font-ui);
+  --type-paper: 500 16px/1.35 var(--font-display); /* a fact on the calendar sheet */
+  --type-paper-date: 600 10.5px/1 var(--font-ui); /* in capitals, always with --track-date */
   --weight-strong: 600; /* b and strong in running text */
   --track-title: -0.015em; /* Faustina runs narrow at title size */
   --track-code: 0.14em; /* household code field */
+  --track-date: 0.12em;
 
   /* --dur-fade for changes in place, --dur-step for movement; a dimming takes the duration of what moves on it.
      --ease-out to arrive, --ease-in to leave, --ease-spring to confirm. */
@@ -159,6 +163,10 @@
   --happy-soft: light-dark(#e3ecd7, #333a26);
   --vomit: light-dark(#6d5884, #c8b3e1);
   --vomit-soft: light-dark(#ece3f7, #3b3245);
+  /* the calendar sheet: paper in the dark too, only dimmed */
+  --paper: light-dark(#f7f0dd, #cfc4a8);
+  --paper-ink: light-dark(#3a3326, #2b261d);
+  --paper-muted: light-dark(#6b5f45, #574c37);
 
   --raise: var(--surface); /* fill of a field, chip, box or soft button on the ground; cards set --surface-2 */
 
@@ -171,6 +179,9 @@
   --shadow-low: 0 1px 4px light-dark(#25261f1a, #0b0c094d); /* resting lift */
   --shadow-high:
     0 14px 34px -14px light-dark(#25261f4d, #0b0c09a6), 0 2px 6px light-dark(#25261f14, #0b0c0959); /* what floats */
+  --shadow-paper:
+    0 1px 2px light-dark(#25261f26, #0b0c0926), 0 8px 18px -10px light-dark(#25261f59, #0b0c0959); /* at 15 and 35 % */
+  --opaque: #000; /* what a mask keeps */
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -313,6 +324,12 @@
   100% {
     transform: scaleY(1);
     opacity: 0;
+  }
+}
+@keyframes tearOff {
+  to {
+    opacity: 0;
+    transform: translateY(-50%) rotate(-5deg);
   }
 }
 @keyframes shimmer {
