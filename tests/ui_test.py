@@ -1340,8 +1340,8 @@ async def test_news(browser, url):
     await tap(pg, '[data-sec=evaluation] .picks button')
     await tap(pg, '#sheet [data-action=close]')
     check(
-        title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 0,
-        'no cat calendar: the news of its own, gone once a variety on the card is opened',
+        title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 1,
+        'no cat calendar: the news of its own, which has nothing to use and stays until hidden',
     )
     await ctx.close()
 
