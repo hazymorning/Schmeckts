@@ -10,6 +10,7 @@ import {
   observationOf,
   RATINGS,
   scaleOf,
+  SEXES,
   SPECIES,
   TEXTURES,
   TYPES,
@@ -627,6 +628,7 @@ function viewPet() {
       <p class="hint mt-s">Die App nennt dein Tier dann mal so, mal so.</p>`,
     )}
     ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
+    ${group('Geschlecht', `<div class="chips">${[...SEXES, {k: '', label: 'Keine Angabe'}].map(x => `<button class="chip" aria-pressed="${s.sex === x.k}" data-action="set-sex" data-v="${x.k}">${x.label}</button>`).join('')}</div>`)}
     <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button></div>
     ${editing ? apart(armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
 }

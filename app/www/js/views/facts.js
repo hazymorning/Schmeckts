@@ -3,7 +3,8 @@
 import {DAY, dayNumber} from '../dates.js';
 
 /* By pool: the moment of the day (momentOf() in views/overview.js), a moment after a meal was left, a birthday.
-   {time}, {span} and {pet} come bold; a sentence with {age} is only taken with the age known. */
+   {time}, {span} and {pet} come bold; a sentence is only taken when the card knows all it names, {age} the age,
+   {Sie} and {sie} the sex of the one pet shown. */
 export const POOLS = {
   due: [
     'Die Uhr sagt {meal}, und sie ist hier nicht die Einzige.',
@@ -16,6 +17,8 @@ export const POOLS = {
     'Zeit fürs {meal}, die großen Augen warten schon.',
     'Der Napf ist leer und wird sehr gründlich bewacht.',
     'Ein Wunder, dass du noch sitzt. Das {meal} ist dran.',
+    '{Sie} sitzt schon am Napf und tut, als wäre das Zufall.',
+    '{Sie} weiß genau, wie spät es ist. Zeit fürs {meal}.',
   ],
   dueFirst: [
     'Heute war noch niemand am Napf, außer zum Nachgucken.',
@@ -28,6 +31,8 @@ export const POOLS = {
     'Der erste Napf des Tages wird sehnsüchtig erwartet.',
     'Bisher gab’s heute nichts. Das lässt sich ja ändern.',
     'Zeit fürs {meal}, der Tag hat bisher nichts gebracht.',
+    'Heute gab’s noch nichts, und {sie} lässt es dich spüren.',
+    '{Sie} hat heute noch nichts bekommen und weiß das genau.',
   ],
   fresh: [
     'Der Napf ist voll, und für eine Weile bist du jetzt abgemeldet.',
@@ -40,6 +45,8 @@ export const POOLS = {
     'Die ersten Happen entscheiden über den ganzen Napf.',
     'Mahlzeit. Bis der Napf leer ist, herrscht Ruhe.',
     'Gerade aufgetischt, und die Welt ist kurz in Ordnung.',
+    '{Sie} hat gerade zu tun, Störungen bitte erst später.',
+    'Serviert. Jetzt entscheidet {sie}, ob es was taugt.',
   ],
   freshTreat: [
     'Ein Snack zwischendurch, rein aus Gründen der Höflichkeit.',
@@ -60,6 +67,8 @@ export const POOLS = {
     'Gegen {time} gibt’s {meal}, so sicher wie jeden Tag.',
     'Bis {time} ist Pause. Der Napf weiß das, der Bauch nicht.',
     'Nachschub gibt’s gegen {time}, bis dahin heißt es warten.',
+    'Bis {time} hält {sie} durch, mit Würde und Seufzern.',
+    'Gegen {time} gibt’s {meal}, und {sie} weiß das längst.',
   ],
   morning: [
     'Heute gab’s noch nichts, aber gegen {time} ist es so weit.',
@@ -70,6 +79,7 @@ export const POOLS = {
     'Gegen {time} gibt’s den ersten Napf. Darauf ist Verlass.',
     'Vor {time} gibt’s nichts, auch nicht für schöne Augen.',
     'Heute geht’s am Napf gegen {time} los, nicht früher.',
+    'Gegen {time} gibt’s {meal}, {sie} zählt schon die Minuten.',
   ],
   done: [
     'Für heute ist alles gefressen, oder zumindest alles serviert.',
@@ -81,6 +91,8 @@ export const POOLS = {
     'Mehr gibt’s heute nicht, und dabei bleibt es auch.',
     'Was jetzt noch an Blicken kommt, ist Rahmenprogramm.',
     'Für heute ist Schluss, alles Weitere klärt sich morgen.',
+    'Für heute ist Schluss, {sie} sieht das vermutlich anders.',
+    'Alles serviert. {Sie} wird trotzdem noch mal nachsehen.',
   ],
   night: [
     'Wer um diese Uhrzeit Hunger hat, muss bis {time} durchhalten.',
@@ -92,6 +104,8 @@ export const POOLS = {
     'Schlaf gut. Der Napf öffnet wieder gegen {time}.',
     'Erst wird geschlafen, ums Futter geht’s gegen {time}.',
     'Das nächste Futter kommt gegen {time}, nicht vorher.',
+    '{Sie} schläft hoffentlich, gefüttert wird gegen {time}.',
+    'Falls {sie} dich weckt, Futter gibt’s erst gegen {time}.',
   ],
   today: [
     'Seit {span} wird verdaut, und das ganz in Ruhe.',

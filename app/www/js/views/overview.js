@@ -67,17 +67,18 @@ export function poolOf(g, now) {
 }
 // what a sentence can name; what the moment does not have is left out
 export function valuesOf(g, now) {
-  const {last, next, birthday} = g;
+  const {last, next, birthday, sex} = g;
   return {
     ...(next && {meal: mealAt(next.at), time: b(clock(next.at))}),
     ...(last && {since: since(last.servedAt, now), span: b(spanOf(Math.round((now - last.servedAt) / 6e4)))}),
     ...(birthday && {pet: b(esc(calledNames([birthday.pet], 'line', now))), age: birthday.age}),
+    ...(sex && (sex === 'f' ? {Sie: 'Sie', sie: 'sie'} : {Sie: 'Er', sie: 'er'})),
   };
 }
 // the day's sentence, the same all day, or the next in its pool where it repeats a word of the heading
 export function sentenceOf(g, now, head) {
   const values = valuesOf(g, now),
-    list = POOLS[poolOf(g, now)].filter(t => values.age || !t.includes('{age}')),
+    list = POOLS[poolOf(g, now)].filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, key]) => values[key] != null)),
     day = dayNumber(now),
     said = list.map((_, i) => fill(list[(day + i) % list.length], values));
   return said.find(t => !sharesWord(head, t)) ?? said[0];

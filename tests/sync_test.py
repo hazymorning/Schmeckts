@@ -310,6 +310,12 @@ async def main():
             )
             await run(a, "delete db.pets.find(p => p.id === 'tigerpet0001').nicknames; save();")
             await expect(await until(b, "!('nicknames' in db.pets.find(p => p.id === 'tigerpet0001'))", 6), 'and go there too when all are removed')
+            await run(b, "db.pets.find(p => p.id === 'tigerpet0001').sex = 'm'; save();")
+            await expect(
+                await until(a, "db.pets.find(p => p.id === 'tigerpet0001')?.sex === 'm'", 6)
+                and srv.records()['pets'].get('tigerpet0001', {}).get('sex') == 'm',
+                'the sex goes through the server as it is',
+            )
             await expect(await until_sync(a, 'status.live'), 'the live connection is up')
             await run(
                 a,

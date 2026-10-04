@@ -1495,6 +1495,38 @@ async def test_birthday(browser, url):
     await ctx.close()
 
 
+PRESSED = "document.querySelector('#sheet [data-action=set-sex][aria-pressed=true]').dataset.v"
+
+
+async def test_sex(browser, url):
+    print('sex in the pet editor: none at first, saved, back to none drops the field; a field the editor does not know stays, as sex does with 0.28')
+    ctx, pg, errors = await one_pet(browser, url)
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    none = await pg.evaluate(PRESSED)
+    await tap(pg, '#sheet [data-action=set-sex][data-v=f]')
+    await tap(pg, '[data-action=save-pet]')
+    check(none == '' and await state(pg, 'db.pets[0].sex') == 'f', 'none given at first, „Weiblich“ saved')
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    shown = await pg.evaluate(PRESSED)
+    await tap(pg, '#sheet [data-action=set-sex][data-v=""]')
+    await tap(pg, '[data-action=save-pet]')
+    check(shown == 'f' and await state(pg, "!('sex' in db.pets[0])"), 'shown again in the editor, „Keine Angabe“ drops the field')
+    # 0.28's editor changes the stored pet only where it shows a field, as this one does with a field from a newer version
+    await change(pg, "s.db.pets[0].zukunft = 'x'")
+    clock = 'state.clocks.pets[db.pets[0].id].zukunft'
+    before = await state(pg, clock)
+    await tap(pg, '#sheet [data-action=edit-pet]')
+    await pg.fill('#f-name', 'Minka II')
+    await tap(pg, '[data-action=save-pet]')
+    check(
+        await state(pg, f'[db.pets[0].name, db.pets[0].zukunft, {clock}]') == ['Minka II', 'x', before],
+        'a field the editor does not know stays as it is when the pet is edited, and is not sent again',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 # What the overview card fills in, as it writes it; every sentence was measured with each of these
 VALUES = {
     'meal': ['Frühstück', 'Mittagessen', 'Abendessen', 'Futter'],
@@ -1503,6 +1535,8 @@ VALUES = {
     'since': ['vorgestern', 'vor 6 Tagen', 'am 30. September'],
     'pet': ['<b>Mau</b>', '<b>Prinzessin</b>'],
     'age': ['3', '12'],
+    'Sie': ['Sie', 'Er'],
+    'sie': ['sie', 'er'],
 }
 # each text in a span in the element, as many lines as the span has different tops
 LINES = """([sel, texts]) => { const p = document.querySelector(sel);
@@ -2955,6 +2989,7 @@ run_tests(
         'pets': test_petbar,
         'nicknames': test_nicknames,
         'birthday': test_birthday,
+        'sex': test_sex,
         'overview-lines': test_overview_lines,
         'calendar': test_calendar,
         'local': test_local,

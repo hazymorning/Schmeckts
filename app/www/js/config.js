@@ -7,6 +7,12 @@ export const SPECIES = [
   {k: 'Andere', i: 'paw'},
 ];
 export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1)).i;
+// pets[].sex, absent when not given
+export const SEXES = [
+  {k: 'f', label: 'Weiblich'},
+  {k: 'm', label: 'Männlich'},
+];
+export const sexOf = pet => (SEXES.some(s => s.k === pet?.sex) ? pet.sex : null);
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]);
 // Keys are stored in the data, never rename them. Every wording says what the pet ate; short has to fit a column of

@@ -390,6 +390,10 @@ const ACTIONS = {
     sheet.species = el.dataset.v;
     renderSheet();
   },
+  'set-sex'(el) {
+    sheet.sex = el.dataset.v;
+    renderSheet();
+  },
   'save-pet'() {
     savePet();
   },

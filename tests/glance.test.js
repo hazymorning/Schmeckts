@@ -203,7 +203,7 @@ test('the overview pools: none empty, each one the card reaches, every sentence 
   for (const [pool, [g, now]] of Object.entries(STATES)) {
     assert.ok(POOLS[pool].length, `${pool}: not empty`);
     assert.equal(poolOf(g, now), pool);
-    for (const said of POOLS[pool].map(x => fill(x, valuesOf(g, now))))
+    for (const said of POOLS[pool].map(x => fill(x, valuesOf({...g, sex: 'f'}, now))))
       assert.ok(!/[{}]/.test(said), `${pool}: ${said}`);
   }
 });
@@ -228,7 +228,7 @@ test('the overview sentence: a meal left takes its own pool where there is one, 
 
   const [g, now] = STATES.dueFirst,
     head = 'Minkas Tag',
-    list = POOLS.dueFirst.map(x => fill(x, valuesOf(g, now)));
+    list = POOLS.dueFirst.filter(x => !/\{sie\}/i.test(x)).map(x => fill(x, valuesOf(g, now)));
   assert.ok(list.some(s => sharesWord(head, s)) && list.some(s => !sharesWord(head, s)));
   for (let i = 0; i < list.length; i++) {
     const on = addDays(now, i),
@@ -284,6 +284,33 @@ test('the overview heading: whose day it is, a wording a day, the birthday and t
     [0, 1, 2, 3].map(i => headOf(pets, {}, T + i * DAY, 'later')).every(h => !/Mau|Felix|Kiwi/.test(h)),
     'more than two: the bunch, no list of names',
   );
+});
+
+test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is known, she or he as it is', () => {
+  replaceDb(structuredClone(HOME));
+  const shown = (pets, ids) => glance({...household(['nass'], []), pets}, ids, NOW).sex,
+    f = {id: 'A', sex: 'f'},
+    m = {id: 'B', sex: 'm'};
+  assert.deepEqual(
+    [
+      shown([f], ['A']),
+      shown([m], ['B']),
+      shown([{id: 'A'}], ['A']),
+      shown([{id: 'A', sex: 'x'}], ['A']),
+      shown([f, m], ['A', 'B']),
+      shown([f, m], ['B']),
+    ],
+    ['f', 'm', null, null, null, 'm'],
+  );
+  for (const [pool, [g, now]] of Object.entries(STATES)) {
+    const named = POOLS[pool].filter(x => /\{sie\}/i.test(x)),
+      next = i => ({...g, last: g.last && {...g.last, servedAt: addDays(g.last.servedAt, i)}}),
+      month = sex => [...Array(31).keys()].map(i => sentenceOf({...next(i), sex}, addDays(now, i), '')),
+      as = (Sie, sie) => named.map(x => fill(x, {...valuesOf(g, now), Sie, sie}));
+    assert.ok(!month(null).some(said => as('Sie', 'sie').includes(said) || as('Er', 'er').includes(said)), pool);
+    assert.ok(!named.length || month('f').some(said => as('Sie', 'sie').includes(said)), `${pool}: she`);
+    assert.ok(!named.length || month('m').some(said => as('Er', 'er').includes(said)), `${pool}: he`);
+  }
 });
 
 test('the cat calendar: its ids in order, every text once, the months in shape', () => {

@@ -20,6 +20,7 @@ export const petState = p => ({
   nicknames: namesOf(p).slice(1),
   nick: '', // typed, not yet added
   species: p?.species || 'Katze',
+  sex: p?.sex || '',
   photo: p?.photo || null,
   birthday: p?.birthday || '',
   step: null,
@@ -118,6 +119,10 @@ export function savePet() {
   Object.assign(p, {name, species: s.species, photo: s.photo || null});
   if (birthday) p.birthday = birthday;
   else delete p.birthday; // removed on the other phones too
+  if (s.sex) {
+    p.sex = s.sex;
+    usedNews('sex');
+  } else delete p.sex;
   if (nicknames.length) {
     p.nicknames = nicknames;
     usedNews('nicknames');
