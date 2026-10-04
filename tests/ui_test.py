@@ -1533,6 +1533,82 @@ async def test_overview_lines(browser, url):
     await ctx.close()
 
 
+SHEET = "document.querySelector('#home .calsheet .cal-text')?.textContent ?? null"
+FACT = "([t, torn]) => import('./js/views/facts.js').then(f => (t ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn)).text)"
+REDRAW = "import('./js/views/home.js').then(h => h.renderHome())"
+
+
+async def test_calendar(browser, url):
+    print('the cat calendar: with a cat and its switch on, above the history, every fact on two lines at most, a tap tears the sheet off')
+    ctx, pg, errors = await demo(browser, url, width=360, timezone_id='Europe/Berlin')
+    await pg.evaluate('document.fonts.ready')
+    facts = await pg.evaluate("import('./js/views/facts.js').then(f => f.FACTS.map(x => x.text))")
+    lines = await pg.evaluate(LINES, ['#home .cal-text', facts])
+    check(not [t for t, n in zip(facts, lines) if n > 2], f'{len(facts)} facts, none over two lines at 360px')
+    await pg.clock.set_fixed_time('2026-10-14T12:00:00+02:00')
+    await pg.evaluate(REDRAW)
+    order = await pg.evaluate(
+        "(l => [l.indexOf('cal'), l.indexOf('hist'), l.indexOf('hint')])([...document.querySelectorAll('#home > *')].map(e => e.matches('.calsheet') ? 'cal' : e.dataset.sec))"
+    )
+    check(order[1] == order[0] + 1 and order[2] < order[0], f'right above the history, under the hints {order}')
+    first = await pg.evaluate(SHEET)
+    await tap(pg, '#home .calsheet')
+    torn = await pg.evaluate(SHEET)
+    await pg.focus('#home .calsheet')
+    await pg.keyboard.press('Enter')
+    await idle(pg)
+    check(
+        [first, torn, await pg.evaluate(SHEET), await state(pg, 'prefs.torn')]
+        == [await pg.evaluate(FACT, [False, 0]), await pg.evaluate(FACT, [False, 1]), await pg.evaluate(FACT, [False, 2]), 2],
+        f'a tap, or Enter, shows the next fact {first} / {torn}',
+    )
+    await pg.clock.set_fixed_time('2026-08-08T12:00:00+02:00')
+    await pg.evaluate(REDRAW)
+    dated = await pg.evaluate(SHEET)
+    await tap(pg, '#home .calsheet')
+    check(
+        dated == await pg.evaluate(FACT, [True, 0])
+        and await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, 2])
+        and await state(pg, "[prefs.torn, prefs.hiddenHints.includes('blatt:2026-08-08')]") == [2, True],
+        f'on its day a dated fact comes first, under it the day’s own {dated}',
+    )
+    await pg.evaluate(REDRAW)
+    check(await pg.evaluate(SHEET) == await pg.evaluate(FACT, [False, 2]), 'torn off, it stays off that day')
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=calendar]')
+    await back(pg)
+    off = await pg.locator('#home .calsheet').count()
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=calendar]')
+    await back(pg)
+    check(off == 0 and await pg.locator('#home .calsheet').count() == 1, 'its switch in the settings takes it away and back')
+    await change(pg, "s.db.pets[0].species = 'Hund'")
+    await settings(pg)
+    check(
+        await pg.locator('#home .calsheet').count() == 0 and await pg.locator('#sheet [data-action=calendar]').count() == 0,
+        'no cat: no sheet and no switch',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+    ctx, pg, errors = await demo(browser, url, motion=True)
+    await idle(pg)
+    await pg.click('#home .calsheet')
+    flying = await pg.evaluate(
+        "[...document.querySelectorAll('#home .calsheet')].map(e => [e.matches('.torn'), e.querySelector('.cal-text').textContent])"
+    )
+    await idle(pg)
+    check(
+        len(flying) == 2
+        and flying[0][0]
+        and flying[1] == [False, await pg.evaluate(FACT, [False, 1])]
+        and await pg.locator('#home .calsheet').count() == 1,
+        f'the sheet torn off rises over the next one, already in place, and goes {flying}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn(en|t)\b')
 TEXTS = """[document.body.innerText, ...[...document.querySelectorAll('[placeholder], [aria-label], [title]')]
   .map(e => [e.placeholder, e.getAttribute('aria-label'), e.title].join(' '))].join('\\n').toLowerCase()"""
@@ -2879,6 +2955,7 @@ run_tests(
         'nicknames': test_nicknames,
         'birthday': test_birthday,
         'overview-lines': test_overview_lines,
+        'calendar': test_calendar,
         'local': test_local,
         'network': test_network,
         'scanning': test_scan,

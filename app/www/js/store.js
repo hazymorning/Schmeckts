@@ -24,6 +24,8 @@ const defaultPrefs = () => ({
   codes: {},
   exchange: {},
   photoStamps: {},
+  calendar: true,
+  torn: 0,
 });
 export const hooks = {changed() {}, saved() {}};
 
@@ -66,6 +68,8 @@ function tidyPrefs(p) {
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null;
   out.lookup = out.lookup === true;
   out.serverPhoto = out.serverPhoto !== false;
+  out.calendar = out.calendar !== false;
+  out.torn = Number.isInteger(out.torn) && out.torn > 0 ? out.torn : 0; // sheets torn off the cat calendar
   delete out.aiKey;
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {};

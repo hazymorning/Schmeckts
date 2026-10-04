@@ -1,11 +1,11 @@
-// The overview card (js/glance.js, views/overview.js). Usage: node --test tests/*.test.js
+// The overview card (js/glance.js, views/overview.js) and the cat calendar (views/facts.js). Usage: node --test tests/*.test.js
 process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {glance} from '../app/www/js/glance.js';
 import {nextMeal} from '../app/www/js/smart.js';
 import {addDays, dayNumber} from '../app/www/js/dates.js';
-import {fill, POOLS, sharesWord} from '../app/www/js/views/facts.js';
+import {datedOn, FACTS, factOn, fill, POOLS, sharesWord} from '../app/www/js/views/facts.js';
 
 // views/overview.js reaches for the page as it loads; in Node a stub answers every such call
 const stub = new Proxy(function () {}, {
@@ -284,4 +284,58 @@ test('the overview heading: whose day it is, a wording a day, the birthday and t
     [0, 1, 2, 3].map(i => headOf(pets, {}, T + i * DAY, 'later')).every(h => !/Mau|Felix|Kiwi/.test(h)),
     'more than two: the bunch, no list of names',
   );
+});
+
+test('the cat calendar: its ids in order, every text once, the months in shape', () => {
+  assert.deepEqual(
+    FACTS.map(f => f.id),
+    FACTS.map((_, i) => `k${String(i + 1).padStart(3, '0')}`),
+  );
+  assert.equal(new Set(FACTS.map(f => f.text)).size, FACTS.length);
+  for (const f of FACTS) assert.ok(!f.months || f.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12), f.id);
+});
+
+test('the cat calendar without a sheet torn off: no fact comes again before all others have had their turn, none out of its months, none bound to a day', () => {
+  const every = FACTS.filter(f => !f.day && !f.months).map(f => f.id),
+    last = new Map(),
+    shown = [];
+  for (let i = 0; i < 3 * 365; i++) {
+    const d = new Date(2026, 9, 4 + i, 12),
+      f = factOn(d);
+    assert.ok(!f.day && (!f.months || f.months.includes(d.getMonth() + 1)), `${f.id} on ${d.toDateString()}`);
+    if (last.has(f.id)) {
+      const since = new Set(shown.slice(last.get(f.id) + 1));
+      assert.ok(
+        every.every(id => id === f.id || since.has(id)),
+        `${f.id} again on ${d.toDateString()} before all others`,
+      );
+    }
+    last.set(f.id, shown.length);
+    shown.push(f.id);
+  }
+});
+
+test('the cat calendar: a fact bound to a day comes on that day, the clocks changing on the last Sunday of March and October', () => {
+  const on = (y, m, d) => datedOn(new Date(y, m - 1, d, 12))?.id ?? null;
+  assert.deepEqual(
+    [
+      on(2026, 8, 8),
+      on(2026, 2, 17),
+      on(2026, 3, 29),
+      on(2026, 10, 25),
+      on(2027, 3, 28),
+      on(2027, 10, 31),
+      on(2026, 12, 31),
+    ],
+    ['k139', 'k140', 'k141', 'k141', 'k141', 'k141', 'k145'],
+  );
+  assert.deepEqual([on(2026, 8, 7), on(2026, 10, 24), on(2027, 3, 29), on(2026, 10, 4)], [null, null, null, null]);
+});
+
+test('the cat calendar: a sheet torn off shows the next fact in season, the one tomorrow brings; each in turn before any comes again', () => {
+  const d = new Date(2026, 9, 14, 12),
+    open = FACTS.filter(f => !f.day && (!f.months || f.months.includes(10)));
+  assert.equal(factOn(d, 1), factOn(new Date(2026, 9, 15, 12)));
+  assert.equal(new Set(open.map((_, n) => factOn(d, n))).size, open.length);
+  assert.equal(factOn(d, open.length), factOn(d));
 });

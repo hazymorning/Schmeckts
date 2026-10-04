@@ -10,6 +10,7 @@ import {isConnected, status} from '../sync.js';
 import {feedSlots} from '../smart.js';
 import {petNames} from '../derive.js';
 import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} from './parts.js';
+import {hasCat} from './home.js';
 import {sheet} from '../ui/sheet.js';
 
 const THEMES = [
@@ -66,7 +67,11 @@ function overview() {
     ${group('Tiere', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Tier hinzufügen'), 'set-group')}
     ${group(
       'Darstellung',
-      labelRow('auto', 'Farbschema') + under(segmented('theme', THEMES, prefs.theme)),
+      labelRow('auto', 'Farbschema') +
+        under(segmented('theme', THEMES, prefs.theme)) +
+        (hasCat()
+          ? switchRow('calendar', 'cat', 'Katzenkalender', 'Ein Katzenfakt am Tag auf der Startseite', prefs.calendar)
+          : ''),
       'set-group',
     )}
     ${group(

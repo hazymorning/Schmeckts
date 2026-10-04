@@ -2,9 +2,10 @@ import {$, reduceMotion} from '../dom.js';
 import {settled} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, dayStart} from '../dates.js';
+import {haptic} from '../native.js';
 import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
-import {db, loadError, prefs, storageOK} from '../store.js';
+import {db, hideHint, loadError, prefs, savePrefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {
   calledNames,
@@ -42,6 +43,7 @@ import {
 import {renderMood} from './mood.js';
 import {overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
+import {datedOn, factOn} from './facts.js';
 
 export function update() {
   let done = false;
@@ -147,6 +149,7 @@ function homeHTML() {
     html +=
       newsHTML() +
       hintHTML(m) +
+      calsheetHTML() +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m);
   return html;
@@ -250,6 +253,42 @@ function newsHTML() {
   const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
   return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
+}
+
+// The cat calendar: a fact bound to the day on top, under it one fact a day, moved on by every sheet torn off
+export const hasCat = () => db.pets.some(p => p.species === 'Katze');
+const calendarOn = () => prefs.calendar && hasCat();
+const datedKey = now => 'blatt:' + dayKey(now); // in hiddenHints: the day's dated sheet is torn off
+function sheetFact(now) {
+  const dated = datedOn(now);
+  return dated && !prefs.hiddenHints.includes(datedKey(now)) ? dated : factOn(now, prefs.torn);
+}
+const short = (d, o) => d.toLocaleDateString('de-DE', o).replace('.', '');
+function calsheetHTML() {
+  if (!calendarOn()) return '';
+  const now = Date.now(),
+    d = new Date(now);
+  return `<aside class="calsheet" role="button" tabindex="0" aria-label="Nächster Katzenfakt" data-action="tear" style="view-transition-name:sec-cal">
+    <span class="cal-date">${short(d, {weekday: 'short'})} ${d.getDate()}. ${short(d, {month: 'short'})}</span><p class="cal-text">${sheetFact(now).text}</p></aside>`;
+}
+// the next fact is in place at once; the sheet torn off rises from it and fades
+export function tearSheet(el) {
+  const now = Date.now(),
+    old = el.cloneNode(true);
+  if (datedOn(now) && !prefs.hiddenHints.includes(datedKey(now))) hideHint(datedKey(now));
+  else {
+    prefs.torn++;
+    savePrefs();
+  }
+  haptic();
+  $('.cal-text', el).textContent = sheetFact(now).text;
+  if (reduceMotion.matches) return;
+  for (const a of ['data-action', 'role', 'tabindex', 'aria-label', 'style']) old.removeAttribute(a);
+  old.setAttribute('aria-hidden', 'true');
+  old.classList.add('torn');
+  old.style.width = el.offsetWidth + 'px';
+  el.before(old);
+  settled(old).then(() => old.remove());
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

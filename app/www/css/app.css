@@ -1807,14 +1807,49 @@ dialog.sheet::after {
   color: var(--on-accent);
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
+/* a sheet of a tear-off calendar, its top perforated; paper in the dark too, only dimmed. The text lines up with a
+   card's, the full width at 360px that every fact needs for two lines. */
+.calsheet {
+  position: relative;
+  display: block;
+  padding: var(--space-5) var(--space-3) var(--space-3h);
+  background: var(--paper);
+  color: var(--paper-ink);
+  border-radius: var(--radius-paper);
+  transform: rotate(-0.7deg);
+  box-shadow: var(--shadow-paper);
+  mask: radial-gradient(circle at 7px 0, transparent 3.2px, var(--opaque) 3.7px) 0 0 / 14px 100% repeat-x;
+}
+/* the mask would cut a ring outside away */
+.calsheet:focus-visible {
+  outline-offset: calc(-1 * var(--space-1));
+}
+.cal-date {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  font: var(--type-paper-date);
+  letter-spacing: var(--track-date);
+  text-transform: uppercase;
+  color: var(--paper-muted);
+}
+.cal-text {
+  margin: 0;
+  font: var(--type-paper);
+}
 
 /* == Views == */
 .brand {
   margin: 0;
   color: var(--ink);
 }
-.card + .card {
+/* the gap above the calendar sheet takes its tilt */
+.card + .card,
+.calsheet + .card {
   margin-top: var(--space-3h);
+}
+.calsheet {
+  margin: var(--space-4) var(--space-1h) 0;
 }
 .group + .group {
   margin-top: var(--space-3);
@@ -2480,6 +2515,12 @@ html.step-back::view-transition-new(page) {
 .pend.leaving {
   overflow: hidden;
   animation: leave var(--dur-step) var(--ease-in) both;
+}
+/* over the next sheet, already in place */
+.calsheet.torn {
+  position: absolute;
+  pointer-events: none;
+  animation: tearOff var(--dur-step) var(--ease-in) forwards;
 }
 .slider-thumb > .picked,
 .fab.filled {
