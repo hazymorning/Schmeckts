@@ -5,7 +5,7 @@ import {addDays, dayKey, dayStart} from '../dates.js';
 import {haptic} from '../native.js';
 import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
-import {db, hideHint, loadError, prefs, savePrefs, storageOK} from '../store.js';
+import {db, hideHint, loadError, prefs, savePrefs, storageOK, usedNews} from '../store.js';
 import {isConnected} from '../sync.js';
 import {
   calledNames,
@@ -249,7 +249,13 @@ function newsHTML() {
   const n = NEWS[0],
     [setting, offWhy] = n?.off || [],
     off = setting && !prefs[setting];
-  if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
+  if (
+    !n ||
+    prefs.hiddenHints.includes('neu:' + n.v) ||
+    db.pets.some(p => p.id.startsWith(DEMO)) ||
+    (n.cat && !calendarOn())
+  )
+    return '';
   const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
   return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
@@ -274,7 +280,8 @@ function calsheetHTML() {
 // the next fact is in place at once; the sheet torn off rises from it and fades
 export function tearSheet(el) {
   const now = Date.now(),
-    old = el.cloneNode(true);
+    old = el.cloneNode(true),
+    news = usedNews('calendar'); // its news card goes once the sheet is gone
   if (datedOn(now) && !prefs.hiddenHints.includes(datedKey(now))) hideHint(datedKey(now));
   else {
     prefs.torn++;
@@ -282,13 +289,16 @@ export function tearSheet(el) {
   }
   haptic();
   $('.cal-text', el).textContent = sheetFact(now).text;
-  if (reduceMotion.matches) return;
+  if (reduceMotion.matches) return news && update();
   for (const a of ['data-action', 'role', 'tabindex', 'aria-label', 'style']) old.removeAttribute(a);
   old.setAttribute('aria-hidden', 'true');
   old.classList.add('torn');
   old.style.width = el.offsetWidth + 'px';
   el.before(old);
-  settled(old).then(() => old.remove());
+  settled(old).then(() => {
+    old.remove();
+    if (news) update();
+  });
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

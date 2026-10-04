@@ -1268,7 +1268,9 @@ CARD = '[data-sec=news]'
 
 
 async def test_news(browser, url):
-    print('news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used')
+    print(
+        'news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used, the cat calendar’s only with a cat'
+    )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
     keys = await pg.evaluate(NEWS)
@@ -1283,9 +1285,6 @@ async def test_news(browser, url):
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
-    await tap(pg, f'{CARD} [data-action=open-evaluation]')
-    check(await pg.evaluate(LEVEL) == [True, 'evaluation', None, None], 'the card leads to where the novelty is')
-    await tap(pg, '#sheet [data-action=settings-back]')
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -1306,13 +1305,15 @@ async def test_news(browser, url):
     check(await pg.locator(CARD).count() == 0, 'only sample data: no news')
     await ctx.close()
 
+    dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}]}
+    ctx, pg, errors = await seeded(browser, url, {'db': dog}, native=True)
+    check(await pg.locator(CARD).count() == 0, 'no cat: no news of the cat calendar')
+    await ctx.close()
+
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
     shown = await pg.locator(CARD).count() == 1
-    await tap(pg, f'{CARD} [data-action=open-evaluation]')
-    await tap(pg, '#sheet [data-action=open-product]')
-    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
-    await idle(pg)
-    check(shown and await pg.locator(CARD).count() == 0, 'a variety’s card opened: the news has done its job')
+    await tap(pg, '#home .calsheet')
+    check(shown and await pg.locator(CARD).count() == 0, 'a sheet torn off: the news has done its job')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
