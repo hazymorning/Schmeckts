@@ -345,6 +345,22 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    ic: an icon before the title. */
 export const NEWS = [
   {
+    v: '0.31.0',
+    use: 'calendar',
+    cat: true,
+    ic: 'calendar',
+    title: 'Ein Blatt pro Tag',
+    say: 'Wie beim echten Abreißkalender hängt morgens noch das Blatt von gestern. Einmal antippen, und es fällt.',
+    why: 'Dafür reichen die Blätter jetzt das ganze Jahr.',
+  },
+  {
+    v: '0.31.0',
+    cat: false,
+    title: 'Zwei volle Zeilen',
+    say: 'Der Satz oben passt sich jetzt der Breite deines Handys an.',
+    why: 'So bleibt keine Zeile halb leer.',
+  },
+  {
     v: '0.30.0',
     use: 'calendar',
     cat: true,

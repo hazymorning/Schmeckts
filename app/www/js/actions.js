@@ -13,7 +13,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {tearSheet, update} from './views/home.js';
+import {tearSheet, turnSheet, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -430,6 +430,9 @@ const ACTIONS = {
   },
   tear(el) {
     tearSheet(el);
+  },
+  turn(el) {
+    turnSheet(el);
   },
   'feed-remind'() {
     haptic('select');

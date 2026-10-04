@@ -5,7 +5,7 @@ import {addDays, dayKey, dayStart} from '../dates.js';
 import {haptic} from '../native.js';
 import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
-import {db, hideHint, loadError, prefs, savePrefs, storageOK, usedNews} from '../store.js';
+import {db, loadError, prefs, savePrefs, storageOK, usedNews} from '../store.js';
 import {isConnected} from '../sync.js';
 import {
   calledNames,
@@ -43,7 +43,7 @@ import {
 import {renderMood} from './mood.js';
 import {overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
-import {catOf, datedOn, sheetOn, sheetText} from './facts.js';
+import {catOf, hangingDay, sheetOn, sheetText} from './facts.js';
 
 export function update() {
   let done = false;
@@ -129,6 +129,7 @@ export function renderHome() {
   renderMood();
   const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
   $('#home').innerHTML = homeHTML();
+  fitTexts();
   if (rail) $('#home .obs').scrollLeft = rail;
   $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
@@ -256,10 +257,52 @@ function newsHTML() {
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
-// The cat calendar: a sheet bound to the day on top, under it the weekday's, moved on by every sheet torn off
+/* The two texts at the top fill their two lines: each breaks as it does at 360px, set larger on a wider phone.
+   [its width at 360px, the smallest and largest size there, the largest at all] */
+const FIT = {'.overview p': [202, 14, 15.5, 17.5], '.cal-text': [288, 16, 22, 24]};
+let fitWidth = null; // the home page's width at the last fitting; null: not watched yet
+export function fitTexts() {
+  const home = $('#home');
+  if (fitWidth == null) {
+    // a frame later: fitting while the observer reports would resize what it watches
+    new ResizeObserver(() => requestAnimationFrame(() => home.clientWidth !== fitWidth && fitTexts())).observe(home);
+    document.fonts.addEventListener('loadingdone', fitTexts);
+  }
+  fitWidth = home.clientWidth;
+  for (const [sel, [width, min, max, most]] of Object.entries(FIT))
+    for (const el of home.querySelectorAll(sel)) {
+      const k = el.clientWidth / width;
+      if (k) fitTwoLines(el, Math.min(min * k, most), Math.min(max * k, most));
+    }
+}
+// the largest size from min to max at which el keeps to two lines, in eight halvings
+function fitTwoLines(el, min, max) {
+  const fits = px => {
+    el.style.fontSize = px + 'px';
+    return lines(el) <= 2;
+  };
+  if (fits(max)) return;
+  let lo = min,
+    hi = max;
+  for (let i = 0; i < 8; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  fits(lo);
+}
+// boxes less than half a line apart share one, also on the tilted calendar sheet
+function lines(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const tops = [...range.getClientRects()].map(r => r.top).sort((a, b) => a - b),
+    half = parseFloat(el.style.fontSize) / 2;
+  return tops.filter((top, i) => !i || top - tops[i - 1] > half).length;
+}
+
+// The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
-const datedKey = now => 'blatt:' + dayKey(now); // in hiddenHints: the day's dated sheet is torn off
 const STAMPS = {
   Katzenlogik: 'idea',
   'Stimmt’s?': 'question',
@@ -269,73 +312,72 @@ const STAMPS = {
   Sprache: 'speech',
 };
 const named = (d, part) => d.toLocaleDateString('de-DE', {[part]: 'long'});
-/* ask: a sheet with a back, a Stimmt’s?, still on its front, which the next tap turns over. The day is red on Sundays
-   and on days with a sheet of their own, as on a real tear-off calendar; the back's stamp is the verdict. */
-function calendar(now) {
-  const {sheet, format} = sheetOn(now, prefs.torn, prefs.hiddenHints.includes(datedKey(now))),
-    back = !!sheet.back && homeView.turned === sheet.id,
-    d = new Date(now),
-    red = !d.getDay() || !!datedOn(now),
-    stamp = back ? sheet.verdict : icon(format ? STAMPS[format] : 'star') + (format ?? 'Heute');
+/* A day's sheet, the day red on Sundays and on days with a sheet of their own, as on a real tear-off calendar. Today's
+   Stimmt’s? turns over on a tap, its back stamped with the verdict. */
+function face(date, hanging = false) {
+  const {sheet, format} = sheetOn(date),
+    back = !hanging && !!sheet.back && homeView.turned === sheet.id,
+    d = new Date(date),
+    stamp = hanging
+      ? icon('down') + 'Abreißen'
+      : back
+        ? sheet.verdict
+        : icon(format ? STAMPS[format] : 'star') + (format ?? 'Heute');
   return {
-    sheet,
-    format,
-    ask: !!sheet.back && !back,
-    html: `<div class="cal-head"><span class="cal-day${red ? ' red' : ''}">${d.getDate()}</span><span class="cal-dm"><span>${named(d, 'weekday')}</span><span>${named(d, 'month')}</span></span><span class="cal-stamp${back ? ' verdict' : ''}">${stamp}</span></div>
+    label: hanging ? 'Gestriges Blatt abreißen' : sheet.back ? (back ? 'Behauptung zeigen' : 'Auflösung zeigen') : '',
+    html: `<div class="cal-head"><span class="cal-day${!d.getDay() || !format ? ' red' : ''}">${d.getDate()}</span><span class="cal-dm"><span>${named(d, 'weekday')}</span><span>${named(d, 'month')}</span></span><span class="cal-stamp${back ? ' verdict' : ''}">${stamp}</span></div>
       <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
   };
 }
-const label = c => (c.ask ? 'Auflösung zeigen' : 'Nächstes Kalenderblatt');
+const tappable = (action, label) => ` role="button" tabindex="0" aria-label="${label}" data-action="${action}"`;
 // the pad thins out over the year: three sheets deep until April, two until August, then the last one
 function calsheetHTML() {
   if (!calendarOn()) return '';
   const now = Date.now(),
-    c = calendar(now);
-  return `<div class="calpad" data-left="${3 - Math.floor(new Date(now).getMonth() / 4)}" style="view-transition-name:sec-cal"><aside class="calsheet" role="button" tabindex="0" aria-label="${label(c)}" data-action="tear">${c.html}</aside></div>`;
-}
-function paint(el, c) {
-  el.innerHTML = c.html;
-  el.setAttribute('aria-label', label(c));
-}
-// a Stimmt’s? turns over first; then the next sheet is in place at once, the one torn off rises from it and fades
-export function tearSheet(el) {
-  const now = Date.now(),
-    c = calendar(now);
-  if (c.ask) return turnSheet(el, c.sheet);
-  const old = el.cloneNode(true),
-    news = usedNews('calendar'); // its news card goes once the sheet is gone
-  if (c.format) {
-    prefs.torn[c.format] = (prefs.torn[c.format] || 0) + 1;
+    today = dayKey(now);
+  // first seen, or ahead after the clock was put back: nothing hangs today
+  if (!prefs.sheetDay || prefs.sheetDay > today) {
+    prefs.sheetDay = today;
     savePrefs();
-  } else hideHint(datedKey(now));
-  haptic();
-  el.classList.remove('turning', 'turned'); // a turn still running ends with this sheet
-  paint(el, calendar(now));
-  if (reduceMotion.matches) return news && update();
-  for (const a of ['data-action', 'role', 'tabindex', 'aria-label']) old.removeAttribute(a);
-  old.setAttribute('aria-hidden', 'true');
-  old.classList.remove('turning', 'turned');
-  old.classList.add('torn');
-  old.style.width = el.offsetWidth + 'px';
-  el.before(old);
-  settled(old).then(() => {
-    old.remove();
-    if (news) update();
-  });
+  }
+  const day = hangingDay(prefs.sheetDay, now),
+    c = face(now),
+    old = day && face(day, true);
+  return `<div class="calpad" data-left="${3 - Math.floor(new Date(now).getMonth() / 4)}" style="view-transition-name:sec-cal"><aside class="calsheet"${c.label ? tappable('turn', c.label) : ''}${old ? ' inert' : ''}>${c.html}</aside>${old ? `<aside class="calsheet"${tappable('tear', old.label)}>${old.html}</aside>` : ''}</div>`;
 }
-// edge on, halfway through, the back takes the front's place and its verdict is stamped on
-function turnSheet(el, sheet) {
-  homeView.turned = sheet.id;
+// the sheet left hanging comes off at the perforation and falls over what lies below; today's is already in place
+export function tearSheet(el) {
+  prefs.sheetDay = dayKey(Date.now());
+  savePrefs();
+  usedNews('calendar');
   haptic();
-  if (reduceMotion.matches) return paint(el, calendar(Date.now()));
+  if (reduceMotion.matches) return update();
+  el.removeAttribute('data-action');
+  el.classList.add('torn');
+  el.parentElement.classList.add('tearing');
+  settled(el).then(update);
+}
+// today's Stimmt’s? turns over and back: edge on, halfway through, the other side takes its place
+export function turnSheet(el) {
+  if (el.matches('.turning, .turned')) return;
+  const {sheet} = sheetOn(Date.now());
+  homeView.turned = homeView.turned === sheet.id ? null : sheet.id;
+  haptic();
+  if (reduceMotion.matches) return paint(el);
   el.classList.add('turning');
   settled(el)
     .then(() => {
-      paint(el, calendar(Date.now()));
+      paint(el);
       el.classList.replace('turning', 'turned');
       return settled(el, true);
     })
     .then(() => el.classList.remove('turned'));
+}
+function paint(el) {
+  const c = face(Date.now());
+  el.innerHTML = c.html;
+  el.setAttribute('aria-label', c.label);
+  fitTexts();
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

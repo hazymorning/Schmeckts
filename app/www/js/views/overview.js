@@ -160,10 +160,7 @@ export function overviewHTML(m, noted = null) {
   const g = glance(db, ids, now),
     moment = momentOf(g, now),
     head = headOf(pets, g, now, moment),
-    said = sentenceOf(g, now, head)
-      .split(' | ')
-      .map(half => `<span>${half}</span>`)
-      .join(' ');
+    said = sentenceOf(g, now, head);
   // a party hat on a birthday, sleepy z's at night
   const party = g.birthday?.today,
     mood = party ? ' party' : SLEEP.has(moment) ? ' sleepy' : '',

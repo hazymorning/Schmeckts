@@ -1,162 +1,165 @@
 /* The overview card's sentences and the cat calendar's sheets. Pure data so the tests can check them; they also
    measure every text in the real card and on the real sheet. */
-import {DAY, dayNumber} from '../dates.js';
+import {DAY, dayKey, dayNumber} from '../dates.js';
 import {esc} from '../text.js';
 import {sexOf} from '../config.js';
 
 /* By pool: the moment of the day (momentOf() in views/overview.js), a moment after a meal was left, a birthday.
-   A sentence is two halves, „ | “ between them, each measured to fit one line of the card. [Katze] in front: only
-   where every pet shown is a cat. {time}, {span} and {pet} come bold; a sentence is only taken when the card knows
-   all it names, {age} the age, {Sie} and {sie} the sex of the one pet shown. */
+   One sentence, set in two full lines of the card. [Katze] in front: only where every pet shown is a cat. {time},
+   {span} and {pet} come bold; a sentence is only taken when the card knows all it names, {age} the age, {Sie} and
+   {sie} the sex of the one pet shown. */
 export const POOLS = {
   due: [
-    'Die Uhr sagt {meal}. | Der Bauch schon seit Stunden.',
-    'Das {meal} ist dran. | Die erste Reihe ist besetzt.',
-    'Es ist Zeit fürs {meal}. | Das wurde dir schon mitgeteilt.',
-    'Das {meal} ist fällig. | Die Blicke werden deutlicher.',
-    'Wer jetzt in die Küche geht, | hat sofort Begleitung.',
-    'Das {meal} ist dran. | Ein Wunder, dass du noch sitzt.',
-    'Zeit fürs {meal}. | Noch vor der nächsten Folge.',
-    '[Katze] Es ist so weit. | Dein Bein wurde informiert.',
-    '[Katze] Das {meal} ist fällig. | Es wird im Minutentakt miaut.',
-    '[Katze] Zeit fürs {meal}. | Napfkontrolle Nummer drei.',
-    '{Sie} sitzt schon am Napf | und tut, als wäre das Zufall.',
-    '{Sie} weiß genau, wie spät es ist. | Zeit fürs {meal}.',
+    'Die Uhr sagt {meal}, der Bauch sagt das schon länger.',
+    'Das {meal} ist dran, und die erste Reihe ist besetzt.',
+    'Es ist Zeit fürs {meal}. Das wurde dir bereits mitgeteilt.',
+    'Das {meal} ist fällig, und die Blicke werden deutlicher.',
+    'Wer jetzt in die Küche geht, bekommt sofort Begleitung.',
+    'Das {meal} ist dran. Ein Wunder, dass du da noch sitzt.',
+    'Zeit fürs {meal}, und zwar noch vor der nächsten Folge.',
+    '[Katze] Es ist so weit, dein Bein wurde bereits informiert.',
+    '[Katze] Das {meal} ist fällig, und es wird im Minutentakt miaut.',
+    '[Katze] Zeit fürs {meal}, es läuft Napfkontrolle Nummer drei.',
+    '{Sie} sitzt schon am Napf und tut, als wäre das Zufall.',
+    '{Sie} weiß genau, wie spät es ist, nämlich Zeit fürs {meal}.',
   ],
   dueFirst: [
-    'Heute gab’s noch nichts. | Das hat sich herumgesprochen.',
-    'Der Tag läuft schon eine Weile. | Nur der Napf noch nicht.',
-    'Der Napf ist noch unberührt, | aus Mangel an Inhalt.',
-    'Zeit fürs {meal}. | Heute gab’s ja noch nichts.',
-    'Noch nichts heute. | Das wird persönlich genommen.',
-    'Noch war niemand am Napf, | außer zum Nachgucken.',
-    '[Katze] Bisher gab’s nichts. | Der Ton wird vorwurfsvoll.',
-    '[Katze] Heute noch nichts im Napf. | Das wird laut besprochen.',
-    'Heute gab’s noch nichts, | und {sie} lässt es dich spüren.',
-    '{Sie} hat noch nichts bekommen | und weiß das ganz genau.',
+    'Heute gab’s noch nichts, und das hat sich herumgesprochen.',
+    'Der Tag läuft schon eine Weile, nur der Napf noch nicht.',
+    'Der Napf ist heute noch unberührt, aus Mangel an Inhalt.',
+    'Zeit fürs {meal}, denn heute gab’s ja noch gar nichts.',
+    'Noch nichts heute, und das wird hier persönlich genommen.',
+    'Heute war noch niemand am Napf, außer zum Nachgucken.',
+    '[Katze] Bisher gab’s nichts, und der Ton wird langsam vorwurfsvoll.',
+    '[Katze] Heute noch nichts im Napf. Das wird gerade laut besprochen.',
+    'Heute gab’s noch nichts, und {sie} lässt es dich spüren.',
+    '{Sie} hat heute noch nichts bekommen und weiß das genau.',
   ],
   fresh: [
-    'Gerade serviert. | Ob’s schmeckt, zeigt sich.',
-    'Der Napf ist voll. | Du bist jetzt abgemeldet.',
-    'Frisch serviert. | Die Begutachtung läuft.',
-    'Es gibt Futter. | Damit ist erst mal alles gesagt.',
-    'Das Futter steht. | Der Rest liegt nicht bei dir.',
-    '[Katze] Gerade serviert. | Erst wird nur gerochen.',
-    '[Katze] Frisch serviert. | Mal sehen, ob das gut genug ist.',
-    '{Sie} hat gerade zu tun. | Störungen bitte später.',
-    'Jetzt entscheidet {sie}, | ob das hier was taugt.',
+    'Gerade serviert, und ob’s schmeckt, zeigt sich gleich.',
+    'Der Napf ist voll, und für eine Weile bist du abgemeldet.',
+    'Frisch serviert, und die Begutachtung läuft. Bitte leise.',
+    'Es gibt Futter, und damit ist erst mal alles gesagt.',
+    'Das Futter steht. Der Rest liegt jetzt nicht mehr bei dir.',
+    '[Katze] Gerade serviert. Erst wird gerochen, gefressen später.',
+    '[Katze] Frisch serviert. Mal sehen, ob das hier gut genug ist.',
+    '{Sie} ist gerade beschäftigt, also bitte nicht stören.',
+    'Serviert. Jetzt entscheidet {sie}, ob das hier was taugt.',
   ],
   freshTreat: [
-    'Ein Snack zwischendurch, | aus reiner Höflichkeit.',
-    'Es gab einen Snack. | Der wievielte ist egal.',
-    'Ein Snack. | Gebettelt wurde natürlich nicht.',
-    'Manche Blicke überzeugen. | Daher der Snack.',
-    '[Katze] Die Snacktüte hat geraschelt. | Mehr braucht es nicht.',
+    'Ein Snack zwischendurch, rein aus Gründen der Höflichkeit.',
+    'Es gab einen Snack. Wie viele heute schon, bleibt geheim.',
+    'Ein Snack. Gebettelt wurde vorher selbstverständlich nicht.',
+    'Manche Blicke überzeugen eben, daher dieser Snack.',
+    '[Katze] Die Snacktüte hat geraschelt, und mehr braucht es nicht.',
   ],
   later: [
-    '{meal} gibt’s gegen {time}. | Bis dahin wird gedöst.',
-    'Gegen {time} gibt’s wieder was. | Fragen ist zwecklos, aber üblich.',
-    'Bis {time} ist Pause. | Der Bauch weiß davon nichts.',
-    'Gegen {time} gibt’s mehr. | Gewartet wird gern im Weg.',
-    'Gegen {time} gibt’s {meal}, | so sicher wie jeden Tag.',
-    'Bis {time} ist noch Zeit | für ein ordentliches Nickerchen.',
-    '[Katze] Gegen {time} gibt’s {meal}. | Bis dahin wird gestarrt.',
-    '[Katze] Pause bis {time}. | Bewacht wird trotzdem.',
-    '[Katze] Futter gibt’s gegen {time}. | Vorher gibt’s nur Theater.',
-    'Bis {time} hält {sie} durch, | mit Würde und Seufzern.',
-    'Gegen {time} gibt’s {meal}. | {Sie} weiß das längst.',
+    '{meal} gibt’s gegen {time}, bis dahin wird ausgiebig gedöst.',
+    'Gegen {time} gibt’s wieder was. Fragen ist zwecklos, aber üblich.',
+    'Bis {time} ist Pause, aber der Bauch weiß davon nichts.',
+    'Gegen {time} gibt’s mehr. Bis dahin wird im Weg gewartet.',
+    'Gegen {time} gibt’s {meal}, so zuverlässig wie jeden Tag.',
+    'Bis {time} ist noch Zeit für ein ordentliches Nickerchen.',
+    '[Katze] Gegen {time} gibt’s {meal}, bis dahin wird nur gestarrt.',
+    '[Katze] Bis {time} ist Pause. Der Napf wird trotzdem bewacht.',
+    '[Katze] Futter gibt’s gegen {time}, vorher gibt’s nur Theater.',
+    'Bis {time} hält {sie} noch durch, mit Würde und Seufzern.',
+    'Gegen {time} gibt’s {meal}, und {sie} weiß das längst.',
   ],
   morning: [
-    'Heute gab’s noch nichts, | aber gegen {time} ist es so weit.',
-    'Gefüttert wird heute ab {time}. | Darauf ist Verlass.',
-    'Vor {time} gibt’s nichts, | auch nicht für schöne Augen.',
-    '{meal} gibt’s gegen {time}. | Bis dahin heißt es durchhalten.',
-    '[Katze] Heute geht’s gegen {time} los. | Vorher wird nur laut erinnert.',
-    '[Katze] Vor {time} bleibt der Napf leer. | Gemaunzt wird trotzdem.',
-    'Gegen {time} gibt’s {meal}. | {Sie} zählt schon die Minuten.',
+    'Heute gab’s noch nichts, aber gegen {time} ist es so weit.',
+    'Gefüttert wird heute ab {time}, und darauf ist Verlass.',
+    'Vor {time} gibt’s nichts, auch nicht für schöne Augen.',
+    '{meal} gibt’s gegen {time}, bis dahin heißt es durchhalten.',
+    '[Katze] Heute geht’s gegen {time} los, vorher wird nur laut erinnert.',
+    '[Katze] Vor {time} bleibt der Napf leer. Gemaunzt wird trotzdem.',
+    'Gegen {time} gibt’s {meal}, {sie} zählt schon die Minuten.',
   ],
   done: [
-    'Mehr gibt’s heute nicht. | Fragen kostet aber nichts.',
-    'Für heute ist alles serviert. | Geprüft wird trotzdem noch.',
-    'Für heute ist alles gefressen, | oder zumindest alles serviert.',
-    'Feierabend am Napf. | Für alle, die das akzeptieren.',
-    'Heute gibt’s nichts mehr. | Da hilft auch kein Gucken.',
-    'Das war’s für heute. | Morgen gegen {time} weiter.',
-    'Alles serviert. | Der Rest ist Rahmenprogramm.',
-    '[Katze] Der Napf hat Feierabend. | Das Miauen hat Spätschicht.',
-    '[Katze] Heute kommt nichts mehr. | Auch nicht um vier Uhr früh.',
-    '[Katze] Für heute ist Schluss. | Die Katze sieht das noch anders.',
-    'Für heute ist Schluss. | {Sie} sieht das vermutlich anders.',
-    'Alles serviert. | {Sie} wird trotzdem nachsehen.',
+    'Mehr gibt’s heute nicht, aber fragen kostet ja nichts.',
+    'Für heute ist alles serviert. Geprüft wird trotzdem noch.',
+    'Für heute ist alles gefressen, oder zumindest alles serviert.',
+    'Feierabend am Napf, zumindest für alle, die das akzeptieren.',
+    'Heute gibt’s nichts mehr, da hilft auch kein Gucken.',
+    'Das war’s für heute, morgen gegen {time} geht’s weiter.',
+    'Alles ist serviert, der Rest des Tages ist Rahmenprogramm.',
+    '[Katze] Der Napf hat Feierabend, das Miauen hat noch Spätschicht.',
+    '[Katze] Heute kommt nichts mehr, auch nicht um vier Uhr früh.',
+    '[Katze] Für heute ist Schluss. Die Katze sieht das noch anders.',
+    'Für heute ist Schluss, {sie} sieht das vermutlich anders.',
+    'Alles serviert, aber {sie} wird trotzdem noch mal nachsehen.',
   ],
   night: [
-    'Es ist mitten in der Nacht. | Gefüttert wird ab {time}.',
-    'Um diese Uhrzeit gibt’s nichts. | Auch nicht auf Nachfrage.',
-    'Wer jetzt Hunger hat, | muss bis {time} durchhalten.',
-    'Der Napf schläft bis {time}. | Eigentlich wie alle hier.',
-    'Falls du gleich geweckt wirst: | Gefüttert wird erst ab {time}.',
-    '[Katze] Nachts gibt’s nichts. | Auch nicht auf deinem Gesicht.',
-    '[Katze] Gerade wird geschlafen. | Zumindest von dir.',
-    '[Katze] Futter gibt’s ab {time}. | Geweckt wird trotzdem vorher.',
-    '{Sie} schläft hoffentlich. | Gefüttert wird ab {time}.',
-    'Falls {sie} dich weckt: | Futter gibt’s erst ab {time}.',
+    'Es ist mitten in der Nacht, gefüttert wird erst ab {time}.',
+    'Um diese Uhrzeit gibt’s nichts, auch nicht auf Nachfrage.',
+    'Wer jetzt Hunger hat, muss leider bis {time} durchhalten.',
+    'Der Napf schläft bis {time}, so wie eigentlich alle hier.',
+    'Falls du gleich geweckt wirst: Gefüttert wird erst ab {time}.',
+    '[Katze] Nachts gibt’s nichts, auch nicht auf deinem Gesicht.',
+    '[Katze] Du schläfst. Der Rest der Wohnung geht auf die Jagd.',
+    '[Katze] Futter gibt’s ab {time}, geweckt wird aber trotzdem vorher.',
+    '{Sie} schläft hoffentlich noch, gefüttert wird erst ab {time}.',
+    'Falls {sie} dich gleich weckt: Futter gibt’s erst ab {time}.',
   ],
   today: [
-    'Hier wird gerade verdaut, | seit {span}.',
-    'Gefüttert wurde zuletzt | vor {span}.',
-    'Erst gefressen, dann gedöst. | Ein solider Tag.',
-    '[Katze] Gefressen, geputzt, geschlafen. | Das volle Programm.',
+    'Hier wird gerade in aller Ruhe verdaut, bitte nicht stören.',
+    'Zuletzt gab’s vor {span} was, seitdem ist Ruhe.',
+    'Erst gefressen, dann gedöst. Ein solider Tag bis hierhin.',
+    '[Katze] Gefressen, geputzt, geschlafen, also das volle Programm.',
   ],
   yesterday: [
-    'Heute ist noch alles offen, | vor allem der Napf.',
-    'Laut Tagebuch: noch nichts. | Hoffentlich irrt es sich.',
-    'Das Tagebuch wartet heute | geduldiger als der Rest.',
-    'Falls schon gefüttert wurde, | fehlt noch der Eintrag.',
+    'Heute ist noch alles offen, und vor allem der Napf.',
+    'Laut Tagebuch gab’s noch nichts, hoffentlich irrt es sich.',
+    'Das Tagebuch wartet heute deutlich geduldiger als der Rest.',
+    'Falls heute schon gefüttert wurde, fehlt noch der Eintrag.',
   ],
   lastNight: [
-    'Um diese Zeit gehört alles | dem Schlaf, nicht dem Napf.',
-    'Der Napf hat frei, | alle anderen hoffentlich auch.',
-    'Jetzt wird geschlafen. | Das Futter läuft nicht weg.',
-    'Der Napf bleibt jetzt leer, | egal wer gerade wach ist.',
-    '[Katze] Um diese Uhrzeit wird gejagt. | Hoffentlich nur Spielzeug.',
+    'Um diese Zeit gehört alles dem Schlaf und nicht dem Napf.',
+    'Der Napf hat frei, und alle anderen hoffentlich auch.',
+    'Jetzt wird geschlafen, das Futter läuft ja nicht weg.',
+    'Der Napf bleibt jetzt leer, egal wer gerade wach ist.',
+    '[Katze] Um diese Uhrzeit wird gejagt, hoffentlich nur Spielzeug.',
   ],
   older: [
-    'Hier war eine Weile Ruhe. | Schön, dass du wieder da bist.',
-    'Das Tagebuch hatte Pause, | der Napf hoffentlich nicht.',
-    'Eine Weile kein Eintrag. | Gefressen wurde trotzdem.',
-    'Lange nichts notiert. | Einfach weitermachen.',
+    'Hier war eine Weile Ruhe. Schön, dass du wieder da bist.',
+    'Das Tagebuch hatte eine Pause, der Napf hoffentlich nicht.',
+    'Eine Weile gab’s keinen Eintrag, gefressen wurde trotzdem.',
+    'Lange nichts notiert. Einfach mit dem nächsten Napf weiter.',
   ],
   none: [
-    'Das Tagebuch ist noch leer, | der Napf vermutlich auch.',
-    'Noch ist hier alles leer. | Mit dem ersten Napf geht’s los.',
-    'Alles ist bereit. | Es fehlt nur noch das Futter.',
-    'Fürs erste Kapitel | auf „Füttern“ tippen.',
+    'Das Tagebuch ist noch leer, der Napf vermutlich auch.',
+    'Noch ist hier alles leer. Mit dem ersten Napf geht’s los.',
+    'Alles ist bereit, jetzt fehlt eigentlich nur noch das Futter.',
+    'Für das erste Kapitel unten rechts auf „Füttern“ tippen.',
   ],
   leftDue: [
-    'Zeit fürs {meal}. | Vielleicht eine andere Sorte?',
-    'Neuer Versuch, neues Glück. | Der letzte war ja nichts.',
-    'Das {meal} ist fällig. | Das letzte vergessen wir.',
-    'Das {meal} ist dran. | Diesmal gern was anderes.',
+    'Zeit fürs {meal}. Vielleicht diesmal eine andere Sorte?',
+    'Neuer Versuch, neues Glück, der letzte war ja nichts.',
+    'Das {meal} ist fällig, und das letzte vergessen wir.',
+    'Das {meal} ist dran, und diesmal gern mal was anderes.',
   ],
   leftLater: [
-    'Gegen {time} wird neu probiert. | Gern mit mehr Begeisterung.',
-    'Bis {time} ist Zeit, | über die Sorte nachzudenken.',
+    'Gegen {time} wird neu probiert, gern mit mehr Begeisterung.',
+    'Bis {time} ist noch Zeit, über die Sorte nachzudenken.',
   ],
   leftDone: [
-    'Für heute ist Schluss. | Morgen gibt’s neue Chancen.',
-    'Was übrig blieb, | traf nicht den Geschmack.',
-    'Heute lief’s nicht rund. | Morgen wird neu probiert.',
+    'Für heute ist Schluss, und morgen gibt’s neue Chancen.',
+    'Was übrig blieb, traf wohl nicht ganz den Geschmack.',
+    'Heute lief’s nicht rund, morgen wird einfach neu probiert.',
   ],
-  leftToday: ['Die letzte Runde lief zäh. | Seitdem ist Ruhe.', 'Der Napf steht unbeachtet da, | seit {span}.'],
+  leftToday: [
+    'Die letzte Runde lief eher zäh, seitdem ist Ruhe am Napf.',
+    'Seit {span} steht der Napf eher unbeachtet da.',
+  ],
   birthdayToday: [
-    'Heute wird gefeiert, | der Napf darf voller sein.',
-    'Ein Jahr älter | und kein bisschen satter.',
-    'Alles Gute zum Ehrentag. | Heute darf es etwas mehr sein.',
-    'Das {age}. Jahr ist geschafft. | Darauf eine Extraportion.',
+    'Heute wird gefeiert, und der Napf darf etwas voller sein.',
+    'Ein Jahr älter und dabei kein bisschen satter geworden.',
+    'Alles Gute zum Ehrentag, heute darf es etwas mehr sein.',
+    'Das {age}. Jahr ist geschafft, darauf eine Extraportion.',
   ],
   birthdayTomorrow: [
-    'Morgen ist Geburtstag, | und {pet} ahnt noch nichts.',
-    'Noch einmal schlafen, | dann hat {pet} Geburtstag.',
+    'Morgen ist Geburtstag, und {pet} ahnt noch nichts.',
+    'Nur noch einmal schlafen, dann hat {pet} Geburtstag.',
   ],
 };
 
@@ -702,8 +705,8 @@ export function datedOn(date) {
 }
 
 /* The days of a format from START on take its sheets in turn; one out of season is skipped, so none comes twice
-   before the others have had their turn. torn: sheets torn off on this phone by format, each the next in season. */
-export function factOn(date, torn = {}) {
+   before the others have had their turn. */
+export function factOn(date) {
   const today = dayNumber(date),
     format = formatOf(today),
     order = ORDERS[format];
@@ -715,13 +718,19 @@ export function factOn(date, torn = {}) {
     if (day === today) break;
     at++;
   }
-  const open = order.filter(f => inSeason(f, monthOf(today)));
-  return open[(open.indexOf(order[at % order.length]) + (torn[format] || 0)) % open.length];
+  return order[at % order.length];
 }
-// the day's sheet: the one bound to it until torn off, then the weekday's; format is null for a dated one
-export function sheetOn(date, torn = {}, datedTorn = false) {
-  const dated = !datedTorn && datedOn(date);
-  return dated ? {sheet: dated, format: null} : {sheet: factOn(date, torn), format: formatOn(date)};
+// the day's sheet: the one bound to it, otherwise the weekday's; format is null for a dated one
+export function sheetOn(date) {
+  const dated = datedOn(date);
+  return dated ? {sheet: dated, format: null} : {sheet: factOn(date), format: formatOn(date)};
+}
+/* sheetDay: the day of the sheet on top, "YYYY-MM-DD". Before today it still hangs over today's sheet: the last one
+   seen, whatever came in between. Its noon, or null. */
+export function hangingDay(sheetDay, now) {
+  if (!sheetDay || sheetDay >= dayKey(now)) return null;
+  const [y, m, d] = sheetDay.split('-').map(Number);
+  return new Date(y, m - 1, d, 12).getTime();
 }
 
 // the household's only cat, if its sex is known: the variants and „dein Kater“ speak of it

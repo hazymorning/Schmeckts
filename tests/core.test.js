@@ -234,7 +234,7 @@ test('news: one per release with something to see, or one where the cat calendar
   }
   assert.ok(!versions.length || order(versions[0]) <= order(app), `${versions[0]} is not ahead of the app's ${app}`);
   assert.ok(
-    NEWS.every(n => n.title && n.say && n.use),
-    'each says what is new and how it counts as used',
+    NEWS.every(n => n.title && n.say),
+    'each says what is new',
   );
 });

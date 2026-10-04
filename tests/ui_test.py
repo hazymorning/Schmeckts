@@ -1340,17 +1340,17 @@ async def test_news(browser, url):
     await tap(pg, '[data-sec=evaluation] .picks button')
     await tap(pg, '#sheet [data-action=close]')
     check(
-        title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 0,
-        'no cat calendar: the news of its own, gone once a variety on the card is opened',
+        title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 1,
+        'no cat calendar: the news of its own, which has nothing to use and stays until hidden',
     )
     await ctx.close()
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
-    await pg.clock.set_fixed_time('2026-10-12T12:00:00+02:00')  # a Monday, whose sheet tears at the first tap
-    await pg.evaluate(REDRAW)
+    await pg.clock.set_fixed_time('2026-10-12T12:00:00+02:00')
+    await change(pg, "s.prefs.sheetDay = '2026-10-11'")  # yesterday's sheet hangs
     title = await pg.locator(f'{CARD} h2').all_inner_texts()
     pad = await pg.locator(f'{CARD} h2 .ic').count()
-    await tap(pg, '#home .calsheet')
+    await tap(pg, '#home .calsheet[data-action=tear]')
     check(
         title == [await pg.evaluate(NEWEST, True)] and pad == 1 and await pg.locator(CARD).count() == 0,
         'with the cat calendar its news, under the calendar’s icon, gone once a sheet is torn off',
@@ -1568,7 +1568,7 @@ async def test_sex(browser, url):
     await ctx.close()
 
 
-# What the overview card fills in, as it writes it; every half was measured with each of these
+# What the overview card fills in, as it writes it; every sentence was measured with each of these
 VALUES = {
     'meal': ['Frühstück', 'Mittagessen', 'Abendessen', 'Futter'],
     'time': ['<b>7 Uhr</b>', '<b>11:45</b>', '<b>18:30</b>'],
@@ -1578,9 +1578,33 @@ VALUES = {
     'Sie': ['Sie', 'Er'],
     'sie': ['sie', 'er'],
 }
-# each text in a span in the element, as many lines as the span has different tops
-LINES = """([sel, texts]) => { const p = document.querySelector(sel);
-  return texts.map(t => { p.innerHTML = `<span>${t}</span>`; return new Set([...p.firstChild.getClientRects()].map(r => Math.round(r.top))).size; }); }"""
+WIDTHS = (360, 375, 393, 412, 430)
+# The smallest size of the overview sentence and of the calendar text: the one at 360px, grown with the width they
+# have, never over the largest. [width at 360px, size there, largest]
+SMALLEST = {'.overview p': [202, 14, 17.5], '#home .cal-text': [288, 16, 24]}
+# the width of each line of a text in a span in p: the span's boxes, those less than half a line apart on one line
+LINE_WIDTHS = """const lineWidths = p => { const lines = [], half = parseFloat(getComputedStyle(p).fontSize) / 2;
+  for (const r of [...p.firstChild.getClientRects()].sort((a, b) => a.top - b.top)) {
+    const line = lines.at(-1);
+    if (line && r.top - line.top < half) [line.left, line.right] = [Math.min(line.left, r.left), Math.max(line.right, r.right)];
+    else lines.push({top: r.top, left: r.left, right: r.right});
+  }
+  return lines.map(l => l.right - l.left); };"""
+# each text in the element at its smallest size: the element's width and the width of each line
+AT_SMALLEST = (
+    """([sel, [at360, size, most], texts]) => { """
+    + LINE_WIDTHS
+    + """ const p = document.querySelector(sel);
+  p.style.fontSize = Math.min(size * p.clientWidth / at360, most) + 'px';
+  return [p.clientWidth, texts.map(t => { p.innerHTML = `<span>${t}</span>`; return lineWidths(p); })]; }"""
+)
+# each text fitted as the home page fits it: its lines and its size
+FITTED = (
+    """([sel, texts]) => import('./js/views/home.js').then(h => { """
+    + LINE_WIDTHS
+    + """ const p = document.querySelector(sel);
+  return texts.map(t => { p.innerHTML = `<span>${t}</span>`; h.fitTexts(); return [lineWidths(p).length, parseFloat(p.style.fontSize)]; }); })"""
+)
 
 
 def filled(template):
@@ -1593,36 +1617,37 @@ def filled(template):
 
 
 async def test_overview_lines(browser, url):
-    print('the overview card: every sentence in two lines, each half on one line from 360 to 430px, whatever it names')
+    print('the overview card: every sentence in two lines from 360 to 430px, whatever it names, the shorter one well filled, fitted never three')
     ctx, pg, errors = await demo(browser, url)
     await pg.evaluate('document.fonts.ready')
-    shown = await pg.eval_on_selector_all('.overview p > span', 'l => l.map(s => s.getClientRects().length)')
+    said = await pg.inner_html('.overview p')
     pools = await pg.evaluate("import('./js/views/facts.js').then(f => f.POOLS)")
-    halves = [
-        (pool, text)
-        for pool, sentences in pools.items()
-        for s in sentences
-        for half in s.removeprefix('[Katze] ').split(' | ')
-        for text in filled(half)
-    ]
-    off = []
-    for width in (360, 375, 393, 412, 430):
+    texts = [(pool, text) for pool, sentences in pools.items() for s in sentences for text in filled(s.removeprefix('[Katze] '))]
+    await pg.evaluate("document.querySelector('#home .calpad')?.remove()")  # fitted along, it would only cost time
+    off, short, three = [], [], []
+    for width in WIDTHS:
         await pg.set_viewport_size({'width': width, 'height': 860})
-        lines = await pg.evaluate(LINES, ['.overview p > span', [text for _, text in halves]])
-        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(halves, lines) if n != 1]
-    check(shown == [1, 1], f'the day’s sentence in two blocks {shown}')
-    check(len(halves) > 400 and not off, f'{len(halves)} halves on one line at every width {off[:5]}')
+        column, lines = await pg.evaluate(AT_SMALLEST, ['.overview p', SMALLEST['.overview p'], [t for _, t in texts]])
+        off += [f'{width}px {pool} {len(w)}: {t}' for (pool, t), w in zip(texts, lines) if len(w) != 2]
+        if width < 430:  # wider, the size stays at its largest and the lines fill a little less
+            short += [f'{width}px {pool} {min(w) / column:.0%}: {t}' for (pool, t), w in zip(texts, lines) if len(w) == 2 and min(w) < 0.65 * column]
+        fitted = await pg.evaluate(FITTED, ['.overview p', [t for _, t in texts]])
+        three += [f'{width}px {pool}: {t}' for (pool, t), (n, _) in zip(texts, fitted) if n > 2]
+    check('<span' not in said and '|' not in said, f'the day’s sentence in one piece {said}')
+    check(len(texts) > 300 and not off, f'{len(texts)} sentences in two lines at the smallest size, at every width {off[:5]}')
+    check(not short, f'the shorter line at least 65% as wide as the column up to 412px {short[:5]}')
+    check(not three, f'fitted, never three lines {three[:5]}')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
 
-SHEET = "document.querySelector('#home .calsheet .cal-text')?.textContent ?? null"
-# the sheet's head: day, weekday, month, stamp, whether the day is red and the stamp a verdict
-HEAD = """(h => [...[...h.querySelectorAll('.cal-day, .cal-dm > span, .cal-stamp')].map(e => e.textContent),
-  h.querySelector('.cal-day').matches('.red'), h.querySelector('.cal-stamp').matches('.verdict')])(document.querySelector('#home .cal-head'))"""
-LABEL = "document.querySelector('#home .calsheet').getAttribute('aria-label')"
-# the day's sheet in facts.js, the dated one or the weekday's after the sheets torn off
-FACT = """([dated, torn]) => import('./js/views/facts.js').then(f => dated ? f.datedOn(Date.now()) : f.factOn(Date.now(), torn))"""
+# each sheet in the pad, the one on top last: its text, its head (day, weekday, month, stamp, whether the day is red
+# and the stamp a verdict), its label and whether it lies out of reach under another
+SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => [s.querySelector('.cal-text').textContent,
+  [...[...s.querySelectorAll('.cal-day, .cal-dm > span, .cal-stamp')].map(e => e.textContent), s.querySelector('.cal-day').matches('.red'),
+    s.querySelector('.cal-stamp').matches('.verdict')], s.getAttribute('aria-label'), s.inert])"""
+# the sheet of a day in facts.js
+FACT = "when => import('./js/views/facts.js').then(f => f.sheetOn(new Date(when)).sheet)"
 # every text a sheet can show: front and back, the variants and „deine Katze“ for a cat of either sex
 SHEET_TEXTS = """import('./js/views/facts.js').then(f => { const cat = sex => ({name: 'Schnurrsula', species: 'Katze', sex});
   return [...new Set([...Object.values(f.FACTS).flat(), ...f.DATED].flatMap(s => [null, cat('f'), cat('m')]
@@ -1631,15 +1656,13 @@ SHEET_TEXTS = """import('./js/views/facts.js').then(f => { const cat = sex => ({
 WIDE_STAMPS = """() => import('./js/views/facts.js').then(f => { const h = document.querySelector('#home .cal-head'), [day, dm, stamp] = h.children,
     icon = stamp.querySelector('svg').outerHTML, verdicts = new Set(f.FACTS['Stimmt’s?'].map(s => s.verdict));
   [day.textContent, dm.children[0].textContent, dm.children[1].textContent] = ['28', 'Donnerstag', 'September'];
-  return [...Object.keys(f.FACTS).map(t => icon + t), icon + 'Heute', ...verdicts]
+  return [...Object.keys(f.FACTS).map(t => icon + t), icon + 'Heute', icon + 'Abreißen', ...verdicts]
     .filter(t => { stamp.innerHTML = t; return h.scrollWidth > h.clientWidth; }); })"""
+# the sizes of the overview's sentence and of the sheet's text
+SIZES = "[...document.querySelectorAll('.overview p, #home .cal-text')].map(e => parseFloat(e.style.fontSize))"
 # sheets in the pad, the one on top and the layers under it
 LAYERS = "(p => 1 + ['::before', '::after'].filter(x => getComputedStyle(p, x).display !== 'none').length)(document.querySelector('#home .calpad'))"
 REDRAW = "import('./js/views/home.js').then(h => h.renderHome())"
-
-
-async def sheet(pg):
-    return [await pg.evaluate(SHEET), await pg.evaluate(HEAD), await pg.evaluate(LABEL)]
 
 
 async def day_at(pg, when):
@@ -1649,77 +1672,120 @@ async def day_at(pg, when):
 
 async def test_calendar(browser, url):
     print(
-        'the cat calendar: under the overview, every text on two lines at most, a format a weekday, a dated sheet first, Stimmt’s? turned before torn'
+        'the cat calendar: under the overview, every text in two lines at most and larger on a wider phone, a format a weekday, a sheet a day,'
+        ' the last one seen hanging over today’s until torn off'
     )
-    ctx, pg, errors = await demo(browser, url, width=360, timezone_id='Europe/Berlin')
+    ctx = await phone(browser, width=360, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-09-28T12:00:00+02:00')  # a Monday, the calendar's first day on this phone
+    await tap(pg, '[data-action=demo]')
     await pg.evaluate('document.fonts.ready')
-    texts = await pg.evaluate(SHEET_TEXTS)
-    lines = await pg.evaluate(LINES, ['#home .cal-text', texts])
-    off = [t for t, n in zip(texts, lines) if n > 2]
-    check(len(texts) > 300 and not off, f'{len(texts)} texts, none over two lines at 360px {off[:3]}')
+    first = await pg.evaluate(SHEETS)
+    monday = await pg.evaluate(FACT, '2026-09-28T12:00:00+02:00')
+    await tap(pg, '#home .calsheet')
+    check(
+        first == [[monday['text'], ['28', 'Montag', 'September', 'Katzenlogik', False, False], None, False]]
+        and await pg.evaluate(SHEETS) == first
+        and await state(pg, 'prefs.sheetDay') == '2026-09-28',
+        f'first use: Monday’s Katzenlogik with its stamp, nothing hanging over it, a tap does nothing {first}',
+    )
+    order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calpad') ? 'cal' : e.dataset.sec || '')")
+    check(order.index('cal') == order.index('overview') + 1, f'right under the overview {order}')
     wide = await pg.evaluate(WIDE_STAMPS)
     check(not wide, f'the head on one line at 360px, with 28 Donnerstag September and every stamp {wide}')
+
+    texts = await pg.evaluate(SHEET_TEXTS)
+    await pg.evaluate("document.querySelector('#home .overview')?.remove()")  # fitted along, it would only cost time
+    off, three, sizes = [], [], {}
+    for width in WIDTHS:
+        await pg.set_viewport_size({'width': width, 'height': 860})
+        _, lines = await pg.evaluate(AT_SMALLEST, ['#home .cal-text', SMALLEST['#home .cal-text'], texts])
+        off += [f'{width}px {len(w)}: {t}' for t, w in zip(texts, lines) if len(w) > 2]
+        fitted = await pg.evaluate(FITTED, ['#home .cal-text', texts])
+        three += [f'{width}px: {t}' for t, (n, _) in zip(texts, fitted) if n > 2]
+        sizes[width] = [px for _, px in fitted]
+    smaller = [t for t, narrow, wide in zip(texts, sizes[360], sizes[412]) if wide <= narrow]
+    check(len(texts) > 300 and not off, f'{len(texts)} texts, none over two lines at the smallest size, at any width {off[:3]}')
+    check(not three, f'fitted, never three lines {three[:3]}')
+    check(not smaller, f'each set larger 412px wide than 360px wide {smaller[:3]}')
+    await pg.set_viewport_size({'width': 360, 'height': 860})
+    await pg.evaluate(REDRAW)
+    narrow = await pg.evaluate(SIZES)
+    await pg.set_viewport_size({'width': 412, 'height': 860})
+    await idle(pg)
+    wide = await pg.evaluate(SIZES)
+    await pg.set_viewport_size({'width': 360, 'height': 860})
+    await idle(pg)
+    check(
+        all(w > n for w, n in zip(wide, narrow)) and await pg.evaluate(SIZES) == narrow,
+        f'turned to a wider width and back, both texts are fitted again {narrow} {wide}',
+    )
+
+    await day_at(pg, '2026-09-29T08:00:00+02:00')  # Tuesday morning
+    morning = await pg.evaluate(SHEETS)
+    tuesday = await pg.evaluate(FACT, '2026-09-29T08:00:00+02:00')
+    await pg.click('#home .calsheet[data-action=tear]')
+    swapped = await pg.evaluate(SHEETS)
+    await idle(pg)
+    front = [tuesday['text'], ['29', 'Dienstag', 'September', 'Stimmt’s?', False, False], 'Auflösung zeigen', False]
+    check(
+        morning
+        == [
+            [*front[:3], True],
+            [monday['text'], ['28', 'Montag', 'September', 'Abreißen', False, False], 'Gestriges Blatt abreißen', False],
+        ],
+        f'a new day: yesterday’s sheet hangs over today’s as it was, its stamp saying to tear it off {morning}',
+    )
+    check(
+        swapped == [front] and await state(pg, 'prefs.sheetDay') == '2026-09-29',
+        f'a tap tears it off, at once under reduced motion, and marks the day {swapped}',
+    )
+    await pg.evaluate(REDRAW)
+    check(await pg.evaluate(SHEETS) == [front], 'the same day nothing hangs any more')
+    await tap(pg, '#home .calsheet')
+    answer = await pg.evaluate(SHEETS)
+    await pg.evaluate(REDRAW)
+    kept = await pg.evaluate(SHEETS)
+    await pg.focus('#home .calsheet')
+    await pg.keyboard.press('Enter')
+    await idle(pg)
+    check(
+        answer == [[tuesday['back'], ['29', 'Dienstag', 'September', tuesday['verdict'], False, True], 'Behauptung zeigen', False]]
+        and kept == answer
+        and await pg.evaluate(SHEETS) == [front],
+        f'today’s Stimmt’s? turns over to the verdict stamped above the answer, which stays, and back, by tap or Enter {answer}',
+    )
+
+    await day_at(pg, '2026-08-08T12:00:00+02:00')  # a Saturday with a sheet of its own, the clock put back
+    dated = await pg.evaluate(SHEETS)
+    own = await pg.evaluate(FACT, '2026-08-08T12:00:00+02:00')
+    await day_at(pg, '2026-08-11T12:00:00+02:00')  # three days later
+    away = await pg.evaluate(SHEETS)
+    await tap(pg, '#home .calsheet[data-action=tear]')
+    check(
+        dated == [[own['text'], ['8', 'Samstag', 'August', 'Heute', True, False], None, False]]
+        and away[1:] == [[own['text'], ['8', 'Samstag', 'August', 'Abreißen', True, False], 'Gestriges Blatt abreißen', False]]
+        and len(await pg.evaluate(SHEETS)) == 1
+        and await state(pg, "prefs.sheetDay === '2026-08-11' && !prefs.hiddenHints.some(k => k.startsWith('blatt:'))"),
+        f'a day with a sheet of its own is red and stamped „Heute“; days away, the last one seen hangs and the days between are gone {dated} {away}',
+    )
+    await day_at(pg, '2026-10-04T12:00:00+02:00')
+    sunday = (await pg.evaluate(SHEETS))[0][1]
+    check(sunday[:2] == ['4', 'Sonntag'] and sunday[4], f'red on Sundays {sunday}')
     layers = []
     for when in ('2026-01-13T12:00:00+01:00', '2026-04-28T12:00:00+02:00', '2026-05-12T12:00:00+02:00', '2026-09-01T12:00:00+02:00'):
         await day_at(pg, when)
         layers.append(await pg.evaluate(LAYERS))
     check(layers == [3, 3, 2, 1], f'the pad thins out over the year: three sheets deep until April, two until August, then one {layers}')
-    await day_at(pg, '2026-09-28T12:00:00+02:00')  # a Monday
-    order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calpad') ? 'cal' : e.dataset.sec || '')")
-    check(order.index('cal') == order.index('overview') + 1, f'right under the overview {order}')
-    first = await sheet(pg)
-    await tap(pg, '#home .calsheet')
-    torn = await pg.evaluate(SHEET)
-    await pg.focus('#home .calsheet')
-    await pg.keyboard.press('Enter')
-    await idle(pg)
-    check(
-        first[1] == ['28', 'Montag', 'September', 'Katzenlogik', False, False]
-        and first[2] == 'Nächstes Kalenderblatt'
-        and [first[0], torn, await pg.evaluate(SHEET), await state(pg, 'prefs.torn')]
-        == [*[(await pg.evaluate(FACT, [False, {'Katzenlogik': n}]))['text'] for n in range(3)], {'Katzenlogik': 2}],
-        f'Monday’s Katzenlogik with its stamp, a tap or Enter shows the next {first}',
-    )
-    await day_at(pg, '2026-09-29T12:00:00+02:00')
-    fact = await pg.evaluate(FACT, [False, {}])
-    front = await sheet(pg)
-    await tap(pg, '#home .calsheet')
-    await pg.evaluate(REDRAW)
-    answer = await sheet(pg)
-    turned = await state(pg, 'prefs.torn')
-    await tap(pg, '#home .calsheet')
-    check(
-        front == [fact['text'], ['29', 'Dienstag', 'September', 'Stimmt’s?', False, False], 'Auflösung zeigen']
-        and answer == [fact['back'], ['29', 'Dienstag', 'September', fact['verdict'], False, True], 'Nächstes Kalenderblatt']
-        and turned == {'Katzenlogik': 2}
-        and await sheet(pg) == [(await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}]))['text'], front[1], 'Auflösung zeigen']
-        and await state(pg, 'prefs.torn') == {'Katzenlogik': 2, 'Stimmt’s?': 1},
-        f'Tuesday’s Stimmt’s?: the first tap turns it over to the verdict stamped above the answer, which stays, the second tears it off {front} {answer}',
-    )
-    await day_at(pg, '2026-10-04T12:00:00+02:00')
-    sunday = await pg.evaluate(HEAD)
-    await day_at(pg, '2026-08-08T12:00:00+02:00')  # a Saturday
-    dated = await sheet(pg)
-    await tap(pg, '#home .calsheet')
-    check(
-        sunday[0] == '4'
-        and sunday[4]
-        and dated[0] == (await pg.evaluate(FACT, [True, {}]))['text']
-        and dated[1] == ['8', 'Samstag', 'August', 'Heute', True, False]
-        and await sheet(pg) == [(await pg.evaluate(FACT, [False, {}]))['text'], [*dated[1][:3], 'Sprache', True, False], 'Nächstes Kalenderblatt']
-        and await state(pg, "prefs.hiddenHints.includes('blatt:2026-08-08')"),
-        f'red on Sundays and on a day with a sheet of its own, which comes first, stamped „Heute“, under it the weekday’s {sunday} {dated}',
-    )
-    await pg.evaluate(REDRAW)
-    check(await pg.evaluate(SHEET) == (await pg.evaluate(FACT, [False, {}]))['text'], 'torn off, it stays off that day')
+
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')
     await back(pg)
-    off = await pg.locator('#home .calsheet').count()
+    off = await pg.locator('#home .calpad').count()
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')
     await back(pg)
-    check(off == 0 and await pg.locator('#home .calsheet').count() == 1, 'its switch in the settings takes it away and back')
+    check(off == 0 and await pg.locator('#home .calpad').count() == 1, 'its switch in the settings takes it away and back')
     await change(pg, "s.db.pets[0].species = 'Hund'")
     await settings(pg)
     check(
@@ -1729,30 +1795,44 @@ async def test_calendar(browser, url):
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
-    ctx, pg, errors = await demo(browser, url, motion=True)
-    await day_at(pg, '2026-09-29T12:00:00+02:00')  # a Tuesday
-    await idle(pg)
-    fact = await pg.evaluate(FACT, [False, {}])
+    ctx, pg, errors = await seeded(browser, url, {'db': SAVED, 'prefs': {'torn': 3}})
+    check(
+        await pg.locator('#home .calsheet').count() == 1 and await state(pg, "!('torn' in prefs)") and not real_errors(errors),
+        'a count of sheets torn off, as 0.28 kept it, does no harm and goes',
+    )
+    await ctx.close()
+
+    ctx = await phone(browser, motion=True, timezone_id='Europe/Berlin')
+    pg, errors = await open_page(ctx, url)
+    await pg.clock.set_fixed_time('2026-09-29T12:00:00+02:00')  # a Tuesday
+    await tap(pg, '[data-action=demo]')
+    fact = await pg.evaluate(FACT, '2026-09-29T12:00:00+02:00')
     await pg.click('#home .calsheet')
     moving = await pg.evaluate("document.querySelector('#home .calsheet').getAnimations().length")
     await pg.wait_for_selector('#home .calsheet.turned')
     stamped = await pg.evaluate("document.querySelector('#home .verdict').getAnimations().map(a => a.animationName)")
     await idle(pg)
     check(
-        moving and stamped == ['stamp'] and await pg.evaluate(SHEET) == fact['back'],
+        moving and stamped == ['stamp'] and (await pg.evaluate(SHEETS))[0][0] == fact['back'],
         f'Stimmt’s? turns over, its verdict is pressed on, then its answer shows {stamped}',
     )
-    await pg.click('#home .calsheet')
-    flying = await pg.evaluate(
-        "[...document.querySelectorAll('#home .calsheet')].map(e => [e.matches('.torn'), e.querySelector('.cal-text').textContent])"
-    )
+    await day_at(pg, '2026-09-30T12:00:00+02:00')
     await idle(pg)
+    await pg.click('#home .calsheet[data-action=tear]')
+    # stopped two thirds through: up to then it mostly tilts off the perforation, the ease-in drop comes after
+    await pg.evaluate("document.querySelector('#home .calsheet.torn').getAnimations().forEach(a => { a.pause(); a.currentTime = 300; })")
+    card = await pg.evaluate(
+        "(r => ({x: r.x + 24, y: r.y, width: r.width - 48, height: 60}))(document.querySelector('#home .calpad + *').getBoundingClientRect())"
+    )  # the card's opaque top, clear of its round corners: a sheet behind it would not show there
+    over = await pg.screenshot(clip=card)
+    await pg.evaluate("document.querySelector('#home .calsheet.torn').style.visibility = 'hidden'")
+    bare = await pg.screenshot(clip=card)
+    await pg.evaluate("(s => { s.style.visibility = ''; s.getAnimations().forEach(a => a.play()); })(document.querySelector('#home .calsheet.torn'))")
+    await idle(pg)
+    check(over != bare, 'the sheet torn off falls over the card below, not behind it')
     check(
-        len(flying) == 2
-        and flying[0][0]
-        and flying[1] == [False, (await pg.evaluate(FACT, [False, {'Stimmt’s?': 1}]))['text']]
-        and await pg.locator('#home .calsheet').count() == 1,
-        f'the sheet torn off rises over the next one, already in place, and goes {flying}',
+        len(await pg.evaluate(SHEETS)) == 1 and await state(pg, 'prefs.sheetDay') == '2026-09-30',
+        'once it has fallen, today’s sheet is left',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
