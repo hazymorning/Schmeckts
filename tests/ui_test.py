@@ -1263,13 +1263,15 @@ async def test_reminder_buttons(browser, url):
     await ctx.close()
 
 
-NEWS = "import('./js/config.js').then(c => c.NEWS.map(n => 'neu:' + n.v))"
+NEWS = "import('./js/config.js').then(c => [...new Set(c.NEWS.map(n => 'neu:' + n.v))])"
+# the newest release's title for a household where the cat calendar shows, or does not
+NEWEST = "cat => import('./js/config.js').then(c => c.NEWS.find(n => n.v === c.NEWS[0].v && (n.cat ?? cat) === cat).title)"
 CARD = '[data-sec=news]'
 
 
 async def test_news(browser, url):
     print(
-        'news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used, the cat calendar’s only with a cat'
+        'news after an update: never on a new phone or with sample data, hidden for good, gone once the novelty is used, the one that fits the household'
     )
     ctx = await phone(browser)
     pg, errors = await open_page(ctx, url, native=True)
@@ -1307,13 +1309,25 @@ async def test_news(browser, url):
 
     dog = {**SAVED, 'pets': [{**SAVED['pets'][0], 'species': 'Hund'}]}
     ctx, pg, errors = await seeded(browser, url, {'db': dog}, native=True)
-    check(await pg.locator(CARD).count() == 0, 'no cat: no news of the cat calendar')
+    title = await pg.locator(f'{CARD} h2').all_inner_texts()
+    await tap(pg, f'{CARD} .btn.primary')
+    await tap(pg, '#sheet [data-action=set-sex][data-v=m]')
+    await tap(pg, '[data-action=save-pet]')
+    check(
+        title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 0,
+        'no cat calendar: the news of its own, into the pet editor, gone once a sex is saved',
+    )
     await ctx.close()
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
-    shown = await pg.locator(CARD).count() == 1
+    await pg.clock.set_fixed_time('2026-10-12T12:00:00+02:00')  # a Monday, whose sheet tears at the first tap
+    await pg.evaluate(REDRAW)
+    title = await pg.locator(f'{CARD} h2').all_inner_texts()
     await tap(pg, '#home .calsheet')
-    check(shown and await pg.locator(CARD).count() == 0, 'a sheet torn off: the news has done its job')
+    check(
+        title == [await pg.evaluate(NEWEST, True)] and await pg.locator(CARD).count() == 0,
+        'with the cat calendar its news, gone once a sheet is torn off',
+    )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 

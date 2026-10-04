@@ -341,8 +341,25 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
    it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
-   „Vorlieben“. cat: only where the cat calendar shows. */
+   „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
 export const NEWS = [
+  {
+    v: '0.29.0',
+    use: 'calendar',
+    cat: true,
+    title: 'Der Katzenkalender hat jetzt Wochentage',
+    say: 'Montags Katzenlogik, dienstags Stimmt’s?, freitags ein Flachwitz, dazwischen Kurioses, Wissen und Sprache.',
+    why: 'Bei Stimmt’s? dreht das erste Antippen das Blatt um.',
+  },
+  {
+    v: '0.29.0',
+    use: 'sex',
+    cat: false,
+    title: 'Neu: das Geschlecht im Tierprofil',
+    say: 'Mit Angabe sagt die App auch mal sie oder er.',
+    why: 'Ohne Angabe bleibt alles wie bisher.',
+    go: ['pet', 'Eintragen'],
+  },
   {
     v: '0.28.0',
     use: 'calendar',
