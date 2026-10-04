@@ -81,9 +81,9 @@ server.
 | `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
 | `pets[].sex` | `f` `m`, absent | female, male, not given |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
-| `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung`, `neu:<version>`, `blatt:<YYYY-MM-DD>` | hints hidden on this phone; `tipp:beobachtung`: the first observation Vorlieben weighs said what it is for; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`); `blatt:` the cat calendar's fact bound to that day torn off |
+| `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung`, `neu:<version>` | hints hidden on this phone; `tipp:beobachtung`: the first observation Vorlieben weighs said what it is for; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`) |
 | `prefs.milestones` | `meals:100`, `sorts:10` | milestones already shown |
-| `prefs.torn` | `Katzenlogik` `Stimmt’s?` `Kurios` `Wissen` `Flachwitz` `Sprache` | cat calendar sheets torn off on this phone, a count per format; a number from 0.28 counts for `Wissen` |
+| `prefs.sheetDay` | `<YYYY-MM-DD>` | the day of the cat calendar's top sheet on this phone; before today it still hangs over today's until torn off. Set on first sight; `prefs.torn` from 0.28 to 0.30 is dropped |
 | reminder buttons | `actionTypeId` `rate:<key>[,<key>]`, `extra.pet`, `extra.rate`; a button's id is its rating key | Android keeps them with a pending „Wie war’s?“ across updates |
 | exchange file `kind` | `exchange` | written by „Änderungen teilen“ |
 

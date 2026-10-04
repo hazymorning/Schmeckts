@@ -1636,9 +1636,7 @@ dialog.sheet::after {
 .overview p {
   margin: 0;
   font: var(--type-small);
-}
-.overview p > span {
-  display: block;
+  text-wrap: balance;
 }
 .pet-label {
   display: flex;
@@ -1867,10 +1865,14 @@ dialog.sheet::after {
 }
 /* The tear-off calendar: a pad that thins out over the year, its top sheet perforated, on night paper in the dark. The
    layers under the sheet hang on the pad, since the sheet's mask cuts away everything outside it. The text lines up
-   with a card's, the full width at 360px that every text needs for two lines. */
+   with a card's. A sheet left hanging lies on today's, both as tall as the taller one. */
 .calpad {
   position: relative;
+  display: grid;
   rotate: -0.7deg;
+}
+.calpad > .calsheet {
+  grid-area: 1 / 1;
 }
 .calpad::before,
 .calpad::after {
@@ -1956,11 +1958,12 @@ dialog.sheet::after {
 .cal-stamp.verdict {
   color: var(--paper-red);
 }
-/* never under two lines, so tearing off and turning over do not jump */
+/* never under two lines of its own size */
 .cal-text {
   min-height: 2lh;
   margin: 0;
   font: var(--type-paper);
+  text-wrap: balance;
 }
 
 /* == Views == */
@@ -2600,11 +2603,21 @@ html.step-back::view-transition-new(page) {
   overflow: hidden;
   animation: leave var(--dur-step) var(--ease-in) both;
 }
-/* over the next sheet, already in place */
+/* fitted size by size in one go, so each applies at once, also under reduced motion's short transitions */
+.overview p,
+.overview p *,
+.cal-text,
+.cal-text * {
+  transition: none;
+}
+/* off at the perforation and down over the cards below; today's sheet is already in place */
+.calpad.tearing {
+  z-index: var(--z-fall);
+}
 .calsheet.torn {
-  position: absolute;
   pointer-events: none;
-  animation: tearOff var(--dur-step) var(--ease-in) forwards;
+  transform-origin: 85% 0;
+  animation: tearOff calc(1.5 * var(--dur-step)) var(--ease-in) forwards;
 }
 .calsheet.turning {
   animation: turnAway calc(var(--dur-step) / 2) var(--ease-in) forwards;

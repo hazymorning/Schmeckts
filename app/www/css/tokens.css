@@ -99,6 +99,7 @@
   /* Dialogs sit in the top layer and take no z-index */
   --z-raise: 1; /* within one component */
   --z-sticky: 2;
+  --z-fall: 2; /* the calendar sheet torn off, over the cards below and what they raise */
   --z-bar: 3;
   --z-edge: 3; /* the home page's fading foot, under the feeding button */
   --z-fab: 4;
@@ -345,9 +346,15 @@
   }
 }
 @keyframes tearOff {
-  to {
+  0% {
+    transform: rotate(-0.7deg);
+  }
+  18% {
+    transform: translateY(3px) rotate(-2.5deg);
+  }
+  100% {
+    transform: translate(-18px, 120%) rotate(-11deg);
     opacity: 0;
-    transform: translateY(-50%) rotate(-5deg);
   }
 }
 /* the calendar sheet turning over, edge on in between */

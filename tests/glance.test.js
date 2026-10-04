@@ -13,6 +13,7 @@ import {
   factOn,
   fill,
   formatOn,
+  hangingDay,
   POOLS,
   sharesWord,
   sheetOn,
@@ -328,9 +329,9 @@ test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is kno
   }
 });
 
-test('a sentence is two halves; one marked [Katze] only where every pet shown is a cat', () => {
+test('a sentence in one piece; one marked [Katze] only where every pet shown is a cat', () => {
   for (const [pool, list] of Object.entries(POOLS))
-    for (const x of list) assert.match(x, /^(\[Katze\] )?[^|[\]]*\S \| \S[^|[\]]*$/, pool);
+    for (const x of list) assert.match(x, /^(\[Katze\] )?[^|[\]]+$/, pool);
   replaceDb(structuredClone(HOME));
   const kitty = {id: 'A', species: 'Katze'},
     tom = {id: 'B', species: 'Katze'},
@@ -401,24 +402,23 @@ test('the cat calendar: on the days of a format its sheets in turn, the same all
   }
 });
 
-test('the cat calendar: a sheet torn off shows the next of its format, the one the format’s next day brings, and leaves the other formats alone', () => {
-  const mon = new Date(2026, 9, 12, 12),
-    tue = new Date(2026, 9, 13, 12),
-    thu = new Date(2026, 9, 15, 12);
-  assert.equal(factOn(mon, {Katzenlogik: 1}), factOn(new Date(2026, 9, 19, 12)));
-  assert.equal(factOn(thu, {Wissen: 1}), factOn(new Date(2026, 9, 18, 12)), 'Thursday, then Sunday');
-  assert.equal(factOn(tue, {Katzenlogik: 5, Wissen: 2}), factOn(tue));
-  for (const [format, d] of [
-    ['Katzenlogik', mon],
-    ['Wissen', thu],
-  ]) {
-    const open = FACTS[format].filter(f => !f.months || f.months.includes(10));
-    assert.equal(new Set(open.map((_, n) => factOn(d, {[format]: n}))).size, open.length, format);
-    assert.equal(factOn(d, {[format]: open.length}), factOn(d), format);
-  }
+test('the cat calendar: a sheet a day; on a new day the last one seen hangs over today’s until torn off, none on first use', () => {
+  const now = new Date(2026, 9, 6, 7, 30),
+    yesterday = hangingDay('2026-10-05', now);
+  assert.deepEqual(
+    [hangingDay(null, now), hangingDay('2026-10-06', now), hangingDay('2026-10-07', now)],
+    [null, null, null],
+    'first use, torn off today, a day ahead: nothing hangs',
+  );
+  assert.deepEqual(
+    [new Date(yesterday).toDateString(), sheetOn(yesterday)],
+    [new Date(2026, 9, 5).toDateString(), sheetOn(new Date(2026, 9, 5, 21))],
+    'yesterday’s sheet, as it was all yesterday',
+  );
+  assert.equal(new Date(hangingDay('2026-10-01', now)).getDate(), 1, 'away for days: the last one seen');
 });
 
-test('the cat calendar: a sheet bound to a day comes first on that day, the clocks changing on the last Sunday of March and October; torn off, the weekday’s follows', () => {
+test('the cat calendar: a sheet bound to a day is that day’s, the clocks changing on the last Sunday of March and October', () => {
   const on = (y, m, d) => datedOn(new Date(y, m - 1, d, 12))?.id ?? null;
   assert.deepEqual(
     DATED.filter(f => typeof f.day === 'string').map(f => on(2026, ...f.day.split('-').map(Number))),
@@ -430,9 +430,10 @@ test('the cat calendar: a sheet bound to a day comes first on that day, the cloc
     [clocks, clocks, clocks, clocks],
   );
   assert.deepEqual([on(2026, 8, 7), on(2026, 10, 24), on(2027, 3, 29), on(2026, 10, 4)], [null, null, null, null]);
-  const sat = new Date(2026, 7, 8, 12);
-  assert.deepEqual(sheetOn(sat, {}), {sheet: datedOn(sat), format: null});
-  assert.deepEqual(sheetOn(sat, {Sprache: 1}, true), {sheet: factOn(sat, {Sprache: 1}), format: 'Sprache'});
+  const sat = new Date(2026, 7, 8, 12),
+    sun = new Date(2026, 7, 9, 12);
+  assert.deepEqual(sheetOn(sat), {sheet: datedOn(sat), format: null});
+  assert.deepEqual(sheetOn(sun), {sheet: factOn(sun), format: 'Wissen'});
 });
 
 test('the cat calendar speaks of the cat only where the household has one cat of known sex: its variant, its name, „dein Kater“', () => {
@@ -462,6 +463,6 @@ test('the cat calendar speaks of the cat only where the household has one cat of
       for (const back of f.back ? [false, true] : [false]) assert.ok(!/[{}]/.test(sheetText(f, c, back)), f.id);
 });
 
-test('the sheets torn off, which 0.28 counted as one number, count for Wissen', () => {
-  assert.deepEqual(prefs.torn, {Wissen: 3});
+test('the sheets torn off, which 0.28 counted, are forgotten', () => {
+  assert.ok(!('torn' in prefs) && prefs.sheetDay === null);
 });

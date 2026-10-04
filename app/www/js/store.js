@@ -25,7 +25,7 @@ const defaultPrefs = () => ({
   exchange: {},
   photoStamps: {},
   calendar: true,
-  torn: {},
+  sheetDay: null,
 });
 export const hooks = {changed() {}, saved() {}};
 
@@ -64,16 +64,13 @@ function tidyPrefs(p) {
   delete out.backdrop;
   delete out.closedWeek;
   delete out.overview;
+  delete out.torn;
   // null: never set
   out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null;
   out.lookup = out.lookup === true;
   out.serverPhoto = out.serverPhoto !== false;
   out.calendar = out.calendar !== false;
-  // sheets torn off the cat calendar by format; 0.28 kept one number, for facts that are mostly Wissen now
-  const torn = Number.isInteger(out.torn) ? {Wissen: out.torn} : out.torn;
-  out.torn = Object.fromEntries(
-    Object.entries(torn && typeof torn === 'object' ? torn : {}).filter(([, n]) => Number.isInteger(n) && n > 0),
-  );
+  out.sheetDay = /^\d{4}-\d{2}-\d{2}$/.test(out.sheetDay) ? out.sheetDay : null;
   delete out.aiKey;
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};
   out.exchange = out.exchange && typeof out.exchange === 'object' ? out.exchange : {};
