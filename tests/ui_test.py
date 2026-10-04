@@ -1541,12 +1541,11 @@ async def test_sex(browser, url):
     await ctx.close()
 
 
-# What the overview card fills in, as it writes it; every sentence was measured with each of these
+# What the overview card fills in, as it writes it; every half was measured with each of these
 VALUES = {
     'meal': ['Frühstück', 'Mittagessen', 'Abendessen', 'Futter'],
     'time': ['<b>7 Uhr</b>', '<b>11:45</b>', '<b>18:30</b>'],
     'span': ['<b>45 Minuten</b>', '<b>eineinhalb Stunden</b>', '<b>zweieinhalb Stunden</b>', '<b>10 Stunden</b>'],
-    'since': ['vorgestern', 'vor 6 Tagen', 'am 30. September'],
     'pet': ['<b>Mau</b>', '<b>Prinzessin</b>'],
     'age': ['3', '12'],
     'Sie': ['Sie', 'Er'],
@@ -1567,17 +1566,25 @@ def filled(template):
 
 
 async def test_overview_lines(browser, url):
-    print('the overview card: every sentence of every pool on exactly two lines from 360 to 430px, whatever it names')
+    print('the overview card: every sentence in two lines, each half on one line from 360 to 430px, whatever it names')
     ctx, pg, errors = await demo(browser, url)
     await pg.evaluate('document.fonts.ready')
+    shown = await pg.eval_on_selector_all('.overview p > span', 'l => l.map(s => s.getClientRects().length)')
     pools = await pg.evaluate("import('./js/views/facts.js').then(f => f.POOLS)")
-    texts = [(pool, text) for pool, sentences in pools.items() for s in sentences for text in filled(s)]
+    halves = [
+        (pool, text)
+        for pool, sentences in pools.items()
+        for s in sentences
+        for half in s.removeprefix('[Katze] ').split(' | ')
+        for text in filled(half)
+    ]
     off = []
     for width in (360, 375, 393, 412, 430):
         await pg.set_viewport_size({'width': width, 'height': 860})
-        lines = await pg.evaluate(LINES, ['.overview p', [text for _, text in texts]])
-        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(texts, lines) if n != 2]
-    check(len(texts) > 200 and not off, f'{len(texts)} sentences on two lines at every width {off[:5]}')
+        lines = await pg.evaluate(LINES, ['.overview p > span', [text for _, text in halves]])
+        off += [f'{width}px {pool} {n}: {text}' for (pool, text), n in zip(halves, lines) if n != 1]
+    check(shown == [1, 1], f'the day’s sentence in two blocks {shown}')
+    check(len(halves) > 400 and not off, f'{len(halves)} halves on one line at every width {off[:5]}')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 

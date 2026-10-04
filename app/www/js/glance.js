@@ -27,7 +27,7 @@ function nextBirthday(db, shown, now) {
 }
 
 /* last: the newest serving of the pets shown up to now. left: it is a meal one of them left; a treat is no meal.
-   next: the next usual meal. sex: of the one pet shown, if known. */
+   next: the next usual meal. sex: of the one pet shown, if known. cats: every pet shown is a cat. */
 export function glance(db, pets, now) {
   const shown = new Set(pets),
     last = db.servings.find(s => s.servedAt <= now && Object.keys(s.pets || {}).some(id => shown.has(id))) || null,
@@ -38,5 +38,6 @@ export function glance(db, pets, now) {
     birthday: nextBirthday(db, shown, now),
     next: nextMeal(db, now, pets),
     sex: pets.length === 1 ? sexOf(db.pets.find(p => p.id === pets[0])) : null,
+    cats: db.pets.filter(p => shown.has(p.id)).every(p => p.species === 'Katze'),
   };
 }

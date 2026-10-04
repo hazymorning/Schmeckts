@@ -1,5 +1,5 @@
-/* Home page overview card: whose day it is, then one sentence on where the day stands for the bowl. Of how a meal
-   went only a hint when the last one was left; never what the cards below already show. */
+/* Home page overview card: whose day it is, then one sentence on where the day stands for the bowl, in two lines.
+   Of how a meal went only a hint when the last one was left; never what the cards below already show. */
 import {esc} from '../text.js';
 import {addDays, dayNumber, dayStart, quarterStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
@@ -8,7 +8,7 @@ import {db} from '../store.js';
 import {calledNames, getObservation, getPet, getProduct} from '../derive.js';
 import {glance} from '../glance.js';
 import {fill, POOLS, sharesWord} from './facts.js';
-import {avatar, since} from './parts.js';
+import {avatar} from './parts.js';
 
 const FRESH = 60; // minutes a meal counts as news
 const NIGHT = 5; // night lasts until this hour
@@ -70,15 +70,19 @@ export function valuesOf(g, now) {
   const {last, next, birthday, sex} = g;
   return {
     ...(next && {meal: mealAt(next.at), time: b(clock(next.at))}),
-    ...(last && {since: since(last.servedAt, now), span: b(spanOf(Math.round((now - last.servedAt) / 6e4)))}),
+    ...(last && {span: b(spanOf(Math.round((now - last.servedAt) / 6e4)))}),
     ...(birthday && {pet: b(esc(calledNames([birthday.pet], 'line', now))), age: birthday.age}),
     ...(sex && (sex === 'f' ? {Sie: 'Sie', sie: 'sie'} : {Sie: 'Er', sie: 'er'})),
   };
 }
+const CAT = '[Katze] ';
 // the day's sentence, the same all day, or the next in its pool where it repeats a word of the heading
 export function sentenceOf(g, now, head) {
   const values = valuesOf(g, now),
-    list = POOLS[poolOf(g, now)].filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, key]) => values[key] != null)),
+    list = POOLS[poolOf(g, now)]
+      .filter(t => g.cats || !t.startsWith(CAT))
+      .map(t => t.replace(CAT, ''))
+      .filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, key]) => values[key] != null)),
     day = dayNumber(now),
     said = list.map((_, i) => fill(list[(day + i) % list.length], values));
   return said.find(t => !sharesWord(head, t)) ?? said[0];
@@ -155,7 +159,11 @@ export function overviewHTML(m, noted = null) {
     ids = pets.map(p => p.id);
   const g = glance(db, ids, now),
     moment = momentOf(g, now),
-    head = headOf(pets, g, now, moment);
+    head = headOf(pets, g, now, moment),
+    said = sentenceOf(g, now, head)
+      .split(' | ')
+      .map(half => `<span>${half}</span>`)
+      .join(' ');
   // a party hat on a birthday, sleepy z's at night
   const party = g.birthday?.today,
     mood = party ? ' party' : SLEEP.has(moment) ? ' sleepy' : '',
@@ -168,6 +176,6 @@ export function overviewHTML(m, noted = null) {
           .join('')}${hat}</span>`,
     just = noted && getObservation(noted)?.kind;
   return `<section class="card overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
-    <div class="ov-top">${pic}<div class="ov-text"><h2>${head}</h2><p>${sentenceOf(g, now, head)}</p></div></div>
+    <div class="ov-top">${pic}<div class="ov-text"><h2>${head}</h2><p>${said}</p></div></div>
     ${observeRail(just)}</section>`;
 }

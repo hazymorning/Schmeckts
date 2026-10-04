@@ -243,7 +243,7 @@ test('the overview sentence: a meal left takes its own pool where there is one, 
 
   const [g, now] = STATES.dueFirst,
     head = 'Minkas Tag',
-    list = POOLS.dueFirst.filter(x => !/\{sie\}/i.test(x)).map(x => fill(x, valuesOf(g, now)));
+    list = POOLS.dueFirst.filter(x => !/\{sie\}|\[Katze\]/i.test(x)).map(x => fill(x, valuesOf(g, now)));
   assert.ok(list.some(s => sharesWord(head, s)) && list.some(s => !sharesWord(head, s)));
   for (let i = 0; i < list.length; i++) {
     const on = addDays(now, i),
@@ -325,6 +325,32 @@ test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is kno
     assert.ok(!month(null).some(said => as('Sie', 'sie').includes(said) || as('Er', 'er').includes(said)), pool);
     assert.ok(!named.length || month('f').some(said => as('Sie', 'sie').includes(said)), `${pool}: she`);
     assert.ok(!named.length || month('m').some(said => as('Er', 'er').includes(said)), `${pool}: he`);
+  }
+});
+
+test('a sentence is two halves; one marked [Katze] only where every pet shown is a cat', () => {
+  for (const [pool, list] of Object.entries(POOLS))
+    for (const x of list) assert.match(x, /^(\[Katze\] )?[^|[\]]*\S \| \S[^|[\]]*$/, pool);
+  replaceDb(structuredClone(HOME));
+  const kitty = {id: 'A', species: 'Katze'},
+    tom = {id: 'B', species: 'Katze'},
+    dog = {id: 'C', species: 'Hund'},
+    shown = (pets, ids) => glance({...household(['nass'], []), pets}, ids, NOW).cats;
+  assert.deepEqual(
+    [
+      shown([kitty], ['A']),
+      shown([kitty, tom], ['A', 'B']),
+      shown([kitty, dog], ['A', 'C']),
+      shown([kitty, dog], ['A']),
+    ],
+    [true, true, false, true],
+  );
+  for (const [pool, [g, now]] of Object.entries(STATES)) {
+    const marked = POOLS[pool].filter(x => x.startsWith('[Katze] ')).map(x => fill(x.slice(8), valuesOf(g, now))),
+      next = i => ({...g, last: g.last && {...g.last, servedAt: addDays(g.last.servedAt, i)}}),
+      month = cats => [...Array(31).keys()].map(i => sentenceOf({...next(i), cats}, addDays(now, i), ''));
+    assert.ok(!month(false).some(said => marked.includes(said) || said.includes('[')), pool);
+    assert.ok(!marked.length || month(true).some(said => marked.includes(said)), `${pool}: cats`);
   }
 });
 
