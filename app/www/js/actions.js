@@ -187,6 +187,7 @@ const ACTIONS = {
     openSheet(reportState(el.dataset.v || null));
   },
   'open-evaluation'() {
+    if (usedNews('evaluation')) update();
     openSheet({kind: 'evaluation'});
   },
   // the shopping list's folds start closed each time

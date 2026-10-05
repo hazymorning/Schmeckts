@@ -5,19 +5,15 @@ import {PENDING_WINDOW, TYPES, typeOf} from './config.js';
 import {
   analyze,
   basis,
-  feederGap,
-  habits,
+  insights,
   moves,
   nextUp,
-  novelty,
   observed,
-  patterns,
-  profile,
   ranking,
   shopGroups,
+  slowStarters,
   tally,
   trend,
-  variety as change,
 } from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
 
@@ -89,32 +85,19 @@ function refresh(now) {
 }
 export const model = () =>
   cached('model', [prefs.activePet, prefs.hiddenHints.join()], now => analyze(db, prefs, now, sums));
-export const profileModel = () => cached('profile', [prefs.activePet], () => profile(model()));
-// the card shows the first two, so the order matters; asked for lazily since change() reads every meal
-export const habitsModel = () =>
-  cached('habits', [prefs.activePet], () => {
-    const m = model(),
-      eaten = habits(m),
-      of = kind => eaten.filter(h => h.kind === kind);
-    return [...of('sosse'), ...change(m), ...novelty(m), ...of('eager')];
-  });
 // the home card needs only the ranking; the rest waits until the page opens
 export const rankingModel = () => cached('ranking', [prefs.activePet], now => ranking(model(), now));
 export const evaluationModel = () =>
   cached('evaluation', [prefs.activePet], now => {
     const m = model(),
       r = rankingModel(),
-      last = lastServed(),
-      slow = novelty(m)
-        .filter(h => h.kind === 'anlauf')
-        .map(h => h.pet);
+      last = lastServed();
     return {
       moves: moves(m, now, r),
       trend: trend(db, m, now),
-      patterns: patterns(profileModel()),
-      next: nextUp(m, now, r, last, slow),
+      insights: insights(db, m, now),
+      next: nextUp(m, now, r, last, slowStarters(m)),
       observed: observed(db, m.pets, now),
-      feeder: feederGap(db, m, now),
       basis: basis(m, r),
       last,
     };

@@ -1021,8 +1021,8 @@ dialog.sheet::after {
   margin-left: calc(-1 * var(--space-2));
 }
 /* Scrolls sideways edge to edge in its card, so a chip slides under the card's rim like on a shelf; the padding keeps
-   the ends in line with the card's text. While there is more to the right, it fades out there, so a chip cut off
-   there does not look broken; a rail that does not scroll has no timeline and no fade. */
+   the ends in line with the card's text. It fades out where a chip is cut off, so none looks broken: at the left once
+   scrolled, at the right while there is more. A rail that does not scroll has no timeline and no fade. */
 .rail {
   display: flex;
   gap: var(--space-2);
@@ -1033,10 +1033,22 @@ dialog.sheet::after {
   scroll-snap-type: x mandatory;
   scroll-padding-inline: var(--gutter);
   scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(to left, transparent, var(--opaque) var(--rail-fade));
-  mask-image: linear-gradient(to left, transparent, var(--opaque) var(--rail-fade));
-  animation: railEnd linear both;
+  --rail-mask: linear-gradient(
+    to right,
+    transparent,
+    var(--opaque) var(--rail-start),
+    var(--opaque) calc(100% - var(--rail-end)),
+    transparent
+  );
+  -webkit-mask-image: var(--rail-mask);
+  mask-image: var(--rail-mask);
+  animation:
+    railStart linear both,
+    railEnd linear both;
   animation-timeline: scroll(self inline);
+  animation-range:
+    0 var(--space-7),
+    calc(100% - var(--space-7)) 100%;
 }
 .rail::-webkit-scrollbar {
   display: none;
@@ -1273,11 +1285,12 @@ dialog.sheet::after {
   width: var(--pic-xl);
   height: var(--pic-xl);
 }
+/* at the top of its card, under the card's own corners */
 .thumb.pack {
   width: 100%;
   height: auto;
-  aspect-ratio: 3 / 2;
-  border-radius: var(--radius-m);
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
   font: var(--type-title);
 }
 /* a chip in its tone: plain like any chip, the icon coloured */
@@ -1327,7 +1340,7 @@ dialog.sheet::after {
   border-radius: var(--radius-l);
 }
 .photo-btn:has(> .pack) {
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
 }
 .photo-btn[aria-busy="true"] {
   opacity: var(--busy);
@@ -1803,13 +1816,13 @@ dialog.sheet::after {
   flex: none;
 }
 
-/* the Leibgericht's crown and the Ladenhüter's bowl on the corner of its packaging */
+/* the best Top's crown and the worst Flop's bowl, out on the corner of its packaging so it hides at most the edge */
 .medal {
   position: absolute;
-  right: calc(-1 * var(--space-1));
-  bottom: calc(-1 * var(--space-1));
-  width: var(--pic-xs);
-  height: var(--pic-xs);
+  right: calc(-1 * var(--space-2h));
+  bottom: calc(-1 * var(--space-2h));
+  width: var(--pic-badge);
+  height: var(--pic-badge);
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1818,18 +1831,16 @@ dialog.sheet::after {
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
 .medal .ic {
-  width: 75%;
-  height: 75%;
+  width: var(--icon-xs);
+  height: var(--icon-xs);
 }
-/* a side of the „Vorlieben“ card: its name in small capitals and its tone, a fine line on to the edge */
+/* a side of the „Vorlieben“ card: its name in its tone, a fine line on to the edge */
 .side {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin: var(--space-2) 0 0;
-  font: var(--type-caption-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  font: var(--type-small-strong);
   color: var(--c);
 }
 .side::after {
@@ -1850,10 +1861,10 @@ dialog.sheet::after {
 }
 .place {
   position: absolute;
-  top: calc(-1 * var(--space-1));
-  left: calc(-1 * var(--space-1));
-  min-width: var(--pic-xs);
-  height: var(--pic-xs);
+  top: calc(-1 * var(--space-2h));
+  left: calc(-1 * var(--space-2h));
+  min-width: var(--pic-badge);
+  height: var(--pic-badge);
   display: grid;
   place-items: center;
   border-radius: var(--radius-full);
@@ -1869,7 +1880,6 @@ dialog.sheet::after {
 .calpad {
   position: relative;
   display: grid;
-  rotate: -0.7deg;
 }
 .calpad > .calsheet {
   grid-area: 1 / 1;
@@ -1912,7 +1922,7 @@ dialog.sheet::after {
 .calsheet:focus-visible {
   outline-offset: calc(-1 * var(--space-1));
 }
-/* the day large, beside it the weekday over the month, the format's stamp at the end */
+/* the weekday over the date, its day large, the format's stamp at the end */
 .cal-head {
   display: flex;
   align-items: center;
@@ -1920,21 +1930,25 @@ dialog.sheet::after {
   padding-top: var(--space-1h);
   margin-bottom: var(--space-1);
 }
+.cal-date {
+  display: grid;
+  white-space: nowrap;
+}
+.cal-wd {
+  font: var(--type-paper-date);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--paper-muted);
+}
 .cal-day {
-  min-width: 1.1ch;
+  font: var(--type-paper);
+}
+.cal-day b {
   font: var(--type-paper-day);
   letter-spacing: var(--track-title);
 }
 .cal-day.red {
   color: var(--paper-red);
-}
-.cal-dm {
-  display: grid;
-  font: var(--type-paper-date);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--paper-muted);
 }
 .cal-stamp {
   display: inline-flex;
@@ -1949,7 +1963,6 @@ dialog.sheet::after {
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   white-space: nowrap;
-  rotate: -3deg;
 }
 .cal-stamp .ic {
   width: var(--icon-xs);
@@ -1971,13 +1984,12 @@ dialog.sheet::after {
   margin: 0;
   color: var(--ink);
 }
-/* the gap above the calendar takes its tilt, the one below its layers */
 .card + .card,
 .calpad + .card {
   margin-top: var(--space-3h);
 }
 .calpad {
-  margin: var(--space-4) var(--space-1h) 0;
+  margin: var(--space-3h) var(--space-1h) 0;
 }
 .group + .group {
   margin-top: var(--space-3);
@@ -2077,7 +2089,6 @@ dialog.sheet::after {
   margin: var(--space-hair) 0 0;
 }
 .shop .t-main small,
-.likes .t-main small,
 .verdict-pet .t-main small,
 .tl-item .t-main small,
 .picks .t-main small {
@@ -2319,9 +2330,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
 }
-/* a trading card: the packaging large, the values two by two between lines */
+/* a trading card: the packaging across its full width, the values two by two between lines */
 .quartet > :first-child {
-  margin-top: var(--space-3);
+  width: calc(100% + 2 * var(--space-4));
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-4)) 0;
 }
 .quartet .stats {
   display: grid;
@@ -2602,13 +2614,6 @@ html.step-back::view-transition-new(page) {
 .pend.leaving {
   overflow: hidden;
   animation: leave var(--dur-step) var(--ease-in) both;
-}
-/* fitted size by size in one go, so each applies at once, also under reduced motion's short transitions */
-.overview p,
-.overview p *,
-.cal-text,
-.cal-text * {
-  transition: none;
 }
 /* off at the perforation and down over the cards below; today's sheet is already in place */
 .calpad.tearing {

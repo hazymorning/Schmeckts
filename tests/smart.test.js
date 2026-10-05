@@ -6,31 +6,36 @@ import {
   analyze,
   basis,
   feedReminders,
-  feederGap,
   feedSlots,
-  habits,
   hintKey,
+  insights,
   likingOf,
   milestones,
   moves,
   nextUp,
   mealsBefore,
-  novelty,
   observed,
   observedAfter,
-  patterns,
-  profile,
   quickRatings,
   ranking,
   rateCls,
   ratingsIn,
   shopGroups,
   sideOf,
+  slowStarters,
   swings,
   trend,
-  variety,
 } from '../app/www/js/smart.js';
 import {flavoursOf, RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
+
+// views/evaluation.js words the insights and reaches for the page as it loads; in Node a stub answers every such call
+const stub = new Proxy(function () {}, {
+  get: (_, k) => (k === 'then' ? undefined : k === Symbol.toPrimitive ? () => '' : stub),
+  apply: () => stub,
+});
+Object.assign(globalThis, {window: globalThis, document: stub, matchMedia: stub, addEventListener: () => {}});
+globalThis.localStorage = {getItem: () => null, setItem: () => {}, removeItem: () => {}};
+const {insightSaid} = await import('../app/www/js/views/evaluation.js');
 
 const DAY = 864e5,
   NOW = Date.UTC(2026, 5, 3, 10);
@@ -387,177 +392,6 @@ test('feeding times: from 14 days, treats excluded, from 4 days on; reminder 45 
   assert.deepEqual(feedSlots(household(['A'], ['nass'], meals.slice(0, 6)), now), []);
 });
 
-/* The profile as [dimension, type, [[group, good, of], …] best first, clear] */
-const profiled = (db, prefs) =>
-  profile(model(db, prefs)).map(d => [d.kind, d.type, d.groups.map(g => [g.key, g.good, g.n]), d.clear]);
-const FOUR = [
-  {id: 'a', brand: 'Sheba', variety: 'Lachs in Soße'},
-  {id: 'b', brand: 'Sheba', variety: 'Huhn in Soße'},
-  {id: 'c', brand: 'Felix', variety: 'Lachs in Gelee'},
-  {id: 'd', brand: 'Felix', variety: 'Huhn in Gelee'},
-];
-
-test('profile: every dimension with two groups of two varieties rated twice, ranked, and clear where far apart', () => {
-  const db = household(['A'], FOUR, [
-    ...rate('a', 'A', [T, T]),
-    ...rate('b', 'A', [T, G]),
-    ...rate('c', 'A', [X, X]),
-    ...rate('d', 'A', [S, X]),
-  ]);
-  assert.deepEqual(
-    profiled(db),
-    [
-      [
-        'konsistenz',
-        'Nassfutter',
-        [
-          ['In Soße', 4, 4],
-          ['In Gelee', 0, 4],
-        ],
-        true,
-      ],
-      [
-        'geschmack',
-        'Nassfutter',
-        [
-          ['Huhn', 2, 4],
-          ['Lachs', 2, 4],
-        ],
-        false,
-      ],
-      [
-        'marke',
-        'Nassfutter',
-        [
-          ['Sheba', 4, 4],
-          ['Felix', 0, 4],
-        ],
-        true,
-      ],
-    ],
-    'a fixed order of dimensions, each shown on its own; level groups are not clear, and they rank by name',
-  );
-  assert.deepEqual(
-    profiled(household(['A'], [FOUR[0], FOUR[2]], [...rate('a', 'A', [T, T]), ...rate('c', 'A', [X, X])])),
-    [],
-    'one variety a group: that is a verdict, not a profile',
-  );
-  assert.deepEqual(
-    profiled(
-      household(['A'], FOUR, [
-        ...rate('a', 'A', [T]),
-        ...rate('b', 'A', [T, G]),
-        ...rate('c', 'A', [X, X]),
-        ...rate('d', 'A', [S, X]),
-      ]),
-    ),
-    [],
-    'a variety rated once does not count, so every group it is in is too small',
-  );
-  const carried = profiled(
-    household(['A'], FOUR, [
-      ...rate('a', 'A', [T, T, T, T]),
-      ...rate('b', 'A', [X, X]),
-      ...rate('c', 'A', [X, X]),
-      ...rate('d', 'A', [G, X]),
-    ]),
-  )[0];
-  assert.deepEqual(
-    carried,
-    [
-      'konsistenz',
-      'Nassfutter',
-      [
-        ['In Soße', 4, 6],
-        ['In Gelee', 1, 4],
-      ],
-      false,
-    ],
-    'far enough apart on the whole, but a sauce variety left behind a jelly one: ranked, and not clear',
-  );
-});
-
-test('profile: within one food type, with the pet filter, and every group’s ratings oldest first', () => {
-  const sort = (id, brand, type) => ({id, brand, variety: 'Huhn', type});
-  const dry = household(
-    ['A', 'B'],
-    [
-      sort('t1', 'Felix', 'Trockenfutter'),
-      sort('t2', 'Felix', 'Trockenfutter'),
-      sort('t3', 'Josera', 'Trockenfutter'),
-      sort('t4', 'Josera', 'Trockenfutter'),
-      sort('n1', 'Sheba', 'Nassfutter'),
-    ],
-    [
-      ['t1', {A: 'liegen'}, 9],
-      ['t1', {A: 'wenig'}, 8],
-      ['t2', {A: 'liegen'}, 7],
-      ['t2', {A: 'normal'}, 6],
-      ['t3', {A: 'gern', B: 'liegen'}, 5],
-      ['t3', {A: 'gern', B: 'liegen'}, 4],
-      ['t4', {A: 'normal', B: 'liegen'}, 3],
-      ['t4', {A: 'gern', B: 'wenig'}, 2],
-      ['n1', {A: 'top'}, 1],
-      ['n1', {A: 'top'}, 1],
-    ],
-  );
-  assert.deepEqual(profiled(dry, {activePet: 'A'}), [
-    [
-      'marke',
-      'Trockenfutter',
-      [
-        ['Josera', 4, 4],
-        ['Felix', 1, 4],
-      ],
-      true,
-    ],
-  ]);
-  assert.deepEqual(
-    profiled(dry),
-    [
-      [
-        'marke',
-        'Trockenfutter',
-        [
-          ['Josera', 4, 8],
-          ['Felix', 1, 4],
-        ],
-        false,
-      ],
-    ],
-    'the whole household: Tiger left Josera, so it is no longer clear; the wet food variety stands alone',
-  );
-  const minka = model(dry, {activePet: 'A'});
-  assert.deepEqual(
-    profile(minka)[0].groups.map(g => ratingsIn(minka, g.ids)),
-    [
-      {keys: ['gern', 'gern', 'normal', 'gern'], more: false},
-      {keys: ['liegen', 'wenig', 'liegen', 'normal'], more: false},
-    ],
-    'the ratings of a group oldest first, only those within the filter',
-  );
-});
-
-test('profile: comparisons within one food type only', () => {
-  const sort = (id, brand, type) => ({id, brand, variety: 'Huhn', type});
-  const mixed = household(
-    ['A'],
-    [
-      sort('n1', 'Sheba', 'Nassfutter'),
-      sort('n2', 'Sheba', 'Nassfutter'),
-      sort('t1', 'Felix', 'Trockenfutter'),
-      sort('t2', 'Felix', 'Trockenfutter'),
-    ],
-    [
-      ...rate('n1', 'A', [T, T]),
-      ...rate('n2', 'A', [T, T]),
-      ...rate('t1', 'A', ['liegen', 'liegen']),
-      ...rate('t2', 'A', ['liegen', 'liegen']),
-    ],
-  );
-  assert.deepEqual(profiled(mixed), [], 'a brand of wet food and one of dry food are no comparison');
-});
-
 test('flavours: every group a name holds, matched at the start of a word, the general fish only without a particular one', () => {
   const cases = {
     'Seelachs in Soße': ['Fisch'],
@@ -575,7 +409,73 @@ test('flavours: every group a name holds, matched at the start of a word, the ge
   for (const [text, want] of Object.entries(cases)) assert.deepEqual(flavoursOf(text), want, text);
 });
 
-test('profile by flavour: a variety naming two flavours counts in both groups, and the comparison is never clear through it', () => {
+/* Erkenntnisse as the page words them, strongest first: [kind, sentence, counts] without markup */
+const learned = (db, prefs, now = NOW) =>
+  insights(db, model(db, prefs, now), now).map(x => [
+    x.kind,
+    ...insightSaid(x)
+      .slice(1)
+      .map(t => t.replace(/<[^>]*>/g, '')),
+  ]);
+const learnedOf = (kind, db, prefs) =>
+  learned(db, prefs)
+    .filter(x => x[0] === kind)
+    .map(x => x.slice(1));
+const FOUR = [
+  {id: 'a', brand: 'Sheba', variety: 'Lachs in Soße'},
+  {id: 'b', brand: 'Sheba', variety: 'Huhn in Soße'},
+  {id: 'c', brand: 'Felix', variety: 'Lachs in Gelee'},
+  {id: 'd', brand: 'Felix', variety: 'Huhn in Gelee'},
+];
+
+test('Erkenntnisse by brand, animal and consistency: wet food, the best group against the weakest, two varieties rated twice a group', () => {
+  const db = household(['A'], FOUR, [
+    ...rate('a', 'A', [T, T]),
+    ...rate('b', 'A', [T, G]),
+    ...rate('c', 'A', [X, X]),
+    ...rate('d', 'A', [S, X]),
+  ]);
+  assert.deepEqual(learned(db), [
+    ['marke', 'Bisher kommt Sheba besser an als Felix.', 'Sheba 4 von 4 Mal gut gefressen, Felix 0 von 4 Mal.'],
+    [
+      'konsistenz',
+      'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
+      'Stückchen in Soße 4 von 4 Mal gut gefressen, Stückchen in Gelee 0 von 4 Mal.',
+    ],
+  ]);
+  assert.deepEqual(
+    learned(household(['A'], [FOUR[0], FOUR[2]], [...rate('a', 'A', [T, T]), ...rate('c', 'A', [X, X])])),
+    [],
+    'one variety a group: that is a verdict, not an insight',
+  );
+  assert.deepEqual(
+    learned(
+      household(['A'], FOUR, [
+        ...rate('a', 'A', [T]),
+        ...rate('b', 'A', [T, G]),
+        ...rate('c', 'A', [X, X]),
+        ...rate('d', 'A', [S, X]),
+      ]),
+    ),
+    [],
+    'a variety rated once does not count, so every group it is in is too small',
+  );
+  const dry = FOUR.map(p => ({...p, type: 'Trockenfutter'}));
+  assert.deepEqual(
+    learned(
+      household(['A'], dry, [
+        ...rate('a', 'A', ['gern', 'gern']),
+        ...rate('b', 'A', ['gern', 'gern']),
+        ...rate('c', 'A', ['liegen', 'liegen']),
+        ...rate('d', 'A', ['liegen', 'liegen']),
+      ]),
+    ),
+    [],
+    'dry food: no comparison',
+  );
+});
+
+test('Erkenntnisse by animal: a variety naming two flavours counts in both groups', () => {
   const db = household(
     ['A'],
     [
@@ -585,24 +485,12 @@ test('profile by flavour: a variety naming two flavours counts in both groups, a
     ],
     [...rate('a', 'A', [T, T]), ...rate('b', 'A', [X, X]), ...rate('ab', 'A', [T, X])],
   );
-  assert.deepEqual(
-    profiled(db),
-    [
-      [
-        'geschmack',
-        'Nassfutter',
-        [
-          ['Huhn', 3, 4],
-          ['Thunfisch', 1, 4],
-        ],
-        false,
-      ],
-    ],
-    'the mixed variety makes both groups, and standing in both it keeps them from being clearly apart',
-  );
+  assert.deepEqual(learnedOf('geschmack', db), [
+    ['Bisher kommt Huhn besser an als Thunfisch.', 'Huhn 3 von 4 Mal gut gefressen, Thunfisch 1 von 4 Mal.'],
+  ]);
 });
 
-test('profile by consistency: the texture field, the keywords only when it is missing, apart for wet food and treats', () => {
+test('Erkenntnisse by consistency: the texture field, the keywords only when it is missing', () => {
   const db = household(
     ['A'],
     [
@@ -610,243 +498,91 @@ test('profile by consistency: the texture field, the keywords only when it is mi
       {id: 'n2', variety: 'Huhn in Gelee'},
       {id: 'n3', variety: 'Rind Pastete'},
       {id: 'n4', variety: 'Pute', texture: 'pastete'},
-      {id: 's1', type: 'Snack', variety: 'Knusperkissen'},
-      {id: 's2', type: 'Snack', variety: 'Knusprige Taler'},
-      {id: 's3', type: 'Snack', variety: 'Happen', texture: 'creme'},
-      {id: 's4', type: 'Snack', variety: 'Snack in Soße', texture: 'creme'},
     ],
-    [
-      ...rate('n1', 'A', [T, T]),
-      ...rate('n2', 'A', [T, G]),
-      ...rate('n3', 'A', [M, M]),
-      ...rate('n4', 'A', [X, M]),
-      ...rate('s1', 'A', ['unberuehrt', 'unberuehrt']),
-      ...rate('s2', 'A', ['angeknabbert', 'unberuehrt']),
-      ...rate('s3', 'A', ['verputzt', 'verputzt']),
-      ...rate('s4', 'A', ['verputzt', 'spaeter']),
-    ],
+    [...rate('n1', 'A', [T, T]), ...rate('n2', 'A', [T, G]), ...rate('n3', 'A', [M, M]), ...rate('n4', 'A', [X, M])],
   );
-  assert.deepEqual(
-    profiled(db).filter(d => d[0] === 'konsistenz'),
+  assert.deepEqual(learnedOf('konsistenz', db), [
     [
-      [
-        'konsistenz',
-        'Nassfutter',
-        [
-          ['In Gelee', 4, 4],
-          ['Pastete', 0, 4],
-        ],
-        true,
-      ],
-      [
-        'konsistenz',
-        'Snack',
-        [
-          ['Creme', 4, 4],
-          ['Knusprig', 0, 4],
-        ],
-        true,
-      ],
+      'Bisher kommt Stückchen in Gelee besser an als Pastete.',
+      'Stückchen in Gelee 4 von 4 Mal gut gefressen, Pastete 0 von 4 Mal.',
     ],
-  );
+  ]);
 });
 
-test('habits: „nur die Soße“ and „nur bissl“ from two varieties where it happened at least half of the time', () => {
-  const E = 'eager';
-  const db = household(
-    ['A'],
-    ['a', 'b', 'c', 'd'],
-    [...rate('a', 'A', [S, S, T]), ...rate('b', 'A', [S, G]), ...rate('c', 'A', [S]), ...rate('d', 'A', [E, E, T])],
-  );
-  assert.deepEqual(
-    habits(model(db)),
+test('Erkenntnisse on sauce: at least four in ten ratings of the varieties in sauce „Nur Soße“, from five ratings', () => {
+  const sauce = meals => learnedOf('sosse', household(['A'], ['x', ...FOUR.slice(0, 2)], meals));
+  assert.deepEqual(sauce([...rate('a', 'A', [S, S, T, T, T]), ...rate('b', 'A', [S, S, T, T, T])]), [
     [
-      {
-        kind: 'sosse',
-        sorts: [
-          {id: 'a', k: 2, n: 3},
-          {id: 'b', k: 1, n: 2},
-        ],
-      },
+      'Bei Stückchen in Soße wird oft nur die Soße geleckt.',
+      '4 von 10 Mal nur die Soße. Eine Pastete wäre einen Versuch wert.',
     ],
-    'c rated once does not count; „nur bissl“ with one variety is no habit',
-  );
-  const both = household(['A'], ['a', 'b'], [...rate('a', 'A', [E, S]), ...rate('b', 'A', [S, E])]);
+  ]);
+  assert.deepEqual(sauce([...rate('a', 'A', [S, S, T]), ...rate('b', 'A', [S])]), [], 'four ratings are too few');
   assert.deepEqual(
-    habits(model(both)).map(x => x.kind),
-    ['sosse', 'eager'],
+    sauce([...rate('a', 'A', [S, T, T, T, T]), ...rate('b', 'A', [S, S, T, T, T]), ...rate('x', 'A', [S, S])]),
+    [],
+    'three in ten are not enough, and a variety not in sauce does not count',
   );
 });
 
 /* A pet's meals in the order they were served, the oldest first, one a day up to yesterday: [variety, rating] */
 const inTurn = (pet, meals) => meals.map(([sort, r], i) => [sort, {[pet]: r}, meals.length - i]);
-const FOUR_SORTS = ['a', 'b', 'c', 'd', {id: 'snack', type: 'Snack'}];
-const tried = (meals, prefs, pets = ['A']) =>
-  variety(model(household(pets, FOUR_SORTS, meals), prefs)).map(v => [
-    v.pet,
-    v.kind,
-    v.same.good,
-    v.same.n,
-    v.other.good,
-    v.other.n,
-  ]);
-/* Four varieties taking turns, so that a meal has three other varieties before it, and a variety served again right
-   away, which comes shortly after the same one: 15 meals after other varieties, 12 of them good, against 8 shortly
-   after the same one, 3 of them good */
-const LIKES = inTurn('A', [
+const SORTS = ['a', 'b', 'c', 'd', {id: 'snack', type: 'Snack'}];
+// four times the same variety again right away, all left, against five after another one, all eaten well
+const AGAIN = [
   ['a', T],
   ['a', X],
   ['b', T],
   ['b', X],
   ['c', T],
-  ['c', T],
-  ['d', T],
-  ['d', X],
-  ['a', X],
-  ['a', T],
-  ['b', T],
-  ['b', X],
-  ['c', T],
-  ['c', T],
+  ['c', X],
   ['d', T],
   ['d', X],
   ['a', T],
   ['b', T],
-  ['c', T],
-  ['d', X],
-  ['a', T],
-  ['b', T],
-  ['c', X],
-]);
-/* The other way round: 8 after other varieties, 2 of them good, against 8 shortly after the same one, 7 of them good */
-const HABIT = inTurn('A', [
-  ['a', X],
-  ['a', T],
-  ['b', X],
-  ['b', T],
-  ['c', X],
-  ['c', T],
-  ['d', T],
-  ['d', T],
-  ['a', X],
-  ['a', T],
-  ['b', T],
-  ['b', T],
-  ['c', X],
-  ['c', X],
-  ['d', X],
-  ['d', T],
-]);
-/* Pairs of a meal after other varieties and the same variety served again right away, the varieties taking turns;
-   then, with `rest`, meals of the varieties taking turns on, each after three others */
-const turns = (same, other, rest = []) =>
-  inTurn('A', [
-    ...same.flatMap((r, i) => [
-      ['abcd'[i % 4], other[i]],
-      ['abcd'[i % 4], r],
-    ]),
-    ...rest.map((r, i) => ['abcd'[(same.length + i) % 4], r]),
-  ]);
+];
 
-test('Abwechslung: shortly after the same variety against the rest, 25 points apart, either way', () => {
-  assert.deepEqual(tried(LIKES), [['A', 'abwechslung', 3, 8, 12, 15]]);
-  assert.deepEqual(tried(HABIT), [['A', 'gewohnheit', 7, 8, 2, 8]]);
-});
-
-test('Abwechslung: the same variety within the three meals before counts as shortly after it', () => {
-  const repeats = meals => model(household(['A'], FOUR_SORTS, meals)).repeats.A;
+test('Erkenntnisse on serving the same twice: a meal of the variety the pet had just before against one of another', () => {
+  const again = meals => learnedOf('wiederholung', household(['A'], SORTS, inTurn('A', meals)));
+  assert.deepEqual(again(AGAIN), [
+    [
+      'Zweimal hintereinander dieselbe Sorte kommt schlechter an.',
+      'Beim zweiten Mal 0 von 4 Mal gut gefressen, sonst 5 von 5 Mal.',
+    ],
+  ]);
+  assert.deepEqual(again(AGAIN.slice(2)), [], 'three times again are too few');
   assert.deepEqual(
-    repeats(
-      inTurn('A', [
-        ['a', T],
-        ['b', T],
-        ['a', X],
-      ]),
-    ),
-    {same: {n: 1, good: 0}, other: {n: 2, good: 2}},
-    'two meals later it counts',
+    again(AGAIN.map(([sort, r]) => [sort, r === T ? X : T])),
+    [],
+    'the same again going down better is no help when buying or feeding',
   );
-  assert.deepEqual(
-    repeats(
-      inTurn('A', [
-        ['a', T],
-        ['b', T],
-        ['c', T],
-        ['a', X],
-      ]),
-    ),
-    {same: {n: 1, good: 0}, other: {n: 3, good: 3}},
-    'three meals later as well',
-  );
-  assert.deepEqual(
-    repeats(
-      inTurn('A', [
-        ['a', T],
-        ['b', T],
-        ['c', T],
-        ['d', T],
-        ['a', X],
-      ]),
-    ),
-    {same: {n: 0, good: 0}, other: {n: 5, good: 4}},
-    'four meals later it does not',
-  );
-  const around = inTurn('A', [
+  const around = [
     ['a', T],
     ['snack', 'verputzt'],
     ['a', X],
     [null, T],
-    ['b', T],
-    ['c', T],
-    ['a', T],
-  ]);
+    ['a', X],
+  ];
+  const db = household(['A'], SORTS, inTurn('A', [...around, ...AGAIN.slice(2)]));
   assert.deepEqual(
-    repeats(around),
-    {same: {n: 1, good: 0}, other: {n: 4, good: 4}},
-    'a treat between two meals of the same variety leaves it a repeat, a meal of unknown food takes one of the three places before',
+    insights(db, model(db), NOW)
+      .filter(x => x.kind === 'wiederholung')
+      .map(x => [x.a, x.b]),
+    [
+      [
+        {n: 4, good: 0},
+        {n: 6, good: 5},
+      ],
+    ],
+    'a treat between two meals of the same variety leaves it a repeat, a meal of unknown food takes a place',
   );
-});
-
-test('Abwechslung: at least 6 ratings on either side, exactly 25 points is enough', () => {
-  assert.deepEqual(
-    tried(turns([X, X, X, X, X], [T, T, T, T, T])),
-    [],
-    'five meals shortly after the same variety are too few',
-  );
-  assert.deepEqual(
-    tried(turns([T, T, T, X, X, X], [T, T, T, T, T, T])),
-    [['A', 'abwechslung', 3, 6, 6, 6]],
-    'six on either side are enough',
-  );
-  assert.deepEqual(
-    tried(turns([T, T, T, X, X, X], [T, T, T, T, T, T], [X, X])),
-    [['A', 'abwechslung', 3, 6, 6, 8]],
-    '3 of 6 against 6 of 8: exactly 25 points',
-  );
-  assert.deepEqual(
-    tried(turns([T, T, T, T, X, X], [T, T, T, T, T, T], [T, T, T, X])),
-    [],
-    '4 of 6 against 9 of 10: 23 points',
-  );
-});
-
-test('Abwechslung: one per pet, and only the pet in the filter', () => {
-  const both = [...LIKES, ...LIKES.map(([sort, {A: r}, when]) => [sort, {B: r === T ? X : T}, when + 0.5])];
-  assert.deepEqual(tried(both, {}, ['A', 'B']), [
-    ['A', 'abwechslung', 3, 8, 12, 15],
-    ['B', 'gewohnheit', 5, 8, 3, 15],
-  ]);
-  assert.deepEqual(tried(both, {activePet: 'B'}, ['A', 'B']), [['B', 'gewohnheit', 5, 8, 3, 15]]);
 });
 
 /* First encounters: [variety, first rating, later ratings …] each, the first one the oldest, the later ones spread
    after it five days apart, all of it `start` days ago */
 const met = (pet, list, start = 100) =>
   list.flatMap(([sort, ...rs], i) => rs.map((r, j) => [sort, {[pet]: r}, start - j * 5 - i]));
-const novel = (meals, prefs, pets = ['A']) =>
-  novelty(model(household(pets, ['s1', 's2', 's3', 's4', 's5', 's6', {id: 'snack', type: 'Snack'}], meals), prefs)).map(
-    v => [v.pet, v.kind, v.first.good, v.first.n, v.later.good, v.later.n],
-  );
+const NEW = ['s1', 's2', 's3', 's4', 's5', 's6', {id: 'snack', type: 'Snack'}];
 const CURIOUS = [
   ['s1', T, X, X, X],
   ['s2', T, X, X],
@@ -863,66 +599,182 @@ const SLOW = [
   ['s5', X, T, T, X],
 ];
 
-test('Neuheit: new food goes down well at first and wears off, or needs a while, 30 points apart either way', () => {
-  assert.deepEqual(novel(met('A', CURIOUS)), [['A', 'neugier', 5, 6, 4, 15]]);
-  assert.deepEqual(novel(met('A', SLOW)), [['A', 'anlauf', 1, 5, 12, 16]]);
-  assert.deepEqual(novel(met('A', SLOW, 400)), [['A', 'anlauf', 1, 5, 12, 16]], 'every rating counts, however old');
+test('Erkenntnisse on new varieties: the first rating of each against the later ones, from five varieties served again', () => {
+  const fresh = (meals, prefs, pets = ['A']) => learnedOf('neu', household(pets, NEW, meals), prefs);
+  assert.deepEqual(fresh(met('A', CURIOUS)), [
+    [
+      'Neue Sorten kommen beim ersten Mal besser an als danach.',
+      'Beim ersten Mal 5 von 6, danach 4 von 15 Mal gut gefressen.',
+    ],
+  ]);
   assert.deepEqual(
-    novel(met('A', [...SLOW, ['snack', 'unberuehrt', 'verputzt', 'verputzt', 'verputzt', 'verputzt']])),
-    [['A', 'anlauf', 1, 5, 12, 16]],
+    fresh(met('A', SLOW, 400)),
+    [
+      [
+        'Neue Sorten brauchen eine Weile, danach läuft es besser.',
+        'Beim ersten Mal 1 von 5, danach 12 von 16 Mal gut gefressen.',
+      ],
+    ],
+    'every rating counts, however old',
+  );
+  assert.deepEqual(fresh(met('A', SLOW.slice(0, 4))), [], 'four varieties are too few');
+  assert.deepEqual(
+    fresh(met('A', [...SLOW.slice(0, 4), ['s5', X], ['snack', 'unberuehrt', 'verputzt', 'verputzt']])),
+    [],
+    'a variety rated once and treats do not count',
+  );
+  const both = [...met('A', CURIOUS), ...met('B', SLOW, 300)];
+  assert.deepEqual(
+    [
+      slowStarters(model(household(['A', 'B'], NEW, both))),
+      slowStarters(model(household(['A', 'B'], NEW, both), {activePet: 'A'})),
+    ],
+    [['B'], []],
+    'a pet that needs a while is told apart for a second try, in the filter',
+  );
+});
+
+// meals at a time of day: [hour, rating] each on a day of its own, the oldest first
+const atHours = (pet, list) =>
+  list.map(([hour, r], i) => [
+    i % 2 ? 'a' : 'b',
+    {[pet]: r},
+    `2026-05-${String(i + 1).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`,
+  ]);
+
+test('Erkenntnisse on the time of day: meals before 11 against those from 17, either way, exactly 0.3 apart is enough', () => {
+  const daytime = (list, prefs, pets = ['A']) =>
+    learnedOf('tageszeit', household(pets, ['a', 'b'], atHours('A', list)), prefs);
+  const morning = r => [7, r],
+    noon = r => [13, r],
+    evening = r => [18, r];
+  assert.deepEqual(daytime([...[T, T, T, T].map(morning), ...[T, X, X, X].map(evening), ...[X, X].map(noon)]), [
+    ['Morgens wird besser gefressen als abends.', 'Morgens 4 von 4 Mal gut gefressen, abends 1 von 4 Mal.'],
+  ]);
+  assert.deepEqual(daytime([...[X, X, X, T].map(morning), ...[T, T, T, T].map(r => [17, r])]), [
+    ['Abends wird besser gefressen als morgens.', 'Morgens 1 von 4 Mal gut gefressen, abends 4 von 4 Mal.'],
+  ]);
+  assert.deepEqual(
+    daytime([...[T, T, T].map(r => [10, r]), ...[X, X, X, X].map(evening)]),
+    [],
+    'three in the morning are too few',
+  );
+  const ten = (good, r) => Array.from({length: 10}, (_, i) => [r, i < good ? T : X]);
+  assert.deepEqual(daytime([...ten(7, 8), ...ten(4, 19)]).length, 1, '7 of 10 against 4 of 10: exactly 0.3');
+  assert.deepEqual(daytime([...ten(7, 8), ...ten(5, 19)]), [], '7 of 10 against 5 of 10 are too close');
+});
+
+test('Erkenntnisse on treats: the meals up to three hours after one against all others, only where they go down worse', () => {
+  const day = (d, time) => `2026-05-${String(d).padStart(2, '0')}T${time}`;
+  const after = (d, r, gap = '16:00') => [
+    ['snack', {A: 'verputzt'}, day(d, gap)],
+    ['a', {A: r}, day(d, '18:00')],
+  ];
+  const plain = (d, r) => [['b', {A: r}, day(d, '18:00')]];
+  const snacks = meals => learnedOf('snack', household(['A'], ['a', 'b', {id: 'snack', type: 'Snack'}], meals));
+  const meals = [...[1, 2, 3, 4].flatMap(d => after(d, X)), ...[5, 6, 7, 8].flatMap(d => plain(d, T))];
+  assert.deepEqual(snacks(meals), [
+    [
+      'Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.',
+      'Nach Snacks 0 von 4 Mal gut gefressen, sonst 4 von 4 Mal.',
+    ],
+  ]);
+  assert.deepEqual(
+    snacks([...[1, 2, 3, 4].flatMap(d => after(d, X, '14:30')), ...[5, 6, 7, 8].flatMap(d => plain(d, T))]),
+    [],
+    'a treat three and a half hours before does not count',
+  );
+  assert.deepEqual(snacks(meals.slice(2)), [], 'three meals after a treat are too few');
+  assert.deepEqual(
+    snacks([...[1, 2, 3, 4].flatMap(d => after(d, T)), ...[5, 6, 7, 8].flatMap(d => plain(d, X))]),
+    [],
+    'meals after treats going down better is no help',
+  );
+});
+
+test('Erkenntnisse on who serves: the same varieties as often from each person, the one the pets eat best with', () => {
+  // ten days: the same two varieties from both, a with Anna eaten well, with Jonas left
+  const days = (ra, rj, n = 10, sort = ['a', 'b']) =>
+    Array.from({length: n}, (_, i) => [
+      [sort[i % 2], {A: ra(i)}, i + 0.5, 'Anna'],
+      [sort[i % 2], {A: rj(i)}, i + 0.6, 'Jonas'],
+    ]).flat();
+  const feeder = meals => learnedOf('feeder', household(['A'], ['a', 'b', {id: 's', type: 'Snack'}], meals));
+  assert.deepEqual(
+    feeder(
+      days(
+        () => T,
+        i => (i % 3 ? X : T),
+      ),
+    ),
+    [
+      [
+        'Bei Anna kommt dasselbe Futter besser an als bei Jonas.',
+        'Bei Anna 10 von 10 Mal gut gefressen, bei Jonas 4 von 10 Mal.',
+      ],
+    ],
+  );
+  assert.deepEqual(
+    feeder(
+      days(
+        () => T,
+        () => X,
+        3,
+      ),
+    ),
+    [],
+    'three meals each are too few',
+  );
+  assert.deepEqual(
+    feeder([
+      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.5, 'Anna']),
+      ...Array.from({length: 12}, (_, i) => ['b', {A: X}, i + 0.6, 'Anna']),
+      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.7, 'Jonas']),
+      ...Array.from({length: 2}, (_, i) => ['b', {A: X}, i + 0.8, 'Jonas']),
+    ]),
+    [],
+    'Jonas serving the liked one more often does not make him better',
+  );
+  assert.deepEqual(
+    feeder(
+      days(
+        () => T,
+        () => X,
+      ).map(m => (m[3] === 'Jonas' ? [...m.slice(0, 3), ''] : m)),
+    ),
+    [],
+    'one person only',
+  );
+  assert.deepEqual(
+    feeder(
+      days(
+        () => 'verputzt',
+        () => 'unberuehrt',
+        10,
+        ['s', 's'],
+      ),
+    ),
+    [],
     'treats do not count',
   );
 });
 
-test('Neuheit at the thresholds: four varieties, eight later ratings, exactly 30 points', () => {
-  assert.deepEqual(novel(met('A', CURIOUS.slice(0, 3))), [], 'three varieties are too few');
-  const seven = [
-    ['s1', T, X, X],
-    ['s2', T, X, X],
-    ['s3', T, X, X],
-    ['s4', T, X],
-  ];
-  assert.deepEqual(novel(met('A', seven)), [], 'seven later ratings are too few');
-  assert.deepEqual(
-    novel(met('A', [...seven.slice(0, 3), ['s4', T, X, X]])),
-    [['A', 'neugier', 4, 4, 0, 8]],
-    'eight are enough',
-  );
-  assert.deepEqual(
-    novel(
-      met('A', [
-        ['s1', T, T, T, T],
-        ['s2', T, T, T, X],
-        ['s3', T, T, X],
-        ['s4', T, T, X],
-      ]),
-    ),
-    [['A', 'neugier', 4, 4, 7, 10]],
-    'all four the first time against 7 of 10 later: exactly 30 points',
-  );
-  assert.deepEqual(
-    novel(
-      met('A', [
-        ['s1', T, T, T, T, T],
-        ['s2', T, T, T, T, X],
-        ['s3', T, T, T, X],
-        ['s4', T, T, X, X],
-      ]),
-    ),
-    [],
-    'against 10 of 14 later: 29 points',
-  );
-});
-
-test('Neuheit: one line per pet in the filter, none for a pet with too few varieties', () => {
-  const few = met('B', SLOW.slice(0, 3));
-  assert.deepEqual(novel([...met('A', CURIOUS), ...few], {}, ['A', 'B']), [['A', 'neugier', 5, 6, 4, 15]]);
-  const both = [...met('A', CURIOUS), ...met('B', SLOW)];
-  assert.deepEqual(novel(both, {}, ['A', 'B']), [
-    ['A', 'neugier', 5, 6, 4, 15],
-    ['B', 'anlauf', 1, 5, 12, 16],
+test('Erkenntnisse: the widest gap first, and only the pet in the filter', () => {
+  const day = (d, hour) => `2026-05-${String(d).padStart(2, '0')}T${hour}:00`;
+  const db = household(['A', 'B'], FOUR, [
+    ...rate('a', 'A', [T, T]),
+    ...rate('b', 'A', [T, X]),
+    ...rate('c', 'A', [X, X]),
+    ...rate('d', 'A', [X, T]),
+    ...[1, 2, 3, 4].map(d => ['a', {B: T}, day(d, '07')]),
+    ...[5, 6, 7, 8].map(d => ['c', {B: d === 5 ? T : X}, day(d, '19')]),
   ]);
-  assert.deepEqual(novel(both, {activePet: 'B'}, ['A', 'B']), [['B', 'anlauf', 1, 5, 12, 16]]);
+  const kinds = prefs => learned(db, prefs).map(([kind]) => kind);
+  assert.deepEqual(
+    [kinds(), kinds({activePet: 'A'}), kinds({activePet: 'B'})],
+    [['tageszeit', 'marke', 'konsistenz'], ['marke', 'konsistenz'], ['tageszeit']],
+    'morning against evening before brand and consistency, further apart; each pet on its own',
+  );
 });
 
 /* „Vorlieben“ */
@@ -1273,7 +1125,7 @@ test('nextUp: favourites gone for six weeks from their newest ratings however ol
     [['gone', 3, {top: 3}]],
   );
   assert.deepEqual(next(['A']).retry, [{id: 'first', pet: 'A'}]);
-  assert.deepEqual(next(['B']).retry, [], 'only where novelty() says the pet needs a while');
+  assert.deepEqual(next(['B']).retry, [], 'only where slowStarters() says the pet needs a while');
 
   const turned = household(
     ['A', 'B'],
@@ -1294,23 +1146,6 @@ test('nextUp: favourites gone for six weeks from their newest ratings however ol
     [ids(rt.flop), ids(rt.split), nextUp(mt, NOW, rt, lt, []).missed],
     [['flop'], ['mixed'], []],
     'a favourite once whose window says „Nicht mehr kaufen“ now, for all or for one pet, is not served again',
-  );
-});
-
-test('patterns: the ranked types, GAP apart, the clear ones first, one per dimension, at most two', () => {
-  const d = (kind, type, gap, clear) => ({kind, type, gap, clear});
-  assert.deepEqual(
-    patterns([
-      d('marke', 'Nassfutter', 0.5, false),
-      d('konsistenz', 'Nassfutter', 0.35, true),
-      d('marke', 'Sonstiges', 0.9, true),
-      d('geschmack', 'Snack', 0.9, true),
-      d('geschmack', 'Nassfutter', 0.2, true),
-    ]).map(x => [x.kind, x.type]),
-    [
-      ['marke', 'Sonstiges'],
-      ['konsistenz', 'Nassfutter'],
-    ],
   );
 });
 
@@ -1635,93 +1470,6 @@ test('reminder buttons: the levels most given to this variety by this pet, fille
     quickRatings(household(['A'], ['p'], rate('p', 'A', [S, T, M], 1)), open('p'), 'A'),
     [T, S],
     'a tie goes to the newer level',
-  );
-});
-
-test('Bei wem schmeckt’s: the same varieties as often from each person, only a clear gap beyond chance, never from a person serving the better liked ones', () => {
-  // ten days: the same two varieties from both, a with Anna eaten well, with Jonas left
-  const days = (ra, rj, n = 10, sort = ['a', 'b']) =>
-    Array.from({length: n}, (_, i) => [
-      [sort[i % 2], {A: ra(i)}, i + 0.5, 'Anna'],
-      [sort[i % 2], {A: rj(i)}, i + 0.6, 'Jonas'],
-    ]).flat();
-  const gap = meals =>
-    feederGap(
-      household(['A'], ['a', 'b', snackProduct], meals),
-      model(household(['A'], ['a', 'b', snackProduct], meals)),
-      NOW,
-    );
-  const snackProduct = {id: 's', type: 'Snack'};
-  assert.deepEqual(
-    gap(
-      days(
-        () => T,
-        i => (i % 3 ? X : T),
-      ),
-    ),
-    {name: 'Anna', others: ['Jonas'], n: 10, good: 10, theirs: 4},
-    'with Anna all ten eaten well, with Jonas four',
-  );
-  assert.equal(
-    gap(
-      days(
-        () => T,
-        i => (i % 4 ? T : X),
-      ),
-    ),
-    null,
-    'seven against ten is chance',
-  );
-  assert.equal(
-    gap(
-      days(
-        () => T,
-        () => X,
-        4,
-      ),
-    ),
-    null,
-    'four meals each are too few',
-  );
-  assert.equal(
-    gap([
-      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.5, 'Anna']),
-      ...Array.from({length: 12}, (_, i) => ['b', {A: X}, i + 0.6, 'Jonas']),
-    ]),
-    null,
-    'each serving a variety of their own: nothing to compare',
-  );
-  assert.deepEqual(
-    gap([
-      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.5, 'Anna']),
-      ...Array.from({length: 12}, (_, i) => ['b', {A: X}, i + 0.6, 'Anna']),
-      ...Array.from({length: 12}, (_, i) => ['a', {A: T}, i + 0.7, 'Jonas']),
-      ...Array.from({length: 2}, (_, i) => ['b', {A: X}, i + 0.8, 'Jonas']),
-    ]),
-    null,
-    'Jonas serving the liked one more often does not make him better',
-  );
-  assert.equal(
-    gap(
-      days(
-        () => T,
-        () => X,
-      ).map(m => (m[3] === 'Jonas' ? [...m.slice(0, 3), ''] : m)),
-    ),
-    null,
-    'one person only',
-  );
-  assert.equal(
-    gap(
-      days(
-        () => 'verputzt',
-        () => 'unberuehrt',
-        10,
-        ['s', 's'],
-      ),
-    ),
-    null,
-    'treats do not count',
   );
 });
 

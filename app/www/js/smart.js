@@ -170,7 +170,6 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     })
     .sort((a, b) => b.score - a.score || b.n - a.n);
   const byId = new Map(sorts.map(e => [e.id, e]));
-  let repeats = null; // lazy, only one card reads it
   return {
     pet,
     pets: pet ? [pet] : petIds,
@@ -178,132 +177,10 @@ export function analyze(db, prefs, now, sums = tally(db, now)) {
     byId,
     rated: sorts.reduce((a, e) => a + e.n, 0),
     hints: hints(sorts, appetite(db, pet ? [pet] : petIds, now), pet, prefs),
-    get repeats() {
-      return (repeats ||= repeatsOf(db, pet ? [pet] : petIds, now));
-    },
   };
 }
 
-// "Worauf es ankommt": what holds across varieties, never one variety's verdict told again
-const shareOf = (x, r) => (x.counts[r] || 0) / x.n;
-const sauceShare = x => shareOf(x, 'sosse');
-const GAP = 0.3,
-  TWO = 2; // varieties in a group, ratings of a variety
-const DIMENSIONS = [
-  ['konsistenz', p => [(textureOf(p, p.texture) || textureOf(p, guessTexture(p)))?.[1]]],
-  ['geschmack', p => flavoursOf(p.variety)],
-  ['marke', p => [p.brand]],
-];
-const HABITS = ['sosse', 'eager']; // levels that say how a variety is eaten
-
-/* clear also needs every variety of the best group to beat every one of the weakest, so no single variety carries
-   it. A variety with two flavours counts in both groups, and in the best and the weakest at once it blocks clear. */
-export function profile(m) {
-  const out = [],
-    rated = m.sorts.filter(e => e.n >= TWO);
-  for (const type of TYPES) {
-    const mine = rated.filter(e => typeOf(e.product) === type);
-    for (const [kind, keysOf] of DIMENSIONS) {
-      const groups = new Map();
-      for (const e of mine) for (const k of keysOf(e.product)) if (k) groups.set(k, [...(groups.get(k) || []), e]);
-      const ranked = [...groups]
-        .filter(([, l]) => l.length >= TWO)
-        .map(([key, l]) => groupOf(key, l))
-        .sort((a, b) => b.share - a.share || b.n - a.n || a.key.localeCompare(b.key, 'de'));
-      if (ranked.length < TWO) continue;
-      const best = ranked[0],
-        worst = ranked.at(-1),
-        gap = best.share - worst.share;
-      out.push({kind, type, groups: ranked, gap, clear: gap >= GAP && best.low > worst.high});
-    }
-  }
-  return out;
-}
-function groupOf(key, l) {
-  const n = l.reduce((a, e) => a + e.n, 0),
-    good = l.reduce((a, e) => a + goodOf(e.counts), 0),
-    shares = l.map(e => goodOf(e.counts) / e.n);
-  return {key, ids: l.map(e => e.id), n, good, share: good / n, low: Math.min(...shares), high: Math.max(...shares)};
-}
-
-export function habits(m) {
-  const out = [],
-    rated = m.sorts.filter(e => e.n >= TWO);
-  for (const kind of HABITS) {
-    const l = rated.filter(e => shareOf(e, kind) >= 0.5).sort((a, b) => shareOf(b, kind) - shareOf(a, kind));
-    if (l.length >= TWO) out.push({kind, sorts: l.slice(0, 3).map(e => ({id: e.id, k: e.counts[kind], n: e.n}))});
-  }
-  return out;
-}
-
-// same: the pet had the variety within its last REPEAT.within meals; treats are skipped, unknown food takes a place
-const REPEAT = {within: 3};
-function repeatsOf(db, petIds, now) {
-  const snack = new Set(),
-    known = new Set(),
-    out = {},
-    before = {}; // per pet, newest last
-  for (const p of db.products) (typeOf(p) === 'Snack' ? snack : known).add(p.id);
-  for (const id of petIds) {
-    out[id] = {same: {n: 0, good: 0}, other: {n: 0, good: 0}};
-    before[id] = [];
-  }
-  for (let i = db.servings.length - 1; i >= 0; i--) {
-    // oldest first, so a meal's predecessors are already in before
-    const s = db.servings[i];
-    if (s.servedAt > now || snack.has(s.productId)) continue;
-    for (const pid in s.pets) {
-      if (!out[pid]) continue;
-      const r = rOf(s.pets[pid]);
-      if (r && known.has(s.productId)) {
-        const side = out[pid][before[pid].includes(s.productId) ? 'same' : 'other'];
-        side.n++;
-        if (RATINGS[r].score >= GOOD) side.good++;
-      }
-      before[pid].push(s.productId || null);
-      if (before[pid].length > REPEAT.within) before[pid].shift();
-    }
-  }
-  return out;
-}
-const VARIETY = {min: 6, gap: 25};
-export function variety(m) {
-  const out = [];
-  for (const [pet, {same, other}] of Object.entries(m.repeats)) {
-    if (same.n < VARIETY.min || other.n < VARIETY.min) continue;
-    const apart = 100 * (same.good * other.n - other.good * same.n), // cross-multiplied to stay exact
-      far = VARIETY.gap * same.n * other.n;
-    if (apart <= -far) out.push({pet, kind: 'abwechslung', same, other});
-    else if (apart >= far) out.push({pet, kind: 'gewohnheit', same, other});
-  }
-  return out;
-}
-
-// uses every rating, older than VERDICT_SPAN too, since this is about first encounters
-const NOVELTY = {minSorts: 4, minLater: 8, gap: 30};
-export function novelty(m) {
-  const out = [],
-    good = r => RATINGS[r.r].score >= GOOD;
-  for (const pet of m.pets) {
-    const first = {n: 0, good: 0},
-      later = {n: 0, good: 0};
-    for (const e of m.sorts) {
-      const x = e.pets[pet];
-      if (!x || x.list.length < 2 || typeOf(e.product) === 'Snack') continue;
-      const [head, ...rest] = [...x.list].sort((a, b) => a.t - b.t);
-      first.n++;
-      if (good(head)) first.good++;
-      later.n += rest.length;
-      later.good += rest.filter(good).length;
-    }
-    if (first.n < NOVELTY.minSorts || later.n < NOVELTY.minLater) continue;
-    const apart = 100 * (first.good * later.n - later.good * first.n), // cross-multiplied to stay exact
-      far = NOVELTY.gap * first.n * later.n;
-    if (apart >= far) out.push({pet, kind: 'neugier', first, later});
-    else if (apart <= -far) out.push({pet, kind: 'anlauf', first, later});
-  }
-  return out;
-}
+const sauceShare = x => (x.counts.sosse || 0) / x.n;
 
 // has a pet been eating noticeably worse for a few days?
 function appetite(db, petIds, now) {
@@ -536,11 +413,116 @@ function causeOf(recent, before, dir) {
   return {cause: 'futter', behind};
 }
 
+/* Erkenntnisse: what holds across varieties and meals and helps with buying and feeding, never one variety's verdict
+   told again. Most set two sides against each other by how many of their meals went down well and count once both
+   have INSIGHT.ratings and their shares lie INSIGHT.gap apart. The widest gap comes first. */
+const INSIGHT = {ratings: 4, gap: 0.3};
+const SAUCE = {ratings: 5, share: 0.4}; // „Nur Soße“ among the ratings of the varieties in sauce
+const NEW_SORTS = 5; // varieties served again after their first time
+const DAYTIME = {morning: 11, evening: 17}; // before the one hour, from the other
+const AFTER_SNACK = 3 * 36e5;
+const TWO = 2; // varieties in a group, ratings of a variety
+const zero = () => ({n: 0, good: 0});
+function add(x, r) {
+  x.n++;
+  if (RATINGS[r].score >= GOOD) x.good++;
+}
+// gap: a's share ahead of b's, negative behind; one division, so exactly 0.3 counts
+function insightOf(kind, a, b) {
+  if (a.n < INSIGHT.ratings || b.n < INSIGHT.ratings) return null;
+  const gap = (a.good * b.n - b.good * a.n) / (a.n * b.n);
+  return Math.abs(gap) >= INSIGHT.gap ? {kind, a, b, gap} : null;
+}
+const worse = x => (x?.gap < 0 ? x : null); // where only that way round helps
+const textureKey = p => textureOf(p, p.texture)?.[0] || guessTexture(p);
+const GROUPS = {marke: p => [p.brand], geschmack: p => flavoursOf(p.variety), konsistenz: p => [textureKey(p)]};
+/* Wet food, the best group against the weakest. A group needs two varieties rated twice, so no single one carries it;
+   a variety naming two flavours counts in both. */
+function byGroup(m) {
+  const rated = m.sorts.filter(e => e.n >= TWO && typeOf(e.product) === TYPES[0]);
+  return Object.entries(GROUPS).map(([kind, keysOf]) => {
+    const by = new Map();
+    for (const e of rated) for (const k of keysOf(e.product)) if (k) by.set(k, [...(by.get(k) || []), e]);
+    const ranked = [...by]
+      .filter(([, l]) => l.length >= TWO)
+      .map(([key, l]) => ({key, n: l.reduce((a, e) => a + e.n, 0), good: l.reduce((a, e) => a + goodOf(e.counts), 0)}))
+      .sort((a, b) => b.good / b.n - a.good / a.n || b.n - a.n || a.key.localeCompare(b.key, 'de'));
+    return ranked.length >= TWO ? insightOf(kind, ranked[0], ranked.at(-1)) : null;
+  });
+}
+function inSauce(m) {
+  const l = m.sorts.filter(e => typeOf(e.product) === TYPES[0] && textureKey(e.product) === 'sosse'),
+    n = l.reduce((a, e) => a + e.n, 0),
+    k = l.reduce((a, e) => a + (e.counts.sosse || 0), 0);
+  return n >= SAUCE.ratings && k / n >= SAUCE.share ? {kind: 'sosse', k, n, gap: k / n} : null;
+}
+// each pet's meals up to now, oldest first, without treats and dry food, unknown food as id null; and its treats
+function mealsOf(db, pets, now) {
+  const types = new Map(db.products.map(p => [p.id, typeOf(p)])),
+    out = new Map(pets.map(pid => [pid, {meals: [], snacks: []}]));
+  for (let i = db.servings.length - 1; i >= 0; i--) {
+    const s = db.servings[i],
+      type = types.get(s.productId);
+    if (s.servedAt > now || type === 'Trockenfutter') continue;
+    for (const pid in s.pets || {}) {
+      const x = out.get(pid);
+      if (type === 'Snack') x?.snacks.push(s.servedAt);
+      else x?.meals.push({id: type ? s.productId : null, t: s.servedAt, r: rOf(s.pets[pid])});
+    }
+  }
+  return [...out.values()];
+}
+// a meal of the same variety as the pet's meal before against one of another
+function repeat(meals) {
+  const same = zero(),
+    other = zero();
+  for (const {meals: l} of meals)
+    l.forEach((x, i) => i && x.id && x.r && add(l[i - 1].id === x.id ? same : other, x.r));
+  return worse(insightOf('wiederholung', same, other));
+}
+// a variety's first rating by a pet against its later ones, every rating however old, of the varieties served again
+function newSorts(m, pets) {
+  const first = zero(),
+    later = zero(),
+    sorts = new Set();
+  for (const e of m.sorts)
+    for (const pid of pets) {
+      const l = e.pets[pid]?.list; // newest first
+      if (!ranks(e.product) || !(l?.length >= TWO)) continue;
+      sorts.add(e.id);
+      l.forEach((x, i) => add(i === l.length - 1 ? first : later, x.r));
+    }
+  return sorts.size >= NEW_SORTS ? insightOf('neu', first, later) : null;
+}
+// pets that take to new food only after the first time, so one left then is worth a second try
+export const slowStarters = m => m.pets.filter(pid => newSorts(m, [pid])?.gap < 0);
+function daytime(meals) {
+  const morning = zero(),
+    evening = zero();
+  for (const {meals: l} of meals)
+    for (const x of l) {
+      const h = new Date(x.t).getHours();
+      if (x.r && h < DAYTIME.morning) add(morning, x.r);
+      else if (x.r && h >= DAYTIME.evening) add(evening, x.r);
+    }
+  return insightOf('tageszeit', morning, evening);
+}
+function afterSnacks(meals) {
+  const after = zero(),
+    rest = zero();
+  for (const {meals: l, snacks} of meals) {
+    let j = 0,
+      last = -Infinity;
+    for (const x of l) {
+      while (j < snacks.length && snacks[j] < x.t) last = snacks[j++];
+      if (x.r) add(x.t - last <= AFTER_SNACK ? after : rest, x.r);
+    }
+  }
+  return worse(insightOf('snack', after, rest));
+}
 /* Who served: per variety the newest meals from each side, as many from one as from the other, so serving the
-   better liked varieties more often cannot make a person look better. A gap also needs FEEDER.z pooled standard
-   errors, as in trend(). The person the pets eat best with, or null. */
-const FEEDER = {min: 10, gap: 25, z: 2};
-export function feederGap(db, m, now) {
+   better liked varieties more often cannot make a person look better. The person the pets eat best with. */
+function feeder(db, m, now) {
   const meal = new Set(db.products.filter(ranks).map(p => p.id)),
     per = new Map(); // variety → [{by, good}], newest first
   for (const s of db.servings) {
@@ -556,24 +538,35 @@ export function feederGap(db, m, now) {
   const names = new Set([...per.values()].flatMap(l => l.map(x => x.by)));
   let best = null;
   for (const name of names) {
-    let n = 0,
-      good = 0,
-      theirs = 0;
+    const mine = {key: name, ...zero()},
+      theirs = {key: [...names].filter(x => x !== name), ...zero()};
     for (const list of per.values()) {
-      const mine = list.filter(x => x.by === name),
-        other = list.filter(x => x.by !== name),
-        k = Math.min(mine.length, other.length);
-      n += k;
-      good += mine.slice(0, k).filter(x => x.good).length;
-      theirs += other.slice(0, k).filter(x => x.good).length;
+      const a = list.filter(x => x.by === name),
+        b = list.filter(x => x.by !== name),
+        k = Math.min(a.length, b.length);
+      mine.n += k;
+      theirs.n += k;
+      mine.good += a.slice(0, k).filter(x => x.good).length;
+      theirs.good += b.slice(0, k).filter(x => x.good).length;
     }
-    const p = (good + theirs) / (2 * n),
-      se = 100 * Math.sqrt((p * (1 - p) * 2) / n);
-    if (n < FEEDER.min || 100 * (good - theirs) < Math.max(FEEDER.gap, FEEDER.z * se) * n) continue;
-    if (!best || good - theirs > best.good - best.theirs)
-      best = {name, others: [...names].filter(x => x !== name), n, good, theirs};
+    const x = insightOf('feeder', mine, theirs);
+    if (x?.gap > 0 && !(best?.gap >= x.gap)) best = x;
   }
   return best;
+}
+export function insights(db, m, now) {
+  const meals = mealsOf(db, m.pets, now);
+  return [
+    ...byGroup(m),
+    inSauce(m),
+    repeat(meals),
+    newSorts(m, m.pets),
+    daytime(meals),
+    afterSnacks(meals),
+    feeder(db, m, now),
+  ]
+    .filter(Boolean)
+    .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
 }
 
 /* Sides as they stood MOVE.days ago, worked out the same way as now. A move needs a real change in the good share,
@@ -625,7 +618,7 @@ export function moves(m, now, r) {
 }
 
 /* missed reads the newest ratings however old, since a variety not served for long has an empty window. retry is
-   a single poor rating by a pet that novelty() says needs a while with new food. */
+   a single poor rating by a pet that slowStarters() says needs a while with new food. */
 const NEXT = {newest: 8, away: 42 * DAY, missed: 2, span: 60 * DAY, retry: 2, shown: 5};
 export function nextUp(m, now, r, last, slow) {
   const shown = new Set(r.top.slice(0, NEXT.shown).map(e => e.id)),
@@ -671,17 +664,6 @@ export function nextUp(m, now, r, last, slow) {
       .slice(0, NEXT.retry)
       .map(({id, pet}) => ({id, pet})),
   };
-}
-
-// the profile's own comparisons, so the two pages never disagree
-const PATTERNS = 2;
-export function patterns(dims) {
-  const seen = new Set();
-  return dims
-    .filter(d => !UNRANKED.includes(d.type) && d.gap >= GAP)
-    .sort((a, b) => b.clear - a.clear || b.gap - a.gap)
-    .filter(d => !seen.has(d.kind) && seen.add(d.kind))
-    .slice(0, PATTERNS);
 }
 
 export function basis(m, r) {

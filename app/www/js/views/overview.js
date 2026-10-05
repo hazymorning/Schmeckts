@@ -1,5 +1,6 @@
 /* Home page overview card: whose day it is, then one sentence on where the day stands for the bowl, in two lines.
    Of how a meal went only a hint when the last one was left; never what the cards below already show. */
+import {$} from '../dom.js';
 import {esc} from '../text.js';
 import {addDays, dayNumber, dayStart, quarterStr} from '../dates.js';
 import {OBSERVATIONS, typeOf} from '../config.js';
@@ -76,8 +77,8 @@ export function valuesOf(g, now) {
   };
 }
 const CAT = '[Katze] ';
-// the day's sentence, the same all day, or the next in its pool where it repeats a word of the heading
-export function sentenceOf(g, now, head) {
+// the day's sentence first, the same all day, then the rest of its pool; those repeating a word of the heading last
+export function sentencesOf(g, now, head) {
   const values = valuesOf(g, now),
     list = POOLS[poolOf(g, now)]
       .filter(t => g.cats || !t.startsWith(CAT))
@@ -85,7 +86,7 @@ export function sentenceOf(g, now, head) {
       .filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, key]) => values[key] != null)),
     day = dayNumber(now),
     said = list.map((_, i) => fill(list[(day + i) % list.length], values));
-  return said.find(t => !sharesWord(head, t)) ?? said[0];
+  return [...said.filter(t => !sharesWord(head, t)), ...said.filter(t => sharesWord(head, t))];
 }
 // always at hand, so noting takes one tap; just: the kind just noted
 const observeRail = just =>
@@ -141,14 +142,35 @@ const HEADS = {
     night: ['Die Nacht der Bande', 'Nachtruhe bei der Bande'],
   },
 };
-export function headOf(pets, g, now, moment) {
-  if (g.birthday?.today) return `${whose(esc(calledNames([g.birthday.pet], 'head', now)))} Geburtstag`;
+// the day's wording first, then the rest of its rotation, last the name alone
+export function headsOf(pets, g, now, moment) {
+  if (g.birthday?.today) {
+    const name = esc(calledNames([g.birthday.pet], 'head', now));
+    return [`${whose(name)} Geburtstag`, name];
+  }
   const heads = HEADS[pets.length === 1 ? 'one' : pets.length === 2 ? 'two' : 'more'],
     day = new Date(now).getDay(),
     list = SLEEP.has(moment) ? heads.night : [...heads.any, ...(day % 6 ? [] : [heads.weekend])],
     ids = pets.map(p => p.id),
-    names = esc(calledNames(ids, 'head', now));
-  return fill(list[dayNumber(now) % list.length], {whose: whose(names), name: names, names, weekday: WEEKDAYS[day]});
+    names = esc(calledNames(ids, 'head', now)),
+    from = dayNumber(now) % list.length;
+  return [...list.slice(from), ...list.slice(0, from)]
+    .map(t => fill(t, {whose: whose(names), name: names, names, weekday: WEEKDAYS[day]}))
+    .concat(names);
+}
+let shown = null; // the card's headings in turn, and its sentences for a heading
+/* Measured on the card as drawn: the first heading that keeps to one line, then the first sentence that keeps to two.
+   Measured again once the typefaces are there, if they were not yet. */
+export function fitOverview() {
+  const h = $('#home .overview h2');
+  if (!h) return;
+  const p = h.nextElementSibling,
+    within = (el, n) => el.offsetHeight < (n + 0.5) * parseFloat(getComputedStyle(el).lineHeight),
+    head = shown.heads.find(t => ((h.innerHTML = t), within(h, 1))) ?? shown.heads.at(-1),
+    said = shown.said(head);
+  h.innerHTML = head;
+  p.innerHTML = said.find(t => ((p.innerHTML = t), within(p, 2))) ?? said[0];
+  if (document.fonts.status === 'loading') document.fonts.ready.then(fitOverview);
 }
 
 // noted: the entry just made, so the chip just tapped can answer
@@ -159,8 +181,8 @@ export function overviewHTML(m, noted = null) {
     ids = pets.map(p => p.id);
   const g = glance(db, ids, now),
     moment = momentOf(g, now),
-    head = headOf(pets, g, now, moment),
-    said = sentenceOf(g, now, head);
+    heads = headsOf(pets, g, now, moment);
+  shown = {heads, said: head => sentencesOf(g, now, head)};
   // a party hat on a birthday, sleepy z's at night
   const party = g.birthday?.today,
     mood = party ? ' party' : SLEEP.has(moment) ? ' sleepy' : '',
@@ -173,6 +195,6 @@ export function overviewHTML(m, noted = null) {
           .join('')}${hat}</span>`,
     just = noted && getObservation(noted)?.kind;
   return `<section class="card overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
-    <div class="ov-top">${pic}<div class="ov-text"><h2>${head}</h2><p>${said}</p></div></div>
+    <div class="ov-top">${pic}<div class="ov-text"><h2>${heads[0]}</h2><p>${shown.said(heads[0])[0]}</p></div></div>
     ${observeRail(just)}</section>`;
 }

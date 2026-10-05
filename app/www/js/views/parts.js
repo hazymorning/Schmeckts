@@ -2,7 +2,7 @@
 import {andList, cap, esc} from '../text.js';
 import {DAY, addDays, ago, clockStr, dayKey, dayLabel, dayStart} from '../dates.js';
 import {icon} from '../icons.js';
-import {observationOf, RATINGS, scaleOf, speciesIcon, TEXTURES, TYPES, typeOf} from '../config.js';
+import {observationOf, RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {held, pending, status} from '../sync.js';
 import {getPet, getProduct, isObservation, observedPets, petNames, pname, servingPets, timeOf} from '../derive.js';
@@ -277,49 +277,6 @@ export const told = (pic, say, why = '') =>
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
 export const toldBtn = (id, pic, say, why = '', end = '') =>
   `<li><button class="row" data-action="open-product" data-id="${id}">${pic}<span class="said">${say}${why ? `<small class="hint why">${why}</small>` : ''}</span>${end}</button></li>`;
-
-// no bracket for wet food (TYPES[0]); other types' textures have a title of their own
-const DIMENSION = {konsistenz: 'Konsistenz', geschmack: 'Geschmack', marke: 'Marke'};
-const dimName = d =>
-  d.kind === 'konsistenz' && d.type !== TYPES[0]
-    ? TEXTURES[d.type].title
-    : DIMENSION[d.kind] + (d.type === TYPES[0] ? '' : ` (${d.type})`);
-const upTo = (k, n) => (k < n ? `${k} von ${n}` : `alle ${n}`);
-export function habitRow(h, several) {
-  const name = id => pname(getProduct(id));
-  if (h.kind === 'sosse' || h.kind === 'eager')
-    return told(
-      sign(h.kind === 'sosse' ? 'drop' : 'r_eager'),
-      `Bei <b>${esc(andList(h.sorts.map(x => name(x.id))))}</b> ${h.kind === 'sosse' ? 'wird oft nur die Soße geleckt' : 'wird oft nur ein bissl gefressen, dann bleibt der Rest stehen'}.`,
-      esc(cap(h.sorts.map(x => `${name(x.id)} ${times(x.k, x.n)}`).join(', '))) + '.',
-    );
-  const pet = several ? getPet(h.pet) : null,
-    who = pet ? `<b>${esc(pet.name)}</b> ` : '';
-  if (h.kind === 'neugier' || h.kind === 'anlauf')
-    return told(
-      pet ? avatar(pet) : sign('sparkle'),
-      h.kind === 'neugier'
-        ? `${who}${pet ? 'ist neugierig' : 'Neugierig'}: Neues kommt erst gut an, dann lässt es nach.`
-        : `${who}${pet ? 'braucht' : 'Braucht'} Anlauf: beim ersten Mal bleibt öfter was übrig als später.`,
-      `<b>${h.first.good} von ${h.first.n} Sorten</b> beim ersten Mal gut gefressen, danach ${h.later.good} von ${h.later.n} Mal.`,
-    );
-  return told(
-    pet ? avatar(pet) : sign('repeat'),
-    h.kind === 'abwechslung'
-      ? `${who}${pet ? 'mag' : 'Mag'} Abwechslung: kurz nach derselben Sorte bleibt öfter was übrig.`
-      : `${who}${pet ? 'ist ein Gewohnheitstier' : 'Gewohnheitstier'}: dieselbe Sorte kurz hintereinander kommt besser an.`,
-    `Kurz nach derselben Sorte <b>${times(h.same.good, h.same.n)}</b> gut gefressen, sonst ${upTo(h.other.good, h.other.n)}.`,
-  );
-}
-// not a button, nothing opens from it yet. g: a group of profile() in smart.js
-const groupRow = (m, g, clear) =>
-  `<li class="row"><span class="t-main"><span class="t-top"><b>${esc(g.key)}</b>${clear ? '<span class="badge">deutlich</span>' : ''}</span>
-    <small>${cap(`${times(g.good, g.n)} gut gefressen`)}</small></span>${strip(ratingsIn(m, g.ids))}</li>`;
-
-export const likesList = (m, d) =>
-  `<h3 class="label grp">${dimName(d)}</h3><ul class="list likes">${d.groups
-    .map((g, i) => groupRow(m, g, d.clear && (i === 0 || i === d.groups.length - 1)))
-    .join('')}</ul>`;
 
 const waitingText = n => (n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '');
 const ERROR_TITLE = {auth: 'Code prüfen', protocol: 'Update nötig', locked: 'Kurz gesperrt'};

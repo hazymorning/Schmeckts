@@ -71,8 +71,8 @@
   --type-level: 400 13px/1.25 var(--font-ui);
   --type-level-strong: 600 13px/1.25 var(--font-ui);
   --type-paper: 500 16px/1.35 var(--font-display); /* a fact on the calendar sheet */
-  --type-paper-day: 600 27px/1 var(--font-display); /* its day, always with --track-title */
-  --type-paper-date: 600 9.5px/1.2 var(--font-ui); /* its weekday and month in capitals, always with --track-caps */
+  --type-paper-day: 600 22px/1 var(--font-display); /* its day, always with --track-title */
+  --type-paper-date: 600 9.5px/1.2 var(--font-ui); /* its weekday in capitals, always with --track-caps */
   --type-stamp: 700 9px/1 var(--font-ui); /* its stamp in capitals, always with --track-caps */
   --weight-strong: 600; /* b and strong in running text */
   --track-title: -0.015em; /* Faustina runs narrow at title size */
@@ -106,7 +106,7 @@
   --z-strip: 5; /* behind the status bar */
   --z-toast: 6;
 
-  --icon-xs: 12px; /* in the calendar sheet's stamp */
+  --icon-xs: 12px; /* in the calendar sheet's stamp and a medal */
   --icon-s: 20px; /* inside controls */
   --icon: 24px; /* on its own */
   --icon-l: 32px; /* a rating as the content */
@@ -117,6 +117,7 @@
   --control: 52px;
   --control-l: 56px; /* feeding button, settings row */
   --bar: 56px; /* a plain length: views/sheets.js reads it through --stick */
+  --pic-badge: 18px; /* a medal or place on a packaging's corner */
   --pic-xs: 24px;
   --pic-s: 32px;
   --pic-m: 40px;
@@ -200,15 +201,25 @@
 }
 
 /* Every @keyframes in the app; app.css defines none */
-@property --rail-fade {
+@property --rail-start {
   syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
-/* scrolled to its end, a rail no longer fades out */
+@property --rail-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+/* over the first and the last stretch it scrolls, a rail starts and stops fading out */
+@keyframes railStart {
+  to {
+    --rail-start: var(--space-7);
+  }
+}
 @keyframes railEnd {
   from {
-    --rail-fade: var(--space-7);
+    --rail-end: var(--space-7);
   }
 }
 @keyframes fadeIn {
@@ -346,9 +357,6 @@
   }
 }
 @keyframes tearOff {
-  0% {
-    transform: rotate(-0.7deg);
-  }
   18% {
     transform: translateY(3px) rotate(-2.5deg);
   }
