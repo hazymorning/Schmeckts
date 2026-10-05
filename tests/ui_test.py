@@ -1414,19 +1414,18 @@ async def test_news(browser, url):
     await tap(pg, '#sheet [data-action=close]')
     check(
         title == [await pg.evaluate(NEWEST, False)] and await pg.locator(CARD).count() == 1,
-        'no cat calendar: the news of its own, which has nothing to use and stays until hidden',
+        'no cat calendar: the news for it, which a variety opened does not use',
     )
     await ctx.close()
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
-    await pg.clock.set_fixed_time('2026-10-12T12:00:00+02:00')
-    await change(pg, "s.prefs.sheetDay = '2026-10-11'")  # yesterday's sheet hangs
     title = await pg.locator(f'{CARD} h2').all_inner_texts()
-    pad = await pg.locator(f'{CARD} h2 .ic').count()
-    await tap(pg, '#home .calsheet[data-action=tear]')
+    await tap(pg, f'{CARD} [data-action=open-evaluation]')
+    level = await pg.evaluate(LEVEL)
+    await tap(pg, '#sheet [data-action=settings-back]')
     check(
-        title == [await pg.evaluate(NEWEST, True)] and pad == 1 and await pg.locator(CARD).count() == 0,
-        'with the cat calendar its news, under the calendar’s icon, gone once a sheet is torn off',
+        title == [await pg.evaluate(NEWEST, True)] and level[1] == 'evaluation' and await pg.locator(CARD).count() == 0,
+        'with the cat calendar the news for it; its button opens „Vorlieben“, and then it is gone',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()

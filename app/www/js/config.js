@@ -345,6 +345,14 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    ic: an icon before the title. */
 export const NEWS = [
   {
+    v: '0.32.0',
+    use: 'evaluation',
+    title: 'Erkenntnisse',
+    say: 'Unter Vorlieben steht jetzt, was wirklich hilft, zum Beispiel ob Pastete besser ankommt als Soße oder ob Snacks den Appetit verderben.',
+    why: 'Tops und Flops heißen jetzt auch so.',
+    go: ['evaluation', 'Vorlieben öffnen'],
+  },
+  {
     v: '0.31.0',
     use: 'calendar',
     cat: true,
