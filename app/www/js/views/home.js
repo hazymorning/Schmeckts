@@ -41,7 +41,7 @@ import {
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
-import {overviewHTML} from './overview.js';
+import {fitOverview, overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
 import {catOf, hangingDay, sheetOn, sheetText} from './facts.js';
 
@@ -129,7 +129,7 @@ export function renderHome() {
   renderMood();
   const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
   $('#home').innerHTML = homeHTML();
-  fitTexts();
+  fitOverview();
   if (rail) $('#home .obs').scrollLeft = rail;
   $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
@@ -257,49 +257,6 @@ function newsHTML() {
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
-/* The two texts at the top fill their two lines: each breaks as it does at 360px, set larger on a wider phone.
-   [its width at 360px, the smallest and largest size there, the largest at all] */
-const FIT = {'.overview p': [202, 14, 15.5, 17.5], '.cal-text': [288, 16, 22, 24]};
-let fitWidth = null; // the home page's width at the last fitting; null: not watched yet
-export function fitTexts() {
-  const home = $('#home');
-  if (fitWidth == null) {
-    // a frame later: fitting while the observer reports would resize what it watches
-    new ResizeObserver(() => requestAnimationFrame(() => home.clientWidth !== fitWidth && fitTexts())).observe(home);
-    document.fonts.addEventListener('loadingdone', fitTexts);
-  }
-  fitWidth = home.clientWidth;
-  for (const [sel, [width, min, max, most]] of Object.entries(FIT))
-    for (const el of home.querySelectorAll(sel)) {
-      const k = el.clientWidth / width;
-      if (k) fitTwoLines(el, Math.min(min * k, most), Math.min(max * k, most));
-    }
-}
-// the largest size from min to max at which el keeps to two lines, in eight halvings
-function fitTwoLines(el, min, max) {
-  const fits = px => {
-    el.style.fontSize = px + 'px';
-    return lines(el) <= 2;
-  };
-  if (fits(max)) return;
-  let lo = min,
-    hi = max;
-  for (let i = 0; i < 8; i++) {
-    const mid = (lo + hi) / 2;
-    if (fits(mid)) lo = mid;
-    else hi = mid;
-  }
-  fits(lo);
-}
-// boxes less than half a line apart share one, also on the tilted calendar sheet
-function lines(el) {
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const tops = [...range.getClientRects()].map(r => r.top).sort((a, b) => a - b),
-    half = parseFloat(el.style.fontSize) / 2;
-  return tops.filter((top, i) => !i || top - tops[i - 1] > half).length;
-}
-
 // The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
@@ -312,7 +269,7 @@ const STAMPS = {
   Sprache: 'speech',
 };
 const named = (d, part) => d.toLocaleDateString('de-DE', {[part]: 'long'});
-/* A day's sheet, the day red on Sundays and on days with a sheet of their own, as on a real tear-off calendar. Today's
+/* A day's sheet, the date red on Sundays and on days with a sheet of their own, as on a real tear-off calendar. Today's
    Stimmt’s? turns over on a tap, its back stamped with the verdict. */
 function face(date, hanging = false) {
   const {sheet, format} = sheetOn(date),
@@ -325,7 +282,7 @@ function face(date, hanging = false) {
         : icon(format ? STAMPS[format] : 'star') + (format ?? 'Heute');
   return {
     label: hanging ? 'Gestriges Blatt abreißen' : sheet.back ? (back ? 'Behauptung zeigen' : 'Auflösung zeigen') : '',
-    html: `<div class="cal-head"><span class="cal-day${!d.getDay() || !format ? ' red' : ''}">${d.getDate()}</span><span class="cal-dm"><span>${named(d, 'weekday')}</span><span>${named(d, 'month')}</span></span><span class="cal-stamp${back ? ' verdict' : ''}">${stamp}</span></div>
+    html: `<div class="cal-head"><span class="cal-date"><span class="cal-wd">${named(d, 'weekday')}</span><span class="cal-day${!d.getDay() || !format ? ' red' : ''}"><b>${d.getDate()}.</b> ${named(d, 'month')}</span></span><span class="cal-stamp${back ? ' verdict' : ''}">${stamp}</span></div>
       <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
   };
 }
@@ -377,7 +334,6 @@ function paint(el) {
   const c = face(Date.now());
   el.innerHTML = c.html;
   el.setAttribute('aria-label', c.label);
-  fitTexts();
 }
 
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing

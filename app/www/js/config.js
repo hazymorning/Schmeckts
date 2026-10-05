@@ -285,7 +285,7 @@ export const OBSERVATIONS = {
   happy: {
     icon: 'o_happy',
     label: 'Gut drauf',
-    said: 'Gute Laune ist notiert. Das hört man gern.',
+    said: 'Notiert: gut drauf. Das hört man gern.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -294,7 +294,7 @@ export const OBSERVATIONS = {
   stink: {
     icon: 'o_stink',
     label: 'Stunk',
-    said: 'Stunk ist notiert. Lüften schadet sicher nicht.',
+    said: 'Notiert: Stunk. Lüften schadet sicher nicht.',
     about: 'meal',
     within: 24,
     window: 'in den 24 Stunden',
@@ -302,8 +302,8 @@ export const OBSERVATIONS = {
   },
   hungry: {
     icon: 'o_hungry',
-    label: 'Noch Hunger',
-    said: 'Noch Hunger ist notiert. Vielleicht war die Portion knapp.',
+    label: 'Extra hungrig',
+    said: 'Notiert: extra hungrig. Vielleicht war die Portion knapp.',
     about: 'meal',
     within: 3,
     window: 'in den drei Stunden',
@@ -311,14 +311,14 @@ export const OBSERVATIONS = {
   },
   tired: {
     icon: 'o_tired',
-    label: 'Müde',
-    said: 'Müdigkeit ist notiert. Ein ruhiger Tag tut gut.',
+    label: 'Besonders müde',
+    said: 'Notiert: besonders müde. Ein ruhiger Tag tut gut.',
     about: 'day',
   },
   vomit: {
     icon: 'o_vomit',
     label: 'Erbrochen',
-    said: 'Erbrechen ist notiert. Hoffentlich bleibt es dabei.',
+    said: 'Notiert: Erbrechen. Hoffentlich bleibt es dabei.',
     about: 'meal',
     within: 6,
     window: 'in den sechs Stunden',
@@ -326,7 +326,7 @@ export const OBSERVATIONS = {
   },
 };
 export const observationOf = kind =>
-  OBSERVATIONS[kind] || {icon: 'sparkle', label: 'Beobachtung', said: 'Ist notiert', about: 'day'};
+  OBSERVATIONS[kind] || {icon: 'sparkle', label: 'Beobachtung', said: 'Notiert.', about: 'day'};
 
 // rating reminder, minutes after serving, 0 = off
 export const REMIND = [0, 60, 180, 360];

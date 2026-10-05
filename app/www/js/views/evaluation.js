@@ -2,29 +2,16 @@
 import {andList, cap, esc} from '../text.js';
 import {DAY} from '../dates.js';
 import {icon} from '../icons.js';
-import {observationOf, TEXTURES} from '../config.js';
+import {observationOf} from '../config.js';
 import {db} from '../store.js';
-import {
-  calledNames,
-  evaluationModel,
-  getPet,
-  getProduct,
-  habitsModel,
-  model,
-  petNames,
-  pname,
-  profileModel,
-  rankingModel,
-} from '../derive.js';
-import {GOOD, goodOf, poorOf, ratingsIn, shopGroups} from '../smart.js';
+import {calledNames, evaluationModel, getPet, getProduct, model, petNames, pname, rankingModel} from '../derive.js';
+import {goodOf, poorOf, ratingsIn, shopGroups} from '../smart.js';
 import {
   avatar,
   cardHead,
   evidenceOf,
   forWhom,
-  habitRow,
   head,
-  likesList,
   lower,
   obsThumb,
   SIDE,
@@ -77,7 +64,7 @@ const needs = (t, several) =>
   `noch ${t.need === 1 ? 'einmal' : 'zweimal'}${forPet(t, several)} servieren und bewerten, dann steht’s fest`;
 // lists, with their empty sides, show once a side or a settled variety exists
 const listed = r => r.top.length || r.flop.length || (r.settled && !r.stale);
-// the variety an empty Leibgericht side names, so „Als Nächstes“ leaves it out
+// the variety an empty Tops side names, so „Als Nächstes“ leaves it out
 const candidate = r => (r.top.length || r.stale ? null : r.trials[0]);
 const toRate = (t, several) => `noch ${t.need}×${forPet(t, several)} bewerten`;
 const onTheWay = (t, several) => `Auf gutem Weg: ${named(t.e)}, ${toRate(t, several)}`;
@@ -92,9 +79,9 @@ function waiting(m, r) {
 }
 
 const PICKS = 2; // varieties a side shows on the card
-const SIDES = {top: ['Kommt an', 'Leibgericht'], flop: ['Bleibt stehen', 'Ladenhüter']};
-/* A variety on the card, as in the history: its packaging, the best of a side marked as its Leibgericht or
-   Ladenhüter, how it went down, its ratings. t: a candidate for Leibgericht, which says what it lacks instead. */
+const SIDES = {top: 'Tops', flop: 'Flops'};
+/* A variety on the card, as in the history: its packaging, the best of a side marked, how it went down, its ratings.
+   t: a candidate for the Tops, which says what it lacks instead. */
 function sideRow(m, e, side, first, t = null) {
   const p = e.product,
     brand = brandOf(p),
@@ -102,16 +89,16 @@ function sideRow(m, e, side, first, t = null) {
     said = t ? toRate(t, several) : saidOf(e, side),
     [ic, tone] = SIDE[side],
     medal = first ? `<span class="medal ${tone}">${icon(ic)}</span>` : '',
-    label = `${first ? `${SIDES[side][1]}: ` : ''}${pname(p)}${brand ? ` von ${brand}` : ''}. ${cap(said)}.`;
+    label = `${pname(p)}${brand ? ` von ${brand}` : ''}. ${cap(said)}.`;
   return `<li><button class="row" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="ranked">${thumbOf(null, p)}${medal}</span>
     <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(' · ')))}</small></span>${strip(ratingsIn(m, [e.id]), t && !several ? t.need : 0)}</button></li>`;
 }
-// what goes down well and what is left, a side only where it has a variety; without a Leibgericht the closest one
+// what goes down well and what is left, a side only where it has a variety; without a Top the closest one
 function sideList(m, r, side) {
   const t = side === 'top' && candidate(r),
     rows = t ? [sideRow(m, t.e, side, false, t)] : r[side].slice(0, PICKS).map((e, i) => sideRow(m, e, side, !i));
   return rows.length
-    ? `<h3 class="side ${SIDE[side][1]}">${SIDES[side][0]}</h3><ul class="picks">${rows.join('')}</ul>`
+    ? `<h3 class="side ${SIDE[side][1]}">${SIDES[side]}</h3><ul class="picks">${rows.join('')}</ul>`
     : '';
 }
 const SHOP_SHOWN = 3;
@@ -199,28 +186,27 @@ function listsHTML(m, r, x) {
   if (!listed(r)) return ''; // the first card says why
   const top = r.top.slice(0, PLACES),
     flop = r.flop.slice(0, PLACES);
-  const tops = top.length
-    ? card(
-        listTitle('top', top.length > 1 ? 'Leibgerichte' : 'Leibgericht'),
-        (r.flat ? say('Die Sorten liegen noch so nah beieinander, dass die Reihenfolge Zufall sein kann.') : '') +
-          places(m, x, top, 'top'),
-      )
-    : card(
-        listTitle('top', 'Noch kein Leibgericht'),
-        candidate(r) ? toldList([trialRow(m, candidate(r), true)]) : say(noneYet(r)),
-      );
-  const flops = flop.length
-    ? card(listTitle('flop', 'Ladenhüter'), places(m, x, flop, 'flop'))
-    : r.settled < 3
-      ? card(listTitle('flop', 'Noch kein Ladenhüter'), say('Dafür ist noch zu wenig bewertet.'))
-      : card(
-          listTitle('flop', 'Kein Ladenhüter'),
-          say(
-            r.settled === r.top.length
-              ? 'Alles, was feststeht, kommt gut an.'
-              : 'Keine Sorte bleibt regelmäßig stehen.',
+  const tops = card(
+      listTitle('top', SIDES.top),
+      top.length
+        ? (r.flat ? say('Die Sorten liegen noch so nah beieinander, dass die Reihenfolge Zufall sein kann.') : '') +
+            places(m, x, top, 'top')
+        : candidate(r)
+          ? toldList([trialRow(m, candidate(r), true)])
+          : say(noneYet(r)),
+    ),
+    flops = card(
+      listTitle('flop', SIDES.flop),
+      flop.length
+        ? places(m, x, flop, 'flop')
+        : say(
+            r.settled < 3
+              ? 'Dafür ist noch zu wenig bewertet.'
+              : r.settled === r.top.length
+                ? 'Alles, was feststeht, kommt gut an.'
+                : 'Keine Sorte bleibt regelmäßig stehen.',
           ),
-        );
+    );
   return tops + flops;
 }
 
@@ -335,65 +321,93 @@ function splitCard(m, r) {
   );
 }
 
-// shows only where several people feed and the pets eat clearly better with one of them
-function feederCard(x) {
-  const f = x.feeder;
-  if (!f) return '';
-  const others = esc(andList(f.others));
-  return card(
-    'Bei wem schmeckt’s?',
-    toldList([
-      told(
-        sign('person'),
-        `Bei <b>${esc(f.name)}</b> schmeckt’s besser als bei ${others}.`,
-        `Dieselben Sorten, gleich oft serviert: bei ${esc(f.name)} <b>${times(f.good, f.n)}</b> gut gefressen, bei ${others} ${times(f.theirs, f.n)}.`,
-      ),
-    ]),
-  );
+/* Erkenntnisse, each a sentence on what helps when buying and feeding and below it the counts it rests on; the
+   strongest on the card, all of them on its page */
+const INSIGHTS = 3;
+const TEXTURE_SAID = {
+  pastete: 'Pastete',
+  sosse: 'Stückchen in Soße',
+  gelee: 'Stückchen in Gelee',
+  mousse: 'Mousse',
+  block: 'fester Block',
+  suppe: 'Suppe',
+};
+const ofN = x => `${x.good} von ${x.n}`;
+function compared(ic, {kind, a, b}) {
+  const [A, B] = [a.key, b.key].map(key => esc(kind === 'konsistenz' ? TEXTURE_SAID[key] : key));
+  return [
+    ic,
+    `Bisher kommt <b>${A}</b> besser an als ${B}.`,
+    `${cap(A)} <b>${ofN(a)} Mal</b> gut gefressen, ${B} ${ofN(b)} Mal.`,
+  ];
 }
-
-const DIM_ICON = {konsistenz: 'layers', geschmack: 'fish', marke: 'tag'};
-const inText = (d, key) => (d.kind === 'konsistenz' ? key.replace(/^(In|Fester) /, w => w.toLowerCase()) : key);
-const SHELF = {
-  sosse: 'in Soße',
-  gelee: 'in Gelee',
-  pastete: 'als Pastete',
-  mousse: 'als Mousse',
-  block: 'am Stück',
-  suppe: 'als Suppe',
+// [icon, the sentence, the counts], as HTML
+const INSIGHT = {
+  marke: x => compared('tag', x),
+  geschmack: x => compared('fish', x),
+  konsistenz: x => compared('layers', x),
+  sosse: ({k, n}) => [
+    'drop',
+    'Bei Stückchen in Soße wird oft nur die Soße geleckt.',
+    `<b>${k} von ${n} Mal</b> nur die Soße. Eine Pastete wäre einen Versuch wert.`,
+  ],
+  wiederholung: ({a, b}) => [
+    'repeat',
+    'Zweimal hintereinander dieselbe Sorte kommt schlechter an.',
+    `Beim zweiten Mal <b>${ofN(a)} Mal</b> gut gefressen, sonst ${ofN(b)} Mal.`,
+  ],
+  neu: ({a, b, gap}) => [
+    'sparkle',
+    gap > 0
+      ? 'Neue Sorten kommen beim ersten Mal besser an als danach.'
+      : 'Neue Sorten brauchen eine Weile, danach läuft es besser.',
+    `Beim ersten Mal <b>${ofN(a)}</b>, danach ${ofN(b)} Mal gut gefressen.`,
+  ],
+  tageszeit: ({a, b, gap}) => [
+    gap > 0 ? 'sun' : 'moon',
+    gap > 0 ? 'Morgens wird besser gefressen als abends.' : 'Abends wird besser gefressen als morgens.',
+    `Morgens <b>${ofN(a)} Mal</b> gut gefressen, abends ${ofN(b)} Mal.`,
+  ],
+  snack: ({a, b}) => [
+    'r_verputzt',
+    'Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.',
+    `Nach Snacks <b>${ofN(a)} Mal</b> gut gefressen, sonst ${ofN(b)} Mal.`,
+  ],
+  feeder: ({a, b}) => {
+    const [A, B] = [esc(a.key), esc(andList(b.key))];
+    return [
+      'person',
+      `Bei <b>${A}</b> kommt dasselbe Futter besser an als bei ${B}.`,
+      `Bei ${A} <b>${ofN(a)} Mal</b> gut gefressen, bei ${B} ${ofN(b)} Mal.`,
+    ];
+  },
 };
-const lookFor = d => {
-  const key = d.groups[0].key;
-  if (d.kind !== 'konsistenz') return `${d.kind === 'geschmack' ? 'mit' : 'von'} ${key}`;
-  return SHELF[TEXTURES.Nassfutter.items.find(([, label]) => label === key)?.[0]] || key;
-};
-const HABITS = 2; // max habits shown without a comparison
-function patternCard(m, x) {
-  const dims = profileModel(),
-    habits = dims.length ? [] : habitsModel();
-  if (!dims.length && !habits.length) return '';
-  const rows = x.patterns.map(d => {
-    const [a, z] = [d.groups[0], d.groups.at(-1)];
-    return told(
-      sign(DIM_ICON[d.kind]),
-      d.clear
-        ? `<b>${esc(a.key)}</b> kommt deutlich besser an als ${esc(inText(d, z.key))}.`
-        : `Bisher kommt <b>${esc(inText(d, a.key))}</b> besser an als ${esc(inText(d, z.key))}.`,
-      `${d.type === 'Nassfutter' ? '' : `${esc(d.type)}: `}${esc(a.key)} <b>${times(a.good, a.n)}</b> gut gefressen, ${esc(inText(d, z.key))} ${times(z.good, z.n)}.`,
-    );
-  });
-  const tips = x.patterns.filter(d => d.clear && d.groups[0].share * 100 >= GOOD).map(d => esc(lookFor(d))),
-    first = [...dims].sort((a, b) => b.clear - a.clear || b.gap - a.gap)[0];
-  const body = rows.length
-    ? toldList(rows)
-    : first
-      ? likesList(m, {...first, groups: [first.groups[0], first.groups.at(-1)]})
-      : toldList(habits.slice(0, HABITS).map(h => habitRow(h, db.pets.length > 1 && !m.pet)));
-  return `<section class="card">${cardHead('Worauf es ankommt', 'open-level', 'Mehr dazu', 'Mehr', 'profile')}${tips.length ? say(`Neues probierst du am besten <b>${andList(tips)}</b>.`) : ''}${body}</section>`;
+export const insightSaid = x => INSIGHT[x.kind](x);
+const insightRows = list =>
+  toldList(
+    list.map(x => {
+      const [ic, ...said] = insightSaid(x);
+      return told(sign(ic), ...said);
+    }),
+  );
+function insightsCard(x) {
+  const list = x.insights;
+  if (!list.length) return '';
+  const title = 'Erkenntnisse';
+  return `<section class="card">${list.length > INSIGHTS ? cardHead(title, 'open-level', 'Alle Erkenntnisse', 'Mehr', 'insights') : `<h2>${title}</h2>`}${insightRows(list.slice(0, INSIGHTS))}</section>`;
+}
+const BUYING = new Set(['marke', 'geschmack', 'konsistenz', 'sosse']);
+export function viewInsights() {
+  const list = evaluationModel().insights,
+    part = (title, buying) => {
+      const rows = list.filter(x => BUYING.has(x.kind) === buying);
+      return rows.length ? card(title, insightRows(rows)) : '';
+    };
+  return `${head('Erkenntnisse')}${part('Beim Kaufen', true)}${part('Beim Füttern', false)}`;
 }
 
 const TRIALS = 3;
-// a variety still in its trial, with the ratings it has and the ones it lacks; best: the one closest to Leibgericht
+// a variety still in its trial, with the ratings it has and the ones it lacks; best: the one closest to the Tops
 function trialRow(m, t, best = false) {
   const several = m.pets.length > 1;
   return toldBtn(
@@ -458,7 +472,7 @@ function footHTML(m, b) {
         ...(first.getFullYear() === new Date().getFullYear() ? {} : {year: 'numeric'}),
       });
     parts.push(
-      `Leibgerichte und Ladenhüter beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, pro Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
+      `Tops und Flops beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, pro Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
     );
   }
   if (b.left.length)
@@ -480,5 +494,5 @@ export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${feederCard(x)}${patternCard(m, x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${insightsCard(x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
 }

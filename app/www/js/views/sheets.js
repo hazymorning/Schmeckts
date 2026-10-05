@@ -24,9 +24,7 @@ import {
   getProduct,
   getServing,
   observationsInFilter,
-  habitsModel,
   model,
-  profileModel,
   petNames,
   pname,
   productsByCode,
@@ -52,11 +50,9 @@ import {
   evidenceOf,
   forWhom,
   group,
-  habitRow,
   head,
   labelled,
   lead,
-  likesList,
   main,
   nameBlock,
   obsThumb,
@@ -78,7 +74,7 @@ import {
   whoObserved,
 } from './parts.js';
 import {paintHouse, viewSettings} from './settings.js';
-import {viewEvaluation} from './evaluation.js';
+import {viewEvaluation, viewInsights} from './evaluation.js';
 
 // the variety on top of a sheet; with the full photo on this phone, the thumbnail opens it
 const prodRow = (s, p, inner, action, label) =>
@@ -522,23 +518,6 @@ function viewShop() {
     }${unclear(g).length ? `<section class="card"><h2>Noch unklar</h2>${foldBox('unklar')}</section>` : ''}`;
 }
 
-function viewProfile() {
-  const m = model(),
-    dims = profileModel(),
-    habits = habitsModel(),
-    several = db.pets.length > 1 && !m.pet;
-  return `${head('Worauf es ankommt')}
-    <section class="card"><h2>Was ankommt</h2>${
-      dims.length
-        ? dims.map(d => likesList(m, d)).join('')
-        : '<p class="hint card-line">Noch zu wenig bewertet. Nach ein paar Wochen steht hier, was dein Tier mag.</p>'
-    }</section>${
-      habits.length
-        ? `<section class="card"><h2>Gewohnheiten</h2>${toldList(habits.map(h => habitRow(h, several)))}</section>`
-        : ''
-    }`;
-}
-
 // draws a page of days past the target, otherwise it cannot scroll to the top
 export function jumpToDay(key) {
   const at = histDays.findIndex(g => g.key === key);
@@ -654,8 +633,9 @@ const VIEWS = {
   pet: viewPet,
   settings: () => (sheet.page === 'pet' ? viewPet() : viewSettings()),
   report: viewReport,
-  // profile and shopping list are levels of the evaluation, so back returns there
-  evaluation: () => (sheet.page === 'profile' ? viewProfile() : sheet.page === 'shop' ? viewShop() : viewEvaluation()),
+  // insights and shopping list are levels of the evaluation, so back returns there
+  evaluation: () =>
+    sheet.page === 'insights' ? viewInsights() : sheet.page === 'shop' ? viewShop() : viewEvaluation(),
 };
 /* An unchanged view is left alone: a sync redraws every open sheet, and rewriting would lose decoded photos, scroll
    position and focus. Kept per body, page and sheet. Boxes filled afterwards are not compared and always redrawn. */

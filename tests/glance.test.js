@@ -30,7 +30,10 @@ Object.assign(globalThis, {window: globalThis, document: stub, matchMedia: stub,
 const stored = {'schmeckts-prefs': JSON.stringify({torn: 3})};
 globalThis.localStorage = {getItem: k => stored[k] ?? null, setItem: (k, v) => (stored[k] = v), removeItem: () => {}};
 const {prefs, replaceDb} = await import('../app/www/js/store.js');
-const {headOf, poolOf, sentenceOf, valuesOf} = await import('../app/www/js/views/overview.js');
+const {headsOf, poolOf, sentencesOf, valuesOf} = await import('../app/www/js/views/overview.js');
+// what the card draws first, before it measures
+const headOf = (...a) => headsOf(...a)[0],
+  sentenceOf = (...a) => sentencesOf(...a)[0];
 
 const at = text => new Date(text).getTime();
 const NOW = at('2026-06-10T12:00');
@@ -254,6 +257,12 @@ test('the overview sentence: a meal left takes its own pool where there is one, 
   }
   const [later, noon] = STATES.later;
   assert.equal(sentenceOf(later, t('09:00'), 'Minka heute'), sentenceOf(later, t('16:00'), 'Minka heute'));
+  const turn = sentencesOf(g, now, head),
+    sharing = turn.findIndex(s => sharesWord(head, s));
+  assert.ok(
+    turn.length === list.length && sharing > 0 && turn.slice(sharing).every(s => sharesWord(head, s)),
+    'the rest of the pool follows, those repeating a word of the heading last',
+  );
 
   const party = age => ({...later, birthday: {pet: MINKA, today: true, age}}),
     week = [...Array(8).keys()].map(i => addDays(noon, i)),
@@ -265,7 +274,7 @@ test('the overview sentence: a meal left takes its own pool where there is one, 
   );
 });
 
-test('the overview heading: whose day it is, a wording a day, the birthday and the night their own', () => {
+test('the overview heading: whose day it is, a wording a day, the birthday and the night their own, the name alone last', () => {
   const DAY = 864e5,
     T = at('2026-10-05T12:00'); // a Monday
   const pets = [
@@ -300,6 +309,16 @@ test('the overview heading: whose day it is, a wording a day, the birthday and t
     [0, 1, 2, 3].map(i => headOf(pets, {}, T + i * DAY, 'later')).every(h => !/Mau|Felix|Kiwi/.test(h)),
     'more than two: the bunch, no list of names',
   );
+  const turn = headsOf([pets[1]], {}, T, 'later');
+  assert.deepEqual(
+    [turn.length, new Set(turn).size, turn.at(-1)],
+    [9, 9, 'Felix'],
+    'the rest of the rotation, eight on a weekday, then the name alone',
+  );
+  assert.deepEqual(headsOf([pets[1]], {birthday: {pet: 'felix00001', today: true}}, T, 'later'), [
+    'Felix’ Geburtstag',
+    'Felix',
+  ]);
 });
 
 test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is known, she or he as it is', () => {

@@ -188,7 +188,8 @@ async def test_views(browser, url, scheme):
     await scan()
     await tap('[data-sec=evaluation] [data-action=open-evaluation]')
     await scan()
-    await tap('#sheet [data-action=open-level][data-v=profile]')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.openPage('insights'))")  # the demo may have too few for „Mehr“
+    await idle(pg)
     await scan()
     await tap('#sheet [data-action=settings-back]')
     await tap('#sheet .head [data-action=open-level][data-v=shop]')
