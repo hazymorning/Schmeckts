@@ -148,7 +148,8 @@ function slidePage(how, swap) {
   }
 }
 export const isClosing = () => !!(base.closing || over.closing);
-export const leaving = el => [base, over].some(L => L.closing && L.dlg.contains(el));
+// the toast rides along in a closing sheet until it lands on the page, and its undo stays live
+export const leaving = el => !el.closest('#toast') && [base, over].some(L => L.closing && L.dlg.contains(el));
 
 export function closeSheet(fromPop = false) {
   const L = top();

@@ -524,6 +524,11 @@ test('Erkenntnisse on sauce: at least four in ten ratings of the varieties in sa
     ],
     'the texture that goes down well is named, not one that does not',
   );
+  assert.deepEqual(
+    sauce([...licked, ...rate('p', 'A', [X, X, X, X, T])]),
+    [['Bei Stückchen in Soße wird oft nur die Soße geleckt.', '4 von 10 Mal nur die Soße.']],
+    'no texture goes down better: no advice',
+  );
   assert.deepEqual(sauce([...rate('a', 'A', [S, S, T]), ...rate('b', 'A', [S])]), [], 'four ratings are too few');
   assert.deepEqual(
     sauce([...rate('a', 'A', [S, T, T, T, T]), ...rate('b', 'A', [S, S, T, T, T]), ...rate('x', 'A', [S, S])]),

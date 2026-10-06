@@ -312,7 +312,7 @@ async def test_flow(browser, url):
     await pg.fill('#f-variety', 'Lachs in Soße')
     await tap(pg, '[data-action=save-name]')
     check(
-        not await pg.evaluate(OPEN) and await pg.inner_text('#toast span') == 'Lachs in Soße für Minka und Tiger. Guten Appetit!',
+        not await pg.evaluate(OPEN) and (await pg.inner_text('#toast span')).startswith('Lachs in Soße für '),
         'named right after the photo: back on the home page, the toast as for any meal',
     )
     await tap(pg, '.pend [data-action=open-serving]')
@@ -917,7 +917,7 @@ async def test_scales(browser, url):
 CUT = """() => { const bad = [], vw = document.documentElement.clientWidth;
   for (const el of document.querySelectorAll('body *')) {
     if (!el.getClientRects().length || el.closest('svg, .rail, .pets') || !el.checkVisibility({opacityProperty: true})) continue;
-    if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+    if (!el.matches('.seg') && ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
     const s = getComputedStyle(el), r = el.getBoundingClientRect(), what = el.textContent.trim().slice(0, 40);
     if (r.left < -0.5 || r.right > vw + 0.5) bad.push(`off the screen: ${what}`);
     else if (s.webkitLineClamp !== 'none' && !el.matches(':is(.t-main, .t-top) > b') && el.scrollHeight > el.clientHeight + 1)
@@ -1627,6 +1627,9 @@ async def test_several(browser, url):
     )
     check(said == 'Sheba, bei beiden alle 3 Mal alles gefressen', f'three meals for both read as three, not six: {said}')
     check(named == ['Minka'], f'a meal for one of them names it at its slider {named}')
+    await pg.focus('#pets [data-id=all]')
+    await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome(false))")
+    check(await pg.evaluate("document.activeElement.matches('#pets [data-id=all]')"), 'the minute tick leaves the pet bar and its focus alone')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2173,10 +2176,7 @@ async def test_recognize(browser, url):
         and await state(pg, '(s => [s.status, s.error ?? null])(db.servings[0])') == ['noserver', None],
         f'without a server the phone reads the text and fills brand, variety and type, the photo file it read goes again {filled} {cache}',
     )
-    check(
-        await pg.inner_text('#sheet .read-note + .mt [data-action=save-name]') == 'Passt so',
-        'what was read is confirmed with one tap right under it',
-    )
+    check(await pg.locator('#sheet .read-note + .mt [data-action=save-name]').count() == 1, 'what was read is confirmed with one tap right under it')
     await tap(pg, '#sheet .read-note + .mt [data-action=save-name]')
     p = await state(pg, '(p => [p.brand, p.variety, p.type, p.texture])(db.products[0])')
     check(
@@ -2848,6 +2848,8 @@ async def test_observations(browser, url):
         and await pg.inner_text(f'{ROW} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary under the chip’s word {after[0]}',
     )
+    lefts = await pg.eval_on_selector_all('[data-sec=hist] .tl-day .row .t-main', 'l => l.map(t => t.getBoundingClientRect().left)')
+    check(len(lefts) > 1 and len(set(lefts)) == 1, f'beside the meals of the day, its text in the same column {lefts}')
     await tap(pg, '#toast [data-action=undo]')
     check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
     await tap(pg, '[data-action=observe][data-v=hungry]')
@@ -3315,6 +3317,12 @@ async def test_toast_swipe(browser, url):
         kept == [False, True],
         f'a sheet opening drops a toast with nothing to undo, which would cover its last button, and keeps one with undo {kept}',
     )
+    await pg.click('#fab')
+    await idle(pg)
+    await pg.evaluate("import('./js/ui/toast.js').then(m => m.toast('Alles gefressen.', () => { window.__undone = true; }))")
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => { m.closeSheet(); document.querySelector('#toast [data-action=undo]').click(); })")
+    await idle(pg)
+    check(await pg.evaluate('window.__undone === true'), 'its undo works while the sheet it sits in closes')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 

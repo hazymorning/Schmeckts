@@ -249,7 +249,7 @@ function servingItem(s, multiHouse, fresh, plain) {
         ? 'Wird gelesen …'
         : 'Unbekannte Sorte';
   return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row${plain ? '' : ' tl-item'}" data-action="open-serving" data-id="${s.id}">
-        ${plain ? '' : `<span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>`}${thumbOf(s, p, plain ? '' : 'm')}
+        ${plain ? '' : `<span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>`}${thumbOf(s, p, 'm')}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
         ${resultBadges(s, true)}</button></li>`;
 }

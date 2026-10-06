@@ -78,15 +78,16 @@ export function scrollTop() {
    turned: the Stimmt’s? sheet showing its back */
 export const homeView = {fresh: null, held: new Map(), turned: null};
 
+let petsDrawn = ''; // an unchanged bar is left alone, so it keeps the focus
 function renderPets() {
   const el = $('#pets');
   if (db.pets.length < 2) {
-    el.innerHTML = '';
+    el.innerHTML = petsDrawn = '';
     el.hidden = true;
     return;
   }
   el.hidden = false;
-  el.innerHTML =
+  const html =
     `<button class="pet" data-action="filter" data-id="all" aria-pressed="${prefs.activePet === 'all'}" style="view-transition-name:av-all"><span class="av xl all">${icon('paw')}</span><span>Alle</span></button>` +
     db.pets
       .map(
@@ -95,6 +96,7 @@ function renderPets() {
       )
       .join('') +
     `<button class="pet" data-action="add-pet" aria-label="Tier hinzufügen"><span class="av xl add">${icon('plus')}</span><span>Neu</span></button>`;
+  if (html !== petsDrawn) el.innerHTML = petsDrawn = html;
 }
 
 function renderFab() {
