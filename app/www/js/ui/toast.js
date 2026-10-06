@@ -41,7 +41,12 @@ export function toast(msg, undo, {ic = '', tone = '', html = false} = {}) {
   el.classList.remove('show');
   void el.offsetWidth;
   el.classList.add('show');
-  wait(Math.max(undo ? 5200 : 2600, READ * chars));
+  const ms = Math.max(undo ? 5200 : 2600, READ * chars);
+  // a finger already on it: the new one waits for it to let go, and a swipe begun on the old one starts over
+  if (down) {
+    Object.assign(drag, {x0: drag.x, dx: 0, swiped: false});
+    left = ms;
+  } else wait(ms);
 }
 export function hideToast() {
   clearTimeout(toastTimer);
@@ -50,30 +55,25 @@ export function hideToast() {
 }
 
 /* Swiped sideways it goes without undoing anything; while the finger is on it, it stays. Only a move past SLOP is a
-   swipe, so a tap on its button stays a tap. */
+   swipe and takes the pointer, so its click lands on the toast and a tap on the button stays a tap. */
 const SLOP = 8;
 const el = $('#toast');
-let x0 = 0,
-  dx = 0,
-  t0 = 0,
-  left = 0,
-  down = false,
-  swiped = false;
+const drag = {x: 0, x0: 0, dx: 0, t0: 0, swiped: false};
+let left = 0,
+  down = false;
 el.addEventListener('pointerdown', e => {
   if (!el.classList.contains('show')) return;
   down = true;
-  swiped = false;
-  x0 = e.clientX;
-  dx = 0;
-  t0 = performance.now();
+  Object.assign(drag, {x: e.clientX, x0: e.clientX, dx: 0, t0: performance.now(), swiped: false});
   left = ends - Date.now();
   clearTimeout(toastTimer);
 });
 el.addEventListener('pointermove', e => {
   if (!down) return;
-  dx = e.clientX - x0;
-  if (!swiped && Math.abs(dx) > SLOP) {
-    swiped = true;
+  drag.x = e.clientX;
+  drag.dx = drag.x - drag.x0;
+  if (!drag.swiped && Math.abs(drag.dx) > SLOP) {
+    drag.swiped = true;
     el.classList.add('dragging');
     try {
       el.setPointerCapture(e.pointerId);
@@ -81,15 +81,16 @@ el.addEventListener('pointermove', e => {
       /* pointer already gone; the next pointerup ends the swipe */
     }
   }
-  if (swiped) el.style.setProperty('--swipe', `${dx}px`);
+  if (drag.swiped) el.style.setProperty('--swipe', `${drag.dx}px`);
 });
 const end = () => {
   if (!down) return;
   down = false;
   el.classList.remove('dragging');
-  const v = Math.abs(dx) / Math.max(1, performance.now() - t0);
-  if (swiped && (Math.abs(dx) > el.offsetWidth / 3 || (v > 0.5 && Math.abs(dx) > 24))) {
-    el.style.setProperty('--swipe', `${Math.sign(dx) * window.innerWidth}px`);
+  const dx = Math.abs(drag.dx),
+    v = dx / Math.max(1, performance.now() - drag.t0);
+  if (drag.swiped && (dx > el.offsetWidth / 3 || (v > 0.5 && dx > 24))) {
+    el.style.setProperty('--swipe', `${Math.sign(drag.dx) * window.innerWidth}px`);
     hideToast();
   } else {
     el.style.removeProperty('--swipe');
@@ -98,13 +99,3 @@ const end = () => {
 };
 el.addEventListener('pointerup', end);
 el.addEventListener('pointercancel', end);
-// a swipe that began on the button undoes nothing
-el.addEventListener(
-  'click',
-  e => {
-    if (!swiped) return;
-    swiped = false;
-    e.stopPropagation();
-  },
-  true,
-);

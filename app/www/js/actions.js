@@ -14,7 +14,7 @@ import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {REMIND_ASKED, tearSheet, turnSheet, update} from './views/home.js';
-import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
+import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState, showError} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
   guessOf,
@@ -27,7 +27,15 @@ import {
   serveProduct,
   shootPhoto,
 } from './logic/feeding.js';
-import {deleteProduct, deleteServing, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
+import {
+  deleteProduct,
+  deleteServing,
+  mergeTarget,
+  removeCode,
+  saveName,
+  setPackLine,
+  useProduct,
+} from './logic/editing.js';
 import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
 import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
@@ -115,12 +123,11 @@ const ARMED = {
   merge: el => useProduct(el.dataset.id),
 };
 let armTimer = null;
-function arm(el) {
-  const key = el.dataset.then + (el.dataset.id ? ':' + el.dataset.id : '');
+function arm(key, run) {
   if (sheet.armed === key) {
     sheet.armed = null;
     clearTimeout(armTimer);
-    ARMED[el.dataset.then](el);
+    run();
     return;
   }
   sheet.armed = key;
@@ -133,6 +140,13 @@ function arm(el) {
       renderSheet();
     }
   }, 3500);
+}
+
+// a variety renamed into another one is merged with it, so that takes a second tap like a suggestion does
+function nameOrMerge() {
+  const other = mergeTarget();
+  if (other) arm('merge:' + other.id, () => useProduct(other.id));
+  else saveName();
 }
 
 const ACTIONS = {
@@ -296,7 +310,7 @@ const ACTIONS = {
     renderSheet();
   },
   'save-name'() {
-    saveName();
+    nameOrMerge();
   },
   rephoto() {
     rephoto();
@@ -379,6 +393,7 @@ const ACTIONS = {
       () => {
         setKaufen(id, was);
         update();
+        renderSheet();
       },
       {ic, tone},
     );
@@ -412,7 +427,8 @@ const ACTIONS = {
     renderSheet();
   },
   arm(el) {
-    arm(el);
+    const {then, id} = el.dataset;
+    arm(then + (id ? ':' + id : ''), () => ARMED[then](el));
   },
   'set-species'(el) {
     sheet.species = el.dataset.v;
@@ -575,10 +591,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.field && sheet) {
     sheet[t.dataset.field] = t.value;
-    if (sheet.error) {
-      sheet.error = '';
-      $('#f-error')?.remove();
-    }
+    if (sheet.error && ['name', 'brand', 'variety'].includes(t.dataset.field)) showError('');
     if (t.dataset.field === 'brand' || t.dataset.field === 'variety') renderSuggestions();
   }
   if (t.dataset.note) {
@@ -620,7 +633,7 @@ document.addEventListener('keydown', e => {
   } else if (sheet.step === 'name' || sheet.kind === 'new') {
     e.preventDefault();
     if (e.target.id === 'f-brand') $('#f-variety')?.focus();
-    else saveName();
+    else nameOrMerge();
   }
 });
 document.addEventListener('change', e => {

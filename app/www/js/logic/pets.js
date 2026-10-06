@@ -10,7 +10,7 @@ import {cropRect, cropStart} from '../ui/crop.js';
 import {toast} from '../ui/toast.js';
 import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
-import {renderNicks} from '../views/sheets.js';
+import {renderNicks, showError} from '../views/sheets.js';
 
 // as a page, exactly these keys are taken off again on the way back
 export const petState = p => ({
@@ -101,8 +101,7 @@ export function savePet() {
   const s = sheet,
     name = (s.name || '').trim();
   if (!name) {
-    s.error = 'Wie heißt dein Tier?';
-    renderSheet();
+    showError('Wie heißt dein Tier?');
     $('#f-name')?.focus();
     return;
   }

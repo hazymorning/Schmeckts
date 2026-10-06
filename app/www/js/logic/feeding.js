@@ -27,6 +27,7 @@ import {closeAll, closeSheet, isClosing, openSheet, renderSheet, sheet, topBody}
 import {openCamera} from '../ui/camera.js';
 import {fabFill, homeView, scrollTop, update} from '../views/home.js';
 import {lower, record} from '../views/parts.js';
+import {showError} from '../views/sheets.js';
 import {applyProduct, cleanupProduct, linkProduct, replaceProductPhoto} from './products.js';
 import {planReminder} from './reminders.js';
 
@@ -49,7 +50,7 @@ export function serveProduct(pid, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  const msg = `Mit ${pname(p)} gefüttert. ${onRecord(p) || `Guten Appetit, ${calledNames(ids, s.id)}!`}`;
+  const msg = `${pname(p)} für ${calledNames(ids, s.id)}. ${onRecord(p) || 'Guten Appetit!'}`;
   update();
   scrollTop();
   toast(msg, () => undoServe(s.id), {ic: 'bowl'});
@@ -388,6 +389,7 @@ function fillName(id, guess) {
   for (const f of ['brand', 'variety']) {
     if (typed.includes(f) || !guess[f]) continue;
     sheet[f] = guess[f];
+    showError('');
     const el = $('#f-' + f);
     if (el) el.value = guess[f];
   }

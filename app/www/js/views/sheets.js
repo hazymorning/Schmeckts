@@ -68,7 +68,6 @@ import {
   thumbOf,
   told,
   toldList,
-  under,
   verdictLabel,
   whoObserved,
 } from './parts.js';
@@ -217,18 +216,29 @@ function viewName() {
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
-    ${fieldError(s)}
+    ${errorSlot}
     <div class="suggest" id="brandChips"></div>
     <label class="label" for="f-variety">Sorte</label>
     <input id="f-variety" class="field" data-field="variety" value="${esc(s.variety)}" placeholder="z. B. Lachs in Soße" autocomplete="off" enterkeyhint="done">
     <div class="suggest" id="lineChips"></div>
     ${labelled('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
     ${textureChips(s, '', labelled)}
-    <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : read.length ? 'Passt so' : 'Speichern'}</button></div>
+    <div class="mt">${
+      s.armed?.startsWith('merge:')
+        ? `<button class="btn armed" data-action="save-name">${icon('check')}Nochmal tippen: zusammenführen</button>`
+        : `<button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : read.length ? 'Passt so' : 'Speichern'}</button>`
+    }</div>
     ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
 }
-// what a form still needs, under its field until something is typed
-const fieldError = s => (s.error ? `<p class="hint note warn" id="f-error" role="alert">${esc(s.error)}</p>` : '');
+/* What a form still needs, under its field until that is filled in. The slot is filled after drawing, so an unchanged
+   view stays as it was drawn. */
+const errorSlot = '<p class="hint note warn field-error" id="f-error" role="alert"></p>';
+export function showError(text) {
+  if (!sheet) return;
+  sheet.error = text;
+  const el = $('#f-error');
+  if (el) el.textContent = text;
+}
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
 // x: a variety, or the sheet itself while naming
 function textureChips(x, note = '', wrap = group) {
@@ -586,7 +596,7 @@ function viewPet() {
       '',
       `<div class="row set-row">${lead('paw')}<label class="t-main" for="f-name"><b>Name</b></label>
         <input id="f-name" class="field in-row" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done"></div>` +
-        (s.error ? under(fieldError(s)) : ''),
+        errorSlot,
       'set-group',
     )}
     ${group(
@@ -644,6 +654,8 @@ setSheetView((state, body) => {
       for (const a of el.getAnimations({subtree: true}))
         a.startTime = document.timeline.currentTime - (Date.now() - el.dataset.since);
   }
+  const error = $('#f-error', body);
+  if (error) error.textContent = state.error || '';
   if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
   if (state.kind === 'pet' || state.page === 'pet') renderNicks();

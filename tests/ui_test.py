@@ -3122,6 +3122,12 @@ async def test_photo_viewer(browser, url):
     await ctx.close()
 
 
+# the toast's lines of text, and whether its button stands under the text
+LAYOUT = """(t => { const s = t.querySelector(':scope > span'), b = t.querySelector('button');
+  return [Math.round(s.offsetHeight / parseFloat(getComputedStyle(s).lineHeight)), b.getBoundingClientRect().top >= s.getBoundingClientRect().bottom - 1]; })(
+  document.getElementById('toast'))"""
+
+
 async def test_toast_swipe(browser, url):
     print('a toast swiped sideways goes without undoing anything; held, it stays; a tap on „Rückgängig“ still undoes')
     ctx = await phone(browser)
@@ -3152,6 +3158,19 @@ async def test_toast_swipe(browser, url):
     check(held and after and not await pg.evaluate(SHOWN), 'held it stays, let go it goes after a while')
 
     x, y, w, h = await show()
+    await pg.mouse.move(x + 20, y + h / 2)
+    await pg.mouse.down()
+    await pg.mouse.move(x + 60, y + h / 2)
+    await show()
+    await pg.clock.run_for(20000)
+    under = await pg.evaluate(SHOWN)
+    await pg.mouse.up()
+    check(
+        under and await pg.evaluate(SHOWN) and await pg.evaluate('window.__undone') is None,
+        'a toast that comes while the finger is on the last one waits for it and takes no part of its swipe',
+    )
+
+    x, y, w, h = await show()
     await drag(x + 20, y + h / 2, 20)
     back = [await pg.evaluate(SHOWN), await pg.eval_on_selector('#toast', "e => e.style.getPropertyValue('--swipe')")]
     await drag(x + 20, y + h / 2, w / 2)
@@ -3168,6 +3187,16 @@ async def test_toast_swipe(browser, url):
         'a tap on its button undoes, a swipe that begins there does not',
     )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+    ctx = await phone(browser)  # the clock running, so the toast settles
+    pg, errors = await open_page(ctx, url)
+    sizes = []
+    for text in ('Eintrag gelöscht', 'Notiert bei Minka oder Felix: extra hungrig. Vielleicht war die Portion knapp.'):
+        await pg.evaluate("t => import('./js/ui/toast.js').then(m => m.toast(t, () => {}))", text)
+        await idle(pg)
+        sizes.append(await pg.evaluate(LAYOUT))
+    check(sizes == [[1, False], [2, True]], f'the text in two lines at most: beside the button, or over it where it needs the room {sizes}')
     await ctx.close()
 
 
@@ -3229,6 +3258,17 @@ async def test_merge(browser, url):
         and await state(pg, "[db.products.length, db.servings.every(s => s.productId === 'lachs00001')]") == [1, True],
         f'the first tap asks again, the second merges {armed}',
     )
+    await change(pg, 's.db.products.push(a); s.db.servings[1].productId = a.id', product('huhn000001', 'Sheba', 'Huhn'))
+    await open_sheet(pg, kind='product', id='huhn000001')
+    await tap(pg, '#sheet [data-action=rename-product]')
+    await pg.fill('#f-variety', 'lachs')
+    await tap(pg, '#sheet [data-action=save-name]')
+    typed = [await state(pg, 'db.products.length'), await pg.inner_text('#sheet [data-action=save-name]')]
+    await tap(pg, '#sheet [data-action=save-name]')
+    check(
+        typed[0] == 2 and 'zusammenführen' in typed[1] and await state(pg, 'db.products.length') == 1,
+        f'the name of another variety typed in: saving asks again too {typed}',
+    )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -3240,15 +3280,24 @@ async def test_form_errors(browser, url):
     await tap(pg, '#sheet [data-action=add-pet]')
     await tap(pg, '[data-action=save-pet]')
     pet_said = [await pg.inner_text('#sheet #f-error'), await pg.evaluate('document.activeElement.id'), await pg.evaluate(SHOWN_TOAST)]
+    await pg.type('#f-nick', 'Mausi')
+    kept = await pg.inner_text('#sheet #f-error')
     await pg.type('#f-name', 'T')
-    gone = await pg.locator('#sheet #f-error').count()
+    gone = await pg.is_visible('#sheet #f-error')
+    await pg.fill('#f-name', '')
+    await tap(pg, '[data-action=save-pet]')
+    again = await pg.inner_text('#sheet #f-error')
     await back(pg, 2)
     await open_sheet(pg, kind='new', brand='', variety='', type='Nassfutter')
     await tap(pg, '#sheet [data-action=save-name]')
     name_said = [await pg.inner_text('#sheet #f-error'), await pg.evaluate('document.activeElement.id'), await pg.evaluate(SHOWN_TOAST)]
     check(
-        pet_said == ['Wie heißt dein Tier?', 'f-name', False] and gone == 0 and name_said == ['Bitte Marke oder Sorte eintragen.', 'f-brand', False],
-        f'under the field, which takes the focus; typing takes it away {pet_said} {name_said}',
+        pet_said == ['Wie heißt dein Tier?', 'f-name', False] and name_said == ['Bitte Marke oder Sorte eintragen.', 'f-brand', False],
+        f'under the field, which takes the focus {pet_said} {name_said}',
+    )
+    check(
+        kept == pet_said[0] and not gone and again == pet_said[0],
+        'another field leaves it, typing in its own takes it away, and it comes back on the next try',
     )
     check(await state(pg, '[db.pets.length, db.products.length]') == [1, 0], 'nothing saved')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
