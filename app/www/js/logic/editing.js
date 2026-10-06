@@ -8,7 +8,7 @@ import {closeAll, closeSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
 import {renderSuggestions, showError} from '../views/sheets.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
-import {refinePets, retryNow, serveProduct} from './feeding.js';
+import {refinePets, retryNow, servedToast, serveProduct} from './feeding.js';
 
 export function saveName() {
   const s = sheet;
@@ -56,6 +56,14 @@ function renameProduct(id, details) {
   backFromNaming();
 }
 function backFromNaming() {
+  if (sheet.fresh) {
+    const id = sheet.id;
+    closeSheet().then(() => {
+      update();
+      servedToast(id);
+    });
+    return;
+  }
   sheet.step = null;
   renderSheet();
   update();
@@ -81,9 +89,7 @@ export function useProduct(pid) {
     refinePets(sv, p, null);
     linkProduct(sv, p);
     save();
-    sheet.step = null;
-    renderSheet();
-    update();
+    backFromNaming();
   } else if (sheet.kind === 'new') closeAll().then(() => serveProduct(p.id));
   else if (sheet.kind === 'product') {
     const cur = getProduct(sheet.id);

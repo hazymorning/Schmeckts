@@ -50,10 +50,17 @@ export function serveProduct(pid, scanCode = '') {
   save();
   savePrefs();
   served(s.id);
-  const msg = `${pname(p)} für ${calledNames(ids, s.id)}. ${onRecord(p) || 'Guten Appetit!'}`;
   update();
   scrollTop();
-  toast(msg, () => undoServe(s.id), {ic: 'bowl'});
+  servedToast(s.id);
+}
+// also once a meal just photographed is named
+export function servedToast(id) {
+  const s = getServing(id),
+    p = getProduct(s?.productId);
+  if (!p) return;
+  const msg = `${pname(p)} für ${calledNames(Object.keys(s.pets), s.id)}. ${onRecord(p) || 'Guten Appetit!'}`;
+  toast(msg, () => undoServe(id), {ic: 'bowl'});
 }
 // a variety that goes down badly, or that nobody buys any more, shows its record as it is served
 function onRecord(p) {
@@ -166,7 +173,9 @@ export async function servePhoto(file, scanCode = '') {
   await closeAll();
   update();
   scrollTop();
-  if (local) openSheet({kind: 'serving', id: s.id, step: 'name', brand: '', variety: '', type: 'Nassfutter'});
+  // fresh: once named, the meal is rated on the home page like any other
+  if (local)
+    openSheet({kind: 'serving', id: s.id, step: 'name', fresh: true, brand: '', variety: '', type: 'Nassfutter'});
   toast(
     `${db.pets.length > 1 ? petNames(ids) + ' gefüttert' : 'Gefüttert'}${local ? '' : '. Sorte wird erkannt …'}`,
     () => undoServe(s.id),
@@ -361,7 +370,7 @@ function unrecognize(id, pid, was) {
   }
   save();
   update();
-  openSheet({kind: 'serving', id, step: 'name', ...guessOf(s)});
+  openSheet({kind: 'serving', id, step: 'name', fresh: true, ...guessOf(s)});
 }
 
 function waitForAnotherTry(s, err) {

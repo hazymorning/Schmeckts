@@ -347,7 +347,7 @@ export function renderServeHits(text) {
   box.innerHTML = words.length ? hitList(text.trim(), words) : quickList(quickProducts());
 }
 function hitList(text, words) {
-  const hits = quickProducts()
+  const hits = quickProducts(Infinity, true)
     .filter(({product: p}) => words.every(w => norm(`${p.brand || ''} ${p.variety || ''}`).includes(w)))
     .slice(0, HITS);
   if (hits.length) return group('', `<ul class="list plist">${serveRows(hits)}</ul>`, '');

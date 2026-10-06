@@ -315,6 +315,11 @@ async def test_flow(browser, url):
     await pg.fill('#f-brand', 'Sheba')
     await pg.fill('#f-variety', 'Lachs in Soße')
     await tap(pg, '[data-action=save-name]')
+    check(
+        not await pg.evaluate(OPEN) and await pg.inner_text('#toast span') == 'Lachs in Soße für Minka und Tiger. Guten Appetit!',
+        'named right after the photo: back on the home page, the toast as for any meal',
+    )
+    await tap(pg, '.pend [data-action=open-serving]')
     rates = pg.locator('#sheet .slider')
     await rates.nth(0).locator('[data-r=gut]').click(force=True)
     await idle(pg)
@@ -1121,6 +1126,21 @@ async def test_suggestions(browser, url):
         hit == ['Sorte 11'] and await pg.evaluate(NAMES) == ['Sorte 1', 'Sorte 2', 'Sorte 3'],
         f'brand and variety together; empty: suggestions {hit}',
     )
+    await tap(pg, '#sheet [data-action=close]')
+    await change(pg, "s.db.products.find(p => p.variety === 'Sorte 2').kaufen = 'nicht'")
+    await tap(pg, '#fab')
+    offered = await pg.evaluate(NAMES)
+    await pg.fill('#sheet [data-search]', 'sorte 2')
+    await idle(pg)
+    check(
+        offered == ['Sorte 1', 'Sorte 3', 'Sorte 4'] and await pg.evaluate(NAMES) == ['Sorte 12', 'Sorte 2'],
+        f'a variety no longer bought is not suggested, the search still finds it, last {offered}',
+    )
+    meals = await state(pg, 'db.servings.length')
+    await pg.evaluate("(b => { b.click(); b.click(); })(document.querySelector('#serveList [data-action=serve]'))")
+    await idle(pg)
+    check(await state(pg, 'db.servings.length') == meals + 1, 'a quick second tap does not feed twice')
+    await tap(pg, '#fab')
     await pg.fill('#sheet [data-search]', 'gibtsnicht')
     await idle(pg)
     await tap(pg, '#serveList [data-action=new-product]')
@@ -1921,7 +1941,6 @@ async def test_scan(browser, url):
     await pg.fill('#f-variety', 'Lachs in Soße')
     await tap(pg, '[data-action=save-name]')
     check(await state(pg, f"db.products.length === 1 && db.products[0].codes['{SHEBA}'] === true"), 'named: the code hangs on the variety')
-    await tap(pg, '[data-action=close]')
     sheba = await state(pg, 'db.products[0].id')
     await tap(pg, '#fab')
     await tap(pg, '[data-action=scan]')
@@ -2080,7 +2099,6 @@ async def test_recognize(browser, url):
         f'without a server the phone reads the text and fills brand, variety and type, the photo file it read goes again {filled} {cache}',
     )
     await tap(pg, '[data-action=save-name]')
-    await tap(pg, '[data-action=close]')
     p = await state(pg, '(p => [p.brand, p.variety, p.type, p.texture])(db.products[0])')
     check(
         p == ['Sheba', 'Selection in Sauce mit Lachs', 'Nassfutter', 'sosse'] and not await state(pg, 'db.servings[0].guess'),
@@ -2444,7 +2462,6 @@ async def test_product_photo(browser, url):
     await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
     await snap(pg)
     await tap(pg, '[data-action=save-name]')
-    await tap(pg, '#sheet [data-action=close]')
     pid = await state(pg, 'db.products[0].id')
 
     async def take(photo, owner=None):
