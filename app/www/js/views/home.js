@@ -144,10 +144,10 @@ function homeHTML() {
     m = db.servings.length ? model() : null;
   let html = banner + (m ? overviewHTML(m, homeView.fresh) + calsheetHTML() : '');
   if (pend.length) html += pendingHTML(pend);
-  if (m) html += remindHTML();
   if (!m) html += stepsHTML();
   else
     html +=
+      remindHTML() +
       newsHTML() +
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
