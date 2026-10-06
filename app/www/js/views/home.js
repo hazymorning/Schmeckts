@@ -4,7 +4,7 @@ import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, dayStart} from '../dates.js';
 import {canNotify, haptic} from '../native.js';
 import {icon, sketch} from '../icons.js';
-import {DEMO, NEWS, observationOf, RATINGS, REMIND_DEFAULT} from '../config.js';
+import {DEMO, NEWS, observationOf, RATINGS, REMIND_ASKED, REMIND_DEFAULT} from '../config.js';
 import {db, loadError, prefs, savePrefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {
@@ -240,7 +240,6 @@ function hintHTML(m) {
 }
 
 // asked once after the first meal: with the reminder on, a meal is rated right in the notification
-export const REMIND_ASKED = 'tipp:erinnern';
 function remindHTML() {
   if (
     prefs.remind ||

@@ -3214,9 +3214,10 @@ async def test_remind_ask(browser, url):
         asked = await pg.locator(REMIND_CARD).count()
         if answer == 'yes':
             await tap(pg, f'{REMIND_CARD} [data-action=remind-yes]')
+            planned = await pg.evaluate("JSON.parse(localStorage.getItem('__notes') || '[]').length")
             check(
-                [before, asked, await state(pg, 'prefs.remind'), len(await calls(pg, 'requestPermissions'))] == [0, 1, 180, 1],
-                'not before the first meal; yes asks for notifications and turns the reminder on',
+                [before, asked, await state(pg, 'prefs.remind'), len(await calls(pg, 'requestPermissions')), planned] == [0, 1, 180, 1, 1],
+                'not before the first meal; yes asks for notifications, turns the reminder on and plans it for the meal just fed',
             )
             await change(pg, 's.prefs.remind = 0')
         else:
@@ -3232,6 +3233,17 @@ async def test_remind_ask(browser, url):
         await ctx.close()
     ctx, pg, errors = await demo(browser, url, native=True)
     check(await pg.locator(REMIND_CARD).count() == 0, 'never beside sample data')
+    await ctx.close()
+    ctx, pg, errors = await one_pet(browser, url)
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=remind-on]')
+    await tap(pg, '#sheet [data-action=remind-on]')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+    await change(pg, 's.db.products.push(a)', product('lachs00001'))
+    await pg.evaluate("import('./js/logic/feeding.js').then(f => f.serveProduct('lachs00001'))")
+    await idle(pg)
+    check(await pg.locator(REMIND_CARD).count() == 0, 'set in the settings before, on or off: not asked')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
 

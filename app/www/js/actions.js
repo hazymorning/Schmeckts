@@ -13,7 +13,7 @@ import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
-import {REMIND_ASKED, tearSheet, turnSheet, update} from './views/home.js';
+import {tearSheet, turnSheet, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState, showError} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
@@ -38,7 +38,7 @@ import {
 } from './logic/editing.js';
 import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
-import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
+import {planReminder, remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
 import {
   addNick,
@@ -399,11 +399,12 @@ const ACTIONS = {
     );
   },
   async 'remind-yes'() {
-    hideHint(REMIND_ASKED);
     haptic('select');
     await setRemind(REMIND_DEFAULT);
     update();
-    if (prefs.remind) toast('Die Erinnerung ist an. Ändern lässt sie sich in den Einstellungen.');
+    if (!prefs.remind) return;
+    db.servings.forEach(planReminder); // the meal just fed is asked about too
+    toast('Die Erinnerung ist an. Ändern lässt sie sich in den Einstellungen.');
   },
   'hide-hint'(el) {
     hideHint(el.dataset.v);

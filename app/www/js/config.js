@@ -331,6 +331,7 @@ export const observationOf = kind =>
 // rating reminder, minutes after serving, 0 = off
 export const REMIND = [0, 60, 180, 360];
 export const REMIND_DEFAULT = 180; // used when the switch is turned on with nothing chosen yet
+export const REMIND_ASKED = 'tipp:erinnern'; // hiddenHints: the reminder was chosen, or asked about once after a meal
 export const REMIND_MAX_H = 24;
 export const tidyRemind = m =>
   Number.isFinite(m) && m > 0 ? Math.min(REMIND_MAX_H, Math.max(1, Math.round(m / 60))) * 60 : 0;
@@ -339,8 +340,8 @@ export const PENDING_WINDOW = 48 * 3600e3; // older open meals no longer ask for
 export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
-   is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
-   it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
+   is hidden (neu:<v> in prefs.hiddenHints, so v never changes). off: a setting it needs and what to say while that
+   is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
    „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
 export const NEWS = [
   {

@@ -1677,6 +1677,7 @@ dialog.sheet::after {
   left: 50%;
   top: calc(var(--space-4) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   transform: translateX(-50%);
+  width: max-content;
   margin: 0;
   padding: var(--inset-compact);
   border-radius: var(--radius-m);

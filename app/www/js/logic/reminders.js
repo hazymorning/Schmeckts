@@ -2,8 +2,8 @@
 import {clockStr} from '../dates.js';
 import {FeedReminder, Notifications} from '../native.js';
 import {report} from '../report.js';
-import {RATINGS, REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
-import {db, prefs, savePrefs} from '../store.js';
+import {RATINGS, REMIND_ASKED, REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
+import {db, hideHint, prefs, savePrefs} from '../store.js';
 import {caughtUp, isConnected, reachable} from '../sync.js';
 import {fedToday, feedReminders, quickRatings} from '../smart.js';
 import {callName, getPet, getProduct, getServing, petNames, pname} from '../derive.js';
@@ -102,6 +102,7 @@ async function allowed(wanted, which) {
 let lastStep = 0;
 export const remindStep = () => lastStep || REMIND_DEFAULT;
 export async function setRemind(minutes, redraw = true) {
+  hideHint(REMIND_ASKED); // chosen, so the home page need not ask
   const ok = await allowed(minutes, 'remind');
   prefs.remind = ok ? tidyRemind(minutes) : 0;
   if (prefs.remind) lastStep = prefs.remind;
