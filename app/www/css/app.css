@@ -1052,16 +1052,18 @@ dialog.sheet::after {
   white-space: nowrap;
   scroll-snap-align: start;
 }
+/* equal parts; a long word takes the room it needs, and what no longer fits goes to a second line */
 .seg {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(min-content, 1fr); /* a long word takes the room it needs */
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   padding: var(--space-1);
   border-radius: var(--radius-m);
   background: var(--surface-2);
 }
 .seg button {
+  flex: 1 1 0;
+  min-width: min-content;
   display: flex;
   align-items: center;
   justify-content: center;

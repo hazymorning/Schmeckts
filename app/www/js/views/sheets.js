@@ -376,7 +376,7 @@ const countsRow = (levels, counts) =>
     .join('')}</div>${scaleEnds(levels)}</div>`;
 const mealRow = s =>
   `<li><button class="row" data-action="open-serving" data-id="${s.id}"><span class="t-main">
-    <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s)}</button></li>`;
+    <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s, true) || resultBadges(s)}</button></li>`;
 const mealMeta = s =>
   [petNames(Object.keys(s.pets).filter(getPet)), s.note ? '„' + s.note + '“' : ''].filter(Boolean).join(', ');
 const barcodeRow = c =>
