@@ -112,6 +112,13 @@ export const SCALES = {
 };
 const SCALE_OF = {Nassfutter: 'portion', Trockenfutter: 'bowl', Snack: 'bite', Sonstiges: 'bite'};
 export const scaleOf = product => SCALES[SCALE_OF[typeOf(product)]];
+// a rating reminder's buttons: a good, a middling and a poor level, so a meal gone wrong is rated there too
+const QUICK = {
+  portion: ['top', 'mittel', 'schlecht'],
+  bowl: ['gern', 'wenig', 'liegen'],
+  bite: ['verputzt', 'angeknabbert', 'unberuehrt'],
+};
+export const quickOf = product => QUICK[SCALE_OF[typeOf(product)]];
 // [key, label, pattern]; keys are stored in the data, the pattern guesses a missing texture from the name
 export const TEXTURES = {
   Nassfutter: {
@@ -344,6 +351,13 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
    „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
 export const NEWS = [
+  {
+    v: '0.34.0',
+    title: 'Schneller fertig',
+    say: 'Ist die Packung benannt, bist du gleich wieder auf der Startseite. Die fragt jetzt nur noch eins auf einmal.',
+    why: 'Die Erinnerung ans Bewerten hat drei Knöpfe, auch für eine Mahlzeit, die stehen blieb.',
+    off: ['remind', 'Schalte die Erinnerung ans Bewerten ein, dann bewertest du gleich in der Benachrichtigung.'],
+  },
   {
     v: '0.33.0',
     title: 'Mehr Luft',

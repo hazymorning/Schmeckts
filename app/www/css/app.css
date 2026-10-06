@@ -827,22 +827,15 @@ dialog.sheet::after {
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
   gap: var(--space-hair);
   margin: 0 var(--space-1);
-  font: var(--type-small-strong);
+  font: var(--type-small);
   color: var(--muted);
   text-align: center;
-}
-.slider-names > .on {
-  color: var(--c);
-}
-.slider-names b,
-.slider-names small {
-  display: block;
-}
-.slider-names small {
-  margin-top: var(--space-hair);
-  font: var(--type-small);
   hyphens: auto;
   overflow-wrap: anywhere;
+}
+.slider-names > .on {
+  font: var(--type-small-strong);
+  color: var(--c);
 }
 .ends {
   display: flex;
@@ -868,18 +861,6 @@ dialog.sheet::after {
   font: var(--type-heading);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
-}
-.stat b,
-.stat small {
-  display: block;
-}
-.stat b {
-  font: var(--type-subheading);
-  font-variant-numeric: tabular-nums;
-}
-.stat small {
-  font: var(--type-caption);
-  color: var(--muted);
 }
 
 .btn {
@@ -1071,16 +1052,18 @@ dialog.sheet::after {
   white-space: nowrap;
   scroll-snap-align: start;
 }
+/* equal parts; a long word takes the room it needs, and what no longer fits goes to a second line */
 .seg {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   padding: var(--space-1);
   border-radius: var(--radius-m);
   background: var(--surface-2);
 }
 .seg button {
+  flex: 1 1 0;
+  min-width: min-content;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1182,10 +1165,6 @@ dialog.sheet::after {
   color: var(--c);
 }
 /* a frame instead of the fill, for a badge on a ground of its own */
-.badge.framed {
-  background: none;
-  box-shadow: inset 0 0 0 var(--hairline) currentColor;
-}
 /* a meal still to rate asks for it, in the tone of what can be tapped */
 .badge.open {
   background: var(--accent-soft);
@@ -1223,6 +1202,7 @@ dialog.sheet::after {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  font: var(--type-subheading);
   background: var(--surface-2);
   color: var(--muted);
 }
@@ -1239,18 +1219,22 @@ dialog.sheet::after {
 .av.xs {
   width: var(--pic-xs);
   height: var(--pic-xs);
+  font: var(--type-caption-strong);
 }
 .av.s {
   width: var(--pic-s);
   height: var(--pic-s);
+  font: var(--type-small-strong);
 }
 .av.l {
   width: var(--pic-l);
   height: var(--pic-l);
+  font: var(--type-heading);
 }
 .av.xl {
   width: var(--pic-xl);
   height: var(--pic-xl);
+  font: var(--type-heading);
 }
 .av.xxl {
   width: var(--pic-xxl);
@@ -1259,6 +1243,10 @@ dialog.sheet::after {
 .av.xxxl {
   width: var(--pic-xxxl);
   height: var(--pic-xxxl);
+}
+.av:is(.xxl, .xxxl) {
+  font: var(--type-title);
+  letter-spacing: var(--track-title);
 }
 .av:is(.xxl, .xxxl) .ic {
   stroke-width: var(--icon-stroke-l);
@@ -1653,7 +1641,7 @@ dialog.sheet::after {
 }
 .ov-text p {
   margin: 0;
-  font: var(--type-small);
+  font: var(--type-body);
 }
 .pet-label {
   display: flex;
@@ -1889,35 +1877,31 @@ dialog.sheet::after {
 .calpad > .calsheet {
   grid-area: 1 / 1;
 }
+/* the layers a shade towards the ink, so they show on the ground in light and dark */
 .calpad::before,
 .calpad::after {
   content: "";
   position: absolute;
-  left: 5px;
-  right: 5px;
-  bottom: -4px;
-  height: 24px;
+  left: var(--space-1h);
+  right: var(--space-1h);
+  bottom: calc(-1 * var(--space-1));
+  height: var(--space-6);
   border-radius: var(--radius-paper);
-  background: var(--paper);
-  filter: brightness(0.9);
+  background: color-mix(in srgb, var(--paper), var(--ink) 8%);
   z-index: -1;
 }
 .calpad::after {
-  left: 10px;
-  right: 10px;
-  bottom: -8px;
-  filter: brightness(0.8);
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(-1 * var(--space-2));
+  background: color-mix(in srgb, var(--paper), var(--ink) 16%);
   z-index: -2;
 }
-/* the date and the format's badge on one line, the text under the date; the text lines up with a card's */
+/* as wide as a card and set like one: the date as its heading, then the fact */
 .calsheet {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  align-content: start; /* a sheet as tall as the one beside it keeps its rows */
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-4) calc(var(--gutter) - var(--space-1h));
+  display: block;
+  padding: var(--space-5) var(--gutter);
   background: var(--paper-grain), var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
@@ -1928,15 +1912,28 @@ dialog.sheet::after {
   outline-offset: calc(-1 * var(--space-1));
 }
 .cal-date {
-  font: var(--type-caption-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--paper-muted);
+  margin: 0 0 var(--space-2);
+  font: var(--type-heading);
+  text-box: trim-start cap alphabetic;
 }
 .cal-text {
-  grid-column: 1;
   margin: 0;
-  font: var(--type-small);
+  font: var(--type-body);
+}
+.cal-verdict {
+  display: inline-block; /* so it can be pressed on */
+}
+.cal-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1h);
+  margin: var(--space-3) 0 0;
+  font: var(--type-small-strong);
+  color: var(--paper-muted);
+}
+.cal-foot .ic {
+  width: var(--icon-s);
+  height: var(--icon-s);
 }
 
 /* == Views == */
@@ -1944,19 +1941,19 @@ dialog.sheet::after {
   margin: 0;
   color: var(--ink);
 }
-.card + .card,
-.calpad + .card {
+.card + .card {
   margin-top: var(--space-4);
 }
 .calpad {
-  margin: var(--space-4) var(--space-1h) 0;
+  margin-top: var(--space-4);
 }
-.calsheet .badge {
-  color: var(--paper-muted);
+/* the paper layers reach 8 below the sheet, so the card keeps 16 from them */
+.calpad + .card {
+  margin-top: var(--space-6);
 }
 /* Sundays and the verdict, as printed on a tear-off calendar */
 .cal-date.red,
-.calsheet .verdict {
+.cal-verdict {
   color: var(--paper-red);
 }
 .group + .group {
@@ -2237,17 +2234,14 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
 }
-/* a trading card: the packaging across its full width, the values two by two between lines */
-.quartet > :first-child {
+/* the packaging across the card's full width, its edge the line above the first row */
+.pack-card > :first-child {
+  grid-column: 1 / -1;
   width: calc(100% + 2 * var(--space-4));
   margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-4)) 0;
 }
-.quartet .stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-block: var(--divider);
+.pack-card > :first-child + .set-row::before {
+  content: none;
 }
 .tally {
   margin: var(--space-2h) 0 var(--space-1);
@@ -2541,7 +2535,8 @@ html.step-back::view-transition-new(page) {
   animation: turnBack calc(var(--dur-step) / 2) var(--ease-out);
 }
 /* once the back faces up, its verdict is pressed on: large and pale, then small and full */
-.calsheet.turned .verdict {
+.calsheet.turned .cal-verdict {
+  transform-origin: 0 50%;
   animation: stamp var(--dur-fade) var(--ease-in) calc(var(--dur-step) / 2) both;
 }
 .slider-thumb > .picked,

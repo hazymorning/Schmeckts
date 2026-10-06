@@ -45,7 +45,7 @@ function saidOf(e, side) {
   const good = goodOf(e.counts),
     left = poorOf(e.counts),
     agree = side === 'top' ? good * 2 > e.n : left * 2 > e.n || (e.n - good - left) * 2 > e.n;
-  return agree ? evidenceOf(e) : whyOf(e);
+  return whyOf(e, agree);
 }
 function lapse(at, now) {
   const days = Math.floor((now - at) / DAY);
@@ -340,10 +340,10 @@ const INSIGHT = {
   marke: x => compared('tag', x),
   geschmack: x => compared('fish', x),
   konsistenz: x => compared('layers', x),
-  sosse: ({k, n}) => [
+  sosse: ({k, n, instead}) => [
     'drop',
     'Bei Stückchen in Soße wird oft nur die Soße geleckt.',
-    `<b>${k} von ${n} Mal</b> nur die Soße. Eine Pastete wäre einen Versuch wert.`,
+    `<b>${k} von ${n} Mal</b> nur die Soße.${instead ? ` ${cap(TEXTURE_SAID[instead.key])} dagegen ${ofN(instead)} Mal gut gefressen.` : ''}`,
   ],
   wiederholung: ({a, b}) => [
     'repeat',
@@ -407,7 +407,7 @@ function trialRow(m, t, best = false) {
   return toldBtn(
     t.e.id,
     `${best ? onTheWay(t, several) : cap(needs(t, several, `mit ${named(t.e)}`))}.`,
-    esc(`Bisher ${lower(evidenceOf(t.e))}.`),
+    esc(`Bisher ${lower(whyOf(t.e, true))}.`),
     strip(ratingsIn(m, [t.e.id]), several ? 0 : t.need),
   );
 }
@@ -473,17 +473,11 @@ function footHTML(m, b) {
   return parts.length ? `<p class="hint foot">${parts.join(' ')}</p>` : '';
 }
 
-function shopCard(m) {
-  const buy = shopGroups(m).nachkaufen;
-  return buy.length
-    ? `<section class="card">${cardHead('Einkaufen', 'open-level', 'Alle Sorten zum Einkaufen', 'Alle', 'shop')}${shopRows(m, buy)}</section>`
-    : '';
-}
 const shopBtn = `<button class="icon-btn" data-action="open-level" data-v="shop" aria-label="Einkaufen">${icon('cart')}</button>`;
 
 export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${insightsCard(x)}${nextCard(m, r, x)}${shopCard(m)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${insightsCard(x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
 }

@@ -2,10 +2,10 @@
 import {clockStr} from '../dates.js';
 import {FeedReminder, Notifications} from '../native.js';
 import {report} from '../report.js';
-import {RATINGS, REMIND_ASKED, REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
+import {quickOf, RATINGS, REMIND_ASKED, REMIND_DEFAULT, REMIND_MAX_AGE, tidyRemind} from '../config.js';
 import {db, hideHint, prefs, savePrefs} from '../store.js';
 import {caughtUp, isConnected, reachable} from '../sync.js';
-import {fedToday, feedReminders, quickRatings} from '../smart.js';
+import {fedToday, feedReminders} from '../smart.js';
 import {callName, getPet, getProduct, getServing, petNames, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {openSheet, renderSheet, sheet} from '../ui/sheet.js';
@@ -25,7 +25,7 @@ function notice(s) {
   const p = getProduct(s.productId),
     at = s.servedAt + prefs.remind * 60e3,
     open = openPets(s),
-    rate = buttons && open.length === 1 ? quickRatings(db, s, open[0]).join(',') : '';
+    rate = buttons && open.length === 1 ? quickOf(p).join(',') : '';
   return {
     id: idOf(s.id),
     title: 'Wie war’s?',

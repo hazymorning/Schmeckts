@@ -12,7 +12,7 @@ import {timing} from './recognize.js';
 import {applyTheme} from './ui/theme.js';
 import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
-import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
+import {closeAll, closeSheet, leaving, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {tearSheet, turnSheet, update} from './views/home.js';
 import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState, showError} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
@@ -574,7 +574,8 @@ export async function openLink(url) {
 
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
-  if (el && ACTIONS[el.dataset.action]) ACTIONS[el.dataset.action](el);
+  // a sheet on its way out takes no more taps, so a quick second tap does not feed twice
+  if (el && ACTIONS[el.dataset.action] && !leaving(el)) ACTIONS[el.dataset.action](el);
 });
 // what is a button only by its role takes the keys a button takes
 document.addEventListener('keydown', e => {

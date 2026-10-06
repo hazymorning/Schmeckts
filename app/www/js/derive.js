@@ -22,7 +22,7 @@ export const getProduct = id => (id ? db.products.find(p => p.id === id) : null)
 export const getServing = id => db.servings.find(s => s.id === id);
 export const getObservation = id => db.observations.find(o => o.id === id);
 export const pname = p => (p ? p.variety || p.brand || 'Unbekannt' : 'Unbekannte Sorte');
-const inFilter = pid => prefs.activePet === 'all' || prefs.activePet === pid;
+export const inFilter = pid => prefs.activePet === 'all' || prefs.activePet === pid;
 export const petMap = ids => Object.fromEntries(ids.map(id => [id, {r: null, at: null}]));
 export const findProduct = (brand, variety) =>
   db.products.find(p => norm(p.brand) === norm(brand) && norm(p.variety) === norm(variety));
@@ -136,7 +136,8 @@ function lastServed() {
   return last;
 }
 export const withLast = (products, last = lastServed()) => products.map(p => ({product: p, at: last.get(p.id) || 0}));
-export function quickProducts(limit = Infinity) {
+// all: every variety, as a search must find each one or it gets made twice; flops and other animals' food last
+export function quickProducts(limit = Infinity, all = false) {
   const last = lastServed();
   const flop = new Set(
     model()
@@ -144,10 +145,13 @@ export function quickProducts(limit = Infinity) {
       .map(e => e.id),
   );
   const pet = prefs.activePet !== 'all' ? getPet(prefs.activePet) : null;
+  const later = p => flop.has(p.id) || (!!pet && !last.has(p.id) && !!p.animal && p.animal !== pet.species);
   const products = db.products
-    .filter(p => !flop.has(p.id))
-    .filter(p => !pet || last.has(p.id) || !p.animal || p.animal === pet.species)
-    .sort((a, b) => (last.get(b.id) || 0) - (last.get(a.id) || 0) || (b.createdAt || 0) - (a.createdAt || 0))
+    .filter(p => all || !later(p))
+    .sort(
+      (a, b) =>
+        later(a) - later(b) || (last.get(b.id) || 0) - (last.get(a.id) || 0) || (b.createdAt || 0) - (a.createdAt || 0),
+    )
     .slice(0, limit);
   return withLast(products, last);
 }

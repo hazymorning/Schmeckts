@@ -40,6 +40,7 @@ export function setLevel(slider, r) {
 }
 // redraws wait for this, so a slider is never replaced under a finger
 export const untouched = () => (press ? new Promise(resolve => lifted.push(resolve)) : Promise.resolve());
+export const pressing = () => !!press;
 
 function nearest(slider, x) {
   const off = b => {

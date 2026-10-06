@@ -21,6 +21,7 @@ import {
 import {hintKey} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {anyOpen} from '../ui/sheet.js';
+import {pressing, untouched} from '../ui/slider.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {
   avatar,
@@ -28,11 +29,11 @@ import {
   dayBlocks,
   dayGroups,
   deleteMealBtn,
-  evidenceOf,
   lower,
   nameBlock,
   photoThumb,
   rateSlider,
+  resultBadges,
   cardHead,
   syncChip,
   thumbOf,
@@ -77,15 +78,16 @@ export function scrollTop() {
    turned: the Stimmt’s? sheet showing its back */
 export const homeView = {fresh: null, held: new Map(), turned: null};
 
+let petsDrawn = ''; // an unchanged bar is left alone, so it keeps the focus
 function renderPets() {
   const el = $('#pets');
   if (db.pets.length < 2) {
-    el.innerHTML = '';
+    el.innerHTML = petsDrawn = '';
     el.hidden = true;
     return;
   }
   el.hidden = false;
-  el.innerHTML =
+  const html =
     `<button class="pet" data-action="filter" data-id="all" aria-pressed="${prefs.activePet === 'all'}" style="view-transition-name:av-all"><span class="av xl all">${icon('paw')}</span><span>Alle</span></button>` +
     db.pets
       .map(
@@ -94,6 +96,7 @@ function renderPets() {
       )
       .join('') +
     `<button class="pet" data-action="add-pet" aria-label="Tier hinzufügen"><span class="av xl add">${icon('plus')}</span><span>Neu</span></button>`;
+  if (html !== petsDrawn) el.innerHTML = petsDrawn = html;
 }
 
 function renderFab() {
@@ -121,13 +124,20 @@ export function renderSyncChip() {
   el.setAttribute('aria-label', `${c.label}, Haushalt in den Einstellungen öffnen`);
 }
 
-export function renderHome() {
+/* changed false: a redraw nothing asked for, such as the minute tick, which leaves an unchanged page alone and so
+   the focus where it is. Never under a finger on a slider, or the rating would go with it. */
+let drawn = '';
+export function renderHome(changed = true) {
+  if (pressing()) return void untouched().then(() => renderHome(changed));
   renderPets();
   renderFab();
   renderSyncChip();
   renderMood();
+  const html = homeHTML();
+  if (!changed && html === drawn) return;
+  drawn = html;
   const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
-  $('#home').innerHTML = homeHTML();
+  $('#home').innerHTML = html;
   if (rail) $('#home .obs').scrollLeft = rail;
   $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
@@ -147,9 +157,7 @@ function homeHTML() {
   if (!m) html += stepsHTML();
   else
     html +=
-      remindHTML() +
-      newsHTML() +
-      hintHTML(m) +
+      (remindHTML() || newsHTML() || hintHTML(m)) + // one question at a time
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m);
   return html;
@@ -171,23 +179,25 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
 
 // a pet rated here keeps its row while the meal stays in the card
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
+// each pet rates its newest meal here; older ones open their sheet
 function pendingHTML(list) {
-  const multiHouse = db.pets.length > 1;
+  const multiHouse = db.pets.length > 1,
+    newest = new Map();
+  for (const s of list) for (const pid of rateRows(s)) if (!newest.has(pid)) newest.set(pid, s.id);
   return (
     `<section class="card" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul class="list">` +
     list
       .map(s => {
         const p = getProduct(s.productId),
-          ids = rateRows(s),
-          multi = ids.length > 1;
-        const main = `<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 's') : ''}`;
+          ids = rateRows(s).filter(pid => newest.get(pid) === s.id);
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s, true)}`;
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
         const rows = ids
           .map(
             pid =>
-              `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateSlider(s, pid)}</div>`,
+              `<div class="pet-rate">${multiHouse ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateSlider(s, pid)}</div>`,
           )
           .join('');
         return `<li class="pend" data-id="${s.id}" style="view-transition-name:sv-${s.id};view-transition-class:${homeView.fresh === s.id ? 'fresh' : 'item'}">${head}${rows}${p ? '' : deleteMealBtn(s.id)}</li>`;
@@ -203,40 +213,40 @@ const HINT_TITLES = {
   sosse: 'Frisst meist nur die Soße',
   liebling: 'Nachkaufen?',
 };
-const sortName = p => (p.variety && p.brand ? `${p.variety} von ${p.brand}` : pname(p));
 function hintHTML(m) {
   const h = m.hints[0];
   if (!h) return '';
   const e = m.byId.get(h.id),
-    name = e && esc(sortName(e.product)),
     pet = h.pet && getPet(h.pet);
   const hide = `<button class="btn soft" data-action="hide-hint" data-v="${esc(hintKey(h))}">Ausblenden</button>`;
   const set = (v, label) =>
     `<button class="btn primary" data-action="hint-buy" data-id="${e.id}" data-v="${v}">${label}</button>`;
-  let say, why, btns;
-  if (h.kind === 'appetit') {
-    [say, why, btns] = [
-      `${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.`,
-      `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
-        (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => `„${observationOf(k).label}“`))}.` : ''),
+  const card = (body, btns) =>
+    `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>${body}<div class="btn-row">${btns}</div></section>`;
+  if (h.kind === 'appetit')
+    return card(
+      `<p class="say">${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.</p>
+      <p class="hint why">${esc(
+        `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
+          (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => `„${observationOf(k).label}“`))}.` : ''),
+      )}</p>`,
       hide,
-    ];
-  } else if (h.kind === 'sosse') {
-    const x = e.pets[h.pet];
-    [say, why, btns] = [
-      `${esc(calledNames([pet.id], 'hint'))} frisst bei ${name} meist nur die Soße.`,
-      cap(`${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}`),
-      hide,
-    ];
-  } else {
-    why = pet ? `${pet.name}: ${lower(evidenceOf(e))}` : whyOf(e);
-    [say, btns] =
-      h.kind === 'stop'
-        ? [`${name} kommt nicht gut an.`, set('nicht', 'Nicht mehr kaufen') + hide]
-        : [`${name} kommt gut an.`, set('immer', 'Nachkaufen') + hide];
-  }
-  return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
-    <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
+    );
+  // the variety with its packaging, as in the cards around it
+  const p = e.product,
+    x = h.kind === 'sosse' && e.pets[h.pet],
+    why = x ? `${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}` : lower(whyOf(e)),
+    sub = [p.variety ? p.brand : '', pet && db.pets.length > 1 ? `${pet.name}: ${why}` : why]
+      .filter(Boolean)
+      .join(', ');
+  return card(
+    `<ul class="list"><li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(cap(sub))}</small></span></button></li></ul>`,
+    h.kind === 'stop'
+      ? set('nicht', 'Nicht mehr kaufen') + hide
+      : h.kind === 'liebling'
+        ? set('immer', 'Nachkaufen') + hide
+        : hide,
+  );
 }
 
 // asked once after the first meal: with the reminder on, a meal is rated right in the notification
@@ -274,27 +284,17 @@ function newsHTML() {
 // The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
-const BADGES = {
-  Katzenlogik: 'idea',
-  'Stimmt’s?': 'question',
-  Kurios: 'search',
-  Wissen: 'book',
-  Flachwitz: 'grin',
-  Sprache: 'speech',
-};
-const dateLine = d =>
-  `${d.toLocaleDateString('de-DE', {weekday: 'long'})} • ${d.toLocaleDateString('de-DE', {day: 'numeric', month: 'short'})}`;
-/* A day's sheet, the date red on Sundays, as on a real tear-off calendar. Today's Stimmt’s? turns over on a tap, its
-   back stamped with the verdict. */
+/* A day's sheet: the date as its heading, red on Sundays as on a real tear-off calendar, then the fact led by its
+   format. Today's Stimmt’s? turns over on a tap, its answer led by the verdict. */
 function face(date, hanging = false) {
   const {sheet, format} = sheetOn(date),
     back = !hanging && !!sheet.back && homeView.turned === sheet.id,
     d = new Date(date),
-    badge = hanging ? icon('down') + 'Abreißen' : back ? sheet.verdict : icon(BADGES[format]) + format;
+    lead = back ? `<b class="cal-verdict">${sheet.verdict}.</b>` : `<b>${format}${format.endsWith('?') ? '' : ':'}</b>`;
   return {
     label: hanging ? 'Gestriges Blatt abreißen' : sheet.back ? (back ? 'Behauptung zeigen' : 'Auflösung zeigen') : '',
-    html: `<span class="cal-date${d.getDay() ? '' : ' red'}">${dateLine(d)}</span><span class="badge framed${back ? ' verdict' : ''}">${badge}</span>
-      <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
+    html: `<p class="cal-date${d.getDay() ? '' : ' red'}">${d.toLocaleDateString('de-DE', {weekday: 'long', day: 'numeric', month: 'long'})}</p>
+      <p class="cal-text">${lead} ${sheetText(sheet, catOf(db.pets), back)}</p>${hanging ? `<p class="cal-foot">${icon('down')}Zum Abreißen tippen</p>` : ''}`,
   };
 }
 const tappable = (action, label) => ` role="button" tabindex="0" aria-label="${label}" data-action="${action}"`;
@@ -370,7 +370,7 @@ function historyHTML() {
   return (
     calendarHTML(recent, true) +
     (shown.length
-      ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
+      ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh, plain: true})
       : recent.length || db.servings.some(s => servingPets(s).length)
         ? `<p class="hint empty"><span>Heute noch nicht gefüttert, der Napf langweilt sich.</span></p>`
         : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts eingetragen, der Napf wartet auf seine Premiere.</span></p>`)

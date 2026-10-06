@@ -28,8 +28,9 @@ export function rateMeal(sid, pid, r) {
   return true;
 }
 export function rate(el) {
-  const {s, p, r} = el.dataset;
-  if (rateMeal(s, p, r)) showRated(setLevel(el.closest('.slider'), r), getServing(s), p);
+  const {s, p, r} = el.dataset,
+    was = getServing(s)?.pets[p]?.r;
+  if (rateMeal(s, p, r)) showRated(setLevel(el.closest('.slider'), r), getServing(s), p, !!was);
 }
 
 const undoRating = (sid, pid, prev) => () => {
@@ -41,12 +42,13 @@ const undoRating = (sid, pid, prev) => () => {
   renderSheet();
 };
 
-// a fully rated meal stays put for a moment so it can be corrected; a finger still on a slider holds it longer
+/* A fully rated meal stays put for a moment so it can be corrected; a finger still on a slider holds it longer.
+   Its sheet closes by itself only once the last open pet is rated, not when an old rating is put right. */
 const HOLD = 1500; // ms
 const holds = new Map(); // meal id → its newest hold, so an older one ending does nothing
 let lastHold = 0;
 const rated = s => Object.values(s.pets).every(x => x.r);
-function showRated(disc, s, pid) {
+function showRated(disc, s, pid, corrected) {
   const inSheet = sheet?.kind === 'serving' && sheet.id === s.id;
   if (!inSheet) {
     // the row stays until the pop has run
@@ -56,7 +58,7 @@ function showRated(disc, s, pid) {
   settled(disc)
     .then(untouched)
     .then(() => update());
-  if (!rated(s)) {
+  if (!rated(s) || (inSheet && corrected && !holds.has(s.id))) {
     holds.delete(s.id);
     return;
   }

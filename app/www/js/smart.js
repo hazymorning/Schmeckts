@@ -1,5 +1,5 @@
 // The evaluation model. Pure; caching is in derive.js.
-import {flavoursOf, guessTexture, OBSERVATIONS, RATINGS, scaleOf, textureOf, TYPES, typeOf} from './config.js';
+import {flavoursOf, guessTexture, OBSERVATIONS, RATINGS, textureOf, TYPES, typeOf} from './config.js';
 import {DAY, addDays, dayKey, dayStart} from './dates.js';
 
 const HALF_LIFE = 90 * DAY;
@@ -63,16 +63,6 @@ export function ratingsIn(m, ids) {
 }
 const countOf = (counts, on) => Object.entries(counts).reduce((a, [r, k]) => a + (on(RATINGS[r].score) ? k : 0), 0);
 export const goodOf = counts => countOf(counts, v => v >= GOOD);
-// how often a pet's newest ratings went otherwise than the time before, of how many times they could have
-export function swings(e) {
-  const out = {k: 0, n: 0};
-  for (const {window: w} of Object.values(e.pets))
-    for (let i = 1; i < w.length; i++) {
-      out.n++;
-      if (toneOf(RATINGS[w[i].r].score) !== toneOf(RATINGS[w[i - 1].r].score)) out.k++;
-    }
-  return out;
-}
 export const poorOf = counts => countOf(counts, v => v < NO);
 // counts ratings instead of using the score, so it agrees with the wording in evidenceOf() (views/parts.js)
 const verdictOf = (n, good, poor) =>
@@ -449,11 +439,27 @@ function byGroup(m) {
     return ranked.length >= TWO ? insightOf(kind, ranked[0], ranked.at(-1)) : null;
   });
 }
+// instead: the texture eaten best otherwise, mostly well and better than the sauce, as advice; none, no advice
 function inSauce(m) {
-  const l = m.sorts.filter(e => typeOf(e.product) === TYPES[0] && textureKey(e.product) === 'sosse'),
-    n = l.reduce((a, e) => a + e.n, 0),
-    k = l.reduce((a, e) => a + (e.counts.sosse || 0), 0);
-  return n >= SAUCE.ratings && k / n >= SAUCE.share ? {kind: 'sosse', k, n, gap: k / n} : null;
+  const wet = m.sorts.filter(e => typeOf(e.product) === TYPES[0]),
+    by = new Map();
+  for (const e of wet) {
+    const key = textureKey(e.product),
+      x = by.get(key) || {key, ...zero(), sosse: 0};
+    x.n += e.n;
+    x.good += goodOf(e.counts);
+    x.sosse += e.counts.sosse || 0;
+    by.set(key, x);
+  }
+  const sauce = by.get('sosse');
+  if (!sauce || sauce.n < SAUCE.ratings || sauce.sosse / sauce.n < SAUCE.share) return null;
+  const instead = [...by.values()]
+    .filter(
+      x =>
+        x.key && x.key !== 'sosse' && x.n >= INSIGHT.ratings && x.good * 2 > x.n && x.good * sauce.n > sauce.good * x.n,
+    )
+    .sort((a, b) => b.good / b.n - a.good / a.n || b.n - a.n)[0];
+  return {kind: 'sosse', k: sauce.sosse, n: sauce.n, gap: sauce.sosse / sauce.n, instead};
 }
 // each pet's meals up to now, oldest first, without treats and dry food, unknown food as id null; and its treats
 function mealsOf(db, pets, now) {
@@ -731,28 +737,6 @@ export function fedToday(db, now) {
   return feedSlots(db, now)
     .filter(slot => mealsIn(db, atMinute(now, slot.from - FEED.lead) - 1, now).length)
     .map(slot => `${dayKey(now)}|${slot.at}`);
-}
-
-/* The buttons of a rating reminder: the two levels the pet gave this variety most often in its newest ratings,
-   filled up from all its meals of the same scale; in the scale's order. */
-const QUICK = 2;
-export function quickRatings(db, s, pid) {
-  const scale = scaleOf(db.products.find(p => p.id === s.productId)),
-    often = same => {
-      const n = new Map(); // newest first, so the newer level wins a tie
-      let left = WINDOW;
-      for (const x of db.servings) {
-        const r = same(x) && rOf(x.pets[pid]);
-        if (!r || !scale.includes(r)) continue;
-        n.set(r, (n.get(r) || 0) + 1);
-        if (!--left) break;
-      }
-      return [...n].sort((a, b) => b[1] - a[1]).map(([r]) => r);
-    },
-    own = s.productId ? often(x => x.productId === s.productId) : [];
-  return [...new Set([...own, ...often(() => true)])]
-    .slice(0, QUICK)
-    .sort((a, b) => scale.indexOf(a) - scale.indexOf(b));
 }
 
 export function nextMeal(db, now, pets) {

@@ -4,18 +4,7 @@ import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {addDays, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {
-  guessTexture,
-  OBSERVATIONS,
-  observationOf,
-  RATINGS,
-  scaleOf,
-  SEXES,
-  SPECIES,
-  TEXTURES,
-  TYPES,
-  typeOf,
-} from '../config.js';
+import {OBSERVATIONS, observationOf, RATINGS, scaleOf, SEXES, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {
   diary,
@@ -33,7 +22,7 @@ import {
   sortOf,
   withLast,
 } from '../derive.js';
-import {goodOf, mealsBefore, observedAfter, rateCls, ratingsIn, shopGroups, swings, VERDICTS} from '../smart.js';
+import {mealsBefore, observedAfter, rateCls, ratingsIn, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
 import {memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
@@ -201,8 +190,10 @@ function viewName() {
     }${note}`;
   if (patient) return top + fieldSkeleton + fieldSkeleton; // same height as the fields, so nothing jumps
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
+    // read right, it takes one tap right under the reading; the fields below are for putting it right
     said = read.length
-      ? `<p class="say read-note">Gelesen: <b>${esc(read.join(', '))}</b>. Passt das?</p>`
+      ? `<p class="say read-note">Gelesen: <b>${esc(read.join(', '))}</b>. Passt das?</p>
+        <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}Passt so</button></div>`
       : serving?.status === 'noserver' && !product
         ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.</p>`
         : '',
@@ -226,7 +217,7 @@ function viewName() {
     <div class="mt">${
       s.armed?.startsWith('merge:')
         ? `<button class="btn armed" data-action="save-name">${icon('check')}Nochmal tippen: zusammenführen</button>`
-        : `<button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : read.length ? 'Passt so' : 'Speichern'}</button>`
+        : `<button class="btn ${read.length ? 'soft' : 'primary'}" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : 'Speichern'}</button>`
     }</div>
     ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
 }
@@ -347,7 +338,7 @@ export function renderServeHits(text) {
   box.innerHTML = words.length ? hitList(text.trim(), words) : quickList(quickProducts());
 }
 function hitList(text, words) {
-  const hits = quickProducts()
+  const hits = quickProducts(Infinity, true)
     .filter(({product: p}) => words.every(w => norm(`${p.brand || ''} ${p.variety || ''}`).includes(w)))
     .slice(0, HITS);
   if (hits.length) return group('', `<ul class="list plist">${serveRows(hits)}</ul>`, '');
@@ -385,7 +376,7 @@ const countsRow = (levels, counts) =>
     .join('')}</div>${scaleEnds(levels)}</div>`;
 const mealRow = s =>
   `<li><button class="row" data-action="open-serving" data-id="${s.id}"><span class="t-main">
-    <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s)}</button></li>`;
+    <b>${esc(cap(when(s.servedAt)))}</b><small>${esc(mealMeta(s))}</small></span>${resultBadges(s, true) || resultBadges(s)}</button></li>`;
 const mealMeta = s =>
   [petNames(Object.keys(s.pets).filter(getPet)), s.note ? '„' + s.note + '“' : ''].filter(Boolean).join(', ');
 const barcodeRow = c =>
@@ -393,26 +384,14 @@ const barcodeRow = c =>
     <button class="icon-btn" data-action="remove-code" data-code="${esc(c)}" aria-label="Barcode ${esc(c)} entfernen">
     ${icon('close')}</button></li>`;
 const MEALS_SHOWN = 12; // the rest is on the history page
-const QUIRKS = ['sosse', 'liegen', 'spaeter']; // the level each scale is known for
-/* a variety as a trading card: the packaging large, under it how often it was served and the same newest ratings
-   as the counts below, two by two */
-function quartet(p, e, served) {
-  const {n, counts} = e.house,
-    quirk = scaleOf(p).find(r => QUIRKS.includes(r)),
-    sauce = quirk !== 'sosse' || counts.sosse || ['sosse', 'gelee'].includes(p.texture || guessTexture(p)),
-    turns = swings(e),
-    stats = [
-      [served, 'Einsätze'],
-      n && [`${goodOf(counts)} von ${n}`, 'Gut gefressen'],
-      n && quirk && sauce && [`${counts[quirk] || 0} von ${n}`, RATINGS[quirk].short],
-      turns.n && [`${turns.k} von ${turns.n}`, 'Meinungswechsel'],
-    ].filter(Boolean);
+// with a picture the packaging spans the card, without one the variety has the row a meal has
+function packGroup(p) {
+  const inner = `<span class="t-main"><b>${esc(p.brand || p.variety)}</b><small>${typeOf(p)}</small></span>`;
+  if (!p.thumb) return prodGroup(null, p, inner, 'rename-product', 'Umbenennen');
   return group(
     '',
-    `${photoThumb(null, p, 'pack')}<button class="row set-row" data-action="rename-product" aria-label="Umbenennen">
-      <span class="t-main"><b>${esc(p.brand || p.variety)}</b><small>${typeOf(p)}</small></span>${icon('pencil', 'chev')}</button>
-    <div class="stats">${stats.map(([v, label]) => `<span class="stat"><small>${label}</small><b>${v}</b></span>`).join('')}</div>${photoRow(p)}`,
-    'quartet',
+    `${photoThumb(null, p, 'pack')}<button class="row set-row" data-action="rename-product" aria-label="Umbenennen">${inner}${icon('pencil', 'chev')}</button>${photoRow(p)}`,
+    'set-group pack-card',
   );
 }
 // counts only; whether they stand out is for the evaluation
@@ -452,7 +431,7 @@ function viewProduct() {
   const codes = Object.keys(p.codes || {}).sort();
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
-    ${quartet(p, e, ss.length)}
+    ${packGroup(p)}
     ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Füttern zerkleinern</p>' : '')}
     ${group('Bewertungen', e.house.n ? countsRow(levels, counts) : `<p class="hint">${e.total ? OLD : 'Noch nicht bewertet.'}</p>`)}
     ${kaufenHTML(e)}

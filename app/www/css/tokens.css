@@ -68,7 +68,6 @@
   --weight-strong: 600; /* b and strong in running text */
   --track-title: -0.015em; /* Faustina runs narrow at title size */
   --track-code: 0.14em; /* household code field */
-  --track-caps: 0.13em; /* small text in capitals */
 
   /* --dur-fade for changes in place, --dur-step for movement; a dimming takes the duration of what moves on it.
      --ease-out to arrive, --ease-in to leave, --ease-spring to confirm. */
@@ -365,12 +364,10 @@
     transform: perspective(600px) rotateY(-90deg);
   }
 }
-/* the right edge stays put, so the large stamp does not run off the sheet */
 @keyframes stamp {
   from {
     opacity: 0.25;
     scale: 1.6;
-    translate: -30%;
   }
 }
 @keyframes shimmer {

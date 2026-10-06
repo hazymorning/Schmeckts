@@ -5,7 +5,17 @@ import {icon} from '../icons.js';
 import {observationOf, RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {held, pending, status} from '../sync.js';
-import {getPet, getProduct, isObservation, observedPets, petNames, pname, servingPets, timeOf} from '../derive.js';
+import {
+  getPet,
+  getProduct,
+  inFilter,
+  isObservation,
+  observedPets,
+  petNames,
+  pname,
+  servingPets,
+  timeOf,
+} from '../derive.js';
 import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, sideOf, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
@@ -14,7 +24,11 @@ import {sliderCls, thumbHTML} from '../ui/slider.js';
 export function avatar(pet, cls = '') {
   if (!pet) return '';
   if (pet.photo) return `<span class="av ${cls}"><img src="${esc(pet.photo)}" alt="" decoding="async"></span>`;
-  return `<span class="av ${cls}">${icon(speciesIcon(pet.species))}</span>`;
+  // two of a kind without a photo would look alike: their initials tell them apart
+  const initial =
+    db.pets.some(x => x.id !== pet.id && x.species === pet.species && !x.photo) &&
+    (pet.name || '').trim().charAt(0).toUpperCase();
+  return `<span class="av ${cls}">${initial ? esc(initial) : icon(speciesIcon(pet.species))}</span>`;
 }
 export function thumbOf(s, p, cls = '') {
   const src = p?.thumb || s?.thumb;
@@ -60,10 +74,9 @@ export function rateSlider(s, pid) {
       .map((r, i) => `var(--${rateTone(r)}-soft) ${(((i + 0.5) / scale.length) * 100).toFixed(1)}%`)
       .join(', '),
     words = scale
-      .map((r, i) => {
-        const [first, ...rest] = RATINGS[r].short.split(' ');
-        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${rest.join(' ')}</small></span>`;
-      })
+      .map(
+        (r, i) => `<span class="${rateCls(r)}${i === at ? ' on' : ''}">${RATINGS[r].short.replace(' ', '<br>')}</span>`,
+      )
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
     <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;
@@ -74,7 +87,7 @@ export function resultBadges(s, compact = false) {
   const ids = servingPets(s);
   if (ids.length === 1) {
     const r = rOf(s.pets[ids[0]]);
-    if (!r) return `<span class="badge open">offen</span>`;
+    if (!r) return compact ? '' : `<span class="badge open">offen</span>`; // in a row its dot or the rating card says it
     return compact
       ? `<span class="badge ic-only ${rateCls(r)}" title="${RATINGS[r].label}">${icon('r_' + r)}</span>`
       : rateBadge(r);
@@ -202,41 +215,55 @@ export function dayGroups(list) {
   }
   return groups;
 }
-function observationItem(o, multiHouse, fresh) {
+// plain: rows as in any card, the time in the small line; else the history page's timeline of times and dots
+function observationItem(o, multiHouse, fresh, plain) {
   const kind = observationOf(o.kind),
     ids = observedPets(o),
-    meta = [multiHouse || ids.length > 1 ? whoObserved(ids) : '', o.by ? 'von ' + o.by : ''].filter(Boolean).join(', ');
-  return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
-        <span class="tl-time">${clockStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
+    meta = [
+      plain ? clockStr(o.at) : '',
+      multiHouse || ids.length > 1 ? whoObserved(ids) : '',
+      o.by ? 'von ' + o.by : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+  return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row${plain ? '' : ' tl-item'}" data-action="open-observation" data-id="${o.id}">
+        ${plain ? '' : `<span class="tl-time">${clockStr(o.at)}</span><span class="tl-node"><i></i></span>`}${obsThumb(o.kind)}
         <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
+function servingItem(s, multiHouse, fresh, plain) {
+  const p = getProduct(s.productId),
+    ids = servingPets(s);
+  const meta = [
+    p && p.variety ? p.brand : '',
+    plain ? clockStr(s.servedAt) : '',
+    multiHouse ? 'für ' + petNames(ids) : '',
+    s.by ? 'von ' + s.by : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const title = p
+    ? esc(pname(p))
+    : s.status === 'recognizing'
+      ? 'Wird erkannt …'
+      : s.status === 'reading'
+        ? 'Wird gelesen …'
+        : 'Unbekannte Sorte';
+  return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row${plain ? '' : ' tl-item'}" data-action="open-serving" data-id="${s.id}">
+        ${plain ? '' : `<span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>`}${thumbOf(s, p, 'm')}
+        <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
+        ${resultBadges(s, true)}</button></li>`;
+}
 // anchors: day ids the calendar jumps to; fresh: id of the entry just made
-export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}) {
+export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false, plain = false} = {}) {
   return groups
     .map(
       g => `<div class="tl-day"${anchors ? ` id="d-${g.key}"` : ''}>
     <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
-    <ol class="tl">${g.items
-      .map(s => {
-        if (isObservation(s)) return observationItem(s, multiHouse, fresh);
-        const p = getProduct(s.productId),
-          ids = servingPets(s);
-        const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : '']
-          .filter(Boolean)
-          .join(', ');
-        const title = p
-          ? esc(pname(p))
-          : s.status === 'recognizing'
-            ? 'Wird erkannt …'
-            : s.status === 'reading'
-              ? 'Wird gelesen …'
-              : 'Unbekannte Sorte';
-        return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-serving" data-id="${s.id}">
-        <span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
-        <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
-        ${resultBadges(s, true)}</button></li>`;
-      })
-      .join('')}</ol></div>`,
+    <${plain ? 'ul class="list"' : 'ol class="tl"'}>${g.items
+      .map(s =>
+        isObservation(s) ? observationItem(s, multiHouse, fresh, plain) : servingItem(s, multiHouse, fresh, plain),
+      )
+      .join('')}</${plain ? 'ul' : 'ol'}></div>`,
     )
     .join('');
 }
@@ -347,16 +374,18 @@ function once(phrases) {
     : phrases;
 }
 export const lower = t => t.charAt(0).toLowerCase() + t.slice(1);
-// when only some pets decided the verdict, only their ratings are told
-export function whyOf(e) {
-  const by = e.verdict === 'nachkaufen' ? e.yes : e.verdict === 'nicht' ? e.no : [];
-  if (!by.length || by.length === Object.keys(e.pets).length) return evidenceOf(e);
-  const x = {n: 0, counts: {}};
-  for (const id of by) {
-    x.n += e.pets[id].n;
-    for (const [r, k] of Object.entries(e.pets[id].counts)) x.counts[r] = (x.counts[r] || 0) + k;
-  }
-  return `Bei ${petNames(by)} ${lower(evidenceOf(x))}`;
+/* A variety's ratings in words, each pet counted on its own, or three meals for two would read as six. Only the pets
+   that decided the verdict are told, unless all. */
+export function whyOf(e, all = false) {
+  const rated = Object.keys(e.pets).filter(id => e.pets[id].n && inFilter(id) && getPet(id)),
+    by = all ? [] : e.verdict === 'nachkaufen' ? e.yes : e.verdict === 'nicht' ? e.no : [],
+    ids = rated.filter(id => !by.length || by.includes(id));
+  if (!ids.length) return evidenceOf(e);
+  if (rated.length < 2) return evidenceOf(e.pets[ids[0]]);
+  const said = ids.map(id => lower(evidenceOf(e.pets[id])));
+  if (said.every(x => x === said[0]))
+    return `Bei ${ids.length === 2 && rated.length === 2 ? 'beiden' : petNames(ids)} ${said[0]}`;
+  return cap(ids.map((id, i) => `bei ${getPet(id).name} ${said[i]}`).join(', '));
 }
 // what a variety that goes down badly, or that nobody buys any more, has to show for itself when it is served
 export const record = e => (e?.n && (e.choice === 'nicht' || sideOf(e) === 'flop') ? whyOf(e) : '');

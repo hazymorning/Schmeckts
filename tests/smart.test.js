@@ -7,6 +7,7 @@ import {
   basis,
   feedReminders,
   feedSlots,
+  GOOD,
   hintKey,
   insights,
   likingOf,
@@ -15,17 +16,15 @@ import {
   mealsBefore,
   observed,
   observedAfter,
-  quickRatings,
   ranking,
   rateCls,
   ratingsIn,
   shopGroups,
   sideOf,
   slowStarters,
-  swings,
   trend,
 } from '../app/www/js/smart.js';
-import {flavoursOf, RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
+import {flavoursOf, quickOf, RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
 
 // views/evaluation.js words the insights and reaches for the page as it loads; in Node a stub answers every such call
 const stub = new Proxy(function () {}, {
@@ -509,13 +508,27 @@ test('Erkenntnisse by consistency: the texture field, the keywords only when it 
 });
 
 test('Erkenntnisse on sauce: at least four in ten ratings of the varieties in sauce „Nur Soße“, from five ratings', () => {
-  const sauce = meals => learnedOf('sosse', household(['A'], ['x', ...FOUR.slice(0, 2)], meals));
-  assert.deepEqual(sauce([...rate('a', 'A', [S, S, T, T, T]), ...rate('b', 'A', [S, S, T, T, T])]), [
-    [
-      'Bei Stückchen in Soße wird oft nur die Soße geleckt.',
-      '4 von 10 Mal nur die Soße. Eine Pastete wäre einen Versuch wert.',
-    ],
+  const sauce = meals =>
+    learnedOf('sosse', household(['A'], ['x', ...FOUR, {id: 'p', variety: 'Rind Pastete'}], meals));
+  const licked = [...rate('a', 'A', [S, S, T, T, T]), ...rate('b', 'A', [S, S, T, T, T])];
+  assert.deepEqual(sauce(licked), [
+    ['Bei Stückchen in Soße wird oft nur die Soße geleckt.', '4 von 10 Mal nur die Soße.'],
   ]);
+  assert.deepEqual(
+    sauce([...licked, ...rate('c', 'A', [T, T, X]), ...rate('d', 'A', [T, G]), ...rate('p', 'A', [X, X, X, X, T])]),
+    [
+      [
+        'Bei Stückchen in Soße wird oft nur die Soße geleckt.',
+        '4 von 10 Mal nur die Soße. Stückchen in Gelee dagegen 4 von 5 Mal gut gefressen.',
+      ],
+    ],
+    'the texture that goes down well is named, not one that does not',
+  );
+  assert.deepEqual(
+    sauce([...licked, ...rate('p', 'A', [X, X, X, X, T])]),
+    [['Bei Stückchen in Soße wird oft nur die Soße geleckt.', '4 von 10 Mal nur die Soße.']],
+    'no texture goes down better: no advice',
+  );
   assert.deepEqual(sauce([...rate('a', 'A', [S, S, T]), ...rate('b', 'A', [S])]), [], 'four ratings are too few');
   assert.deepEqual(
     sauce([...rate('a', 'A', [S, T, T, T, T]), ...rate('b', 'A', [S, S, T, T, T]), ...rate('x', 'A', [S, S])]),
@@ -1422,46 +1435,10 @@ test('appetite: what was noted about the pet in the same hours comes with the hi
   assert.deepEqual(model(db).hints[0].seen, ['tired']);
 });
 
-test('reminder buttons: the levels most given to this variety by this pet, filled up from its scale, in the scale order', () => {
-  const db = household(
-    ['A', 'B'],
-    [{id: 'nass'}, {id: 'neu'}, {id: 'snack', type: 'Snack'}],
-    [
-      ...rate('nass', 'A', [G, T, G, M, T, G], 1),
-      ...rate('nass', 'B', [X, X, X, X], 2),
-      ...rate('neu', 'A', [S, S, S], 3),
-    ],
-  );
-  const open = (productId, pets = {A: {r: null}}) => ({id: 'open', productId, pets});
-  assert.deepEqual(quickRatings(db, open('nass'), 'A'), [T, G], 'this pet with this variety, best level first');
-  assert.deepEqual(quickRatings(db, open('nass'), 'B'), [X], 'only what was given: one level, no second');
-  assert.deepEqual(quickRatings(db, open('neu'), 'A'), [G, S], 'one level here, filled up with the most given overall');
-  assert.deepEqual(
-    quickRatings(db, open(null), 'A'),
-    [T, G],
-    'unknown food: the pet\u2019s newest ratings across its meals',
-  );
-  assert.deepEqual(quickRatings(db, open('snack'), 'A'), [], 'a treat has its own scale, and none of it was given');
-  assert.deepEqual(quickRatings(db, open('nass'), 'C'), [], 'no ratings, no buttons');
-  const newer = household(
-    ['A'],
-    ['p'],
-    [...rate('p', 'A', [S, M, S, M, S, M, S, M], 1), ...rate('p', 'A', Array(9).fill(T), 30)],
-  );
-  assert.deepEqual(quickRatings(newer, open('p'), 'A'), [M, S], 'only the newest eight count');
-  assert.deepEqual(
-    quickRatings(household(['A'], ['p'], rate('p', 'A', [S, T, M], 1)), open('p'), 'A'),
-    [T, S],
-    'a tie goes to the newer level',
-  );
-});
-
-test('Quartett: how often the newest ratings of each pet went otherwise than the time before', () => {
-  const m = model(household(['A', 'B'], ['p'], [...rate('p', 'A', [T, X, T, G], 1), ...rate('p', 'B', [M, M], 2)]));
-  assert.deepEqual(
-    swings(m.byId.get('p')),
-    {k: 2, n: 4},
-    'top, fast nix, top, gut: two of three; die Hälfte twice: none of one',
-  );
-  assert.deepEqual(swings(model(household(['A'], ['p'], rate('p', 'A', [T]))).byId.get('p')), {k: 0, n: 0});
+test('reminder buttons: the best and the worst level of each scale and one between, so any meal can be rated there', () => {
+  for (const type of ['Nassfutter', 'Trockenfutter', 'Snack', undefined]) {
+    const [best, between, worst] = quickOf({type}).map(r => scaleOf({type}).indexOf(r));
+    assert.ok(best === 0 && between > 0 && worst > between && worst === scaleOf({type}).length - 1, type);
+    assert.ok(RATINGS[scaleOf({type})[between]].score < GOOD, type);
+  }
 });
