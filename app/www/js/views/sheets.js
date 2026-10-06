@@ -190,8 +190,10 @@ function viewName() {
     }${note}`;
   if (patient) return top + fieldSkeleton + fieldSkeleton; // same height as the fields, so nothing jumps
   const read = [serving?.guess?.brand, serving?.guess?.variety].filter(Boolean),
+    // read right, it takes one tap right under the reading; the fields below are for putting it right
     said = read.length
-      ? `<p class="say read-note">Gelesen: <b>${esc(read.join(', '))}</b>. Passt das?</p>`
+      ? `<p class="say read-note">Gelesen: <b>${esc(read.join(', '))}</b>. Passt das?</p>
+        <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}Passt so</button></div>`
       : serving?.status === 'noserver' && !product
         ? `<p class="hint read-note">Auf dem Foto war nichts zu lesen. Tipp Marke und Sorte ein oder mach ein neues Foto.</p>`
         : '',
@@ -215,7 +217,7 @@ function viewName() {
     <div class="mt">${
       s.armed?.startsWith('merge:')
         ? `<button class="btn armed" data-action="save-name">${icon('check')}Nochmal tippen: zusammenführen</button>`
-        : `<button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : read.length ? 'Passt so' : 'Speichern'}</button>`
+        : `<button class="btn ${read.length ? 'soft' : 'primary'}" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : 'Speichern'}</button>`
     }</div>
     ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
 }

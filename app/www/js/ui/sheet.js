@@ -33,10 +33,12 @@ const markEdge = L => {
 };
 for (const L of [base, over]) L.body.addEventListener('scroll', () => markEdge(L), {passive: true});
 
-// the toast must sit in the top dialog, or that dialog's dimming covers it
-function hostToast() {
+/* the toast must sit in the top dialog, or that dialog's dimming covers it. A sheet opening drops one with nothing
+   to undo, which would lie over its last button. */
+function hostToast(opening = false) {
   const t = $('#toast'),
     host = topDialog() || document.body;
+  if (opening && t.classList.contains('plain')) t.classList.remove('show');
   if (t.parentNode !== host) host.appendChild(t);
   t.classList.toggle('in-sheet', host !== document.body);
 }
@@ -65,7 +67,7 @@ function openOn(L, state) {
     L.depth = 0;
     push(L);
     if (state.page) push(L); // opened on a sub-page, so back goes to the overview first
-    hostToast();
+    hostToast(true);
   }
 }
 function push(L) {

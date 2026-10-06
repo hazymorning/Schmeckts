@@ -903,7 +903,12 @@ async def test_scales(browser, url):
     await tap(pg, '[data-sec=hist] [data-id=meal000002]')  # rated on another scale
     await tap(pg, '#sheet [data-r=liegen]', force=True)
     check(await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r") == 'liegen', 'a tap replaces a level from another scale')
-    check(await until(pg, f'!{OPEN}', 5), 'every pet rated: the sheet closes')
+    await pg.wait_for_timeout(2000)
+    check(await pg.evaluate(OPEN), 'a rating put right: the sheet stays open')
+    await tap(pg, '#sheet [data-action=close]')
+    await tap(pg, '.pend[data-id=meal000000] .pend-head')
+    await tap(pg, '#sheet [data-r=normal]', force=True)
+    check(await until(pg, f'!{OPEN}', 5), 'the last open pet rated: the sheet closes by itself')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
@@ -915,6 +920,8 @@ CUT = """() => { const bad = [], vw = document.documentElement.clientWidth;
     if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
     const s = getComputedStyle(el), r = el.getBoundingClientRect(), what = el.textContent.trim().slice(0, 40);
     if (r.left < -0.5 || r.right > vw + 0.5) bad.push(`off the screen: ${what}`);
+    else if (s.webkitLineClamp !== 'none' && !el.matches(':is(.t-main, .t-top) > b') && el.scrollHeight > el.clientHeight + 1)
+      bad.push(`cut short: ${what}`);
     else if (s.webkitLineClamp !== 'none' || s.display === 'inline') continue;
     else if (el.scrollWidth > el.clientWidth + 1) bad.push(`too wide: ${what}`);
     else if (/hidden|clip/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1) bad.push(`cut: ${what}`);
@@ -922,46 +929,67 @@ CUT = """() => { const bad = [], vw = document.documentElement.clientWidth;
   return bad; }"""
 
 
+# Android's large system font scales every text size, not the layout: the type tokens grown by 30 %
+BIG_FONT = """() => { const r = document.documentElement, s = getComputedStyle(r);
+  for (const n of ['title', 'heading', 'subheading', 'body', 'body-strong', 'small', 'small-strong', 'caption', 'caption-strong'])
+    r.style.setProperty('--type-' + n, s.getPropertyValue('--type-' + n).replace(/([\\d.]+)px/, (_, x) => x * 1.3 + 'px')); }"""
+
+
 async def test_narrow(browser, url):
-    print('at 360px nothing is cut off: the home page, the pages and sheets, every rating scale')
-    ctx, pg, errors = await demo(browser, url, width=360)
-    foods = [product('trocken0001', 'Josera', 'Huhn', 'Trockenfutter'), product('snack0001', 'Dreamies', 'Käse', 'Snack')]
-    await change(
-        pg,
-        """a.forEach((p, i) => { s.db.products.push(p); s.db.servings.push({id: 'narrow' + i, productId: p.id, servedAt: Date.now() - (i + 1) * 6e4,
-          note: '', pets: {[s.db.pets[0].id]: {r: null, at: null}}}); }); s.db.servings.sort((x, y) => y.servedAt - x.servedAt)""",
-        foods,
-    )
-    cut = {}
+    print('at 360px nothing is cut off, also with a large system font: the home page, the pages and sheets, every rating scale')
+    for big in (False, True):
+        ctx, pg, errors = await demo(browser, url, width=360)
+        if big:
+            await pg.evaluate(BIG_FONT)
+        foods = [product('trocken0001', 'Josera', 'Huhn', 'Trockenfutter'), product('snack0001', 'Dreamies', 'Käse', 'Snack')]
+        await change(
+            pg,
+            """a.forEach((p, i) => { s.db.products.push(p); s.db.servings.push({id: 'narrow' + i, productId: p.id, servedAt: Date.now() - (i + 1) * 6e4,
+              note: '', pets: {[s.db.pets[0].id]: {r: null, at: null}}}); }); s.db.servings.sort((x, y) => y.servedAt - x.servedAt)""",
+            foods,
+        )
+        cut = {}
 
-    async def look(name):
-        await idle(pg)
-        found = await pg.evaluate(CUT)
-        if found:
-            cut[name] = found
+        async def look(name):
+            await idle(pg)
+            found = await pg.evaluate(CUT)
+            if found:
+                cut[name] = found
 
-    await look('home')
-    for sel in (
-        '[data-sec=evaluation] [data-action=open-evaluation]',
-        '[data-action=open-settings]',
-        '#fab',
-        '[data-sec=hist] [data-action=open-serving]',
-    ):
-        await tap(pg, sel)
-        await look(sel)
-        await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
-        await idle(pg)
-    await tap(pg, '[data-sec=evaluation] .picks button')
-    await look('variety')
-    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
-    meals = await pg.eval_on_selector_all('.pend', 'l => l.map(x => x.dataset.id)')
-    for meal_ in meals:
-        await tap(pg, f'.pend[data-id="{meal_}"] .pend-head')
-        await look(meal_)
-        await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
-    check(len(meals) >= 3 and not cut, f'nothing cut, with all three scales {cut}')
-    check(not errors, f'no errors {errors}')
-    await ctx.close()
+        async def closed():
+            await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+            await idle(pg)
+
+        await look('home')
+        for sel in (
+            '[data-sec=evaluation] [data-action=open-evaluation]',
+            '[data-sec=hist] [data-action=open-report]',
+            '#fab',
+            '#sheet [data-action=new-product]',
+            '[data-sec=hist] [data-action=open-serving]',
+        ):
+            await tap(pg, sel)
+            await look(sel)
+            if sel != '#fab':
+                await closed()
+        await tap(pg, '[data-action=open-settings]')
+        await look('settings')
+        for page in await pg.eval_on_selector_all('#sheet [data-action=settings-page]', 'l => l.map(b => b.dataset.v)'):
+            await settings_page(pg, page)
+            await look(page)
+            await back(pg)
+        await closed()
+        await tap(pg, '[data-sec=evaluation] .picks button')
+        await look('variety')
+        await closed()
+        meals = await pg.eval_on_selector_all('.pend', 'l => l.map(x => x.dataset.id)')
+        for meal_ in meals:
+            await tap(pg, f'.pend[data-id="{meal_}"] .pend-head')
+            await look(meal_)
+            await closed()
+        check(len(meals) >= 3 and not cut, f'nothing cut{" with a large font" if big else ""}, with all three scales {cut}')
+        check(not errors, f'no errors {errors}')
+        await ctx.close()
 
 
 async def test_slide(browser, url):
@@ -1029,7 +1057,8 @@ async def test_slide(browser, url):
     await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome())")
     await touch('touchEnd')
     await idle(pg)
-    check(await rated() == [None, []], 'a slider redrawn under the finger rates nothing')
+    check(await rated() == ['gut', ['gut']], 'a redraw waits for the finger to lift, so the rating counts')
+    await reopen()
     at_ = await stops()
     await pg.mouse.move(*at_[5])
     await pg.mouse.down()
@@ -1043,6 +1072,12 @@ async def test_slide(browser, url):
     await pg.keyboard.press('Enter')
     await idle(pg)
     check(await rated() == ['mittel', ['mittel']], 'keyboard: Enter rates the focused level')
+    await pg.focus('[data-sec=hist] [data-action=open-report]')
+    await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome(false))")
+    check(
+        await pg.evaluate("document.activeElement.matches('[data-sec=hist] [data-action=open-report]')"),
+        'the minute tick leaves an unchanged page alone, and the focus where it is',
+    )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2138,7 +2173,11 @@ async def test_recognize(browser, url):
         and await state(pg, '(s => [s.status, s.error ?? null])(db.servings[0])') == ['noserver', None],
         f'without a server the phone reads the text and fills brand, variety and type, the photo file it read goes again {filled} {cache}',
     )
-    await tap(pg, '[data-action=save-name]')
+    check(
+        await pg.inner_text('#sheet .read-note + .mt [data-action=save-name]') == 'Passt so',
+        'what was read is confirmed with one tap right under it',
+    )
+    await tap(pg, '#sheet .read-note + .mt [data-action=save-name]')
     p = await state(pg, '(p => [p.brand, p.variety, p.type, p.texture])(db.products[0])')
     check(
         p == ['Sheba', 'Selection in Sauce mit Lachs', 'Nassfutter', 'sosse'] and not await state(pg, 'db.servings[0].guess'),
@@ -3261,6 +3300,22 @@ async def test_toast_swipe(browser, url):
         await idle(pg)
         sizes.append(await pg.evaluate(LAYOUT))
     check(sizes == [[1, False], [2, True]], f'the text in two lines at most: beside the button, or over it where it needs the room {sizes}')
+    await tap(pg, '.welcome [data-action=add-pet]')
+    await pg.fill('#f-name', 'Minka')
+    await tap(pg, '[data-action=save-pet]')
+    kept = []
+    for undo in (False, True):
+        await pg.evaluate("u => import('./js/ui/toast.js').then(m => m.toast('Willkommen, Minka!', u ? () => {} : null))", undo)
+        await pg.click('#fab')
+        await idle(pg)
+        kept.append(await pg.evaluate("(t => t.classList.contains('show') && !!t.closest('#sheet'))(document.getElementById('toast'))"))
+        await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+        await idle(pg)
+    check(
+        kept == [False, True],
+        f'a sheet opening drops a toast with nothing to undo, which would cover its last button, and keeps one with undo {kept}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
 

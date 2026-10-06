@@ -85,8 +85,8 @@ markScrolled();
 window.addEventListener('scroll', markScrolled, {passive: true});
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && !anyOpen()) renderHome();
+  if (!document.hidden && !anyOpen()) renderHome(false);
 });
 setInterval(() => {
-  if (!anyOpen() && !document.hidden) renderHome();
+  if (!anyOpen() && !document.hidden) renderHome(false);
 }, 60000);

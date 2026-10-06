@@ -50,7 +50,7 @@ const petRow = p =>
   `<button class="row set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p, 's')}${main(esc(p.name), esc(p.species))}${chev}</button>`;
 const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(title)}</div>`;
 
-const LOOKUP = 'Schlägt unbekannte Barcodes nach, nur mit der Nummer';
+const LOOKUP = 'Sucht nur mit der Nummer des Barcodes';
 const SERVER_PHOTO = 'Der Server erkennt Marke und Sorte, sonst das Handy selbst.';
 
 function overview() {

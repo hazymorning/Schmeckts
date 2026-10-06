@@ -21,6 +21,7 @@ import {
 import {hintKey} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {anyOpen} from '../ui/sheet.js';
+import {pressing, untouched} from '../ui/slider.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {
   avatar,
@@ -121,13 +122,20 @@ export function renderSyncChip() {
   el.setAttribute('aria-label', `${c.label}, Haushalt in den Einstellungen öffnen`);
 }
 
-export function renderHome() {
+/* changed false: a redraw nothing asked for, such as the minute tick, which leaves an unchanged page alone and so
+   the focus where it is. Never under a finger on a slider, or the rating would go with it. */
+let drawn = '';
+export function renderHome(changed = true) {
+  if (pressing()) return void untouched().then(() => renderHome(changed));
   renderPets();
   renderFab();
   renderSyncChip();
   renderMood();
+  const html = homeHTML();
+  if (!changed && html === drawn) return;
+  drawn = html;
   const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
-  $('#home').innerHTML = homeHTML();
+  $('#home').innerHTML = html;
   if (rail) $('#home .obs').scrollLeft = rail;
   $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
