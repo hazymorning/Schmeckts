@@ -28,7 +28,6 @@ import {
   dayBlocks,
   dayGroups,
   deleteMealBtn,
-  evidenceOf,
   lower,
   nameBlock,
   photoThumb,
@@ -226,7 +225,7 @@ function hintHTML(m) {
   // the variety with its packaging, as in the cards around it
   const p = e.product,
     x = h.kind === 'sosse' && e.pets[h.pet],
-    why = x ? `${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}` : lower(pet ? evidenceOf(e) : whyOf(e)),
+    why = x ? `${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}` : lower(whyOf(e)),
     sub = [p.variety ? p.brand : '', pet && db.pets.length > 1 ? `${pet.name}: ${why}` : why]
       .filter(Boolean)
       .join(', ');

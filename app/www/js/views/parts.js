@@ -5,7 +5,17 @@ import {icon} from '../icons.js';
 import {observationOf, RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {held, pending, status} from '../sync.js';
-import {getPet, getProduct, isObservation, observedPets, petNames, pname, servingPets, timeOf} from '../derive.js';
+import {
+  getPet,
+  getProduct,
+  inFilter,
+  isObservation,
+  observedPets,
+  petNames,
+  pname,
+  servingPets,
+  timeOf,
+} from '../derive.js';
 import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, sideOf, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {isPage, sheet} from '../ui/sheet.js';
@@ -14,7 +24,11 @@ import {sliderCls, thumbHTML} from '../ui/slider.js';
 export function avatar(pet, cls = '') {
   if (!pet) return '';
   if (pet.photo) return `<span class="av ${cls}"><img src="${esc(pet.photo)}" alt="" decoding="async"></span>`;
-  return `<span class="av ${cls}">${icon(speciesIcon(pet.species))}</span>`;
+  // two of a kind without a photo would look alike: their initials tell them apart
+  const initial =
+    db.pets.some(x => x.id !== pet.id && x.species === pet.species && !x.photo) &&
+    (pet.name || '').trim().charAt(0).toUpperCase();
+  return `<span class="av ${cls}">${initial ? esc(initial) : icon(speciesIcon(pet.species))}</span>`;
 }
 export function thumbOf(s, p, cls = '') {
   const src = p?.thumb || s?.thumb;
@@ -360,16 +374,18 @@ function once(phrases) {
     : phrases;
 }
 export const lower = t => t.charAt(0).toLowerCase() + t.slice(1);
-// when only some pets decided the verdict, only their ratings are told
-export function whyOf(e) {
-  const by = e.verdict === 'nachkaufen' ? e.yes : e.verdict === 'nicht' ? e.no : [];
-  if (!by.length || by.length === Object.keys(e.pets).length) return evidenceOf(e);
-  const x = {n: 0, counts: {}};
-  for (const id of by) {
-    x.n += e.pets[id].n;
-    for (const [r, k] of Object.entries(e.pets[id].counts)) x.counts[r] = (x.counts[r] || 0) + k;
-  }
-  return `Bei ${petNames(by)} ${lower(evidenceOf(x))}`;
+/* A variety's ratings in words, each pet counted on its own, or three meals for two would read as six. Only the pets
+   that decided the verdict are told, unless all. */
+export function whyOf(e, all = false) {
+  const rated = Object.keys(e.pets).filter(id => e.pets[id].n && inFilter(id) && getPet(id)),
+    by = all ? [] : e.verdict === 'nachkaufen' ? e.yes : e.verdict === 'nicht' ? e.no : [],
+    ids = rated.filter(id => !by.length || by.includes(id));
+  if (!ids.length) return evidenceOf(e);
+  if (rated.length < 2) return evidenceOf(e.pets[ids[0]]);
+  const said = ids.map(id => lower(evidenceOf(e.pets[id])));
+  if (said.every(x => x === said[0]))
+    return `Bei ${ids.length === 2 && rated.length === 2 ? 'beiden' : petNames(ids)} ${said[0]}`;
+  return cap(ids.map((id, i) => `bei ${getPet(id).name} ${said[i]}`).join(', '));
 }
 // what a variety that goes down badly, or that nobody buys any more, has to show for itself when it is served
 export const record = e => (e?.n && (e.choice === 'nicht' || sideOf(e) === 'flop') ? whyOf(e) : '');

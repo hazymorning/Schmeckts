@@ -112,6 +112,13 @@ export const SCALES = {
 };
 const SCALE_OF = {Nassfutter: 'portion', Trockenfutter: 'bowl', Snack: 'bite', Sonstiges: 'bite'};
 export const scaleOf = product => SCALES[SCALE_OF[typeOf(product)]];
+// a rating reminder's buttons: a good, a middling and a poor level, so a meal gone wrong is rated there too
+const QUICK = {
+  portion: ['top', 'mittel', 'schlecht'],
+  bowl: ['gern', 'wenig', 'liegen'],
+  bite: ['verputzt', 'angeknabbert', 'unberuehrt'],
+};
+export const quickOf = product => QUICK[SCALE_OF[typeOf(product)]];
 // [key, label, pattern]; keys are stored in the data, the pattern guesses a missing texture from the name
 export const TEXTURES = {
   Nassfutter: {

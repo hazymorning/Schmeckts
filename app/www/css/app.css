@@ -862,18 +862,6 @@ dialog.sheet::after {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
-.stat b,
-.stat small {
-  display: block;
-}
-.stat b {
-  font: var(--type-subheading);
-  font-variant-numeric: tabular-nums;
-}
-.stat small {
-  font: var(--type-caption);
-  color: var(--muted);
-}
 
 .btn {
   display: flex;
@@ -1212,6 +1200,7 @@ dialog.sheet::after {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  font: var(--type-subheading);
   background: var(--surface-2);
   color: var(--muted);
 }
@@ -1228,18 +1217,22 @@ dialog.sheet::after {
 .av.xs {
   width: var(--pic-xs);
   height: var(--pic-xs);
+  font: var(--type-caption-strong);
 }
 .av.s {
   width: var(--pic-s);
   height: var(--pic-s);
+  font: var(--type-small-strong);
 }
 .av.l {
   width: var(--pic-l);
   height: var(--pic-l);
+  font: var(--type-heading);
 }
 .av.xl {
   width: var(--pic-xl);
   height: var(--pic-xl);
+  font: var(--type-heading);
 }
 .av.xxl {
   width: var(--pic-xxl);
@@ -1248,6 +1241,10 @@ dialog.sheet::after {
 .av.xxxl {
   width: var(--pic-xxxl);
   height: var(--pic-xxxl);
+}
+.av:is(.xxl, .xxxl) {
+  font: var(--type-title);
+  letter-spacing: var(--track-title);
 }
 .av:is(.xxl, .xxxl) .ic {
   stroke-width: var(--icon-stroke-l);
@@ -2235,17 +2232,14 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
 }
-/* a trading card: the packaging across its full width, the values two by two between lines */
-.quartet > :first-child {
+/* the packaging across the card's full width, its edge the line above the first row */
+.pack-card > :first-child {
+  grid-column: 1 / -1;
   width: calc(100% + 2 * var(--space-4));
   margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-4)) 0;
 }
-.quartet .stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-block: var(--divider);
+.pack-card > :first-child + .set-row::before {
+  content: none;
 }
 .tally {
   margin: var(--space-2h) 0 var(--space-1);
