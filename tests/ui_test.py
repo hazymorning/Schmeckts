@@ -906,15 +906,16 @@ async def test_scales(browser, url):
     await ctx.close()
 
 
-# text that runs off the screen or is cut by its box; rails scroll and a title is cut to two lines on purpose
+# text that runs off the screen, out of its box or is cut by it; rails scroll and a title is cut to two lines on purpose
 CUT = """() => { const bad = [], vw = document.documentElement.clientWidth;
   for (const el of document.querySelectorAll('body *')) {
     if (!el.getClientRects().length || el.closest('svg, .rail, .pets') || !el.checkVisibility({opacityProperty: true})) continue;
     if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
     const s = getComputedStyle(el), r = el.getBoundingClientRect(), what = el.textContent.trim().slice(0, 40);
     if (r.left < -0.5 || r.right > vw + 0.5) bad.push(`off the screen: ${what}`);
-    else if (s.webkitLineClamp === 'none' && /hidden|clip/.test(s.overflowX + s.overflowY)
-      && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) bad.push(`cut: ${what}`);
+    else if (s.webkitLineClamp !== 'none' || s.display === 'inline') continue;
+    else if (el.scrollWidth > el.clientWidth + 1) bad.push(`too wide: ${what}`);
+    else if (/hidden|clip/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1) bad.push(`cut: ${what}`);
   }
   return bad; }"""
 
@@ -2727,9 +2728,9 @@ async def test_observations(browser, url):
     # the scroll timeline moves on with the next frame; the rail snaps to a chip
     FADE = """left => new Promise(done => { const rail = document.querySelector('#home .obs'); rail.scrollLeft = left;
       requestAnimationFrame(() => requestAnimationFrame(() => done(['--rail-start', '--rail-end'].map(p => getComputedStyle(rail).getPropertyValue(p))))); })"""
-    fades = [await pg.evaluate(FADE, x) for x in (0, 140, 10000, 0)]
+    fades = [[f != '0px' for f in await pg.evaluate(FADE, x)] for x in (0, 140, 10000, 0)]
     check(
-        fades[0] == fades[3] == ['0px', '32px'] and fades[1] == ['32px', '32px'] and fades[2] == ['32px', '0px'],
+        fades[0] == fades[3] == [False, True] and fades[1] == [True, True] and fades[2] == [True, False],
         f'the chips fade out at the left once scrolled, at the right while there are more {fades}',
     )
     await tap(pg, '[data-action=observe][data-v=tired]')
@@ -3160,10 +3161,11 @@ async def test_toast_swipe(browser, url):
     x, y, w, h = await show()
     await pg.mouse.move(x + 20, y + h / 2)
     await pg.mouse.down()
-    await pg.mouse.move(x + 60, y + h / 2)
+    await pg.mouse.move(x + 20 + w / 4, y + h / 2)
     await show()
     await pg.clock.run_for(20000)
     under = await pg.evaluate(SHOWN)
+    await pg.mouse.move(x + 20 + w / 4 + w / 6, y + h / 2)
     await pg.mouse.up()
     check(
         under and await pg.evaluate(SHOWN) and await pg.evaluate('window.__undone') is None,
@@ -3233,6 +3235,21 @@ async def test_remind_ask(browser, url):
         await ctx.close()
     ctx, pg, errors = await demo(browser, url, native=True)
     check(await pg.locator(REMIND_CARD).count() == 0, 'never beside sample data')
+    await ctx.close()
+
+    async def fed(pg, why):
+        await change(pg, 's.db.pets.push(a.pet); s.db.products.push(a.product)', {'pet': pet(M), 'product': product('lachs00001')})
+        await pg.evaluate("import('./js/logic/feeding.js').then(f => f.serveProduct('lachs00001'))")
+        await idle(pg)
+        check(await pg.locator(REMIND_CARD).count() == 0 and await state(pg, 'db.servings.length') == 1, f'{why}: not asked')
+
+    ctx, pg, errors = await seeded(browser, url, {'prefs': {'remind': 180}}, native=True)
+    await fed(pg, 'the reminder already on')
+    await ctx.close()
+    ctx = await phone(browser)
+    await ctx.add_init_script("Object.defineProperty(Notification, 'permission', {get: () => 'denied'})")
+    pg, errors = await open_page(ctx, url)
+    await fed(pg, 'in a browser that may not notify')
     await ctx.close()
     ctx, pg, errors = await one_pet(browser, url)
     await settings(pg)

@@ -169,7 +169,7 @@ are named constants at the top of `smart.js` and `views/overview.js`.
   screen, no type), Motion.
 - Colour carries meaning: `--accent` for actions, selection and focus; rating colours only for ratings.
 - Type only through the `--type-*` styles, spacing only from the space scale, radii only from the radius tokens.
-- Made for 390 to 412px width; at 360px nothing is cut off. Text wraps as it comes, nothing measures it to fit.
+- Made for 390 to 412px width; at 360px nothing is cut off. Text wraps as it comes; none is swapped or shrunk to fit.
 - A sheet rises from below for a task, a page comes in from the side for a place, back leaves the way it came.
 - Undo instead of confirmation prompts. Own SVG icons, no emoji. Nothing moves under reduced motion. Text contrast at
   least 4.5:1 in light and dark.
