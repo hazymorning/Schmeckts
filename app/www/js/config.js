@@ -352,6 +352,13 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
 export const NEWS = [
   {
+    v: '0.34.0',
+    title: 'Schneller fertig',
+    say: 'Ist die Packung benannt, bist du gleich wieder auf der Startseite. Die fragt jetzt nur noch eins auf einmal.',
+    why: 'Die Erinnerung ans Bewerten hat drei Knöpfe, auch für eine Mahlzeit, die stehen blieb.',
+    off: ['remind', 'Schalte die Erinnerung ans Bewerten ein, dann bewertest du gleich in der Benachrichtigung.'],
+  },
+  {
     v: '0.33.0',
     title: 'Mehr Luft',
     say: 'Die Karten haben mehr Platz, und die App sagt jetzt überall „Sorte“ und „füttern“.',
