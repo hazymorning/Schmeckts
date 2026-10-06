@@ -89,7 +89,7 @@ server.
 
 ## Without and with a server
 
-Without a server nothing goes out as long as the product lookup („Produktsuche im Internet“, off by default) stays
+Without a server nothing goes out as long as the product lookup („Sortensuche im Internet“, off by default) stays
 off; a test holds that. The phone reads the packaging text itself (ML Kit, on device), and one of the household's
 own varieties found on the packaging is served at once with undo. Google's barcode scanner in Play services sends
 its own usage data to Google.
