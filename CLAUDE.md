@@ -14,7 +14,12 @@ Read `PROJECT.md` before changing stored data, sync, storage or the server.
 - `PROJECT.md` changes only with architecture, stored data, the protocol or the server API, never with wording or
   layout.
 - Tests cover behaviour. Do not pin exact wording or pixel sizes unless that is what the change is about.
-- The interface is German, plain, as people talk. Code, comments and commit messages are English.
+- The interface is German, plain, as people talk. Code, comments and commit messages are English. The words are
+  „füttern“, never „servieren“, and „Sorte“, never „Futter“ or „Produkt“ for a variety.
+- Code earns its place by being seen. What users rarely see does not go in.
+- Made for 390 to 412px width. At 360px only one thing counts: nothing is cut off.
+- A new type style, distance or building block only after asking.
+- When a wanted design change breaks a test, the test changes. No special rule for it.
 - Commits and pull requests: short and plain, no trailers, no footers, no emoji, no long dash. One pull request at a
   time.
 

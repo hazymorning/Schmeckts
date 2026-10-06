@@ -27,7 +27,7 @@ the offset keeps it above builds from before the version restart at 0.1.0. ARM b
 `app/www/js/`, each layer importing only from the ones above it:
 
 1. Foundations: `dom`, `text`, `dates`, `report`, `native`, `reading`, `icons`, `config`, `fields`, `clock`, `disk`,
-   `motion`
+   `motion`, `content/*` (the texts of the overview card and the cat calendar)
 2. Data: `store`, `api`, `sync`, `smart`, `glance`, `derive`, `images`, `photos`, `recognize`, `ocr`, `online`
 3. Interface: `ui/*`
 4. Views: `views/*`
@@ -64,7 +64,8 @@ db = { version: 3,
   observations: [{ id, kind, at, pets: { [petId]: true }, by }] }
 ```
 
-Fields this phone does not know, written by a newer app version, are left untouched. Barcodes are stored as EAN-13
+Fields this phone does not know, written by a newer app version, are left untouched, and so is `birthday`, which
+the app no longer shows or changes since 0.33. Barcodes are stored as EAN-13
 (UPC-A gets a leading 0) or EAN-8. Sample data carries ids starting with `demo` and is removed on connecting to a
 server.
 
@@ -81,9 +82,8 @@ server.
 | `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
 | `pets[].sex` | `f` `m`, absent | female, male, not given |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
-| `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:beobachtung`, `neu:<version>` | hints hidden on this phone; `tipp:beobachtung`: the first observation Vorlieben weighs said what it is for; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`) |
-| `prefs.milestones` | `meals:100`, `sorts:10` | milestones already shown |
-| `prefs.sheetDay` | `<YYYY-MM-DD>` | the day of the cat calendar's top sheet on this phone; before today it still hangs over today's until torn off. Set on first sight; `prefs.torn` from 0.28 to 0.30 is dropped |
+| `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:erinnern`, `neu:<version>` | hints hidden on this phone; `tipp:erinnern`: asked once after the first meal whether to remind about rating; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`). `tipp:beobachtung` from before 0.33 stays unread |
+| `prefs.sheetDay` | `<YYYY-MM-DD>` | the day of the cat calendar's top sheet on this phone; before today it still hangs over today's until torn off. Set on first sight; `prefs.torn` from 0.28 to 0.30 and `prefs.milestones` from before 0.33 are dropped |
 | reminder buttons | `actionTypeId` `rate:<key>[,<key>]`, `extra.pet`, `extra.rate`; a button's id is its rating key | Android keeps them with a pending „Wie war’s?“ across updates |
 | exchange file `kind` | `exchange` | written by „Änderungen teilen“ |
 
@@ -163,14 +163,16 @@ are named constants at the top of `smart.js` and `views/overview.js`.
 
 ## Design
 
-- Every value lives in `css/tokens.css`; the palette there is fixed and `tests/design_test.py` holds it.
-- `css/app.css` has four sections: Foundations, Recipes (one block per kind of thing), Views (only placement and
-  colour), Motion.
+- Colours, type styles, distances and radii live in `css/tokens.css`. The palette and the lists of type styles,
+  spaces and insets there are fixed; `tests/design_test.py` holds them.
+- `css/app.css` has four sections: Foundations, Recipes (one block per kind of thing), Views (layout and colour of one
+  screen, no type), Motion.
 - Colour carries meaning: `--accent` for actions, selection and focus; rating colours only for ratings.
-- Type only through the `--type-*` styles, spacing only from the space scale, radii only from the four radius tokens.
+- Type only through the `--type-*` styles, spacing only from the space scale, radii only from the radius tokens.
+- Made for 390 to 412px width; at 360px nothing is cut off. Text wraps as it comes, nothing measures it to fit.
 - A sheet rises from below for a task, a page comes in from the side for a place, back leaves the way it came.
-- Undo instead of confirmation prompts. Own SVG icons, no emoji. Nothing moves under reduced motion. Nothing is
-  clipped at 360px width. Text contrast at least 4.5:1 in light and dark.
+- Undo instead of confirmation prompts. Own SVG icons, no emoji. Nothing moves under reduced motion. Text contrast at
+  least 4.5:1 in light and dark.
 
 ## Working
 

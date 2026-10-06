@@ -15,8 +15,8 @@ export const SEXES = [
 export const sexOf = pet => (SEXES.some(s => s.k === pet?.sex) ? pet.sex : null);
 export const TYPES = ['Nassfutter', 'Trockenfutter', 'Snack', 'Sonstiges'];
 export const typeOf = product => (TYPES.includes(product?.type) ? product.type : TYPES[0]);
-// Keys are stored in the data, never rename them. Every wording says what the pet ate; short has to fit a column of
-// six at 360px. cheer: what the confirmation adds
+// Keys are stored in the data, never rename them. Every wording says what the pet ate; short stands under the rating
+// slider, a column for each level. cheer: what the confirmation adds
 export const RATINGS = {
   top: {label: 'Alles gefressen', short: 'Alles', said: 'alles gefressen', score: 100, cheer: 'Ratzeputz!'},
   gut: {
@@ -341,97 +341,12 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes) or the novelty is used: usedNews(use). off: a setting
    it needs and what to say while that is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
-   „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each.
-   ic: an icon before the title. */
+   „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
 export const NEWS = [
   {
-    v: '0.32.0',
-    use: 'evaluation',
-    title: 'Erkenntnisse',
-    say: 'Unter Vorlieben steht jetzt, was wirklich hilft, zum Beispiel ob Pastete besser ankommt als Soße oder ob Snacks den Appetit verderben.',
-    why: 'Tops und Flops heißen jetzt auch so.',
-    go: ['evaluation', 'Vorlieben öffnen'],
-  },
-  {
-    v: '0.31.0',
-    use: 'calendar',
-    cat: true,
-    ic: 'calendar',
-    title: 'Ein Blatt pro Tag',
-    say: 'Wie beim echten Abreißkalender hängt morgens noch das Blatt von gestern. Einmal antippen, und es fällt.',
-    why: 'Dafür reichen die Blätter jetzt das ganze Jahr.',
-  },
-  {
-    v: '0.31.0',
-    cat: false,
-    title: 'Zwei volle Zeilen',
-    say: 'Der Satz oben passt sich jetzt der Breite deines Handys an.',
-    why: 'So bleibt keine Zeile halb leer.',
-  },
-  {
-    v: '0.30.0',
-    use: 'calendar',
-    cat: true,
-    ic: 'calendar',
-    title: 'Ein richtiger Abreißkalender',
-    say: 'Große Tageszahl, rote Sonntage, und der Block wird übers Jahr dünner.',
-    why: 'Bei Stimmt’s? kommt die Antwort jetzt per Stempel.',
-  },
-  {
-    v: '0.30.0',
-    use: 'variety',
-    cat: false,
-    title: 'Vorlieben auf einen Blick',
-    say: 'Die Karte zeigt jetzt die Packungen, die gut ankommen und die stehen bleiben.',
-    why: 'Mit den Bewertungen daneben, wie im Verlauf.',
-  },
-  {
-    v: '0.29.0',
-    use: 'calendar',
-    cat: true,
-    title: 'Der Katzenkalender hat jetzt Wochentage',
-    say: 'Montags Katzenlogik, dienstags Stimmt’s?, freitags ein Flachwitz, dazwischen Kurioses, Wissen und Sprache.',
-    why: 'Bei Stimmt’s? dreht das erste Antippen das Blatt um.',
-  },
-  {
-    v: '0.29.0',
-    use: 'sex',
-    cat: false,
-    title: 'Neu: das Geschlecht im Tierprofil',
-    say: 'Mit Angabe sagt die App auch mal sie oder er.',
-    why: 'Ohne Angabe bleibt alles wie bisher.',
-    go: ['pet', 'Eintragen'],
-  },
-  {
-    v: '0.28.0',
-    use: 'calendar',
-    cat: true,
-    title: 'Neu: der Katzenkalender',
-    say: 'Wohnt bei dir eine Katze, liegt auf der Startseite jetzt jeden Tag ein Blatt mit einem Katzenfakt.',
-    why: 'Antippen reißt es ab. Die Karte darüber sagt dafür nur noch einen Satz.',
-  },
-  {
-    v: '0.27.0',
-    use: 'variety',
-    title: 'Neu: Sorten-Quartett',
-    say: 'Tippst du unter „Vorlieben“ auf eine Sorte, zeigt sie ihre Werte wie auf einer Quartettkarte.',
-    why: 'Und beim Servieren nennt die App gleich die Bilanz einer Sorte, die schlecht ankommt.',
-    go: ['evaluation', 'Vorlieben öffnen'],
-  },
-  {
-    v: '0.26.0',
-    use: 'nicknames',
-    title: 'Neu: Spitznamen',
-    say: 'Im Profil deines Tieres kannst du jetzt Spitznamen eintragen. Die App nennt es dann mal so, mal so.',
-    why: 'Einkaufen ist umgezogen und steht jetzt ganz unten bei „Vorlieben“.',
-    go: ['pet', 'Eintragen'],
-  },
-  {
-    v: '0.25.0',
-    use: 'rate-reminder',
-    title: 'Neu: Schneller bewerten',
-    say: 'In der Erinnerung „Wie war’s?“ bewertest du jetzt mit einem Tipp.',
-    why: 'Gilt sie nur einem Tier, bietet sie gleich an, wie viel es von der Sorte meistens frisst.',
-    off: ['remind', 'Sie ist noch aus. Du schaltest sie in den Einstellungen bei „Ans Bewerten erinnern“ ein.'],
+    v: '0.33.0',
+    title: 'Mehr Luft',
+    say: 'Die Karten haben mehr Platz, und die App sagt jetzt überall „Sorte“ und „füttern“.',
+    why: 'Meldungen unten lassen sich zur Seite wegwischen.',
   },
 ];

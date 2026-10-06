@@ -1,6 +1,6 @@
 // Evaluation card and page. The analysis is in smart.js, this only words it
 import {andList, cap, esc} from '../text.js';
-import {DAY} from '../dates.js';
+import {DAY, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {observationOf} from '../config.js';
 import {db} from '../store.js';
@@ -15,10 +15,8 @@ import {
   lower,
   obsThumb,
   SIDE,
-  sideIcon,
   shopRow,
   sign,
-  since,
   strip,
   thumbOf,
   times,
@@ -60,8 +58,9 @@ function lapse(at, now) {
         : `${Math.floor(days / 365)} Jahren`;
 }
 const forPet = (t, several) => (several ? ` für ${esc(getPet(t.pet).name)}` : '');
-const needs = (t, several) =>
-  `noch ${t.need === 1 ? 'einmal' : 'zweimal'}${forPet(t, several)} servieren und bewerten, dann steht’s fest`;
+// what: how the variety is named in the sentence
+const needs = (t, several, what) =>
+  `${several ? esc(getPet(t.pet).name) + ' ' : ''}noch ${t.need === 1 ? 'einmal' : 'zweimal'} ${what} füttern und bewerten, dann steht’s fest`;
 // lists, with their empty sides, show once a side or a settled variety exists
 const listed = r => r.top.length || r.flop.length || (r.settled && !r.stale);
 // the variety an empty Tops side names, so „Als Nächstes“ leaves it out
@@ -91,7 +90,7 @@ function sideRow(m, e, side, first, t = null) {
     medal = first ? `<span class="medal ${tone}">${icon(ic)}</span>` : '',
     label = `${pname(p)}${brand ? ` von ${brand}` : ''}. ${cap(said)}.`;
   return `<li><button class="row" data-action="open-product" data-id="${e.id}" aria-label="${esc(label)}"><span class="ranked">${thumbOf(null, p)}${medal}</span>
-    <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(' · ')))}</small></span>${strip(ratingsIn(m, [e.id]), t && !several ? t.need : 0)}</button></li>`;
+    <span class="t-main"><b>${esc(pname(p))}</b><small>${esc(cap([brand, lower(said)].filter(Boolean).join(', ')))}</small></span>${strip(ratingsIn(m, [e.id]), t && !several ? t.need : 0)}</button></li>`;
 }
 // what goes down well and what is left, a side only where it has a variety; without a Top the closest one
 function sideList(m, r, side) {
@@ -118,7 +117,7 @@ export function evaluationCard(m) {
   else {
     const t = r.stale ? null : r.trials[0],
       next = t
-        ? `Am weitesten ist ${named(t.e)}: ${needs(t, m.pets.length > 1)}.`
+        ? `Am weitesten ist ${named(t.e)}: ${needs(t, m.pets.length > 1, 'damit')}.`
         : r.settled || r.stale
           ? ''
           : 'Ab drei Bewertungen einer Sorte steht hier, was am besten ankommt und was stehen bleibt.';
@@ -153,7 +152,7 @@ function portraitHTML(m, r) {
         .map(p => avatar(p, 'l pair'))
         .join('')
     : avatar(pets[0], 'xxl');
-  return `<section class="card portrait"><span class="ov-pic">${pic}</span><div class="portrait-text"><h2>${esc(petNames(ids))}</h2><p class="say">${said.join(' ')}</p></div></section>`;
+  return `<section class="card portrait"><div class="ov-top"><span class="ov-pic">${pic}</span><div class="ov-text"><h2>${esc(petNames(ids))}</h2><p>${said.join(' ')}</p></div></div></section>`;
 }
 
 // x.moves.fresh: varieties that came onto their side within the last 30 days; place: 0 for the only one
@@ -170,7 +169,6 @@ function placeRow(m, x, e, place, side) {
     <span class="t-main"><span class="t-top"><b>${esc(pname(p))}</b>${fresh ? '<span class="badge">neu</span>' : ''}</span><small>${esc(cap([brand, lower(said), away].filter(Boolean).join(', ')))}</small></span>${strip(ratingsIn(m, [e.id]))}</button></li>`;
 }
 const card = (title, inner) => `<section class="card"><h2>${title}</h2>${inner}</section>`;
-const listTitle = (side, title) => `${sideIcon(side)}${title}`;
 const say = text => `<p class="say card-line">${text}</p>`;
 const hint = text => `<p class="hint card-line">${text}</p>`;
 // a place is only worth showing beside another
@@ -187,7 +185,7 @@ function listsHTML(m, r, x) {
   const top = r.top.slice(0, PLACES),
     flop = r.flop.slice(0, PLACES);
   const tops = card(
-      listTitle('top', SIDES.top),
+      SIDES.top,
       top.length
         ? (r.flat ? say('Die Sorten liegen noch so nah beieinander, dass die Reihenfolge Zufall sein kann.') : '') +
             places(m, x, top, 'top')
@@ -196,7 +194,7 @@ function listsHTML(m, r, x) {
           : say(noneYet(r)),
     ),
     flops = card(
-      listTitle('flop', SIDES.flop),
+      SIDES.flop,
       flop.length
         ? places(m, x, flop, 'flop')
         : say(
@@ -251,14 +249,13 @@ function trendCard(m, x) {
   // skip varieties whose move the pet's own change already explains
   const pet = dir => lines.some(t => t.cause === 'tier' && t.dir === dir),
     moved = [
-      ...(pet(-1) ? [] : x.moves.cooled.map(v => ['fall', v, 'kommt nicht mehr so gut an wie vor einem Monat'])),
-      ...(pet(1) ? [] : x.moves.warmed.map(v => ['rise', v, 'kommt inzwischen gut an'])),
+      ...(pet(-1) ? [] : x.moves.cooled.map(v => [v, 'kommt nicht mehr so gut an wie vor einem Monat'])),
+      ...(pet(1) ? [] : x.moves.warmed.map(v => [v, 'kommt inzwischen gut an'])),
     ].slice(0, MOVED);
-  for (const [ic, v, text] of moved)
+  for (const [v, text] of moved)
     rows.push(
       toldBtn(
         v.id,
-        sign(ic),
         `${named(m.byId.get(v.id))} ${text}.`,
         `Davor <b>${times(goodOf(v.before.counts), v.before.n)}</b> gut gefressen, seitdem ${lower(evidenceOf(v.since))}.`,
       ),
@@ -275,8 +272,7 @@ function trendCard(m, x) {
 const OFTEN = 'ein zwei drei vier fünf sechs sieben acht neun zehn elf zwölf'.split(' ');
 const often = n => (OFTEN[n - 1] ? OFTEN[n - 1] + 'mal' : `${n} Mal`);
 function observedCard(x) {
-  const {kinds, links} = x.observed,
-    now = Date.now();
+  const {kinds, links} = x.observed;
   if (!kinds.length && !links.length) return '';
   const rows = [
     ...kinds.map(k => {
@@ -284,14 +280,13 @@ function observedCard(x) {
       return told(
         obsThumb(k.kind),
         `${o.label}, <b>${often(k.n)}</b> in den letzten vier Wochen.`,
-        `Zuletzt ${since(k.last, now)}${k.before ? `, in den acht Wochen davor ${often(k.before)}` : ''}.`,
+        `Zuletzt ${when(k.last)}${k.before ? `, in den acht Wochen davor ${often(k.before)}` : ''}.`,
       );
     }),
     ...links.map(l => {
       const o = observationOf(l.kind);
       return toldBtn(
         l.id,
-        obsThumb(l.kind),
         `Nach <b>${esc(pname(getProduct(l.id)))}</b> öfter notiert: ${o.label}.`,
         `Nach <b>${l.after.hit} von ${l.after.n}</b> Mahlzeiten ${o.after}, bei anderen Sorten nach ${l.other.hit} von ${l.other.n}.`,
       );
@@ -308,7 +303,6 @@ function splitCard(m, r) {
     .map(e =>
       toldBtn(
         e.id,
-        avatar(getPet(e.yes[0])),
         `${petsOf(e.yes)} ${e.yes.length > 1 ? 'mögen' : 'mag'} ${named(e)}, ${petsOf(e.no)} nicht.`,
         esc(cap([...e.yes, ...e.no].map(pid => `${getPet(pid).name} ${lower(evidenceOf(e.pets[pid]))}`).join(', '))) +
           '.',
@@ -377,7 +371,7 @@ const INSIGHT = {
     const [A, B] = [esc(a.key), esc(andList(b.key))];
     return [
       'person',
-      `Bei <b>${A}</b> kommt dasselbe Futter besser an als bei ${B}.`,
+      `Bei <b>${A}</b> kommen dieselben Sorten besser an als bei ${B}.`,
       `Bei ${A} <b>${ofN(a)} Mal</b> gut gefressen, bei ${B} ${ofN(b)} Mal.`,
     ];
   },
@@ -412,8 +406,7 @@ function trialRow(m, t, best = false) {
   const several = m.pets.length > 1;
   return toldBtn(
     t.e.id,
-    sign('sparkle'),
-    `${best ? onTheWay(t, several) : `${named(t.e)} ${needs(t, several)}`}.`,
+    `${best ? onTheWay(t, several) : cap(needs(t, several, `mit ${named(t.e)}`))}.`,
     esc(`Bisher ${lower(evidenceOf(t.e))}.`),
     strip(ratingsIn(m, [t.e.id]), several ? 0 : t.need),
   );
@@ -428,7 +421,6 @@ function nextCard(m, r, x) {
     rows.push(
       toldBtn(
         v.id,
-        sign('clock'),
         `${named(m.byId.get(v.id))} gab es seit ${lapse(v.at, now)} nicht mehr.`,
         esc(`Davor ${by}${lower(evidenceOf(v))}.`),
       ),
@@ -440,7 +432,6 @@ function nextCard(m, r, x) {
     rows.push(
       toldBtn(
         v.id,
-        sign('repeat'),
         `${named(m.byId.get(v.id))} blieb beim ersten Mal stehen.`,
         `${esc(petName(m, v.pet, 'next'))} braucht bei Neuem oft Anlauf, ein zweiter Versuch kann sich lohnen.`,
       ),

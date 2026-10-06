@@ -3,7 +3,6 @@ import {clockState, observe, randomId, rebase, stamp} from './clock.js';
 import {flush, read, schedule, storageOK} from './disk.js';
 import {report} from './report.js';
 import {DEMO, NEWS, tidyRemind} from './config.js';
-import {milestones} from './smart.js';
 import {COLLECTIONS, complete, fieldsOf, fromFields, sameValue, setField, validId, valueOf} from './fields.js';
 
 export {flush, storageOK};
@@ -11,7 +10,6 @@ export const defaults = () => ({version: 3, pets: [], products: [], servings: []
 const defaultPrefs = () => ({
   theme: 'system',
   hiddenHints: [],
-  milestones: null,
   remind: 0,
   feedRemind: false,
   server: '',
@@ -65,8 +63,7 @@ function tidyPrefs(p) {
   delete out.closedWeek;
   delete out.overview;
   delete out.torn;
-  // null: never set
-  out.milestones = Array.isArray(out.milestones) ? out.milestones.filter(k => typeof k === 'string') : null;
+  delete out.milestones;
   out.lookup = out.lookup === true;
   out.serverPhoto = out.serverPhoto !== false;
   out.calendar = out.calendar !== false;
@@ -197,7 +194,6 @@ async function load() {
   snap = snapshot();
   if (fixed) persist('db', 'sync');
   if (prefs.activePet !== 'all' && !db.pets.some(x => x.id === prefs.activePet)) prefs.activePet = 'all';
-  prefs.milestones ||= milestones(db).reached; // first run: what is reached counts as seen
   // news are for an update: a phone without pets of its own has seen them all
   if (!db.pets.some(x => !x.id.startsWith(DEMO))) for (const n of NEWS) hideHint('neu:' + n.v);
 }

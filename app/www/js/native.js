@@ -96,6 +96,9 @@ function browserNotifications() {
   };
 }
 export const Notifications = plugin('LocalNotifications') || browserNotifications();
+// in the browser only where the page may still ask
+export const canNotify = () =>
+  !!plugin('LocalNotifications') || (!!window.Notification && Notification.permission !== 'denied');
 
 // browser stand-in for our own plugin, only while the page is open
 function browserFeedReminder() {

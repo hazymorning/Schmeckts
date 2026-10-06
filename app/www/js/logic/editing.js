@@ -15,7 +15,9 @@ export function saveName() {
   const brand = (s.brand || '').trim(),
     variety = (s.variety || '').trim();
   if (!brand && !variety) {
-    toast('Bitte Marke oder Sorte eintragen.');
+    s.error = 'Bitte Marke oder Sorte eintragen.';
+    renderSheet();
+    $('#f-brand')?.focus();
     return;
   }
   const details = {brand, variety, type: s.type, texture: s.texture, userType: true};
@@ -46,7 +48,7 @@ function renameProduct(id, details) {
   if (other && other.id !== p.id) {
     mergeProducts(p, other);
     sheet.id = other.id;
-    toast('Mit vorhandenem Futter zusammengeführt');
+    toast('Mit der vorhandenen Sorte zusammengeführt');
   } else {
     Object.assign(p, {brand: details.brand, variety: details.variety, type: details.type});
     applyTexture(p, details);
@@ -92,7 +94,7 @@ export function useProduct(pid) {
       sheet.step = null;
       renderSheet();
       update();
-      toast('Mit vorhandenem Futter zusammengeführt');
+      toast('Mit der vorhandenen Sorte zusammengeführt');
     }
   }
 }

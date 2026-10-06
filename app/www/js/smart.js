@@ -17,7 +17,6 @@ export const VERDICTS = {
   nicht: 'Nicht mehr kaufen',
 };
 const HINTS = ['appetit', 'stop', 'sosse', 'liebling']; // by precedence
-const MILESTONES = {meals: [50, 100, 250, 500, 1000], sorts: [10, 25, 50]};
 export const rOf = x => (RATINGS[x?.r] ? x.r : null); // unknown values from other devices do not count
 const toneOf = v => (v >= GOOD ? 'good' : v >= NO ? 'mid' : 'bad');
 export const rateTone = r => (RATINGS[r].score > 0 && RATINGS[r].score <= NO ? 'sauce' : toneOf(RATINGS[r].score));
@@ -767,18 +766,6 @@ export function nextMeal(db, now, pets) {
     if (minute <= slot.remind + FEED.lead) return {at: slot.at, due: true};
   }
   return slots.length ? {at: slots[0].at, tomorrow: true} : null;
-}
-
-export function milestones(db) {
-  const ids = new Set(db.products.map(p => p.id));
-  const count = {
-    meals: db.servings.length,
-    sorts: new Set(db.servings.map(s => s.productId).filter(id => ids.has(id))).size,
-  };
-  return {
-    ...count,
-    reached: Object.entries(MILESTONES).flatMap(([k, steps]) => steps.filter(n => count[k] >= n).map(n => `${k}:${n}`)),
-  };
 }
 
 // Observations never change a rating, a verdict or a place. Several pets on one means one of them or all.
