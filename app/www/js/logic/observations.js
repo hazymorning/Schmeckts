@@ -2,8 +2,7 @@
 import {haptic} from '../native.js';
 import {observationOf} from '../config.js';
 import {uid} from '../fields.js';
-import {addSentence} from '../text.js';
-import {db, hideHint, prefs, save} from '../store.js';
+import {db, prefs, save} from '../store.js';
 import {byMe, getObservation} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {closeSheet, renderSheet, sheet} from '../ui/sheet.js';
@@ -14,7 +13,6 @@ const shown = () =>
   prefs.activePet !== 'all' && db.pets.some(p => p.id === prefs.activePet) ? [prefs.activePet] : db.pets.map(p => p.id);
 const petSet = ids => Object.fromEntries(ids.map(id => [id, true]));
 const sortObs = () => db.observations.sort((a, b) => b.at - a.at);
-const EXPLAINED = 'tipp:beobachtung'; // hiddenHints: the first note said once what notes are good for
 
 export function observe(kind) {
   const ids = shown();
@@ -26,13 +24,9 @@ export function observe(kind) {
   homeView.fresh = o.id;
   update();
   const seen = observationOf(kind),
-    said = db.pets.length > 1 ? seen.said.replace('Notiert', `Notiert bei ${whoObserved(ids)}`) : seen.said,
-    first = seen.about === 'meal' && !prefs.hiddenHints.includes(EXPLAINED); // Vorlieben weighs only those
-  if (first) hideHint(EXPLAINED);
+    said = db.pets.length > 1 ? seen.said.replace('Notiert', `Notiert bei ${whoObserved(ids)}`) : seen.said;
   toast(
-    first
-      ? addSentence(said, 'Unter „Vorlieben“ siehst du später, ob das nach bestimmten Sorten öfter vorkommt.')
-      : said,
+    said,
     () => {
       db.observations = db.observations.filter(x => x.id !== o.id);
       save();

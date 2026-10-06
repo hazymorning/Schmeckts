@@ -7,7 +7,7 @@ import {closeAll, renderSheet, sheet} from '../ui/sheet.js';
 import {serveProduct, shootPhoto} from './feeding.js';
 import {applyTexture, newProduct} from './products.js';
 
-const FRONT = 'Vorderseite fotografieren';
+const FRONT = 'Barcode unbekannt. Fotografier die Vorderseite.';
 let running = false;
 
 export async function scan() {

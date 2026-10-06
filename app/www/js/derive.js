@@ -21,7 +21,7 @@ export const getPet = id => db.pets.find(p => p.id === id);
 export const getProduct = id => (id ? db.products.find(p => p.id === id) : null);
 export const getServing = id => db.servings.find(s => s.id === id);
 export const getObservation = id => db.observations.find(o => o.id === id);
-export const pname = p => (p ? p.variety || p.brand || 'Unbekannt' : 'Unbekanntes Futter');
+export const pname = p => (p ? p.variety || p.brand || 'Unbekannt' : 'Unbekannte Sorte');
 const inFilter = pid => prefs.activePet === 'all' || prefs.activePet === pid;
 export const petMap = ids => Object.fromEntries(ids.map(id => [id, {r: null, at: null}]));
 export const findProduct = (brand, variety) =>

@@ -23,7 +23,7 @@ export async function lookupOnline(code) {
     reached = true;
     if (hit.found) return remember(code, hit);
   }
-  if (!reached) throw new Error('Keine Produktdatenbank erreichbar.');
+  if (!reached) throw new Error('Keine Datenbank im Internet erreichbar.');
   return remember(code, {found: false});
 }
 

@@ -34,18 +34,17 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-7: 32px;
-  --gutter: var(--space-4h); /* side margin of pages and sheets, card inset */
+  --gutter: var(--space-5); /* side margin of pages and sheets, card inset */
   --page-width: 600px;
 
   /* A box takes its recipe's inset and nothing else */
-  --inset-card: var(--gutter) var(--gutter) var(--space-2); /* the last row adds 10 at the foot */
+  --inset-card: var(--gutter) var(--gutter) var(--space-2h); /* the last row adds 10 at the foot */
   --inset-group: var(--space-1) var(--space-4);
   --inset-row: var(--space-2h) 0;
   --inset-box: var(--space-3);
   --inset-control: var(--space-3) var(--space-4); /* height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* chips, fields in a row, the toast's action */
   --inset-badge: var(--space-1) var(--space-2h);
-  --inset-stamp: 3px 7px 3px 6px; /* the calendar sheet's stamp, a little wider at the end of the word */
   --field-room: calc(
     var(--space-3h) + var(--icon-s) + var(--space-2h)
   ); /* 44: the side of a field that holds an icon */
@@ -55,7 +54,6 @@
   --radius-l: 24px; /* containers */
   --radius-full: 999px;
   --radius-paper: 3px 3px 6px 6px; /* the calendar sheet */
-  --radius-stamp: 6px; /* and its stamp */
 
   /* app.css sets type only as font: var(--type-...) */
   --type-title: 650 30px/1.1 var(--font-display); /* always with --track-title */
@@ -67,13 +65,6 @@
   --type-small-strong: 600 14px/1.4 var(--font-ui); /* labels and small controls */
   --type-caption: 400 12px/1.25 var(--font-ui);
   --type-caption-strong: 600 12px/1.25 var(--font-ui);
-  /* the names under the rating slider, the largest at which every scale's words fit their columns at 360px */
-  --type-level: 400 13px/1.25 var(--font-ui);
-  --type-level-strong: 600 13px/1.25 var(--font-ui);
-  --type-paper: 500 16px/1.35 var(--font-display); /* a fact on the calendar sheet */
-  --type-paper-day: 600 22px/1 var(--font-display); /* its day, always with --track-title */
-  --type-paper-date: 600 9.5px/1.2 var(--font-ui); /* its weekday in capitals, always with --track-caps */
-  --type-stamp: 700 9px/1 var(--font-ui); /* its stamp in capitals, always with --track-caps */
   --weight-strong: 600; /* b and strong in running text */
   --track-title: -0.015em; /* Faustina runs narrow at title size */
   --track-code: 0.14em; /* household code field */
@@ -106,7 +97,7 @@
   --z-strip: 5; /* behind the status bar */
   --z-toast: 6;
 
-  --icon-xs: 12px; /* in the calendar sheet's stamp and a medal */
+  --icon-xs: 12px; /* in a medal */
   --icon-s: 20px; /* inside controls */
   --icon: 24px; /* on its own */
   --icon-l: 32px; /* a rating as the content */
@@ -130,7 +121,6 @@
 
   --hairline: 1px;
   --stroke: 2px; /* every emphasised line */
-  --stroke-stamp: 1.5px;
   --divider: var(--hairline) solid var(--line);
 
   /* Opacity */
@@ -287,7 +277,6 @@
     max-height: 0;
     padding-top: 0;
     padding-bottom: 0;
-    border-top-width: 0;
   }
 }
 @keyframes pop {

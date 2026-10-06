@@ -1,6 +1,6 @@
 // Building blocks shared by the views
 import {andList, cap, esc} from '../text.js';
-import {DAY, addDays, ago, clockStr, dayKey, dayLabel, dayStart} from '../dates.js';
+import {ago, clockStr, dayKey, dayLabel, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {observationOf, RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
 import {db} from '../store.js';
@@ -37,12 +37,10 @@ export function nameBlock(s, p, inSheet = false) {
         : {waiting: 'Wird erkannt, sobald der Server erreichbar ist', failed: 'Nicht erkannt, tippen zum Benennen'}[
             s.status
           ] || 'Tippen zum Benennen';
-    return `<b>Unbekanntes Futter</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver is local mode, not an error
+    return `<b>Unbekannte Sorte</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver is local mode, not an error
   }
   // in the sheet the time field sits right below, so show the type instead
-  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : since(s.servedAt, Date.now())]
-    .filter(Boolean)
-    .join(', ');
+  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : when(s.servedAt)].filter(Boolean).join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;
@@ -232,7 +230,7 @@ export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = f
             ? 'Wird erkannt …'
             : s.status === 'reading'
               ? 'Wird gelesen …'
-              : 'Unbekanntes Futter';
+              : 'Unbekannte Sorte';
         return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-serving" data-id="${s.id}">
         <span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
@@ -253,9 +251,8 @@ export function shopRow(m, e) {
     ${e.kaufen ? `<span class="pin" title="Von dir festgelegt">${icon('pin')}</span>` : ''}</button></li>`;
 }
 
-// the two sides, on „Vorlieben“ and when buying, always with this icon in this tone
+// the two sides on „Vorlieben“, always with this icon in this tone
 export const SIDE = {top: ['champ', 'r-good'], flop: ['flop', 'r-bad']};
-export const sideIcon = side => icon(...SIDE[side]);
 // say and why are HTML; the caller escapes user text
 export const lead = ic => `<span class="lead">${icon(ic)}</span>`;
 export const main = (title, sub = '', id = '') =>
@@ -275,8 +272,9 @@ export const obsThumb = kind => sign(observationOf(kind).icon, `o-${kind}`);
 export const told = (pic, say, why = '') =>
   `<li class="row">${pic}<span>${say}${why ? `<small class="hint why">${why}</small>` : ''}</span></li>`;
 export const toldList = rows => (rows.length ? `<ul class="list told">${rows.join('')}</ul>` : '');
-export const toldBtn = (id, pic, say, why = '', end = '') =>
-  `<li><button class="row" data-action="open-product" data-id="${id}">${pic}<span class="said">${say}${why ? `<small class="hint why">${why}</small>` : ''}</span>${end}</button></li>`;
+// a row of a variety, with its packaging
+export const toldBtn = (id, say, why = '', end = '') =>
+  `<li><button class="row" data-action="open-product" data-id="${id}">${thumbOf(null, getProduct(id), 'm')}<span class="said">${say}${why ? `<small class="hint why">${why}</small>` : ''}</span>${end}</button></li>`;
 
 const waitingText = n => (n ? `${n} ${n === 1 ? 'Änderung wartet' : 'Änderungen warten'}` : '');
 const ERROR_TITLE = {auth: 'Code prüfen', protocol: 'Update nötig', locked: 'Kurz gesperrt'};
@@ -316,14 +314,6 @@ export function syncChip() {
   return null;
 }
 
-export function since(t, now) {
-  const day = dayStart(now);
-  if (t >= day) return `heute um ${clockStr(t)}`;
-  if (t >= addDays(day, -1)) return `gestern um ${clockStr(t)}`;
-  const days = Math.round((day - dayStart(t)) / DAY);
-  if (days < 7) return days === 2 ? 'vorgestern' : `vor ${days} Tagen`;
-  return 'am ' + new Date(t).toLocaleDateString('de-DE', {day: 'numeric', month: 'long'});
-}
 export const times = (k, n) =>
   n === 1 ? 'einmal' : k < n ? `${k} von ${n} Mal` : n === 2 ? 'beide Male' : `alle ${n} Mal`;
 /* Ratings in words, never as a percentage. Each falls on a side (good, poor, between); the majority side is named,

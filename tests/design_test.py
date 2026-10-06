@@ -107,7 +107,17 @@ def css_decls(text):
     ]
 
 
+# The only type styles and distances; a new one is a design decision, so it fails here first
+TYPES = ('title', 'heading', 'subheading', 'body', 'body-strong', 'small', 'small-strong', 'caption', 'caption-strong')
+SPACES = ('hair', '1', '1h', '2', '2h', '3', '3h', '4', '4h', '5', '6', '7')
+INSETS = ('card', 'group', 'row', 'box', 'control', 'compact', 'badge')
+
+
 def test_tokens():
+    tokens = re.sub(r'/\*.*?\*/', '', (WWW / 'css/tokens.css').read_text(encoding='utf-8'), flags=re.S)
+    for kind, want in (('type', TYPES), ('space', SPACES), ('inset', INSETS)):
+        have = re.findall(rf'--{kind}-([\w-]+):', tokens)
+        check(sorted(have) == sorted(want), f'only the {kind} tokens the design names {sorted(set(have) ^ set(want))}')
     app = (WWW / 'css/app.css').read_text(encoding='utf-8')
     literal = re.compile(r'#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(|\b(?:white|black)\b(?!-)')
     outside = [f'app.css: {m.group(0)}' for m in literal.finditer(re.sub(r'/\*.*?\*/', '', app, flags=re.S))]

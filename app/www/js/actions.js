@@ -2,11 +2,11 @@
 import {$} from './dom.js';
 import {when} from './dates.js';
 import {haptic} from './native.js';
-import {REMIND_MAX_H, textureOf} from './config.js';
-import {db, hideHint, prefs, save, savePrefs, usedNews} from './store.js';
+import {REMIND_DEFAULT, REMIND_MAX_H, textureOf} from './config.js';
+import {db, hideHint, prefs, save, savePrefs} from './store.js';
 import {ServerError} from './api.js';
 import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
-import {getProduct, getServing} from './derive.js';
+import {getProduct, getServing, pname} from './derive.js';
 import {forgetPhoto, keptPhoto, photoSrc} from './photos.js';
 import {timing} from './recognize.js';
 import {applyTheme} from './ui/theme.js';
@@ -14,7 +14,7 @@ import {hideToast, toast, toastUndo} from './ui/toast.js';
 import {openViewer} from './ui/viewer.js';
 import {closeAll, closeSheet, openPage, openSheet, renderSheet, sheet, sheetBack} from './ui/sheet.js';
 import {tearSheet, turnSheet, update} from './views/home.js';
-import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState} from './views/sheets.js';
+import {foldPart, jumpToDay, renderServeHits, renderSuggestions, reportState, showError} from './views/sheets.js';
 import {paintHouse} from './views/settings.js';
 import {
   guessOf,
@@ -27,10 +27,18 @@ import {
   serveProduct,
   shootPhoto,
 } from './logic/feeding.js';
-import {deleteProduct, deleteServing, removeCode, saveName, setPackLine, useProduct} from './logic/editing.js';
+import {
+  deleteProduct,
+  deleteServing,
+  mergeTarget,
+  removeCode,
+  saveName,
+  setPackLine,
+  useProduct,
+} from './logic/editing.js';
 import {rate} from './logic/rating.js';
 import {setKaufen, shareShopping, toggleTexture, unsharePhoto} from './logic/products.js';
-import {remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
+import {planReminder, remindStep, setFeedRemind, setRemind} from './logic/reminders.js';
 import {scan} from './logic/scan.js';
 import {
   addNick,
@@ -106,15 +114,20 @@ async function syncByHand() {
   }
 }
 
-// tap twice instead of a confirmation dialog
-const ARMED = {'delete-product': deleteProduct, 'delete-pet': deletePet, wipe, disconnect: disconnectServer};
+// tap twice instead of a confirmation dialog; data-id tells apart the buttons of one kind
+const ARMED = {
+  'delete-product': deleteProduct,
+  'delete-pet': deletePet,
+  wipe,
+  disconnect: disconnectServer,
+  merge: el => useProduct(el.dataset.id),
+};
 let armTimer = null;
-function arm(el) {
-  const key = el.dataset.then;
+function arm(key, run) {
   if (sheet.armed === key) {
     sheet.armed = null;
     clearTimeout(armTimer);
-    ARMED[key]();
+    run();
     return;
   }
   sheet.armed = key;
@@ -127,6 +140,13 @@ function arm(el) {
       renderSheet();
     }
   }, 3500);
+}
+
+// a variety renamed into another one is merged with it, so that takes a second tap like a suggestion does
+function nameOrMerge() {
+  const other = mergeTarget();
+  if (other) arm('merge:' + other.id, () => useProduct(other.id));
+  else saveName();
 }
 
 const ACTIONS = {
@@ -187,7 +207,6 @@ const ACTIONS = {
     openSheet(reportState(el.dataset.v || null));
   },
   'open-evaluation'() {
-    if (usedNews('evaluation')) update();
     openSheet({kind: 'evaluation'});
   },
   // the shopping list's folds start closed each time
@@ -285,12 +304,13 @@ const ACTIONS = {
       p = getProduct(s?.productId);
     Object.assign(sheet, {
       step: 'name',
+      error: '',
       ...(p ? {brand: p.brand, variety: p.variety, type: p.type || 'Nassfutter', texture: p.texture} : guessOf(s)),
     });
     renderSheet();
   },
   'save-name'() {
-    saveName();
+    nameOrMerge();
   },
   rephoto() {
     rephoto();
@@ -347,7 +367,6 @@ const ACTIONS = {
     deleteServing(el.dataset.id || sheet?.id);
   },
   'open-product'(el) {
-    if (usedNews('variety')) update();
     openSheet({kind: 'product', id: el.dataset.id});
   },
   'remove-code'(el) {
@@ -360,9 +379,32 @@ const ACTIONS = {
     update();
   },
   'hint-buy'(el) {
-    setKaufen(el.dataset.id, el.dataset.v);
+    const {id, v} = el.dataset,
+      p = getProduct(id),
+      was = p?.kaufen;
+    if (!p) return;
+    setKaufen(id, v);
     haptic('success');
     update();
+    const [said, ic, tone] =
+      v === 'immer' ? ['kommt auf die Einkaufsliste', 'champ', 'r-good'] : ['wird nicht mehr gekauft', 'flop', 'r-bad'];
+    toast(
+      `${pname(p)} ${said}.`,
+      () => {
+        setKaufen(id, was);
+        update();
+        renderSheet();
+      },
+      {ic, tone},
+    );
+  },
+  async 'remind-yes'() {
+    haptic('select');
+    await setRemind(REMIND_DEFAULT);
+    update();
+    if (!prefs.remind) return;
+    db.servings.forEach(planReminder); // the meal just fed is asked about too
+    toast('Die Erinnerung ist an. Ändern lässt sie sich in den Einstellungen.');
   },
   'hide-hint'(el) {
     hideHint(el.dataset.v);
@@ -377,6 +419,7 @@ const ACTIONS = {
     if (!p) return;
     Object.assign(sheet, {
       step: 'name',
+      error: '',
       brand: p.brand,
       variety: p.variety,
       type: p.type || 'Nassfutter',
@@ -385,7 +428,8 @@ const ACTIONS = {
     renderSheet();
   },
   arm(el) {
-    arm(el);
+    const {then, id} = el.dataset;
+    arm(then + (id ? ':' + id : ''), () => ARMED[then](el));
   },
   'set-species'(el) {
     sheet.species = el.dataset.v;
@@ -548,6 +592,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.field && sheet) {
     sheet[t.dataset.field] = t.value;
+    if (sheet.error && ['name', 'brand', 'variety'].includes(t.dataset.field)) showError('');
     if (t.dataset.field === 'brand' || t.dataset.field === 'variety') renderSuggestions();
   }
   if (t.dataset.note) {
@@ -589,12 +634,12 @@ document.addEventListener('keydown', e => {
   } else if (sheet.step === 'name' || sheet.kind === 'new') {
     e.preventDefault();
     if (e.target.id === 'f-brand') $('#f-variety')?.focus();
-    else saveName();
+    else nameOrMerge();
   }
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.hasAttribute('data-remind') || t.id === 'f-birthday') return renderSheet();
+  if (t.hasAttribute('data-remind')) return renderSheet();
   if (t.dataset.obsTime && t.value) return setObservationTime(t.dataset.obsTime, new Date(t.value).getTime());
   if (!t.dataset.time || !t.value) return;
   const s = getServing(t.dataset.time),

@@ -1,17 +1,16 @@
 // from the settings the editor is a page with its own history entry, elsewhere a sheet
 import {$} from '../dom.js';
 import {uid} from '../fields.js';
-import {dayKey} from '../dates.js';
 import {norm} from '../text.js';
 import {haptic} from '../native.js';
-import {db, prefs, save, savePrefs, usedNews} from '../store.js';
+import {db, prefs, save, savePrefs} from '../store.js';
 import {getPet, namesOf} from '../derive.js';
 import {cropSquare, fileToImage} from '../images.js';
 import {cropRect, cropStart} from '../ui/crop.js';
 import {toast} from '../ui/toast.js';
 import {backPage, closeSheet, openPage, openSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
-import {renderNicks} from '../views/sheets.js';
+import {renderNicks, showError} from '../views/sheets.js';
 
 // as a page, exactly these keys are taken off again on the way back
 export const petState = p => ({
@@ -19,10 +18,10 @@ export const petState = p => ({
   name: p?.name || '',
   nicknames: namesOf(p).slice(1),
   nick: '', // typed, not yet added
+  error: '',
   species: p?.species || 'Katze',
   sex: p?.sex || '',
   photo: p?.photo || null,
-  birthday: p?.birthday || '',
   step: null,
   cropImg: null,
   crop: null,
@@ -102,14 +101,8 @@ export function savePet() {
   const s = sheet,
     name = (s.name || '').trim();
   if (!name) {
-    toast('Wie heißt dein Tier?');
+    showError('Wie heißt dein Tier?');
     $('#f-name')?.focus();
-    return;
-  }
-  const birthday = (s.birthday || '').trim(); // YYYY-MM-DD, so text compares like dates
-  if (birthday > dayKey(Date.now())) {
-    toast('Das Geburtsdatum liegt in der Zukunft.');
-    $('#f-birthday')?.focus();
     return;
   }
   const isNew = !s.id,
@@ -117,16 +110,10 @@ export function savePet() {
   addNick(true);
   const nicknames = s.nicknames.filter(n => !sameName(n, name));
   Object.assign(p, {name, species: s.species, photo: s.photo || null});
-  if (birthday) p.birthday = birthday;
-  else delete p.birthday; // removed on the other phones too
-  if (s.sex) {
-    p.sex = s.sex;
-    usedNews('sex');
-  } else delete p.sex;
-  if (nicknames.length) {
-    p.nicknames = nicknames;
-    usedNews('nicknames');
-  } else delete p.nicknames;
+  if (s.sex) p.sex = s.sex;
+  else delete p.sex;
+  if (nicknames.length) p.nicknames = nicknames;
+  else delete p.nicknames;
   if (isNew) db.pets.push(p);
   save();
   haptic('success');

@@ -6,7 +6,7 @@ import {findProduct, getProduct, getServing, pname} from '../derive.js';
 import {toast} from '../ui/toast.js';
 import {closeAll, closeSheet, renderSheet, sheet} from '../ui/sheet.js';
 import {update} from '../views/home.js';
-import {renderSuggestions} from '../views/sheets.js';
+import {renderSuggestions, showError} from '../views/sheets.js';
 import {applyProduct, applyTexture, linkProduct, mergeProducts, newProduct} from './products.js';
 import {refinePets, retryNow, serveProduct} from './feeding.js';
 
@@ -15,7 +15,8 @@ export function saveName() {
   const brand = (s.brand || '').trim(),
     variety = (s.variety || '').trim();
   if (!brand && !variety) {
-    toast('Bitte Marke oder Sorte eintragen.');
+    showError('Bitte Marke oder Sorte eintragen.');
+    $('#f-brand')?.focus();
     return;
   }
   const details = {brand, variety, type: s.type, texture: s.texture, userType: true};
@@ -39,18 +40,18 @@ function serveNewProduct(details) {
   save();
   closeAll().then(() => serveProduct(p.id)); // the meal is rated on the home page
 }
+// the other variety a rename would turn this one into, which merges the two
+export function mergeTarget() {
+  const s = sheet;
+  if (s?.kind !== 'product' || s.step !== 'name') return null;
+  const other = findProduct((s.brand || '').trim(), (s.variety || '').trim());
+  return other && other.id !== s.id ? other : null;
+}
 function renameProduct(id, details) {
   const p = getProduct(id);
   if (!p) return;
-  const other = findProduct(details.brand, details.variety);
-  if (other && other.id !== p.id) {
-    mergeProducts(p, other);
-    sheet.id = other.id;
-    toast('Mit vorhandenem Futter zusammengeführt');
-  } else {
-    Object.assign(p, {brand: details.brand, variety: details.variety, type: details.type});
-    applyTexture(p, details);
-  }
+  Object.assign(p, {brand: details.brand, variety: details.variety, type: details.type});
+  applyTexture(p, details);
   save();
   backFromNaming();
 }
@@ -64,6 +65,7 @@ export function setPackLine(field, line) {
   if (!sheet || !['brand', 'variety'].includes(field)) return;
   haptic('select');
   sheet[field] = hasLine(sheet[field], line) ? '' : line;
+  if (sheet[field]) showError('');
   const el = $('#f-' + field);
   if (el) el.value = sheet[field];
   renderSuggestions();
@@ -92,7 +94,7 @@ export function useProduct(pid) {
       sheet.step = null;
       renderSheet();
       update();
-      toast('Mit vorhandenem Futter zusammengeführt');
+      toast('Mit der vorhandenen Sorte zusammengeführt');
     }
   }
 }

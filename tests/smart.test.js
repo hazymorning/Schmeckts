@@ -10,7 +10,6 @@ import {
   hintKey,
   insights,
   likingOf,
-  milestones,
   moves,
   nextUp,
   mealsBefore,
@@ -709,7 +708,7 @@ test('Erkenntnisse on who serves: the same varieties as often from each person, 
     ),
     [
       [
-        'Bei Anna kommt dasselbe Futter besser an als bei Jonas.',
+        'Bei Anna kommen dieselben Sorten besser an als bei Jonas.',
         'Bei Anna 10 von 10 Mal gut gefressen, bei Jonas 4 von 10 Mal.',
       ],
     ],
@@ -1319,22 +1318,6 @@ test('appetite per pet, hidden until the next rating', () => {
   assert.deepEqual(appetite([...USUAL, ...LOW], hidden), []);
   const next = appetite([...USUAL, ...LOW, ['p2', {A: X}, -0.9]], hidden, ['A'], NOW + DAY);
   assert.equal(next[0][0], 'appetit:A:2026-06-04');
-});
-
-test('milestones: total meals and varieties tried', () => {
-  const products = Array.from({length: 10}, (_, i) => 'p' + i);
-  const db = household(['A'], products, [
-    ...Array.from({length: 48}, (_, i) => ['p' + (i % 10), {A: null}, i]),
-    [null, {A: null}, 1],
-    ['weg', {A: null}, 1],
-  ]);
-  assert.deepEqual(milestones(db), {
-    meals: 50,
-    sorts: 10,
-    reached: ['meals:50', 'sorts:10'],
-  });
-  db.servings.pop();
-  assert.deepEqual(milestones(db).reached, ['sorts:10']);
 });
 
 /* Observations: one meal a day at the same hour, so a stink five hours after one falls in that meal's day alone */

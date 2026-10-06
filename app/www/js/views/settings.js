@@ -105,7 +105,7 @@ function overview() {
     )}
     ${group(
       'Scannen',
-      switchRow('lookup', 'search', 'Produktsuche im Internet', LOOKUP, prefs.lookup) +
+      switchRow('lookup', 'search', 'Sortensuche im Internet', LOOKUP, prefs.lookup) +
         (house
           ? switchRow('server-photo', 'camera', 'Fotos über den Server erkennen', SERVER_PHOTO, prefs.serverPhoto)
           : ''),
@@ -146,9 +146,9 @@ function exchangePage() {
 
 // the last paragraph is the attribution the ODbL requires, see NOTICE
 const PRIVACY = [
-  'Tiere, Futter und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
+  'Tiere, Sorten und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
-  'Den Text auf einer Packung liest das Handy selbst, ohne Internet. Die Produktsuche unter „Scannen“ ist anfangs aus. Eingeschaltet fragt sie bei unbekannten Barcodes zwei freie Produktdatenbanken, und zwar nur mit der Nummer.',
+  'Den Text auf einer Packung liest das Handy selbst, ohne Internet. Die Sortensuche unter „Scannen“ ist anfangs aus. Eingeschaltet fragt sie bei unbekannten Barcodes zwei freie Datenbanken im Internet, und zwar nur mit der Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',
   'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt deine Einträge als Datei an ein anderes Handy weiter, ohne Server.',
   'Beim Lesen einer Packung berichtigt das Handy falsch gelesene Wörter mit einer Wortliste. Sie enthält Informationen aus Open Pet Food Facts, die hier unter der Open Database License (ODbL) verfügbar gemacht werden.',

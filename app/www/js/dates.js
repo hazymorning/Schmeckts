@@ -42,15 +42,18 @@ export function dayLabel(t) {
   if (new Date(t).getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
   return new Date(t).toLocaleDateString('de-DE', o);
 }
+// every date with its time: heute um 7:05, gestern um 18:30, am 2. Okt. um 18:29
 export function when(t) {
-  const n = daysAgo(t);
-  const d =
+  const n = daysAgo(t),
+    d = new Date(t),
+    year = d.getFullYear() !== new Date().getFullYear() ? {year: 'numeric'} : {};
+  const day =
     n === 0
       ? 'heute'
       : n === 1
         ? 'gestern'
-        : new Date(t).toLocaleDateString('de-DE', {weekday: 'short', day: 'numeric', month: 'short'});
-  return `${d}, ${clockStr(t)} Uhr`;
+        : 'am ' + d.toLocaleDateString('de-DE', {day: 'numeric', month: 'short', ...year});
+  return `${day} um ${clockStr(t)}`;
 }
 export function ago(t) {
   const d = (t - Date.now()) / 1000,

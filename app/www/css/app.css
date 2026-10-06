@@ -1,6 +1,6 @@
 /* Four sections, each opened by an == marker the tests read: Foundations, Recipes (each alone sets its box, type and
-   layer), Views (placement only), Motion. The WebView scales px with the system font, so no text box has a fixed
-   height. */
+   layer), Views (layout and colour of one screen, no type), Motion. The WebView scales px with the system font, so
+   no text box has a fixed height. */
 
 /* == Foundations == */
 * {
@@ -298,24 +298,27 @@ body::after {
 .note.warn {
   color: var(--bad);
 }
+.field-error:empty {
+  display: none;
+}
 .t-main {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-.t-main b {
-  font: var(--type-body-strong);
-  white-space: nowrap;
+/* a row's title in at most two lines, the line under it wraps */
+:is(.t-main, .t-top) > b {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  font: var(--type-body-strong);
 }
-.t-main small {
+.t-main > small {
+  margin-top: var(--space-hair);
   font: var(--type-small);
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .t-main small.warn {
   color: var(--bad);
@@ -352,24 +355,37 @@ body::after {
   display: grid;
   grid-template-columns: var(--lead, var(--pic-s)) 1fr;
   column-gap: var(--space-3);
-}
-/* dividers start at the text column, so the icons form a column of their own */
-.set-group > .set-row:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: calc(var(--lead, var(--pic-s)) + var(--space-3));
-  right: 0;
-  height: var(--hairline);
-  background: var(--line);
+  --text-at: calc(var(--lead, var(--pic-s)) + var(--space-3));
 }
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.list > li + li {
-  border-top: var(--divider);
+.list > li {
+  position: relative;
+}
+/* where the text column starts: after the row's picture, whichever it is */
+.list > li:has(> .row > :first-child:is(.sign, .av, .thumb.m), > :first-child:is(.sign, .av)) {
+  --text-at: calc(var(--pic-m) + var(--space-3));
+}
+.list > li:has(> .row > :first-child:is(.thumb:not(.m), .ranked), > :first-child:is(.pend-head, .pend-top)) {
+  --text-at: calc(var(--pic-l) + var(--space-3));
+}
+.steps > li {
+  --text-at: calc(var(--pic-s) + var(--space-3));
+}
+/* dividers start at the text column, so the pictures form a column of their own */
+.set-group > .set-row:not(:first-child)::before,
+.list > li + li::before,
+.fold > .list > li:first-child::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--text-at, 0);
+  right: 0;
+  height: var(--hairline);
+  background: var(--line);
 }
 
 dialog.sheet {
@@ -604,6 +620,8 @@ dialog.sheet::after {
   font: var(--type-small);
   box-shadow: var(--shadow-high);
   pointer-events: none;
+  touch-action: pan-y; /* sideways it is swiped away */
+  translate: var(--swipe, 0) 0;
 }
 .toast.plain {
   padding-right: var(--gutter);
@@ -666,17 +684,12 @@ dialog.sheet::after {
   grid-column: 1 / -1;
   min-height: var(--control-l);
 }
-.set-row .t-main b {
-  white-space: normal;
-}
 /* at most two lines, so a status line cannot grow the row */
 .set-row .t-main small {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  white-space: normal;
-  margin-top: var(--space-hair);
 }
 .pend {
   padding: var(--inset-row);
@@ -747,7 +760,7 @@ dialog.sheet::after {
   border-radius: var(--radius-m);
   background: var(--mid-soft);
   font: var(--type-small);
-  margin: 0 0 var(--space-3h);
+  margin: 0 0 var(--space-4);
 }
 /* the whole bar takes the finger; the buttons are for keyboard and screen readers */
 .slider {
@@ -814,7 +827,7 @@ dialog.sheet::after {
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
   gap: var(--space-hair);
   margin: 0 var(--space-1);
-  font: var(--type-level-strong);
+  font: var(--type-small-strong);
   color: var(--muted);
   text-align: center;
 }
@@ -827,7 +840,7 @@ dialog.sheet::after {
 }
 .slider-names small {
   margin-top: var(--space-hair);
-  font: var(--type-level);
+  font: var(--type-small);
   hyphens: auto;
   overflow-wrap: anywhere;
 }
@@ -1168,6 +1181,11 @@ dialog.sheet::after {
   margin-left: calc(-1 * var(--space-1));
   color: var(--c);
 }
+/* a frame instead of the fill, for a badge on a ground of its own */
+.badge.framed {
+  background: none;
+  box-shadow: inset 0 0 0 var(--hairline) currentColor;
+}
 /* a meal still to rate asks for it, in the tone of what can be tapped */
 .badge.open {
   background: var(--accent-soft);
@@ -1370,20 +1388,7 @@ dialog.sheet::after {
   top: 0;
   left: 0;
 }
-/* a party hat tipped over the picture's corner on a birthday; at night a z drifts up from it */
-.hat {
-  position: absolute;
-  top: calc(-1 * var(--space-2h));
-  right: calc(-1 * var(--space-1));
-  display: grid;
-  color: var(--happy);
-  transform: rotate(18deg);
-}
-.hat .ic {
-  width: var(--icon-l);
-  height: var(--icon-l);
-  stroke-width: var(--icon-stroke-l);
-}
+/* at night a z drifts up from the picture */
 .ov-pic.sleepy::after {
   content: "z";
   position: absolute;
@@ -1548,10 +1553,10 @@ dialog.sheet::after {
   cursor: default;
 }
 .tl-day {
-  margin: 0 0 var(--space-1);
   scroll-margin-top: calc(var(--stick, 0px) + var(--space-5));
 }
 .tl-day + .tl-day {
+  margin-top: var(--space-1);
   border-top: var(--divider);
 }
 .tl-date {
@@ -1646,10 +1651,9 @@ dialog.sheet::after {
 .tl-note {
   font-style: italic;
 }
-.overview p {
+.ov-text p {
   margin: 0;
   font: var(--type-small);
-  text-wrap: balance;
 }
 .pet-label {
   display: flex;
@@ -1673,6 +1677,7 @@ dialog.sheet::after {
   left: 50%;
   top: calc(var(--space-4) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   transform: translateX(-50%);
+  width: max-content;
   margin: 0;
   padding: var(--inset-compact);
   border-radius: var(--radius-m);
@@ -1874,9 +1879,9 @@ dialog.sheet::after {
   color: var(--on-accent);
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
-/* The tear-off calendar: a pad that thins out over the year, its top sheet perforated, on night paper in the dark. The
-   layers under the sheet hang on the pad, since the sheet's mask cuts away everything outside it. The text lines up
-   with a card's. A sheet left hanging lies on today's, both as tall as the taller one. */
+/* The tear-off calendar: a pad with its top sheet perforated, on night paper in the dark. The layers under the sheet
+   hang on the pad, since the sheet's mask cuts away everything outside it. A sheet left hanging lies on today's, both
+   as tall as the taller one. */
 .calpad {
   position: relative;
   display: grid;
@@ -1904,15 +1909,15 @@ dialog.sheet::after {
   filter: brightness(0.8);
   z-index: -2;
 }
-.calpad[data-left="1"]::before,
-.calpad[data-left="1"]::after,
-.calpad[data-left="2"]::after {
-  display: none;
-}
+/* the date and the format's badge on one line, the text under the date; the text lines up with a card's */
 .calsheet {
   position: relative;
-  display: block;
-  padding: var(--space-2h) var(--space-3) var(--space-3h);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  align-content: start; /* a sheet as tall as the one beside it keeps its rows */
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4) calc(var(--gutter) - var(--space-1h));
   background: var(--paper-grain), var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
@@ -1922,61 +1927,16 @@ dialog.sheet::after {
 .calsheet:focus-visible {
   outline-offset: calc(-1 * var(--space-1));
 }
-/* the weekday over the date, its day large, the format's stamp at the end */
-.cal-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding-top: var(--space-1h);
-  margin-bottom: var(--space-1);
-}
 .cal-date {
-  display: grid;
-  white-space: nowrap;
-}
-.cal-wd {
-  font: var(--type-paper-date);
+  font: var(--type-caption-strong);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--paper-muted);
 }
-.cal-day {
-  font: var(--type-paper);
-}
-.cal-day b {
-  font: var(--type-paper-day);
-  letter-spacing: var(--track-title);
-}
-.cal-day.red {
-  color: var(--paper-red);
-}
-.cal-stamp {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin-left: auto;
-  padding: var(--inset-stamp);
-  border: var(--stroke-stamp) solid;
-  border-radius: var(--radius-stamp);
-  color: var(--paper-muted);
-  font: var(--type-stamp);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.cal-stamp .ic {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
-}
-.cal-stamp.verdict {
-  color: var(--paper-red);
-}
-/* never under two lines of its own size */
 .cal-text {
-  min-height: 2lh;
+  grid-column: 1;
   margin: 0;
-  font: var(--type-paper);
-  text-wrap: balance;
+  font: var(--type-small);
 }
 
 /* == Views == */
@@ -1986,10 +1946,18 @@ dialog.sheet::after {
 }
 .card + .card,
 .calpad + .card {
-  margin-top: var(--space-3h);
+  margin-top: var(--space-4);
 }
 .calpad {
-  margin: var(--space-3h) var(--space-1h) 0;
+  margin: var(--space-4) var(--space-1h) 0;
+}
+.calsheet .badge {
+  color: var(--paper-muted);
+}
+/* Sundays and the verdict, as printed on a tear-off calendar */
+.cal-date.red,
+.calsheet .verdict {
+  color: var(--paper-red);
 }
 .group + .group {
   margin-top: var(--space-3);
@@ -2033,7 +2001,7 @@ dialog.sheet::after {
   align-items: center;
   gap: var(--space-3h);
   color: var(--muted);
-  margin: var(--space-hair) 0 var(--space-2);
+  margin: var(--space-hair) 0 var(--space-2h);
 }
 .empty .sk {
   color: var(--faint);
@@ -2044,11 +2012,11 @@ dialog.sheet::after {
   align-items: center;
   gap: var(--space-3h);
 }
+/* with the card's 10px foot this makes 20, as at the top */
 .ov-pic,
 .ov-text {
   margin-bottom: var(--space-2h);
 }
-/* with the card's 8px foot this makes 18, as at the top */
 .obs {
   margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-2h);
 }
@@ -2056,7 +2024,7 @@ dialog.sheet::after {
   flex: 1;
   min-width: 0;
 }
-.overview h2 {
+.ov-text h2 {
   margin: 0 0 var(--space-hair);
 }
 
@@ -2087,12 +2055,6 @@ dialog.sheet::after {
 
 .why {
   margin: var(--space-hair) 0 0;
-}
-.shop .t-main small,
-.verdict-pet .t-main small,
-.tl-item .t-main small,
-.picks .t-main small {
-  white-space: normal;
 }
 .told .why {
   display: block;
@@ -2127,41 +2089,6 @@ dialog.sheet::after {
 .steps li,
 .told li {
   align-items: flex-start;
-}
-.portrait {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3h);
-}
-/* with the card's 8px foot this makes 18, as at the top */
-.portrait > .ov-pic,
-.portrait-text {
-  margin-bottom: var(--space-2h);
-}
-.portrait-text {
-  flex: 1;
-  min-width: 0;
-}
-.portrait h2 {
-  margin: 0 0 var(--space-hair);
-}
-.portrait .say {
-  margin: 0;
-}
-.card h2 > .ic {
-  margin-right: var(--space-2);
-  vertical-align: -0.125em;
-  color: var(--c);
-}
-.ranks .t-main b {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.ranks .t-main small {
-  white-space: normal;
 }
 .told button.row {
   align-items: flex-start;
@@ -2223,16 +2150,6 @@ dialog.sheet::after {
 .tl-item .t-main {
   margin-right: var(--space-2);
 }
-:is(.tl-item, .picks) .t-main b {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-:is(.tl-item, .picks) .t-main small {
-  margin-top: var(--space-hair);
-}
 
 .page-title {
   margin: 0 0 var(--space-1h);
@@ -2285,16 +2202,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 }
 .serve-list .empty {
   margin: 0;
-}
-.plist .t-main small {
-  white-space: normal;
-}
-.plist .t-main b {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 .prod-edit {
   flex: 1;
@@ -2351,9 +2258,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 .verdict p span {
   color: var(--muted);
 }
-.fold > .list {
-  border-top: var(--divider);
-}
 .nicks:not(:empty) {
   margin-bottom: var(--space-3);
 }
@@ -2382,6 +2286,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   grid-column: 2;
   margin-bottom: var(--space-3h);
 }
+.set-group > .field-error {
+  grid-column: 2;
+  margin: 0 0 var(--space-3);
+}
 .set-under .label {
   margin-top: var(--space-3);
 }
@@ -2402,10 +2310,6 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 }
 .srv.bad .srv-ic {
   color: var(--bad);
-}
-.srv .t-main small {
-  white-space: normal;
-  margin-top: var(--space-hair);
 }
 .connect {
   display: flex;
@@ -2499,14 +2403,20 @@ dialog.sheet.dragging {
   transform: translate(-50%, var(--space-3)) scale(0.96);
   transition:
     opacity var(--dur-fade) var(--ease-in),
-    transform var(--dur-fade) var(--ease-in);
+    transform var(--dur-fade) var(--ease-in),
+    translate var(--dur-fade) var(--ease-in);
 }
 .toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
   transition:
     opacity var(--dur-fade) var(--ease-out),
-    transform var(--dur-step) var(--ease-spring);
+    transform var(--dur-step) var(--ease-spring),
+    translate var(--dur-fade) var(--ease-out);
+}
+/* the finger leads */
+.toast.dragging {
+  transition: none;
 }
 .toast.show .toast-ic {
   animation: badgeIn var(--dur-step) var(--ease-spring) both;

@@ -2,10 +2,10 @@ import {$, reduceMotion} from '../dom.js';
 import {settled} from '../motion.js';
 import {andList, cap, esc} from '../text.js';
 import {addDays, dayKey, dayStart} from '../dates.js';
-import {haptic} from '../native.js';
+import {canNotify, haptic} from '../native.js';
 import {icon, sketch} from '../icons.js';
-import {DEMO, NEWS, observationOf, RATINGS} from '../config.js';
-import {db, loadError, prefs, savePrefs, storageOK, usedNews} from '../store.js';
+import {DEMO, NEWS, observationOf, RATINGS, REMIND_ASKED, REMIND_DEFAULT} from '../config.js';
+import {db, loadError, prefs, savePrefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
 import {
   calledNames,
@@ -33,7 +33,6 @@ import {
   nameBlock,
   photoThumb,
   rateSlider,
-  sideIcon,
   cardHead,
   syncChip,
   thumbOf,
@@ -41,7 +40,7 @@ import {
   whyOf,
 } from './parts.js';
 import {renderMood} from './mood.js';
-import {fitOverview, overviewHTML} from './overview.js';
+import {overviewHTML} from './overview.js';
 import {evaluationCard} from './evaluation.js';
 import {catOf, hangingDay, sheetOn, sheetText} from './facts.js';
 
@@ -129,7 +128,6 @@ export function renderHome() {
   renderMood();
   const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
   $('#home').innerHTML = homeHTML();
-  fitOverview();
   if (rail) $('#home .obs').scrollLeft = rail;
   $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
@@ -149,6 +147,7 @@ function homeHTML() {
   if (!m) html += stepsHTML();
   else
     html +=
+      remindHTML() +
       newsHTML() +
       hintHTML(m) +
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
@@ -200,9 +199,9 @@ function pendingHTML(list) {
 
 const HINT_TITLES = {
   appetit: 'Appetit',
-  stop: `${sideIcon('flop')}Nicht mehr kaufen?`,
+  stop: 'Nicht mehr kaufen?',
   sosse: 'Frisst meist nur die Soße',
-  liebling: `${sideIcon('top')}Nachkaufen?`,
+  liebling: 'Nachkaufen?',
 };
 const sortName = p => (p.variety && p.brand ? `${p.variety} von ${p.brand}` : pname(p));
 function hintHTML(m) {
@@ -240,6 +239,21 @@ function hintHTML(m) {
     <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
 }
 
+// asked once after the first meal: with the reminder on, a meal is rated right in the notification
+function remindHTML() {
+  if (
+    prefs.remind ||
+    prefs.hiddenHints.includes(REMIND_ASKED) ||
+    !canNotify() ||
+    db.pets.some(p => p.id.startsWith(DEMO))
+  )
+    return '';
+  return `<section class="card" data-sec="remind" style="view-transition-name:sec-remind"><h2>Ans Bewerten erinnern?</h2>
+    <p class="say">${REMIND_DEFAULT / 60} Stunden nach dem Füttern fragt die App, wie es geschmeckt hat.</p>
+    <p class="hint why">Bewerten geht dann gleich in der Benachrichtigung.</p>
+    <div class="btn-row"><button class="btn primary" data-action="remind-yes">Ja, erinnern</button><button class="btn soft" data-action="hide-hint" data-v="${REMIND_ASKED}">Nein danke</button></div></section>`;
+}
+
 // with several pets the editor is reached through the settings
 const goTo = ([where, label]) =>
   where === 'pet' && db.pets.length === 1
@@ -253,14 +267,14 @@ function newsHTML() {
     off = setting && !prefs[setting];
   if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
   const go = off ? goTo(['settings', 'Einstellungen öffnen']) : n.go ? goTo(n.go) : '';
-  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.ic ? icon(n.ic) : ''}${n.title}</h2>
+  return `<section class="card" data-sec="news" style="view-transition-name:sec-news"><h2>${n.title}</h2>
     <p class="say">${n.say}</p><p class="hint why">${off ? offWhy : n.why}</p><div class="btn-row">${go}<button class="btn soft" data-action="hide-hint" data-v="neu:${n.v}">Ausblenden</button></div></section>`;
 }
 
 // The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
-const STAMPS = {
+const BADGES = {
   Katzenlogik: 'idea',
   'Stimmt’s?': 'question',
   Kurios: 'search',
@@ -268,26 +282,22 @@ const STAMPS = {
   Flachwitz: 'grin',
   Sprache: 'speech',
 };
-const named = (d, part) => d.toLocaleDateString('de-DE', {[part]: 'long'});
-/* A day's sheet, the date red on Sundays and on days with a sheet of their own, as on a real tear-off calendar. Today's
-   Stimmt’s? turns over on a tap, its back stamped with the verdict. */
+const dateLine = d =>
+  `${d.toLocaleDateString('de-DE', {weekday: 'long'})} • ${d.toLocaleDateString('de-DE', {day: 'numeric', month: 'short'})}`;
+/* A day's sheet, the date red on Sundays, as on a real tear-off calendar. Today's Stimmt’s? turns over on a tap, its
+   back stamped with the verdict. */
 function face(date, hanging = false) {
   const {sheet, format} = sheetOn(date),
     back = !hanging && !!sheet.back && homeView.turned === sheet.id,
     d = new Date(date),
-    stamp = hanging
-      ? icon('down') + 'Abreißen'
-      : back
-        ? sheet.verdict
-        : icon(format ? STAMPS[format] : 'star') + (format ?? 'Heute');
+    badge = hanging ? icon('down') + 'Abreißen' : back ? sheet.verdict : icon(BADGES[format]) + format;
   return {
     label: hanging ? 'Gestriges Blatt abreißen' : sheet.back ? (back ? 'Behauptung zeigen' : 'Auflösung zeigen') : '',
-    html: `<div class="cal-head"><span class="cal-date"><span class="cal-wd">${named(d, 'weekday')}</span><span class="cal-day${!d.getDay() || !format ? ' red' : ''}"><b>${d.getDate()}.</b> ${named(d, 'month')}</span></span><span class="cal-stamp${back ? ' verdict' : ''}">${stamp}</span></div>
+    html: `<span class="cal-date${d.getDay() ? '' : ' red'}">${dateLine(d)}</span><span class="badge framed${back ? ' verdict' : ''}">${badge}</span>
       <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
   };
 }
 const tappable = (action, label) => ` role="button" tabindex="0" aria-label="${label}" data-action="${action}"`;
-// the pad thins out over the year: three sheets deep until April, two until August, then the last one
 function calsheetHTML() {
   if (!calendarOn()) return '';
   const now = Date.now(),
@@ -300,13 +310,12 @@ function calsheetHTML() {
   const day = hangingDay(prefs.sheetDay, now),
     c = face(now),
     old = day && face(day, true);
-  return `<div class="calpad" data-left="${3 - Math.floor(new Date(now).getMonth() / 4)}" style="view-transition-name:sec-cal"><aside class="calsheet"${c.label ? tappable('turn', c.label) : ''}${old ? ' inert' : ''}>${c.html}</aside>${old ? `<aside class="calsheet"${tappable('tear', old.label)}>${old.html}</aside>` : ''}</div>`;
+  return `<div class="calpad" style="view-transition-name:sec-cal"><aside class="calsheet"${c.label ? tappable('turn', c.label) : ''}${old ? ' inert' : ''}>${c.html}</aside>${old ? `<aside class="calsheet"${tappable('tear', old.label)}>${old.html}</aside>` : ''}</div>`;
 }
 // the sheet left hanging comes off at the perforation and falls over what lies below; today's is already in place
 export function tearSheet(el) {
   prefs.sheetDay = dayKey(Date.now());
   savePrefs();
-  usedNews('calendar');
   haptic();
   if (reduceMotion.matches) return update();
   el.removeAttribute('data-action');
@@ -363,7 +372,7 @@ function historyHTML() {
     (shown.length
       ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
       : recent.length || db.servings.some(s => servingPets(s).length)
-        ? `<p class="hint empty"><span>Heute noch nichts serviert, der Napf langweilt sich.</span></p>`
-        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts serviert, der Napf wartet auf seine Premiere.</span></p>`)
+        ? `<p class="hint empty"><span>Heute noch nicht gefüttert, der Napf langweilt sich.</span></p>`
+        : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts eingetragen, der Napf wartet auf seine Premiere.</span></p>`)
   );
 }

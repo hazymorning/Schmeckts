@@ -2,7 +2,7 @@
 import {$, reduceMotion} from '../dom.js';
 import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
-import {addDays, dayKey, toLocalInput, weekStart, when} from '../dates.js';
+import {addDays, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
 import {
   guessTexture,
@@ -64,8 +64,6 @@ import {
   scaleEnds,
   segmented,
   shopRow,
-  sideIcon,
-  since,
   strip,
   thumbOf,
   told,
@@ -116,12 +114,12 @@ function viewServing() {
   const ids = Object.keys(s.pets).filter(id => getPet(id));
   const multi = db.pets.length > 1;
   return `<div class="sh-head"><h2>Wie war’s?</h2>${closeBtn}</div>
-    ${prodGroup(s, p, `<span class="t-main">${nameBlock(s, p, true)}</span>`, 'edit-name', 'Futter ändern')}
+    ${prodGroup(s, p, `<span class="t-main">${nameBlock(s, p, true)}</span>`, 'edit-name', 'Sorte ändern')}
     ${ids.map(pid => group(multi ? esc(getPet(pid).name) : '', rateSlider(s, pid))).join('')}
-    ${multi ? group('Serviert für', petChips('toggle-serving-pet', s.pets)) : ''}
+    ${multi ? group('Wer wurde gefüttert?', petChips('toggle-serving-pet', s.pets)) : ''}
     ${group(
       '',
-      timeRow('Serviert', s.by, s.servedAt, `id="f-time" data-time="${s.id}"`) +
+      timeRow('Gefüttert', s.by, s.servedAt, `id="f-time" data-time="${s.id}"`) +
         `<div class="row set-row">${lead('note')}<input id="f-note" class="field bare" data-note="${s.id}" value="${esc(s.note || '')}" placeholder="Notiz, z. B. neue Packung" aria-label="Notiz" autocomplete="off"></div>`,
       'set-group',
     )}
@@ -169,12 +167,12 @@ function viewName() {
     product = s.kind === 'product' ? getProduct(s.id) : getProduct(serving?.productId);
   const title =
     s.kind === 'new'
-      ? 'Neues Futter'
+      ? 'Neue Sorte'
       : s.kind === 'product'
-        ? 'Futter umbenennen'
+        ? 'Sorte umbenennen'
         : product
-          ? 'Futter ändern'
-          : 'Futter benennen';
+          ? 'Sorte ändern'
+          : 'Sorte benennen';
   const photo = product?.thumb || serving?.photo || serving?.thumb,
     large = hasPhoto(serving, product),
     reading = serving?.status === 'reading',
@@ -218,14 +216,28 @@ function viewName() {
     <div class="suggest" id="suggest"></div>
     <label class="label" for="f-brand">Marke</label>
     <input id="f-brand" class="field" data-field="brand" value="${esc(s.brand)}" placeholder="z. B. Sheba" autocomplete="off" autocapitalize="words" enterkeyhint="next">
+    ${errorSlot}
     <div class="suggest" id="brandChips"></div>
     <label class="label" for="f-variety">Sorte</label>
     <input id="f-variety" class="field" data-field="variety" value="${esc(s.variety)}" placeholder="z. B. Lachs in Soße" autocomplete="off" enterkeyhint="done">
     <div class="suggest" id="lineChips"></div>
     ${labelled('Art', `<div class="chips">${TYPES.map(t => `<button class="chip" aria-pressed="${s.type === t}" data-action="set-type" data-v="${t}">${t}</button>`).join('')}</div>`)}
     ${textureChips(s, '', labelled)}
-    <div class="mt"><button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Servieren' : read.length ? 'Passt so' : 'Speichern'}</button></div>
+    <div class="mt">${
+      s.armed?.startsWith('merge:')
+        ? `<button class="btn armed" data-action="save-name">${icon('check')}Nochmal tippen: zusammenführen</button>`
+        : `<button class="btn primary" data-action="save-name">${icon('check')}${s.kind === 'new' ? 'Füttern' : read.length ? 'Passt so' : 'Speichern'}</button>`
+    }</div>
     ${serving && !product ? apart(deleteMealBtn(serving.id)) : ''}`;
+}
+/* What a form still needs, under its field until that is filled in. The slot is filled after drawing, so an unchanged
+   view stays as it was drawn. */
+const errorSlot = '<p class="hint note warn field-error" id="f-error" role="alert"></p>';
+export function showError(text) {
+  if (!sheet) return;
+  sheet.error = text;
+  const el = $('#f-error');
+  if (el) el.textContent = text;
 }
 const fieldSkeleton = `<span class="label"><span class="skel skel-text"></span></span><span class="skel skel-field"></span>`;
 // x: a variety, or the sheet itself while naming
@@ -263,13 +275,15 @@ export function renderSuggestions() {
     hits = quickProducts(4).map(x => x.product);
     title = 'Schon mal gehabt?';
   }
+  // renaming a variety into another one merges the two, so that takes a second tap
+  const merge = sheet.kind === 'product';
   box.innerHTML =
     (hits.length ? `<span class="label">${title}</span>` : '') +
     hits
-      .map(
-        p =>
-          `<button class="box sugg" data-action="use-product" data-id="${p.id}">${thumbOf(null, p, 'm')}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(p.brand)}</small></span>${icon('chevron')}</button>`,
-      )
+      .map(p => {
+        const armed = merge && sheet.armed === 'merge:' + p.id;
+        return `<button class="box sugg" ${merge ? 'data-action="arm" data-then="merge"' : 'data-action="use-product"'} data-id="${p.id}">${thumbOf(null, p, 'm')}<span class="t-main"><b>${esc(pname(p))}</b><small${armed ? ' class="warn"' : ''}>${armed ? 'Nochmal tippen: zusammenführen' : esc(p.brand)}</small></span>${icon('chevron')}</button>`;
+      })
       .join('');
   const read = (serving && memLines.get(serving.id)) || {lines: [], brands: []},
     brands = $('#brandChips'),
@@ -290,11 +304,10 @@ const CTA = {
 };
 // entries: [{product, at}]
 function serveRows(entries, code = '') {
-  const now = Date.now(),
-    m = model();
+  const m = model();
   return entries
     .map(({product: p, at}) => {
-      const meta = [p.variety ? p.brand : '', at ? since(at, now) : 'noch nie serviert'].filter(Boolean).join(', '),
+      const meta = [p.variety ? p.brand : '', at ? when(at) : 'noch nie gehabt'].filter(Boolean).join(', '),
         past = record(m.byId.get(p.id));
       return `<li><button class="row" data-action="serve" data-id="${p.id}"${code ? ` data-code="${esc(code)}"` : ''}>
         ${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(meta)}</small>${past ? `<small>${esc(past)}</small>` : ''}</span>${strip(ratingsIn(m, [p.id]))}</button></li>`;
@@ -340,7 +353,7 @@ function hitList(text, words) {
   if (hits.length) return group('', `<ul class="list plist">${serveRows(hits)}</ul>`, '');
   const q = esc(text);
   return `<p class="hint empty"><span>Keine Sorte passt zu „${q}“.</span></p>
-    <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neues Futter eintippen</button>`;
+    <button class="btn plain" data-action="new-product" data-v="${q}">„${q}“ als neue Sorte eintippen</button>`;
 }
 
 const KAUFEN = [
@@ -429,7 +442,7 @@ function noticed(p) {
 function viewProduct() {
   const p = getProduct(sheet.id);
   if (!p)
-    return `<div class="sh-head"><h2>Futter</h2>${closeBtn}</div><p class="hint empty">Dieses Futter gibt es nicht mehr.</p>`;
+    return `<div class="sh-head"><h2>Sorte</h2>${closeBtn}</div><p class="hint empty">Diese Sorte gibt es nicht mehr.</p>`;
   if (sheet.step === 'name') return viewName();
   const ss = db.servings.filter(s => s.productId === p.id),
     e = sortOf(p.id),
@@ -440,14 +453,14 @@ function viewProduct() {
   const hist = ss.slice(0, MEALS_SHOWN).map(mealRow).join('');
   return `<div class="sh-head"><h2>${esc(pname(p))}</h2>${closeBtn}</div>
     ${quartet(p, e, ss.length)}
-    ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Servieren zerkleinern</p>' : '')}
+    ${textureChips(p, p.texture === 'block' ? '<p class="hint note">Vor dem Füttern zerkleinern</p>' : '')}
     ${group('Bewertungen', e.house.n ? countsRow(levels, counts) : `<p class="hint">${e.total ? OLD : 'Noch nicht bewertet.'}</p>`)}
     ${kaufenHTML(e)}
     ${noticed(p)}
     ${hist ? group('Verlauf', `<ul class="list plist">${hist}</ul>`, '') : ''}
     ${codes.length ? group('Barcodes', `<ul class="list plist">${codes.map(barcodeRow).join('')}</ul>`, '') : ''}
-    <div class="mt"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Servieren</button></div>
-    ${apart(armBtn('delete-product', 'Futter löschen', 'Nochmal tippen: Futter und Einträge löschen', {cls: 'quiet'}))}`;
+    <div class="mt"><button class="btn primary" data-action="serve" data-id="${p.id}">${icon('check')}Füttern</button></div>
+    ${apart(armBtn('delete-product', 'Sorte löschen', 'Nochmal tippen: Sorte und Einträge löschen', {cls: 'quiet'}))}`;
 }
 
 // at: id of the day to open at
@@ -480,7 +493,7 @@ function viewReport() {
     ${
       histDays.length
         ? `<div id="histBox">${histHTML(pet, 0, upto)}</div>`
-        : `<p class="hint empty"><span>Noch nichts serviert, der Napf wartet auf seine Premiere.</span></p>`
+        : `<p class="hint empty"><span>Noch nichts eingetragen, der Napf wartet auf seine Premiere.</span></p>`
     }</section>`;
 }
 // swaps only the fold, so the rest of the page and the button stay put
@@ -511,10 +524,8 @@ function viewShop() {
     ? types.map(([t, l]) => `<h3 class="label grp">${t}</h3>${shopList(m, l)}`).join('')
     : '<p class="hint card-line">Noch nichts zum Nachkaufen, erst mal probieren.</p>';
   return `${head('Einkaufen' + forWhom(m.pet), 'settings-back', share)}
-    <section class="card"><h2>${sideIcon('top')}Nachkaufen</h2>${buy}</section>${
-      g.nicht.length
-        ? `<section class="card"><h2>${sideIcon('flop')}Nicht mehr kaufen</h2>${foldBox('nicht')}</section>`
-        : ''
+    <section class="card"><h2>Nachkaufen</h2>${buy}</section>${
+      g.nicht.length ? `<section class="card"><h2>Nicht mehr kaufen</h2>${foldBox('nicht')}</section>` : ''
     }${unclear(g).length ? `<section class="card"><h2>Noch unklar</h2>${foldBox('unklar')}</section>` : ''}`;
 }
 
@@ -572,11 +583,6 @@ const viewCrop = () => `${head('Foto zuschneiden', 'crop-cancel')}
     <input id="f-zoom" class="zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1">
     <div class="btn-row"><button class="btn soft" data-action="crop-cancel">Abbrechen</button><button class="btn primary" data-action="crop-apply">${icon('check')}Übernehmen</button></div>`;
 
-// "YYYY-MM-DD" as a local day, not UTC midnight
-const birthdayStr = key => {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('de-DE', {day: 'numeric', month: 'long', year: 'numeric'});
-};
 function viewPet() {
   if (sheet.step === 'crop') return viewCrop();
   const s = sheet,
@@ -590,13 +596,7 @@ function viewPet() {
       '',
       `<div class="row set-row">${lead('paw')}<label class="t-main" for="f-name"><b>Name</b></label>
         <input id="f-name" class="field in-row" data-field="name" value="${esc(s.name)}" placeholder="z. B. Minka" autocomplete="off" autocapitalize="words" enterkeyhint="done"></div>` +
-        pickRow(
-          'cake',
-          'Geburtstag',
-          '',
-          s.birthday ? esc(birthdayStr(s.birthday)) : 'Optional',
-          `<input id="f-birthday" class="pick-in" type="date" data-field="birthday" value="${esc(s.birthday)}" max="${dayKey(Date.now())}" aria-label="Geburtstag">`,
-        ),
+        errorSlot,
       'set-group',
     )}
     ${group(
@@ -654,6 +654,8 @@ setSheetView((state, body) => {
       for (const a of el.getAnimations({subtree: true}))
         a.startTime = document.timeline.currentTime - (Date.now() - el.dataset.since);
   }
+  const error = $('#f-error', body);
+  if (error) error.textContent = state.error || '';
   if (state.kind === 'settings') paintHouse(fresh);
   if (state.step === 'name' || state.kind === 'new') renderSuggestions();
   if (state.kind === 'pet' || state.page === 'pet') renderNicks();
