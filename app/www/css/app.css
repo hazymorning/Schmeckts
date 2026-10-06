@@ -827,22 +827,15 @@ dialog.sheet::after {
   grid-template-columns: repeat(var(--n), minmax(0, 1fr));
   gap: var(--space-hair);
   margin: 0 var(--space-1);
-  font: var(--type-small-strong);
+  font: var(--type-small);
   color: var(--muted);
   text-align: center;
-}
-.slider-names > .on {
-  color: var(--c);
-}
-.slider-names b,
-.slider-names small {
-  display: block;
-}
-.slider-names small {
-  margin-top: var(--space-hair);
-  font: var(--type-small);
   hyphens: auto;
   overflow-wrap: anywhere;
+}
+.slider-names > .on {
+  font: var(--type-small-strong);
+  color: var(--c);
 }
 .ends {
   display: flex;

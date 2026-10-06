@@ -285,7 +285,7 @@ async def test_tour(browser, url):
     await tap(pg, '[data-sec=evaluation] .picks button')
     check(await pg.evaluate(LEVEL) == [True, 'product', None, None], 'food sheet opens')
     await tap(pg, '[data-action=close]')
-    await tap(pg, '.tl [data-action=open-serving]')
+    await tap(pg, '[data-sec=hist] [data-action=open-serving]')
     await tap(pg, '[data-action=close]')
     check(not errors, f'no errors {errors}')
     await ctx.close()
@@ -327,7 +327,7 @@ async def test_flow(browser, url):
     await idle(pg)
     check(await state(pg, 'Object.values(db.servings[0].pets).map(x => x.r).join()') == 'gut,sosse', 'both pets rated')
     check(await state(pg, "!('photo' in db.servings[0]) && !('status' in db.servings[0])"), 'named: photo and status dropped from the meal')
-    await tap(pg, '.tl [data-action=open-serving]')
+    await tap(pg, '[data-sec=hist] [data-action=open-serving]')
     await tap(pg, '[data-action=delete-serving]')
     check(await state(pg, 'db.servings.length') == 0, 'meal deleted')
     await tap(pg, '#toast [data-action=undo]')
@@ -439,6 +439,10 @@ async def test_cards(browser, url):
             break
         key = f'{first["kind"]}:{first["id"]}'
         ok &= await pg.locator('[data-sec=hint]').count() == 1 and await pg.get_attribute('[data-sec=hint] [data-action=hide-hint]', 'data-v') == key
+        if first['kind'] != 'appetit':  # the variety as a row with its packaging, which opens it
+            await tap(pg, '[data-sec=hint] .row .thumb')
+            ok &= await pg.evaluate("import('./js/ui/sheet.js').then(m => [m.sheet?.kind, m.sheet?.id])") == ['product', first['id']]
+            await tap(pg, '#sheet [data-action=close]')
         seen.append(first['kind'])
         if first['kind'] in ('stop', 'liebling') and seen.count(first['kind']) == 1:
             kaufen = f"db.products.find(p => p.id === '{first['id']}').kaufen ?? null"
@@ -563,7 +567,7 @@ async def test_home_history(browser, url):
     print('history on the home page: today, else yesterday, within the pet filter')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
-    IDS = "[...document.querySelectorAll('[data-sec=hist] .tl-item')].map(b => b.dataset.id)"
+    IDS = "[...document.querySelectorAll('[data-sec=hist] .tl-day .row')].map(b => b.dataset.id)"
 
     async def seed(now, meals, pets=(M,)):
         await pg.clock.set_fixed_time(now)
@@ -581,6 +585,13 @@ async def test_home_history(browser, url):
         ['m5', '2026-06-10T08:00', [M]],
     ]
     check(await seed('2026-06-12T10:00:00+02:00', owner) == ['m1'], 'served today: only today')
+    ROW = "(r => [r.querySelector('small').textContent, !!r.querySelector('.tl-time, .tl-node'), r.querySelectorAll('.badge').length])(document.querySelector('[data-sec=hist] .tl-day .row'))"
+    rated = await pg.evaluate(ROW)
+    await change(pg, 'Object.values(s.db.servings[0].pets).forEach(x => { x.r = null; })')
+    check(
+        rated == ['Sheba, 7:00', False, 1] and await pg.evaluate(ROW) == ['Sheba, 7:00', False, 0] and await pg.locator('#home .pend').count() == 1,
+        f'a row as in any card, the time in its small line; not rated yet, only the rating card says so {rated}',
+    )
     check(await seed('2026-06-12T05:30:00+02:00', owner[1:]) == ['m4', 'm3', 'm2'], 'nothing yet today: yesterday, newest first')
     none = await seed('2026-06-14T10:00:00+02:00', owner)
     check(
@@ -896,14 +907,17 @@ async def test_scales(browser, url):
         [product('trocken0001', 'Josera', '', 'Trockenfutter'), product('snack0001', 'Dreamies', '', 'Snack')],
         [meal(f'meal00000{i}', p + '0001', now - ago * 36e5, {M: r}) for i, (p, r, ago) in enumerate(rated)],
     )
-    levels = await pg.evaluate(
-        "[...document.querySelectorAll('.pend .slider')].map(s => [...s.querySelectorAll('.slider-track button')].map(b => b.dataset.r))"
-    )
+    LEVELS = "[...document.querySelectorAll('%s .slider')].map(s => [...s.querySelectorAll('.slider-track button')].map(b => b.dataset.r))"
+    levels = await pg.evaluate(LEVELS % '.pend')
+    rows = await pg.locator('.pend').count()
+    await tap(pg, '.pend[data-id=meal000001] .pend-head')
+    levels += await pg.evaluate(LEVELS % '#sheet')
+    await tap(pg, '#sheet [data-action=close]')
     check(
-        levels == [['gern', 'normal', 'wenig', 'liegen'], ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']],
-        f'own scales for dry food and treats {levels}',
+        levels == [['gern', 'normal', 'wenig', 'liegen'], ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']] and rows == 2,
+        f'own scales for dry food and treats; the newest open meal is rated on the home page, the older one in its sheet {levels}',
     )
-    await tap(pg, '.tl-item[data-id=meal000002]')  # rated on another scale
+    await tap(pg, '[data-sec=hist] [data-id=meal000002]')  # rated on another scale
     await tap(pg, '#sheet [data-r=liegen]', force=True)
     check(await state(pg, "db.servings.find(x => x.id === 'meal000002').pets.minka00001.r") == 'liegen', 'a tap replaces a level from another scale')
     check(await until(pg, f'!{OPEN}', 5), 'every pet rated: the sheet closes')
@@ -944,15 +958,25 @@ async def test_narrow(browser, url):
             cut[name] = found
 
     await look('home')
-    for sel in ('[data-sec=evaluation] [data-action=open-evaluation]', '[data-action=open-settings]', '#fab', '.tl [data-action=open-serving]'):
+    for sel in (
+        '[data-sec=evaluation] [data-action=open-evaluation]',
+        '[data-action=open-settings]',
+        '#fab',
+        '[data-sec=hist] [data-action=open-serving]',
+    ):
         await tap(pg, sel)
         await look(sel)
         await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
         await idle(pg)
     await tap(pg, '[data-sec=evaluation] .picks button')
     await look('variety')
-    scales = await pg.locator('.pend .slider').count()
-    check(scales >= 3 and not cut, f'nothing cut, with all three scales on the home page {cut}')
+    await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+    meals = await pg.eval_on_selector_all('.pend', 'l => l.map(x => x.dataset.id)')
+    for meal_ in meals:
+        await tap(pg, f'.pend[data-id="{meal_}"] .pend-head')
+        await look(meal_)
+        await pg.evaluate("import('./js/ui/sheet.js').then(m => m.closeAll())")
+    check(len(meals) >= 3 and not cut, f'nothing cut, with all three scales {cut}')
     check(not errors, f'no errors {errors}')
     await ctx.close()
 
@@ -1434,7 +1458,12 @@ async def test_news(browser, url):
     await ctx.close()
 
     ctx, pg, errors = await seeded(browser, url, {'db': SAVED}, native=True)
-    check(await pg.locator(CARD).count() == 1, 'an update with own pets brings the newest news')
+    first = [await pg.locator('[data-sec=remind]').count(), await pg.locator(CARD).count()]
+    await tap(pg, '[data-sec=remind] [data-action=hide-hint]')
+    check(
+        first == [1, 0] and await pg.locator(CARD).count() == 1,
+        f'an update with own pets brings the newest news, once the reminder question is answered: one question at a time {first}',
+    )
     await tap(pg, f'{CARD} [data-action=hide-hint]')
     await pg.reload()
     await started(pg)
@@ -2301,7 +2330,7 @@ async def test_pack_lines(browser, url):
     await tap(pg, '[data-action=close]')
     await connect(pg)
     await snap(pg, done='db.servings[0]?.productId')
-    await tap(pg, '.tl [data-action=open-serving]')
+    await tap(pg, '[data-sec=hist] [data-action=open-serving]')
     await tap(pg, '#sheet [data-action=edit-name]')
     check(await pg.evaluate(FIELDS) == ['Gourmet', 'Gold Pastete'] and await pg.evaluate(CHIPS) == [], 'recognised by the server: no chips')
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
@@ -2671,11 +2700,11 @@ async def test_popup(browser, url):
         f'X, back button, gesture close the sheet only {ways}',
     )
     meal_ = await pg.evaluate(
-        "(b => { b.scrollIntoView({block: 'center'}); return b.dataset.id; })(document.querySelector('#sheet .tl-item .badge.open').closest('.tl-item'))"
+        "(b => { b.scrollIntoView({block: 'center'}); return b.dataset.id; })(document.querySelector('#sheet .tl-item .tl-node .open').closest('.tl-item'))"
     )
     await idle(pg)
     y = await pg.evaluate("document.getElementById('sheetBody').scrollTop")
-    OPEN_BADGE = f'#sheet .tl-item[data-id="{meal_}"] .badge.open'
+    OPEN_BADGE = f'#sheet .tl-item[data-id="{meal_}"] .tl-node .open'
     await tap(pg, f'#sheet .tl-item[data-id="{meal_}"]')
     await pg.click('#popup [data-action=rate][data-r=gut]', force=True)
     await pg.wait_for_function("!document.getElementById('popup').open", timeout=6000)

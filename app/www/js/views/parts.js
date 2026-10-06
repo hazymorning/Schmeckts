@@ -60,10 +60,9 @@ export function rateSlider(s, pid) {
       .map((r, i) => `var(--${rateTone(r)}-soft) ${(((i + 0.5) / scale.length) * 100).toFixed(1)}%`)
       .join(', '),
     words = scale
-      .map((r, i) => {
-        const [first, ...rest] = RATINGS[r].short.split(' ');
-        return `<span class="${rateCls(r)}${i === at ? ' on' : ''}"><b>${first}</b><small>${rest.join(' ')}</small></span>`;
-      })
+      .map(
+        (r, i) => `<span class="${rateCls(r)}${i === at ? ' on' : ''}">${RATINGS[r].short.replace(' ', '<br>')}</span>`,
+      )
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
     <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;
@@ -74,7 +73,7 @@ export function resultBadges(s, compact = false) {
   const ids = servingPets(s);
   if (ids.length === 1) {
     const r = rOf(s.pets[ids[0]]);
-    if (!r) return `<span class="badge open">offen</span>`;
+    if (!r) return compact ? '' : `<span class="badge open">offen</span>`; // in a row its dot or the rating card says it
     return compact
       ? `<span class="badge ic-only ${rateCls(r)}" title="${RATINGS[r].label}">${icon('r_' + r)}</span>`
       : rateBadge(r);
@@ -202,41 +201,55 @@ export function dayGroups(list) {
   }
   return groups;
 }
-function observationItem(o, multiHouse, fresh) {
+// plain: rows as in any card, the time in the small line; else the history page's timeline of times and dots
+function observationItem(o, multiHouse, fresh, plain) {
   const kind = observationOf(o.kind),
     ids = observedPets(o),
-    meta = [multiHouse || ids.length > 1 ? whoObserved(ids) : '', o.by ? 'von ' + o.by : ''].filter(Boolean).join(', ');
-  return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-observation" data-id="${o.id}">
-        <span class="tl-time">${clockStr(o.at)}</span><span class="tl-node"><i></i></span>${obsThumb(o.kind)}
+    meta = [
+      plain ? clockStr(o.at) : '',
+      multiHouse || ids.length > 1 ? whoObserved(ids) : '',
+      o.by ? 'von ' + o.by : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+  return `<li style="view-transition-name:tl-${o.id};view-transition-class:${fresh === o.id ? 'fresh' : 'item'}"><button class="row${plain ? '' : ' tl-item'}" data-action="open-observation" data-id="${o.id}">
+        ${plain ? '' : `<span class="tl-time">${clockStr(o.at)}</span><span class="tl-node"><i></i></span>`}${obsThumb(o.kind)}
         <span class="t-main"><b>${esc(kind.label)}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</span></button></li>`;
 }
+function servingItem(s, multiHouse, fresh, plain) {
+  const p = getProduct(s.productId),
+    ids = servingPets(s);
+  const meta = [
+    p && p.variety ? p.brand : '',
+    plain ? clockStr(s.servedAt) : '',
+    multiHouse ? 'für ' + petNames(ids) : '',
+    s.by ? 'von ' + s.by : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const title = p
+    ? esc(pname(p))
+    : s.status === 'recognizing'
+      ? 'Wird erkannt …'
+      : s.status === 'reading'
+        ? 'Wird gelesen …'
+        : 'Unbekannte Sorte';
+  return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row${plain ? '' : ' tl-item'}" data-action="open-serving" data-id="${s.id}">
+        ${plain ? '' : `<span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>`}${thumbOf(s, p, plain ? '' : 'm')}
+        <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
+        ${resultBadges(s, true)}</button></li>`;
+}
 // anchors: day ids the calendar jumps to; fresh: id of the entry just made
-export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false} = {}) {
+export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false, plain = false} = {}) {
   return groups
     .map(
       g => `<div class="tl-day"${anchors ? ` id="d-${g.key}"` : ''}>
     <div class="tl-date"><b>${esc(dayLabel(g.t))}</b><span>${fedLabel(g.items)}</span></div>
-    <ol class="tl">${g.items
-      .map(s => {
-        if (isObservation(s)) return observationItem(s, multiHouse, fresh);
-        const p = getProduct(s.productId),
-          ids = servingPets(s);
-        const meta = [p && p.variety ? p.brand : '', multiHouse ? petNames(ids) : '', s.by ? 'von ' + s.by : '']
-          .filter(Boolean)
-          .join(', ');
-        const title = p
-          ? esc(pname(p))
-          : s.status === 'recognizing'
-            ? 'Wird erkannt …'
-            : s.status === 'reading'
-              ? 'Wird gelesen …'
-              : 'Unbekannte Sorte';
-        return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row tl-item" data-action="open-serving" data-id="${s.id}">
-        <span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>${thumbOf(s, p, 'm')}
-        <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
-        ${resultBadges(s, true)}</button></li>`;
-      })
-      .join('')}</ol></div>`,
+    <${plain ? 'ul class="list"' : 'ol class="tl"'}>${g.items
+      .map(s =>
+        isObservation(s) ? observationItem(s, multiHouse, fresh, plain) : servingItem(s, multiHouse, fresh, plain),
+      )
+      .join('')}</${plain ? 'ul' : 'ol'}></div>`,
     )
     .join('');
 }

@@ -33,6 +33,7 @@ import {
   nameBlock,
   photoThumb,
   rateSlider,
+  resultBadges,
   cardHead,
   syncChip,
   thumbOf,
@@ -147,9 +148,7 @@ function homeHTML() {
   if (!m) html += stepsHTML();
   else
     html +=
-      remindHTML() +
-      newsHTML() +
-      hintHTML(m) +
+      (remindHTML() || newsHTML() || hintHTML(m)) + // one question at a time
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m);
   return html;
@@ -171,23 +170,25 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
 
 // a pet rated here keeps its row while the meal stays in the card
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
+// each pet rates its newest meal here; older ones open their sheet
 function pendingHTML(list) {
-  const multiHouse = db.pets.length > 1;
+  const multiHouse = db.pets.length > 1,
+    newest = new Map();
+  for (const s of list) for (const pid of rateRows(s)) if (!newest.has(pid)) newest.set(pid, s.id);
   return (
     `<section class="card" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul class="list">` +
     list
       .map(s => {
         const p = getProduct(s.productId),
-          ids = rateRows(s),
-          multi = ids.length > 1;
-        const main = `<span class="t-main">${nameBlock(s, p)}</span>${multiHouse && !multi ? avatar(getPet(ids[0]), 's') : ''}`;
+          ids = rateRows(s).filter(pid => newest.get(pid) === s.id);
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s, true)}`;
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
         const rows = ids
           .map(
             pid =>
-              `<div class="pet-rate">${multi ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateSlider(s, pid)}</div>`,
+              `<div class="pet-rate">${multiHouse ? `<div class="pet-label">${avatar(getPet(pid), 'xs')}${esc(getPet(pid).name)}</div>` : ''}${rateSlider(s, pid)}</div>`,
           )
           .join('');
         return `<li class="pend" data-id="${s.id}" style="view-transition-name:sv-${s.id};view-transition-class:${homeView.fresh === s.id ? 'fresh' : 'item'}">${head}${rows}${p ? '' : deleteMealBtn(s.id)}</li>`;
@@ -203,40 +204,40 @@ const HINT_TITLES = {
   sosse: 'Frisst meist nur die Soße',
   liebling: 'Nachkaufen?',
 };
-const sortName = p => (p.variety && p.brand ? `${p.variety} von ${p.brand}` : pname(p));
 function hintHTML(m) {
   const h = m.hints[0];
   if (!h) return '';
   const e = m.byId.get(h.id),
-    name = e && esc(sortName(e.product)),
     pet = h.pet && getPet(h.pet);
   const hide = `<button class="btn soft" data-action="hide-hint" data-v="${esc(hintKey(h))}">Ausblenden</button>`;
   const set = (v, label) =>
     `<button class="btn primary" data-action="hint-buy" data-id="${e.id}" data-v="${v}">${label}</button>`;
-  let say, why, btns;
-  if (h.kind === 'appetit') {
-    [say, why, btns] = [
-      `${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.`,
-      `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
-        (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => `„${observationOf(k).label}“`))}.` : ''),
+  const card = (body, btns) =>
+    `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>${body}<div class="btn-row">${btns}</div></section>`;
+  if (h.kind === 'appetit')
+    return card(
+      `<p class="say">${esc(calledNames([pet.id], 'hint'))} frisst seit ein paar Tagen schlechter als sonst.</p>
+      <p class="hint why">${esc(
+        `Zuletzt ${times(h.good, h.n)} gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.` +
+          (h.seen?.length ? ` Dazu notiert: ${andList(h.seen.map(k => `„${observationOf(k).label}“`))}.` : ''),
+      )}</p>`,
       hide,
-    ];
-  } else if (h.kind === 'sosse') {
-    const x = e.pets[h.pet];
-    [say, why, btns] = [
-      `${esc(calledNames([pet.id], 'hint'))} frisst bei ${name} meist nur die Soße.`,
-      cap(`${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}`),
-      hide,
-    ];
-  } else {
-    why = pet ? `${pet.name}: ${lower(evidenceOf(e))}` : whyOf(e);
-    [say, btns] =
-      h.kind === 'stop'
-        ? [`${name} kommt nicht gut an.`, set('nicht', 'Nicht mehr kaufen') + hide]
-        : [`${name} kommt gut an.`, set('immer', 'Nachkaufen') + hide];
-  }
-  return `<section class="card" data-sec="hint" style="view-transition-name:sec-hint"><h2>${HINT_TITLES[h.kind]}</h2>
-    <p class="say">${say}</p><p class="hint why">${esc(why)}</p><div class="btn-row">${btns}</div></section>`;
+    );
+  // the variety with its packaging, as in the cards around it
+  const p = e.product,
+    x = h.kind === 'sosse' && e.pets[h.pet],
+    why = x ? `${times(x.counts.sosse, x.n)} ${RATINGS.sosse.said}` : lower(pet ? evidenceOf(e) : whyOf(e)),
+    sub = [p.variety ? p.brand : '', pet && db.pets.length > 1 ? `${pet.name}: ${why}` : why]
+      .filter(Boolean)
+      .join(', ');
+  return card(
+    `<ul class="list"><li><button class="row" data-action="open-product" data-id="${e.id}">${thumbOf(null, p)}<span class="t-main"><b>${esc(pname(p))}</b><small>${esc(cap(sub))}</small></span></button></li></ul>`,
+    h.kind === 'stop'
+      ? set('nicht', 'Nicht mehr kaufen') + hide
+      : h.kind === 'liebling'
+        ? set('immer', 'Nachkaufen') + hide
+        : hide,
+  );
 }
 
 // asked once after the first meal: with the reminder on, a meal is rated right in the notification
@@ -360,7 +361,7 @@ function historyHTML() {
   return (
     calendarHTML(recent, true) +
     (shown.length
-      ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh})
+      ? dayBlocks(dayGroups(shown), {multiHouse, fresh: homeView.fresh, plain: true})
       : recent.length || db.servings.some(s => servingPets(s).length)
         ? `<p class="hint empty"><span>Heute noch nicht gefüttert, der Napf langweilt sich.</span></p>`
         : `<p class="hint empty">${sketch('empty', 'xl')}<span>Noch nichts eingetragen, der Napf wartet auf seine Premiere.</span></p>`)
