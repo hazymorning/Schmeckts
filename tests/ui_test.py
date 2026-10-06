@@ -1639,15 +1639,16 @@ async def test_sex(browser, url):
 
 # each sheet in the pad, the one on top last: its text, its head (the date, the badge, whether the date is red and the
 # badge a verdict), its label and whether it lies out of reach under another
-SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => [s.querySelector('.cal-text').textContent,
-  [s.querySelector('.cal-date').textContent, s.querySelector('.badge').textContent, s.querySelector('.cal-date').matches('.red'),
-    s.querySelector('.badge').matches('.verdict')], s.getAttribute('aria-label'), s.inert])"""
+SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => { const t = s.querySelector('.cal-text'), b = t.querySelector('b');
+  return [t.textContent.slice(b.textContent.length + 1), [s.querySelector('.cal-date').textContent, b.textContent,
+    s.querySelector('.cal-date').matches('.red'), b.matches('.cal-verdict'), !!s.querySelector('.cal-foot')], s.getAttribute('aria-label'), s.inert]; })"""
 # the sheet of a day in facts.js
 FACT = "when => import('./js/views/facts.js').then(f => f.sheetOn(new Date(when)).sheet)"
-# the badge on the date's line at its end, the text never under it
+# the date alone on its line, the text below it across the sheet, the sheet as wide as the cards
 PLACED = """(() => { const s = document.querySelector('#home .calsheet'), r = q => s.querySelector(q).getBoundingClientRect(),
-    date = r('.cal-date'), badge = r('.badge'), text = r('.cal-text');
-  return [Math.abs(date.top + date.bottom - badge.top - badge.bottom) < 4, badge.left > date.right, text.right <= badge.left]; })()"""
+    date = r('.cal-date'), text = r('.cal-text'), box = s.getBoundingClientRect(), card = document.querySelector('#home .card').getBoundingClientRect(),
+    pad = parseFloat(getComputedStyle(s).paddingLeft) + parseFloat(getComputedStyle(s).paddingRight);
+  return [text.top >= date.bottom, Math.abs(text.width - (box.width - pad)) < 1, Math.abs(box.width - card.width) < 1]; })()"""
 REDRAW = "import('./js/views/home.js').then(h => h.renderHome())"
 
 
@@ -1666,15 +1667,15 @@ async def test_calendar(browser, url):
     monday = await pg.evaluate(FACT, '2026-09-28T12:00:00+02:00')
     await tap(pg, '#home .calsheet')
     check(
-        first == [[monday['text'], ['Montag • 28. Sept.', 'Katzenlogik', False, False], None, False]]
+        first == [[monday['text'], ['Montag, 28. September', 'Katzenlogik:', False, False, False], None, False]]
         and await pg.evaluate(SHEETS) == first
         and await state(pg, 'prefs.sheetDay') == '2026-09-28',
-        f'first use: Monday’s Katzenlogik with its badge, nothing hanging over it, a tap does nothing {first}',
+        f'first use: Monday’s Katzenlogik, nothing hanging over it, a tap does nothing {first}',
     )
     order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calpad') ? 'cal' : e.dataset.sec || '')")
     check(order.index('cal') == order.index('overview') + 1, f'right under the overview {order}')
     placed = await pg.evaluate(PLACED)
-    check(placed == [True, True, True], f'the badge on the date’s line at its end, the text never under it {placed}')
+    check(placed == [True, True, True], f'the date as its heading, the text below across the sheet, as wide as the cards {placed}')
 
     await day_at(pg, '2026-09-29T08:00:00+02:00')  # Tuesday morning
     morning = await pg.evaluate(SHEETS)
@@ -1682,14 +1683,14 @@ async def test_calendar(browser, url):
     await pg.click('#home .calsheet[data-action=tear]')
     swapped = await pg.evaluate(SHEETS)
     await idle(pg)
-    front = [tuesday['text'], ['Dienstag • 29. Sept.', 'Stimmt’s?', False, False], 'Auflösung zeigen', False]
+    front = [tuesday['text'], ['Dienstag, 29. September', 'Stimmt’s?', False, False, False], 'Auflösung zeigen', False]
     check(
         morning
         == [
             [*front[:3], True],
-            [monday['text'], ['Montag • 28. Sept.', 'Abreißen', False, False], 'Gestriges Blatt abreißen', False],
+            [monday['text'], ['Montag, 28. September', 'Katzenlogik:', False, False, True], 'Gestriges Blatt abreißen', False],
         ],
-        f'a new day: yesterday’s sheet hangs over today’s as it was, its badge saying to tear it off {morning}',
+        f'a new day: yesterday’s sheet hangs over today’s as it was, its foot saying to tear it off {morning}',
     )
     check(
         swapped == [front] and await state(pg, 'prefs.sheetDay') == '2026-09-29',
@@ -1705,10 +1706,10 @@ async def test_calendar(browser, url):
     await pg.keyboard.press('Enter')
     await idle(pg)
     check(
-        answer == [[tuesday['back'], ['Dienstag • 29. Sept.', tuesday['verdict'], False, True], 'Behauptung zeigen', False]]
+        answer == [[tuesday['back'], ['Dienstag, 29. September', tuesday['verdict'] + '.', False, True, False], 'Behauptung zeigen', False]]
         and kept == answer
         and await pg.evaluate(SHEETS) == [front],
-        f'today’s Stimmt’s? turns over to the verdict in its badge above the answer, which stays, and back, by tap or Enter {answer}',
+        f'today’s Stimmt’s? turns over to its answer led by the verdict, which stays, and back, by tap or Enter {answer}',
     )
 
     await day_at(pg, '2026-08-08T12:00:00+02:00')  # a Saturday, the clock put back
@@ -1718,15 +1719,15 @@ async def test_calendar(browser, url):
     away = await pg.evaluate(SHEETS)
     await tap(pg, '#home .calsheet[data-action=tear]')
     check(
-        saturday == [[own['text'], ['Samstag • 8. Aug.', 'Sprache', False, False], None, False]]
-        and away[1:] == [[own['text'], ['Samstag • 8. Aug.', 'Abreißen', False, False], 'Gestriges Blatt abreißen', False]]
+        saturday == [[own['text'], ['Samstag, 8. August', 'Sprache:', False, False, False], None, False]]
+        and away[1:] == [[own['text'], ['Samstag, 8. August', 'Sprache:', False, False, True], 'Gestriges Blatt abreißen', False]]
         and len(await pg.evaluate(SHEETS)) == 1
         and await state(pg, "prefs.sheetDay === '2026-08-11' && !prefs.hiddenHints.some(k => k.startsWith('blatt:'))"),
         f'the clock put back: nothing hangs; days away, the last one seen hangs and the days between are gone {saturday} {away}',
     )
     await day_at(pg, '2026-10-04T12:00:00+02:00')
     sunday = (await pg.evaluate(SHEETS))[0][1]
-    check(sunday[0] == 'Sonntag • 4. Okt.' and sunday[2], f'red on Sundays {sunday}')
+    check(sunday[0] == 'Sonntag, 4. Oktober' and sunday[2], f'red on Sundays {sunday}')
 
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')
@@ -1762,7 +1763,7 @@ async def test_calendar(browser, url):
     await pg.click('#home .calsheet')
     moving = await pg.evaluate("document.querySelector('#home .calsheet').getAnimations().length")
     await pg.wait_for_selector('#home .calsheet.turned')
-    stamped = await pg.evaluate("document.querySelector('#home .verdict').getAnimations().map(a => a.animationName)")
+    stamped = await pg.evaluate("document.querySelector('#home .cal-verdict').getAnimations().map(a => a.animationName)")
     await idle(pg)
     check(
         moving and stamped == ['stamp'] and (await pg.evaluate(SHEETS))[0][0] == fact['back'],

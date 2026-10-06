@@ -274,27 +274,17 @@ function newsHTML() {
 // The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
 export const hasCat = () => db.pets.some(p => p.species === 'Katze');
 const calendarOn = () => prefs.calendar && hasCat();
-const BADGES = {
-  Katzenlogik: 'idea',
-  'Stimmt’s?': 'question',
-  Kurios: 'search',
-  Wissen: 'book',
-  Flachwitz: 'grin',
-  Sprache: 'speech',
-};
-const dateLine = d =>
-  `${d.toLocaleDateString('de-DE', {weekday: 'long'})} • ${d.toLocaleDateString('de-DE', {day: 'numeric', month: 'short'})}`;
-/* A day's sheet, the date red on Sundays, as on a real tear-off calendar. Today's Stimmt’s? turns over on a tap, its
-   back stamped with the verdict. */
+/* A day's sheet: the date as its heading, red on Sundays as on a real tear-off calendar, then the fact led by its
+   format. Today's Stimmt’s? turns over on a tap, its answer led by the verdict. */
 function face(date, hanging = false) {
   const {sheet, format} = sheetOn(date),
     back = !hanging && !!sheet.back && homeView.turned === sheet.id,
     d = new Date(date),
-    badge = hanging ? icon('down') + 'Abreißen' : back ? sheet.verdict : icon(BADGES[format]) + format;
+    lead = back ? `<b class="cal-verdict">${sheet.verdict}.</b>` : `<b>${format}${format.endsWith('?') ? '' : ':'}</b>`;
   return {
     label: hanging ? 'Gestriges Blatt abreißen' : sheet.back ? (back ? 'Behauptung zeigen' : 'Auflösung zeigen') : '',
-    html: `<span class="cal-date${d.getDay() ? '' : ' red'}">${dateLine(d)}</span><span class="badge framed${back ? ' verdict' : ''}">${badge}</span>
-      <p class="cal-text">${sheetText(sheet, catOf(db.pets), back)}</p>`,
+    html: `<p class="cal-date${d.getDay() ? '' : ' red'}">${d.toLocaleDateString('de-DE', {weekday: 'long', day: 'numeric', month: 'long'})}</p>
+      <p class="cal-text">${lead} ${sheetText(sheet, catOf(db.pets), back)}</p>${hanging ? `<p class="cal-foot">${icon('down')}Zum Abreißen tippen</p>` : ''}`,
   };
 }
 const tappable = (action, label) => ` role="button" tabindex="0" aria-label="${label}" data-action="${action}"`;

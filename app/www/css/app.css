@@ -1182,10 +1182,6 @@ dialog.sheet::after {
   color: var(--c);
 }
 /* a frame instead of the fill, for a badge on a ground of its own */
-.badge.framed {
-  background: none;
-  box-shadow: inset 0 0 0 var(--hairline) currentColor;
-}
 /* a meal still to rate asks for it, in the tone of what can be tapped */
 .badge.open {
   background: var(--accent-soft);
@@ -1653,7 +1649,7 @@ dialog.sheet::after {
 }
 .ov-text p {
   margin: 0;
-  font: var(--type-small);
+  font: var(--type-body);
 }
 .pet-label {
   display: flex;
@@ -1889,35 +1885,31 @@ dialog.sheet::after {
 .calpad > .calsheet {
   grid-area: 1 / 1;
 }
+/* the layers a shade towards the ink, so they show on the ground in light and dark */
 .calpad::before,
 .calpad::after {
   content: "";
   position: absolute;
-  left: 5px;
-  right: 5px;
-  bottom: -4px;
-  height: 24px;
+  left: var(--space-1h);
+  right: var(--space-1h);
+  bottom: calc(-1 * var(--space-1));
+  height: var(--space-6);
   border-radius: var(--radius-paper);
-  background: var(--paper);
-  filter: brightness(0.9);
+  background: color-mix(in srgb, var(--paper), var(--ink) 8%);
   z-index: -1;
 }
 .calpad::after {
-  left: 10px;
-  right: 10px;
-  bottom: -8px;
-  filter: brightness(0.8);
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(-1 * var(--space-2));
+  background: color-mix(in srgb, var(--paper), var(--ink) 16%);
   z-index: -2;
 }
-/* the date and the format's badge on one line, the text under the date; the text lines up with a card's */
+/* as wide as a card and set like one: the date as its heading, then the fact */
 .calsheet {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  align-content: start; /* a sheet as tall as the one beside it keeps its rows */
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-4) calc(var(--gutter) - var(--space-1h));
+  display: block;
+  padding: var(--space-5) var(--gutter);
   background: var(--paper-grain), var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
@@ -1928,15 +1920,28 @@ dialog.sheet::after {
   outline-offset: calc(-1 * var(--space-1));
 }
 .cal-date {
-  font: var(--type-caption-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--paper-muted);
+  margin: 0 0 var(--space-2);
+  font: var(--type-heading);
+  text-box: trim-start cap alphabetic;
 }
 .cal-text {
-  grid-column: 1;
   margin: 0;
-  font: var(--type-small);
+  font: var(--type-body);
+}
+.cal-verdict {
+  display: inline-block; /* so it can be pressed on */
+}
+.cal-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1h);
+  margin: var(--space-3) 0 0;
+  font: var(--type-small-strong);
+  color: var(--paper-muted);
+}
+.cal-foot .ic {
+  width: var(--icon-s);
+  height: var(--icon-s);
 }
 
 /* == Views == */
@@ -1944,19 +1949,19 @@ dialog.sheet::after {
   margin: 0;
   color: var(--ink);
 }
-.card + .card,
-.calpad + .card {
+.card + .card {
   margin-top: var(--space-4);
 }
 .calpad {
-  margin: var(--space-4) var(--space-1h) 0;
+  margin-top: var(--space-4);
 }
-.calsheet .badge {
-  color: var(--paper-muted);
+/* the paper layers reach 8 below the sheet, so the card keeps 16 from them */
+.calpad + .card {
+  margin-top: var(--space-6);
 }
 /* Sundays and the verdict, as printed on a tear-off calendar */
 .cal-date.red,
-.calsheet .verdict {
+.cal-verdict {
   color: var(--paper-red);
 }
 .group + .group {
@@ -2541,7 +2546,8 @@ html.step-back::view-transition-new(page) {
   animation: turnBack calc(var(--dur-step) / 2) var(--ease-out);
 }
 /* once the back faces up, its verdict is pressed on: large and pale, then small and full */
-.calsheet.turned .verdict {
+.calsheet.turned .cal-verdict {
+  transform-origin: 0 50%;
   animation: stamp var(--dur-fade) var(--ease-in) calc(var(--dur-step) / 2) both;
 }
 .slider-thumb > .picked,
