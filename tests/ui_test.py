@@ -1876,9 +1876,17 @@ async def test_calendar(browser, url):
     over = await pg.screenshot(clip=card)
     await pg.evaluate("document.querySelector('#home .calsheet.torn').style.visibility = 'hidden'")
     bare = await pg.screenshot(clip=card)
+    await pg.evaluate("""() => { const start = document.startViewTransition.bind(document);
+      document.startViewTransition = run => { const t = start(run); t.ready.then(() => { window.__edges = document.getAnimations()
+        .map(a => a.effect?.pseudoElement || '').filter(p => /group\\(edge-/.test(p)); }); return t; }; }""")
     await pg.evaluate("(s => { s.style.visibility = ''; s.getAnimations().forEach(a => a.play()); })(document.querySelector('#home .calsheet.torn'))")
     await idle(pg)
     check(over != bare, 'the sheet torn off falls over the card below, not behind it')
+    edges = await pg.evaluate('window.__edges')
+    check(
+        edges and {'::view-transition-group(edge-top)', '::view-transition-group(edge-bottom)'} <= set(edges),
+        f'while the page redraws after it, the soft edges at the top and bottom stay over the cards {edges}',
+    )
     check(
         len(await pg.evaluate(SHEETS)) == 1 and await state(pg, 'prefs.sheetDay') == '2026-09-30',
         'once it has fallen, today’s sheet is left',

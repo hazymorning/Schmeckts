@@ -206,7 +206,9 @@ body::after {
   left: 0;
   right: 0;
 }
+/* named, so a view transition keeps the edges over the cards it moves */
 body::before {
+  view-transition-name: edge-top;
   --from: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --over: var(--space-7);
   top: 0;
@@ -220,6 +222,7 @@ body::before {
   opacity: 1;
 }
 body::after {
+  view-transition-name: edge-bottom;
   --to: to top;
   --from: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --over: calc(var(--control-l) + 2 * var(--space-5));
