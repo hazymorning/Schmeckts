@@ -1,118 +1,78 @@
-/* The overview card's sentence by pool: the moment of the day (momentOf() in views/overview.js) or a moment after a
-   meal was left. Facts first, said as people say them. {time} and {span} come bold, so a sentence holds only one of
-   them; a sentence is only taken when the card knows all it names, {Sie} and {sie} the sex of the one pet shown.
-   {when} is the last meal's time with its day, {what} its flavours, {count} today's meals as „zweimal“, {nth} the next
-   meal's place today as „dritte“. */
-export const POOLS = {
+/* The overview card's words: a sentence on the last meal for the moment, then one fact of the day. Facts first, said
+   as people say them, the cat by its pronoun where its sex is known. A wording is only taken when the card knows all
+   it names. {ago} is the last meal's time as „vor 2 Stunden“ or „gestern um 19:28“ (bold), {Ago} the same at the
+   start of a sentence, {what} its flavours, {said} how it went for the one cat („fast alles gefressen“), {all} the
+   same for several („beide haben gut gefressen“). */
+export const ANCHORS = {
   none: [
     'Noch ist nichts eingetragen. Tipp unten auf „Füttern“, sobald es was gibt.',
     'Das Tagebuch ist noch leer. Die erste Mahlzeit trägst du über „Füttern“ ein.',
-    'Sobald du fütterst, steht hier, wann es zuletzt was gab.',
-  ],
-  fresh: [
-    'Eben gab’s {what}. Guten Appetit!',
-    'Vor {span} gab’s {what}. Weiter geht’s gegen {time}.',
-    'Gerade gefüttert, heute schon {count}.',
-    '{Sie} hat eben {what} bekommen. Guten Appetit!',
-    'Frisch gefüttert. Das {meal} gibt’s gegen {time}.',
-    'Gerade gefüttert. Guten Appetit!',
-  ],
-  freshTreat: [
-    'Eben gab’s einen Snack. Das {meal} gibt’s gegen {time}.',
-    'Ein Snack zwischendurch. Die letzte Mahlzeit ist {span} her.',
-    'Eben gab’s einen Snack, heute schon den {nthTreat}.',
-    'Snackpause. Gefüttert wird wieder gegen {time}.',
-    'Eben gab’s einen Snack zwischendurch.',
-  ],
-  due: [
-    'Zeit fürs {meal}, das gibt’s meist gegen {time}.',
-    'Zeit fürs {meal}. Die letzte Mahlzeit ist {span} her.',
-    'Das {meal} ist dran. Zuletzt gab’s {what}, vor {span}.',
-    '{Sie} wartet bestimmt schon aufs {meal}.',
-    'Zeit fürs {meal}, heute die {nth} Mahlzeit.',
-    'Das {meal} ist fällig, meist gibt’s das gegen {time}.',
-  ],
-  dueFirst: [
-    'Zeit fürs {meal}. Heute gab’s noch nichts.',
-    'Heute gab’s noch nichts, das {meal} gibt’s meist gegen {time}.',
-    'Das {meal} ist dran. Zuletzt gab’s {when} {what}.',
-    '{Sie} hat heute noch nichts bekommen. Zeit fürs {meal}.',
-    'Zeit fürs {meal}, die letzte Mahlzeit war {when}.',
-  ],
-  later: [
-    'Heute schon {count} gefüttert. Weiter geht’s gegen {time}.',
-    'Zuletzt gab’s vor {span} {what}. Das {meal} gibt’s gegen {time}.',
-    'Die letzte Mahlzeit ist {span} her. Das {meal} gibt’s gegen {time}.',
-    'Bis zum {meal} gegen {time} ist Pause. Zuletzt gab’s {what}.',
-    '{Sie} hat vor {span} {what} bekommen. Weiter geht’s gegen {time}.',
-    'Gegen {time} gibt’s {meal}, heute die {nth} Mahlzeit.',
-    'Weiter geht’s gegen {time}.',
-  ],
-  morning: [
-    'Heute gab’s noch nichts. Das {meal} gibt’s meist gegen {time}.',
-    'Das {meal} gibt’s meist gegen {time}. Zuletzt gab’s {when} {what}.',
-    '{Sie} bekommt das {meal} meist gegen {time}.',
-    'Noch ist der Napf leer, das {meal} gibt’s meist gegen {time}.',
-    'Die letzte Mahlzeit war {when}. Das {meal} gibt’s meist gegen {time}.',
-  ],
-  done: [
-    'Heute {count} gefüttert. Morgen geht’s gegen {time} weiter.',
-    'Für heute ist alles gefüttert. Das {meal} gibt’s morgen gegen {time}.',
-    'Zuletzt gab’s {what}, {when}. Morgen geht’s gegen {time} weiter.',
-    '{Sie} hat heute {count} was bekommen. Morgen gegen {time} geht’s weiter.',
-    'Feierabend am Napf. Das {meal} gibt’s morgen gegen {time}.',
-  ],
-  night: [
-    'Zuletzt gab’s {when} {what}. Das {meal} gibt’s gegen {time}.',
-    'Die letzte Mahlzeit war {when}. Weiter geht’s gegen {time}.',
-    'Jetzt ist Nachtruhe. Das {meal} gibt’s gegen {time}.',
-    'Bis zum {meal} gegen {time} wird geschlafen.',
-    '{Sie} hat zuletzt {when} was bekommen. Das {meal} gibt’s gegen {time}.',
-  ],
-  today: [
-    'Heute schon {count} gefüttert, zuletzt vor {span}.',
-    'Zuletzt gab’s vor {span} {what}.',
-    'Die letzte Mahlzeit ist {span} her.',
-    '{Sie} hat vor {span} zuletzt was bekommen.',
-    'Heute gab’s schon was, jetzt ist erst mal Pause.',
-  ],
-  yesterday: [
-    'Heute ist noch nichts eingetragen. Zuletzt gab’s {when} {what}.',
-    'Die letzte Mahlzeit war {when}. Heute fehlt noch ein Eintrag.',
-    'Heute ist noch nichts eingetragen.',
-  ],
-  lastNight: [
-    'Zuletzt gab’s {when} {what}.',
-    'Die letzte Mahlzeit war {when}.',
-    'Jetzt ist Nachtruhe, zuletzt gab’s {when} was.',
+    'Sobald du fütterst, steht hier, wie der Tag am Napf läuft.',
   ],
   older: [
     'Der letzte Eintrag ist {days} her. Schön, dass du wieder da bist.',
     'Zuletzt eingetragen war {what}, {date}.',
     'Eine Weile gab’s keinen Eintrag. Mit der nächsten Mahlzeit geht’s weiter.',
   ],
-  leftDue: [
-    'Zeit fürs {meal}. Zuletzt blieb fast alles stehen, vielleicht passt eine andere Sorte.',
-    'Das {meal} ist dran. Beim letzten Mal blieb viel übrig.',
-    'Zeit fürs {meal}. Die letzte Mahlzeit kam nicht gut an.',
+  fresh: [
+    'Eben gab’s {what}. Guten Appetit!',
+    '{Sie} hat eben {what} bekommen. Guten Appetit!',
+    'Gerade gefüttert: {what}.',
+    'Gerade gefüttert. Guten Appetit!',
   ],
-  leftLater: [
-    'Zuletzt blieb fast alles stehen. Gegen {time} gibt’s einen neuen Versuch.',
-    'Die letzte Mahlzeit kam nicht gut an. Das {meal} gibt’s gegen {time}.',
+  // a variety's first time, in place of fresh and last
+  firstFresh: [
+    'Eben gab’s zum ersten Mal {variety}. Guten Appetit!',
+    'Premiere im Napf: Eben gab’s zum ersten Mal {variety}.',
   ],
-  leftDone: [
-    'Die letzte Mahlzeit blieb fast stehen. Morgen gegen {time} gibt’s einen neuen Versuch.',
-    'Zuletzt kam die Sorte nicht gut an. Morgen geht’s gegen {time} weiter.',
+  firstLast: [
+    'Zum ersten Mal gab’s heute {variety}: {said}.',
+    '{Sie} hat {ago} zum ersten Mal {variety} bekommen und {said}.',
+    'Heute gab’s zum ersten Mal {variety}: {all}.',
+    'Heute gab’s zum ersten Mal {variety}.',
   ],
-  leftToday: [
-    'Die letzte Mahlzeit vor {span} blieb fast stehen.',
-    'Vor {span} blieb fast alles im Napf.',
-    'Die letzte Mahlzeit kam nicht gut an.',
+  freshTreat: [
+    'Eben gab’s einen Snack, heute schon den {nthTreat}.',
+    'Eben gab’s einen Snack zwischendurch.',
+    '{Sie} hat eben einen Snack bekommen.',
+  ],
+  notYet: [
+    'Heute gab’s noch keine Mahlzeit, zuletzt {ago} {what}.',
+    'Heute ist noch nichts eingetragen. Zuletzt gab’s {ago} {what}.',
+    '{Sie} hat heute noch nichts bekommen, zuletzt {ago} {what}.',
+    'Heute gab’s noch keine Mahlzeit, die letzte war {ago}.',
+  ],
+  last: [
+    '{Sie} hat {ago} {what} bekommen und {said}.',
+    '{Ago} gab’s {what}: {said}.',
+    'Zuletzt gab’s {ago} {what}: {said}.',
+    '{Ago} gab’s {what}: {all}.',
+    'Zuletzt gab’s {ago} {what}.',
+    '{Ago} gab’s {what}.',
+    'Zuletzt im Napf: {what}, {ago}.',
+    '{Sie} hat {ago} zuletzt {what} bekommen.',
+    'Die letzte Mahlzeit war {ago}: {said}.',
+    'Die letzte Mahlzeit war {ago}.',
   ],
 };
 
-// added after the sentence where there is room: today's treats, or none yet where they are usual
-export const TREAT_LINES = {
-  some: ['Dazu gab’s {treats}.', 'Außerdem gab’s heute {treats}.', 'Dazu gab’s heute {treats}.'],
-  none: ['Noch kein Snack heute.', 'Ein Snack steht noch aus.', 'Snack gab’s heute noch keinen.'],
+/* The second sentence. Notable facts come first where there are any, in the order of NOTABLE; the others take
+   turns. */
+export const FACTS = {
+  noted: ['Heute notiert: {noted}.', 'Heute schon notiert: {noted}.'],
+  streakLeft: [
+    'Die letzten {k} Mahlzeiten blieben fast stehen.',
+    '{Sie} hat die letzten {k} Mahlzeiten stehen lassen.',
+  ],
+  treatsNone: ['Einen Snack gab’s heute noch nicht.', '{Sie} hatte heute noch keinen Snack.', 'Noch kein Snack heute.'],
+  streakGood: [
+    'Die letzten {k} Mahlzeiten gingen alle gut weg.',
+    '{Sie} hat die letzten {k} Mahlzeiten alle gut gefressen.',
+  ],
+  week: ['Diese Woche {good} von {n} Mal gut gefressen.', '{Sie} hat diese Woche {good} von {n} Mal gut gefressen.'],
+  favourite: ['Am liebsten frisst {sie} gerade {fav}.', 'Liebling gerade: {fav}.', '{fav} ist gerade {ihr} Liebling.'],
+  treats: ['Heute gab’s schon {treats}.', '{Sie} hatte heute schon {treats}.'],
+  count: ['Heute gab’s schon {count} Mahlzeiten.', '{Sie} hat heute schon {count} Mahlzeiten bekommen.'],
+  sorts: ['Diese Woche gab’s schon {sorts} verschiedene Sorten.'],
 };
+export const NOTABLE = ['noted', 'streakLeft', 'treatsNone'];

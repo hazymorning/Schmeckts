@@ -5,10 +5,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {glance} from '../app/www/js/glance.js';
 import {nextMeal} from '../app/www/js/smart.js';
-import {addDays} from '../app/www/js/dates.js';
-import {catOf, factOn, fill, formatOn, hangingDay, sharesWord, sheetOn, sheetText} from '../app/www/js/views/facts.js';
+import {addDays, dayStart} from '../app/www/js/dates.js';
+import {catOf, factOn, formatOn, hangingDay, sharesWord, sheetOn, sheetText} from '../app/www/js/views/facts.js';
 import {FACTS} from '../app/www/js/content/facts.js';
-import {POOLS, TREAT_LINES} from '../app/www/js/content/pools.js';
+import {ANCHORS, FACTS as DAY_FACTS, NOTABLE} from '../app/www/js/content/pools.js';
 
 // views/overview.js reaches for the page as it loads; in Node a stub answers every such call
 const stub = new Proxy(function () {}, {
@@ -20,7 +20,7 @@ Object.assign(globalThis, {window: globalThis, document: stub, matchMedia: stub,
 const stored = {'schmeckts-prefs': JSON.stringify({torn: 3})};
 globalThis.localStorage = {getItem: k => stored[k] ?? null, setItem: (k, v) => (stored[k] = v), removeItem: () => {}};
 const {prefs, replaceDb} = await import('../app/www/js/store.js');
-const {headOf, poolOf, sentenceOf, valuesOf} = await import('../app/www/js/views/overview.js');
+const {factsOf, headOf, momentOf, sentenceOf, valuesOf} = await import('../app/www/js/views/overview.js');
 
 const at = text => new Date(text).getTime();
 const NOW = at('2026-06-10T12:00');
@@ -93,6 +93,46 @@ test('the glance: the newest serving and the newest meal of the pets shown up to
   );
 });
 
+test('the glance: how the last meal went, a variety’s first time, the rated meals in a row that went one way, the week, today’s notes', () => {
+  const db = household(
+    ['nass', 'neu', snack],
+    [
+      ['nass', 'A', '03 07:00', '', 'schlecht'],
+      ['nass', 'A', '04 07:00', '', 'top'],
+      ['nass', 'A', '05 07:00', '', 'gut'],
+      ['nass', 'A', '06 07:00', '', 'schlecht'],
+      ['nass', 'A', '07 07:00', '', 'top'],
+      ['nass', 'A', '08 07:00', '', 'top'],
+      ['nass', 'A', '09 07:00', '', 'gut'],
+      ['snack', 'A', '10 06:00', '', 'verputzt'],
+      ['neu', 'A', '10 07:00', ''],
+    ],
+    ['A'],
+  );
+  db.observations = [
+    {id: 'o1', kind: 'happy', at: at(day(10, '08:00')), pets: {A: true}},
+    {id: 'o2', kind: 'vomit', at: at(day(9, '08:00')), pets: {A: true}},
+  ];
+  const g = glance(db, ['A'], NOW);
+  assert.deepEqual(
+    [g.meal.productId, g.outcome, g.rating, g.first, g.streak, g.week, g.noted, g.meals, g.treats],
+    ['neu', null, null, true, {kind: 'good', n: 3}, {n: 6, good: 5, sorts: 2}, ['happy'], 1, 1],
+  );
+  const rated = glance(db, ['A'], at(day(9, '12:00')));
+  assert.deepEqual(
+    [rated.meal.productId, rated.outcome, rated.rating, rated.first],
+    ['nass', 'good', 'gut', false],
+    'the day before: the last meal rated, a variety served before',
+  );
+  db.servings.find(s => s.productId === 'neu').pets.A.r = 'sosse';
+  assert.deepEqual((x => [x.outcome, x.rating, x.left, x.streak])(glance(db, ['A'], NOW)), [
+    'left',
+    'sosse',
+    true,
+    {kind: 'left', n: 1},
+  ]);
+});
+
 test('the next usual meal: later today, due while nothing has been served for it, tomorrow once today is over', () => {
   const week = [3, 4, 5, 6, 7, 8, 9].flatMap(d => [
     ['nass', 'A', `${String(d).padStart(2, '0')} 07:15`, ''],
@@ -142,166 +182,166 @@ test('a heading and a sentence share a word when a content word or a name comes 
   for (const [a, b] of apart) assert.ok(!sharesWord(a, b), `${a} | ${b}`);
 });
 
-const MINKA = 'minka00001';
-const HOME = {
-  version: 3,
-  pets: [{id: MINKA, name: 'Minka', species: 'Katze', createdAt: 1}],
-  products: [
-    {id: 'lachs00001', brand: 'Sheba', variety: 'Lachs', type: 'Nassfutter', codes: {}},
-    {id: 'paste00001', brand: 'Sheba', variety: 'Feine Pastete', type: 'Nassfutter', codes: {}},
-    {id: 'snack00001', brand: 'Dreamies', variety: 'Huhn', type: 'Snack', codes: {}},
-  ],
-  servings: [],
-  observations: [],
-};
+const MAU = 'mau0000001';
+const PRODUCTS = [
+  {id: 'lamm000001', brand: 'Catz', variety: 'Lamm mit Nachtkerzenöl', type: 'Nassfutter', codes: {}},
+  {id: 'huhn000001', brand: 'Bozita', variety: 'Huhn & Pute in Soße', type: 'Nassfutter', codes: {}},
+  {id: 'pferd00001', brand: 'Catz', variety: 'Pferd mit Nachtkerzenöl', type: 'Nassfutter', codes: {}},
+  {id: 'paste00001', brand: 'Sheba', variety: 'Feine Pastete', type: 'Nassfutter', codes: {}},
+  {id: 'snack00001', brand: 'Dreamies', variety: 'Käse', type: 'Snack', codes: {}},
+];
 const t = (when, days = 0) => addDays(at(`2026-06-09T${when}`), days); // a Tuesday
-const served = (when, days = 0, productId = 'lachs00001') => ({
-  id: 'last' + when,
-  productId,
-  servedAt: t(when, days),
-  pets: {[MINKA]: {r: null}},
-});
-/* A glance and a time for every pool: rich names all a sentence can name, bare as little as the moment allows. meal is
-   the last serving unless that was a treat. */
-const glanceOf = (last, next, rich, x = {}) => ({
-  last,
-  meal: last?.productId === 'snack00001' ? served('07:20') : last,
-  next,
-  ...(rich
-    ? {meals: 3, treats: 2, sex: 'f'}
-    : {
-        meals: 0,
-        treats: 0,
-        sex: null,
-        ...(last && {last: {...last, productId: last.productId === 'snack00001' ? last.productId : 'paste00001'}}),
-      }),
-  ...x,
-});
-const MOMENTS = {
-  due: [served('07:20'), {at: 1110, due: true}, t('18:40'), {}],
-  dueFirst: [served('18:00', -1), {at: 435, due: true}, t('07:30'), {meals: 0}],
-  fresh: [served('11:40'), {at: 1110}, t('12:00'), {}],
-  freshTreat: [served('11:40', 0, 'snack00001'), {at: 1110}, t('12:00'), {}],
-  later: [served('07:20'), {at: 1110}, t('12:00'), {}],
-  morning: [served('18:00', -1), {at: 435}, t('06:00'), {meals: 0}],
-  done: [served('18:30'), {at: 435, tomorrow: true}, t('21:00'), {}],
-  night: [served('18:00', -1), {at: 435}, t('02:00'), {meals: 0}],
-  today: [served('07:20'), null, t('12:00'), {}],
-  yesterday: [served('18:00', -1), null, t('12:00'), {meals: 0}],
-  lastNight: [served('18:00', -1), null, t('02:00'), {meals: 0}],
-  older: [served('18:00', -3), {at: 435}, t('12:00'), {meals: 0}],
-  none: [null, {at: 435}, t('12:00'), {meals: 0}],
-};
-for (const [pool, moment] of Object.entries({leftDue: 'due', leftLater: 'later', leftDone: 'done', leftToday: 'today'}))
-  MOMENTS[pool] = [...MOMENTS[moment].slice(0, 3), {...MOMENTS[moment][3], left: true}];
-const stateOf = (pool, rich) => {
-  const [last, next, now, x] = MOMENTS[pool];
-  return [glanceOf(last, next, rich, rich ? x : {...x, meals: 0}), now];
-};
+// two weeks of a meal at 7:15 and one at 18:30, rated, treats on two days of three
+const WEEKS = Array.from({length: 14}, (_, i) => -14 + i).flatMap(d => [
+  ['lamm000001', t('07:15', d), d % 4 ? 'top' : 'mittel'],
+  ['huhn000001', t('18:30', d), 'gut'],
+  ...(d % 3 ? [['snack00001', t('15:00', d), 'verputzt']] : []),
+]);
+/* the card for one cat or several: meals as [variety, time, rating], then the glance as overviewHTML() makes it */
+function home(meals, now, {sex = null, cats = 1, notes = [], favourite = 'Rind in Gelee'} = {}) {
+  const pets = Array.from({length: cats}, (_, i) => ({
+      id: i ? `cat${i}000001` : MAU,
+      name: i ? `Kater${i}` : 'Mau',
+      createdAt: 1,
+      ...(sex && !i && {sex}),
+    })),
+    ids = pets.map(p => p.id),
+    db = {
+      version: 3,
+      pets,
+      products: PRODUCTS,
+      servings: meals
+        .map(([productId, when, r = null], i) => ({
+          id: 'serv' + String(i).padStart(5, '0'),
+          productId,
+          servedAt: when,
+          pets: Object.fromEntries(ids.map(id => [id, {r}])),
+        }))
+        .sort((a, b) => b.servedAt - a.servedAt),
+      observations: notes.map(([kind, when], i) => ({id: 'note' + i + '0000', kind, at: when, pets: {[MAU]: true}})),
+    };
+  replaceDb(db);
+  return [{...glance(db, ids, now), pets: cats, favourite}, now];
+}
 const keys = text => [...text.matchAll(/\{(\w+)\}/g)].map(([, k]) => k);
 const plain = html => html.replace(/<[^>]*>/g, '');
+const heads = ['', 'Mau heute', 'Ein Tag mit Mau', 'Nachtruhe bei Mau'];
+// a state for every anchor and fact, with and without a sex, one cat and two
+const STATES = {
+  none: home([], t('12:00')),
+  older: home(WEEKS, t('12:00', 3)),
+  fresh: home([...WEEKS, ['lamm000001', t('07:20')]], t('07:40'), {sex: 'f'}),
+  firstFresh: home([...WEEKS, ['pferd00001', t('07:20')]], t('07:40'), {sex: 'm'}),
+  freshTreat: home(
+    [...WEEKS, ['lamm000001', t('07:20')], ['snack00001', t('11:30')], ['snack00001', t('11:50')]],
+    t('12:00'),
+    {sex: 'f'},
+  ),
+  notYet: home(WEEKS, t('09:00'), {sex: 'f'}),
+  notYetPlain: home([...WEEKS, ['paste00001', t('18:40', -1)]], t('09:00')),
+  last: home([...WEEKS, ['lamm000001', t('07:20'), 'gut']], t('15:30'), {sex: 'f'}),
+  lastPlain: home([...WEEKS, ['paste00001', t('07:20')]], t('12:00')),
+  lastBoth: home([...WEEKS, ['lamm000001', t('07:20'), 'top']], t('12:00'), {cats: 2}),
+  lastLeft: home([...WEEKS, ['lamm000001', t('07:20'), 'sosse'], ['huhn000001', t('12:20'), 'schlecht']], t('16:00'), {
+    cats: 2,
+  }),
+  firstLast: home([...WEEKS, ['pferd00001', t('07:20'), 'top']], t('12:00'), {sex: 'f'}),
+  firstLastBoth: home([...WEEKS, ['pferd00001', t('07:20'), 'top']], t('12:00'), {cats: 2}),
+  night: home(WEEKS, t('01:00'), {sex: 'm'}),
+  noted: home([...WEEKS, ['lamm000001', t('07:20'), 'gut']], t('16:00'), {
+    notes: [
+      ['happy', t('09:00')],
+      ['stink', t('10:00')],
+    ],
+  }),
+  bare: home([['lamm000001', t('07:20'), 'gut']], t('12:00'), {favourite: null}),
+};
 
-test('the overview pools: each one the card reaches, every wording in use, none naming what the card lacks; a sentence holds one bold and stays short', () => {
-  replaceDb(structuredClone(HOME));
-  assert.deepEqual(Object.keys(MOMENTS).sort(), Object.keys(POOLS).sort());
-  for (const pool of Object.keys(POOLS)) {
-    const [rich, now] = stateOf(pool, true),
-      [bare] = stateOf(pool, false),
-      all = valuesOf(rich, now),
-      few = valuesOf(bare, now);
-    assert.equal(poolOf(rich, now), pool);
-    assert.equal(poolOf(bare, now), pool);
-    for (const x of POOLS[pool]) {
-      assert.ok(
-        keys(x).every(k => all[k] != null),
-        `${pool}: ${x} is never said`,
-      );
-      const said = fill(x, all);
-      assert.ok(plain(said).length <= 100, `${pool}: ${said}`);
+test('the overview card: every anchor and every wording of it in use; only what the card knows is named, one bold a sentence, short', () => {
+  const used = new Set();
+  for (const [name, [g, now]] of Object.entries(STATES)) {
+    const values = valuesOf(g, now);
+    for (const [pool, list] of Object.entries(ANCHORS))
+      for (const x of list) if (keys(x).every(k => values[k] != null)) used.add(`${pool}|${x}`);
+    for (const head of heads) {
+      const said = sentenceOf(g, now, head);
+      assert.ok(said && !/[{}]|undefined|null/.test(said), `${name}: ${said}`);
+      assert.ok(plain(said).length <= 120, `${name}: ${said}`);
       for (const sentence of said.split(/(?<=[.!?])\s/)) assert.ok((sentence.match(/<b>/g) || []).length <= 1, said);
     }
-    assert.ok(
-      POOLS[pool].some(x => keys(x).every(k => few[k] != null)),
-      `${pool}: something for the bare moment`,
-    );
-    for (const head of ['', 'Minka heute', 'Ein Tag mit Minka'])
-      for (const g of [rich, bare]) assert.ok(!/[{}]/.test(sentenceOf(g, now, head)) && sentenceOf(g, now, head), pool);
   }
-  for (const line of [...TREAT_LINES.some, ...TREAT_LINES.none])
-    assert.ok(!/<b>/.test(line) && keys(line).every(k => k === 'treats'));
-});
-
-test('the overview sentence: facts of the last meal and the next, a meal left takes its own pool where there is one', () => {
-  replaceDb(structuredClone(HOME));
-  const pool = (name, x) => {
-    const [g, now] = stateOf(name, true);
-    return poolOf({...g, ...x}, now);
-  };
+  for (const [pool, list] of Object.entries(ANCHORS))
+    for (const x of list) assert.ok(used.has(`${pool}|${x}`), `${pool}: ${x} is never said`);
   assert.deepEqual(
+    Object.entries(STATES)
+      .filter(([name]) => !/Plain|Both|Left|noted|bare/.test(name))
+      .map(([name, [g, now]]) => [name, momentOf(g, now)]),
     [
-      pool('dueFirst', {left: true}),
-      pool('morning', {left: true}),
-      pool('fresh', {left: true}),
-      pool('night', {left: true}),
-      pool('done', {left: true}),
+      ['none', 'none'],
+      ['older', 'older'],
+      ['fresh', 'fresh'],
+      ['firstFresh', 'fresh'],
+      ['freshTreat', 'freshTreat'],
+      ['notYet', 'notYet'],
+      ['last', 'today'],
+      ['firstLast', 'today'],
+      ['night', 'night'],
     ],
-    ['leftDue', 'leftLater', 'fresh', 'night', 'leftDone'],
   );
-  const [night, at2] = stateOf('night', true),
-    shift = (x, i) => ({...x, servedAt: addDays(x.servedAt, i)}),
-    said = [...Array(8).keys()].map(i =>
-      plain(sentenceOf({...night, last: shift(night.last, i), meal: shift(night.meal, i)}, addDays(at2, i), '')),
-    );
-  assert.ok(
-    said.some(x => x.includes('gestern um 18:00')) && said.every(x => /7:15|gestern um 18:00|geschlafen/.test(x)),
-    `at night: when the last meal was, what comes next ${said}`,
-  );
-  const [later] = stateOf('later', true),
-    v = valuesOf(later, t('12:00'));
-  assert.deepEqual(
-    [v.span, v.what, v.count, v.nth, v.meal, v.time],
-    ['<b>5 Stunden</b>', 'Lachs', 'dreimal', 'vierte', 'Abendessen', '<b>18:30</b>'],
-  );
-  const first = valuesOf({...later, meals: 0, next: {at: 690}}, t('09:00')),
-    second = valuesOf({...later, meals: 1, next: {at: 690}}, t('09:00'));
-  assert.deepEqual([first.meal, second.meal], ['Frühstück', 'Mittagessen'], 'the first meal of a day is its breakfast');
 });
 
-test('the overview sentence: a wording stays for three hours and until the next serving, the next where it repeats a word of the heading', () => {
-  replaceDb(structuredClone(HOME));
-  const [g] = stateOf('later', true),
-    at3 = hour => t(`${String(hour).padStart(2, '0')}:00`);
-  assert.equal(sentenceOf(g, at3(12), ''), sentenceOf(g, at3(14), ''));
-  const allDay = [9, 12, 15, 18].map(h => sentenceOf(g, at3(h), '')),
-    fed = [0, 1, 2].map(n => sentenceOf({...g, meals: g.meals + n}, at3(12), ''));
+test('the overview card: the last meal with how it went, then one fact of the day, the notable ones first; never the schedule', () => {
+  const said = name => plain(sentenceOf(...STATES[name], ''));
+  assert.match(said('last'), /Lamm.*fast alles gefressen/);
+  assert.match(said('lastBoth'), /Lamm.*beide haben gut gefressen/);
+  assert.match(said('lastLeft'), /Huhn und Pute.*da blieb einiges stehen/);
+  assert.match(said('firstFresh'), /zum ersten Mal Pferd mit Nachtkerzenöl/);
+  assert.match(said('firstLast'), /zum ersten Mal Pferd mit Nachtkerzenöl.*alles gefressen/);
+  assert.match(said('night'), /gestern um 18:30 Huhn und Pute/);
+  assert.match(said('notYet'), /(nichts bekommen|keine Mahlzeit|nichts eingetragen).*gestern um 18:30 Huhn und Pute/);
+  assert.match(said('noted'), /Heute (schon )?notiert: „Gut drauf“ und „Stunk“\./);
+  assert.match(said('older'), /Der letzte Eintrag ist 3 Tage her|eingetragen war Huhn und Pute|keinen Eintrag/);
+  assert.deepEqual(factsOf(...STATES.lastLeft, 'today'), ['streakLeft', 'treatsNone'], 'only the notable ones');
+  assert.match(said('lastLeft'), /Die letzten zwei Mahlzeiten blieben fast stehen\./, 'two left in a row come first');
+  assert.deepEqual(factsOf(...STATES.last, 'today'), ['treatsNone'], 'an afternoon without the usual treat');
+  assert.deepEqual(factsOf(...STATES.bare, 'today'), [], 'a first day has no facts yet');
+  const plenty = factsOf(...STATES.firstLast, 'today');
+  assert.ok(
+    ['streakGood', 'week', 'favourite', 'sorts'].every(k => plenty.includes(k)) &&
+      !plenty.some(k => NOTABLE.includes(k)),
+    `${plenty}`,
+  );
+  for (const [g, now] of Object.values(STATES))
+    for (let h = 0; h < 24; h += 3)
+      assert.ok(!/gegen|Uhr/.test(plain(sentenceOf(g, now + h * 36e5, ''))), 'no time to come');
+  for (const [kind, list] of Object.entries(DAY_FACTS)) assert.ok(list.length, kind);
+});
+
+test('the overview card: a wording stays for three hours and until something is served or noted, the day sees several', () => {
+  const [g, now] = STATES.firstLast,
+    hour = h => addDays(dayStart(now), 0) + h * 36e5;
+  const shape = h => plain(sentenceOf(g, hour(h), '')).replace(/\d+/g, '#');
+  assert.equal(shape(12), shape(13.8), 'within the stretch only the hours go on');
+  const allDay = [9, 12, 15, 18, 21].map(h => sentenceOf(g, hour(h), '')),
+    fed = [0, 1, 2].map(n => sentenceOf({...g, meals: g.meals + n}, hour(12), ''));
   assert.ok(new Set(allDay).size >= 3, `the wordings of a day ${allDay}`);
   assert.ok(new Set(fed).size >= 2, `a new meal, a new wording ${fed}`);
-  const chosen = sentenceOf(g, at3(12), ''),
-    word = plain(chosen)
-      .split(/[^\p{L}]+/u)
-      .find(w => w.length > 4);
-  assert.ok(!sharesWord(word, sentenceOf(g, at3(12), word)), `${word}: ${chosen}`);
 });
 
-test('the overview sentence: today’s treats where there is room, and none yet only in an afternoon where treats are usual', () => {
-  replaceDb(structuredClone(HOME));
-  const [g] = stateOf('later', false),
-    hour = h => t(`${String(h).padStart(2, '0')}:00`),
-    tail = (x, h) => {
-      const said = plain(sentenceOf({...g, ...x}, hour(h), ''));
-      return [...TREAT_LINES.some, ...TREAT_LINES.none].find(l =>
-        said.endsWith(fill(l, {treats: x.treats === 1 ? 'einen Snack' : 'zwei Snacks'})),
-      );
-    };
-  assert.ok(TREAT_LINES.some.includes(tail({treats: 1}, 12)), 'one treat');
-  assert.ok(TREAT_LINES.some.includes(tail({treats: 2}, 15)), 'two treats');
-  assert.ok(TREAT_LINES.none.includes(tail({treats: 0, treatsUsual: true}, 15)), 'none yet in the afternoon');
-  assert.equal(tail({treats: 0, treatsUsual: true}, 11), undefined, 'not in the morning');
-  assert.equal(tail({treats: 0, treatsUsual: false}, 15), undefined, 'not where treats are rare');
-  const [done, late] = stateOf('done', false);
+test('the overview card speaks of the cat as she or he only where its sex is known, and never starts two sentences that way', () => {
+  for (const [name, [g, now]] of Object.entries(STATES))
+    for (let d = 0; d < 14; d++) {
+      const said = plain(sentenceOf(g, addDays(now, d), '')),
+        starts = said.split(/(?<=[.!?])\s/).map(x => x.split(' ')[0]);
+      if (!g.sex) assert.ok(!/\b(Sie|Er|sie|er|ihr|sein)\b/.test(said), `${name}: ${said}`);
+      assert.ok(starts.filter(w => w === 'Sie' || w === 'Er').length <= 1, `${name}: ${said}`);
+    }
+  const said = [...Array(14).keys()].map(d =>
+    plain(sentenceOf(...STATES.last.map((x, i) => (i ? addDays(x, d) : x)), '')),
+  );
   assert.ok(
-    !TREAT_LINES.none.some(l => plain(sentenceOf({...done, treatsUsual: true}, late, '')).endsWith(l)),
-    'once the day’s meals are over, none yet is not said',
+    said.some(x => /\bSie\b|\bsie\b|\bihr\b/.test(x)),
+    `she ${said}`,
   );
 });
 
@@ -339,38 +379,9 @@ test('the overview heading: whose day it is, a wording a day, the night its own'
   assert.equal(new Set(days).size, 8, 'on a weekday its eight wordings in turn');
 });
 
-test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is known, she or he as it is', () => {
-  replaceDb(structuredClone(HOME));
-  const shown = (pets, ids) => glance({...household(['nass'], []), pets}, ids, NOW).sex,
-    f = {id: 'A', sex: 'f'},
-    m = {id: 'B', sex: 'm'};
-  assert.deepEqual(
-    [
-      shown([f], ['A']),
-      shown([m], ['B']),
-      shown([{id: 'A'}], ['A']),
-      shown([{id: 'A', sex: 'x'}], ['A']),
-      shown([f, m], ['A', 'B']),
-      shown([f, m], ['B']),
-    ],
-    ['f', 'm', null, null, null, 'm'],
-  );
-  for (const pool of Object.keys(POOLS)) {
-    const [g, now] = stateOf(pool, true),
-      named = POOLS[pool].filter(x => /\{sie\}/i.test(x)),
-      shift = (x, i) => x && {...x, servedAt: addDays(x.servedAt, i)},
-      on = (i, sex) => sentenceOf({...g, last: shift(g.last, i), meal: shift(g.meal, i), sex}, addDays(now, i), ''),
-      month = sex => [...Array(31).keys()].map(i => on(i, sex)),
-      as = (Sie, sie) => named.map(x => fill(x, {...valuesOf(g, now), Sie, sie})),
-      says = (list, forms) => list.some(said => forms.some(x => said.startsWith(x)));
-    assert.ok(!says(month(null), [...as('Sie', 'sie'), ...as('Er', 'er')]), pool);
-    assert.ok(!named.length || says(month('f'), as('Sie', 'sie')), `${pool}: she`);
-    assert.ok(!named.length || says(month('m'), as('Er', 'er')), `${pool}: he`);
-  }
-});
-
-test('a sentence in one piece', () => {
-  for (const [pool, list] of Object.entries(POOLS)) for (const x of list) assert.match(x, /^[^|[\]]+$/, pool);
+test('a wording in one piece', () => {
+  for (const list of [...Object.values(ANCHORS), ...Object.values(DAY_FACTS)])
+    for (const x of list) assert.match(x, /^[^|[\]]+$/);
 });
 
 const cat = (sex, name = 'Schnurrsula') => ({id: 'cat' + name, name, species: 'Katze', ...(sex && {sex})});

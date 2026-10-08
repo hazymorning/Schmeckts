@@ -328,7 +328,7 @@ export const NEWS = [
   {
     v: '0.37.0',
     title: 'Der Tag auf einen Blick',
-    say: 'Oben steht jetzt, wann es zuletzt was gab, was als Nächstes kommt und ob heute schon ein Snack dabei war.',
+    say: 'Oben steht jetzt, wann es zuletzt was gab und wie es ankam, dazu etwas zum Tag: Snacks, Serien, die Woche oder der aktuelle Liebling.',
     why: 'Im Katzenkalender gibt’s bessere Flachwitze, und die erste Mahlzeit des Tages zählt als Frühstück, wann immer sie kommt.',
   },
   {
