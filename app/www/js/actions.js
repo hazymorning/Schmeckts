@@ -345,7 +345,7 @@ const ACTIONS = {
     const id = el.dataset.id;
     if (s.pets[id]) {
       if (Object.keys(s.pets).length === 1) {
-        toast('Mindestens ein Tier muss dabei sein.');
+        toast('Mindestens eine Katze muss dabei sein.');
         return;
       }
       delete s.pets[id];
@@ -430,10 +430,6 @@ const ACTIONS = {
   arm(el) {
     const {then, id} = el.dataset;
     arm(then + (id ? ':' + id : ''), () => ARMED[then](el));
-  },
-  'set-species'(el) {
-    sheet.species = el.dataset.v;
-    renderSheet();
   },
   'set-sex'(el) {
     sheet.sex = el.dataset.v;
@@ -563,7 +559,7 @@ export async function openLink(url) {
   if (!(path in LINKS)) return false;
   if (!db.pets.length) {
     openSheet({kind: 'pet', ...petState(null)});
-    toast('Leg zuerst dein Tier an.');
+    toast('Leg zuerst deine Katze an.');
     return true;
   }
   await closeAll();

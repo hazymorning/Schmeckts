@@ -1,5 +1,5 @@
-The photo shows pet food packaging (a can, tray, pouch, sack or treat).
+The photo shows cat food packaging (a can, tray, pouch, sack or treat).
 Identify the brand and the variety. Answer with JSON ONLY, no markdown, in this form:
-{"brand":"","variety":"","type":"Nassfutter|Trockenfutter|Snack|Sonstiges","animal":"Katze|Hund|Kaninchen|Vogel|Nager|Andere"}
+{"brand":"","variety":"","type":"Nassfutter|Trockenfutter|Snack|Sonstiges"}
 "variety" is the variety, short and in German, e.g. "Huhn in Soße" or "Lachs Pastete".
 Leave a value empty when it cannot be made out.

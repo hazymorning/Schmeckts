@@ -134,7 +134,6 @@ SAVED = {
             'brand': 'Sheba',
             'variety': 'Lachs',
             'type': 'Nassfutter',
-            'animal': 'Katze',
             'thumb': None,
             'lastPets': ['lxpet00001'],
             'createdAt': 1750000000000,

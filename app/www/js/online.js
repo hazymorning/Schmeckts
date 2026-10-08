@@ -41,7 +41,7 @@ async function fetchProduct(base, code) {
     .trim();
   const variety = cleanVariety(String(p.product_name_de || '').trim() || String(p.product_name || ''), brand);
   if (!brand && !variety) return {found: false};
-  return {found: true, brand, variety, ...classify(Array.isArray(p.categories_tags) ? p.categories_tags : [])};
+  return {found: true, brand, variety, type: typeOfTags(Array.isArray(p.categories_tags) ? p.categories_tags : [])};
 }
 
 // "Sheba Fresh Choice Huhn in Sauce 4x50g" → "Fresh Choice Huhn in Sauce"
@@ -52,22 +52,18 @@ function cleanVariety(name, brand) {
 }
 
 // unambiguous categories only
-function classify(tags) {
+function typeOfTags(tags) {
   const has = (...words) => tags.some(t => words.some(w => String(t).includes(w)));
   const wet = has('wet'),
     dry = has('dry'),
-    snack = has('treat', 'snack'),
-    cat = has('cat-'),
-    dog = has('dog-');
-  const type =
-    wet && !dry && !snack
-      ? 'Nassfutter'
-      : dry && !wet && !snack
-        ? 'Trockenfutter'
-        : snack && !wet && !dry
-          ? 'Snack'
-          : '';
-  return {type, animal: cat && !dog ? 'Katze' : dog && !cat ? 'Hund' : ''};
+    snack = has('treat', 'snack');
+  return wet && !dry && !snack
+    ? 'Nassfutter'
+    : dry && !wet && !snack
+      ? 'Trockenfutter'
+      : snack && !wet && !dry
+        ? 'Snack'
+        : '';
 }
 
 // remembered so the same number does not go out again

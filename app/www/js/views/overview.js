@@ -73,14 +73,10 @@ export function valuesOf(g, now) {
     ...(sex && (sex === 'f' ? {Sie: 'Sie', sie: 'sie'} : {Sie: 'Er', sie: 'er'})),
   };
 }
-const CAT = '[Katze] ';
 // the day's sentence, the same all day; the next in its pool where it repeats a word of the heading
 export function sentenceOf(g, now, head) {
   const values = valuesOf(g, now),
-    list = POOLS[poolOf(g, now)]
-      .filter(t => g.cats || !t.startsWith(CAT))
-      .map(t => t.replace(CAT, ''))
-      .filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, key]) => values[key] != null)),
+    list = POOLS[poolOf(g, now)].filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, key]) => values[key] != null)),
     day = dayNumber(now),
     said = list.map((_, i) => fill(list[(day + i) % list.length], values));
   return said.find(t => !sharesWord(head, t)) ?? said[0];

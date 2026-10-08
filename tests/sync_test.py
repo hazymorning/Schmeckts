@@ -45,7 +45,7 @@ class FakeAnthropic:
     """Answers like the Messages API with reply as the packaging, and counts the calls."""
 
     def __init__(self):
-        self.calls, self.reply = 0, {'brand': 'Sheba', 'variety': 'Lachs in Soße', 'type': 'Nassfutter', 'animal': 'Katze'}
+        self.calls, self.reply = 0, {'brand': 'Sheba', 'variety': 'Lachs in Soße', 'type': 'Nassfutter'}
         fake = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -442,7 +442,7 @@ async def main():
 
             # The queue without a connection survives a restart
             await block(ctx_a)
-            await run(a, "db.pets.push({id: 'lunapet00001', name: 'Luna', species: 'Hund', photo: null, createdAt: Date.now()}); save();")
+            await run(a, "db.pets.push({id: 'lunapet00001', name: 'Luna', species: 'Katze', photo: null, createdAt: Date.now()}); save();")
             await a.wait_for_selector('#syncChip:not([hidden])')
             await a.reload()
             await started(a)
@@ -464,7 +464,7 @@ async def main():
             await b.close()
             del PHONES['B']
             await restart()
-            await run(a, "db.pets.find(p => p.name === 'Luna').species = 'Katze'; save();")
+            await run(a, "db.pets.find(p => p.name === 'Luna').sex = 'f'; save();")
             await online(a)
             await expect(await until(a, 'queue.length === 0', 10), 'server back: A syncs')
             b, err_b2 = await open_page(ctx_b, url)
@@ -473,7 +473,7 @@ async def main():
             await repoint(b)
             await online(b)
             await expect(
-                await until(b, "db.pets.some(p => p.name === 'Luna' && p.species === 'Katze') && !db.pets.some(p => p.name === 'Tiger')", 8),
+                await until(b, "db.pets.some(p => p.name === 'Luna' && p.sex === 'f') && !db.pets.some(p => p.name === 'Tiger')", 8),
                 'B starts again: sends what waited and catches up',
             )
             await expect(await until(a, "db.pets.some(p => p.name === 'Tiger II')", 8), 'B’s change arrives at A')
@@ -642,7 +642,7 @@ async def main():
                 'only the thumbnail is shared, on the food',
             )
             await block(ctx_a)
-            fake.reply = {'brand': 'Felix', 'variety': 'So gut wie es aussieht', 'type': 'Nassfutter', 'animal': 'Katze'}
+            fake.reply = {'brand': 'Felix', 'variety': 'So gut wie es aussieht', 'type': 'Nassfutter'}
             await a.click('#fab')
             await idle(a)
             await a.set_input_files('#camInputSheet', str(PACK))
@@ -662,7 +662,7 @@ async def main():
             print('scanning')
             barcode_asked = []
             ctx_a.on('request', lambda r: barcode_asked.append(r.url) if '/api/barcode' in r.url else None)
-            fake.reply = {'brand': 'Animonda', 'variety': 'Carny Rind', 'type': 'Nassfutter', 'animal': 'Katze'}
+            fake.reply = {'brand': 'Animonda', 'variety': 'Carny Rind', 'type': 'Nassfutter'}
             await a.evaluate(
                 f"window.__calls = []; window.__barcode = '{MISS}'; window.__photo = {json.dumps(base64.b64encode(PACK.read_bytes()).decode())}"
             )
@@ -750,7 +750,7 @@ async def main():
             ctx_c = await new_phone()
             await ctx_c.add_init_script('const _now = Date.now; Date.now = () => _now() + 2 * 3600e3;')
             c, _ = await open_page(ctx_c, url)
-            await run(c, "db.pets.push({id: 'kiwipet00001', name: 'Kiwi', species: 'Vogel', photo: null, createdAt: Date.now()}); save();")
+            await run(c, "db.pets.push({id: 'kiwipet00001', name: 'Kiwi', species: 'Katze', photo: null, createdAt: Date.now()}); save();")
             await connect(c, CODE, srv.url)
             await expect(
                 await until(c, "state.epoch !== '' && queue.length === 0", 10), 'a phone with a skewed clock: changes restamped and accepted'

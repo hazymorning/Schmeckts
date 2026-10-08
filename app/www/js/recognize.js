@@ -1,6 +1,6 @@
 // stages run cheapest first; any may be skipped, and an error moves on to the next
 import {request} from './api.js';
-import {SPECIES, TYPES} from './config.js';
+import {TYPES} from './config.js';
 import {readPhoto} from './native.js';
 import {cropped, photoOf, readable} from './images.js';
 import {
@@ -133,7 +133,6 @@ function asDetails(hit) {
       brand,
       variety,
       type: TYPES.includes(hit.type) ? hit.type : undefined,
-      animal: SPECIES.some(s => s.k === hit.animal) ? hit.animal : undefined,
       texture: hit.texture,
     },
   };

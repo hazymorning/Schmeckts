@@ -1,12 +1,3 @@
-export const SPECIES = [
-  {k: 'Katze', i: 'cat'},
-  {k: 'Hund', i: 'dog'},
-  {k: 'Kaninchen', i: 'rabbit'},
-  {k: 'Vogel', i: 'bird'},
-  {k: 'Nager', i: 'rodent'},
-  {k: 'Andere', i: 'paw'},
-];
-export const speciesIcon = k => (SPECIES.find(s => s.k === k) || SPECIES.at(-1)).i;
 // pets[].sex, absent when not given
 export const SEXES = [
   {k: 'f', label: 'Weiblich'},
@@ -158,11 +149,6 @@ export const BRANDS = [
   'Purina One',
   'Pro Plan',
   'Friskies',
-  'Beneful',
-  'Cesar',
-  'Pedigree',
-  'Frolic',
-  'Chappi',
   'Dreamies',
   'Catessy',
   'Vitakraft',
@@ -172,19 +158,14 @@ export const BRANDS = [
   'Catz Finefood',
   'MAC’s',
   'Wildes Land',
-  'Terra Canis',
   'Herrmann’s',
-  'Lukullus',
-  'Rocco',
   'Cosma',
   'Feringa',
   'Smilla',
   'Concept for Life',
-  'Wolf of Wilderness',
   'Purizon',
   'Josera',
   'Happy Cat',
-  'Happy Dog',
   'Bosch',
   'Sanabelle',
   'Royal Canin',
@@ -195,7 +176,6 @@ export const BRANDS = [
   'Real Nature',
   'Multifit',
   'Wolfsblut',
-  'Belcando',
   'Dr. Clauder’s',
   'Granatapet',
   'Leonardo',
@@ -206,7 +186,6 @@ export const BRANDS = [
   'Christopherus',
   'Mera',
   'MjAMjAM',
-  'Rinti',
   'Bozita',
   'Platinum',
   'Kattovit',
@@ -235,10 +214,6 @@ export const TYPE_WORDS = [
   ['Trockenfutter', /trockenfutter|trockennahrung|kroketten|kibble|dry food/i],
   ['Snack', /snack|leckerli|leckerchen|belohnung|treat/i],
   ['Nassfutter', /nassfutter|nassnahrung|wet food/i],
-];
-export const ANIMAL_WORDS = [
-  ['Katze', /katze|kätzchen|kitten|\bcat\b/i],
-  ['Hund', /hund|welpe|puppy|\bdog\b/i],
 ];
 /* Words match only at their start (so "Elemente" is no duck); liver, heart and cheese also end compounds.
    flavoursOf() returns groups in this order. */
@@ -348,9 +323,14 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
 
 /* What a release brought that one can see, newest first. Only the newest shows, as a card after an update, until it
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes). off: a setting it needs and what to say while that
-   is off. go: where the card leads, 'pet' being the pet editor and 'evaluation'
-   „Vorlieben“. cat: only where the cat calendar shows, false only where it does not; a release may have one of each. */
+   is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
+  {
+    v: '0.35.0',
+    title: 'Ganz für Katzen',
+    say: 'Schmeckt’s? ist jetzt eine reine Katzen-App und spricht überall von deiner Katze.',
+    why: 'An deinen Einträgen ändert sich nichts.',
+  },
   {
     v: '0.34.0',
     title: 'Schneller fertig',

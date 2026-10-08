@@ -241,7 +241,7 @@ func fakeAnthropic(t *testing.T, status int, reply string, seen *map[string]any)
 
 func TestRecognition(t *testing.T) {
 	var sent map[string]any
-	fake := fakeAnthropic(t, 200, "```json\n{\"brand\":\"Sheba \",\"variety\":\"Lachs in Soße\",\"type\":\"nassfutter\",\"animal\":\"Einhorn\"}\n```", &sent)
+	fake := fakeAnthropic(t, 200, "```json\n{\"brand\":\"Sheba \",\"variety\":\"Lachs in Soße\",\"type\":\"nassfutter\"}\n```", &sent)
 	defer fake.Close()
 	useAnthropic(t, fake.URL)
 	a := newTestAPI(t)
@@ -249,7 +249,7 @@ func TestRecognition(t *testing.T) {
 		chg("prod0001", "products", "prod1", clock(now.UnixMilli(), 0, "anna"), map[string]any{"brand": "Felix", "variety": "Huhn in Gelee", "createdAt": 1}),
 	}})
 	status, out, _ := call(a, "POST", "/api/recognize", testCode, map[string]any{"image": jpeg})
-	if status != 200 || out["brand"] != "Sheba" || out["variety"] != "Lachs in Soße" || out["type"] != "Nassfutter" || out["animal"] != "" {
+	if status != 200 || out["brand"] != "Sheba" || out["variety"] != "Lachs in Soße" || out["type"] != "Nassfutter" {
 		t.Fatalf("%d %v", status, out)
 	}
 	msg, _ := json.Marshal(sent)

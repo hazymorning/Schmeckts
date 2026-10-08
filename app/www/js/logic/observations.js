@@ -52,7 +52,7 @@ export function toggleObservationPet(pid) {
   if (!o) return;
   if (o.pets[pid]) {
     if (Object.keys(o.pets).length === 1) {
-      toast('Mindestens ein Tier muss dabei sein.');
+      toast('Mindestens eine Katze muss dabei sein.');
       return;
     }
     delete o.pets[pid];

@@ -1,6 +1,6 @@
 # Schmeckt’s?
 
-Android app that records which food a pet likes and how well it went down.
+Android app that records which food a cat likes and how well it went down.
 
 **Local first.** Everything is stored on the phone, and the app works in full without a network or a server. An
 optional server on the home network adds two conveniences for a household: syncing the phones, and recognising
@@ -64,10 +64,10 @@ db = { version: 3,
   observations: [{ id, kind, at, pets: { [petId]: true }, by }] }
 ```
 
-Fields this phone does not know, written by a newer app version, are left untouched, and so is `birthday`, which
-the app no longer shows or changes since 0.33. Barcodes are stored as EAN-13
-(UPC-A gets a leading 0) or EAN-8. Sample data carries ids starting with `demo` and is removed on connecting to a
-server.
+Fields this phone does not know, written by a newer app version, are left untouched, and so are `birthday`, which
+the app no longer shows or changes since 0.33, and `animal`, which it no longer reads or writes since 0.35. Barcodes
+are stored as EAN-13 (UPC-A gets a leading 0) or EAN-8. Sample data carries ids starting with `demo` and is removed on
+connecting to a server.
 
 | Where | Value | Meaning |
 |---|---|---|
@@ -79,7 +79,7 @@ server.
 | `products[].kaufen` | `immer`, `nicht`, absent | set by hand, beats the computed verdict |
 | `products[].sharedPhoto` | `true` or a number (ms) | the server holds the large photo; a number stamps a replaced one |
 | `observations[].kind` | `happy` `stink` `hungry` `tired` `vomit` | unknown kinds from newer phones are kept |
-| `pets[].species` | `Katze` `Hund` `Kaninchen` `Vogel` `Nager` `Andere` | picks the icon |
+| `pets[].species` | `Katze` | set on every new pet; only versions before 0.35 read it, for the icon and the cat calendar. Their `Hund` `Kaninchen` `Vogel` `Nager` `Andere` are left as they are |
 | `pets[].sex` | `f` `m`, absent | female, male, not given |
 | `servings[].status` | `reading` `recognizing` `waiting` `failed` `noserver` | recognition state, this phone only |
 | `prefs.hiddenHints` | `stop:` `sosse:` `liebling:<variety>`, `appetit:<pet>:<YYYY-MM-DD>`, `tipp:erinnern`, `neu:<version>` | hints hidden on this phone; `tipp:erinnern`: the rating reminder was set, or asked about once after a meal; `neu:` news seen, all of them on a phone without pets of its own (`NEWS` in `config.js`). `tipp:beobachtung` from before 0.33 stays unread |
@@ -140,7 +140,7 @@ Errors are `{"error": "<German message>"}`. Requests are only accepted from priv
 | `POST /api/changes`, `GET /api/changes?since=N` | send and fetch changes |
 | `GET /api/events` | server-sent events with the newest sequence number |
 | `GET /api/checksum?c=` | checksum over the collections named |
-| `POST /api/recognize` | photo in, `{brand, variety, type, animal}` out; the API key lives only on the server |
+| `POST /api/recognize` | photo in, `{brand, variety, type}` out; the API key lives only on the server |
 | `GET /api/fed?since=<ms>` | whether a meal was served since then (server 1.2.0) |
 | `POST`/`GET /api/photo/<variety>` | the shared packaging photo (1.3.0; replacing from 1.4.0) |
 

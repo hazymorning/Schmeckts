@@ -105,8 +105,8 @@ test('consistency and treat type: the choice per type, keywords in brand and var
       'Drink',
       'Sticks Lachs',
       'Filetstreifen',
-      'Kauknochen',
-      'Chew Bone',
+      'Kausnack',
+      'Dental Chew',
     ]),
     [
       'knusprig',
@@ -215,7 +215,7 @@ test('modules: no circular dependencies', () => {
   for (const file of deps.keys()) visit(file, []);
 });
 
-test('news: one per release with something to see, or one where the cat calendar shows and one where not, newest first, none ahead of the app', () => {
+test('news: one per release with something to see, newest first, none ahead of the app', () => {
   const app = JSON.parse(readFileSync(new URL('../app/package.json', import.meta.url))).version,
     order = v => v.split('.').reduce((n, part) => n * 1000 + +part, 0);
   const versions = NEWS.map(n => n.v);
@@ -228,10 +228,7 @@ test('news: one per release with something to see, or one where the cat calendar
     versions,
     'newest first',
   );
-  for (const v of new Set(versions)) {
-    const cats = NEWS.filter(n => n.v === v).map(n => n.cat);
-    assert.ok(cats.length === 1 || (cats.length === 2 && cats.includes(true) && cats.includes(false)), v);
-  }
+  assert.equal(new Set(versions).size, versions.length, 'one per release');
   assert.ok(!versions.length || order(versions[0]) <= order(app), `${versions[0]} is not ahead of the app's ${app}`);
   assert.ok(
     NEWS.every(n => n.title && n.say),

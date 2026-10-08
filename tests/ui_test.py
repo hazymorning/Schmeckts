@@ -162,7 +162,7 @@ async def household(ctx, fail=None, photos=None):
         elif path.startswith('/api/info'):
             body = {'app': 'schmeckts', 'protocol': 1, 'recognition': True, 'features': [], 'auth': True}
         elif path.startswith('/api/recognize'):
-            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter', 'animal': 'Katze'}
+            body = {'brand': 'Gourmet', 'variety': 'Gold Pastete', 'type': 'Nassfutter'}
         elif path.startswith('/api/changes') and request.method == 'POST':
             body = {'ok': [c['id'] for c in json.loads(request.post_data or '{}').get('changes', [])]}
         elif path.startswith('/api/changes'):
@@ -293,7 +293,6 @@ async def test_flow(browser, url):
     pg, errors = await open_page(ctx, url, native=True)
     await tap(pg, '.welcome [data-action=add-pet]')
     await pg.fill('#f-name', 'Minka')
-    await pg.click('[data-action=set-species][data-v=Hund]')
     await tap(pg, '[data-action=save-pet]')
     await settings(pg)  # with one pet there is no pet bar
     await tap(pg, '#sheet [data-action=add-pet]')
@@ -301,7 +300,7 @@ async def test_flow(browser, url):
     await tap(pg, '[data-action=save-pet]')
     check(await pg.evaluate(LEVEL) == [True, 'settings', None, None], 'saving a pet returns to the settings overview')
     await back(pg)
-    check(await state(pg, 'db.pets.length') == 2, 'two pets')
+    check(await state(pg, "db.pets.length === 2 && db.pets.every(p => p.species === 'Katze')"), 'two pets, stored as cats for older versions')
     await snap(pg)
     check(
         await state(pg, "db.servings[0].status + '|' + db.servings[0].error") == 'noserver|undefined'
@@ -545,7 +544,7 @@ async def test_dry_food(browser, url):
     await ctx.close()
 
 
-BRANDS = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Rinti', 'Bozita', 'Schesir']
+BRANDS = ['Sheba', 'Felix', 'Gourmet', 'Whiskas', 'Animonda', 'Miamor', 'Cosma', 'Purizon', 'Bozita', 'Schesir']
 
 
 # n varieties of their own brand, one meal each, `days` apart (0: an hour)
@@ -1620,11 +1619,7 @@ async def test_several(browser, url):
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
     said = await pg.inner_text('#sheet [data-action=open-product][data-id=lachs00001] small')
     await back(pg)
-    await change(pg, 's.db.pets[1].species = "Hund"')
-    apart = await pg.eval_on_selector_all('#pets [data-action=filter] .av', 'l => l.map(a => a.textContent.trim())')
-    check(
-        bar == ['', 'M', 'T'] and apart == ['', '', ''], f'two cats without a photo go by their initials, a cat and a dog by their kind {bar} {apart}'
-    )
+    check(bar == ['', 'M', 'T'], f'two cats without a photo go by their initials {bar}')
     check(said == 'Sheba, bei beiden alle 3 Mal alles gefressen', f'three meals for both read as three, not six: {said}')
     check(named == ['Minka'], f'a meal for one of them names it at its slider {named}')
     await pg.focus('#pets [data-id=all]')
@@ -1835,12 +1830,6 @@ async def test_calendar(browser, url):
     await tap(pg, '#sheet [data-action=calendar]')
     await back(pg)
     check(off == 0 and await pg.locator('#home .calpad').count() == 1, 'its switch in the settings takes it away and back')
-    await change(pg, "s.db.pets[0].species = 'Hund'")
-    await settings(pg)
-    check(
-        await pg.locator('#home .calpad').count() == 0 and await pg.locator('#sheet [data-action=calendar]').count() == 0,
-        'no cat: no sheet and no switch',
-    )
     check(not real_errors(errors), f'no errors {real_errors(errors)}')
     await ctx.close()
 
@@ -2226,7 +2215,7 @@ async def test_recognize(browser, url):
     hit = got.get('details') or {}
     check(
         got['source'] == 'online'
-        and [hit.get(k) for k in ('brand', 'variety', 'type', 'animal')] == ['Sheba', 'Fresh Choice Huhn in Sauce', 'Nassfutter', 'Katze']
+        and [hit.get(k) for k in ('brand', 'variety', 'type')] == ['Sheba', 'Fresh Choice Huhn in Sauce', 'Nassfutter']
         and (await state(pg, f"prefs.codes['{SHEBA}']"))['found'] is True,
         f'product lookup on: brand and variety tidied {hit}',
     )
@@ -3446,7 +3435,7 @@ async def test_form_errors(browser, url):
     await tap(pg, '#sheet [data-action=save-name]')
     name_said = [await pg.inner_text('#sheet #f-error'), await pg.evaluate('document.activeElement.id'), await pg.evaluate(SHOWN_TOAST)]
     check(
-        pet_said == ['Wie heißt dein Tier?', 'f-name', False] and name_said == ['Bitte Marke oder Sorte eintragen.', 'f-brand', False],
+        pet_said == ['Wie heißt deine Katze?', 'f-name', False] and name_said == ['Bitte Marke oder Sorte eintragen.', 'f-brand', False],
         f'under the field, which takes the focus {pet_said} {name_said}',
     )
     check(

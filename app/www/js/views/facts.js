@@ -53,10 +53,7 @@ export function hangingDay(sheetDay, now) {
 }
 
 // the household's only cat, if its sex is known: the variants and „dein Kater“ speak of it
-export function catOf(pets) {
-  const cats = pets.filter(p => p.species === 'Katze');
-  return cats.length === 1 && sexOf(cats[0]) ? cats[0] : null;
-}
+export const catOf = pets => (pets.length === 1 && sexOf(pets[0]) ? pets[0] : null);
 export function sheetText(sheet, cat, back = false) {
   const text = back ? sheet.back : (cat && sheet[cat.sex]) || sheet.text,
     yours = cat?.sex === 'm' ? 'ein Kater' : 'eine Katze';

@@ -301,7 +301,7 @@ function takeResult(s, found, house) {
     else linkProduct(s, found.products[0]);
   } else if (found.details && found.source !== 'text') {
     tries.delete(s.id);
-    refinePets(s, findProduct(found.details.brand, found.details.variety), found.details.animal);
+    refinePets(s, findProduct(found.details.brand, found.details.variety));
     applyProduct(s, found.details);
     if (sheet?.kind === 'serving' && sheet.id === s.id && sheet.step === 'name' && !sheet.brand && !sheet.variety)
       sheet.step = null;
@@ -469,12 +469,8 @@ function refreshServing(id) {
   if (sheet.step !== 'name' || !typing) renderSheet();
 }
 
-export function refinePets(s, known, animalHint) {
+export function refinePets(s, known) {
   if (!s.autoPets || db.pets.length < 2 || Object.values(s.pets).some(x => x.r)) return;
-  let pref = (known?.lastPets || []).filter(pid => getPet(pid));
-  if (!pref.length) {
-    const animal = known?.animal || animalHint;
-    pref = db.pets.filter(x => x.species === animal).map(x => x.id);
-  }
+  const pref = (known?.lastPets || []).filter(pid => getPet(pid));
   if (pref.length) s.pets = petMap(pref);
 }

@@ -463,7 +463,7 @@ function footHTML(m, b) {
         ...(first.getFullYear() === new Date().getFullYear() ? {} : {year: 'numeric'}),
       });
     parts.push(
-      `Tops und Flops beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, pro Sorte${m.pets.length > 1 ? ' und Tier' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
+      `Tops und Flops beruhen auf <b>${b.n} Bewertungen</b> seit dem ${date}, pro Sorte${m.pets.length > 1 ? ' und Katze' : ''} auf den neuesten acht aus dem letzten halben Jahr.`,
     );
   }
   if (b.left.length)

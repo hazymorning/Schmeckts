@@ -2,7 +2,7 @@
 import {andList, cap, esc} from '../text.js';
 import {ago, clockStr, dayKey, dayLabel, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {observationOf, RATINGS, scaleOf, speciesIcon, typeOf} from '../config.js';
+import {observationOf, RATINGS, scaleOf, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {held, pending, status} from '../sync.js';
 import {
@@ -24,11 +24,9 @@ import {sliderCls, thumbHTML} from '../ui/slider.js';
 export function avatar(pet, cls = '') {
   if (!pet) return '';
   if (pet.photo) return `<span class="av ${cls}"><img src="${esc(pet.photo)}" alt="" decoding="async"></span>`;
-  // two of a kind without a photo would look alike: their initials tell them apart
-  const initial =
-    db.pets.some(x => x.id !== pet.id && x.species === pet.species && !x.photo) &&
-    (pet.name || '').trim().charAt(0).toUpperCase();
-  return `<span class="av ${cls}">${initial ? esc(initial) : icon(speciesIcon(pet.species))}</span>`;
+  // two cats without a photo would look alike: their initials tell them apart
+  const initial = db.pets.some(x => x.id !== pet.id && !x.photo) && (pet.name || '').trim().charAt(0).toUpperCase();
+  return `<span class="av ${cls}">${initial ? esc(initial) : icon('cat')}</span>`;
 }
 export function thumbOf(s, p, cls = '') {
   const src = p?.thumb || s?.thumb;
@@ -113,7 +111,7 @@ export const head = (title, back = 'settings-back', end = '') =>
 // a card's heading with the way to its page at its end; label, for screen readers, starts with the visible word
 export const cardHead = (title, action, label, more = 'Alle', v = '') =>
   `<div class="card-head"><h2>${title}</h2><button class="more" data-action="${action}"${v ? ` data-v="${v}"` : ''} aria-label="${label}">${more}${icon('chevron')}</button></div>`;
-export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Tiere'}` : '');
+export const forWhom = pet => (db.pets.length > 1 ? ` für ${pet ? esc(getPet(pet).name) : 'alle Katzen'}` : '');
 // option: [value, label, icon?, action?]
 export const segmented = (action, options, current) =>
   `<div class="seg">${options

@@ -4,7 +4,7 @@ import {slideHeight} from '../motion.js';
 import {andList, cap, esc, norm} from '../text.js';
 import {addDays, toLocalInput, weekStart, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {OBSERVATIONS, observationOf, RATINGS, scaleOf, SEXES, SPECIES, TEXTURES, TYPES, typeOf} from '../config.js';
+import {OBSERVATIONS, observationOf, RATINGS, scaleOf, SEXES, TEXTURES, TYPES, typeOf} from '../config.js';
 import {db} from '../store.js';
 import {
   diary,
@@ -566,8 +566,8 @@ function viewPet() {
   if (sheet.step === 'crop') return viewCrop();
   const s = sheet,
     editing = !!s.id;
-  const title = editing ? 'Tier bearbeiten' : db.pets.length ? 'Neues Tier' : 'Wer wird gefüttert?';
-  const av = avatar({photo: s.photo, species: s.species}, 'xxxl');
+  const title = editing ? 'Katze bearbeiten' : db.pets.length ? 'Neue Katze' : 'Wer wird gefüttert?';
+  const av = avatar({photo: s.photo}, 'xxxl');
   return `${head(title)}
     <label class="pet-photo" for="petPhotoInput" aria-label="Foto wählen">${av}<span class="cam-badge">${icon('camera')}</span></label>
     <label class="link photo-hint" for="petPhotoInput">${s.photo ? 'Foto ändern' : 'Foto hinzufügen'}</label>
@@ -583,12 +583,11 @@ function viewPet() {
       `<div class="chips nicks" id="nicks"></div>
       <div class="connect"><input id="f-nick" class="field" data-field="nick" value="${esc(s.nick)}" placeholder="z. B. Mausi" maxlength="24" autocomplete="off" autocapitalize="words" enterkeyhint="done" aria-label="Spitzname">
         <button class="btn soft" data-action="add-nick" aria-label="Spitzname hinzufügen">${icon('plus')}</button></div>
-      <p class="hint mt-s">Die App nennt dein Tier dann mal so, mal so.</p>`,
+      <p class="hint mt-s">Die App nennt deine Katze dann mal so, mal so.</p>`,
     )}
-    ${group('Tierart', `<div class="chips">${SPECIES.map(x => `<button class="chip" aria-pressed="${s.species === x.k}" data-action="set-species" data-v="${x.k}">${icon(x.i)}${x.k}</button>`).join('')}</div>`)}
     ${group('Geschlecht', `<div class="chips">${[...SEXES, {k: '', label: 'Keine Angabe'}].map(x => `<button class="chip" aria-pressed="${s.sex === x.k}" data-action="set-sex" data-v="${x.k}">${x.label}</button>`).join('')}</div>`)}
-    <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Tier anlegen'}</button></div>
-    ${editing ? apart(armBtn('delete-pet', 'Tier entfernen', 'Nochmal tippen: Tier und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
+    <div class="mt"><button class="btn primary" data-action="save-pet">${icon('check')}${editing ? 'Speichern' : 'Katze anlegen'}</button></div>
+    ${editing ? apart(armBtn('delete-pet', 'Katze entfernen', 'Nochmal tippen: Katze und Bewertungen löschen', {cls: 'quiet'})) : ''}`;
 }
 
 // drawn on their own, so the field keeps its focus and keyboard while names are added

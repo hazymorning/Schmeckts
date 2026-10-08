@@ -112,7 +112,7 @@ test('a heading and a sentence share a word when a content word or a name comes 
   ];
   const apart = [
     ['Seit 3 Stunden ist Ruhe.', 'Noch <b>3×</b> füttern, dann ist das 100. Mal erreicht.'],
-    ['Die Katze ist satt und der Hund auch.', 'Das Futter ist da, und die Uhr tickt nach.'],
+    ['Die Katze ist satt und der Kater auch.', 'Das Futter ist da, und die Uhr tickt nach.'],
     ['Gestern gab’s <b>Rind</b>.', 'Heute gab’s <b>Lachs</b>.'],
   ];
   for (const [a, b] of same) assert.ok(sharesWord(a, b) && sharesWord(b, a), `${a} | ${b}`);
@@ -201,7 +201,7 @@ test('the overview heading: whose day it is, a wording a day, the night its own'
   const pets = [
     {id: 'mau0000001', name: 'Mau', species: 'Katze', nicknames: ['Mausi']},
     {id: 'felix00001', name: 'Felix', species: 'Katze'},
-    {id: 'kiwi000001', name: 'Kiwi', species: 'Vogel'},
+    {id: 'kiwi000001', name: 'Kiwi', species: 'Katze'},
   ];
   replaceDb({version: 3, pets, products: [], servings: [], observations: []});
   const week = [0, 1, 2, 3, 4, 5, 6].map(i => headOf([pets[0]], T + i * DAY, 'later'));
@@ -256,30 +256,8 @@ test('a sentence with {Sie} or {sie} only for the one pet shown whose sex is kno
   }
 });
 
-test('a sentence in one piece; one marked [Katze] only where every pet shown is a cat', () => {
-  for (const [pool, list] of Object.entries(POOLS))
-    for (const x of list) assert.match(x, /^(\[Katze\] )?[^|[\]]+$/, pool);
-  replaceDb(structuredClone(HOME));
-  const kitty = {id: 'A', species: 'Katze'},
-    tom = {id: 'B', species: 'Katze'},
-    dog = {id: 'C', species: 'Hund'},
-    shown = (pets, ids) => glance({...household(['nass'], []), pets}, ids, NOW).cats;
-  assert.deepEqual(
-    [
-      shown([kitty], ['A']),
-      shown([kitty, tom], ['A', 'B']),
-      shown([kitty, dog], ['A', 'C']),
-      shown([kitty, dog], ['A']),
-    ],
-    [true, true, false, true],
-  );
-  for (const [pool, [g, now]] of Object.entries(STATES)) {
-    const marked = POOLS[pool].filter(x => x.startsWith('[Katze] ')).map(x => fill(x.slice(8), valuesOf(g, now))),
-      next = i => ({...g, last: g.last && {...g.last, servedAt: addDays(g.last.servedAt, i)}}),
-      month = cats => [...Array(31).keys()].map(i => sentenceOf({...next(i), cats}, addDays(now, i), ''));
-    assert.ok(!month(false).some(said => marked.includes(said) || said.includes('[')), pool);
-    assert.ok(!marked.length || month(true).some(said => marked.includes(said)), `${pool}: cats`);
-  }
+test('a sentence in one piece', () => {
+  for (const [pool, list] of Object.entries(POOLS)) for (const x of list) assert.match(x, /^[^|[\]]+$/, pool);
 });
 
 const cat = (sex, name = 'Schnurrsula') => ({id: 'cat' + name, name, species: 'Katze', ...(sex && {sex})});
@@ -346,12 +324,9 @@ test('the cat calendar: a sheet a day; on a new day the last one seen hangs over
 });
 
 test('the cat calendar speaks of the cat only where the household has one cat of known sex: its variant, its name, „dein Kater“', () => {
-  const dog = {id: 'bello00001', name: 'Bello', species: 'Hund', sex: 'm'};
   assert.deepEqual(
-    [[cat('m')], [cat('f'), dog], [cat('f'), cat('m', 'Tiger')], [cat(null)], [cat('x')], [dog]].map(
-      pets => catOf(pets)?.name ?? null,
-    ),
-    ['Schnurrsula', 'Schnurrsula', null, null, null, null],
+    [[cat('m')], [cat('f'), cat('m', 'Tiger')], [cat(null)], [cat('x')]].map(pets => catOf(pets)?.name ?? null),
+    ['Schnurrsula', null, null, null],
   );
   const paws = SHEETS.find(f => f.m),
     nose = SHEETS.find(f => f.text.includes('{deine Katze}'));
