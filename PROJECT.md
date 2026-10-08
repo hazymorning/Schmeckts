@@ -140,7 +140,7 @@ Errors are `{"error": "<German message>"}`. Requests are only accepted from priv
 | `POST /api/changes`, `GET /api/changes?since=N` | send and fetch changes |
 | `GET /api/events` | server-sent events with the newest sequence number |
 | `GET /api/checksum?c=` | checksum over the collections named |
-| `POST /api/recognize` | photo in, `{brand, variety, type, animal}` out; the API key lives only on the server |
+| `POST /api/recognize` | photo in, `{brand, variety, type}` out; the API key lives only on the server |
 | `GET /api/fed?since=<ms>` | whether a meal was served since then (server 1.2.0) |
 | `POST`/`GET /api/photo/<variety>` | the shared packaging photo (1.3.0; replacing from 1.4.0) |
 

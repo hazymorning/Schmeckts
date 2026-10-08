@@ -26,7 +26,6 @@ const (
 var (
 	anthropicURL = "https://api.anthropic.com" // tests point it elsewhere
 	foodTypes    = []string{"Nassfutter", "Trockenfutter", "Snack", "Sonstiges"}
-	animalKinds  = []string{"Katze", "Hund", "Kaninchen", "Vogel", "Nager", "Andere"}
 	jsonObject   = regexp.MustCompile(`(?s)\{.*\}`)
 )
 
@@ -34,7 +33,6 @@ type Recognition struct {
 	Brand   string `json:"brand"`
 	Variety string `json:"variety"`
 	Type    string `json:"type"`
-	Animal  string `json:"animal"`
 }
 
 type recognizeError struct {
@@ -140,7 +138,7 @@ func Recognize(ctx context.Context, cfg Config, b64 string, known []string) (Rec
 		return Recognition{}, nil // nothing recognised, not an error
 	}
 	out.Brand, out.Variety = strings.TrimSpace(out.Brand), strings.TrimSpace(out.Variety)
-	out.Type, out.Animal = oneOf(strings.TrimSpace(out.Type), foodTypes), oneOf(strings.TrimSpace(out.Animal), animalKinds)
+	out.Type = oneOf(strings.TrimSpace(out.Type), foodTypes)
 	return out, nil
 }
 
