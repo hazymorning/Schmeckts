@@ -159,6 +159,9 @@ are named constants at the top of `smart.js` and `views/overview.js`.
   otherwise, below that „Noch zu wenig bewertet“. Across pets: a yes and no no is yes, the other way round no, both
   „Gemischt“. `kaufen` set by hand beats the verdict.
 - Observations are shown beside the ratings and never change a rating, verdict or hint.
+- An insight and a link from an observation to a variety need their gap to be a few pooled standard errors wide, as a
+  trend does, so chance makes hardly any. `tests/personas.test.js` holds on simulated households how rarely one shows
+  for a cat without that habit and how often for a cat with it.
 - The texts never give a percentage or a score; they say it in words („3 von 4 Mal gut gefressen“).
 
 ## Design

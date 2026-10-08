@@ -242,7 +242,7 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(var(--space-3) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 0 var(--space-2h);
+  padding: calc(var(--space-3) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 0 var(--space-3);
 }
 .top-end {
   display: flex;
@@ -268,6 +268,7 @@ body::after {
   letter-spacing: var(--track-title);
 }
 .card h2,
+.overview h2,
 .bar-title,
 .sh-head h2 {
   font: var(--type-heading);
@@ -279,7 +280,7 @@ body::after {
   color: var(--muted);
 }
 .hint {
-  margin: 0 0 var(--space-2h);
+  margin: 0 0 var(--space-3);
   font: var(--type-small);
   color: var(--muted);
 }
@@ -357,7 +358,8 @@ body::after {
   column-gap: var(--space-3);
   --text-at: calc(var(--lead, var(--pic-s)) + var(--space-3));
 }
-.list {
+.list,
+.taste-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -451,7 +453,7 @@ dialog.sheet.page .sheet-body {
 .grip-zone {
   position: relative;
   z-index: var(--z-raise);
-  padding: var(--space-2h) 0 var(--space-2);
+  padding: var(--space-2) 0;
   touch-action: none;
   cursor: grab;
   flex: 0 0 auto;
@@ -602,14 +604,13 @@ dialog.sheet::after {
   position: fixed;
   left: 50%;
   bottom: calc(
-    var(--space-5) + var(--control-l) + var(--space-3h) +
-      var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
+    var(--space-5) + var(--control-l) + var(--space-4) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
   );
   z-index: var(--z-toast);
   view-transition-name: toast;
   display: flex;
   align-items: center;
-  gap: var(--space-1h);
+  gap: var(--space-2);
   width: max-content;
   max-width: min(92vw, 520px);
   min-height: var(--control);
@@ -647,7 +648,7 @@ dialog.sheet::after {
   pointer-events: auto;
 }
 .toast > span {
-  margin: var(--space-1h) var(--space-2) var(--space-1h) 0;
+  margin: var(--space-1) var(--space-2) var(--space-1) 0;
 }
 .toast.long {
   flex-wrap: wrap;
@@ -661,7 +662,7 @@ dialog.sheet::after {
 .toast button {
   display: flex;
   align-items: center;
-  gap: var(--space-1h);
+  gap: var(--space-2);
   flex: 0 0 auto;
   min-height: var(--tap-s);
   padding: var(--inset-compact);
@@ -773,7 +774,7 @@ dialog.sheet::after {
 .slider-bar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2h);
+  gap: var(--space-2);
   cursor: pointer;
   touch-action: pan-y;
 }
@@ -836,6 +837,41 @@ dialog.sheet::after {
 .slider-names > .on {
   font: var(--type-small-strong);
   color: var(--c);
+}
+/* Geschmacksprofil: a group and its count, under it the share that went down well */
+.taste-head,
+.taste-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+}
+.taste-head {
+  margin: var(--space-4) 0 var(--space-2);
+  font: var(--type-small-strong);
+  color: var(--muted);
+}
+.taste-row {
+  font: var(--type-small);
+}
+.taste-row > :last-child {
+  flex: none;
+  color: var(--muted);
+}
+.taste-bar {
+  display: block;
+  height: var(--meter-w);
+  margin: var(--space-1) 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--good-soft);
+}
+.taste-bar::before {
+  content: "";
+  display: block;
+  width: calc(var(--share) * 100%);
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--good);
 }
 .ends {
   display: flex;
@@ -973,11 +1009,11 @@ dialog.sheet::after {
 }
 .search {
   position: relative;
-  margin-bottom: var(--space-1h);
+  margin-bottom: var(--space-2);
 }
 .search .ic {
   position: absolute;
-  left: var(--space-3h);
+  left: var(--space-3);
   top: 50%;
   transform: translateY(-50%);
   color: var(--faint);
@@ -1069,7 +1105,7 @@ dialog.sheet::after {
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--tap-s);
-  padding: var(--space-2) var(--space-1h);
+  padding: var(--space-2) var(--space-1);
   border-radius: var(--radius-s);
   font: var(--type-small-strong);
   color: var(--muted);
@@ -1117,7 +1153,7 @@ dialog.sheet::after {
   width: var(--icon-s);
   height: var(--icon-s);
   vertical-align: middle;
-  margin-right: var(--space-1h);
+  margin-right: var(--space-2);
 }
 /* The way from a card to its page, at the end of the heading. The tap area reaches into the card's padding above,
    so the heading line keeps its height. */
@@ -1127,7 +1163,7 @@ dialog.sheet::after {
   gap: var(--space-hair);
   flex: 0 0 auto;
   min-height: var(--tap);
-  margin: calc(-1 * var(--space-3h)) calc(-1 * var(--space-3)) calc(-1 * var(--space-1h)) 0;
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) calc(-1 * var(--space-2)) 0;
   padding: 0 var(--space-3);
   border-radius: var(--radius-m);
   font: var(--type-small-strong);
@@ -1395,9 +1431,9 @@ dialog.sheet::after {
 }
 .pets {
   display: flex;
-  gap: var(--space-2h);
+  gap: var(--space-2);
   overflow-x: auto;
-  padding: var(--space-2h) var(--gutter) var(--space-3h);
+  padding: var(--space-3) var(--gutter);
   margin: 0 calc(-1 * var(--gutter));
   scrollbar-width: none;
 }
@@ -1408,8 +1444,8 @@ dialog.sheet::after {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-1h);
-  width: calc(var(--pic-xl) + var(--space-1h));
+  gap: var(--space-1);
+  width: calc(var(--pic-xl) + var(--space-2));
   flex: 0 0 auto;
 }
 .pet > span:last-child {
@@ -1434,7 +1470,7 @@ dialog.sheet::after {
   display: block;
   width: var(--pic-xxxl);
   height: var(--pic-xxxl);
-  margin: var(--space-4h) auto var(--space-2); /* 24 under the page title with its 6 */
+  margin: var(--space-4) auto var(--space-2); /* 24 under the page title with its 8 */
   cursor: pointer;
   border-radius: 50%;
 }
@@ -1552,8 +1588,8 @@ dialog.sheet::after {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-2h);
-  padding: var(--space-2h) 0 var(--space-hair);
+  gap: var(--space-2);
+  padding: var(--space-3) 0 var(--space-hair);
   margin-bottom: var(--space-hair);
 }
 /* sticky on the history page; views/sheets.js marks it .stuck, which CSS cannot detect */
@@ -1700,7 +1736,7 @@ dialog.sheet::after {
   width: 100%;
   max-width: 340px;
   aspect-ratio: 1;
-  margin: var(--space-4h) auto 0;
+  margin: var(--space-4) auto 0;
   border-radius: var(--radius-l);
   overflow: hidden;
   background: var(--surface-2);
@@ -1812,8 +1848,8 @@ dialog.sheet::after {
 /* the best Top's crown and the worst Flop's bowl, out on the corner of its packaging so it hides at most the edge */
 .medal {
   position: absolute;
-  right: calc(-1 * var(--space-2h));
-  bottom: calc(-1 * var(--space-2h));
+  right: calc(-1 * var(--space-2));
+  bottom: calc(-1 * var(--space-2));
   width: var(--pic-badge);
   height: var(--pic-badge);
   display: grid;
@@ -1854,8 +1890,8 @@ dialog.sheet::after {
 }
 .place {
   position: absolute;
-  top: calc(-1 * var(--space-2h));
-  left: calc(-1 * var(--space-2h));
+  top: calc(-1 * var(--space-2));
+  left: calc(-1 * var(--space-2));
   min-width: var(--pic-badge);
   height: var(--pic-badge);
   display: grid;
@@ -1867,54 +1903,114 @@ dialog.sheet::after {
   color: var(--on-accent);
   box-shadow: 0 0 0 var(--stroke) var(--surface);
 }
-/* The tear-off calendar: a pad with its top sheet perforated, on night paper in the dark. The layers under the sheet
-   hang on the pad, since the sheet's mask cuts away everything outside it. A sheet left hanging lies on today's, both
-   as tall as the taller one. */
+/* The tear-off calendar: a pad under a dark binding, with what is left of the sheets torn off before hanging from it
+   and the edges of the sheets below underneath. A sheet left hanging lies on today's, both as tall as the taller
+   one. Under a curled corner the next sheet shows. */
 .calpad {
   position: relative;
   display: grid;
+  border-radius: var(--radius-paper);
+  background:
+    linear-gradient(315deg, transparent calc(var(--space-6) * 0.3), var(--paper-shade) calc(var(--space-6) * 0.7071))
+      right bottom / var(--space-6) var(--space-6) no-repeat,
+    var(--paper-under);
 }
 .calpad > .calsheet {
   grid-area: 1 / 1;
 }
-/* the layers a shade towards the ink, so they show on the ground in light and dark */
-.calpad::before,
+/* over every sheet, so one torn off falls away under it */
+.cal-top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: var(--z-raise);
+  height: calc(var(--space-2) + var(--space-3));
+  filter: drop-shadow(0 var(--hairline) var(--hairline) var(--paper-shade));
+  pointer-events: none;
+}
+.cal-top::before,
+.cal-top::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.cal-top::before {
+  top: var(--space-1);
+  background: var(--paper-torn);
+  mask: var(--torn-edge) 0 100% / auto 100% repeat-x;
+}
+.cal-top::after {
+  bottom: auto;
+  height: var(--space-2);
+  border-radius: var(--radius-paper) var(--radius-paper) 0 0;
+  background: var(--paper-bind);
+}
+/* six sheet edges under the pad */
 .calpad::after {
   content: "";
   position: absolute;
-  left: var(--space-1h);
-  right: var(--space-1h);
-  bottom: calc(-1 * var(--space-1));
-  height: var(--space-6);
-  border-radius: var(--radius-paper);
-  background: color-mix(in srgb, var(--paper), var(--ink) 8%);
+  inset: 100% 0 auto;
+  height: var(--space-3);
+  border-radius: 0 0 var(--radius-paper) var(--radius-paper);
+  background: repeating-linear-gradient(var(--paper-edge) 0 1.5px, var(--paper-edge-line) 1.5px 2px);
+  box-shadow: var(--shadow-low);
   z-index: -1;
 }
-.calpad::after {
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: calc(-1 * var(--space-2));
-  background: color-mix(in srgb, var(--paper), var(--ink) 16%);
-  z-index: -2;
-}
-/* as wide as a card and set like one: the date as its heading, then the fact */
+/* as wide as a card and set like one: the date as its heading beside the stamp, then the fact; the corner cut
+   away for the curl */
 .calsheet {
   position: relative;
   display: block;
-  padding: var(--space-5) var(--gutter);
+  padding: calc(var(--space-2) + var(--space-3) + var(--space-4)) var(--gutter) var(--space-6);
   background: var(--paper-grain), var(--paper);
   color: var(--paper-ink);
   border-radius: var(--radius-paper);
-  mask: radial-gradient(circle at 7px 0, transparent 3.2px, var(--opaque) 3.7px) 0 0 / 14px 100% repeat-x;
+  mask: linear-gradient(315deg, transparent calc(var(--space-6) * 0.7071), var(--opaque) 0);
+}
+/* the curled corner: its back, bright along the fold and shaded towards the tip, raised a little off the sheet;
+   the shade under it lies on the pad */
+.calsheet::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-top-left-radius: var(--radius-stamp);
+  background: linear-gradient(315deg, transparent 50%, var(--paper-curl) 50%, var(--paper-under));
+  filter: drop-shadow(0 0 var(--hairline) var(--paper-shade));
 }
 /* the mask would cut a ring outside away */
 .calsheet:focus-visible {
   outline-offset: calc(-1 * var(--space-1));
 }
+.cal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
 .cal-date {
-  margin: 0 0 var(--space-2);
+  flex: 1;
+  margin: 0;
   font: var(--type-heading);
-  text-box: trim-start cap alphabetic;
+  text-wrap: balance;
+}
+/* the rubric, pressed on a little askew in worn ink: a heavy frame and a fine one inside it, both within the box
+   the wear masks */
+.cal-stamp {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  border: var(--stroke) solid;
+  border-radius: var(--radius-stamp);
+  box-shadow:
+    inset 0 0 0 var(--space-hair) var(--paper),
+    inset 0 0 0 calc(var(--space-hair) + var(--hairline)) currentColor;
+  color: var(--paper-muted);
+  font: var(--type-caption-strong);
+  letter-spacing: var(--track-stamp);
+  text-transform: uppercase;
+  rotate: -4deg;
+  mask: var(--stamp-wear);
 }
 .cal-text {
   margin: 0;
@@ -1926,7 +2022,7 @@ dialog.sheet::after {
 .cal-foot {
   display: flex;
   align-items: center;
-  gap: var(--space-1h);
+  gap: var(--space-2);
   margin: var(--space-3) 0 0;
   font: var(--type-small-strong);
   color: var(--paper-muted);
@@ -1947,14 +2043,9 @@ dialog.sheet::after {
 .calpad {
   margin-top: var(--space-4);
 }
-/* the paper layers reach 8 below the sheet, so the card keeps 16 from them */
-.calpad + .card {
-  margin-top: var(--space-6);
-}
-/* Sundays and the verdict, as printed on a tear-off calendar */
-.cal-date.red,
-.cal-verdict {
-  color: var(--paper-red);
+/* the sheet edges reach 12 below the pad, so the card keeps 16 from them */
+.calpad + * {
+  margin-top: calc(var(--space-3) + var(--space-4));
 }
 .group + .group {
   margin-top: var(--space-3);
@@ -1991,14 +2082,14 @@ dialog.sheet::after {
   display: flow-root;
 }
 .card-line {
-  margin: 0 0 var(--space-2h);
+  margin: 0 0 var(--space-3);
 }
 .empty {
   display: flex;
   align-items: center;
-  gap: var(--space-3h);
+  gap: var(--space-3);
   color: var(--muted);
-  margin: var(--space-hair) 0 var(--space-2h);
+  margin: var(--space-hair) 0 var(--space-3);
 }
 .empty .sk {
   color: var(--faint);
@@ -2007,15 +2098,29 @@ dialog.sheet::after {
 .ov-top {
   display: flex;
   align-items: center;
-  gap: var(--space-3h);
+  gap: var(--space-4);
 }
-/* with the card's 10px foot this makes 20, as at the top */
+/* the overview stands on the ground, one cat large; several are large in the bar above */
+.overview {
+  padding-top: var(--space-2);
+}
+.ov-pic.xxxl {
+  width: var(--pic-xxxl);
+  height: var(--pic-xxxl);
+}
+.overview .av.pair + .av.pair {
+  box-shadow: 0 0 0 var(--stroke) var(--bg);
+}
+.overview + * {
+  margin-top: var(--space-2);
+}
+/* with the card's 8px foot this makes 20, as at the top */
 .ov-pic,
 .ov-text {
-  margin-bottom: var(--space-2h);
+  margin-bottom: var(--space-3);
 }
 .obs {
-  margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-2h);
+  margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-3);
 }
 .ov-text {
   flex: 1;
@@ -2030,7 +2135,7 @@ dialog.sheet::after {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-3h);
+  margin-bottom: var(--space-4);
 }
 .pend-top > .pend-head {
   flex: 1;
@@ -2041,7 +2146,7 @@ dialog.sheet::after {
   margin-bottom: var(--space-2);
 }
 .pet-rate + .pet-rate {
-  margin-top: var(--space-4h);
+  margin-top: var(--space-4);
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
@@ -2069,7 +2174,7 @@ dialog.sheet::after {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin: var(--space-3h) 0 var(--space-2h);
+  margin: var(--space-4) 0 var(--space-3);
 }
 .btn-row .btn {
   flex: 1 1 auto;
@@ -2100,11 +2205,11 @@ dialog.sheet::after {
 
 .welcome {
   text-align: center;
-  margin: var(--space-6) var(--space-1h) var(--space-5);
+  margin: var(--space-6) var(--space-2) var(--space-5);
 }
 .welcome h2 {
   text-wrap: balance;
-  margin: 0 0 var(--space-2h);
+  margin: 0 0 var(--space-3);
 }
 .welcome p {
   margin: 0 auto var(--space-6);
@@ -2129,7 +2234,7 @@ dialog.sheet::after {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: var(--space-hair);
-  margin: var(--space-3h) 0 var(--space-2h);
+  margin: var(--space-4) 0 var(--space-3);
   text-align: center;
 }
 .days {
@@ -2149,12 +2254,12 @@ dialog.sheet::after {
 }
 
 .page-title {
-  margin: 0 0 var(--space-1h);
+  margin: 0 0 var(--space-2);
   color: var(--ink);
 }
 dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title,
 .page-title:has(+ #serverBox > .srv) {
-  margin-bottom: var(--space-3h);
+  margin-bottom: var(--space-4);
 }
 .btn-col {
   display: flex;
@@ -2168,7 +2273,7 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   margin-top: var(--space-7);
 }
 .mt-s {
-  margin-top: var(--space-2h);
+  margin-top: var(--space-2);
 }
 .chips {
   display: flex;
@@ -2186,13 +2291,13 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 }
 /* margins sit on these always-present boxes; on one hidden while typing, the field would jump */
 .serve {
-  margin: var(--space-5) 0 var(--space-2h);
+  margin: var(--space-5) 0 var(--space-3);
 }
 .serve .search {
   margin: 0;
 }
 .serve-list {
-  margin-top: var(--space-2h);
+  margin-top: var(--space-3);
 }
 .serve-list > .label:first-child {
   margin-top: 0;
@@ -2215,13 +2320,13 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   margin-top: var(--space-2);
 }
 .suggest .label {
-  margin: var(--space-4h) 0 var(--space-hair);
+  margin: var(--space-4) 0 var(--space-hair);
 }
 .suggest {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1h);
-  margin-top: var(--space-2h);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 .suggest:empty {
   display: none;
@@ -2244,10 +2349,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   content: none;
 }
 .tally {
-  margin: var(--space-2h) 0 var(--space-1);
+  margin: var(--space-3) 0 var(--space-1);
 }
 .verdict {
-  margin-top: var(--space-2h);
+  margin-top: var(--space-3);
 }
 .verdict p span {
   color: var(--muted);
@@ -2278,7 +2383,7 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 }
 .set-under {
   grid-column: 2;
-  margin-bottom: var(--space-3h);
+  margin-bottom: var(--space-3);
 }
 .set-group > .field-error {
   grid-column: 2;
@@ -2321,8 +2426,8 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-hair) var(--space-2h);
-  margin: var(--space-2h) 0 0;
+  gap: var(--space-hair) var(--space-2);
+  margin: var(--space-3) 0 0;
   color: var(--muted);
   overflow-wrap: anywhere;
 }

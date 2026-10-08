@@ -2,7 +2,7 @@
 import {andList, cap, esc} from '../text.js';
 import {DAY, when} from '../dates.js';
 import {icon} from '../icons.js';
-import {observationOf} from '../config.js';
+import {observationOf, TEXTURES} from '../config.js';
 import {db} from '../store.js';
 import {calledNames, evaluationModel, getPet, getProduct, model, petNames, pname, rankingModel} from '../derive.js';
 import {goodOf, poorOf, ratingsIn, shopGroups} from '../smart.js';
@@ -126,9 +126,25 @@ export function evaluationCard(m) {
   return `<section class="card" data-sec="evaluation" style="view-transition-name:sec-evaluation">${cardHead('Vorlieben', 'open-evaluation', 'Alle Vorlieben')}${body}</section>`;
 }
 
+// each consistency and flavour with how many of its meals went down well, all of it in the words beside the bar
+const TEXTURE_NAMES = Object.fromEntries(TEXTURES.Nassfutter.items.map(([k, label]) => [k, label]));
+function tasteHTML(t) {
+  const side = (title, list, name) =>
+    list.length
+      ? `<p class="taste-head"><span>${title}</span><span>gut gefressen</span></p><ul class="taste-list">${list
+          .map(
+            x =>
+              `<li><p class="taste-row"><span>${esc(name(x.key))}</span><span>${x.good} von ${x.n}</span></p><i class="taste-bar" style="--share:${(x.good / x.n).toFixed(3)}"></i></li>`,
+          )
+          .join('')}</ul>`
+      : '';
+  const html = side('Konsistenz', t.konsistenz, k => TEXTURE_NAMES[k]) + side('Geschmack', t.geschmack, k => k);
+  return html && `<div class="taste">${html}</div>`;
+}
+
 // the lists below name the varieties, so this only says how many of all settled ones go down well; several pets
 // can be told apart only by „Geschmackssache“, so only one pet is called picky or easy to please
-function portraitHTML(m, r) {
+function portraitHTML(m, r, x) {
   const ids = m.pets,
     several = ids.length > 1,
     pets = ids.map(getPet),
@@ -152,7 +168,7 @@ function portraitHTML(m, r) {
         .map(p => avatar(p, 'l pair'))
         .join('')
     : avatar(pets[0], 'xxl');
-  return `<section class="card portrait"><div class="ov-top"><span class="ov-pic">${pic}</span><div class="ov-text"><h2>${esc(petNames(ids))}</h2><p>${said.join(' ')}</p></div></div></section>`;
+  return `<section class="card portrait"><div class="ov-top"><span class="ov-pic">${pic}</span><div class="ov-text"><h2>${esc(petNames(ids))}</h2><p>${said.join(' ')}</p></div></div>${tasteHTML(x.taste)}</section>`;
 }
 
 // x.moves.fresh: varieties that came onto their side within the last 30 days; place: 0 for the only one
@@ -479,5 +495,5 @@ export function viewEvaluation() {
   const m = model(),
     r = rankingModel(),
     x = evaluationModel();
-  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${insightsCard(x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
+  return `${head('Vorlieben' + forWhom(m.pet), 'settings-back', shopBtn)}${r.rated ? portraitHTML(m, r, x) : ''}${listsHTML(m, r, x)}${trendCard(m, x)}${observedCard(x)}${splitCard(m, r)}${insightsCard(x)}${nextCard(m, r, x)}${footHTML(m, x.basis)}`;
 }

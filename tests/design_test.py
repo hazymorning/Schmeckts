@@ -24,7 +24,6 @@ TEXT_PAIRS = (
         ('--bad', '--surface'),
         ('--paper-ink', '--paper'),
         ('--paper-muted', '--paper'),
-        ('--paper-red', '--paper'),
     ]
     + [('--ink', r + '-soft') for r in RATING + OBSERVED]
 )
@@ -109,7 +108,7 @@ def css_decls(text):
 
 # The only type styles and distances; a new one is a design decision, so it fails here first
 TYPES = ('title', 'heading', 'subheading', 'body', 'body-strong', 'small', 'small-strong', 'caption', 'caption-strong')
-SPACES = ('hair', '1', '1h', '2', '2h', '3', '3h', '4', '4h', '5', '6', '7')
+SPACES = ('hair', '1', '2', '3', '4', '5', '6', '7')
 INSETS = ('card', 'group', 'row', 'box', 'control', 'compact', 'badge')
 
 

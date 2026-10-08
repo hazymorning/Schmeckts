@@ -13,6 +13,7 @@ import {
   shopGroups,
   slowStarters,
   tally,
+  taste,
   trend,
 } from './smart.js';
 import {db, prefs, revision, takeStale} from './store.js';
@@ -96,6 +97,7 @@ export const evaluationModel = () =>
       moves: moves(m, now, r),
       trend: trend(db, m, now),
       insights: insights(db, m, now),
+      taste: taste(m),
       next: nextUp(m, now, r, last, slowStarters(m)),
       observed: observed(db, m.pets, now),
       basis: basis(m, r),

@@ -711,6 +711,16 @@ async def test_evaluation(browser, url):
         "[document.querySelector('#sheet .portrait p').textContent, [...document.querySelectorAll('#sheet .ranks b')].map(b => b.textContent)]"
     )
     check(told[1] and not any(name in told[0] for name in told[1]), f'the portrait names none of the varieties the lists below show {told}')
+    profile = await pg.evaluate("""[...document.querySelectorAll('#sheet .portrait .taste-list')].map(l => [l.previousElementSibling.firstChild.textContent,
+      [...l.children].map(li => { const bar = li.querySelector('.taste-bar');
+        return [li.querySelector('.taste-row > :last-child').textContent, parseFloat(getComputedStyle(bar, '::before').width) / bar.clientWidth]; })])""")
+    filled = [[int(a) / int(b), share] for _, rows in profile for told_, share in rows for a, b in [told_.split(' von ')]]
+    check(
+        [side for side, _ in profile] == ['Konsistenz', 'Geschmack']
+        and all(abs(said - share) < 0.01 for said, share in filled)
+        and all([s for _, s in rows] == sorted([s for _, s in rows], reverse=True) for _, rows in profile),
+        f'the portrait’s taste profile: how often each consistency and flavour went down well, in words and as a bar, best first {profile}',
+    )
     ranked = await pg.eval_on_selector_all('#sheet .ranks', "l => l.map(o => [o.children.length, o.querySelectorAll('.place').length])")
     check(ranked and all(n == shown for n, shown in ranked), f'every row of a longer list shows its place {ranked}')
     titles = await pg.eval_on_selector_all('#sheet .card h2', 'l => l.map(h => h.innerHTML)')
@@ -738,7 +748,7 @@ async def test_insights(browser, url):
         product('treat', 'Dreamies', 'Käse', 'Snack'),
     ]
     meals = []
-    for d in range(1, 5):  # a morning meal in sauce, eaten up; in the evening one in jelly two hours after a treat, left
+    for d in range(1, 9):  # a morning meal in sauce, eaten up; in the evening one in jelly two hours after a treat, left
         meals += [
             meal(f'm{d}', 'ab'[d % 2], at(f'2026-06-0{d}T07:00'), {M: 'top'}),
             meal(f't{d}', 'treat', at(f'2026-06-0{d}T17:00'), {M: 'verputzt'}),
@@ -757,12 +767,12 @@ async def test_insights(browser, url):
             [
                 'Erkenntnisse',
                 [
-                    ['Bisher kommt Sheba besser an als Felix.', 'Sheba 4 von 4 Mal gut gefressen, Felix 0 von 4 Mal.'],
+                    ['Bisher kommt Sheba besser an als Felix.', 'Sheba 8 von 8 Mal gut gefressen, Felix 0 von 8 Mal.'],
                     [
                         'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
-                        'Stückchen in Soße 4 von 4 Mal gut gefressen, Stückchen in Gelee 0 von 4 Mal.',
+                        'Stückchen in Soße 8 von 8 Mal gut gefressen, Stückchen in Gelee 0 von 8 Mal.',
                     ],
-                    ['Morgens wird besser gefressen als abends.', 'Morgens 4 von 4 Mal gut gefressen, abends 0 von 4 Mal.'],
+                    ['Morgens wird besser gefressen als abends.', 'Morgens 8 von 8 Mal gut gefressen, abends 0 von 8 Mal.'],
                 ],
             ]
         ],
@@ -777,7 +787,7 @@ async def test_insights(browser, url):
                 'Beim Füttern',
                 [
                     card[0][1][2],
-                    ['Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.', 'Nach Snacks 0 von 4 Mal gut gefressen, sonst 4 von 4 Mal.'],
+                    ['Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.', 'Nach Snacks 0 von 8 Mal gut gefressen, sonst 8 von 8 Mal.'],
                 ],
             ],
         ]
@@ -1020,6 +1030,8 @@ async def test_slide(browser, url):
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     await pg.evaluate("""import('./js/derive.js').then(d => { window.__open = d.pendingServings()[0].id; window.__rated = [];
       document.addEventListener('click', e => { const b = e.target.closest('.slider-track button'); if (b) window.__rated.push(b.dataset.r); }); })""")
+    await pg.evaluate("document.querySelector('.pend .slider-track').scrollIntoView({block: 'center', behavior: 'instant'})")  # clear of the toast
+    await pg.wait_for_timeout(200)  # a touch right after a scroll only stops it
     at_ = await stops()
     await touch('touchStart', *at_[1])
     await pg.wait_for_timeout(250)  # a resting finger
@@ -1730,11 +1742,11 @@ async def test_sex(browser, url):
     await ctx.close()
 
 
-# each sheet in the pad, the one on top last: its text, its head (the date, the badge, whether the date is red and the
-# badge a verdict), its label and whether it lies out of reach under another
-SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => { const t = s.querySelector('.cal-text'), b = t.querySelector('b');
-  return [t.textContent.slice(b.textContent.length + 1), [s.querySelector('.cal-date').textContent, b.textContent,
-    s.querySelector('.cal-date').matches('.red'), b.matches('.cal-verdict'), !!s.querySelector('.cal-foot')], s.getAttribute('aria-label'), s.inert]; })"""
+# each sheet in the pad, the one on top last: its text, its head (the date, the stamp, the verdict leading the text on a
+# back, whether the foot is there), its label and whether it lies out of reach under another
+SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => { const t = s.querySelector('.cal-text'), b = t.querySelector('.cal-verdict');
+  return [b ? t.textContent.slice(b.textContent.length + 1) : t.textContent, [s.querySelector('.cal-date').textContent.replace(/\\u00a0/g, ' '),
+    s.querySelector('.cal-stamp').textContent, b && b.textContent, !!s.querySelector('.cal-foot')], s.getAttribute('aria-label'), s.inert]; })"""
 # the sheet of a day in facts.js
 FACT = "when => import('./js/views/facts.js').then(f => f.sheetOn(new Date(when)).sheet)"
 # the date alone on its line, the text below it across the sheet, the sheet as wide as the cards
@@ -1751,7 +1763,7 @@ async def day_at(pg, when):
 
 
 async def test_calendar(browser, url):
-    print('the cat calendar: under the overview, a format a weekday, a sheet a day, the last one seen hanging over today’s until torn off')
+    print('the cat calendar: under the meals to rate, a format a weekday, a sheet a day, the last one seen hanging over today’s until torn off')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-09-28T12:00:00+02:00')  # a Monday, the calendar's first day on this phone
@@ -1760,13 +1772,13 @@ async def test_calendar(browser, url):
     monday = await pg.evaluate(FACT, '2026-09-28T12:00:00+02:00')
     await tap(pg, '#home .calsheet')
     check(
-        first == [[monday['text'], ['Montag, 28. September', 'Katzenlogik:', False, False, False], None, False]]
+        first == [[monday['text'], ['Montag, 28. September', 'Katzenlogik', None, False], None, False]]
         and await pg.evaluate(SHEETS) == first
         and await state(pg, 'prefs.sheetDay') == '2026-09-28',
         f'first use: Monday’s Katzenlogik, nothing hanging over it, a tap does nothing {first}',
     )
     order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calpad') ? 'cal' : e.dataset.sec || '')")
-    check(order.index('cal') == order.index('overview') + 1, f'right under the overview {order}')
+    check(order[:3] == ['overview', 'pend', 'cal'], f'the overview, the meals to rate, then the calendar {order}')
     placed = await pg.evaluate(PLACED)
     check(placed == [True, True, True], f'the date as its heading, the text below across the sheet, as wide as the cards {placed}')
 
@@ -1776,12 +1788,12 @@ async def test_calendar(browser, url):
     await pg.click('#home .calsheet[data-action=tear]')
     swapped = await pg.evaluate(SHEETS)
     await idle(pg)
-    front = [tuesday['text'], ['Dienstag, 29. September', 'Stimmt’s?', False, False, False], 'Auflösung zeigen', False]
+    front = [tuesday['text'], ['Dienstag, 29. September', 'Stimmt’s?', None, False], 'Auflösung zeigen', False]
     check(
         morning
         == [
             [*front[:3], True],
-            [monday['text'], ['Montag, 28. September', 'Katzenlogik:', False, False, True], 'Gestriges Blatt abreißen', False],
+            [monday['text'], ['Montag, 28. September', 'Katzenlogik', None, True], 'Gestriges Blatt abreißen', False],
         ],
         f'a new day: yesterday’s sheet hangs over today’s as it was, its foot saying to tear it off {morning}',
     )
@@ -1799,7 +1811,7 @@ async def test_calendar(browser, url):
     await pg.keyboard.press('Enter')
     await idle(pg)
     check(
-        answer == [[tuesday['back'], ['Dienstag, 29. September', tuesday['verdict'] + '.', False, True, False], 'Behauptung zeigen', False]]
+        answer == [[tuesday['back'], ['Dienstag, 29. September', 'Stimmt’s?', tuesday['verdict'] + '.', False], 'Behauptung zeigen', False]]
         and kept == answer
         and await pg.evaluate(SHEETS) == [front],
         f'today’s Stimmt’s? turns over to its answer led by the verdict, which stays, and back, by tap or Enter {answer}',
@@ -1812,15 +1824,12 @@ async def test_calendar(browser, url):
     away = await pg.evaluate(SHEETS)
     await tap(pg, '#home .calsheet[data-action=tear]')
     check(
-        saturday == [[own['text'], ['Samstag, 8. August', 'Sprache:', False, False, False], None, False]]
-        and away[1:] == [[own['text'], ['Samstag, 8. August', 'Sprache:', False, False, True], 'Gestriges Blatt abreißen', False]]
+        saturday == [[own['text'], ['Samstag, 8. August', 'Sprache', None, False], None, False]]
+        and away[1:] == [[own['text'], ['Samstag, 8. August', 'Sprache', None, True], 'Gestriges Blatt abreißen', False]]
         and len(await pg.evaluate(SHEETS)) == 1
         and await state(pg, "prefs.sheetDay === '2026-08-11' && !prefs.hiddenHints.some(k => k.startsWith('blatt:'))"),
         f'the clock put back: nothing hangs; days away, the last one seen hangs and the days between are gone {saturday} {away}',
     )
-    await day_at(pg, '2026-10-04T12:00:00+02:00')
-    sunday = (await pg.evaluate(SHEETS))[0][1]
-    check(sunday[0] == 'Sonntag, 4. Oktober' and sunday[2], f'red on Sundays {sunday}')
 
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')
