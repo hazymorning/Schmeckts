@@ -326,6 +326,12 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
   {
+    v: '0.35.0',
+    title: 'Ganz für Katzen',
+    say: 'Schmeckt’s? ist jetzt eine reine Katzen-App. Die Frage nach der Tierart ist weg, und die App spricht überall von deiner Katze.',
+    why: 'An deinen Einträgen ändert sich nichts.',
+  },
+  {
     v: '0.34.0',
     title: 'Schneller fertig',
     say: 'Ist die Packung benannt, bist du gleich wieder auf der Startseite. Die fragt jetzt nur noch eins auf einmal.',
