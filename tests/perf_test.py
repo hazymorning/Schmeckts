@@ -30,7 +30,6 @@ def household(years):
             'brand': BRANDS[i % 10],
             'variety': f'{FLAVORS[i % 15]} {TEXTURES[i % 5]}',
             'type': 'Nassfutter',
-            'animal': 'Katze',
             'thumb': None,
             'lastPets': [],
             'createdAt': i,

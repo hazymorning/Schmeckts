@@ -95,7 +95,7 @@ function renderPets() {
           `<button class="pet" data-action="filter" data-id="${p.id}" aria-pressed="${prefs.activePet === p.id}" style="view-transition-name:av-${p.id}">${avatar(p, 'xl')}<span>${esc(p.name)}</span></button>`,
       )
       .join('') +
-    `<button class="pet" data-action="add-pet" aria-label="Tier hinzufügen"><span class="av xl add">${icon('plus')}</span><span>Neu</span></button>`;
+    `<button class="pet" data-action="add-pet" aria-label="Katze hinzufügen"><span class="av xl add">${icon('plus')}</span><span>Neu</span></button>`;
   if (html !== petsDrawn) el.innerHTML = petsDrawn = html;
 }
 
@@ -165,9 +165,9 @@ function homeHTML() {
 
 const welcomeHTML = () => `<div class="welcome">
   <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
-  <h2>Was schmeckt deinem Tier?</h2>
-  <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie viel dein Tier gefressen hat. So siehst du bald, was wirklich ankommt.</p>
-  <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Tier anlegen</button>
+  <h2>Was schmeckt deiner Katze?</h2>
+  <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie viel deine Katze gefressen hat. So siehst du bald, was wirklich ankommt.</p>
+  <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Katze anlegen</button>
     ${isConnected() ? '' : `<button class="btn soft" data-action="demo">${icon('sparkle')}Beispieldaten ansehen</button>`}
   </div></div>`;
 
@@ -175,7 +175,7 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
   <div class="steps-hero">${sketch('camera', 'xxl')}</div><ol class="list steps">
   <li class="row"><span class="n">1</span><p class="hint"><b>Zur Futterzeit</b> auf „Füttern“ tippen und die Packung fotografieren. Marke und Sorte liest die App von der Packung.</p></li>
   <li class="row"><span class="n">2</span><p class="hint"><b>Wenn der Napf leer ist</b>, oder eben nicht, hier mit einem Tipp bewerten.</p></li>
-  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was dein Tier mag und was stehen bleibt.</p></li></ol></section>`;
+  <li class="row"><span class="n">3</span><p class="hint"><b>Nach ein paar Tagen</b> siehst du unter „Vorlieben“, was deine Katze mag und was stehen bleibt.</p></li></ol></section>`;
 
 // a pet rated here keeps its row while the meal stays in the card
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
@@ -271,8 +271,7 @@ const goTo = ([where, label]) =>
     : `<button class="btn primary" data-action="${where === 'evaluation' ? 'open-evaluation' : 'open-settings'}">${label}</button>`;
 // the newest news for this household, never beside sample data
 function newsHTML() {
-  const cat = calendarOn(),
-    n = NEWS.find(x => x.v === NEWS[0].v && (x.cat == null || x.cat === cat)),
+  const n = NEWS[0],
     [setting, offWhy] = n?.off || [],
     off = setting && !prefs[setting];
   if (!n || prefs.hiddenHints.includes('neu:' + n.v) || db.pets.some(p => p.id.startsWith(DEMO))) return '';
@@ -282,8 +281,6 @@ function newsHTML() {
 }
 
 // The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
-export const hasCat = () => db.pets.some(p => p.species === 'Katze');
-const calendarOn = () => prefs.calendar && hasCat();
 /* A day's sheet: the date as its heading, red on Sundays as on a real tear-off calendar, then the fact led by its
    format. Today's Stimmt’s? turns over on a tap, its answer led by the verdict. */
 function face(date, hanging = false) {
@@ -299,7 +296,7 @@ function face(date, hanging = false) {
 }
 const tappable = (action, label) => ` role="button" tabindex="0" aria-label="${label}" data-action="${action}"`;
 function calsheetHTML() {
-  if (!calendarOn()) return '';
+  if (!prefs.calendar) return '';
   const now = Date.now(),
     today = dayKey(now);
   // first seen, or ahead after the clock was put back: nothing hangs today

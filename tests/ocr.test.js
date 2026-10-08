@@ -1,5 +1,5 @@
-// Reading packaging text (js/ocr.js) without a device: known varieties, brands, variety, type, species,
-// consistency. Usage: node --test tests/*.test.js
+// Reading packaging text (js/ocr.js) without a device: known varieties, brands, variety, type, consistency.
+// Usage: node --test tests/*.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readdirSync, readFileSync} from 'node:fs';
@@ -24,8 +24,8 @@ import {norm} from '../app/www/js/text.js';
 import {VOCAB_BRANDS, VOCAB_WORDS} from '../app/www/js/vocab.js';
 
 const VARIETIES = [
-  {id: 'shebalachs01', brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', animal: 'Katze', texture: 'sosse'},
-  {id: 'dreamieskaese', brand: 'Dreamies', variety: 'Käse', type: 'Snack', animal: 'Katze'},
+  {id: 'shebalachs01', brand: 'Sheba', variety: 'Lachs in Soße', type: 'Nassfutter', texture: 'sosse'},
+  {id: 'dreamieskaese', brand: 'Dreamies', variety: 'Käse', type: 'Snack'},
 ];
 
 test('packaging text: our own varieties win, insensitive to case, hyphens and spaces, and say which one it is', () => {
@@ -37,7 +37,6 @@ test('packaging text: our own varieties win, insensitive to case, hyphens and sp
         brand: 'Sheba',
         variety: 'Lachs in Soße',
         type: 'Nassfutter',
-        animal: 'Katze',
         texture: 'sosse',
         known: 'shebalachs01',
       },
@@ -82,18 +81,18 @@ test('packaging text: the variety without quantities, advertising, ingredients a
   );
 });
 
-test('packaging text: type, consistency and species from the keywords', () => {
+test('packaging text: type and consistency from the keywords', () => {
   const wet = readPack('Miamor\nFeine Filets\nHuhn in Gelee\nfür Katzen');
-  assert.deepEqual([wet.type, wet.texture, wet.animal], ['Nassfutter', 'gelee', 'Katze']);
+  assert.deepEqual([wet.type, wet.texture], ['Nassfutter', 'gelee']);
   const treat = readPack('Vitakraft\nKnusper-Sticks mit Lachs\nSnack für Katzen');
-  assert.deepEqual([treat.type, treat.texture, treat.animal], ['Snack', 'knusprig', 'Katze']);
-  const dry = readPack('Josera\nTrockenfutter\nHuhn für Welpen');
-  assert.deepEqual([dry.type, dry.texture, dry.animal], ['Trockenfutter', undefined, 'Hund']);
+  assert.deepEqual([treat.type, treat.texture], ['Snack', 'knusprig']);
+  const dry = readPack('Josera\nTrockenfutter\nHuhn für Kitten');
+  assert.deepEqual([dry.type, dry.texture], ['Trockenfutter', undefined]);
 });
 
 test('packaging text: with nothing usable everything stays empty', () => {
   for (const text of ['', '   ', '12345\n4008429087455\n850 g', 'NEU\n100 % natürlich']) {
-    assert.deepEqual(readPack(text, VARIETIES), {brand: '', variety: '', type: '', animal: ''}, JSON.stringify(text));
+    assert.deepEqual(readPack(text, VARIETIES), {brand: '', variety: '', type: ''}, JSON.stringify(text));
   }
 });
 
@@ -800,7 +799,7 @@ function misses(f, again) {
   const out = {};
   if (!same(got.brand, want.brand)) out.brand = got.brand;
   if (!same(got.variety, want.variety)) out.variety = got.variety;
-  for (const k of ['type', 'animal', 'texture']) if (want[k] && got[k] !== want[k]) out[k] = got[k] ?? '';
+  for (const k of ['type', 'texture']) if (want[k] && got[k] !== want[k]) out[k] = got[k] ?? '';
   if (want.chips && JSON.stringify(chips) !== JSON.stringify(want.chips)) out.chips = chips;
   return out;
 }

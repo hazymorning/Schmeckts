@@ -37,10 +37,10 @@ Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumut
 - *Vorlieben*: Tops und Flops, auf der Startseite gleich mit Packung, Erkenntnisse etwa zu Konsistenz, Tageszeit und Snacks, dazu was als Nächstes in den Napf kann.
 - *Einkaufen*: was sich nachzukaufen lohnt, als Liste zum Verschicken.
 - *Verlauf*: jede Mahlzeit, Tag für Tag.
-- *Katzenkalender*: wohnt eine Katze bei dir, liegt auf der Startseite ein Abreißkalender, ein Blatt pro Tag. Montags Katzenlogik, dienstags Stimmt’s? mit Stempel, freitags ein Flachwitz.
+- *Katzenkalender*: auf der Startseite ein Abreißkalender, ein Blatt pro Tag. Montags Katzenlogik, dienstags Stimmt’s? mit Stempel, freitags ein Flachwitz.
 - *Beobachtungen*: von guter Laune bis Erbrechen, mit einem Tipp notiert. Lüften musst du selbst.
 - Erinnerungen ans Füttern und Bewerten.
-- Mehrere Tiere, mit Geschlecht und Spitznamen, auf die sie genauso wenig hören.
+- Mehrere Katzen, mit Geschlecht und Spitznamen, auf die sie genauso wenig hören.
 - Backup fürs neue Handy.
 
 </details>

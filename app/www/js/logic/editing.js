@@ -28,7 +28,7 @@ export function saveName() {
 function nameServing(id, details) {
   const sv = getServing(id);
   if (!sv) return;
-  refinePets(sv, findProduct(details.brand, details.variety), null);
+  refinePets(sv, findProduct(details.brand, details.variety));
   applyProduct(sv, details);
   save();
   backFromNaming();
@@ -86,7 +86,7 @@ export function useProduct(pid) {
   if (sheet.kind === 'serving') {
     const sv = getServing(sheet.id);
     if (!sv) return;
-    refinePets(sv, p, null);
+    refinePets(sv, p);
     linkProduct(sv, p);
     save();
     backFromNaming();

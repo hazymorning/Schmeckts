@@ -19,7 +19,6 @@ export const petState = p => ({
   nicknames: namesOf(p).slice(1),
   nick: '', // typed, not yet added
   error: '',
-  species: p?.species || 'Katze',
   sex: p?.sex || '',
   photo: p?.photo || null,
   step: null,
@@ -101,15 +100,16 @@ export function savePet() {
   const s = sheet,
     name = (s.name || '').trim();
   if (!name) {
-    showError('Wie heißt dein Tier?');
+    showError('Wie heißt deine Katze?');
     $('#f-name')?.focus();
     return;
   }
+  // species for older app versions, which pick the icon and the cat calendar by it
   const isNew = !s.id,
-    p = isNew ? {id: uid(), createdAt: Date.now()} : getPet(s.id) || {};
+    p = isNew ? {id: uid(), species: 'Katze', createdAt: Date.now()} : getPet(s.id) || {};
   addNick(true);
   const nicknames = s.nicknames.filter(n => !sameName(n, name));
-  Object.assign(p, {name, species: s.species, photo: s.photo || null});
+  Object.assign(p, {name, photo: s.photo || null});
   if (s.sex) p.sex = s.sex;
   else delete p.sex;
   if (nicknames.length) p.nicknames = nicknames;

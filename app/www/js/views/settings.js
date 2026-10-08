@@ -10,7 +10,6 @@ import {isConnected, status} from '../sync.js';
 import {feedSlots} from '../smart.js';
 import {petNames} from '../derive.js';
 import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} from './parts.js';
-import {hasCat} from './home.js';
 import {sheet} from '../ui/sheet.js';
 
 const THEMES = [
@@ -47,7 +46,7 @@ const switchRow = (action, ic, title, sub, on, id = '') =>
 const doRow = (action, ic, title) =>
   `<button class="row set-row act" data-action="${action}">${lead(ic)}${main(title)}</button>`;
 const petRow = p =>
-  `<button class="row set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p, 's')}${main(esc(p.name), esc(p.species))}${chev}</button>`;
+  `<button class="row set-row" data-action="edit-pet" data-id="${p.id}">${avatar(p, 's')}${main(esc(p.name))}${chev}</button>`;
 const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(title)}</div>`;
 
 const LOOKUP = 'Sucht nur mit der Nummer des Barcodes';
@@ -64,20 +63,18 @@ function overview() {
         ? ''
         : `<p class="banner">In dieser Vorschau wird nichts dauerhaft gespeichert.</p>`
   }
-    ${group('Tiere', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Tier hinzufügen'), 'set-group')}
+    ${group('Katzen', db.pets.map(petRow).join('') + doRow('add-pet', 'plus', 'Katze hinzufügen'), 'set-group')}
     ${group(
       'Darstellung',
       labelRow('auto', 'Farbschema') +
         under(segmented('theme', THEMES, prefs.theme)) +
-        (hasCat()
-          ? switchRow(
-              'calendar',
-              'calendar',
-              'Katzenkalender',
-              'Ein Kalenderblatt am Tag auf der Startseite',
-              prefs.calendar,
-            )
-          : ''),
+        switchRow(
+          'calendar',
+          'calendar',
+          'Katzenkalender',
+          'Ein Kalenderblatt am Tag auf der Startseite',
+          prefs.calendar,
+        ),
       'set-group',
     )}
     ${group(
@@ -146,7 +143,7 @@ function exchangePage() {
 
 // the last paragraph is the attribution the ODbL requires, see NOTICE
 const PRIVACY = [
-  'Tiere, Sorten und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
+  'Katzen, Sorten und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
   'Den Text auf einer Packung liest das Handy selbst, ohne Internet. Die Sortensuche unter „Scannen“ ist anfangs aus. Eingeschaltet fragt sie bei unbekannten Barcodes zwei freie Datenbanken im Internet, und zwar nur mit der Nummer.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',
@@ -168,8 +165,8 @@ function serverSection(notice = syncInfo()) {
         autocomplete="off" inputmode="url" spellcheck="false" enterkeyhint="next">`;
   if (!isConnected())
     return s.connectForm
-      ? `<p class="hint">Wenn ihr verbunden seid, sehen alle im Haushalt dieselben Tiere, Mahlzeiten und Bewertungen. Adresse und Code findest du auf dem Mini-PC unter „Schmeckt’s-Server einrichten“.</p>${addrField}${codeRow}`
-      : `<p class="hint">Alle Daten bleiben auf diesem Handy. Mit einem Haushalt verbunden, sehen alle dieselben Tiere und Einträge.</p>
+      ? `<p class="hint">Wenn ihr verbunden seid, sehen alle im Haushalt dieselben Katzen, Mahlzeiten und Bewertungen. Adresse und Code findest du auf dem Mini-PC unter „Schmeckt’s-Server einrichten“.</p>${addrField}${codeRow}`
+      : `<p class="hint">Alle Daten bleiben auf diesem Handy. Mit einem Haushalt verbunden, sehen alle dieselben Katzen und Einträge.</p>
         <button class="btn soft" data-action="connect-form">${icon('house')}Mit Haushalt verbinden</button>`;
   const needCode = status.kind === 'auth';
   return `<div class="group srv ${notice.tone}" role="status"><div class="row"><span class="sign srv-ic">${icon(notice.tone === 'bad' ? 'alert' : 'house')}</span>

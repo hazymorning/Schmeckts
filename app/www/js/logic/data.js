@@ -73,7 +73,6 @@ export async function exportReading() {
       brand: p ? p.brand || '' : null, // null: not named yet, filled in by hand
       variety: p ? p.variety || '' : null,
       type: p?.type || null,
-      animal: p?.animal || null,
       texture: p?.texture || null,
       locked: false,
     },
@@ -159,7 +158,7 @@ function demoMeals(pet) {
   const made = [],
     byBrand = {};
   for (const [brand, variety, type, ratings] of DEMO_PLAN) {
-    const p = newProduct({brand, variety, type, animal: 'Katze'}, demoId());
+    const p = newProduct({brand, variety, type}, demoId());
     p.lastPets = [pet.id];
     byBrand[brand] ??= p;
     for (const r of ratings)

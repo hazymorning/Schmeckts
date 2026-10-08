@@ -112,14 +112,8 @@ export function defaultPets(p) {
   const valid = ids => (ids || []).filter(id => getPet(id));
   if (prefs.activePet !== 'all' && getPet(prefs.activePet)) return {ids: [prefs.activePet], auto: false};
   if (db.pets.length === 1) return {ids: [db.pets[0].id], auto: false};
-  if (p) {
-    const lp = valid(p.lastPets);
-    if (lp.length) return {ids: lp, auto: false};
-    if (p.animal) {
-      const sp = db.pets.filter(x => x.species === p.animal).map(x => x.id);
-      if (sp.length) return {ids: sp, auto: false};
-    }
-  }
+  const lp = valid(p?.lastPets);
+  if (lp.length) return {ids: lp, auto: false};
   const last = valid(prefs.lastPets);
   if (last.length) return {ids: last, auto: true};
   return {ids: db.pets.map(x => x.id), auto: true};
@@ -136,7 +130,7 @@ function lastServed() {
   return last;
 }
 export const withLast = (products, last = lastServed()) => products.map(p => ({product: p, at: last.get(p.id) || 0}));
-// all: every variety, as a search must find each one or it gets made twice; flops and other animals' food last
+// all: every variety, as a search must find each one or it gets made twice; flops last
 export function quickProducts(limit = Infinity, all = false) {
   const last = lastServed();
   const flop = new Set(
@@ -144,8 +138,7 @@ export function quickProducts(limit = Infinity, all = false) {
       .sorts.filter(e => e.choice === 'nicht')
       .map(e => e.id),
   );
-  const pet = prefs.activePet !== 'all' ? getPet(prefs.activePet) : null;
-  const later = p => flop.has(p.id) || (!!pet && !last.has(p.id) && !!p.animal && p.animal !== pet.species);
+  const later = p => flop.has(p.id);
   const products = db.products
     .filter(p => all || !later(p))
     .sort(

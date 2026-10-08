@@ -14,6 +14,7 @@ Read `PROJECT.md` before changing stored data, sync, storage or the server.
 - `PROJECT.md` changes only with architecture, stored data, the protocol or the server API, never with wording or
   layout.
 - Tests cover behaviour. Do not pin exact wording or pixel sizes unless that is what the change is about.
+- For cats only. The interface says „Katze“, never „Tier“, and nothing is built for other animals.
 - The interface is German, plain, as people talk. Code, comments and commit messages are English. The words are
   „füttern“, never „servieren“, and „Sorte“, never „Futter“ or „Produkt“ for a variety.
 - Code earns its place by being seen. What users rarely see does not go in.

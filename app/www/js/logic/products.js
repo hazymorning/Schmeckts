@@ -1,7 +1,7 @@
 // barcodes reach a variety only in linkProduct, so a multipack grows and a wrong variety takes its code with it
 import {uid} from '../fields.js';
 import {serverNow} from '../clock.js';
-import {guessTexture, SPECIES, textureOf, TYPES, typeOf} from '../config.js';
+import {guessTexture, textureOf, TYPES, typeOf} from '../config.js';
 import {db, dbFound, loadError, prefs, save, savePrefs} from '../store.js';
 import {setAside} from '../disk.js';
 import {shareText} from '../native.js';
@@ -67,7 +67,6 @@ export function newProduct(details, id = uid()) {
     brand: details.brand || '',
     variety: details.variety || '',
     type: typeOf(details),
-    animal: SPECIES.some(x => x.k === details.animal) ? details.animal : null,
     thumb: details.thumb || null,
     lastPets: [],
     codes: {},

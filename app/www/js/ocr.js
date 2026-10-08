@@ -1,7 +1,7 @@
-/* Packaging text to the same {brand, variety, type, animal, texture} the server returns. Input is readingOf() lines
+/* Packaging text to the same {brand, variety, type, texture} the server returns. Input is readingOf() lines
    or plain text; plain text has no sizes, so no line is dropped for being small or slanted. */
 import {cutName, norm, SMALL} from './text.js';
-import {ANIMAL_WORDS, BRANDS, FLAVORS, PRODUCT_LINES, TEXTURES, TYPE_WORDS} from './config.js';
+import {BRANDS, FLAVORS, PRODUCT_LINES, TEXTURES, TYPE_WORDS} from './config.js';
 import {VOCAB_BRANDS, VOCAB_WORDS} from './vocab.js';
 
 export const MAX_VARIETY = 40;
@@ -39,7 +39,7 @@ export const CLOSEST = 0.5; // of the photo's short side; closer in, a thumbnail
 const ROOM = 0.15; // added on each side, as a share of the text's longer edge
 const SAME_SHAPE = 0.02; // aspect ratios further apart are another photo, or the same one turned
 
-const EMPTY = {brand: '', variety: '', type: '', animal: ''};
+const EMPTY = {brand: '', variety: '', type: ''};
 const QUANTITY =
   /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l)?|\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|stk|stück)\b/gi;
 const JUNK =
@@ -71,7 +71,6 @@ export function readPack(read, products = []) {
       brand: known.brand || '',
       variety: known.variety || '',
       type: known.type || '',
-      animal: known.animal || '',
       texture: known.texture,
       ...(known.id ? {known: known.id} : {}), // recognize.js treats this like a barcode hit
     };
@@ -81,13 +80,7 @@ export function readPack(read, products = []) {
   const variety = pickVariety(page, brand, products);
   if (!brand && !variety) return {...EMPTY};
   const texture = TEXTURES[type]?.items.find(([, , re]) => re.test(raw))?.[0];
-  return {
-    brand,
-    variety,
-    type,
-    animal: ANIMAL_WORDS.find(([, re]) => re.test(raw))?.[0] || '',
-    ...(texture ? {texture} : {}),
-  };
+  return {brand, variety, type, ...(texture ? {texture} : {})};
 }
 
 // mid is the median line height, tilt the direction most lines run in, height the photo's
@@ -226,11 +219,9 @@ export function packBrands(read, products = []) {
 
 // vocab: only Open Pet Food Facts knows it
 const brandEntry = (name, vocab = false) => ({name: String(name || '').trim(), key: norm(name), vocab});
-// Open Pet Food Facts lists "Katzenfutter" and the like as brands
-const onlyFood = b =>
-  b.key
-    .split(' ')
-    .every(w => /^(?:food|futter|nahrung)$/.test(w) || [...ANIMAL_WORDS, ...TYPE_WORDS].some(([, re]) => re.test(w)));
+// Open Pet Food Facts lists "Katzenfutter", "Dog food" and the like as brands
+const FOOD = /^(?:food|futter|nahrung)$|katze|kitten|\bcat\b|hund|\bdog\b/;
+const onlyFood = b => b.key.split(' ').every(w => FOOD.test(w) || TYPE_WORDS.some(([, re]) => re.test(w)));
 const LISTED_BRANDS = BRANDS.map(b => brandEntry(b)),
   VOCAB_BRAND_ENTRIES = VOCAB_BRANDS.map(b => brandEntry(b, true)).filter(b => !onlyFood(b));
 // the first spelling wins, so the list beats ours and ours beats Open Pet Food Facts
@@ -526,7 +517,7 @@ const unscrapped = (line, known) =>
 const GERMAN = new RegExp(
   '(?<!\\p{L})(?:huhn|h(?:ü|ue)hn\\p{L}*|h(?:ä|ae)hnchen|gefl(?:ü|ue)gel|pute|truthahn|rind|ente|lamm|kaninchen|wild|hirsch|reh|' +
     'kalb|schwein|lachs|thunfisch|forelle|fisch|garnele|k(?:ä|ae)se|leber|herz|sauce|so(?:ß|ss)e|gelee|pastete|h(?:ä|ae)ppchen|' +
-    'st(?:ü|ue)ckchen|filets?|ragout|feines?|zartes?|mit|und|ohne|f(?:ü|ue)r|katzen?|hunde?)(?!\\p{L})',
+    'st(?:ü|ue)ckchen|filets?|ragout|feines?|zartes?|mit|und|ohne|f(?:ü|ue)r|katzen?)(?!\\p{L})',
   'giu',
 );
 const ENGLISH = new RegExp(
