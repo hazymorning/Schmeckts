@@ -328,7 +328,7 @@ export const NEWS = [
   {
     v: '0.35.0',
     title: 'Ganz für Katzen',
-    say: 'Schmeckt’s? ist jetzt eine reine Katzen-App. Die Frage nach der Tierart ist weg, und die App spricht überall von deiner Katze.',
+    say: 'Schmeckt’s? ist jetzt eine reine Katzen-App und spricht überall von deiner Katze.',
     why: 'An deinen Einträgen ändert sich nichts.',
   },
   {

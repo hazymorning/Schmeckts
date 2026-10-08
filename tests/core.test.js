@@ -105,8 +105,8 @@ test('consistency and treat type: the choice per type, keywords in brand and var
       'Drink',
       'Sticks Lachs',
       'Filetstreifen',
-      'Kauknochen',
-      'Chew Bone',
+      'Kausnack',
+      'Dental Chew',
     ]),
     [
       'knusprig',

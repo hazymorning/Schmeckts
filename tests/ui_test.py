@@ -300,7 +300,7 @@ async def test_flow(browser, url):
     await tap(pg, '[data-action=save-pet]')
     check(await pg.evaluate(LEVEL) == [True, 'settings', None, None], 'saving a pet returns to the settings overview')
     await back(pg)
-    check(await state(pg, 'db.pets.length') == 2, 'two pets')
+    check(await state(pg, "db.pets.length === 2 && db.pets.every(p => p.species === 'Katze')"), 'two pets, stored as cats for older versions')
     await snap(pg)
     check(
         await state(pg, "db.servings[0].status + '|' + db.servings[0].error") == 'noserver|undefined'
