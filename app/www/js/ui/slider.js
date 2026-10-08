@@ -8,7 +8,8 @@ const SLOP = 8; // px before a touch slides or scrolls, as on Android
 const SETTLE = 150; // ms after a scroll in which a touch only stops it
 const REST = 100; // ms, Android's tap timeout
 let press = null, // at: the level button the thumb is on
-  scrolled = -Infinity;
+  scrolled = -Infinity,
+  kept = null;
 const lifted = []; // resolvers waiting in untouched()
 
 export const thumbHTML = r => (r ? icon('r_' + r) : '');
@@ -41,6 +42,11 @@ export function setLevel(slider, r) {
 // redraws wait for this, so a slider is never replaced under a finger
 export const untouched = () => (press ? new Promise(resolve => lifted.push(resolve)) : Promise.resolve());
 export const pressing = () => !!press;
+// scrolls so a redrawn row stays where it was: to the eye nothing moved, so a touch right after it counts
+export function keepBy(dy) {
+  scrollBy({top: dy, behavior: 'instant'});
+  kept = scrollY;
+}
 
 function nearest(slider, x) {
   const off = b => {
@@ -63,7 +69,13 @@ function end() {
   for (const go of lifted.splice(0)) go();
 }
 
-addEventListener('scroll', e => (scrolled = e.timeStamp), {capture: true, passive: true});
+addEventListener(
+  'scroll',
+  e => {
+    if (e.target !== document || scrollY !== kept) scrolled = e.timeStamp;
+  },
+  {capture: true, passive: true},
+);
 addEventListener('pointerdown', e => {
   if (!e.isPrimary) return;
   const bar = e.target.closest?.('.slider-bar'),

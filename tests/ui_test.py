@@ -1067,6 +1067,7 @@ async def test_slide(browser, url):
     await touch('touchEnd')
     await idle(pg)
     check(await rated() == ['gut', ['gut']], 'lifting the finger rates once')
+    check(abs((await stops())[1][1] - at_[1][1]) < 1, 'the row stays under the finger, whatever the rating changes above it')
     await slide(at_[1], at_[0])
     await touch('touchEnd')
     await idle(pg)
