@@ -2875,18 +2875,19 @@ async def test_observations(browser, url):
     await tap(pg, '[data-action=observe][data-v=stink]')
     after, pet_ = await pg.evaluate(OBS), await state(pg, 'db.pets[0].id')
     told = await pg.inner_text('#toast > span')
+    noted = f'{ROW}[data-id="{await state(pg, "db.observations[0].id")}"]'  # the sample may have noted something today too
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
         and await pg.locator(CHIP).count() == 5
-        and await pg.locator(ROW).count() == 1
-        and await pg.inner_text(f'{ROW} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
+        and await pg.locator(noted).count() == 1
+        and await pg.inner_text(f'{noted} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary under the chip’s word {after[0]}',
     )
     lefts = await pg.eval_on_selector_all('[data-sec=hist] .tl-day .row .t-main', 'l => l.map(t => t.getBoundingClientRect().left)')
     check(len(lefts) > 1 and len(set(lefts)) == 1, f'beside the meals of the day, its text in the same column {lefts}')
     await tap(pg, '#toast [data-action=undo]')
-    check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
+    check(await pg.evaluate(OBS) == before and await pg.locator(noted).count() == 0, 'undo takes it back, from the diary too')
     await tap(pg, '[data-action=observe][data-v=hungry]')
     again = await pg.inner_text('#toast > span')
     check(
