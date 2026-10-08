@@ -99,3 +99,19 @@ jobs:
         run: |
           cp "schmeckts-$VERSION.apk" schmeckts.apk
           gh release upload "$TAG" schmeckts.apk schmeckts-server_*.deb --clobber --repo "$GITHUB_REPOSITORY"
+
+      # an empty release text gets the version's news from the app
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: src
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.apk.outputs.version }}
+        run: |
+          [ -z "$(gh release view "$TAG" --json body --jq .body --repo "$GITHUB_REPOSITORY")" ] || exit 0
+          NOTES="$(node --input-type=module -e "
+            const {NEWS} = await import('$PWD/src/app/www/js/config.js');
+            const n = NEWS.find(x => x.v === process.env.VERSION);
+            if (n) console.log(n.say + ' ' + n.why);")"
+          [ -z "$NOTES" ] || gh release edit "$TAG" --notes "$NOTES" --repo "$GITHUB_REPOSITORY"
