@@ -711,6 +711,16 @@ async def test_evaluation(browser, url):
         "[document.querySelector('#sheet .portrait p').textContent, [...document.querySelectorAll('#sheet .ranks b')].map(b => b.textContent)]"
     )
     check(told[1] and not any(name in told[0] for name in told[1]), f'the portrait names none of the varieties the lists below show {told}')
+    profile = await pg.evaluate("""[...document.querySelectorAll('#sheet .portrait .taste-list')].map(l => [l.previousElementSibling.firstChild.textContent,
+      [...l.children].map(li => { const bar = li.querySelector('.taste-bar');
+        return [li.querySelector('.taste-row > :last-child').textContent, parseFloat(getComputedStyle(bar, '::before').width) / bar.clientWidth]; })])""")
+    filled = [[int(a) / int(b), share] for _, rows in profile for told_, share in rows for a, b in [told_.split(' von ')]]
+    check(
+        [side for side, _ in profile] == ['Konsistenz', 'Geschmack']
+        and all(abs(said - share) < 0.01 for said, share in filled)
+        and all([s for _, s in rows] == sorted([s for _, s in rows], reverse=True) for _, rows in profile),
+        f'the portrait’s taste profile: how often each consistency and flavour went down well, in words and as a bar, best first {profile}',
+    )
     ranked = await pg.eval_on_selector_all('#sheet .ranks', "l => l.map(o => [o.children.length, o.querySelectorAll('.place').length])")
     check(ranked and all(n == shown for n, shown in ranked), f'every row of a longer list shows its place {ranked}')
     titles = await pg.eval_on_selector_all('#sheet .card h2', 'l => l.map(h => h.innerHTML)')

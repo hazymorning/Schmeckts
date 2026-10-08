@@ -22,6 +22,7 @@ import {
   shopGroups,
   sideOf,
   slowStarters,
+  taste,
   trend,
 } from '../app/www/js/smart.js';
 import {flavoursOf, quickOf, RATINGS, scaleOf, SCALES} from '../app/www/js/config.js';
@@ -31,8 +32,17 @@ const stub = new Proxy(function () {}, {
   get: (_, k) => (k === 'then' ? undefined : k === Symbol.toPrimitive ? () => '' : stub),
   apply: () => stub,
 });
-Object.assign(globalThis, {window: globalThis, document: stub, matchMedia: stub, addEventListener: () => {}});
-globalThis.localStorage = {getItem: () => null, setItem: () => {}, removeItem: () => {}};
+Object.assign(globalThis, {
+  window: globalThis,
+  document: stub,
+  matchMedia: stub,
+  addEventListener: () => {},
+});
+globalThis.localStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 const {insightSaid} = await import('../app/www/js/views/evaluation.js');
 
 const DAY = 864e5,
@@ -482,6 +492,46 @@ test('Erkenntnisse by brand, animal and consistency: wet food, the best group ag
     ),
     [],
     'dry food: no comparison',
+  );
+});
+
+test('Geschmacksprofil: each consistency and flavour of wet food with its good meals, best first, two varieties rated twice a group', () => {
+  const db = household(
+    ['A'],
+    [...FOUR, {id: 'e', brand: 'Felix', variety: 'Rind Pastete'}],
+    [
+      ...rate('a', 'A', [T, T, T]),
+      ...rate('b', 'A', [T, G, X]),
+      ...rate('c', 'A', [X, X, M]),
+      ...rate('d', 'A', [G, X, X]),
+      ...rate('e', 'A', [X, X, X, X]),
+    ],
+  );
+  const of = list => list.map(x => [x.key, x.good, x.n]);
+  const t = taste(model(db));
+  assert.deepEqual(of(t.konsistenz), [
+    ['sosse', 5, 6],
+    ['gelee', 1, 6],
+  ]);
+  assert.deepEqual(of(t.geschmack), [
+    ['Huhn', 3, 6],
+    ['Lachs', 3, 6],
+  ]);
+  const soft = household(['A'], [FOUR[0], FOUR[1]], [...rate('a', 'A', [T, T]), ...rate('b', 'A', [X, X])]);
+  assert.deepEqual(taste(model(soft)).konsistenz, [], 'one consistency alone has nothing to be set against');
+  const kinds = ['Huhn', 'Rind', 'Lachs', 'Pute', 'Ente', 'Kalb'],
+    many = household(
+      ['A'],
+      kinds.flatMap(k => [
+        {id: k + '1', variety: k + ' in Soße'},
+        {id: k + '2', variety: k + ' in Gelee'},
+      ]),
+      kinds.flatMap((k, i) => [...rate(k + '1', 'A', i === 5 ? [T, T] : [T, T, X]), ...rate(k + '2', 'A', [T, X])]),
+    );
+  assert.deepEqual(
+    taste(model(many)).geschmack.map(x => x.key),
+    ['Ente', 'Huhn', 'Lachs', 'Pute', 'Rind'],
+    'the five most rated, the one rated least is left out however well it went',
   );
 });
 
@@ -1395,7 +1445,14 @@ test('observations: how often each kind was noted, and a variety a kind about me
     ],
   );
   assert.equal(o.kinds[0].last, NOW - 2 * DAY + 5 * 36e5);
-  assert.deepEqual(o.links, [{kind: 'stink', id: 'lachs', after: {n: 6, hit: 5}, other: {n: 20, hit: 1}}]);
+  assert.deepEqual(o.links, [
+    {
+      kind: 'stink',
+      id: 'lachs',
+      after: {n: 6, hit: 5},
+      other: {n: 20, hit: 1},
+    },
+  ]);
   assert.deepEqual(observedAfter(db, ['A'], NOW, 'lachs'), [{kind: 'stink', n: 6, hit: 5}]);
   assert.deepEqual(observedAfter(db, ['A'], NOW, 'huhn'), [{kind: 'stink', n: 13, hit: 1}]);
   assert.deepEqual(

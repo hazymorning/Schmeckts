@@ -431,19 +431,34 @@ function insightOf(kind, a, b, z = INSIGHT.z) {
 const worse = x => (x?.gap < 0 ? x : null); // where only that way round helps
 const textureKey = p => textureOf(p, p.texture)?.[0] || guessTexture(p);
 const GROUPS = {marke: p => [p.brand], geschmack: p => flavoursOf(p.variety), konsistenz: p => [textureKey(p)]};
-/* Wet food, the best group against the weakest. A group needs two varieties rated twice, so no single one carries it;
-   a variety naming two flavours counts in both. */
-function byGroup(m) {
-  const rated = m.sorts.filter(e => e.n >= TWO && typeOf(e.product) === TYPES[0]);
-  return Object.entries(GROUPS).map(([kind, keysOf]) => {
-    const by = new Map();
-    for (const e of rated) for (const k of keysOf(e.product)) if (k) by.set(k, [...(by.get(k) || []), e]);
-    const ranked = [...by]
-      .filter(([, l]) => l.length >= TWO)
-      .map(([key, l]) => ({key, n: l.reduce((a, e) => a + e.n, 0), good: l.reduce((a, e) => a + goodOf(e.counts), 0)}))
-      .sort((a, b) => b.good / b.n - a.good / a.n || b.n - a.n || a.key.localeCompare(b.key, 'de'));
+/* Wet food by group, the best share first. A group needs two varieties rated twice, so no single one carries it; a
+   variety naming two flavours counts in both. */
+function grouped(m, keysOf) {
+  const by = new Map();
+  for (const e of m.sorts)
+    if (e.n >= TWO && typeOf(e.product) === TYPES[0])
+      for (const k of keysOf(e.product)) if (k) by.set(k, [...(by.get(k) || []), e]);
+  return [...by]
+    .filter(([, l]) => l.length >= TWO)
+    .map(([key, l]) => ({key, n: l.reduce((a, e) => a + e.n, 0), good: l.reduce((a, e) => a + goodOf(e.counts), 0)}))
+    .sort((a, b) => b.good / b.n - a.good / a.n || b.n - a.n || a.key.localeCompare(b.key, 'de'));
+}
+// the best group against the weakest
+const byGroup = m =>
+  Object.entries(GROUPS).map(([kind, keysOf]) => {
+    const ranked = grouped(m, keysOf);
     return ranked.length >= TWO ? insightOf(kind, ranked[0], ranked.at(-1), INSIGHT.group) : null;
   });
+/* Geschmacksprofil: how each consistency and flavour goes down, best first, the TASTE most rated; a side with one
+   group stays empty, as there is nothing to set it against */
+const TASTE = 5;
+export function taste(m) {
+  const side = keysOf => {
+    const list = grouped(m, keysOf),
+      most = new Set(list.toSorted((a, b) => b.n - a.n).slice(0, TASTE));
+    return list.length >= TWO ? list.filter(x => most.has(x)) : [];
+  };
+  return {konsistenz: side(GROUPS.konsistenz), geschmack: side(GROUPS.geschmack)};
 }
 // instead: the texture eaten best otherwise, mostly well and better than the sauce, as advice; none, no advice
 function inSauce(m) {
