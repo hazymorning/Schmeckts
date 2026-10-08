@@ -24,7 +24,6 @@ TEXT_PAIRS = (
         ('--bad', '--surface'),
         ('--paper-ink', '--paper'),
         ('--paper-muted', '--paper'),
-        ('--paper-red', '--paper'),
     ]
     + [('--ink', r + '-soft') for r in RATING + OBSERVED]
 )

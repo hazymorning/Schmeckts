@@ -54,6 +54,7 @@
   --radius-l: 24px; /* containers */
   --radius-full: 999px;
   --radius-paper: 3px 3px 6px 6px; /* the calendar sheet */
+  --radius-stamp: 5px; /* the frame of the calendar's rubber stamp */
 
   /* app.css sets type only as font: var(--type-...) */
   --type-title: 650 30px/1.1 var(--font-display); /* always with --track-title */
@@ -68,6 +69,7 @@
   --weight-strong: 600; /* b and strong in running text */
   --track-title: -0.015em; /* Faustina runs narrow at title size */
   --track-code: 0.14em; /* household code field */
+  --track-stamp: 0.12em; /* the calendar's rubber stamp */
 
   /* --dur-fade for changes in place, --dur-step for movement; a dimming takes the duration of what moves on it.
      --ease-out to arrive, --ease-in to leave, --ease-spring to confirm. */
@@ -164,7 +166,18 @@
   --paper: light-dark(#f7f0dd, #322d25);
   --paper-ink: light-dark(#3a3326, #ece3cd);
   --paper-muted: light-dark(#6b5f45, #ab9f86);
-  --paper-red: light-dark(#a33a2c, #e8907e); /* Sundays and verdicts, as printed on a tear-off calendar */
+  /* the pad around the sheet: the binding, what is left of the sheets torn off under it, the sheet below seen under
+     the curled corner, the edges of the sheets below, the curled corner's back and the shade paper casts */
+  --paper-bind: light-dark(#3b3730, #100f0d);
+  --paper-torn: light-dark(#fcfaf3, #3d372e);
+  --paper-under: light-dark(#ebe3cd, #29251f);
+  --paper-edge: light-dark(#ece5d1, #2b2620);
+  --paper-edge-line: light-dark(#cdc3ab, #181612);
+  --paper-curl: light-dark(#fffdf7, #4b4438);
+  --paper-shade: light-dark(#3a332640, #000000a6);
+  --torn-edge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='14' viewBox='0 0 300 14'%3E%3Cpath d='M0 0H300V7.0L292.9 6.9L287.3 9.8L283.6 9.2L279.5 8.3L273.8 6.9L268.8 6.3L265.6 5.7L261 6.2L255.7 7.9L249.9 10.1L245.9 7.8L240.7 6.1L236.8 7.5L231.1 12.3L226.4 6L220.8 8.8L215.4 6.3L211.9 5.8L207.5 8.4L204 6.6L200.2 6L194.7 5.7L191.2 11.5L187.9 9.3L184.1 11.3L179.3 5.9L175.1 7.8L169.8 13L164.9 7.3L159.9 8.3L155.7 12L151.8 7.2L148 9.2L144.4 8.3L140.3 6.8L134.9 7.9L130.2 9.5L124.8 9.4L121.2 12.7L117.7 6.1L114.5 7.5L110.5 7.9L105.7 12.6L100.7 6.9L95.3 6.9L90.6 7.5L85.1 7.2L80.2 5.7L76.6 7.7L73.1 8.3L68 8.1L63.3 6.3L58 6.4L53.3 6.5L48.3 11.6L45 7.1L40.1 9.7L34.8 9.3L31.2 6.4L27.9 8.3L23.2 8.3L19.4 5.9L15.1 11.4L10.8 5.7L7.4 6.6L4 9.8L0 7.0Z'/%3E%3C/svg%3E");
+  /* rubber stamp ink: specks of the paper show through */
+  --stamp-wear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='48'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -5 0 0 0 4.1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
   /* a grain just to be felt, specks of up to 7 % black */
   --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 

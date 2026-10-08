@@ -1730,11 +1730,11 @@ async def test_sex(browser, url):
     await ctx.close()
 
 
-# each sheet in the pad, the one on top last: its text, its head (the date, the badge, whether the date is red and the
-# badge a verdict), its label and whether it lies out of reach under another
-SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => { const t = s.querySelector('.cal-text'), b = t.querySelector('b');
-  return [t.textContent.slice(b.textContent.length + 1), [s.querySelector('.cal-date').textContent, b.textContent,
-    s.querySelector('.cal-date').matches('.red'), b.matches('.cal-verdict'), !!s.querySelector('.cal-foot')], s.getAttribute('aria-label'), s.inert]; })"""
+# each sheet in the pad, the one on top last: its text, its head (the date, the stamp, the verdict leading the text on a
+# back, whether the foot is there), its label and whether it lies out of reach under another
+SHEETS = """[...document.querySelectorAll('#home .calsheet')].map(s => { const t = s.querySelector('.cal-text'), b = t.querySelector('.cal-verdict');
+  return [b ? t.textContent.slice(b.textContent.length + 1) : t.textContent, [s.querySelector('.cal-date').textContent.replace(/\\u00a0/g, ' '),
+    s.querySelector('.cal-stamp').textContent, b && b.textContent, !!s.querySelector('.cal-foot')], s.getAttribute('aria-label'), s.inert]; })"""
 # the sheet of a day in facts.js
 FACT = "when => import('./js/views/facts.js').then(f => f.sheetOn(new Date(when)).sheet)"
 # the date alone on its line, the text below it across the sheet, the sheet as wide as the cards
@@ -1760,7 +1760,7 @@ async def test_calendar(browser, url):
     monday = await pg.evaluate(FACT, '2026-09-28T12:00:00+02:00')
     await tap(pg, '#home .calsheet')
     check(
-        first == [[monday['text'], ['Montag, 28. September', 'Katzenlogik:', False, False, False], None, False]]
+        first == [[monday['text'], ['Montag, 28. September', 'Katzenlogik', None, False], None, False]]
         and await pg.evaluate(SHEETS) == first
         and await state(pg, 'prefs.sheetDay') == '2026-09-28',
         f'first use: Monday’s Katzenlogik, nothing hanging over it, a tap does nothing {first}',
@@ -1776,12 +1776,12 @@ async def test_calendar(browser, url):
     await pg.click('#home .calsheet[data-action=tear]')
     swapped = await pg.evaluate(SHEETS)
     await idle(pg)
-    front = [tuesday['text'], ['Dienstag, 29. September', 'Stimmt’s?', False, False, False], 'Auflösung zeigen', False]
+    front = [tuesday['text'], ['Dienstag, 29. September', 'Stimmt’s?', None, False], 'Auflösung zeigen', False]
     check(
         morning
         == [
             [*front[:3], True],
-            [monday['text'], ['Montag, 28. September', 'Katzenlogik:', False, False, True], 'Gestriges Blatt abreißen', False],
+            [monday['text'], ['Montag, 28. September', 'Katzenlogik', None, True], 'Gestriges Blatt abreißen', False],
         ],
         f'a new day: yesterday’s sheet hangs over today’s as it was, its foot saying to tear it off {morning}',
     )
@@ -1799,7 +1799,7 @@ async def test_calendar(browser, url):
     await pg.keyboard.press('Enter')
     await idle(pg)
     check(
-        answer == [[tuesday['back'], ['Dienstag, 29. September', tuesday['verdict'] + '.', False, True, False], 'Behauptung zeigen', False]]
+        answer == [[tuesday['back'], ['Dienstag, 29. September', 'Stimmt’s?', tuesday['verdict'] + '.', False], 'Behauptung zeigen', False]]
         and kept == answer
         and await pg.evaluate(SHEETS) == [front],
         f'today’s Stimmt’s? turns over to its answer led by the verdict, which stays, and back, by tap or Enter {answer}',
@@ -1812,15 +1812,12 @@ async def test_calendar(browser, url):
     away = await pg.evaluate(SHEETS)
     await tap(pg, '#home .calsheet[data-action=tear]')
     check(
-        saturday == [[own['text'], ['Samstag, 8. August', 'Sprache:', False, False, False], None, False]]
-        and away[1:] == [[own['text'], ['Samstag, 8. August', 'Sprache:', False, False, True], 'Gestriges Blatt abreißen', False]]
+        saturday == [[own['text'], ['Samstag, 8. August', 'Sprache', None, False], None, False]]
+        and away[1:] == [[own['text'], ['Samstag, 8. August', 'Sprache', None, True], 'Gestriges Blatt abreißen', False]]
         and len(await pg.evaluate(SHEETS)) == 1
         and await state(pg, "prefs.sheetDay === '2026-08-11' && !prefs.hiddenHints.some(k => k.startsWith('blatt:'))"),
         f'the clock put back: nothing hangs; days away, the last one seen hangs and the days between are gone {saturday} {away}',
     )
-    await day_at(pg, '2026-10-04T12:00:00+02:00')
-    sunday = (await pg.evaluate(SHEETS))[0][1]
-    check(sunday[0] == 'Sonntag, 4. Oktober' and sunday[2], f'red on Sundays {sunday}')
 
     await settings(pg)
     await tap(pg, '#sheet [data-action=calendar]')

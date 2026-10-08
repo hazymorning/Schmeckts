@@ -281,17 +281,20 @@ function newsHTML() {
 }
 
 // The cat calendar: a sheet a day. On a new day the last one seen still hangs over today's until it is torn off.
-/* A day's sheet: the date as its heading, red on Sundays as on a real tear-off calendar, then the fact led by its
-   format. Today's Stimmt’s? turns over on a tap, its answer led by the verdict. */
+/* A day's sheet: the date as its heading, its format stamped beside it, then the fact. Today's Stimmt’s? turns over
+   on a tap, its answer led by the verdict. */
 function face(date, hanging = false) {
   const {sheet, format} = sheetOn(date),
     back = !hanging && !!sheet.back && homeView.turned === sheet.id,
-    d = new Date(date),
-    lead = back ? `<b class="cal-verdict">${sheet.verdict}.</b>` : `<b>${format}${format.endsWith('?') ? '' : ':'}</b>`;
+    lead = back ? `<b class="cal-verdict">${sheet.verdict}.</b> ` : '',
+    // the day and its month stay together when the date needs two lines
+    day = new Date(date)
+      .toLocaleDateString('de-DE', {weekday: 'long', day: 'numeric', month: 'long'})
+      .replace(/\. /, '.\u00a0');
   return {
     label: hanging ? 'Gestriges Blatt abreißen' : sheet.back ? (back ? 'Behauptung zeigen' : 'Auflösung zeigen') : '',
-    html: `<p class="cal-date${d.getDay() ? '' : ' red'}">${d.toLocaleDateString('de-DE', {weekday: 'long', day: 'numeric', month: 'long'})}</p>
-      <p class="cal-text">${lead} ${sheetText(sheet, catOf(db.pets), back)}</p>${hanging ? `<p class="cal-foot">${icon('down')}Zum Abreißen tippen</p>` : ''}`,
+    html: `<div class="cal-head"><p class="cal-date">${day}</p><span class="cal-stamp">${format}</span></div>
+      <p class="cal-text">${lead}${sheetText(sheet, catOf(db.pets), back)}</p>${hanging ? `<p class="cal-foot">${icon('down')}Zum Abreißen tippen</p>` : ''}`,
   };
 }
 const tappable = (action, label) => ` role="button" tabindex="0" aria-label="${label}" data-action="${action}"`;
@@ -307,7 +310,7 @@ function calsheetHTML() {
   const day = hangingDay(prefs.sheetDay, now),
     c = face(now),
     old = day && face(day, true);
-  return `<div class="calpad" style="view-transition-name:sec-cal"><aside class="calsheet"${c.label ? tappable('turn', c.label) : ''}${old ? ' inert' : ''}>${c.html}</aside>${old ? `<aside class="calsheet"${tappable('tear', old.label)}>${old.html}</aside>` : ''}</div>`;
+  return `<div class="calpad" style="view-transition-name:sec-cal"><i class="cal-top" aria-hidden="true"></i><aside class="calsheet"${c.label ? tappable('turn', c.label) : ''}${old ? ' inert' : ''}>${c.html}</aside>${old ? `<aside class="calsheet"${tappable('tear', old.label)}>${old.html}</aside>` : ''}</div>`;
 }
 // the sheet left hanging comes off at the perforation and falls over what lies below; today's is already in place
 export function tearSheet(el) {
