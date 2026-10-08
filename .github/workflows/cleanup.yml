@@ -1,0 +1,30 @@
+name: Clean up
+
+# Started by hand: keeps the two newest releases, deletes the older ones with their tags, and deletes the branches
+# of closed pull requests.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Releases and tags
+        run: |
+          gh release list --limit 1000 --json tagName,createdAt --jq 'sort_by(.createdAt) | reverse | .[2:][].tagName' |
+            while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
+
+      - name: Branches of closed pull requests
+        run: |
+          gh pr list --state all --limit 1000 --json headRefName,state,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)] | group_by(.headRefName)[] | select(all(.state != "OPEN")) | .[0].headRefName | select(. != "main")' |
+            grep -Fx -f <(gh api "repos/$GH_REPO/branches" --paginate --jq '.[].name') |
+            while read -r branch; do gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"; done
