@@ -789,6 +789,11 @@ dialog.sheet::after {
   border-radius: var(--radius-full);
   background: var(--surface-2) linear-gradient(90deg, var(--wash));
 }
+.slider-track .ic,
+.slider-thumb .ic {
+  width: var(--icon-m);
+  height: var(--icon-m);
+}
 .slider-track button {
   flex: 1 1 0;
   min-width: 0;
@@ -1204,10 +1209,9 @@ dialog.sheet::after {
   color: var(--c);
 }
 /* a frame instead of the fill, for a badge on a ground of its own */
-/* a meal still to rate asks for it, in the tone of what can be tapped */
+/* a meal still to rate */
 .badge.open {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  --c: var(--muted);
 }
 .badge.ic-only {
   min-height: 0;
@@ -2470,7 +2474,6 @@ body,
 .pend-head,
 .day,
 .sw,
-.sw::after,
 .shutter,
 .pet-photo,
 .srv-ic {
@@ -2480,6 +2483,19 @@ body::before,
 .bar-title,
 :is(.grip-zone, .head, .days .tl-date)::after {
   transition: opacity var(--dur-fade) var(--ease-out);
+}
+/* a control redrawn takes its old state without moving, then moves to the new one (ui/sheet.js) */
+.still,
+.still *,
+.still *::before,
+.still *::after {
+  transition: none !important;
+}
+/* the knob springs over, the colour follows */
+.sw::after {
+  transition:
+    transform var(--dur-step) var(--ease-spring),
+    background-color var(--dur-fade) var(--ease-out);
 }
 .animating {
   overflow: hidden;

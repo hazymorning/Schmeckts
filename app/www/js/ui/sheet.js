@@ -107,6 +107,30 @@ let drawView = () => {};
 export function setSheetView(fn) {
   drawView = fn;
 }
+/* A redraw replaces the switches, segments and chips; one whose state changed shows the old state for a frame, so it
+   moves to the new one as it does in place. */
+const STATES = ['aria-checked', 'aria-pressed'],
+  STATEFUL = '[aria-checked], [aria-pressed]',
+  keyOf = el => ['action', 'v', 'id', 'field', 's', 'p', 'r'].map(k => el.dataset[k] ?? '').join('|'),
+  statesIn = root =>
+    new Map([...root.querySelectorAll(STATEFUL)].map(el => [keyOf(el), STATES.map(a => el.getAttribute(a))]));
+function carryStates(root, before) {
+  const moved = [];
+  for (const el of root.querySelectorAll(STATEFUL)) {
+    const was = before.get(keyOf(el)),
+      now = STATES.map(a => el.getAttribute(a));
+    if (!was || was.every((v, i) => v === now[i])) continue;
+    STATES.forEach((a, i) => was[i] !== null && el.setAttribute(a, was[i]));
+    el.classList.add('still'); // the old state at once, though the new one may have been styled already
+    moved.push([el, now]);
+  }
+  if (!moved.length) return;
+  void root.offsetWidth;
+  for (const [el, now] of moved) {
+    el.classList.remove('still');
+    STATES.forEach((a, i) => now[i] !== null && el.setAttribute(a, now[i]));
+  }
+}
 export function renderSheet() {
   const L = top();
   if (!L.state) return;
@@ -115,7 +139,9 @@ export function renderSheet() {
   const how = state.slide;
   state.slide = null;
   if (key === L.key) {
+    const before = reduceMotion.matches ? null : statesIn(L.body);
     drawView(state, L.body);
+    if (before) carryStates(L.body, before);
     return markEdge(L);
   }
   const swap = () => {

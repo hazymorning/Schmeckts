@@ -8,6 +8,8 @@ const ABOVE = mark => `<g transform="translate(6.6 .2)">${mark}</g>`; // heart a
 const HEART =
   '<path d="M12 8.7c-1.4-.9-2.8-2-2.8-3.4a1.45 1.45 0 0 1 2.8-.6 1.45 1.45 0 0 1 2.8.6c0 1.4-1.4 2.5-2.8 3.4z"/>';
 const LATER = '<circle cx="12" cy="5.6" r="3.3"/><path d="M12 3.9v1.9l1.2.8"/>';
+const ASK =
+  '<path d="M10.1 3.4a1.9 1.9 0 1 1 2.85 1.65c-.6.35-.95.75-.95 1.45"/><circle cx="12" cy="8.4" r=".9" fill="currentColor" stroke="none"/>';
 const FULL =
   '<path d="M5.4 11c.8-2.7 3.5-4.4 6.6-4.4s5.8 1.7 6.6 4.4z" fill="currentColor" fill-opacity=".3"/>' +
   BOWL +
@@ -49,6 +51,8 @@ const I = {
     DOT(17.8, 8.2) +
     DOT(19.6, 11.4),
   r_unberuehrt: TREAT + '<path d="M16.3 5.8h4.6"/>',
+  // a meal not rated yet: Wie war’s?
+  unrated: BOWL + ASK,
   // fill: what the feeding button and the loader animate
   bowl: FILL + FEED,
   wait: `<g transform="translate(0 -3)">${FILL + BOWL}</g>`, // the bowl alone sits low in the grid

@@ -580,13 +580,15 @@ async def test_home_history(browser, url):
         ['m5', '2026-06-10T08:00', [M]],
     ]
     check(await seed('2026-06-12T10:00:00+02:00', owner) == ['m1'], 'served today: only today')
-    ROW = "(r => [r.querySelector('small').textContent, !!r.querySelector('.tl-time, .tl-node'), r.querySelectorAll('.badge').length])(document.querySelector('[data-sec=hist] .tl-day .row'))"
+    ROW = "(r => [r.querySelector('small').textContent, !!r.querySelector('.tl-time, .tl-node'), [...r.querySelectorAll('.badge')].map(b => b.title)])(document.querySelector('[data-sec=hist] .tl-day .row'))"
     rated = await pg.evaluate(ROW)
     await change(pg, 'Object.values(s.db.servings[0].pets).forEach(x => { x.r = null; })')
+    unrated = await pg.evaluate(ROW)
     check(
-        rated == ['Sheba, 7:00', False, 1] and await pg.evaluate(ROW) == ['Sheba, 7:00', False, 0] and await pg.locator('#home .pend').count() == 1,
-        f'a row as in any card, the time in its small line; not rated yet, only the rating card says so {rated}',
+        rated[:2] == ['Sheba, 7:00', False] and len(rated[2]) == 1 and unrated == ['Sheba, 7:00', False, ['Noch nicht bewertet']],
+        f'a row as in any card, the time in its small line, its rating at the end, a meal not rated yet with its own sign {rated} {unrated}',
     )
+    check(await pg.locator('#home .pend').count() == 1, 'the meal not rated yet waits in the rating card')
     check(await seed('2026-06-12T05:30:00+02:00', owner[1:]) == ['m4', 'm3', 'm2'], 'nothing yet today: yesterday, newest first')
     none = await seed('2026-06-14T10:00:00+02:00', owner)
     check(
@@ -1002,6 +1004,30 @@ async def test_narrow(browser, url):
         check(len(meals) >= 3 and not cut, f'nothing cut{" with a large font" if big else ""}, with all three scales {cut}')
         check(not errors, f'no errors {errors}')
         await ctx.close()
+
+
+async def test_controls(browser, url):
+    print('a switch, a segment or a chip redrawn with its new state moves there as if changed in place')
+    ctx = await phone(browser, motion=True)
+    pg, errors = await open_page(ctx, url)
+    await tap(pg, '[data-action=demo]')
+    await tap(pg, '[data-action=open-settings]')
+    await pg.evaluate("""window.__moved = []; document.addEventListener('transitionrun', e =>
+      window.__moved.push([e.target.closest('[data-action]')?.dataset.action, e.propertyName, e.pseudoElement]), true)""")
+
+    async def moved(sel):
+        await pg.click(sel)
+        await idle(pg)
+        return {f'{p}{e}' for a, p, e in await pg.evaluate('window.__moved.splice(0)') if a == sel.split('"')[1]}
+
+    switch = await moved('#sheet [data-action="calendar"]')
+    seg = await moved('#sheet [data-action="theme"][data-v=dark]')
+    check(
+        {'transform::after', 'background-color'} <= switch and 'background-color' in seg,
+        f'the knob slides over and the track takes its colour, the segment its fill {switch} {seg}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
 
 
 async def test_slide(browser, url):
@@ -3489,6 +3515,7 @@ run_tests(
         'record': test_record,
         'scales': test_scales,
         'narrow': test_narrow,
+        'controls': test_controls,
         'slide': test_slide,
         'texture': test_texture,
         'suggestions': test_suggestions,

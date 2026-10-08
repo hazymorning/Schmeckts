@@ -191,7 +191,7 @@ function pendingHTML(list) {
       .map(s => {
         const p = getProduct(s.productId),
           ids = rateRows(s).filter(pid => newest.get(pid) === s.id);
-        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s, true)}`;
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s)}`;
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
