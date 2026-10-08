@@ -1020,6 +1020,8 @@ async def test_slide(browser, url):
     RATED = '(() => { const s = db.servings.find(x => x.id === window.__open); return s && Object.values(s.pets)[0].r; })()'
     await pg.evaluate("""import('./js/derive.js').then(d => { window.__open = d.pendingServings()[0].id; window.__rated = [];
       document.addEventListener('click', e => { const b = e.target.closest('.slider-track button'); if (b) window.__rated.push(b.dataset.r); }); })""")
+    await pg.evaluate("document.querySelector('.pend .slider-track').scrollIntoView({block: 'center', behavior: 'instant'})")  # clear of the toast
+    await pg.wait_for_timeout(200)  # a touch right after a scroll only stops it
     at_ = await stops()
     await touch('touchStart', *at_[1])
     await pg.wait_for_timeout(250)  # a resting finger

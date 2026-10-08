@@ -24,13 +24,9 @@
 
   --space-hair: 2px;
   --space-1: 4px;
-  --space-1h: 6px;
   --space-2: 8px;
-  --space-2h: 10px;
   --space-3: 12px;
-  --space-3h: 14px;
   --space-4: 16px;
-  --space-4h: 18px;
   --space-5: 20px;
   --space-6: 24px;
   --space-7: 32px;
@@ -38,16 +34,14 @@
   --page-width: 600px;
 
   /* A box takes its recipe's inset and nothing else */
-  --inset-card: var(--gutter) var(--gutter) var(--space-2h); /* the last row adds 10 at the foot */
+  --inset-card: var(--gutter) var(--gutter) var(--space-2); /* the last row adds 12 at the foot */
   --inset-group: var(--space-1) var(--space-4);
-  --inset-row: var(--space-2h) 0;
+  --inset-row: var(--space-3) 0;
   --inset-box: var(--space-3);
   --inset-control: var(--space-3) var(--space-4); /* height comes from --control */
   --inset-compact: var(--space-2) var(--space-4); /* chips, fields in a row, the toast's action */
-  --inset-badge: var(--space-1) var(--space-2h);
-  --field-room: calc(
-    var(--space-3h) + var(--icon-s) + var(--space-2h)
-  ); /* 44: the side of a field that holds an icon */
+  --inset-badge: var(--space-1) var(--space-2);
+  --field-room: calc(var(--space-3) + var(--icon-s) + var(--space-3)); /* 44: the side of a field that holds an icon */
 
   --radius-s: 12px; /* small and nested */
   --radius-m: 16px; /* controls and boxes you tap */

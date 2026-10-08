@@ -242,7 +242,7 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(var(--space-3) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 0 var(--space-2h);
+  padding: calc(var(--space-3) + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 0 var(--space-3);
 }
 .top-end {
   display: flex;
@@ -279,7 +279,7 @@ body::after {
   color: var(--muted);
 }
 .hint {
-  margin: 0 0 var(--space-2h);
+  margin: 0 0 var(--space-3);
   font: var(--type-small);
   color: var(--muted);
 }
@@ -451,7 +451,7 @@ dialog.sheet.page .sheet-body {
 .grip-zone {
   position: relative;
   z-index: var(--z-raise);
-  padding: var(--space-2h) 0 var(--space-2);
+  padding: var(--space-2) 0;
   touch-action: none;
   cursor: grab;
   flex: 0 0 auto;
@@ -602,14 +602,13 @@ dialog.sheet::after {
   position: fixed;
   left: 50%;
   bottom: calc(
-    var(--space-5) + var(--control-l) + var(--space-3h) +
-      var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
+    var(--space-5) + var(--control-l) + var(--space-4) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
   );
   z-index: var(--z-toast);
   view-transition-name: toast;
   display: flex;
   align-items: center;
-  gap: var(--space-1h);
+  gap: var(--space-2);
   width: max-content;
   max-width: min(92vw, 520px);
   min-height: var(--control);
@@ -647,7 +646,7 @@ dialog.sheet::after {
   pointer-events: auto;
 }
 .toast > span {
-  margin: var(--space-1h) var(--space-2) var(--space-1h) 0;
+  margin: var(--space-1) var(--space-2) var(--space-1) 0;
 }
 .toast.long {
   flex-wrap: wrap;
@@ -661,7 +660,7 @@ dialog.sheet::after {
 .toast button {
   display: flex;
   align-items: center;
-  gap: var(--space-1h);
+  gap: var(--space-2);
   flex: 0 0 auto;
   min-height: var(--tap-s);
   padding: var(--inset-compact);
@@ -773,7 +772,7 @@ dialog.sheet::after {
 .slider-bar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2h);
+  gap: var(--space-2);
   cursor: pointer;
   touch-action: pan-y;
 }
@@ -973,11 +972,11 @@ dialog.sheet::after {
 }
 .search {
   position: relative;
-  margin-bottom: var(--space-1h);
+  margin-bottom: var(--space-2);
 }
 .search .ic {
   position: absolute;
-  left: var(--space-3h);
+  left: var(--space-3);
   top: 50%;
   transform: translateY(-50%);
   color: var(--faint);
@@ -1069,7 +1068,7 @@ dialog.sheet::after {
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--tap-s);
-  padding: var(--space-2) var(--space-1h);
+  padding: var(--space-2) var(--space-1);
   border-radius: var(--radius-s);
   font: var(--type-small-strong);
   color: var(--muted);
@@ -1117,7 +1116,7 @@ dialog.sheet::after {
   width: var(--icon-s);
   height: var(--icon-s);
   vertical-align: middle;
-  margin-right: var(--space-1h);
+  margin-right: var(--space-2);
 }
 /* The way from a card to its page, at the end of the heading. The tap area reaches into the card's padding above,
    so the heading line keeps its height. */
@@ -1127,7 +1126,7 @@ dialog.sheet::after {
   gap: var(--space-hair);
   flex: 0 0 auto;
   min-height: var(--tap);
-  margin: calc(-1 * var(--space-3h)) calc(-1 * var(--space-3)) calc(-1 * var(--space-1h)) 0;
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) calc(-1 * var(--space-2)) 0;
   padding: 0 var(--space-3);
   border-radius: var(--radius-m);
   font: var(--type-small-strong);
@@ -1395,9 +1394,9 @@ dialog.sheet::after {
 }
 .pets {
   display: flex;
-  gap: var(--space-2h);
+  gap: var(--space-2);
   overflow-x: auto;
-  padding: var(--space-2h) var(--gutter) var(--space-3h);
+  padding: var(--space-3) var(--gutter);
   margin: 0 calc(-1 * var(--gutter));
   scrollbar-width: none;
 }
@@ -1408,8 +1407,8 @@ dialog.sheet::after {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-1h);
-  width: calc(var(--pic-xl) + var(--space-1h));
+  gap: var(--space-1);
+  width: calc(var(--pic-xl) + var(--space-2));
   flex: 0 0 auto;
 }
 .pet > span:last-child {
@@ -1434,7 +1433,7 @@ dialog.sheet::after {
   display: block;
   width: var(--pic-xxxl);
   height: var(--pic-xxxl);
-  margin: var(--space-4h) auto var(--space-2); /* 24 under the page title with its 6 */
+  margin: var(--space-4) auto var(--space-2); /* 24 under the page title with its 8 */
   cursor: pointer;
   border-radius: 50%;
 }
@@ -1552,8 +1551,8 @@ dialog.sheet::after {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-2h);
-  padding: var(--space-2h) 0 var(--space-hair);
+  gap: var(--space-2);
+  padding: var(--space-3) 0 var(--space-hair);
   margin-bottom: var(--space-hair);
 }
 /* sticky on the history page; views/sheets.js marks it .stuck, which CSS cannot detect */
@@ -1700,7 +1699,7 @@ dialog.sheet::after {
   width: 100%;
   max-width: 340px;
   aspect-ratio: 1;
-  margin: var(--space-4h) auto 0;
+  margin: var(--space-4) auto 0;
   border-radius: var(--radius-l);
   overflow: hidden;
   background: var(--surface-2);
@@ -1812,8 +1811,8 @@ dialog.sheet::after {
 /* the best Top's crown and the worst Flop's bowl, out on the corner of its packaging so it hides at most the edge */
 .medal {
   position: absolute;
-  right: calc(-1 * var(--space-2h));
-  bottom: calc(-1 * var(--space-2h));
+  right: calc(-1 * var(--space-2));
+  bottom: calc(-1 * var(--space-2));
   width: var(--pic-badge);
   height: var(--pic-badge);
   display: grid;
@@ -1854,8 +1853,8 @@ dialog.sheet::after {
 }
 .place {
   position: absolute;
-  top: calc(-1 * var(--space-2h));
-  left: calc(-1 * var(--space-2h));
+  top: calc(-1 * var(--space-2));
+  left: calc(-1 * var(--space-2));
   min-width: var(--pic-badge);
   height: var(--pic-badge);
   display: grid;
@@ -1986,7 +1985,7 @@ dialog.sheet::after {
 .cal-foot {
   display: flex;
   align-items: center;
-  gap: var(--space-1h);
+  gap: var(--space-2);
   margin: var(--space-3) 0 0;
   font: var(--type-small-strong);
   color: var(--paper-muted);
@@ -2046,14 +2045,14 @@ dialog.sheet::after {
   display: flow-root;
 }
 .card-line {
-  margin: 0 0 var(--space-2h);
+  margin: 0 0 var(--space-3);
 }
 .empty {
   display: flex;
   align-items: center;
-  gap: var(--space-3h);
+  gap: var(--space-3);
   color: var(--muted);
-  margin: var(--space-hair) 0 var(--space-2h);
+  margin: var(--space-hair) 0 var(--space-3);
 }
 .empty .sk {
   color: var(--faint);
@@ -2062,15 +2061,15 @@ dialog.sheet::after {
 .ov-top {
   display: flex;
   align-items: center;
-  gap: var(--space-3h);
+  gap: var(--space-4);
 }
-/* with the card's 10px foot this makes 20, as at the top */
+/* with the card's 8px foot this makes 20, as at the top */
 .ov-pic,
 .ov-text {
-  margin-bottom: var(--space-2h);
+  margin-bottom: var(--space-3);
 }
 .obs {
-  margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-2h);
+  margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-3);
 }
 .ov-text {
   flex: 1;
@@ -2085,7 +2084,7 @@ dialog.sheet::after {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-3h);
+  margin-bottom: var(--space-4);
 }
 .pend-top > .pend-head {
   flex: 1;
@@ -2096,7 +2095,7 @@ dialog.sheet::after {
   margin-bottom: var(--space-2);
 }
 .pet-rate + .pet-rate {
-  margin-top: var(--space-4h);
+  margin-top: var(--space-4);
 }
 .pet-rate > .badge {
   margin-bottom: var(--space-2);
@@ -2124,7 +2123,7 @@ dialog.sheet::after {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin: var(--space-3h) 0 var(--space-2h);
+  margin: var(--space-4) 0 var(--space-3);
 }
 .btn-row .btn {
   flex: 1 1 auto;
@@ -2155,11 +2154,11 @@ dialog.sheet::after {
 
 .welcome {
   text-align: center;
-  margin: var(--space-6) var(--space-1h) var(--space-5);
+  margin: var(--space-6) var(--space-2) var(--space-5);
 }
 .welcome h2 {
   text-wrap: balance;
-  margin: 0 0 var(--space-2h);
+  margin: 0 0 var(--space-3);
 }
 .welcome p {
   margin: 0 auto var(--space-6);
@@ -2184,7 +2183,7 @@ dialog.sheet::after {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: var(--space-hair);
-  margin: var(--space-3h) 0 var(--space-2h);
+  margin: var(--space-4) 0 var(--space-3);
   text-align: center;
 }
 .days {
@@ -2204,12 +2203,12 @@ dialog.sheet::after {
 }
 
 .page-title {
-  margin: 0 0 var(--space-1h);
+  margin: 0 0 var(--space-2);
   color: var(--ink);
 }
 dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title,
 .page-title:has(+ #serverBox > .srv) {
-  margin-bottom: var(--space-3h);
+  margin-bottom: var(--space-4);
 }
 .btn-col {
   display: flex;
@@ -2223,7 +2222,7 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   margin-top: var(--space-7);
 }
 .mt-s {
-  margin-top: var(--space-2h);
+  margin-top: var(--space-2);
 }
 .chips {
   display: flex;
@@ -2241,13 +2240,13 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 }
 /* margins sit on these always-present boxes; on one hidden while typing, the field would jump */
 .serve {
-  margin: var(--space-5) 0 var(--space-2h);
+  margin: var(--space-5) 0 var(--space-3);
 }
 .serve .search {
   margin: 0;
 }
 .serve-list {
-  margin-top: var(--space-2h);
+  margin-top: var(--space-3);
 }
 .serve-list > .label:first-child {
   margin-top: 0;
@@ -2270,13 +2269,13 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   margin-top: var(--space-2);
 }
 .suggest .label {
-  margin: var(--space-4h) 0 var(--space-hair);
+  margin: var(--space-4) 0 var(--space-hair);
 }
 .suggest {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1h);
-  margin-top: var(--space-2h);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 .suggest:empty {
   display: none;
@@ -2299,10 +2298,10 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   content: none;
 }
 .tally {
-  margin: var(--space-2h) 0 var(--space-1);
+  margin: var(--space-3) 0 var(--space-1);
 }
 .verdict {
-  margin-top: var(--space-2h);
+  margin-top: var(--space-3);
 }
 .verdict p span {
   color: var(--muted);
@@ -2333,7 +2332,7 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
 }
 .set-under {
   grid-column: 2;
-  margin-bottom: var(--space-3h);
+  margin-bottom: var(--space-3);
 }
 .set-group > .field-error {
   grid-column: 2;
@@ -2376,8 +2375,8 @@ dialog.sheet.page:is([data-kind="report"], [data-kind="evaluation"]) .page-title
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-hair) var(--space-2h);
-  margin: var(--space-2h) 0 0;
+  gap: var(--space-hair) var(--space-2);
+  margin: var(--space-3) 0 0;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
