@@ -268,6 +268,7 @@ body::after {
   letter-spacing: var(--track-title);
 }
 .card h2,
+.overview h2,
 .bar-title,
 .sh-head h2 {
   font: var(--type-heading);
@@ -2062,6 +2063,20 @@ dialog.sheet::after {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+}
+/* the overview stands on the ground, one cat large; several are large in the bar above */
+.overview {
+  padding-top: var(--space-2);
+}
+.ov-pic.xxxl {
+  width: var(--pic-xxxl);
+  height: var(--pic-xxxl);
+}
+.overview .av.pair + .av.pair {
+  box-shadow: 0 0 0 var(--stroke) var(--bg);
+}
+.overview + * {
+  margin-top: var(--space-2);
 }
 /* with the card's 8px foot this makes 20, as at the top */
 .ov-pic,

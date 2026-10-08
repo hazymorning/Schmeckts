@@ -1,4 +1,4 @@
-/* Home page overview card: whose day it is, then one sentence on where the day stands for the bowl.
+/* Top of the home page, on the ground above the cards: whose day it is, then one sentence on where the day stands for the bowl.
    Of how a meal went only a hint when the last one was left; never what the cards below already show. */
 import {esc} from '../text.js';
 import {addDays, dayNumber, dayStart, quarterStr} from '../dates.js';
@@ -156,13 +156,13 @@ export function overviewHTML(m, noted = null) {
   // sleepy z's at night
   const mood = SLEEP.has(moment) ? ' sleepy' : '',
     pic = one
-      ? `<button class="ov-pic${mood}" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'xxl')}</button>`
+      ? `<button class="ov-pic xxxl${mood}" data-action="open-pet" data-id="${one.id}" aria-label="${esc(one.name)} bearbeiten">${avatar(one, 'xxxl')}</button>`
       : `<span class="ov-pic${mood}">${pets
           .slice(0, 2)
           .map(p => avatar(p, 'l pair'))
           .join('')}</span>`,
     just = noted && getObservation(noted)?.kind;
-  return `<section class="card overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
+  return `<section class="overview" data-sec="overview"${DUE.has(moment) ? ' data-due' : ''} style="view-transition-name:sec-overview">
     <div class="ov-top">${pic}<div class="ov-text"><h2>${head}</h2><p>${sentenceOf(g, now, head)}</p></div></div>
     ${observeRail(just)}</section>`;
 }

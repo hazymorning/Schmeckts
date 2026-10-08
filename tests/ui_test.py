@@ -1753,7 +1753,7 @@ async def day_at(pg, when):
 
 
 async def test_calendar(browser, url):
-    print('the cat calendar: under the overview, a format a weekday, a sheet a day, the last one seen hanging over today’s until torn off')
+    print('the cat calendar: under the meals to rate, a format a weekday, a sheet a day, the last one seen hanging over today’s until torn off')
     ctx = await phone(browser, timezone_id='Europe/Berlin')
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-09-28T12:00:00+02:00')  # a Monday, the calendar's first day on this phone
@@ -1768,7 +1768,7 @@ async def test_calendar(browser, url):
         f'first use: Monday’s Katzenlogik, nothing hanging over it, a tap does nothing {first}',
     )
     order = await pg.evaluate("[...document.querySelectorAll('#home > *')].map(e => e.matches('.calpad') ? 'cal' : e.dataset.sec || '')")
-    check(order.index('cal') == order.index('overview') + 1, f'right under the overview {order}')
+    check(order[:3] == ['overview', 'pend', 'cal'], f'the overview, the meals to rate, then the calendar {order}')
     placed = await pg.evaluate(PLACED)
     check(placed == [True, True, True], f'the date as its heading, the text below across the sheet, as wide as the cards {placed}')
 
