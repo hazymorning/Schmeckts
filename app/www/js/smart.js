@@ -404,8 +404,11 @@ function causeOf(recent, before, dir) {
 
 /* Erkenntnisse: what holds across varieties and meals and helps with buying and feeding, never one variety's verdict
    told again. Most set two sides against each other by how many of their meals went down well and count once both
-   have INSIGHT.ratings and their shares lie INSIGHT.gap apart. The widest gap comes first. */
-const INSIGHT = {ratings: 4, gap: 0.3};
+   have INSIGHT.ratings, their shares lie INSIGHT.gap apart and the gap is INSIGHT.z pooled standard errors wide;
+   INSIGHT.group for the best group against the weakest, since picking the two ends widens a gap by chance. In
+   simulated households whose cat likes everything alike that keeps insights to about one in twenty after two months
+   (tests/personas.test.js). The widest gap comes first. */
+const INSIGHT = {ratings: 4, gap: 0.3, z: 2.5, group: 3};
 const SAUCE = {ratings: 5, share: 0.4}; // „Nur Soße“ among the ratings of the varieties in sauce
 const NEW_SORTS = 5; // varieties served again after their first time
 const DAYTIME = {morning: 11, evening: 17}; // before the one hour, from the other
@@ -417,10 +420,13 @@ function add(x, r) {
   if (RATINGS[r].score >= GOOD) x.good++;
 }
 // gap: a's share ahead of b's, negative behind; one division, so exactly 0.3 counts
-function insightOf(kind, a, b) {
+function insightOf(kind, a, b, z = INSIGHT.z) {
   if (a.n < INSIGHT.ratings || b.n < INSIGHT.ratings) return null;
-  const gap = (a.good * b.n - b.good * a.n) / (a.n * b.n);
-  return Math.abs(gap) >= INSIGHT.gap ? {kind, a, b, gap} : null;
+  const gap = (a.good * b.n - b.good * a.n) / (a.n * b.n),
+    p = (a.good + b.good) / (a.n + b.n);
+  return Math.abs(gap) >= INSIGHT.gap && gap * gap >= z * z * p * (1 - p) * (1 / a.n + 1 / b.n)
+    ? {kind, a, b, gap}
+    : null;
 }
 const worse = x => (x?.gap < 0 ? x : null); // where only that way round helps
 const textureKey = p => textureOf(p, p.texture)?.[0] || guessTexture(p);
@@ -436,7 +442,7 @@ function byGroup(m) {
       .filter(([, l]) => l.length >= TWO)
       .map(([key, l]) => ({key, n: l.reduce((a, e) => a + e.n, 0), good: l.reduce((a, e) => a + goodOf(e.counts), 0)}))
       .sort((a, b) => b.good / b.n - a.good / a.n || b.n - a.n || a.key.localeCompare(b.key, 'de'));
-    return ranked.length >= TWO ? insightOf(kind, ranked[0], ranked.at(-1)) : null;
+    return ranked.length >= TWO ? insightOf(kind, ranked[0], ranked.at(-1), INSIGHT.group) : null;
   });
 }
 // instead: the texture eaten best otherwise, mostly well and better than the sauce, as advice; none, no advice
@@ -753,7 +759,7 @@ export function nextMeal(db, now, pets) {
 }
 
 // Observations never change a rating, a verdict or a place. Several pets on one means one of them or all.
-const OBSERVED = {recent: 28 * DAY, before: 56 * DAY, span: 180 * DAY, meals: 4, hits: 2, gap: 30, z: 2, shown: 3};
+const OBSERVED = {recent: 28 * DAY, before: 56 * DAY, span: 180 * DAY, meals: 4, hits: 2, gap: 30, z: 3.5, shown: 3};
 const HOUR = 36e5;
 const concerns = (o, pets) => Object.keys(o.pets || {}).some(pid => pets.includes(pid));
 const notesOf = db => db.observations || []; // older data has no observations
@@ -788,7 +794,8 @@ function followed(db, pets, now, kind, only = null) {
   return out;
 }
 
-// a link also needs OBSERVED.z pooled standard errors, as in trend(), so a lucky run is no news
+/* A link also needs OBSERVED.z pooled standard errors, as in trend(), so a lucky run is no news; it is that high since
+   every variety is weighed against the rest for every kind at once (tests/personas.test.js) */
 export function observed(db, pets, now) {
   const cut = now - OBSERVED.recent,
     back = cut - OBSERVED.before,

@@ -738,7 +738,7 @@ async def test_insights(browser, url):
         product('treat', 'Dreamies', 'Käse', 'Snack'),
     ]
     meals = []
-    for d in range(1, 5):  # a morning meal in sauce, eaten up; in the evening one in jelly two hours after a treat, left
+    for d in range(1, 9):  # a morning meal in sauce, eaten up; in the evening one in jelly two hours after a treat, left
         meals += [
             meal(f'm{d}', 'ab'[d % 2], at(f'2026-06-0{d}T07:00'), {M: 'top'}),
             meal(f't{d}', 'treat', at(f'2026-06-0{d}T17:00'), {M: 'verputzt'}),
@@ -757,12 +757,12 @@ async def test_insights(browser, url):
             [
                 'Erkenntnisse',
                 [
-                    ['Bisher kommt Sheba besser an als Felix.', 'Sheba 4 von 4 Mal gut gefressen, Felix 0 von 4 Mal.'],
+                    ['Bisher kommt Sheba besser an als Felix.', 'Sheba 8 von 8 Mal gut gefressen, Felix 0 von 8 Mal.'],
                     [
                         'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
-                        'Stückchen in Soße 4 von 4 Mal gut gefressen, Stückchen in Gelee 0 von 4 Mal.',
+                        'Stückchen in Soße 8 von 8 Mal gut gefressen, Stückchen in Gelee 0 von 8 Mal.',
                     ],
-                    ['Morgens wird besser gefressen als abends.', 'Morgens 4 von 4 Mal gut gefressen, abends 0 von 4 Mal.'],
+                    ['Morgens wird besser gefressen als abends.', 'Morgens 8 von 8 Mal gut gefressen, abends 0 von 8 Mal.'],
                 ],
             ]
         ],
@@ -777,7 +777,7 @@ async def test_insights(browser, url):
                 'Beim Füttern',
                 [
                     card[0][1][2],
-                    ['Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.', 'Nach Snacks 0 von 4 Mal gut gefressen, sonst 4 von 4 Mal.'],
+                    ['Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.', 'Nach Snacks 0 von 8 Mal gut gefressen, sonst 8 von 8 Mal.'],
                 ],
             ],
         ]

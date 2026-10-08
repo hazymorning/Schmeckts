@@ -124,11 +124,11 @@ const demoId = () => DEMO + uid();
 // made up, but it has to look like a phone in use so every evaluation has something to show
 const DEMO_PLAN = [
   ['Sheba', 'Lachs in Soße', 'Nassfutter', ['top', 'top', 'gut', 'mittel']],
-  ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut']],
-  ['Felix', 'Rind in Gelee', 'Nassfutter', ['top', 'gut', 'top']],
+  ['Felix', 'Huhn in Gelee', 'Nassfutter', ['top', 'gut', 'gut', 'top', 'gut']],
+  ['Felix', 'Rind in Gelee', 'Nassfutter', ['top', 'gut', 'top', 'top', 'gut']],
   ['Whiskas', 'Thunfisch in Soße', 'Nassfutter', ['sosse', 'sosse', 'mittel']],
   ['Kitekat', 'Geflügel in Soße', 'Nassfutter', ['sosse', 'gut', 'sosse']],
-  ['Gourmet', 'Rind Pastete', 'Nassfutter', ['schlecht', 'schlecht', 'mittel']],
+  ['Gourmet', 'Rind Pastete', 'Nassfutter', ['schlecht', 'schlecht', 'mittel', 'schlecht']],
   ['Animonda Carny', 'Pute Pastete', 'Nassfutter', ['mittel', 'gut']],
   ['Dreamies', 'Käse', 'Snack', ['verputzt', 'verputzt']],
 ];
