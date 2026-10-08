@@ -1678,6 +1678,7 @@ dialog.sheet::after {
 .ov-text p {
   margin: 0;
   font: var(--type-body);
+  text-wrap: pretty;
 }
 .pet-label {
   display: flex;
@@ -2100,13 +2101,20 @@ dialog.sheet::after {
   align-items: center;
   gap: var(--space-4);
 }
-/* the overview stands on the ground, one cat large; several are large in the bar above */
+/* the overview stands on the ground, one cat large; several are large in the bar above. The photo grows with the
+   width, so beside the sentence it keeps its proportion from 360px on. */
 .overview {
   padding-top: var(--space-2);
+  container-type: inline-size;
 }
 .ov-pic.xxxl {
-  width: var(--pic-xxxl);
-  height: var(--pic-xxxl);
+  width: clamp(var(--pic-xxl), 26cqi, var(--pic-xxxl));
+  height: auto;
+  aspect-ratio: 1;
+}
+.ov-pic.xxxl > .av {
+  width: 100%;
+  height: 100%;
 }
 .overview .av.pair + .av.pair {
   box-shadow: 0 0 0 var(--stroke) var(--bg);
