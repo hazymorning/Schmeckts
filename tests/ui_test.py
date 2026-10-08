@@ -772,7 +772,10 @@ async def test_insights(browser, url):
                         'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
                         'Stückchen in Soße 8 von 8 Mal gut gefressen, Stückchen in Gelee 0 von 8 Mal.',
                     ],
-                    ['Morgens wird besser gefressen als abends.', 'Morgens 8 von 8 Mal gut gefressen, abends 0 von 8 Mal.'],
+                    [
+                        'Die erste Mahlzeit am Tag kommt besser an als die letzte.',
+                        'Bei der ersten 8 von 8 Mal gut gefressen, bei der letzten 0 von 8 Mal.',
+                    ],
                 ],
             ]
         ],

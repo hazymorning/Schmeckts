@@ -375,8 +375,10 @@ const INSIGHT = {
   ],
   tageszeit: ({a, b, gap}) => [
     gap > 0 ? 'sun' : 'moon',
-    gap > 0 ? 'Morgens wird besser gefressen als abends.' : 'Abends wird besser gefressen als morgens.',
-    `Morgens <b>${ofN(a)} Mal</b> gut gefressen, abends ${ofN(b)} Mal.`,
+    gap > 0
+      ? 'Die erste Mahlzeit am Tag kommt besser an als die letzte.'
+      : 'Die letzte Mahlzeit am Tag kommt besser an als die erste.',
+    `Bei der ersten <b>${ofN(a)} Mal</b> gut gefressen, bei der letzten ${ofN(b)} Mal.`,
   ],
   snack: ({a, b}) => [
     'r_verputzt',
