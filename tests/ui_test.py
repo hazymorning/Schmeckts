@@ -116,8 +116,10 @@ async def change(pg, body, arg=None):
     await idle(pg)
 
 
-async def demo(browser, url, native=False, **kw):
+async def demo(browser, url, native=False, when=None, **kw):
     ctx = await phone(browser, **kw)
+    if when:  # the sample hangs off the time it is loaded; the clock runs on from there
+        await ctx.clock.set_system_time(when)
     pg, errors = await open_page(ctx, url, native=native)
     await tap(pg, '[data-action=demo]')
     return ctx, pg, errors
@@ -2855,7 +2857,7 @@ OBS = "import('./js/store.js').then(s => s.db.observations.map(o => [o.kind, Obj
 
 async def test_observations(browser, url):
     print('observations: noted with one tap, undone, put right and deleted from the diary, per pet')
-    ctx, pg, errors = await demo(browser, url, native=True, width=360)
+    ctx, pg, errors = await demo(browser, url, native=True, width=360, timezone_id='Europe/Berlin', when='2026-06-12T12:00:00+02:00')
     await state(pg, "(prefs.name = 'Anna', true)")
     before = await pg.evaluate(OBS)
     CHIP = '#home .overview [data-action=observe]'
