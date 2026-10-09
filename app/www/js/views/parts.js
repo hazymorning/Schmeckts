@@ -72,9 +72,7 @@ export function rateSlider(s, pid) {
       .map((r, i) => `var(--${rateTone(r)}-soft) ${(((i + 0.5) / scale.length) * 100).toFixed(1)}%`)
       .join(', '),
     words = scale
-      .map(
-        (r, i) => `<span class="${rateCls(r)}${i === at ? ' on' : ''}">${RATINGS[r].short.replace(' ', '<br>')}</span>`,
-      )
+      .map((r, i) => `<span class="${rateCls(r)}${i === at ? ' on' : ''}">${RATINGS[r].short}</span>`)
       .join('');
   return `${cur && at < 0 ? rateBadge(cur) : ''}<div class="${sliderCls(cur, scale)}" style="--n:${scale.length};--wash:${wash}${at < 0 ? '' : ';--at:' + at}" role="group" aria-label="${esc(pet ? 'Bewertung für ' + pet.name : 'Bewertung')}" data-r="${cur || ''}">
     <div class="slider-bar"><div class="slider-track">${stops}<span class="slider-thumb"><i>${thumbHTML(cur)}</i></span></div><p class="slider-names" aria-hidden="true">${words}</p></div></div>`;
