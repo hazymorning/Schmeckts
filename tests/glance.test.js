@@ -8,7 +8,7 @@ import {nextMeal} from '../app/www/js/smart.js';
 import {addDays, dayStart} from '../app/www/js/dates.js';
 import {catOf, factOn, formatOn, hangingDay, sharesWord, sheetOn, sheetText} from '../app/www/js/views/facts.js';
 import {FACTS} from '../app/www/js/content/facts.js';
-import {ANCHORS, FACTS as DAY_FACTS, NOTABLE} from '../app/www/js/content/pools.js';
+import {ANCHORS, FACTS as DAY_FACTS, NOTABLE, NOTED} from '../app/www/js/content/pools.js';
 
 // views/overview.js reaches for the page as it loads; in Node a stub answers every such call
 const stub = new Proxy(function () {}, {
@@ -116,7 +116,7 @@ test('the glance: how the last meal went, a variety’s first time, the rated me
   const g = glance(db, ['A'], NOW);
   assert.deepEqual(
     [g.meal.productId, g.outcome, g.rating, g.first, g.streak, g.week, g.noted, g.meals, g.treats],
-    ['neu', null, null, true, {kind: 'good', n: 3}, {n: 6, good: 5, sorts: 2}, ['happy'], 1, 1],
+    ['neu', null, null, true, {kind: 'good', n: 3}, {n: 6, good: 5, sorts: 2}, [{kind: 'happy', pets: ['A']}], 1, 1],
   );
   const rated = glance(db, ['A'], at(day(9, '12:00')));
   assert.deepEqual(
@@ -218,14 +218,23 @@ function home(meals, now, {sex = null, cats = 1, notes = [], favourite = 'Rind i
           pets: Object.fromEntries(ids.map(id => [id, {r}])),
         }))
         .sort((a, b) => b.servedAt - a.servedAt),
-      observations: notes.map(([kind, when], i) => ({id: 'note' + i + '0000', kind, at: when, pets: {[MAU]: true}})),
+      observations: notes.map(([kind, when, who = [MAU]], i) => ({
+        id: 'note' + i + '0000',
+        kind,
+        at: when,
+        pets: Object.fromEntries(who.map(id => [id, true])),
+      })),
     };
   replaceDb(db);
-  return [{...glance(db, ids, now), pets: cats, favourite}, now];
+  const g = {...glance(db, ids, now), pets: cats, name: cats === 1 ? 'Mau' : null, favourite};
+  homes.set(g, db);
+  return [g, now];
 }
+// each state's sentence with its own household in the store, where the card finds the cats' names
+const homes = new WeakMap(),
+  sentence = (g, ...rest) => (homes.has(g) && replaceDb(homes.get(g)), sentenceOf(g, ...rest));
 const keys = text => [...text.matchAll(/\{(\w+)\}/g)].map(([, k]) => k);
 const plain = html => html.replace(/<[^>]*>/g, '');
-const heads = ['', 'Mau heute', 'Ein Tag mit Mau', 'Nachtruhe bei Mau'];
 // a state for every anchor and fact, with and without a sex, one cat and two
 const STATES = {
   none: home([], t('12:00')),
@@ -249,11 +258,17 @@ const STATES = {
   firstLastBoth: home([...WEEKS, ['pferd00001', t('07:20'), 'top']], t('12:00'), {cats: 2}),
   night: home(WEEKS, t('01:00'), {sex: 'm'}),
   noted: home([...WEEKS, ['lamm000001', t('07:20'), 'gut']], t('16:00'), {
+    sex: 'f',
     notes: [
       ['happy', t('09:00')],
-      ['stink', t('10:00')],
+      ['vomit', t('10:00')],
     ],
   }),
+  notedBoth: home([...WEEKS, ['lamm000001', t('07:20'), 'gut']], t('16:00'), {
+    cats: 2,
+    notes: [['hungry', t('09:00'), [MAU, 'cat1000001']]],
+  }),
+  freshPlain: home([...WEEKS, ['paste00001', t('07:20'), 'gut']], t('07:40')),
   bare: home([['lamm000001', t('07:20'), 'gut']], t('12:00'), {favourite: null}),
 };
 
@@ -263,12 +278,10 @@ test('the overview card: every anchor and every wording of it in use; only what 
     const values = valuesOf(g, now);
     for (const [pool, list] of Object.entries(ANCHORS))
       for (const x of list) if (keys(x).every(k => values[k] != null)) used.add(`${pool}|${x}`);
-    for (const head of heads) {
-      const said = sentenceOf(g, now, head);
-      assert.ok(said && !/[{}]|undefined|null/.test(said), `${name}: ${said}`);
-      assert.ok(plain(said).length <= 120, `${name}: ${said}`);
-      for (const sentence of said.split(/(?<=[.!?])\s/)) assert.ok((sentence.match(/<b>/g) || []).length <= 1, said);
-    }
+    const said = sentence(g, now);
+    assert.ok(said && !/[{}]|undefined|null/.test(said), `${name}: ${said}`);
+    assert.ok(plain(said).length <= 120, `${name}: ${said}`);
+    for (const one of said.split(/(?<=[.!?])\s/)) assert.ok((one.match(/<b>/g) || []).length <= 1, said);
   }
   for (const [pool, list] of Object.entries(ANCHORS))
     for (const x of list) assert.ok(used.has(`${pool}|${x}`), `${pool}: ${x} is never said`);
@@ -291,18 +304,19 @@ test('the overview card: every anchor and every wording of it in use; only what 
 });
 
 test('the overview card: the last meal with how it went, then one fact of the day, the notable ones first; never the schedule', () => {
-  const said = name => plain(sentenceOf(...STATES[name], ''));
-  assert.match(said('last'), /Lamm.*fast alles gefressen/);
-  assert.match(said('lastBoth'), /Lamm.*beide haben gut gefressen/);
-  assert.match(said('lastLeft'), /Huhn und Pute.*da blieb einiges stehen/);
+  const said = name => plain(sentence(...STATES[name]));
+  assert.match(said('last'), /Lamm bekommen und fast alles gefressen\./);
+  assert.match(said('lastBoth'), /Lamm\. Beide haben gut gefressen\./);
+  assert.match(said('lastLeft'), /Huhn und Pute\. Da blieb einiges stehen\./);
   assert.match(said('firstFresh'), /zum ersten Mal Pferd mit Nachtkerzenöl/);
-  assert.match(said('firstLast'), /zum ersten Mal Pferd mit Nachtkerzenöl.*alles gefressen/);
+  assert.match(said('firstLast'), /zum ersten Mal Pferd mit Nachtkerzenöl bekommen und alles gefressen\./);
   assert.match(said('night'), /gestern um 18:30 Huhn und Pute/);
-  assert.match(said('notYet'), /(nichts bekommen|keine Mahlzeit|nichts eingetragen).*gestern um 18:30 Huhn und Pute/);
-  assert.match(said('noted'), /Heute (schon )?notiert: „Gut drauf“ und „Stunk“\./);
-  assert.match(said('older'), /Der letzte Eintrag ist 3 Tage her|eingetragen war Huhn und Pute|keinen Eintrag/);
+  assert.match(said('notYet'), /gestern um 18:30 Huhn und Pute/);
+  assert.match(said('noted'), /\. Sie hat heute erbrochen\.$/, 'the note that matters most, after the cat is named');
+  assert.match(said('notedBoth'), /\. Mau und Kater1 waren heute extra hungrig\.$/);
+  assert.match(said('older'), /Der letzte Eintrag ist 3 Tage her|Zuletzt gab es am 8\.\sJuni Huhn und Pute/);
   assert.deepEqual(factsOf(...STATES.lastLeft, 'today'), ['streakLeft', 'treatsNone'], 'only the notable ones');
-  assert.match(said('lastLeft'), /Die letzten zwei Mahlzeiten blieben fast stehen\./, 'two left in a row come first');
+  assert.match(said('lastLeft'), /Die letzten zwei Mahlzeiten kamen schlecht an\./, 'two left in a row come first');
   assert.deepEqual(factsOf(...STATES.last, 'today'), ['treatsNone'], 'an afternoon without the usual treat');
   assert.deepEqual(factsOf(...STATES.bare, 'today'), [], 'a first day has no facts yet');
   const plenty = factsOf(...STATES.firstLast, 'today');
@@ -311,76 +325,57 @@ test('the overview card: the last meal with how it went, then one fact of the da
       !plenty.some(k => NOTABLE.includes(k)),
     `${plenty}`,
   );
-  for (const [g, now] of Object.values(STATES))
-    for (let h = 0; h < 24; h += 3)
-      assert.ok(!/gegen|Uhr/.test(plain(sentenceOf(g, now + h * 36e5, ''))), 'no time to come');
+  for (const [name, [g, now]] of Object.entries(STATES))
+    for (let h = 0; h < 24; h += 3) {
+      const text = plain(sentence(g, now + h * 36e5));
+      assert.ok(!/gegen|Uhr/.test(text), `no time to come: ${text}`);
+      assert.ok(!/:(?!\d)|,/.test(text), `plain sentences, no colon and no comma: ${name} ${text}`);
+    }
   for (const [kind, list] of Object.entries(DAY_FACTS)) assert.ok(list.length, kind);
 });
 
 test('the overview card: a wording stays for three hours and until something is served or noted, the day sees several', () => {
   const [g, now] = STATES.firstLast,
     hour = h => addDays(dayStart(now), 0) + h * 36e5;
-  const shape = h => plain(sentenceOf(g, hour(h), '')).replace(/\d+/g, '#');
+  const shape = h => plain(sentence(g, hour(h))).replace(/\d+/g, '#');
   assert.equal(shape(12), shape(13.8), 'within the stretch only the hours go on');
-  const allDay = [9, 12, 15, 18, 21].map(h => sentenceOf(g, hour(h), '')),
-    fed = [0, 1, 2].map(n => sentenceOf({...g, meals: g.meals + n}, hour(12), ''));
+  const allDay = [9, 12, 15, 18, 21].map(h => sentence(g, hour(h))),
+    fed = [0, 1, 2].map(n => sentence({...g, meals: g.meals + n}, hour(12)));
   assert.ok(new Set(allDay).size >= 3, `the wordings of a day ${allDay}`);
   assert.ok(new Set(fed).size >= 2, `a new meal, a new wording ${fed}`);
 });
 
-test('the overview card speaks of the cat as she or he only where its sex is known, and never starts two sentences that way', () => {
+test('the overview card names the cat before it says she or he, and says so only where its sex is known', () => {
   for (const [name, [g, now]] of Object.entries(STATES))
     for (let d = 0; d < 14; d++) {
-      const said = plain(sentenceOf(g, addDays(now, d), '')),
-        starts = said.split(/(?<=[.!?])\s/).map(x => x.split(' ')[0]);
-      if (!g.sex) assert.ok(!/\b(Sie|Er|sie|er|ihr|sein)\b/.test(said), `${name}: ${said}`);
-      assert.ok(starts.filter(w => w === 'Sie' || w === 'Er').length <= 1, `${name}: ${said}`);
+      const said = plain(sentence(g, addDays(now, d))),
+        pronoun = said.search(/\b(Sie|Er|sie|er)\b/);
+      if (!g.sex) assert.equal(pronoun, -1, `${name}: ${said}`);
+      else if (pronoun >= 0) assert.ok(said.slice(0, pronoun).includes('Mau'), `${name}: ${said}`);
     }
-  const said = [...Array(14).keys()].map(d =>
-    plain(sentenceOf(...STATES.last.map((x, i) => (i ? addDays(x, d) : x)), '')),
-  );
+  const said = [...Array(14).keys()].map(d => plain(sentence(...STATES.last.map((x, i) => (i ? addDays(x, d) : x)))));
   assert.ok(
-    said.some(x => /\bSie\b|\bsie\b|\bihr\b/.test(x)),
+    said.some(x => /\bsie\b|\bSie\b/.test(x)),
     `she ${said}`,
   );
 });
 
-test('the overview heading: whose day it is, a wording a day, the night its own', () => {
-  const DAY = 864e5,
-    T = at('2026-10-05T12:00'); // a Monday
-  const pets = [
-    {id: 'mau0000001', name: 'Mau', species: 'Katze', nicknames: ['Mausi']},
-    {id: 'felix00001', name: 'Felix', species: 'Katze'},
-    {id: 'kiwi000001', name: 'Kiwi', species: 'Katze'},
-  ];
-  replaceDb({version: 3, pets, products: [], servings: [], observations: []});
-  const week = [0, 1, 2, 3, 4, 5, 6].map(i => headOf([pets[0]], T + i * DAY, 'later'));
+test('the overview heading: a greeting for the hour, by the name of whoever holds the phone, the weekend its own', () => {
+  const on = (d, h) => at(`2026-10-${d}T${String(h).padStart(2, '0')}:00`), // the 6th a Tuesday
+    hours = [1, 6, 12, 15, 19, 23].map(h => headOf(on('06', h), ''));
+  assert.ok(new Set(hours).size === 5 && hours[0] === hours[5], `night, morning, noon, afternoon, evening: ${hours}`);
+  assert.equal(headOf(on('06', 7), ''), headOf(on('06', 10), ''), 'the same within a part of the day');
+  assert.equal(headOf(on('06', 7), 'A<b>'), `${hours[1]}, A&lt;b&gt;`, 'the name escaped, after a comma');
   assert.ok(
-    week.every(h => /Mau|Mausi/.test(h) && !/Maus /.test(h)) &&
-      new Set(week).size >= 4 &&
-      week.some(h => h.includes('Mausi')),
-    `each day names the pet, by its nicknames too, never as Maus: ${week}`,
+    headOf(on('10', 12), '') !== hours[2] &&
+      headOf(on('11', 15), '') !== hours[3] &&
+      headOf(on('11', 19), '') === hours[4],
+    'Saturday and Sunday from noon to the evening',
   );
-  assert.equal(headOf([pets[0]], T + 3 * 36e5, 'done'), week[0], 'the same all day');
-  assert.ok(
-    [0, 1, 2, 3].map(i => headOf([pets[1]], T + i * DAY, 'later')).every(h => !h.includes('Felixs')),
-    'Felix’, never Felixs',
-  );
-  assert.match(headOf([pets[0]], T, 'night'), /Nacht/);
-  assert.ok(
-    [0, 1, 2, 3].map(i => headOf(pets.slice(0, 2), T + i * DAY, 'later')).every(h => h.includes('Mau und Felix')),
-    'two pets by their own names',
-  );
-  assert.ok(
-    [0, 1, 2, 3].map(i => headOf(pets, T + i * DAY, 'later')).every(h => !/Mau|Felix|Kiwi/.test(h)),
-    'more than two: the bunch, no list of names',
-  );
-  const days = [0, 1, 2, 3, 4, 5, 6, 7].map(i => headOf([pets[1]], T + i * 7 * DAY, 'later'));
-  assert.equal(new Set(days).size, 8, 'on a weekday its eight wordings in turn');
 });
 
 test('a wording in one piece', () => {
-  for (const list of [...Object.values(ANCHORS), ...Object.values(DAY_FACTS)])
+  for (const list of [...Object.values(ANCHORS), ...Object.values(DAY_FACTS), Object.values(NOTED)])
     for (const x of list) assert.match(x, /^[^|[\]]+$/);
 });
 

@@ -2018,6 +2018,7 @@ dialog.sheet::after {
   letter-spacing: var(--track-stamp);
   text-transform: uppercase;
   rotate: -4deg;
+  scale: 0.9; /* a touch below the smallest type */
   mask: var(--stamp-wear);
 }
 .cal-text {

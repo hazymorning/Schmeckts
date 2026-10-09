@@ -1701,17 +1701,19 @@ async def test_nicknames(browser, url):
     await back(pg)
     await change(
         pg,
-        "s.db.products.push({id: 'sorte00001', brand: 'Sheba', variety: 'Lachs', type: 'Nassfutter', codes: {}, createdAt: 1}); s.db.servings.unshift({id: 'meal000001', productId: 'sorte00001', servedAt: Date.parse('2026-05-31T08:00:00+02:00'), note: '', pets: {[s.db.pets[0].id]: {r: 'gut', at: 1}}})",
+        """s.db.products.push({id: 'sorte00001', brand: 'Sheba', variety: 'Lachs', type: 'Nassfutter', codes: {}, createdAt: 1});
+          for (let d = 1; d <= 7; d++) s.db.servings.unshift({id: 'meal00000' + d, productId: 'sorte00001', servedAt: Date.parse(`2026-06-0${d}T08:00:00+02:00`),
+            note: '', pets: {[s.db.pets[0].id]: {r: 'gut', at: 1}}})""",
     )
     await fixed_clock(ctx)
-    heads = []
+    said = []
     for day in range(1, 8):
         await pg.clock.set_fixed_time(f'2026-06-{day:02d}T12:00:00+02:00')
         await pg.evaluate("import('./js/views/home.js').then(h => h.renderHome())")
-        heads.append(await pg.inner_text('.overview h2'))
+        said.append(await pg.inner_text('.overview p'))
     check(
-        all(any(n in h for n in ('Minka', 'Mimi', 'Minki')) for h in heads) and any('Mimi' in h or 'Minki' in h for h in heads),
-        f'the heading names the pet each day, now and then by a nickname {heads}',
+        all(any(n in x for n in ('Minka', 'Mimi', 'Minki')) for x in said) and any('Mimi' in x or 'Minki' in x for x in said),
+        f'the card names the pet each day, now and then by a nickname {said}',
     )
     await settings(pg)
     await tap(pg, '#sheet [data-action=edit-pet]')
