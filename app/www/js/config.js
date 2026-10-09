@@ -326,6 +326,12 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
   {
+    v: '0.38.0',
+    title: 'Klar gesagt',
+    say: 'Oben grüßt dich die App jetzt zur Tageszeit und sagt in einfachen Sätzen, wann es zuletzt was gab und wie es geschmeckt hat.',
+    why: 'Die Bewertungen heißen kürzer, der Stempel im Katzenkalender ist kleiner und die Flachwitze sind besser.',
+  },
+  {
     v: '0.37.0',
     title: 'Der Tag auf einen Blick',
     say: 'Oben steht jetzt, wann es zuletzt was gab und wie es ankam, dazu etwas zum Tag: Snacks, Serien, die Woche oder der aktuelle Liebling.',
