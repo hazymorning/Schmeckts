@@ -15,10 +15,21 @@ function outcomeOf(s, shown) {
   return scores.some(v => v < NO) ? 'left' : scores.every(v => v >= GOOD) ? 'good' : 'mid';
 }
 
+// each kind noted today with the pets shown it was noted for
+function notedOn(db, shown, today, now) {
+  const kinds = new Map();
+  for (const o of db.observations || []) {
+    const pets = Object.keys(o.pets || {}).filter(id => shown.has(id));
+    if (o.at >= today && o.at <= now && pets.length)
+      kinds.set(o.kind, new Set([...(kinds.get(o.kind) || []), ...pets]));
+  }
+  return [...kinds].map(([kind, pets]) => ({kind, pets: [...pets]}));
+}
+
 /* last: the newest serving of the pets shown up to now; meal: the newest that is no treat, with how it went and,
    for one pet, its rating; first: it was that variety's first time. meals and treats: today's. streak: the newest
    rated meals that all went the same way, good or left. week: the ratings and varieties of the last WEEK days.
-   noted: the kinds noted today. next: the next usual meal. sex: of the one pet shown, if known. */
+   noted: today's notes. next: the next usual meal. sex: of the one pet shown, if known. */
 export function glance(db, pets, now) {
   const shown = new Set(pets),
     concerns = s => Object.keys(s.pets || {}).some(id => shown.has(id)),
@@ -77,13 +88,7 @@ export function glance(db, pets, now) {
     treatsUsual: treatDays.size >= TREATS.usual,
     streak: streak.kind === 'mid' ? {kind: null, n: 0} : {kind: streak.kind, n: streak.n},
     week: {...week, sorts: sorts.size},
-    noted: [
-      ...new Set(
-        (db.observations || [])
-          .filter(o => o.at >= today && o.at <= now && Object.keys(o.pets || {}).some(id => shown.has(id)))
-          .map(o => o.kind),
-      ),
-    ],
+    noted: notedOn(db, shown, today, now),
     next: nextMeal(db, now, pets),
     sex: pets.length === 1 ? sexOf(db.pets.find(p => p.id === pets[0])) : null,
   };
