@@ -163,7 +163,7 @@
   --paper-muted: light-dark(#6b5f45, #ab9f86);
   /* the pad around the sheet: the binding, what is left of the sheets torn off under it, the sheet below seen under
      the curled corner, the edges of the sheets below, the curled corner's back and the shade paper casts */
-  --paper-bind: light-dark(#3b3730, #100f0d);
+  --paper-bind: light-dark(#846446, #100f0d);
   --paper-torn: light-dark(#fcfaf3, #3d372e);
   --paper-under: light-dark(#ebe3cd, #29251f);
   --paper-edge: light-dark(#ece5d1, #2b2620);
