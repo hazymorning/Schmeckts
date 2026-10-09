@@ -81,14 +81,13 @@ export function rateSlider(s, pid) {
 }
 export const scaleEnds = levels =>
   `<p class="ends"><span>${RATINGS[levels[0]].label}</span><span>${RATINGS[levels.at(-1)].label}</span></p>`;
-export function resultBadges(s, compact = false) {
+export function resultBadges(s) {
   const ids = servingPets(s);
   if (ids.length === 1) {
     const r = rOf(s.pets[ids[0]]);
-    if (!r) return compact ? '' : `<span class="badge open">offen</span>`; // in a row its dot or the rating card says it
-    return compact
+    return r
       ? `<span class="badge ic-only ${rateCls(r)}" title="${RATINGS[r].label}">${icon('r_' + r)}</span>`
-      : rateBadge(r);
+      : `<span class="badge ic-only open" title="Noch nicht bewertet">${icon('unrated')}</span>`;
   }
   return `<span class="minis">${ids
     .map(pid => {
@@ -249,7 +248,7 @@ function servingItem(s, multiHouse, fresh, plain) {
   return `<li style="view-transition-name:tl-${s.id};view-transition-class:${fresh === s.id ? 'fresh' : 'item'}"><button class="row${plain ? '' : ' tl-item'}" data-action="open-serving" data-id="${s.id}">
         ${plain ? '' : `<span class="tl-time">${clockStr(s.servedAt)}</span><span class="tl-node">${servingNode(s)}</span>`}${thumbOf(s, p, 'm')}
         <span class="t-main"><b>${title}</b>${meta ? `<small>${esc(meta)}</small>` : ''}${s.note ? `<small class="tl-note">„${esc(s.note)}“</small>` : ''}</span>
-        ${resultBadges(s, true)}</button></li>`;
+        ${resultBadges(s)}</button></li>`;
 }
 // anchors: day ids the calendar jumps to; fresh: id of the entry just made
 export function dayBlocks(groups, {multiHouse = false, fresh = null, anchors = false, plain = false} = {}) {

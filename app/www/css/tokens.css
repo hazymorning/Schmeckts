@@ -95,6 +95,7 @@
   --icon-xs: 12px; /* in a medal */
   --icon-s: 20px; /* inside controls */
   --icon: 24px; /* on its own */
+  --icon-m: 28px; /* a level on the rating slider */
   --icon-l: 32px; /* a rating as the content */
   --icon-stroke: 1.8; /* icons at 20 and 24px, sketches */
   --icon-stroke-l: 1.4; /* icons at 32px */

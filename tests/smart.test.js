@@ -713,43 +713,58 @@ test('Erkenntnisse on new varieties: the first rating of each against the later 
   );
 });
 
-// meals at a time of day: [hour, rating] each on a day of its own from 1 February on, the oldest first
-const atHours = (pet, list) =>
-  list.map(([hour, r], i) => {
-    const d = new Date(2026, 1, 1 + i),
-      two = n => String(n).padStart(2, '0');
-    return [
-      i % 2 ? 'a' : 'b',
-      {[pet]: r},
-      `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(hour)}:00`,
-    ];
-  });
+// meals by day from 1 February on: per day [hour, rating] pairs, the oldest first; hour 25 is one in the night after
+const byDays = (pet, days) =>
+  days.flatMap((meals, i) =>
+    meals.map(([hour, r], k) => {
+      const d = new Date(2026, 1, 1 + i, hour),
+        two = n => String(n).padStart(2, '0');
+      return [
+        k % 2 ? 'a' : 'b',
+        {[pet]: r},
+        `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:00`,
+      ];
+    }),
+  );
 
-test('Erkenntnisse on the time of day: meals before 11 against those from 17, either way; 0.3 apart is enough on enough meals, a wide gap on few is not', () => {
-  const daytime = (list, prefs, pets = ['A']) =>
-    learnedOf('tageszeit', household(pets, ['a', 'b'], atHours('A', list)), prefs);
-  const morning = r => [7, r],
-    noon = r => [13, r],
-    evening = r => [18, r],
-    of = (n, good, hour) => Array.from({length: n}, (_, i) => [hour, i < good ? T : X]);
-  assert.deepEqual(daytime([...of(8, 8, 7), ...of(8, 2, 18), ...[X, X].map(noon)]), [
-    ['Morgens wird besser gefressen als abends.', 'Morgens 8 von 8 Mal gut gefressen, abends 2 von 8 Mal.'],
-  ]);
-  assert.deepEqual(daytime([...of(8, 2, 7), ...of(8, 8, 17)]), [
-    ['Abends wird besser gefressen als morgens.', 'Morgens 2 von 8 Mal gut gefressen, abends 8 von 8 Mal.'],
-  ]);
+test('Erkenntnisse on the time of day: a day’s first meal against its last, on days with two or more, whenever they come; 0.3 apart is enough on enough meals, a wide gap on few is not', () => {
+  const daytime = days => learnedOf('tageszeit', household(['A'], ['a', 'b'], byDays('A', days))),
+    days = (n, [early, late], goodFirst, goodLast) =>
+      Array.from({length: n}, (_, i) => [
+        [early, i < goodFirst ? T : X],
+        [late, i < goodLast ? T : X],
+      ]),
+    firstBetter = [
+      [
+        'Die erste Mahlzeit am Tag kommt besser an als die letzte.',
+        'Bei der ersten 8 von 8 Mal gut gefressen, bei der letzten 2 von 8 Mal.',
+      ],
+    ];
+  assert.deepEqual(daytime(days(8, [7, 18], 8, 2)), firstBetter);
   assert.deepEqual(
-    daytime([...[T, T, T].map(r => [10, r]), ...[X, X, X, X].map(evening)]),
-    [],
-    'three in the morning are too few',
+    daytime(days(8, [12, 19], 2, 8)),
+    [
+      [
+        'Die letzte Mahlzeit am Tag kommt besser an als die erste.',
+        'Bei der ersten 2 von 8 Mal gut gefressen, bei der letzten 8 von 8 Mal.',
+      ],
+    ],
+    'the first meal comes at noon, and it is still the first',
   );
   assert.deepEqual(
-    daytime([...[T, T, T, T].map(morning), ...[T, X, X, X].map(evening)]),
+    daytime([...days(8, [7, 18], 8, 2).map(([a, b]) => [a, [13, X], b]), [[8, X]], [[19, T]]]),
+    firstBetter,
+    'a meal in between counts for neither, a day with one meal not at all',
+  );
+  assert.deepEqual(daytime(days(8, [7, 25], 8, 2)), firstBetter, 'a meal in the night still belongs to the day before');
+  assert.deepEqual(daytime(days(3, [10, 18], 3, 0)), [], 'three days are too few');
+  assert.deepEqual(
+    daytime(days(4, [8, 18], 4, 1)),
     [],
     '4 of 4 against 1 of 4: wide apart, but that many meals can fall that way by chance',
   );
-  assert.deepEqual(daytime([...of(40, 28, 8), ...of(40, 16, 19)]).length, 1, '28 of 40 against 16 of 40: exactly 0.3');
-  assert.deepEqual(daytime([...of(40, 28, 8), ...of(40, 20, 19)]), [], '28 of 40 against 20 of 40 are too close');
+  assert.equal(daytime(days(40, [8, 19], 28, 16)).length, 1, '28 of 40 against 16 of 40: exactly 0.3');
+  assert.deepEqual(daytime(days(40, [8, 19], 28, 20)), [], '28 of 40 against 20 of 40 are too close');
 });
 
 test('Erkenntnisse on treats: the meals up to three hours after one against all others, only where they go down worse', () => {
@@ -849,19 +864,23 @@ test('Erkenntnisse on who serves: the same varieties as often from each person, 
 
 test('Erkenntnisse: the widest gap first, and only the pet in the filter', () => {
   const day = (d, hour) => `2026-05-${String(d).padStart(2, '0')}T${hour}:00`;
+  const each = (sort, list) => list.map(r => [sort, r]);
   const db = household(['A', 'B'], FOUR, [
-    ...rate('a', 'A', [T, T, T, T]),
-    ...rate('b', 'A', [T, T, T, T]),
-    ...rate('c', 'A', [X, X, X, X]),
-    ...rate('d', 'A', [T, X, X, X]),
-    ...[1, 2, 3, 4, 5, 6, 7, 8].map(d => ['a', {B: T}, day(d, '07')]),
-    ...[9, 10, 11, 12, 13, 14, 15, 16].map(d => ['c', {B: X}, day(d, '19')]),
+    ...daily(
+      'A',
+      [...each('a', [T, T, T, T]), ...each('b', [T, T, T, T]), ...each('c', [X, X, X, X]), ...each('d', [T, X, X, X])],
+      20,
+    ),
+    ...[1, 2, 3, 4, 5, 6, 7, 8].flatMap(d => [
+      ['a', {B: T}, day(d, '07')],
+      ['c', {B: X}, day(d, '19')],
+    ]),
   ]);
   const kinds = prefs => learned(db, prefs).map(([kind]) => kind);
   assert.deepEqual(
     [kinds(), kinds({activePet: 'A'}), kinds({activePet: 'B'})],
     [['tageszeit', 'marke', 'konsistenz'], ['marke', 'konsistenz'], ['tageszeit']],
-    'morning against evening before brand and consistency, further apart; each pet on its own',
+    'first meal against last before brand and consistency, further apart; each pet on its own',
   );
 });
 

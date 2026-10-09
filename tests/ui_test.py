@@ -116,8 +116,10 @@ async def change(pg, body, arg=None):
     await idle(pg)
 
 
-async def demo(browser, url, native=False, **kw):
+async def demo(browser, url, native=False, when=None, **kw):
     ctx = await phone(browser, **kw)
+    if when:  # the sample hangs off the time it is loaded; the clock runs on from there
+        await ctx.clock.set_system_time(when)
     pg, errors = await open_page(ctx, url, native=native)
     await tap(pg, '[data-action=demo]')
     return ctx, pg, errors
@@ -580,13 +582,15 @@ async def test_home_history(browser, url):
         ['m5', '2026-06-10T08:00', [M]],
     ]
     check(await seed('2026-06-12T10:00:00+02:00', owner) == ['m1'], 'served today: only today')
-    ROW = "(r => [r.querySelector('small').textContent, !!r.querySelector('.tl-time, .tl-node'), r.querySelectorAll('.badge').length])(document.querySelector('[data-sec=hist] .tl-day .row'))"
+    ROW = "(r => [r.querySelector('small').textContent, !!r.querySelector('.tl-time, .tl-node'), [...r.querySelectorAll('.badge')].map(b => b.title)])(document.querySelector('[data-sec=hist] .tl-day .row'))"
     rated = await pg.evaluate(ROW)
     await change(pg, 'Object.values(s.db.servings[0].pets).forEach(x => { x.r = null; })')
+    unrated = await pg.evaluate(ROW)
     check(
-        rated == ['Sheba, 7:00', False, 1] and await pg.evaluate(ROW) == ['Sheba, 7:00', False, 0] and await pg.locator('#home .pend').count() == 1,
-        f'a row as in any card, the time in its small line; not rated yet, only the rating card says so {rated}',
+        rated[:2] == ['Sheba, 7:00', False] and len(rated[2]) == 1 and unrated == ['Sheba, 7:00', False, ['Noch nicht bewertet']],
+        f'a row as in any card, the time in its small line, its rating at the end, a meal not rated yet with its own sign {rated} {unrated}',
     )
+    check(await pg.locator('#home .pend').count() == 1, 'the meal not rated yet waits in the rating card')
     check(await seed('2026-06-12T05:30:00+02:00', owner[1:]) == ['m4', 'm3', 'm2'], 'nothing yet today: yesterday, newest first')
     none = await seed('2026-06-14T10:00:00+02:00', owner)
     check(
@@ -772,7 +776,10 @@ async def test_insights(browser, url):
                         'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
                         'Stückchen in Soße 8 von 8 Mal gut gefressen, Stückchen in Gelee 0 von 8 Mal.',
                     ],
-                    ['Morgens wird besser gefressen als abends.', 'Morgens 8 von 8 Mal gut gefressen, abends 0 von 8 Mal.'],
+                    [
+                        'Die erste Mahlzeit am Tag kommt besser an als die letzte.',
+                        'Bei der ersten 8 von 8 Mal gut gefressen, bei der letzten 0 von 8 Mal.',
+                    ],
                 ],
             ]
         ],
@@ -1001,6 +1008,30 @@ async def test_narrow(browser, url):
         await ctx.close()
 
 
+async def test_controls(browser, url):
+    print('a switch, a segment or a chip redrawn with its new state moves there as if changed in place')
+    ctx = await phone(browser, motion=True)
+    pg, errors = await open_page(ctx, url)
+    await tap(pg, '[data-action=demo]')
+    await tap(pg, '[data-action=open-settings]')
+    await pg.evaluate("""window.__moved = []; document.addEventListener('transitionrun', e =>
+      window.__moved.push([e.target.closest('[data-action]')?.dataset.action, e.propertyName, e.pseudoElement]), true)""")
+
+    async def moved(sel):
+        await pg.click(sel)
+        await idle(pg)
+        return {f'{p}{e}' for a, p, e in await pg.evaluate('window.__moved.splice(0)') if a == sel.split('"')[1]}
+
+    switch = await moved('#sheet [data-action="calendar"]')
+    seg = await moved('#sheet [data-action="theme"][data-v=dark]')
+    check(
+        {'transform::after', 'background-color'} <= switch and 'background-color' in seg,
+        f'the knob slides over and the track takes its colour, the segment its fill {switch} {seg}',
+    )
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+
 async def test_slide(browser, url):
     print('rating slider under a finger, the mouse and the keyboard: one rating per gesture, none when scrolling or cancelled')
     ctx, pg, errors = await demo(browser, url, touch=True, width=360, height=800)
@@ -1038,6 +1069,7 @@ async def test_slide(browser, url):
     await touch('touchEnd')
     await idle(pg)
     check(await rated() == ['gut', ['gut']], 'lifting the finger rates once')
+    check(abs((await stops())[1][1] - at_[1][1]) < 1, 'the row stays under the finger, whatever the rating changes above it')
     await slide(at_[1], at_[0])
     await touch('touchEnd')
     await idle(pg)
@@ -1876,9 +1908,17 @@ async def test_calendar(browser, url):
     over = await pg.screenshot(clip=card)
     await pg.evaluate("document.querySelector('#home .calsheet.torn').style.visibility = 'hidden'")
     bare = await pg.screenshot(clip=card)
+    await pg.evaluate("""() => { const start = document.startViewTransition.bind(document);
+      document.startViewTransition = run => { const t = start(run); t.ready.then(() => { window.__edges = document.getAnimations()
+        .map(a => a.effect?.pseudoElement || '').filter(p => /group\\(edge-/.test(p)); }); return t; }; }""")
     await pg.evaluate("(s => { s.style.visibility = ''; s.getAnimations().forEach(a => a.play()); })(document.querySelector('#home .calsheet.torn'))")
     await idle(pg)
     check(over != bare, 'the sheet torn off falls over the card below, not behind it')
+    edges = await pg.evaluate('window.__edges')
+    check(
+        edges and {'::view-transition-group(edge-top)', '::view-transition-group(edge-bottom)'} <= set(edges),
+        f'while the page redraws after it, the soft edges at the top and bottom stay over the cards {edges}',
+    )
     check(
         len(await pg.evaluate(SHEETS)) == 1 and await state(pg, 'prefs.sheetDay') == '2026-09-30',
         'once it has fallen, today’s sheet is left',
@@ -2817,7 +2857,7 @@ OBS = "import('./js/store.js').then(s => s.db.observations.map(o => [o.kind, Obj
 
 async def test_observations(browser, url):
     print('observations: noted with one tap, undone, put right and deleted from the diary, per pet')
-    ctx, pg, errors = await demo(browser, url, native=True, width=360)
+    ctx, pg, errors = await demo(browser, url, native=True, width=360, timezone_id='Europe/Berlin', when='2026-06-12T12:00:00+02:00')
     await state(pg, "(prefs.name = 'Anna', true)")
     before = await pg.evaluate(OBS)
     CHIP = '#home .overview [data-action=observe]'
@@ -2838,18 +2878,19 @@ async def test_observations(browser, url):
     await tap(pg, '[data-action=observe][data-v=stink]')
     after, pet_ = await pg.evaluate(OBS), await state(pg, 'db.pets[0].id')
     told = await pg.inner_text('#toast > span')
+    noted = f'{ROW}[data-id="{await state(pg, "db.observations[0].id")}"]'  # the sample may have noted something today too
     check(
         after[0] == ['stink', [pet_], 'Anna']
         and len(after) == len(before) + 1
         and await pg.locator(CHIP).count() == 5
-        and await pg.locator(ROW).count() == 1
-        and await pg.inner_text(f'{ROW} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
+        and await pg.locator(noted).count() == 1
+        and await pg.inner_text(f'{noted} .t-main b') == await pg.inner_text('[data-action=observe][data-v=stink]'),
         f'a chip notes it at once, for the pet and by who noted it, in today’s diary under the chip’s word {after[0]}',
     )
     lefts = await pg.eval_on_selector_all('[data-sec=hist] .tl-day .row .t-main', 'l => l.map(t => t.getBoundingClientRect().left)')
     check(len(lefts) > 1 and len(set(lefts)) == 1, f'beside the meals of the day, its text in the same column {lefts}')
     await tap(pg, '#toast [data-action=undo]')
-    check(await pg.evaluate(OBS) == before and await pg.locator(ROW).count() == 0, 'undo takes it back, from the diary too')
+    check(await pg.evaluate(OBS) == before and await pg.locator(noted).count() == 0, 'undo takes it back, from the diary too')
     await tap(pg, '[data-action=observe][data-v=hungry]')
     again = await pg.inner_text('#toast > span')
     check(
@@ -3478,6 +3519,7 @@ run_tests(
         'record': test_record,
         'scales': test_scales,
         'narrow': test_narrow,
+        'controls': test_controls,
         'slide': test_slide,
         'texture': test_texture,
         'suggestions': test_suggestions,

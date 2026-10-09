@@ -411,7 +411,7 @@ function causeOf(recent, before, dir) {
 const INSIGHT = {ratings: 4, gap: 0.3, z: 2.5, group: 3};
 const SAUCE = {ratings: 5, share: 0.4}; // „Nur Soße“ among the ratings of the varieties in sauce
 const NEW_SORTS = 5; // varieties served again after their first time
-const DAYTIME = {morning: 11, evening: 17}; // before the one hour, from the other
+const DAY_BEGINS = 4; // a meal before this hour still belongs to the day before
 const AFTER_SNACK = 3 * 36e5;
 const TWO = 2; // varieties in a group, ratings of a variety
 const zero = () => ({n: 0, good: 0});
@@ -522,16 +522,19 @@ function newSorts(m, pets) {
 }
 // pets that take to new food only after the first time, so one left then is worth a second try
 export const slowStarters = m => m.pets.filter(pid => newSorts(m, [pid])?.gap < 0);
+// a day's first meal against its last, on days with two or more, whenever they come: the first is breakfast at noon too
 function daytime(meals) {
-  const morning = zero(),
-    evening = zero();
+  const first = zero(),
+    last = zero(),
+    dayOf = x => dayKey(x.t - DAY_BEGINS * 36e5);
   for (const {meals: l} of meals)
-    for (const x of l) {
-      const h = new Date(x.t).getHours();
-      if (x.r && h < DAYTIME.morning) add(morning, x.r);
-      else if (x.r && h >= DAYTIME.evening) add(evening, x.r);
+    for (let i = 0, j = 0; i < l.length; i = ++j) {
+      while (j + 1 < l.length && dayOf(l[j + 1]) === dayOf(l[i])) j++;
+      if (j === i) continue;
+      if (l[i].r) add(first, l[i].r);
+      if (l[j].r) add(last, l[j].r);
     }
-  return insightOf('tageszeit', morning, evening);
+  return insightOf('tageszeit', first, last);
 }
 function afterSnacks(meals) {
   const after = zero(),

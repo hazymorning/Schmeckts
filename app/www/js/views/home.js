@@ -21,7 +21,7 @@ import {
 import {hintKey} from '../smart.js';
 import {hasPhoto} from '../photos.js';
 import {anyOpen} from '../ui/sheet.js';
-import {pressing, untouched} from '../ui/slider.js';
+import {keepBy, pressing, untouched} from '../ui/slider.js';
 import {viewerOpen} from '../ui/viewer.js';
 import {
   avatar,
@@ -75,8 +75,9 @@ export function scrollTop() {
 }
 
 /* fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets;
-   turned: the Stimmt’s? sheet showing its back */
-export const homeView = {fresh: null, held: new Map(), turned: null};
+   kept: the meal just rated in the card, whose row the next draw leaves under the finger; turned: the Stimmt’s? sheet
+   showing its back */
+export const homeView = {fresh: null, held: new Map(), kept: null, turned: null};
 
 let petsDrawn = ''; // an unchanged bar is left alone, so it keeps the focus
 function renderPets() {
@@ -136,9 +137,13 @@ export function renderHome(changed = true) {
   const html = homeHTML();
   if (!changed && html === drawn) return;
   drawn = html;
-  const rail = $('#home .obs')?.scrollLeft; // a redraw keeps the chip you just tapped in view
+  const rail = $('#home .obs')?.scrollLeft, // a redraw keeps the chip you just tapped in view
+    row = () => homeView.kept && $(`#home .pend[data-id="${homeView.kept}"]`),
+    was = row()?.getBoundingClientRect().top;
   $('#home').innerHTML = html;
   if (rail) $('#home .obs').scrollLeft = rail;
+  if (was != null && row()) keepBy(row().getBoundingClientRect().top - was); // a rating changes the text above its row
+  homeView.kept = null;
   $('#fab').classList.toggle('due', !!$('#home .overview[data-due]')); // a soft nudge at feeding time
   homeView.fresh = null;
 }
@@ -191,7 +196,7 @@ function pendingHTML(list) {
       .map(s => {
         const p = getProduct(s.productId),
           ids = rateRows(s).filter(pid => newest.get(pid) === s.id);
-        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s, true)}`;
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s)}`;
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;

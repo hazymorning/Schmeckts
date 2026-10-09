@@ -54,6 +54,7 @@ function showRated(disc, s, pid, corrected) {
     // the row stays until the pop has run
     if (!homeView.held.has(s.id)) homeView.held.set(s.id, new Set());
     homeView.held.get(s.id).add(pid);
+    homeView.kept = s.id;
   }
   settled(disc)
     .then(untouched)
