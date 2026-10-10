@@ -1,6 +1,6 @@
 {
   "name": "schmeckts",
-  "version": "0.39.0",
+  "version": "0.40.0",
   "private": true,
   "description": "Schmeckt’s? – a feeding diary for cats",
   "dependencies": {
