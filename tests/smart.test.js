@@ -323,11 +323,12 @@ test('household, mixed verdict, the manual setting and the pet filter', () => {
   assert.deepEqual([tiger.byId.get('gemischt').verdict, tiger.byId.get('gemischt').n, tiger.rated], ['nicht', 2, 7]);
 });
 
-test('hints by precedence, hidden per type and variety', () => {
+test('hints by precedence, hidden per type and variety, no treat to buy again', () => {
   const db = household(
     ['A', 'B'],
-    ['stop1', 'stop2', 'sauce', 'lieb1', 'lieb2', 'wenig', 'selten'],
+    ['stop1', 'stop2', 'sauce', 'lieb1', 'lieb2', 'wenig', 'selten', {id: 'leckerli', type: 'Snack'}],
     [
+      ...rate('leckerli', 'A', ['verputzt', 'verputzt', 'verputzt']),
       ...rate('stop1', 'A', [X, X, X]),
       ...rate('stop2', 'A', [S, X]),
       ...rate('sauce', 'A', [G, G, G]),
@@ -415,6 +416,9 @@ test('flavours: every group a name holds, matched at the start of a word, the ge
     'Lachs mit Fischöl': ['Lachs'],
     'Forelle & Lachs': ['Lachs', 'Fisch'],
     Hühnerleber: ['Huhn', 'Leber'],
+    'Rentier in Soße': ['Wild'],
+    'Huhn & Fasan mit Quinoa': ['Huhn', 'Wild'],
+    'Wild & Rotbarsch': ['Wild', 'Fisch'],
   };
   for (const [text, want] of Object.entries(cases)) assert.deepEqual(flavoursOf(text), want, text);
 });
@@ -1500,6 +1504,19 @@ test('appetite at the thresholds', () => {
       ),
     ],
     'comparison older than 30 days': [...daily('A', Array(8).fill(['p1', G]), 34), ...LOW],
+    'only food that was left before as well': [
+      ...daily('A', [...Array(6).fill(['p1', G]), ['p2', X], ['mies', X]], 4),
+      ...daily(
+        'A',
+        [
+          ['p2', X],
+          ['mies', X],
+          ['p2', S],
+        ],
+        0.4,
+        0.8,
+      ),
+    ],
   };
   for (const [name, meals] of Object.entries(none)) assert.deepEqual(appetite(meals), [], name);
   const edge = [

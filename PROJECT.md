@@ -195,6 +195,7 @@ are named constants at the top of `smart.js` and `views/overview.js`.
 - **Tests:** `scripts/test.sh [go node files storage design perf ui sync]`. `tests/*.test.js` test pure modules in Node,
   the Python suites drive the app in Chromium with simulated plugins, `sync_test.py` runs phones against the real
   server. `tests/fixtures/ocr/` holds real packaging readings; `schmeckts://ocr-dump` exports a new one from the phone.
+  `tests/fixtures/household/` holds a real diary, names changed, that `household.test.js` replays as it grew.
 - **CI:** `.github/workflows/tests.yml` on pull requests and on `main`. The browser suites run in Playwright's image,
   whose tag must match the Playwright pin in `tests/requirements.txt` (`lint.sh` checks it).
 - **Release:** raise the version in `app/package.json` (and the server's in `server/VERSION`, `debian/changelog` and

@@ -219,7 +219,7 @@ export const TYPE_WORDS = [
    flavoursOf() returns groups in this order. */
 const start = words => new RegExp(`(?<!\\p{L})(?:${words})`, 'iu');
 const FISH_KINDS = start(
-  'hering|makrele|sardine|sardelle|seelachs|kabeljau|forelle|weißfisch|seehecht|herring|mackerel|cod(?!\\p{L})|trout|whitefish',
+  'hering|makrele|sardine|sardelle|seelachs|kabeljau|forelle|weißfisch|seehecht|rotbarsch|dorsch|scholle|sprotte|herring|mackerel|cod(?!\\p{L})|trout|whitefish',
 );
 export const FLAVORS = [
   ['Thunfisch', start('thunfisch|tuna')],
@@ -230,7 +230,7 @@ export const FLAVORS = [
   ['Ente', start('ente|duck')],
   ['Lamm', start('lamm|lamb')],
   ['Kaninchen', start('kaninchen|hase|rabbit')],
-  ['Wild', start('wild(?!schwein|lachs)|hirsch|reh|venison')],
+  ['Wild', start('wild(?!schwein|lachs)|hirsch|reh|rentier|elch|fasan|wachtel|venison|pheasant')],
   ['Wildschwein', start('wildschwein|boar')],
   ['Schwein', start('schwein|pork')],
   ['Kalb', start('kalb|veal')],
@@ -328,8 +328,8 @@ export const NEWS = [
   {
     v: '0.41.0',
     title: 'Genauere Vorlieben',
-    say: 'Marken und Konsistenzen werden jetzt mit dem übrigen Nassfutter verglichen. So merkt die App früher, was meist stehen bleibt, etwa Stückchen in Soße.',
-    why: '„Nur ein bissl gefressen“ zählt jetzt als stehen gelassen, ein Geschmack wird nur mit Sorten derselben Marke verglichen, und unter „Vorlieben“ stehen auch die Marken.',
+    say: 'Die App erkennt jetzt, wenn eine Marke oder Konsistenz meist stehen bleibt, etwa Stückchen in Soße, und gibt dafür nicht mehr dem Geschmack die Schuld.',
+    why: '„Nur ein bissl“ zählt jetzt als stehen gelassen, unter „Vorlieben“ stehen auch die Marken, und Futter, das deine Katze nie mochte, löst keine Appetit-Warnung mehr aus.',
     go: ['evaluation', 'Vorlieben ansehen'],
   },
   {

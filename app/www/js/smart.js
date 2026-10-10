@@ -195,8 +195,11 @@ function appetite(db, petIds, now) {
     )
       continue;
     const recent = avg(win),
-      usual = avg(base);
-    if (usual - recent >= A.drop && recent < A.below)
+      usual = avg(base),
+      // what each variety got before, so a run of food the pet never liked is no alarm
+      before = x => (x.id && base.some(y => y.id === x.id) ? avg(base.filter(y => y.id === x.id)) : usual),
+      expected = win.reduce((a, x) => a + before(x), 0) / win.length;
+    if (usual - recent >= A.drop && expected - recent >= A.drop && recent < A.below)
       out.push({
         kind: 'appetit',
         pet: pid,
@@ -231,7 +234,9 @@ function hints(sorts, appetites, pet, prefs) {
       .filter(([pid, x]) => (!pet || pid === pet) && x.n >= 3 && sauceShare(x) >= 0.6)
       .sort(([, a], [, b]) => sauceShare(b) - sauceShare(a))[0];
     if (sauce) out.push({kind: 'sosse', id: e.id, pet: sauce[0], order: -sauceShare(sauce[1])});
-    if (e.verdict === 'nachkaufen') out.push({kind: 'liebling', id: e.id, pet, order: -e.score});
+    // a treat is eaten up anyway
+    if (e.verdict === 'nachkaufen' && typeOf(e.product) !== 'Snack')
+      out.push({kind: 'liebling', id: e.id, pet, order: -e.score});
   }
   return out
     .filter(h => !hidden.has(hintKey(h)))
