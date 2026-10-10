@@ -28,7 +28,7 @@ export const RATINGS = {
     label: 'Nur ein bissl gefressen',
     short: 'Bissl',
     said: 'nur ein bissl gefressen',
-    score: 40,
+    score: 35,
     cheer: 'Probiert ist probiert.',
   },
   sosse: {

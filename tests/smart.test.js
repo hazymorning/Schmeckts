@@ -86,7 +86,7 @@ test('scales: one per food type, every level with its own points, the colour fol
     ['top', 100],
     ['gut', 80],
     ['mittel', 50],
-    ['eager', 40],
+    ['eager', 35],
     ['sosse', 30],
     ['schlecht', 0],
   ]);
@@ -171,6 +171,7 @@ test('verdicts count ratings: buy again from 3 with two thirds good, stop buying
     nein2: [S, X],
     dreiViertel: [T, S, S, X],
     nein3: [M, S, S],
+    bissl: [M, 'eager', 'eager'],
   };
   const db = household(
     ['A'],
@@ -190,6 +191,7 @@ test('verdicts count ratings: buy again from 3 with two thirds good, stop buying
       nein2: 'nicht',
       dreiViertel: 'nicht',
       nein3: 'nicht',
+      bissl: 'nicht',
     },
   );
 });
@@ -436,53 +438,131 @@ const FOUR = [
   {id: 'd', brand: 'Felix', variety: 'Huhn in Gelee'},
 ];
 
-test('Erkenntnisse by brand, animal and consistency: wet food, the best group against the weakest, two varieties rated twice a group', () => {
-  const db = household(['A'], FOUR, [
-    ...rate('a', 'A', [T, T, T]),
-    ...rate('b', 'A', [T, G, T]),
-    ...rate('c', 'A', [X, X, X]),
-    ...rate('d', 'A', [S, X, X]),
-  ]);
-  assert.deepEqual(learned(db), [
-    ['marke', 'Bisher kommt Sheba besser an als Felix.', 'Sheba 6 von 6 Mal gut gefressen, Felix 0 von 6 Mal.'],
-    [
-      'konsistenz',
-      'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
-      'Stückchen in Soße 6 von 6 Mal gut gefressen, Stückchen in Gelee 0 von 6 Mal.',
-    ],
-  ]);
+// only the comparisons of groups of varieties
+const groupsOf = db => learned(db).filter(([kind]) => ['marke', 'konsistenz', 'geschmack'].includes(kind));
+
+test('Erkenntnisse by brand and consistency: wet food, a group against the rest, two varieties rated twice a group', () => {
   assert.deepEqual(
-    learned(
+    groupsOf(
       household(['A'], FOUR, [
-        ...rate('a', 'A', [T, T]),
-        ...rate('b', 'A', [T, G]),
-        ...rate('c', 'A', [X, X]),
-        ...rate('d', 'A', [S, X]),
-      ]),
-    ),
-    [],
-    'four against four: picking the best and the weakest group widens a gap by chance, so that is not enough',
-  );
-  assert.deepEqual(
-    learned(household(['A'], [FOUR[0], FOUR[2]], [...rate('a', 'A', [T, T]), ...rate('c', 'A', [X, X])])),
-    [],
-    'one variety a group: that is a verdict, not an insight',
-  );
-  assert.deepEqual(
-    learned(
-      household(['A'], FOUR, [
-        ...rate('a', 'A', [T]),
+        ...rate('a', 'A', [T, T, T]),
         ...rate('b', 'A', [T, G, T]),
         ...rate('c', 'A', [X, X, X]),
         ...rate('d', 'A', [S, X, X]),
       ]),
     ),
+    [
+      [
+        'konsistenz',
+        'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
+        'Stückchen in Soße 6 von 6 Mal gut gefressen, Stückchen in Gelee 0 von 6 Mal.',
+      ],
+    ],
+    'a brand on the very varieties of a consistency says nothing more',
+  );
+  const mixed = [
+    {id: 'a', brand: 'Sheba', variety: 'Lachs in Soße'},
+    {id: 'b', brand: 'Sheba', variety: 'Huhn in Gelee'},
+    {id: 'c', brand: 'Felix', variety: 'Lachs in Soße'},
+    {id: 'd', brand: 'Felix', variety: 'Huhn in Gelee'},
+    {id: 'e', brand: 'Whiskas', variety: 'Rind in Soße'},
+    {id: 'f', brand: 'Whiskas', variety: 'Pute in Gelee'},
+  ];
+  const brands = left => [
+    ...rate('a', 'A', [T, T, T]),
+    ...rate('b', 'A', [T, G, T]),
+    ...left.flatMap(id => rate(id, 'A', [X, S, X])),
+  ];
+  assert.deepEqual(groupsOf(household(['A'], mixed.slice(0, 4), brands(['c', 'd'])))[0], [
+    'marke',
+    'Bisher kommt Sheba besser an als Felix.',
+    'Sheba 6 von 6 Mal gut gefressen, Felix 0 von 6 Mal.',
+  ]);
+  assert.deepEqual(
+    groupsOf(household(['A'], mixed, brands(['c', 'd', 'e', 'f']))),
+    [
+      [
+        'marke',
+        'Bisher kommt Sheba besser an als andere Marken.',
+        'Sheba 6 von 6 Mal gut gefressen, andere Marken 0 von 12 Mal.',
+      ],
+    ],
+    'the rest is named where it is one brand',
+  );
+  const real = [
+    {id: 'm1', brand: 'Miamor', variety: 'Huhn in Sauce'},
+    {id: 'm2', brand: 'Miamor', variety: 'Ente in Sauce'},
+    {id: 'b1', brand: 'Bozita', variety: 'Rentier in Soße'},
+    {id: 'b2', brand: 'Bozita', variety: 'Pute in Soße'},
+    {id: 'c1', brand: 'Catz Finefood', variety: 'Lamm'},
+    {id: 'c2', brand: 'Catz Finefood', variety: 'Pferd'},
+    {id: 'c3', brand: 'Catz Finefood', variety: 'Hirsch'},
+  ];
+  assert.deepEqual(
+    groupsOf(
+      household(['A'], real, [
+        ...rate('m1', 'A', [X, M]),
+        ...rate('m2', 'A', [M, X]),
+        ...rate('b1', 'A', [G, S, M]),
+        ...rate('b2', 'A', [S, X, M]),
+        ...rate('c1', 'A', [T, T, G]),
+        ...rate('c2', 'A', [G, T, G]),
+        ...rate('c3', 'A', [T, G, M]),
+      ]),
+    ),
+    [
+      [
+        'konsistenz',
+        'Bisher kommt Stückchen in Soße schlechter an als anderes Nassfutter.',
+        'Stückchen in Soße 1 von 10 Mal gut gefressen, anderes Nassfutter 8 von 9 Mal.',
+      ],
+    ],
+    'what does not go down well is said too, against food whose consistency is not known; the brand without sauce says the same',
+  );
+  assert.deepEqual(
+    groupsOf(
+      household(['A'], FOUR, [
+        ...rate('a', 'A', [T, T]),
+        ...rate('b', 'A', [T, G]),
+        ...rate('c', 'A', [X, X]),
+        ...rate('d', 'A', [T, X]),
+      ]),
+    ),
     [],
-    'a variety rated once does not count, so every group it is in is too small',
+    'four against four, one of them good: so few meals can fall that way by chance',
+  );
+  assert.deepEqual(
+    groupsOf(household(['A'], [FOUR[0], FOUR[2]], [...rate('a', 'A', [T, T]), ...rate('c', 'A', [X, X])])),
+    [],
+    'one variety a group: that is a verdict, not an insight',
+  );
+  const once = [
+    ...rate('a', 'A', [T]),
+    ...rate('b', 'A', [T, G, T]),
+    ...rate('c', 'A', [X, X, X]),
+    ...rate('d', 'A', [S, X, X]),
+  ];
+  assert.deepEqual(groupsOf(household(['A'], FOUR, once)), [], 'a variety rated once does not make a group');
+  assert.deepEqual(
+    groupsOf(
+      household(
+        ['A'],
+        [...FOUR, {id: 'e', brand: 'Sheba', variety: 'Rind in Soße'}],
+        [...once, ...rate('e', 'A', [T, T])],
+      ),
+    ),
+    [
+      [
+        'konsistenz',
+        'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
+        'Stückchen in Soße 6 von 6 Mal gut gefressen, Stückchen in Gelee 0 von 6 Mal.',
+      ],
+    ],
+    'but its rating counts in a group that has two varieties rated twice',
   );
   const dry = FOUR.map(p => ({...p, type: 'Trockenfutter'}));
   assert.deepEqual(
-    learned(
+    groupsOf(
       household(['A'], dry, [
         ...rate('a', 'A', ['gern', 'gern']),
         ...rate('b', 'A', ['gern', 'gern']),
@@ -495,7 +575,7 @@ test('Erkenntnisse by brand, animal and consistency: wet food, the best group ag
   );
 });
 
-test('Geschmacksprofil: each consistency and flavour of wet food with its good meals, best first, two varieties rated twice a group', () => {
+test('Geschmacksprofil: each brand, consistency and flavour of wet food with its good meals, best first, two varieties rated twice a group', () => {
   const db = household(
     ['A'],
     [...FOUR, {id: 'e', brand: 'Felix', variety: 'Rind Pastete'}],
@@ -509,6 +589,10 @@ test('Geschmacksprofil: each consistency and flavour of wet food with its good m
   );
   const of = list => list.map(x => [x.key, x.good, x.n]);
   const t = taste(model(db));
+  assert.deepEqual(of(t.marke), [
+    ['Sheba', 5, 6],
+    ['Felix', 1, 10],
+  ]);
   assert.deepEqual(of(t.konsistenz), [
     ['sosse', 5, 6],
     ['gelee', 1, 6],
@@ -535,19 +619,56 @@ test('Geschmacksprofil: each consistency and flavour of wet food with its good m
   );
 });
 
-test('Erkenntnisse by animal: a variety naming two flavours counts in both groups', () => {
-  const db = household(
-    ['A'],
+test('Erkenntnisse by flavour: only against varieties of the same brand and consistency, a variety naming two flavours counts in both', () => {
+  const line = [
+    {id: 'h1', brand: 'Sheba', variety: 'Huhn in Soße'},
+    {id: 'h2', brand: 'Sheba', variety: 'Huhn & Lachs in Soße'},
+    {id: 'r1', brand: 'Sheba', variety: 'Rind in Soße'},
+    {id: 'l1', brand: 'Sheba', variety: 'Lachs in Soße'},
+  ];
+  assert.deepEqual(
+    groupsOf(
+      household(['A'], line, [
+        ...rate('h1', 'A', [T, T, T, T]),
+        ...rate('h2', 'A', [T, G, T, T]),
+        ...rate('r1', 'A', [X, X, X, X]),
+        ...rate('l1', 'A', [X, S, X, X]),
+      ]),
+    ),
     [
-      {id: 'a', variety: 'Huhn in Soße'},
-      {id: 'b', variety: 'Thunfisch in Soße'},
-      {id: 'ab', variety: 'Huhn & Thunfisch'},
+      [
+        'geschmack',
+        'Bisher kommt Huhn besser an als andere Sorten derselben Marke.',
+        'Mit Huhn 8 von 8 Mal gut gefressen, ohne 0 von 8 Mal.',
+      ],
     ],
-    [...rate('a', 'A', [T, T, T, T, T, T, T]), ...rate('b', 'A', [X, X, X, X, X, X, X]), ...rate('ab', 'A', [T, X])],
   );
-  assert.deepEqual(learnedOf('geschmack', db), [
-    ['Bisher kommt Huhn besser an als Thunfisch.', 'Huhn 8 von 9 Mal gut gefressen, Thunfisch 1 von 9 Mal.'],
-  ]);
+  const sauce = [
+    {id: 's1', brand: 'Sheba', variety: 'Huhn in Soße'},
+    {id: 's2', brand: 'Sheba', variety: 'Huhn & Pute in Soße'},
+    {id: 'p1', brand: 'Felix', variety: 'Huhn Pastete'},
+    {id: 'p2', brand: 'Felix', variety: 'Rind Pastete'},
+    {id: 'p3', brand: 'Felix', variety: 'Lamm Pastete'},
+  ];
+  assert.deepEqual(
+    groupsOf(
+      household(['A'], sauce, [
+        ...rate('s1', 'A', [X, X, X]),
+        ...rate('s2', 'A', [S, X, X]),
+        ...rate('p1', 'A', [T, T, T]),
+        ...rate('p2', 'A', [T, G, T]),
+        ...rate('p3', 'A', [G, T, T]),
+      ]),
+    ),
+    [
+      [
+        'konsistenz',
+        'Bisher kommt Pastete besser an als Stückchen in Soße.',
+        'Pastete 9 von 9 Mal gut gefressen, Stückchen in Soße 0 von 6 Mal.',
+      ],
+    ],
+    'chicken came mostly in sauce, and the sauce is to blame, not the chicken',
+  );
 });
 
 test('Erkenntnisse by consistency: the texture field, the keywords only when it is missing', () => {
@@ -879,8 +1000,8 @@ test('Erkenntnisse: the widest gap first, and only the pet in the filter', () =>
   const kinds = prefs => learned(db, prefs).map(([kind]) => kind);
   assert.deepEqual(
     [kinds(), kinds({activePet: 'A'}), kinds({activePet: 'B'})],
-    [['tageszeit', 'marke', 'konsistenz'], ['marke', 'konsistenz'], ['tageszeit']],
-    'first meal against last before brand and consistency, further apart; each pet on its own',
+    [['tageszeit', 'konsistenz'], ['konsistenz'], ['tageszeit']],
+    'first meal against last before consistency, further apart; each pet on its own',
   );
 });
 

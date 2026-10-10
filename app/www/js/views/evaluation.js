@@ -126,7 +126,7 @@ export function evaluationCard(m) {
   return `<section class="card" data-sec="evaluation" style="view-transition-name:sec-evaluation">${cardHead('Vorlieben', 'open-evaluation', 'Alle Vorlieben')}${body}</section>`;
 }
 
-// each consistency and flavour with how many of its meals went down well, all of it in the words beside the bar
+// each brand, consistency and flavour with how many of its meals went down well, all of it in the words beside the bar
 const TEXTURE_NAMES = Object.fromEntries(TEXTURES.Nassfutter.items.map(([k, label]) => [k, label]));
 function tasteHTML(t) {
   const side = (title, list, name) =>
@@ -138,7 +138,10 @@ function tasteHTML(t) {
           )
           .join('')}</ul>`
       : '';
-  const html = side('Konsistenz', t.konsistenz, k => TEXTURE_NAMES[k]) + side('Geschmack', t.geschmack, k => k);
+  const html =
+    side('Marke', t.marke, k => k) +
+    side('Konsistenz', t.konsistenz, k => TEXTURE_NAMES[k]) +
+    side('Geschmack', t.geschmack, k => k);
   return html && `<div class="taste">${html}</div>`;
 }
 
@@ -343,18 +346,27 @@ const TEXTURE_SAID = {
   suppe: 'Suppe',
 };
 const ofN = x => `${x.good} von ${x.n}`;
-function compared(ic, {kind, a, b}) {
-  const [A, B] = [a.key, b.key].map(key => esc(kind === 'konsistenz' ? TEXTURE_SAID[key] : key));
+const better = gap => (gap > 0 ? 'besser' : 'schlechter');
+// a group against the rest, which is named where it is one group
+const REST = {marke: 'andere Marken', konsistenz: 'anderes Nassfutter'};
+function compared(ic, {kind, a, b, gap}) {
+  const name = key => esc(kind === 'konsistenz' ? TEXTURE_SAID[key] : key),
+    A = name(a.key),
+    B = b.key ? name(b.key) : REST[kind];
   return [
     ic,
-    `Bisher kommt <b>${A}</b> besser an als ${B}.`,
+    `Bisher kommt <b>${A}</b> ${better(gap)} an als ${B}.`,
     `${cap(A)} <b>${ofN(a)} Mal</b> gut gefressen, ${B} ${ofN(b)} Mal.`,
   ];
 }
 // [icon, the sentence, the counts], as HTML
 const INSIGHT = {
   marke: x => compared('tag', x),
-  geschmack: x => compared('fish', x),
+  geschmack: ({a, b, gap}) => [
+    'fish',
+    `Bisher kommt <b>${esc(a.key)}</b> ${better(gap)} an als andere Sorten derselben Marke.`,
+    `Mit ${esc(a.key)} <b>${ofN(a)} Mal</b> gut gefressen, ohne ${ofN(b)} Mal.`,
+  ],
   konsistenz: x => compared('layers', x),
   sosse: ({k, n, instead}) => [
     'drop',
