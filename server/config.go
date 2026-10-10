@@ -16,7 +16,7 @@ import (
 
 const (
 	configFile   = "config.json"
-	defaultModel = "claude-sonnet-5"
+	defaultModel = "claude-sonnet-5-5"
 	defaultPort  = 8486
 	codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // without 0/O and 1/I, easy to copy down
 )

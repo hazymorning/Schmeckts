@@ -253,10 +253,44 @@ func TestRecognition(t *testing.T) {
 		t.Fatalf("%d %v", status, out)
 	}
 	msg, _ := json.Marshal(sent)
-	for _, want := range []string{`"model":"claude-sonnet-5"`, `"media_type":"image/jpeg"`, "Felix | Huhn in Gelee"} {
+	for _, want := range []string{`"model":"claude-sonnet-5-5"`, `"effort":"low"`, `"media_type":"image/jpeg"`, "Felix | Huhn in Gelee"} {
 		if !strings.Contains(string(msg), want) {
 			t.Errorf("the request to Anthropic does not contain %s", want)
 		}
+	}
+}
+
+func TestRetiredModel(t *testing.T) {
+	asked := []string{}
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/models" {
+			json.NewEncoder(w).Encode(map[string]any{"data": []any{
+				map[string]any{"id": "claude-haiku-9", "line": "haiku", "lifecycle": "active"},
+				map[string]any{"id": "claude-sonnet-9", "line": "sonnet", "lifecycle": "active"},
+				map[string]any{"id": "claude-sonnet-8", "line": "sonnet", "lifecycle": "active"},
+			}})
+			return
+		}
+		var sent struct{ Model string }
+		json.NewDecoder(r.Body).Decode(&sent)
+		asked = append(asked, sent.Model)
+		if sent.Model != "claude-sonnet-9" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"content": []any{map[string]any{"type": "text", "text": `{"brand":"Felix"}`}}})
+	}))
+	defer fake.Close()
+	useAnthropic(t, fake.URL)
+	t.Cleanup(func() { clear(successors) })
+	a := newTestAPI(t)
+	for range 2 {
+		if s, out, _ := call(a, "POST", "/api/recognize", testCode, map[string]any{"image": jpeg}); s != 200 || out["brand"] != "Felix" {
+			t.Fatalf("%d %v", s, out)
+		}
+	}
+	if strings.Join(asked, " ") != "claude-sonnet-5-5 claude-sonnet-9 claude-sonnet-9" {
+		t.Fatalf("a retired model makes way for the newest Sonnet, once: %v", asked)
 	}
 }
 

@@ -4,8 +4,14 @@ import {report} from './report.js';
 
 const FS = Native?.Filesystem;
 const DIR = 'DATA';
-const KEYS = {db: 'schmeckts-v3', prefs: 'schmeckts-prefs', sync: 'schmeckts-sync', queue: 'schmeckts-queue'};
-const ORDER = ['queue', 'db', 'sync', 'prefs'];
+const KEYS = {
+  db: 'schmeckts-v3',
+  prefs: 'schmeckts-prefs',
+  sync: 'schmeckts-sync',
+  queue: 'schmeckts-queue',
+  ai: 'schmeckts-ai',
+};
+const ORDER = ['queue', 'db', 'sync', 'prefs', 'ai'];
 
 export const storageOK = FS
   ? true

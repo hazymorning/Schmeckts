@@ -54,11 +54,8 @@ def test_server_version():
 
 def test_prompt():
     text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
-    app = '\n'.join(p.read_text(encoding='utf-8') for p in sorted(WWW.rglob('*.js')))
-    check(
-        len(text) > 100 and 'api.anthropic.com' not in app and text.split('\n')[0] not in app,
-        'the recognition prompt and the API are only on the server',
-    )
+    app = (WWW / 'js/ai.js').read_text(encoding='utf-8')
+    check(len(text) > 100 and f'`{text}`' in app, 'the phone with its own key asks as the server does')
 
 
 def test_android():

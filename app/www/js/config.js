@@ -326,6 +326,13 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
   {
+    v: '0.40.0',
+    title: 'Fotos mit eigener KI',
+    say: 'Mit einem eigenen Schlüssel von Anthropic, OpenAI oder Google erkennt das Handy Packungsfotos jetzt selbst, auch ohne Server.',
+    why: 'Einfach unter „Scannen“ in den Einstellungen einfügen, die App prüft ihn gleich. Ein Haushalts-Server erkennt Fotos jetzt mit dem neuesten Claude-Modell.',
+    go: ['settings', 'Einstellungen öffnen'],
+  },
+  {
     v: '0.39.0',
     title: 'Kalender im Feinschliff',
     say: 'Im hellen Design hat der Katzenkalender jetzt einen braunen Rand statt eines schwarzen.',

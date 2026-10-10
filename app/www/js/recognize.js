@@ -1,4 +1,4 @@
-// stages run cheapest first; any may be skipped, and an error moves on to the next
+// stages run cheapest first, the own key before the server; any may be skipped, and an error moves on to the next
 import {request} from './api.js';
 import {TYPES} from './config.js';
 import {readPhoto} from './native.js';
@@ -14,6 +14,7 @@ import {
   SECOND_PASS_MS,
 } from './ocr.js';
 import {lookupOnline} from './online.js';
+import {ai, aiReady, aiRecognize} from './ai.js';
 import {db, prefs} from './store.js';
 import {reachable, status} from './sync.js';
 import {getProduct, productsByCode} from './derive.js';
@@ -38,10 +39,16 @@ const STEPS = [
     run: o => lookupOnline(o.code).then(asDetails),
   },
   {
+    name: 'ai',
+    hint: 'Sorte wird erkannt …',
+    when: o => !!o.photo && aiReady(),
+    run: o => aiRecognize(o.photo).then(hit => by(asDetails(hit), ai.provider)),
+  },
+  {
     name: 'server',
     hint: 'Sorte wird erkannt …',
     when: o => !!o.photo && photoByServer(),
-    run: o => recognize(o.photo).then(asDetails),
+    run: o => recognize(o.photo).then(hit => by(asDetails(hit), 'server')),
   },
   {
     name: 'text',
@@ -78,6 +85,11 @@ async function readAgain(b64, first) {
 
 // a server out of reach or without a key leaves the photo to the phone
 export const photoByServer = () => reachable() && prefs.serverPhoto && status.recognition !== false;
+// an AI looks at the photo: on this phone's own key, or on the server's
+export const photoByAI = () => aiReady() || photoByServer();
+// meal → who recognised its photo, shown in its sheet; memory only
+export const seenBy = new Map();
+const by = (hit, via) => hit && {...hit, via};
 
 // meal → {lines, brands}, memory only
 export const memLines = new Map();
@@ -102,7 +114,7 @@ async function measure(o, read) {
   for (const px of [1100, 1800].filter(n => n < edge)) took(px, (await readPhoto(await readable(img, px))).ms);
 }
 
-// sharp: the same photo larger, for reading on the phone; returns {source, products|details} or {source: '', error}
+// sharp: the same photo larger, for reading on the phone; returns {source, products|details, error} or {source: '', error}
 export async function identify({code = '', photo = '', sharp = '', meal = '', note = () => {}} = {}) {
   const o = {code, photo, sharp, meal};
   let error = null;
@@ -113,7 +125,7 @@ export async function identify({code = '', photo = '', sharp = '', meal = '', no
       const hit = await step.run(o);
       if (hit) {
         note('');
-        return {source: step.name, ...hit};
+        return {source: step.name, ...hit, error}; // a stage before it may have failed
       }
     } catch (e) {
       error = e; // the last error is what the interface explains

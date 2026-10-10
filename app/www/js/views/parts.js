@@ -18,6 +18,8 @@ import {
 } from '../derive.js';
 import {GOOD, NO, rateCls, rateTone, ratingsIn, rOf, scoreCls, sideOf, VERDICTS} from '../smart.js';
 import {hasPhoto} from '../photos.js';
+import {seenBy} from '../recognize.js';
+import {PROVIDERS} from '../ai.js';
 import {isPage, sheet} from '../ui/sheet.js';
 import {sliderCls, thumbHTML} from '../ui/slider.js';
 
@@ -39,6 +41,14 @@ export const photoThumb = (s, p, cls = '') =>
   hasPhoto(s, p)
     ? `<button class="photo-btn" data-action="view-photo" data-s="${s?.id || ''}" data-p="${p?.id || ''}" aria-label="Foto vergrößern">${thumbOf(s, p, cls)}</button>`
     : thumbOf(s, p, cls);
+const seenText = via =>
+  via === 'server'
+    ? 'vom Server erkannt'
+    : via === 'phone'
+      ? 'auf dem Handy gelesen'
+      : PROVIDERS[via]
+        ? `von ${PROVIDERS[via].name} erkannt`
+        : '';
 export function nameBlock(s, p, inSheet = false) {
   if (s.status === 'recognizing' || s.status === 'reading')
     return `<b><span class="skel" style="width:68%"></span></b><small>${s.status === 'reading' ? 'Packung wird gelesen …' : 'Sorte wird erkannt …'}</small>`;
@@ -51,8 +61,10 @@ export function nameBlock(s, p, inSheet = false) {
           ] || 'Tippen zum Benennen';
     return `<b>Unbekannte Sorte</b><small class="${s.status === 'waiting' || s.status === 'noserver' ? '' : 'warn'}">${sub}</small>`; // noserver is local mode, not an error
   }
-  // in the sheet the time field sits right below, so show the type instead
-  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : when(s.servedAt)].filter(Boolean).join(', ');
+  // in the sheet the time field sits right below, so show the type instead, and who recognised the photo
+  const meta = [p.variety ? p.brand : '', inSheet ? typeOf(p) : when(s.servedAt), inSheet && seenText(seenBy.get(s.id))]
+    .filter(Boolean)
+    .join(', ');
   return `<b>${esc(pname(p))}</b><small>${esc(meta)}</small>`;
 }
 const rateBadge = r => `<span class="badge ${rateCls(r)}">${icon('r_' + r)}${RATINGS[r].label}</span>`;

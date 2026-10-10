@@ -20,7 +20,7 @@ import {
 import {ServerError, request} from '../api.js';
 import {isConnected, serverCan, status} from '../sync.js';
 import {report} from '../report.js';
-import {memLines} from '../recognize.js';
+import {memLines, seenBy} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 
 // overrides the computed verdict household-wide; any other value means automatic
@@ -101,6 +101,7 @@ export function linkProduct(s, p) {
   delete s.guess;
   memPhotos.delete(s.id);
   memLines.delete(s.id);
+  seenBy.delete(s.id);
   if (prev && prev !== p.id) {
     // corrected: the photo follows if it came from this meal or the old variety has no meal left
     const last = !db.servings.some(x => x.productId === prev),

@@ -7,6 +7,7 @@ import {icon} from '../icons.js';
 import {REMIND, REMIND_MAX_H} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
+import {ai, aiReady, aiTrouble, PROVIDERS} from '../ai.js';
 import {feedSlots} from '../smart.js';
 import {petNames} from '../derive.js';
 import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} from './parts.js';
@@ -51,6 +52,31 @@ const labelRow = (ic, title) => `<div class="row set-row">${lead(ic)}${main(titl
 
 const LOOKUP = 'Sucht nur mit der Nummer des Barcodes';
 const SERVER_PHOTO = 'Der Server erkennt Marke und Sorte, sonst das Handy selbst.';
+const SERVER_AFTER = 'Wenn die eigene KI nichts erkennt';
+
+function aiSub() {
+  if (!ai.on) return 'Direkt vom Handy, mit eigenem Schlüssel';
+  if (!aiReady()) return 'Schlüssel fehlt noch';
+  return esc(`${ai.name} von ${PROVIDERS[ai.provider].name}`);
+}
+// pasted, the key is checked at once; once it works only its end is shown
+function aiBox() {
+  const s = sheet;
+  if (aiReady())
+    return `<p class="hint note">Fotos gehen mit deinem Schlüssel …${esc(ai.key.slice(-4))} direkt an ${PROVIDERS[ai.provider].name}.
+      <button class="link" data-action="ai-forget">Löschen</button></p>
+      ${aiTrouble.last ? `<p class="hint note warn">Zuletzt: ${esc(aiTrouble.last)}</p>` : ''}`;
+  return `<label class="label" for="f-ai">KI-Schlüssel</label>
+    <input id="f-ai" class="field" type="password" data-field="aiKey" value="${esc(s.aiKey || '')}" placeholder="Einfügen"
+      autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done"${s.aiChecking ? ' disabled' : ''}>
+    ${
+      s.aiChecking
+        ? `<p class="hint note" role="status">${icon('wait', 'wait')}Schlüssel wird geprüft …</p>`
+        : s.aiError
+          ? `<p class="hint note warn" role="alert">${esc(s.aiError)}</p>`
+          : '<p class="hint note">Von Anthropic, OpenAI oder Google. Er bleibt auf diesem Handy und geht nur an seinen Anbieter.</p>'
+    }`;
+}
 
 function overview() {
   const house = isConnected(),
@@ -103,8 +129,16 @@ function overview() {
     ${group(
       'Scannen',
       switchRow('lookup', 'search', 'Sortensuche im Internet', LOOKUP, prefs.lookup) +
+        switchRow('ai-photo', 'sparkle', 'Fotos mit eigener KI erkennen', aiSub(), ai.on) +
+        (ai.on ? under(aiBox()) : '') +
         (house
-          ? switchRow('server-photo', 'camera', 'Fotos über den Server erkennen', SERVER_PHOTO, prefs.serverPhoto)
+          ? switchRow(
+              'server-photo',
+              'camera',
+              'Fotos über den Server erkennen',
+              aiReady() ? SERVER_AFTER : SERVER_PHOTO,
+              prefs.serverPhoto,
+            )
           : ''),
       'set-group',
     )}
@@ -146,6 +180,7 @@ const PRIVACY = [
   'Katzen, Sorten und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
   'Den Text auf einer Packung liest das Handy selbst, ohne Internet. Die Sortensuche unter „Scannen“ ist anfangs aus. Eingeschaltet fragt sie bei unbekannten Barcodes zwei freie Datenbanken im Internet, und zwar nur mit der Nummer.',
+  'Mit einem eigenen KI-Schlüssel unter „Scannen“ schickt das Handy Packungsfotos direkt an dessen Anbieter, also Anthropic, OpenAI oder Google. Der Schlüssel bleibt auf diesem Handy.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',
   'Ein Backup und das Löschen aller Daten findest du unter „Daten“. „Austausch von Hand“ unter „Teilen“ gibt deine Einträge als Datei an ein anderes Handy weiter, ohne Server.',
   'Beim Lesen einer Packung berichtigt das Handy falsch gelesene Wörter mit einer Wortliste. Sie enthält Informationen aus Open Pet Food Facts, die hier unter der Open Database License (ODbL) verfügbar gemacht werden.',

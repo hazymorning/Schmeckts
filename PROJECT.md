@@ -28,7 +28,7 @@ the offset keeps it above builds from before the version restart at 0.1.0. ARM b
 
 1. Foundations: `dom`, `text`, `dates`, `report`, `native`, `reading`, `icons`, `config`, `fields`, `clock`, `disk`,
    `motion`, `content/*` (the texts of the overview card and the cat calendar)
-2. Data: `store`, `api`, `sync`, `smart`, `glance`, `derive`, `images`, `photos`, `recognize`, `ocr`, `online`
+2. Data: `store`, `api`, `sync`, `smart`, `glance`, `derive`, `images`, `photos`, `recognize`, `ai`, `ocr`, `online`
 3. Interface: `ui/*`
 4. Views: `views/*`
 5. Logic: `logic/*`
@@ -49,8 +49,9 @@ the offset keeps it above builds from before the version restart at 0.1.0. ARM b
 `db.json`, `prefs.json`, `sync.json` and `queue.json` in private app storage, each written atomically, in the order
 queue, data, clocks. After a crash the next start replays the queue. A file that cannot be read is set aside and the
 app writes nothing until restarted. Packaging photos are files in `photos/<productId>.jpg`, one per variety, and are
-in neither `db.json`, a backup nor an exchange file. Nothing goes to Google's cloud backup; device-to-device transfer
-is allowed (`app/native/res/xml`).
+in neither `db.json`, a backup nor an exchange file. `ai.json` holds the phone's own AI key and its model, and goes
+nowhere else. Nothing goes to Google's cloud backup; device-to-device transfer takes everything but `ai.json`
+(`app/native/res/xml`).
 
 ## Data
 
@@ -90,16 +91,21 @@ connecting to a server.
 ## Without and with a server
 
 Without a server nothing goes out as long as the product lookup („Sortensuche im Internet“, off by default) stays
-off; a test holds that. The phone reads the packaging text itself (ML Kit, on device), and one of the household's
-own varieties found on the packaging is served at once with undo. Google's barcode scanner in Play services sends
-its own usage data to Google.
+off and no AI key of the phone's own is set; a test holds that. The phone reads the packaging text itself (ML Kit, on
+device), and one of the household's own varieties found on the packaging is served at once with undo. Google's
+barcode scanner in Play services sends its own usage data to Google.
+
+With a key of its own („Fotos mit eigener KI erkennen“, `ai.js`) the phone sends packaging photos straight to that
+provider: Anthropic, OpenAI or Google, told apart by the key's prefix. The model is picked from the provider's model
+list when the key is checked and picked again when the provider no longer knows it, so a retired model needs no app
+update. Requests go through Capacitor's native HTTP, not the WebView's fetch.
 
 Connected (`prefs.code` set), everything is still saved on the phone first and the server is one more peer:
 
 - Changes wait in the queue until the server confirms them. Offline nothing is lost and nothing waits for it.
-- Photo recognition: the server is asked first while „Fotos über den Server erkennen“ is on, it has a key and the
-  last sync reached it; otherwise, or if it fails, the phone reads the photo itself (`identify()` in `recognize.js`
-  keeps the whole chain).
+- Photo recognition: the phone's own key goes first. The server is asked while „Fotos über den Server erkennen“ is
+  on, it has a key and the last sync reached it, and only once the own key found nothing; otherwise, or if it
+  fails, the phone reads the photo itself (`identify()` in `recognize.js` keeps the whole chain).
 - Feeding reminders ask the server whether anyone has fed already, and remind as usual when it does not answer.
 - Packaging photos are shared through the server so other phones can show them large.
 - „Verbindung trennen“ keeps all data on the phone.
@@ -140,7 +146,7 @@ Errors are `{"error": "<German message>"}`. Requests are only accepted from priv
 | `POST /api/changes`, `GET /api/changes?since=N` | send and fetch changes |
 | `GET /api/events` | server-sent events with the newest sequence number |
 | `GET /api/checksum?c=` | checksum over the collections named |
-| `POST /api/recognize` | photo in, `{brand, variety, type}` out; the API key lives only on the server |
+| `POST /api/recognize` | photo in, `{brand, variety, type}` out; the server's API key never leaves it |
 | `GET /api/fed?since=<ms>` | whether a meal was served since then (server 1.2.0) |
 | `POST`/`GET /api/photo/<variety>` | the shared packaging photo (1.3.0; replacing from 1.4.0) |
 
