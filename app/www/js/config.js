@@ -326,6 +326,13 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
   {
+    v: '0.41.0',
+    title: 'Genauere Vorlieben',
+    say: 'Marken und Konsistenzen werden jetzt mit dem übrigen Nassfutter verglichen. So merkt die App früher, was meist stehen bleibt, etwa Stückchen in Soße.',
+    why: '„Nur ein bissl gefressen“ zählt jetzt als stehen gelassen, ein Geschmack wird nur mit Sorten derselben Marke verglichen, und unter „Vorlieben“ stehen auch die Marken.',
+    go: ['evaluation', 'Vorlieben ansehen'],
+  },
+  {
     v: '0.40.0',
     title: 'Fotos mit eigener KI',
     say: 'Mit einem eigenen Schlüssel von Anthropic, OpenAI oder Google erkennt das Handy Packungsfotos jetzt selbst, auch ohne Server.',
