@@ -93,7 +93,7 @@ Alles bleibt auf deinem Handy. Kein Konto, keine Cloud, keine Werbung, kein Trac
 <summary><b>Was trotzdem nach draußen geht</b></summary>
 <br>
 
-Der Barcode-Scanner ist von Google und schickt laut Google Gerätedaten wie das Handymodell mit, aber keine Bilder. Die Sortensuche fragt, wenn du sie einschaltest, bei unbekannten Barcodes zwei freie Datenbanken, nur mit der Nummer.
+Der Barcode-Scanner ist von Google und schickt laut Google Gerätedaten wie das Handymodell mit, aber keine Bilder. Die Sortensuche fragt, wenn du sie einschaltest, bei unbekannten Barcodes zwei freie Datenbanken, nur mit der Nummer. Mit einem eigenen KI-Schlüssel gehen Packungsfotos direkt an dessen Anbieter.
 
 </details>
 

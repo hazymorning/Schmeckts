@@ -6,6 +6,7 @@ import {REMIND_DEFAULT, REMIND_MAX_H, textureOf} from './config.js';
 import {db, hideHint, prefs, save, savePrefs} from './store.js';
 import {ServerError} from './api.js';
 import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
+import {ai, aiCheck, aiTrouble, saveAi} from './ai.js';
 import {getProduct, getServing, pname} from './derive.js';
 import {forgetPhoto, keptPhoto, photoSrc} from './photos.js';
 import {timing} from './recognize.js';
@@ -86,6 +87,41 @@ async function connectServer() {
       $('#f-code')?.focus();
     }
   }
+}
+// the key is checked as it is pasted; only one that works is kept
+let aiTimer = null;
+async function checkAiKey() {
+  clearTimeout(aiTimer);
+  if (sheet?.kind !== 'settings' || sheet.aiChecking || !sheet.aiKey?.trim()) return;
+  Object.assign(sheet, {aiChecking: true, aiError: ''});
+  document.activeElement?.blur(); // the field is drawn anew, its keyboard goes
+  renderSheet();
+  let error = '';
+  try {
+    Object.assign(ai, await aiCheck(sheet.aiKey), {on: true});
+    aiTrouble.last = '';
+    saveAi();
+    haptic('success');
+    toast('Der Schlüssel funktioniert.');
+  } catch (e) {
+    haptic('strong');
+    error = e.message;
+  }
+  if (sheet?.kind !== 'settings') return;
+  Object.assign(sheet, {aiChecking: false, aiError: error, aiKey: error ? sheet.aiKey : ''});
+  renderSheet();
+}
+function forgetAiKey() {
+  const was = {...ai};
+  Object.assign(ai, {key: '', provider: '', model: '', name: ''});
+  saveAi();
+  haptic('select');
+  renderSheet();
+  toast('Schlüssel gelöscht', () => {
+    Object.assign(ai, was);
+    saveAi();
+    renderSheet();
+  });
 }
 function disconnectServer() {
   disconnect();
@@ -462,6 +498,16 @@ const ACTIONS = {
     haptic('select');
     renderSheet();
   },
+  'ai-photo'() {
+    ai.on = !ai.on;
+    saveAi();
+    haptic('select');
+    renderSheet();
+    if (ai.on && !ai.key) $('#f-ai')?.focus();
+  },
+  'ai-forget'() {
+    forgetAiKey();
+  },
   calendar() {
     prefs.calendar = !prefs.calendar;
     savePrefs();
@@ -589,6 +635,11 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.field && sheet) {
     sheet[t.dataset.field] = t.value;
+    // pasted whole; typed by hand it waits for a pause
+    if (t.id === 'f-ai' && t.value.trim().length >= 30) {
+      clearTimeout(aiTimer);
+      aiTimer = setTimeout(checkAiKey, 600);
+    }
     if (sheet.error && ['name', 'brand', 'variety'].includes(t.dataset.field)) showError('');
     if (t.dataset.field === 'brand' || t.dataset.field === 'variety') renderSuggestions();
   }
@@ -622,6 +673,9 @@ document.addEventListener('keydown', e => {
   } else if (e.target.id === 'f-remind') {
     e.preventDefault();
     e.target.blur();
+  } else if (e.target.id === 'f-ai') {
+    e.preventDefault();
+    checkAiKey();
   } else if (e.target.id === 'f-nick') {
     e.preventDefault();
     addNick();

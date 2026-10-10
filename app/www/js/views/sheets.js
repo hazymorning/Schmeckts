@@ -24,7 +24,7 @@ import {
 } from '../derive.js';
 import {mealsBefore, observedAfter, rateCls, ratingsIn, shopGroups, VERDICTS} from '../smart.js';
 import {hasLine} from '../ocr.js';
-import {memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
+import {memLines, photoByAI, READ_PATIENCE, readingSince} from '../recognize.js';
 import {hasPhoto} from '../photos.js';
 import {setSheetView, sheet, sheetBody} from '../ui/sheet.js';
 import {ZOOM_MAX, mountCrop} from '../ui/crop.js';
@@ -171,7 +171,7 @@ function viewName() {
     patient = reading && Date.now() - (began || 0) < READ_PATIENCE;
   let note = '';
   const retry = label =>
-    serving.photo && photoByServer() ? `<button class="link" data-action="retry">${label}</button>` : '';
+    serving.photo && photoByAI() ? `<button class="link" data-action="retry">${label}</button>` : '';
   if (reading)
     note = `<p class="hint note"${at}>${icon('wait', 'wait')}Packung wird ${patient ? '' : 'noch '}gelesen …</p>`;
   else if (serving?.status === 'recognizing')
@@ -180,6 +180,8 @@ function viewName() {
     note = `<p class="hint note">${esc(serving.error || 'Wird erkannt, sobald der Server erreichbar ist.')} ${retry('Jetzt versuchen')}</p>`;
   else if (serving?.status === 'failed')
     note = `<p class="hint note warn">${esc(serving.error || 'Nicht erkannt.')} ${retry('Nochmal versuchen')}</p>`;
+  else if (serving?.status === 'noserver' && serving.error)
+    note = `<p class="hint note">${esc(serving.error)} ${retry('Nochmal versuchen')}</p>`;
   const top = `<div class="sh-head"><h2>${title}</h2>${closeBtn}</div>
     ${
       photo

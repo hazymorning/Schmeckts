@@ -1932,7 +1932,7 @@ async def test_calendar(browser, url):
     await ctx.close()
 
 
-SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt|erkenn(en|t)\b')
+SERVER_WORDS = re.compile(r'server|abgleich|abgeglichen|erkennung|erkannt')  # „Fotos mit eigener KI erkennen“ needs no server
 TEXTS = """[document.body.innerText, ...[...document.querySelectorAll('[placeholder], [aria-label], [title]')]
   .map(e => [e.placeholder, e.getAttribute('aria-label'), e.title].join(' '))].join('\\n').toLowerCase()"""
 
@@ -2303,6 +2303,162 @@ async def test_recognize(browser, url):
     await pg.evaluate(f"import('./js/store.js').then(m => {{ m.db.products[0].codes = {{'{SHEBA}': true}}; }})")
     check((await ident(code=SHEBA, photo='AAA'))['source'] == 'codes', 'a code known in the household beats everything')
     await setp(code='', server='', lookup=False)
+    check(not real_errors(errors), f'no errors {real_errors(errors)[:2]}')
+    await ctx.close()
+
+
+CORS = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*'}
+OWN_KEY = 'sk-proj-' + 'Q' * 48  # an OpenAI key, as the phone takes it
+
+
+async def test_own_ai(browser, url):
+    print('own AI key: checked as it is pasted, asked before the server, a retired model replaced, the key kept to itself')
+    fake = {'models': ['gpt-6.1-sol', 'gpt-6-luna', 'gpt-5.5', 'chat-latest', 'gpt-6.1-sol-2026-09-29'], 'gone': set(), 'fail': False, 'sent': []}
+    said = json.dumps({'brand': 'Felix', 'variety': 'Huhn in Gelee', 'type': 'Nassfutter'})
+
+    async def openai(route, request):
+        if request.method == 'OPTIONS':
+            return await route.fulfill(status=204, headers=CORS)
+        if request.headers.get('authorization') != 'Bearer ' + OWN_KEY:
+            return await route.fulfill(status=401, headers=CORS, json={'error': {'message': 'Incorrect API key provided'}})
+        if request.url.endswith('/v1/models'):
+            return await route.fulfill(
+                headers=CORS, json={'object': 'list', 'data': [{'id': m, 'object': 'model', 'created': 1} for m in fake['models']]}
+            )
+        body = request.post_data_json
+        fake['sent'].append(body)
+        if body['model'] in fake['gone']:
+            return await route.fulfill(status=404, headers=CORS, json={'error': {'code': 'model_not_found'}})
+        if body['model'] == 'gpt-7-sol' and 'reasoning' in body:
+            return await route.fulfill(status=400, headers=CORS, json={'error': {'message': "Unsupported parameter: 'reasoning.effort'"}})
+        if fake['fail']:
+            return await route.fulfill(status=500, headers=CORS, json={'error': {'message': 'The server had an error'}})
+        out = [{'type': 'reasoning', 'summary': []}, {'type': 'message', 'content': [{'type': 'output_text', 'text': said}]}]
+        await route.fulfill(headers=CORS, json={'status': 'completed', 'output': out})
+
+    ctx, pg, errors = await one_pet(browser, url)
+    await ctx.route('https://api.openai.com/**', openai)
+    leaks = []
+    ctx.on(
+        'request',
+        lambda r: leaks.append(r.url) if 'api.openai.com' not in r.url and OWN_KEY in r.url + json.dumps(r.headers) + (r.post_data or '') else None,
+    )
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=ai-photo]')
+    await pg.fill('#f-ai', 'ghp_' + 'x' * 36)
+    wrong = await (await pg.wait_for_selector('#sheet .set-under .note.warn')).inner_text()
+    await pg.fill('#f-ai', OWN_KEY)
+    ok = await until(
+        pg, f"localStorage.getItem('__fs:ai.json')?.includes('{OWN_KEY}') && import('./js/ai.js').then(m => m.ai.model === 'gpt-6.1-sol')"
+    )
+    await idle(pg)
+    sub = await pg.inner_text('#sheet [data-action=ai-photo] small')
+    check(
+        'kein Schlüssel von' in wrong and ok and 'gpt-6.1-sol von OpenAI' in sub and await pg.locator('#f-ai').count() == 0,
+        f'a wrong key is named as such; a working one is kept with the newest model of its middle line [{wrong}] [{sub}]',
+    )
+    await back(pg)
+    await snap(pg, done='!!db.servings[0]?.productId')
+    sent = fake['sent'][-1]
+    parts = [c['type'] for c in sent['input'][0]['content']]
+    check(
+        await state(pg, 'db.products.find(p => p.id === db.servings[0].productId).brand') == 'Felix'
+        and sent['model'] == 'gpt-6.1-sol'
+        and sent['store'] is False
+        and parts == ['input_image', 'input_text']
+        and sent['input'][0]['content'][0]['image_url'].startswith('data:image/jpeg;base64,/9j/')
+        and not await calls(pg, 'processImage'),
+        f'a photo goes to OpenAI first and names the meal, nothing read on the phone {parts}',
+    )
+    await open_sheet(pg, kind='serving', id=await state(pg, 'db.servings[0].id'))
+    check('von OpenAI erkannt' in await pg.inner_text('#sheet'), 'the meal says who recognised its photo')
+    await tap(pg, '#sheet [data-action=close]')
+
+    fake['gone'], fake['models'] = {'gpt-6.1-sol'}, ['gpt-6-luna', 'gpt-7-sol']
+    await snap(pg, done='db.servings.length === 2 && !!db.servings[0].productId')
+    asked = [[b['model'], 'reasoning' in b] for b in fake['sent'][-3:]]
+    check(
+        asked == [['gpt-6.1-sol', True], ['gpt-7-sol', True], ['gpt-7-sol', False]]
+        and await until(pg, "localStorage.getItem('__fs:ai.json')?.includes('gpt-7-sol')")
+        and 'Products already known' in fake['sent'][-1]['input'][0]['content'][1]['text'],
+        f'the model gone: the newest that fits takes over and is kept, asked without what it refuses {asked}',
+    )
+
+    photos = []
+    await household(ctx, photos=photos)
+    await connect(pg)
+    await snap(pg, done='db.servings.length === 3 && !!db.servings[0].productId')
+    check(not photos, 'both on: the own key answers, the server is not asked')
+    fake['fail'] = True
+    await snap(pg, done='db.servings.length === 4 && !!db.servings[0].productId')
+    await open_sheet(pg, kind='serving', id=await state(pg, 'db.servings[0].id'))
+    check(len(photos) == 1 and 'vom Server erkannt' in await pg.inner_text('#sheet'), 'the own key fails: the server steps in and says so')
+    await tap(pg, '#sheet [data-action=close]')
+    await settings(pg)
+    server_sub = await pg.inner_text('#sheet [data-action=server-photo] small')
+    await tap(pg, '#sheet [data-action=server-photo]')
+    await back(pg)
+    await pg.evaluate("window.__ocrText = 'Whiskas\\nRind in Gelee'")
+    await snap(pg, done='db.servings.length === 5 && !!db.servings[0].guess')
+    check(
+        'eigene KI' in server_sub
+        and len(photos) == 1
+        and await state(pg, 'db.servings[0].error') == 'OpenAI ist gerade gestört.'
+        and len(await calls(pg, 'processImage')) == 1,
+        f'only the own key: the server is never asked, the phone reads the photo and the meal says why [{server_sub}]',
+    )
+    await settings(pg, 'backup')
+    await tap(pg, '[data-action=export]')
+    files = await pg.evaluate(
+        "Object.keys(localStorage).filter(k => k.startsWith('__fs:schmeckts-backup')).map(k => localStorage.getItem(k)).join('')"
+    )
+    check(
+        not leaks and files and OWN_KEY not in files and await state(pg, f"!JSON.stringify([db, prefs, queue, state]).includes('{OWN_KEY}')"),
+        f'the key goes only to OpenAI: not to the server, not into a backup, not into the data {leaks[:2]}',
+    )
+
+    async def others(route, request):
+        if request.method == 'OPTIONS':
+            return await route.fulfill(status=204, headers=CORS)
+        fake['sent'].append({'url': request.url, 'headers': request.headers, 'body': request.post_data_json})
+        listed = request.method == 'GET'
+        if 'anthropic' in request.url:
+            sonnet = {'line': 'sonnet', 'capabilities': {'image_input': {'supported': True}, 'effort': {'low': {'supported': True}}}}
+            models = [
+                {'id': 'claude-haiku-9', 'line': 'haiku'},
+                {'id': 'claude-sonnet-9', 'lifecycle': 'deprecated', **sonnet},
+                {'id': 'claude-sonnet-8-5', 'display_name': 'Claude Sonnet 8.5', 'lifecycle': 'active', **sonnet},
+            ]
+            answer = {'data': models} if listed else {'content': [{'type': 'thinking', 'thinking': ''}, {'type': 'text', 'text': said}]}
+        else:
+            models = [
+                {'name': 'models/gemini-3.8-flash', 'supportedGenerationMethods': ['generateContent']},
+                {'name': 'models/gemini-flash-latest', 'displayName': 'Gemini Flash Latest', 'supportedGenerationMethods': ['generateContent']},
+                {'name': 'models/embedding-9', 'supportedGenerationMethods': ['embedContent']},
+            ]
+            answer = {'models': models} if listed else {'candidates': [{'content': {'parts': [{'text': '…', 'thought': True}, {'text': said}]}}]}
+        await route.fulfill(headers=CORS, json=answer)
+
+    await ctx.route('https://api.anthropic.com/**', others)
+    await ctx.route('https://generativelanguage.googleapis.com/**', others)
+    fake['sent'] = []
+    got = await pg.evaluate(
+        """keys => import('./js/ai.js').then(async m => { const out = [];
+          for (const k of keys) { Object.assign(m.ai, await m.aiCheck(k)); const hit = await m.aiRecognize('/9j/AAAA'); out.push([m.ai.provider, m.ai.name, hit.brand]); }
+          return out; })""",
+        ['sk-ant-api03-' + 'k' * 90, ' AQ.Ab8' + 'g' * 40 + '\n'],
+    )
+    claude, gemini = [x for x in fake['sent'] if x['body']][1], [x for x in fake['sent'] if x['body']][3]
+    check(
+        got == [['anthropic', 'Claude Sonnet 8.5', 'Felix'], ['google', 'Gemini Flash Latest', 'Felix']]
+        and claude['headers'].get('anthropic-version') == '2023-06-01'
+        and claude['body']['output_config'] == {'effort': 'low'}
+        and claude['body']['messages'][0]['content'][0]['source']['data'] == '/9j/AAAA'
+        and gemini['headers'].get('x-goog-api-key') == 'AQ.Ab8' + 'g' * 40
+        and gemini['url'].endswith('/models/gemini-flash-latest:generateContent')
+        and gemini['body']['contents'][0]['parts'][0] == {'inlineData': {'mimeType': 'image/jpeg', 'data': '/9j/AAAA'}},
+        f'Anthropic and Google keys too: the newest active Sonnet, the Flash Google keeps current {got}',
+    )
     check(not real_errors(errors), f'no errors {real_errors(errors)[:2]}')
     await ctx.close()
 
@@ -3542,6 +3698,7 @@ run_tests(
         'network': test_network,
         'scanning': test_scan,
         'recognition': test_recognize,
+        'own-ai': test_own_ai,
         'text-thumb': test_text_thumb,
         'discard': test_discard,
         'pack-lines': test_pack_lines,

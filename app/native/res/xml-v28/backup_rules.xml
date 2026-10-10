@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 9 to 11: device transfer only, never cloud backup -->
+<!-- Android 9 to 11: device transfer only, never cloud backup, and never the own AI key -->
 <full-backup-content>
     <include domain="root" path="." requireFlags="deviceToDeviceTransfer" />
     <include domain="file" path="." requireFlags="deviceToDeviceTransfer" />
     <include domain="database" path="." requireFlags="deviceToDeviceTransfer" />
     <include domain="sharedpref" path="." requireFlags="deviceToDeviceTransfer" />
     <include domain="external" path="." requireFlags="deviceToDeviceTransfer" />
+    <exclude domain="file" path="ai.json" />
+    <exclude domain="file" path="ai.json.tmp" />
 </full-backup-content>

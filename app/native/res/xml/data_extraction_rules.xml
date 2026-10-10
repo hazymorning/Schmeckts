@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+: no cloud backup; device transfer stays fully allowed -->
+<!-- Android 12+: no cloud backup; device transfer takes everything but the own AI key -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" path="." />
@@ -8,4 +8,8 @@
         <exclude domain="sharedpref" path="." />
         <exclude domain="external" path="." />
     </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="ai.json" />
+        <exclude domain="file" path="ai.json.tmp" />
+    </device-transfer>
 </data-extraction-rules>

@@ -21,7 +21,7 @@ import {
 import {cropSquare, fileToImage, memPhotos, photoOf, readable, resize} from '../images.js';
 import {textSquare} from '../ocr.js';
 import {keepPhoto} from '../photos.js';
-import {identify, memLines, photoByServer, READ_PATIENCE, readingSince} from '../recognize.js';
+import {identify, memLines, photoByAI, photoByServer, READ_PATIENCE, readingSince, seenBy} from '../recognize.js';
 import {toast} from '../ui/toast.js';
 import {closeAll, closeSheet, isClosing, openSheet, renderSheet, sheet, topBody} from '../ui/sheet.js';
 import {openCamera} from '../ui/camera.js';
@@ -79,6 +79,7 @@ function undoServe(id) {
   db.servings = db.servings.filter(x => x.id !== id);
   memPhotos.delete(id);
   memLines.delete(id);
+  seenBy.delete(id);
   tries.delete(id);
   if (s.productId) cleanupProduct(s.productId);
   if (sheet?.kind === 'serving' && sheet.id === id) closeSheet();
@@ -149,7 +150,7 @@ export async function servePhoto(file, scanCode = '') {
     return;
   }
   const full = resize(img, 1100, 0.82),
-    local = !photoByServer();
+    local = !photoByAI();
   const {ids, auto} = defaultPets(null);
   const s = {
     id: uid(),
@@ -205,7 +206,7 @@ export async function replacePhoto(id, file) {
   const full = resize(img, 1100, 0.82);
   s.photo = resize(img, 480, 0.74);
   s.thumb = cropSquare(img, 200, 0.76);
-  s.status = photoByServer() ? 'recognizing' : 'noserver';
+  s.status = photoByAI() ? 'recognizing' : 'noserver';
   delete s.guess;
   delete s.error;
   memPhotos.set(id, full.split(',')[1]);
@@ -247,11 +248,12 @@ async function recognizeServing(id, sharp = '') {
   }
   if (running.get(id) === b64) return;
   running.set(id, b64);
-  const house = photoByServer();
-  s.status = house ? 'recognizing' : 'reading';
+  const house = photoByServer(),
+    asked = photoByAI();
+  s.status = asked ? 'recognizing' : 'reading';
   delete s.error;
   readingSince.set(id, Date.now());
-  if (!house)
+  if (!asked)
     setTimeout(() => {
       if (getServing(id)?.status === 'reading') refreshServing(id);
     }, READ_PATIENCE);
@@ -292,7 +294,8 @@ async function textThumb(b64, read) {
 }
 
 function takeResult(s, found, house) {
-  const err = found.error;
+  const err = found.error,
+    why = err?.kind ? err.message : ''; // why no AI named it, said while naming
   if (found.lines?.length || found.brands?.length)
     memLines.set(s.id, {lines: found.lines || [], brands: found.brands || []});
   if (found.products?.length) {
@@ -303,6 +306,7 @@ function takeResult(s, found, house) {
     tries.delete(s.id);
     refinePets(s, findProduct(found.details.brand, found.details.variety));
     applyProduct(s, found.details);
+    if (found.via) seenBy.set(s.id, found.via);
     if (sheet?.kind === 'serving' && sheet.id === s.id && sheet.step === 'name' && !sheet.brand && !sheet.variety)
       sheet.step = null;
   } else if (found.details) {
@@ -310,17 +314,22 @@ function takeResult(s, found, house) {
     tries.delete(s.id);
     s.guess = found.details;
     s.status = 'noserver';
-    delete s.error;
+    setWhy(s, why);
     fillName(s.id, found.details);
   } else if (!house) {
     s.status = 'noserver';
-    delete s.error;
+    setWhy(s, why);
   } else if (err?.retry) {
     waitForAnotherTry(s, err);
   } else {
     s.status = 'failed';
     s.error = err ? err.message : 'Packung nicht erkannt.';
   }
+}
+
+function setWhy(s, why) {
+  if (why) s.error = why;
+  else delete s.error;
 }
 
 // keeps what linking changes for as long as the toast offers to undo it
@@ -339,6 +348,7 @@ function recognized(s, p) {
     product: {thumb: p.thumb, lastPets: p.lastPets, code: !s.scanCode || !!p.codes?.[s.scanCode]},
   };
   linkProduct(s, p);
+  seenBy.set(s.id, 'phone');
   const naming = sheet?.kind === 'serving' && sheet.id === s.id,
     said = `Erkannt: <b>${esc(pname(p))}</b>`,
     past = onRecord(p);
@@ -357,6 +367,7 @@ function unrecognize(id, pid, was) {
   s.productId = null;
   s.status = 'noserver';
   s.guess = was.guess;
+  seenBy.delete(id);
   if (was.photo) s.photo = was.photo;
   if (was.thumb) s.thumb = was.thumb;
   if (was.mem) memPhotos.set(id, was.mem);

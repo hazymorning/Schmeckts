@@ -45,6 +45,8 @@ SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 
 # plugin, getPending leaves out actionTypeId, and window.__noButtons makes registering fail.
 # Our own feeding reminder keeps the last set it was handed in localStorage.__feed; a tap on one of its reminders opens
 # schmeckts://feed in the app (window.__urlOpen).
+# Capacitor's own HTTP goes through the page's fetch, so the tests' routes answer it; as in the plugin, an HTTP error
+# status is an answer, not a failure.
 NATIVE = """
 window.__calls = []; window.__back = null; window.__urlOpen = null;
 // How often the home page has been written: the splash should go after exactly one drawing of it
@@ -117,6 +119,8 @@ window.Capacitor = {isNativePlatform: () => true,
     if (window.__ocrError) return Promise.reject(new Error(window.__ocrError));
     const answer = window.__ocrQueue?.shift() || window.__ocrResult || {text: window.__ocrText || '', blocks: []};
     return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done(answer); }, window.__ocrDelay || 0)); }},
+  CapacitorHttp: {request: o => fetch(o.url, {method: o.method, headers: o.headers, body: o.data == null ? undefined : JSON.stringify(o.data)})
+    .then(async r => ({status: r.status, headers: {}, url: r.url, data: await r.json().catch(() => null)}))},
   Filesystem, LocalNotifications, FeedReminder, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
