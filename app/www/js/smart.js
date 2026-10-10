@@ -195,8 +195,11 @@ function appetite(db, petIds, now) {
     )
       continue;
     const recent = avg(win),
-      usual = avg(base);
-    if (usual - recent >= A.drop && recent < A.below)
+      usual = avg(base),
+      // what each variety got before, so a run of food the pet never liked is no alarm
+      before = x => (x.id && base.some(y => y.id === x.id) ? avg(base.filter(y => y.id === x.id)) : usual),
+      expected = win.reduce((a, x) => a + before(x), 0) / win.length;
+    if (usual - recent >= A.drop && expected - recent >= A.drop && recent < A.below)
       out.push({
         kind: 'appetit',
         pet: pid,
@@ -231,7 +234,9 @@ function hints(sorts, appetites, pet, prefs) {
       .filter(([pid, x]) => (!pet || pid === pet) && x.n >= 3 && sauceShare(x) >= 0.6)
       .sort(([, a], [, b]) => sauceShare(b) - sauceShare(a))[0];
     if (sauce) out.push({kind: 'sosse', id: e.id, pet: sauce[0], order: -sauceShare(sauce[1])});
-    if (e.verdict === 'nachkaufen') out.push({kind: 'liebling', id: e.id, pet, order: -e.score});
+    // a treat is eaten up anyway
+    if (e.verdict === 'nachkaufen' && typeOf(e.product) !== 'Snack')
+      out.push({kind: 'liebling', id: e.id, pet, order: -e.score});
   }
   return out
     .filter(h => !hidden.has(hintKey(h)))
@@ -405,10 +410,10 @@ function causeOf(recent, before, dir) {
 /* Erkenntnisse: what holds across varieties and meals and helps with buying and feeding, never one variety's verdict
    told again. Most set two sides against each other by how many of their meals went down well and count once both
    have INSIGHT.ratings, their shares lie INSIGHT.gap apart and the gap is INSIGHT.z pooled standard errors wide;
-   INSIGHT.group for the best group against the weakest, since picking the two ends widens a gap by chance. In
-   simulated households whose cat likes everything alike that keeps insights to about one in twenty after two months
+   INSIGHT.group for a group against the rest, since the one furthest off is picked from several. In simulated
+   households whose cat likes everything alike that keeps insights to about one in twenty after two months
    (tests/personas.test.js). The widest gap comes first. */
-const INSIGHT = {ratings: 4, gap: 0.3, z: 2.5, group: 3};
+const INSIGHT = {ratings: 4, gap: 0.3, z: 2.5, group: 2.75};
 const SAUCE = {ratings: 5, share: 0.4}; // „Nur Soße“ among the ratings of the varieties in sauce
 const NEW_SORTS = 5; // varieties served again after their first time
 const DAY_BEGINS = 4; // a meal before this hour still belongs to the day before
@@ -429,36 +434,94 @@ function insightOf(kind, a, b, z = INSIGHT.z) {
     : null;
 }
 const worse = x => (x?.gap < 0 ? x : null); // where only that way round helps
-const textureKey = p => textureOf(p, p.texture)?.[0] || guessTexture(p);
-const GROUPS = {marke: p => [p.brand], geschmack: p => flavoursOf(p.variety), konsistenz: p => [textureKey(p)]};
-/* Wet food by group, the best share first. A group needs two varieties rated twice, so no single one carries it; a
-   variety naming two flavours counts in both. */
+const textureKey = p => textureOf(p, p.texture)?.[0] || guessTexture(p) || '';
+const GROUPS = {
+  marke: p => [(p.brand || '').trim()],
+  geschmack: p => flavoursOf(p.variety),
+  konsistenz: p => [textureKey(p)],
+};
+const wetOf = m => m.sorts.filter(e => e.n && typeOf(e.product) === TYPES[0]);
+const enough = list => list.filter(e => e.n >= TWO).length >= TWO; // so no single variety carries a side
+const tallyOf = list => ({n: list.reduce((a, e) => a + e.n, 0), good: list.reduce((a, e) => a + goodOf(e.counts), 0)});
+/* Wet food by group, the best share first. Every rating counts, but a group needs two varieties rated twice; a variety
+   naming two flavours counts in both. */
 function grouped(m, keysOf) {
   const by = new Map();
-  for (const e of m.sorts)
-    if (e.n >= TWO && typeOf(e.product) === TYPES[0])
-      for (const k of keysOf(e.product)) if (k) by.set(k, [...(by.get(k) || []), e]);
+  for (const e of wetOf(m)) for (const k of keysOf(e.product)) if (k) by.set(k, [...(by.get(k) || []), e]);
   return [...by]
-    .filter(([, l]) => l.length >= TWO)
-    .map(([key, l]) => ({key, n: l.reduce((a, e) => a + e.n, 0), good: l.reduce((a, e) => a + goodOf(e.counts), 0)}))
+    .filter(([, l]) => enough(l))
+    .map(([key, sorts]) => ({key, ...tallyOf(sorts), sorts}))
     .sort((a, b) => b.good / b.n - a.good / a.n || b.n - a.n || a.key.localeCompare(b.key, 'de'));
 }
-// the best group against the weakest
-const byGroup = m =>
-  Object.entries(GROUPS).map(([kind, keysOf]) => {
-    const ranked = grouped(m, keysOf);
-    return ranked.length >= TWO ? insightOf(kind, ranked[0], ranked.at(-1), INSIGHT.group) : null;
-  });
-/* Geschmacksprofil: how each consistency and flavour goes down, best first, the TASTE most rated; a side with one
-   group stays empty, as there is nothing to set it against */
+// the rest by its name where it is all one group
+function restOf(kind, rest) {
+  const keys = new Set(rest.map(e => GROUPS[kind](e.product)[0]));
+  return {key: kind !== 'geschmack' && keys.size === 1 ? [...keys][0] || null : null, ...tallyOf(rest)};
+}
+/* A flavour only against varieties of the same brand and consistency, so it takes no blame for the sauce it came in:
+   the counts are those of the lines holding both, the test Cochran-Mantel-Haenszel's, line by line. */
+const lineOf = p => `${(p.brand || '').trim()}|${textureKey(p)}`;
+function sameLine(g, rest) {
+  const lines = new Map();
+  for (const [i, list] of [g.sorts, rest].entries())
+    for (const e of list) {
+      const key = lineOf(e.product);
+      if (!lines.has(key)) lines.set(key, [[], []]);
+      lines.get(key)[i].push(e);
+    }
+  const mine = [],
+    theirs = [];
+  let off = 0,
+    vary = 0;
+  for (const [a, b] of lines.values()) {
+    if (!a.length || !b.length) continue;
+    mine.push(...a);
+    theirs.push(...b);
+    const x = tallyOf(a),
+      y = tallyOf(b),
+      n = x.n + y.n,
+      k = x.good + y.good;
+    off += x.good - (x.n * k) / n;
+    vary += (x.n * y.n * k * (n - k)) / (n * n * (n - 1));
+  }
+  if (!enough(mine) || !enough(theirs)) return null;
+  const x = insightOf('geschmack', {key: g.key, ...tallyOf(mine)}, {key: null, ...tallyOf(theirs)}, 0);
+  return x && off * x.gap > 0 && off * off >= INSIGHT.group ** 2 * vary ? x : null;
+}
+// each group against the rest of the wet food, the one furthest off; on a tie the better one
+function byGroup(m, kind) {
+  const wet = wetOf(m);
+  let best = null;
+  for (const g of grouped(m, GROUPS[kind])) {
+    const rest = wet.filter(e => !g.sorts.includes(e));
+    if (!enough(rest)) continue;
+    const x =
+      kind === 'geschmack'
+        ? sameLine(g, rest)
+        : insightOf(kind, {key: g.key, n: g.n, good: g.good}, restOf(kind, rest), INSIGHT.group);
+    if (x && (!best || Math.abs(x.gap) > Math.abs(best.gap) || (Math.abs(x.gap) === Math.abs(best.gap) && x.gap > 0)))
+      best = {...x, sorts: g.sorts, rest};
+  }
+  return best;
+}
+// a brand all on one side of a consistency's split says nothing of its own, and the consistency holds for every brand
+const inside = (brand, texture) =>
+  brand.sorts.every(e => (brand.gap * texture.gap > 0 ? texture.sorts : texture.rest).includes(e));
+function byGroups(m) {
+  const brand = byGroup(m, 'marke'),
+    texture = byGroup(m, 'konsistenz');
+  return [brand && texture && inside(brand, texture) ? null : brand, texture, byGroup(m, 'geschmack')];
+}
+/* Geschmacksprofil: how each brand, consistency and flavour goes down, best first, the TASTE most rated; a side with
+   one group stays empty, as there is nothing to set it against */
 const TASTE = 5;
 export function taste(m) {
   const side = keysOf => {
     const list = grouped(m, keysOf),
       most = new Set(list.toSorted((a, b) => b.n - a.n).slice(0, TASTE));
-    return list.length >= TWO ? list.filter(x => most.has(x)) : [];
+    return list.length >= TWO ? list.filter(x => most.has(x)).map(({key, n, good}) => ({key, n, good})) : [];
   };
-  return {konsistenz: side(GROUPS.konsistenz), geschmack: side(GROUPS.geschmack)};
+  return {marke: side(GROUPS.marke), konsistenz: side(GROUPS.konsistenz), geschmack: side(GROUPS.geschmack)};
 }
 // instead: the texture eaten best otherwise, mostly well and better than the sauce, as advice; none, no advice
 function inSauce(m) {
@@ -586,7 +649,7 @@ function feeder(db, m, now) {
 export function insights(db, m, now) {
   const meals = mealsOf(db, m.pets, now);
   return [
-    ...byGroup(m),
+    ...byGroups(m),
     inSauce(m),
     repeat(meals),
     newSorts(m, m.pets),

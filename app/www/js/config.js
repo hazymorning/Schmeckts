@@ -28,7 +28,7 @@ export const RATINGS = {
     label: 'Nur ein bissl gefressen',
     short: 'Bissl',
     said: 'nur ein bissl gefressen',
-    score: 40,
+    score: 35,
     cheer: 'Probiert ist probiert.',
   },
   sosse: {
@@ -219,7 +219,7 @@ export const TYPE_WORDS = [
    flavoursOf() returns groups in this order. */
 const start = words => new RegExp(`(?<!\\p{L})(?:${words})`, 'iu');
 const FISH_KINDS = start(
-  'hering|makrele|sardine|sardelle|seelachs|kabeljau|forelle|weißfisch|seehecht|herring|mackerel|cod(?!\\p{L})|trout|whitefish',
+  'hering|makrele|sardine|sardelle|seelachs|kabeljau|forelle|weißfisch|seehecht|rotbarsch|dorsch|scholle|sprotte|herring|mackerel|cod(?!\\p{L})|trout|whitefish',
 );
 export const FLAVORS = [
   ['Thunfisch', start('thunfisch|tuna')],
@@ -230,7 +230,7 @@ export const FLAVORS = [
   ['Ente', start('ente|duck')],
   ['Lamm', start('lamm|lamb')],
   ['Kaninchen', start('kaninchen|hase|rabbit')],
-  ['Wild', start('wild(?!schwein|lachs)|hirsch|reh|venison')],
+  ['Wild', start('wild(?!schwein|lachs)|hirsch|reh|rentier|elch|fasan|wachtel|venison|pheasant')],
   ['Wildschwein', start('wildschwein|boar')],
   ['Schwein', start('schwein|pork')],
   ['Kalb', start('kalb|veal')],
@@ -325,6 +325,13 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is hidden (neu:<v> in prefs.hiddenHints, so v never changes). off: a setting it needs and what to say while that
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
+  {
+    v: '0.41.0',
+    title: 'Genauere Vorlieben',
+    say: 'Die App erkennt jetzt, wenn eine Marke oder Konsistenz meist stehen bleibt, etwa Stückchen in Soße, und gibt dafür nicht mehr dem Geschmack die Schuld.',
+    why: '„Nur ein bissl“ zählt jetzt als stehen gelassen, unter „Vorlieben“ stehen auch die Marken, und Futter, das deine Katze nie mochte, löst keine Appetit-Warnung mehr aus.',
+    go: ['evaluation', 'Vorlieben ansehen'],
+  },
   {
     v: '0.40.0',
     title: 'Fotos mit eigener KI',

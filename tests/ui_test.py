@@ -752,11 +752,11 @@ async def test_insights(browser, url):
         product('treat', 'Dreamies', 'Käse', 'Snack'),
     ]
     meals = []
-    for d in range(1, 9):  # a morning meal in sauce, eaten up; in the evening one in jelly two hours after a treat, left
+    for d in range(1, 9):  # a morning meal in jelly, eaten up; in the evening one in sauce two hours after a treat, licked
         meals += [
-            meal(f'm{d}', 'ab'[d % 2], at(f'2026-06-0{d}T07:00'), {M: 'top'}),
+            meal(f'm{d}', 'cd'[d % 2], at(f'2026-06-0{d}T07:00'), {M: 'top'}),
             meal(f't{d}', 'treat', at(f'2026-06-0{d}T17:00'), {M: 'verputzt'}),
-            meal(f'e{d}', 'cd'[d % 2], at(f'2026-06-0{d}T19:00'), {M: 'schlecht'}),
+            meal(f'e{d}', 'ab'[d % 2], at(f'2026-06-0{d}T19:00'), {M: 'sosse'}),
         ]
     await load(pg, [pet(M)], sorts, meals)
     await tap(pg, '[data-sec=evaluation] [data-action=open-evaluation]')
@@ -771,10 +771,13 @@ async def test_insights(browser, url):
             [
                 'Erkenntnisse',
                 [
-                    ['Bisher kommt Sheba besser an als Felix.', 'Sheba 8 von 8 Mal gut gefressen, Felix 0 von 8 Mal.'],
                     [
-                        'Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.',
-                        'Stückchen in Soße 8 von 8 Mal gut gefressen, Stückchen in Gelee 0 von 8 Mal.',
+                        'Bisher kommt Stückchen in Gelee besser an als Stückchen in Soße.',
+                        'Stückchen in Gelee 8 von 8 Mal gut gefressen, Stückchen in Soße 0 von 8 Mal.',
+                    ],
+                    [
+                        'Bei Stückchen in Soße wird oft nur die Soße geleckt.',
+                        '8 von 8 Mal nur die Soße. Stückchen in Gelee dagegen 8 von 8 Mal gut gefressen.',
                     ],
                     [
                         'Die erste Mahlzeit am Tag kommt besser an als die letzte.',
@@ -840,7 +843,7 @@ async def test_record(browser, url):
     pg, errors = await open_page(ctx, url)
     await pg.clock.set_fixed_time('2026-06-12T12:00:00+02:00')
     now = at('2026-06-12T12:00')
-    rated = {'lachs': ['top', 'top', 'gut'], 'zaeh': ['mittel', 'eager', 'schlecht'], 'nie': ['schlecht', 'schlecht']}
+    rated = {'lachs': ['top', 'top', 'gut'], 'zaeh': ['mittel', 'mittel', 'schlecht'], 'nie': ['schlecht', 'schlecht']}
     await load(
         pg,
         [pet(M)],
@@ -854,7 +857,7 @@ async def test_record(browser, url):
         '#sheet .plist [data-action=serve]', "l => l.map(b => [b.dataset.id, [...b.querySelectorAll('small')].map(x => x.textContent)])"
     )
     check(
-        dict(rows).get('zaeh', [None])[1:] == ['2 von 3 Mal nur zum Teil gefressen'] and len(dict(rows)['lachs']) == 1 and 'nie' not in dict(rows),
+        dict(rows).get('zaeh', [None])[1:] == ['2 von 3 Mal die Hälfte gefressen'] and len(dict(rows)['lachs']) == 1 and 'nie' not in dict(rows),
         f'a variety that goes down badly shows its record in the list, one that goes down well does not {rows}',
     )
     await tap(pg, '#sheet [data-action=close]')

@@ -72,7 +72,7 @@ connecting to a server.
 
 | Where | Value | Meaning |
 |---|---|---|
-| `RATINGS`, scale `portion` (wet food) | `top` `gut` `mittel` `eager` `sosse` `schlecht` | 100, 80, 50, 40, 30, 0 points |
+| `RATINGS`, scale `portion` (wet food) | `top` `gut` `mittel` `eager` `sosse` `schlecht` | 100, 80, 50, 35, 30, 0 points |
 | `RATINGS`, scale `bowl` (dry food) | `gern` `normal` `wenig` `liegen` | 100, 80, 35, 0 points |
 | `RATINGS`, scale `bite` (treats, other) | `verputzt` `spaeter` `angeknabbert` `unberuehrt` | 100, 70, 35, 0 points |
 | `products[].type` | `Nassfutter` `Trockenfutter` `Snack` `Sonstiges` | food type, decides the scale |
@@ -166,7 +166,8 @@ are named constants at the top of `smart.js` and `views/overview.js`.
   „Gemischt“. `kaufen` set by hand beats the verdict.
 - Observations are shown beside the ratings and never change a rating, verdict or hint.
 - An insight and a link from an observation to a variety need their gap to be a few pooled standard errors wide, as a
-  trend does, so chance makes hardly any. `tests/personas.test.js` holds on simulated households how rarely one shows
+  trend does, so chance makes hardly any. A brand, consistency or flavour is set against the rest of the wet food, a
+  flavour only within varieties of the same brand and consistency, so it does not take the blame for its sauce. `tests/personas.test.js` holds on simulated households how rarely one shows
   for a cat without that habit and how often for a cat with it.
 - The texts never give a percentage or a score; they say it in words („3 von 4 Mal gut gefressen“).
 
@@ -194,6 +195,7 @@ are named constants at the top of `smart.js` and `views/overview.js`.
 - **Tests:** `scripts/test.sh [go node files storage design perf ui sync]`. `tests/*.test.js` test pure modules in Node,
   the Python suites drive the app in Chromium with simulated plugins, `sync_test.py` runs phones against the real
   server. `tests/fixtures/ocr/` holds real packaging readings; `schmeckts://ocr-dump` exports a new one from the phone.
+  `tests/fixtures/household/` holds a real diary, names changed, that `household.test.js` replays as it grew.
 - **CI:** `.github/workflows/tests.yml` on pull requests and on `main`. The browser suites run in Playwright's image,
   whose tag must match the Playwright pin in `tests/requirements.txt` (`lint.sh` checks it).
 - **Release:** raise the version in `app/package.json` (and the server's in `server/VERSION`, `debian/changelog` and

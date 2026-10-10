@@ -21,20 +21,26 @@ function rating(rnd, good, sauce) {
   return rnd() < sauce ? 'sosse' : ['mittel', 'eager', 'schlecht'][Math.floor(rnd() * 3)];
 }
 /* Two meals a day of ten wet varieties for DAYS days, now and then the same as the meal before, a treat on some
-   days, two people feeding. habit gives the chance of a good rating and the sauce share for one meal. */
-function household(seed, habit = {}) {
+   days, two people feeding. habit gives the chance of a good rating and the sauce share for one meal. In lines a brand
+   comes in one consistency, and the lines in sauce mostly with chicken, as the shelves have them. */
+function household(seed, habit = {}, lines = false) {
   const rnd = random(seed),
     good = habit.good || (() => 0.6),
     sauce = habit.sauce || (() => 0.25);
-  const products = Array.from({length: 10}, (_, i) => ({
-    id: 'p' + i,
-    brand: BRANDS[Math.floor(rnd() * BRANDS.length)],
-    variety: `${FLAVOURS[Math.floor(rnd() * FLAVOURS.length)]} ${TEXTURES[i % TEXTURES.length]}`,
-    type: 'Nassfutter',
-    codes: {},
-    lastPets: [],
-    createdAt: 1,
-  }));
+  const products = Array.from({length: 10}, (_, i) => {
+    const b = Math.floor(rnd() * BRANDS.length),
+      flavour = FLAVOURS[Math.floor(rnd() * FLAVOURS.length)],
+      texture = TEXTURES[(lines ? b : i) % TEXTURES.length];
+    return {
+      id: 'p' + i,
+      brand: BRANDS[b],
+      variety: `${lines && texture === 'in Soße' && rnd() < 0.7 ? 'Huhn' : flavour} ${texture}`,
+      type: 'Nassfutter',
+      codes: {},
+      lastPets: [],
+      createdAt: 1,
+    };
+  });
   products.push({
     id: 'snack',
     brand: 'Dreamies',
@@ -93,10 +99,10 @@ function noted(seed, upset = false) {
   return db;
 }
 // per kind of insight, in how many of the households it shows
-function shown(habit) {
+function shown(habit, lines) {
   const out = {any: 0};
   for (let i = 1; i <= HOUSES; i++) {
-    const db = household(i * 7919, habit),
+    const db = household(i * 7919, habit, lines),
       kinds = new Set(insights(db, analyze(db, {activePet: 'all', hiddenHints: []}, NOW), NOW).map(x => x.kind));
     if (kinds.size) out.any++;
     for (const k of kinds) out[k] = (out[k] || 0) + 1;
@@ -122,12 +128,22 @@ test('a cat with a clear habit: the insight that names it shows in most househol
     tageszeit: {good: m => (m.morning ? 0.35 : 0.75)},
     snack: {good: m => (m.afterSnack ? 0.2 : 0.7), snacks: 0.6},
     feeder: {good: m => (m.by === 'Anna' ? 0.8 : 0.45)},
+    marke: {good: m => (m.p.brand === 'Whiskas' ? 0.15 : 0.6)},
   };
-  const least = {konsistenz: 0.55, feeder: 0.6};
+  const least = {konsistenz: 0.6, feeder: 0.6, marke: 0.4}; // a brand needs two of the ten varieties
   for (const [kind, habit] of Object.entries(habits)) {
     const out = shown(habit);
     assert.ok(share(out, kind) >= (least[kind] ?? 0.75), `${kind} ${JSON.stringify(out)}`);
   }
+});
+
+test('a cat that leaves sauce, the sauce mostly with chicken: hardly any household blames a flavour', () => {
+  const sauce = {
+    sauce: m => (m.p.variety.includes('Soße') ? 0.4 : 0.15),
+    good: m => (m.p.variety.includes('Soße') ? 0.15 : 0.6),
+  };
+  const out = shown(sauce, true);
+  assert.ok(share(out, 'geschmack') <= 1 / 20 && share(out, 'konsistenz') >= 0.75, JSON.stringify(out));
 });
 
 test('notes that come at random: after two months at most one household in ten sees one tied to a variety', () => {
