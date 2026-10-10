@@ -1,3 +1,11 @@
+schmeckts-server (1.7.0) unstable; urgency=medium
+
+  * Photo recognition asks Claude Sonnet 5.5, at low effort. Should
+    Anthropic retire the model, the newest Sonnet the key may use takes
+    over without an update.
+
+ -- Schmeckts <schmeckts@localhost>  Sat, 10 Oct 2026 12:00:00 +0200
+
 schmeckts-server (1.6.1) unstable; urgency=medium
 
   * Photo recognition asks for cat food and no longer names the animal.
