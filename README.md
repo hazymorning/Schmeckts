@@ -12,7 +12,7 @@ So ein Tagebuch hält man im Alltag aber nur durch, wenn es kaum Arbeit macht. D
 
 ## So geht’s
 
-1. Beim Füttern scannst du den Barcode oder machst ein Foto von der Packung. Wenn es die Sorte schon mal gab, bist du damit fertig. Bei einer neuen Sorte schlägt dir die App den Namen von der Packung vor, und wenn er stimmt, tippst du auf „Passt so“.
+1. Beim Füttern scannst du den Barcode oder fotografierst die Packung. Wenn die App die Sorte erkennt, bist du damit schon fertig. Bei einer neuen Sorte schlägt sie dir den Namen von der Packung vor, und wenn er stimmt, tippst du auf „Passt so“.
 2. Später tippst du an, wie viel deine Katze gefressen hat, von „Alles“ bis „Nix“. Wenn du dich daran erinnern lässt, geht das auch direkt in der Benachrichtigung.
 3. Nach ein paar Wochen siehst du unter „Vorlieben“, welche Sorten gut ankommen und welche deine Katze lieber stehen lässt.
 
@@ -22,12 +22,12 @@ So ein Tagebuch hält man im Alltag aber nur durch, wenn es kaum Arbeit macht. D
 <summary><b>Was die App sonst so kann</b></summary>
 <br>
 
-- Beim Füttern stehen die Sorten, die es zuletzt gab, unter „Schon mal gehabt“, und du tippst einfach eine an. Wenn du lange auf das App-Symbol drückst, kannst du auch gleich scannen oder ein Foto machen.
-- Wenn du willst, erinnert dich die App ans Füttern, falls zur üblichen Zeit noch nichts eingetragen ist.
+- Beim Füttern stehen die Sorten, die es zuletzt gab, unter „Schon mal gehabt“. Da tippst du einfach die richtige an. Wenn du lange auf das App-Symbol drückst, kannst du auch gleich scannen oder ein Foto machen.
+- Wenn zur üblichen Zeit noch nichts eingetragen ist, kann dich die App ans Füttern erinnern.
 - Unter „Vorlieben“ siehst du mit der Zeit auch, welche Marke am besten ankommt und ob deine Katze lieber Gelee oder Pastete mag.
 - Auf der Startseite steht ein Hinweis, wenn deine Katze ein paar Tage lang schlechter frisst als sonst.
-- Mit einem Tipp notierst du auch Beobachtungen wie „Gut drauf“ oder „Erbrochen“. Die App sagt dir, wenn so etwas nach einer bestimmten Sorte öfter vorkommt.
-- Unter „Einkaufen“ steht, was du nachkaufen kannst und was lieber nicht mehr. Du kannst die Liste auch jemandem schicken, der gerade im Laden steht.
+- Du kannst auch festhalten, ob deine Katze gut drauf ist oder sich übergeben hat. Die App sagt dir, wenn so etwas nach einer bestimmten Sorte öfter vorkommt.
+- Unter „Einkaufen“ steht, was du nachkaufen kannst und was lieber nicht mehr. Du kannst die Liste auch jemandem schicken, der gerade im Laden ist.
 - Jeden Tag kannst du auf der Startseite ein Blatt vom Katzenkalender abreißen. Freitags steht ein Flachwitz drauf.
 - Es geht auch mit mehreren Katzen. Beim Handywechsel machst du ein Backup und liest es auf dem neuen Handy wieder ein.
 
@@ -37,9 +37,9 @@ So ein Tagebuch hält man im Alltag aber nur durch, wenn es kaum Arbeit macht. D
 <summary><b>Wenn ihr euch das Füttern teilt</b></summary>
 <br>
 
-Am besten trägt jeder von euch in den Einstellungen seinen Namen ein. Dann ist bei jeder Mahlzeit klar, wer gefüttert hat. Über „Austausch von Hand“ schickt ihr euch neue Einträge als Datei, zum Beispiel per WhatsApp. Ein Konto braucht ihr dafür nicht. Unter „Vorlieben“ seht ihr dann sogar, ob es eurer Katze bei einem von euch besser schmeckt.
+Am besten trägt jeder von euch in den Einstellungen seinen Namen ein. Dann ist bei jeder Mahlzeit klar, wer gefüttert hat. Über „Austausch von Hand“ schickt ihr euch neue Einträge als Datei, zum Beispiel per WhatsApp. Ein Konto braucht ihr dafür nicht. Unter „Vorlieben“ steht sogar, wenn eure Katze bei einem von euch besser frisst.
 
-Wenn sich jemand bei euch mit Computern auskennt, könnt ihr zu Hause auch einen kleinen [Server](server/) einrichten. Dann landen neue Einträge von selbst auf allen Handys, und eine KI erkennt die Sorten auf den Fotos. Die App kommt aber auch ganz ohne Server aus.
+Wenn sich jemand bei euch mit Computern auskennt, könnt ihr zu Hause auch einen kleinen [Server](server/) einrichten. Dann landen neue Einträge von selbst auf allen Handys, und wenn ihr wollt, erkennt eine KI die Sorten auf euren Fotos. Die App kommt aber auch ganz ohne Server aus.
 
 </details>
 
@@ -63,13 +63,13 @@ Die App gibt es nicht im Play Store, aber du kannst sie hier herunterladen. Dein
 
 Play Protect möchte die App vielleicht erst prüfen, weil sie nicht aus dem Play Store kommt. Das kannst du ruhig zulassen.
 
-Für ein Update installierst du die neue Version einfach über die alte. Lösch die alte App vorher aber nicht, sonst sind alle Einträge weg.
+Für ein Update installierst du die neue Version einfach über die alte. Lösch die alte App vorher nicht, sonst sind alle Einträge weg.
 
 Hinter der Meldung „App nicht installiert“ steckt meistens eine alte Testversion, die noch auf dem Handy ist. Sichere dann in den Einstellungen unter „Backup“ deine Einträge und lösch die alte App. Danach installierst du die neue und liest das Backup wieder ein.
 
 Auf Handys ohne Google-Dienste geht nur der Barcode-Scanner nicht, weil er von Google kommt.
 
-[Hier](https://github.com/hazymorning/Schmeckts/releases) findest du alle bisherigen Versionen.
+Ältere Versionen findest du [hier](https://github.com/hazymorning/Schmeckts/releases).
 
 </details>
 
@@ -81,11 +81,11 @@ Weil Katzen bekanntlich sehr auf ihre Privatsphäre achten, bleibt bei Schmeckt�
 <summary><b>Es gibt ein paar Ausnahmen</b></summary>
 <br>
 
-Der Barcode-Scanner kommt von Google. Laut Google schickt er ein paar allgemeine Daten mit, zum Beispiel welches Handy du hast. Bilder sind nicht dabei.
+Der Barcode-Scanner kommt von Google. Laut Google schickt er allgemeine Daten mit, zum Beispiel welches Handy du hast. Bilder sind nicht dabei.
 
 Alles andere ist freiwillig. Wenn du die „Sortensuche im Internet“ einschaltest, schaut die App unbekannte Barcodes in zwei freien Datenbanken nach und schickt dabei nur die Nummer.
 
-Wenn du „Fotos mit eigener KI erkennen“ nutzt, gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem dein Schlüssel ist. Ein Server bei dir zu Hause schickt die Fotos an Anthropic, wo eine KI die Sorte erkennt. Das kannst du in den Einstellungen abschalten.
+Wenn du „Fotos mit eigener KI erkennen“ nutzt, gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem dein Schlüssel ist. Falls du zu Hause einen Server hast, schickt er die Fotos an Anthropic, und dort erkennt eine KI die Sorte. Das kannst du in den Einstellungen bei „Fotos über den Server erkennen“ abschalten.
 
 </details>
 
