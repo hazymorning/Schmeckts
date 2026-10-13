@@ -48,7 +48,7 @@ Wenn sich jemand bei euch mit Computern auskennt, könnt ihr zu Hause auch einen
 
 ## Installieren
 
-Die App gibt es nicht im Play Store, aber du kannst sie hier herunterladen. Dein Handy braucht mindestens Android 7.
+Die App gibt es nicht im Play Store, aber du kannst sie hier herunterladen.
 
 <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/readme/download-dark.png"><img src=".github/readme/download-light.png" width="224" alt="Download für Android"></picture></a>
 
