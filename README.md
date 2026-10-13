@@ -5,7 +5,7 @@
 
 Katzen sind wählerisch: Was letzte Woche noch ratzeputz aufgefressen wurde, bleibt heute stehen. Welche Sorte gut ankam und welche nicht, weiß nach einem Monat keiner mehr. Aufschreiben würde helfen, aber das hält im Alltag kaum jemand lange durch.
 
-Mit Schmeckt’s? geht das nebenbei. Pro Mahlzeit tippst du zwei-, dreimal, um den Rest kümmert sich die App. Mit der Zeit zeigt sie dir, welche Sorten deiner Katze wirklich schmecken.
+Mit Schmeckt’s? geht das nebenbei. Pro Mahlzeit tippst du drei-, viermal, um den Rest kümmert sich die App. Mit der Zeit zeigt sie dir, welche Sorten deiner Katze wirklich schmecken.
 
 <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/readme/download-dark.png"><img src=".github/readme/download-light.png" width="224" alt="Download für Android"></picture></a><br>
 [So installierst du die App](#installieren)
@@ -16,7 +16,7 @@ Mit Schmeckt’s? geht das nebenbei. Pro Mahlzeit tippst du zwei-, dreimal, um d
 2. Später antippen, wie viel gefressen wurde, von „Alles“ bis „Nix“. Wenn du magst, erinnert dich die App daran, und du antwortest gleich in der Benachrichtigung.
 3. Nach ein paar Wochen unter „Vorlieben“ nachsehen, was deiner Katze schmeckt und was du dir beim nächsten Einkauf sparen kannst.
 
-![Die Vorlieben zweimal, links hell, rechts dunkel: oben die Sorten, die am besten ankommen, darunter die, die stehen bleiben](.github/readme/light-dark.jpg)
+![Zweimal die Vorlieben, links hell, rechts dunkel: oben die Sorten, die am besten ankommen, darunter die, die stehen bleiben](.github/readme/light-dark.jpg)
 
 <details>
 <summary><b>Was die App sonst noch kann</b></summary>
@@ -38,7 +38,7 @@ Mit Schmeckt’s? geht das nebenbei. Pro Mahlzeit tippst du zwei-, dreimal, um d
 <summary><b>Wenn mehrere Leute füttern</b></summary>
 <br>
 
-Trag in den Einstellungen deinen Namen ein, dann steht bei jeder Mahlzeit, wer gefüttert hat. Neue Einträge schickst du über „Austausch von Hand“ als Datei ans andere Handy, zum Beispiel per WhatsApp oder Mail. Ein Konto braucht dafür keiner. Frisst deine Katze bei einem von euch deutlich besser, steht das unter „Vorlieben“.
+Wenn alle in den Einstellungen ihren Namen eintragen, steht bei jeder Mahlzeit, wer gefüttert hat. Neue Einträge schickst du über „Austausch von Hand“ als Datei ans andere Handy, zum Beispiel per WhatsApp oder Mail. Ein Konto braucht dafür keiner. Frisst deine Katze bei einem von euch deutlich besser, steht das unter „Vorlieben“.
 
 Wer sich ein bisschen mit Computern auskennt, kann zu Hause einen kleinen [Server](server/) einrichten. Der hält dann alle Handys von selbst auf dem gleichen Stand und erkennt Sorten auf Fotos mit KI. Nötig ist er nicht.
 
@@ -82,7 +82,7 @@ Weil Katzen bekanntlich großen Wert auf ihre Privatsphäre legen, bleibt bei Sc
 <summary><b>Ein paar Ausnahmen</b></summary>
 <br>
 
-Der Barcode-Scanner kommt von Google. Laut Google meldet er Gerätedaten wie das Handymodell, aber keine Bilder. Die „Sortensuche im Internet“ ist erst mal aus. Schaltest du sie ein, schlägt sie unbekannte Barcodes in zwei öffentlichen Datenbanken nach und schickt dabei nur die Nummer. Nutzt du „Fotos mit eigener KI erkennen“, gehen Packungsfotos direkt an die Firma hinter dieser KI, also Anthropic, OpenAI oder Google. Ein Server zu Hause schickt die Fotos zum Erkennen an Anthropic, das kannst du aber abschalten.
+Der Barcode-Scanner kommt von Google. Laut Google meldet er Nutzungsdaten wie das Handymodell, aber keine Bilder. Die „Sortensuche im Internet“ ist erst mal aus. Schaltest du sie ein, schlägt sie unbekannte Barcodes in zwei öffentlichen Datenbanken nach und schickt dabei nur die Nummer. Nutzt du „Fotos mit eigener KI erkennen“, gehen die Packungsfotos direkt an den Anbieter, also Anthropic, OpenAI oder Google. Hast du einen Server zu Hause, schickt der die Fotos zum Erkennen an Anthropic. Das kannst du aber abschalten.
 
 </details>
 
