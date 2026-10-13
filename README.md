@@ -3,7 +3,7 @@
   <img src=".github/readme/header-light.jpg" alt="Schmeckt’s? auf dem Handy: die Startseite mit dem Foto der Katze und der Frage „Wie war’s?“">
 </picture>
 
-Katzen sind wählerisch: Was letzte Woche noch ratzeputz aufgefressen wurde, bleibt heute stehen. Welche Sorte gut ankam und welche nicht, weiß nach einem Monat keiner mehr. Aufschreiben würde helfen, aber das hält im Alltag kaum jemand lange durch.
+Manche Katzen sind wählerisch: Was letzte Woche noch ratzeputz aufgefressen wurde, bleibt heute stehen. Welche Sorte gut ankam und welche nicht, weiß nach einem Monat keiner mehr. Aufschreiben würde helfen, aber das hält im Alltag kaum jemand lange durch.
 
 Mit Schmeckt’s? geht das nebenbei. Pro Mahlzeit tippst du drei-, viermal, um den Rest kümmert sich die App. Mit der Zeit zeigt sie dir, welche Sorten deiner Katze wirklich schmecken.
 
