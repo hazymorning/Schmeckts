@@ -1,47 +1,33 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/c52ea318-febc-455c-992b-abff5e8857ef">
-    <img src="https://github.com/user-attachments/assets/14afd13f-12c3-417d-b01c-f75f93e1caa9" width="880" alt="Schmeckt’s? Die App, die sich merkt, welches Futter bei deinem Tier ankommt.">
-  </picture>
-</p>
+<img src=".github/readme/header.png" width="880" alt="Schmeckt’s?">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Android-7.0%2B-58603F?logo=android&logoColor=white&labelColor=25261F" alt="Android 7.0 oder neuer">
-  <img src="https://img.shields.io/badge/App--Sprache-Deutsch-58603F?labelColor=25261F" alt="App-Sprache: Deutsch">
-</p>
+Katzen sind wählerisch: Was letzte Woche noch ratzeputz aufgefressen wurde, bleibt heute stehen. Welche Sorte wann wie ankam, weiß nach einem Monat niemand mehr. Mitschreiben würde helfen, aber das hält im Alltag kaum jemand lange durch.
 
-<p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/c9d097c6-4ae7-4b99-8f8f-b1e990b5e6f5" width="292" alt="App installieren"></a>
-  <a href="#installieren"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1798bb44-ce7c-4fe1-aa79-b14bd7346e2e"><img src="https://github.com/user-attachments/assets/382cc84e-bfce-4891-86fc-8ddd5056eef1" width="292" alt="Installationsanleitung"></picture></a>
-</p>
+Schmeckt’s? ist deshalb so gebaut, dass es nebenbei geht. Pro Mahlzeit sind es zwei, drei Tipper, den Rest rechnet die App selbst aus. Mit der Zeit zeigt sie dir, welche Sorten deiner Katze wirklich schmecken.
 
-Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumutung. Also schreibt die App mit, bis klar ist, was ankommt.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/481ce83a-2c33-40ba-87c5-ab68a3b997fc">
-    <img src="https://github.com/user-attachments/assets/cf267424-b4a5-422d-b85f-401e6f9a9f59" width="880" alt="Links das Blatt „Was gibt’s heute?“ mit Barcode-Scan, rechts die Übersicht mit Bewertung und Verlauf">
-  </picture>
-</p>
+<a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/c9d097c6-4ae7-4b99-8f8f-b1e990b5e6f5" width="292" alt="App installieren"></a>
+<a href="#installieren"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1798bb44-ce7c-4fe1-aa79-b14bd7346e2e"><img src="https://github.com/user-attachments/assets/382cc84e-bfce-4891-86fc-8ddd5056eef1" width="292" alt="Installationsanleitung"></picture></a>
 
 ## So geht’s
 
-1. Beim Füttern den Barcode scannen oder die Packung fotografieren.
-2. Später antippen, wie viel gefressen wurde.
-3. Nach ein paar Wochen nachsehen, was wirklich schmeckt.
+1. Beim Füttern den Barcode scannen oder die Packung fotografieren. Bekannte Sorten sind damit schon eingetragen, neue liest die App vom Foto ab.
+2. Später mit einem Tipp sagen, wie viel gefressen wurde, von „Alles“ bis „Nix“. Auf Wunsch geht das direkt in der Benachrichtigung.
+3. Nach ein paar Wochen unter „Vorlieben“ nachsehen, was ankommt und was du dir beim nächsten Einkauf sparen kannst.
+
+<img src=".github/readme/light-dark.png" width="880" alt="Links das Blatt „Was gibt’s heute?“ im hellen Design, rechts die Vorlieben im dunklen">
 
 <details>
-<summary><b>Was noch drin ist</b></summary>
+<summary><b>Was die App sonst noch kann</b></summary>
 <br>
 
-- *Vorlieben*: Tops und Flops, auf der Startseite gleich mit Packung, Erkenntnisse etwa zu Konsistenz, Tageszeit und Snacks, dazu was als Nächstes in den Napf kann.
-- *Einkaufen*: was sich nachzukaufen lohnt, als Liste zum Verschicken.
-- *Verlauf*: jede Mahlzeit, Tag für Tag.
-- *Katzenkalender*: auf der Startseite ein Abreißkalender, ein Blatt pro Tag. Montags Katzenlogik, dienstags Stimmt’s? mit Stempel, freitags ein Flachwitz.
-- *Beobachtungen*: von guter Laune bis Erbrechen, mit einem Tipp notiert. Lüften musst du selbst.
-- Erinnerungen ans Füttern und Bewerten.
-- Mehrere Katzen, mit Geschlecht und Spitznamen, auf die sie genauso wenig hören.
-- Backup fürs neue Handy.
+- Oben auf der Startseite steht in einem Satz, wann es zuletzt was gab und wie es ankam.
+- Hältst du das App-Symbol gedrückt, bist du mit einem Tipp beim Scanner oder bei der Kamera.
+- Die App merkt, ob deine Katze Gelee lieber mag als Soße, welche Marken ankommen und ob Snacks den Appetit verderben.
+- Frisst deine Katze ein paar Tage schlechter als sonst, sagt dir die App Bescheid.
+- Eine Einkaufsliste mit allem, was sich nachzukaufen lohnt, zum Weiterschicken an den, der gerade einkaufen geht.
+- Beobachtungen wie „Gut drauf“, „Stunk“ oder „Erbrochen“ notierst du mit einem Tipp. Häufen sie sich nach einer Sorte, fällt das der App auf.
+- Auf Wunsch erinnert sie dich ans Füttern, wenn zur üblichen Zeit noch nichts eingetragen ist.
+- Jeden Tag ein Blatt vom Katzenkalender, mit Wissen, Kuriosem und freitags einem Flachwitz.
+- Mehrere Katzen, helles und dunkles Design, Backup fürs neue Handy.
 
 </details>
 
@@ -49,71 +35,57 @@ Unsere Katze ist wählerisch. Was gestern ein Festmahl war, ist heute eine Zumut
 <summary><b>Wenn mehrere Leute füttern</b></summary>
 <br>
 
-Mit *Änderungen teilen* gehen neue Einträge als Datei ans andere Handy, ganz ohne Konto. Schmeckt es bei jemandem deutlich besser, steht das unter *Vorlieben*. Ein kleiner [Server](server/) im Heimnetz gleicht die Handys von selbst ab und erkennt Sorten am Foto. Nötig ist er nicht.
+Trag in den Einstellungen deinen Namen ein, dann steht bei jeder Mahlzeit, wer gefüttert hat. Neue Einträge schickst du über „Austausch von Hand“ als Datei ans andere Handy, etwa per Messenger, ganz ohne Konto. Schmeckt es bei jemandem deutlich besser, steht das unter „Vorlieben“.
+
+Wer mag, stellt einen kleinen [Server](server/) ins Heimnetz. Der gleicht die Handys dann von selbst ab und erkennt Sorten am Foto. Nötig ist er nicht.
 
 </details>
 
 <!-- Der QR-Code springt hierher (…#how-to-install). Nicht löschen. -->
 <a id="how-to-install"></a>
 
-<br>
-
 ## Installieren
 
-<p align="center">
-  <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/d12e5669-bdf4-4513-805b-bd4b8d16e2eb" width="292" alt="APK herunterladen"></a>
-</p>
+Du lädst die App hier herunter, ein Android-Handy ab Version 7 reicht.
 
-1. Auf dem Handy den Button antippen und die Datei behalten.
-2. *Öffnen* tippen oder `schmeckts.apk` in den *Downloads* suchen.
-3. Android fragt beim ersten Mal, ob der Browser Apps installieren darf: *Einstellungen*, *Aus dieser Quelle zulassen*, zurück.
-4. *Installieren*, *Öffnen*, füttern.
+<a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><img src="https://github.com/user-attachments/assets/d12e5669-bdf4-4513-805b-bd4b8d16e2eb" width="292" alt="APK herunterladen"></a>
+
+1. Öffne diese Seite auf dem Handy, tippe auf den Button und behalte die Datei, falls der Browser nachfragt.
+2. Tippe auf „Öffnen“ oder such `schmeckts.apk` in deinen Downloads.
+3. Beim ersten Mal fragt Android, ob der Browser Apps installieren darf: „Einstellungen“, „Aus dieser Quelle zulassen“, zurück.
+4. „Installieren“, „Öffnen“, füttern.
 
 <details>
 <summary><b>Wenn’s hakt</b></summary>
 <br>
 
-*Play Protect* will die App prüfen, weil sie nicht aus dem Play Store kommt. Zulassen, fertig.
+„Play Protect“ will die App prüfen, weil sie nicht aus dem Play Store kommt. Zulassen, fertig.
 
-Updates einfach drüberinstallieren. Wer vorher deinstalliert, fängt von vorne an.
+Updates installierst du einfach über die alte Version drüber. Wer vorher deinstalliert, fängt von vorne an.
 
-Bei *„App nicht installiert“* ist meist noch eine alte Testversion drauf: Backup machen, alte App löschen, neue installieren, Backup zurückholen.
+Kommt „App nicht installiert“, ist meist noch eine alte Testversion drauf. Dann ein Backup machen, die alte App löschen, die neue installieren und das Backup zurückholen.
 
-Ohne Google-Dienste geht alles außer dem Barcode-Scanner, der ist von Google.
+Ohne Google-Dienste läuft alles außer dem Barcode-Scanner, der kommt von Google.
+
+Ältere Versionen findest du unter [Releases](https://github.com/hazymorning/Schmeckts/releases).
 
 </details>
 
-<p align="right"><sub><a href="https://github.com/hazymorning/Schmeckts/releases">Alle Versionen</a></sub></p>
-
 ## Datenschutz
 
-Alles bleibt auf deinem Handy. Kein Konto, keine Cloud, keine Werbung, kein Tracking. Was deine Katze frisst, bleibt unter euch. Sie würde es eh abstreiten.
+Weil Katzen bekanntlich großen Wert auf ihre Privatsphäre legen, bleibt bei Schmeckt’s? alles auf deinem Handy. Es gibt kein Konto, keine Cloud, keine Werbung und kein Tracking.
 
 <details>
-<summary><b>Was trotzdem nach draußen geht</b></summary>
+<summary><b>Wann doch etwas das Handy verlässt</b></summary>
 <br>
 
-Der Barcode-Scanner ist von Google und schickt laut Google Gerätedaten wie das Handymodell mit, aber keine Bilder. Die Sortensuche fragt, wenn du sie einschaltest, bei unbekannten Barcodes zwei freie Datenbanken, nur mit der Nummer. Mit einem eigenen KI-Schlüssel gehen Packungsfotos direkt an dessen Anbieter.
+Der Barcode-Scanner kommt von Google und schickt laut Google Gerätedaten wie das Handymodell mit, aber keine Bilder. Die Sortensuche im Internet ist anfangs aus. Schaltest du sie ein, fragt sie bei unbekannten Barcodes zwei freie Datenbanken, und zwar nur mit der Nummer. Hast du einen eigenen KI-Schlüssel hinterlegt, gehen Packungsfotos direkt an dessen Anbieter. Ein Server im Heimnetz schickt sie zur Erkennung an Anthropic, solange das eingeschaltet ist.
 
 </details>
 
 ## Fragen und Fehler
 
-Fragen und Ideen gern in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions), Fehler [hier melden](https://github.com/hazymorning/Schmeckts/issues/new/choose), am besten mit Handy, Android- und App-Version.
-
-## Lizenz
-
-Freie Software unter der [GNU Affero General Public License, Version 3](LICENSE). Copyright © 2026 hazymorning.
-
-<details>
-<summary><b>Name, Logo und Datenquelle</b></summary>
-<br>
-
-Der Name „Schmeckt’s?“, das Logo und das App-Icon sind von der Lizenz ausgenommen. Wer forkt, sucht sich bitte einen eigenen Namen und ein eigenes Design.
-
-Enthält Informationen aus [Open Pet Food Facts](https://world.openpetfoodfacts.org), die hier unter der [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/) verfügbar gemacht werden: die Wortliste, mit der die App falsch gelesene Wörter berichtigt (`app/www/js/vocab.js`, mehr in [NOTICE](NOTICE)).
-
-</details>
+Fragen und Ideen gern in die [Diskussionen](https://github.com/hazymorning/Schmeckts/discussions), Fehler bitte [hier melden](https://github.com/hazymorning/Schmeckts/issues/new/choose), am besten mit Handymodell, Android- und App-Version.
 
 <!-- Wenn das Repo öffentlich ist, können diese Badges oben mit rein. Sie aktualisieren sich von selbst:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=58603F&labelColor=25261F" alt="Neueste Version"></a>
