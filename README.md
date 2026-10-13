@@ -91,7 +91,7 @@ Wenn du „Fotos mit eigener KI erkennen“ nutzt, gehen die Packungsfotos direk
 
 ## Fragen und Probleme
 
-Fragen und Ideen sind im [Forum](https://github.com/hazymorning/Schmeckts/discussions) gut aufgehoben. Wenn etwas nicht richtig funktioniert, melde es bitte [hier](https://github.com/hazymorning/Schmeckts/issues/new/choose). Das Formular fragt dabei nach der App-Version, die ganz unten in den Einstellungen steht. Für beides brauchst du ein kostenloses Konto bei GitHub.
+Fragen und Ideen sind im [Forum](https://github.com/hazymorning/Schmeckts/discussions) gut aufgehoben. Wenn etwas nicht richtig funktioniert, melde es bitte [hier](https://github.com/hazymorning/Schmeckts/issues/new/choose). Das Formular fragt dabei nach der App-Version, die ganz unten in den Einstellungen steht.
 
 <!-- Wenn das Repo öffentlich ist, können diese Badges oben mit rein. Sie aktualisieren sich von selbst:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=58603F&labelColor=25261F" alt="Neueste Version"></a>
