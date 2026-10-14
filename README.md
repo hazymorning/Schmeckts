@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/readme/header-dark.jpg">
-  <img src=".github/readme/header-light.jpg" alt="Die Startseite von Schmeckt’s? mit dem Foto der Katze und der Frage „Wie war’s?“">
+  <img src=".github/readme/header-light.jpg" alt="Schmeckt’s? Beim Füttern die Packung fotografieren, später antippen, wie viel gefressen wurde, und sehen, was deiner Katze wirklich schmeckt. Daneben die Startseite der App.">
 </picture>
 
 Schmeckt’s? ist ein Futtertagebuch für Katzen. Du trägst ein, welche Sorte deine Katze bekommt und wie viel sie davon frisst. Mit der Zeit siehst du dann, welche Sorten ihr schmecken und welche du beim Einkaufen im Regal lassen kannst.
@@ -12,11 +12,11 @@ So ein Tagebuch hält man im Alltag aber nur durch, wenn es kaum Arbeit macht. D
 
 ## So geht’s
 
-1. Beim Füttern scannst du den Barcode oder fotografierst die Packung. Wenn die App die Sorte erkennt, bist du damit schon fertig. Bei einer neuen Sorte schlägt sie dir den Namen von der Packung vor, und wenn er stimmt, tippst du auf „Passt so“.
+1. Beim Füttern fotografierst du die Packung. Wenn die App die Sorte erkennt, bist du damit schon fertig. Bei einer neuen Sorte schlägt sie dir den Namen von der Packung vor, und wenn er stimmt, tippst du auf „Passt so“.
 2. Später tippst du an, wie viel deine Katze gefressen hat, von „Alles“ bis „Nix“. Wenn du dich daran erinnern lässt, geht das auch direkt in der Benachrichtigung.
 3. Nach ein paar Wochen siehst du unter „Vorlieben“, welche Sorten gut ankommen und welche deine Katze lieber stehen lässt.
 
-![Die Vorlieben im hellen und im dunklen Design](.github/readme/light-dark.jpg)
+![Das Füttern im hellen und die Vorlieben im dunklen Design](.github/readme/light-dark.jpg)
 
 <details>
 <summary><b>Was die App sonst so kann</b></summary>
