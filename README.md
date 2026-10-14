@@ -1,7 +1,7 @@
-<picture>
+<p><picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/readme/hero-dark.jpg">
   <img src=".github/readme/hero-light.jpg" alt="Schmeckt’s? Beim Füttern die Packung fotografieren, später antippen, wie viel gefressen wurde, und sehen, was deiner Katze wirklich schmeckt. Daneben die Startseite der App.">
-</picture>
+</picture></p>
 
 Schmeckt’s? ist ein Futtertagebuch für Katzen. Du trägst ein, welche Sorte deine Katze bekommt und wie viel sie davon frisst. Mit der Zeit siehst du dann, welche Sorten ihr schmecken und welche du beim Einkaufen im Regal lassen kannst.
 
