@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(PhotoPlugin.class);
         registerPlugin(FeedReminderPlugin.class);
+        registerPlugin(UpdatePlugin.class);
         shared(getIntent());
         super.onCreate(savedInstanceState);
     }

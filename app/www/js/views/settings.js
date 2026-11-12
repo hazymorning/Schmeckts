@@ -8,6 +8,7 @@ import {REMIND, REMIND_MAX_H} from '../config.js';
 import {db, loadError, prefs, queue, storageOK} from '../store.js';
 import {isConnected, status} from '../sync.js';
 import {ai, aiReady, aiTrouble, PROVIDERS} from '../ai.js';
+import {canUpdate, release} from '../update.js';
 import {feedSlots} from '../smart.js';
 import {petNames} from '../derive.js';
 import {armBtn, avatar, group, head, lead, main, segmented, syncInfo, under} from './parts.js';
@@ -76,6 +77,25 @@ function aiBox() {
           ? `<p class="hint note warn" role="alert">${esc(s.aiError)}</p>`
           : '<p class="hint note">Von Anthropic, OpenAI oder Google. Er bleibt auf diesem Handy und geht nur an seinen Anbieter.</p>'
     }`;
+}
+
+const ASKED = {asking: 'Sucht …', current: 'Du hast die neueste Version', failed: 'GitHub ist gerade nicht erreichbar'};
+function updateGroup() {
+  if (!canUpdate()) return '';
+  const r = release,
+    loading = r.state === 'loading';
+  const row =
+    r.state === 'found' || loading
+      ? `<button class="row set-row act" data-action="update-install"${loading ? ' disabled' : ''}>${lead('download')}${main(
+          `Version ${esc(r.version)} installieren`,
+          loading ? `Lädt … ${Math.round(r.share * 100)} %` : 'Kommt direkt von GitHub',
+        )}</button>`
+      : `<button class="row set-row act" data-action="update-check"${r.state === 'asking' ? ' disabled' : ''}>${lead('refresh')}${main('Nach Updates suchen', ASKED[r.state] || '')}</button>`;
+  return group(
+    'Updates',
+    row + switchRow('update-auto', 'clock', 'Beim Start suchen', 'Fragt dafür kurz bei GitHub nach', prefs.updates),
+    'set-group',
+  );
 }
 
 function overview() {
@@ -149,6 +169,7 @@ function overview() {
         pageRow('privacy', 'shield', 'Datenschutz'),
       'set-group',
     )}
+    ${updateGroup()}
     <div class="mt btn-col">${
       house
         ? armBtn('wipe', 'Alle Daten im Haushalt löschen', 'Nochmal tippen: für alle im Haushalt löschen')
@@ -179,6 +200,7 @@ function exchangePage() {
 const PRIVACY = [
   'Katzen, Sorten und Mahlzeiten speichert die App auf deinem Handy, nicht in der Galerie und nicht in Googles Cloud-Sicherung.',
   'Nutzt du die App nur auf diesem Handy, bleiben die Daten dort. Ausnahme ist der Barcode-Scanner: Er kommt von Google und meldet allgemeine Nutzungsdaten wie das Gerätemodell, aber keine Bilder.',
+  'Beim Start fragt die App bei GitHub, ob es eine neue Version gibt. Dabei geht nur diese Frage raus, keine Einträge. Abschalten lässt sich das unter „Updates“.',
   'Den Text auf einer Packung liest das Handy selbst, ohne Internet. Die Sortensuche unter „Scannen“ ist anfangs aus. Eingeschaltet fragt sie bei unbekannten Barcodes zwei freie Datenbanken im Internet, und zwar nur mit der Nummer.',
   'Mit einem eigenen KI-Schlüssel unter „Scannen“ schickt das Handy Packungsfotos direkt an dessen Anbieter, also Anthropic, OpenAI oder Google. Der Schlüssel bleibt auf diesem Handy.',
   'Bist du mit einem Haushalt verbunden, gleicht die App mit eurem Server ab. Dort liegen auch die Packungsfotos, damit jedes Handy sie groß zeigen kann. Zur Erkennung schickt der Server sie an Anthropic, das lässt sich unter „Scannen“ abschalten.',

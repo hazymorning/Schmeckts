@@ -7,6 +7,7 @@ import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS, REMIND_ASKED, REMIND_DEFAULT} from '../config.js';
 import {db, loadError, prefs, savePrefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
+import {release} from '../update.js';
 import {
   calledNames,
   diary,
@@ -162,7 +163,7 @@ function homeHTML() {
   else
     html +=
       calsheetHTML() +
-      (remindHTML() || newsHTML() || hintHTML(m)) + // one question at a time
+      (updateHTML() || remindHTML() || newsHTML() || hintHTML(m)) + // one question at a time
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m);
   return html;
@@ -273,6 +274,16 @@ const goTo = ([where, label]) =>
     ? `<button class="btn primary" data-action="open-pet" data-id="${db.pets[0].id}">${label}</button>`
     : `<button class="btn primary" data-action="${where === 'evaluation' ? 'open-evaluation' : 'open-settings'}">${label}</button>`;
 // the newest news for this household, never beside sample data
+// a newer version found at start; „Später“ hides it until the next start
+function updateHTML() {
+  const r = release,
+    loading = r.state === 'loading';
+  if (r.later || (r.state !== 'found' && !loading)) return '';
+  return `<section class="card" data-sec="update" style="view-transition-name:sec-update"><h2>Neue Version</h2>
+    <p class="say">Version ${esc(r.version)} ist da.</p><p class="hint why">Das Update kommt direkt von GitHub, deine Einträge bleiben, wo sie sind.</p>
+    <div class="btn-row"><button class="btn primary" data-action="update-install"${loading ? ' disabled' : ''}>${loading ? `Lädt … ${Math.round(r.share * 100)} %` : 'Aktualisieren'}</button><button class="btn soft" data-action="update-later">Später</button></div></section>`;
+}
+
 function newsHTML() {
   const n = NEWS[0],
     [setting, offWhy] = n?.off || [],
