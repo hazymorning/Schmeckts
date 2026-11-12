@@ -3,7 +3,7 @@ import {hideSplash, hideSplashWhenReady} from './ui/splash.js';
 import {appInfo, Native} from './native.js';
 import {icon} from './icons.js';
 import {diskHooks} from './disk.js';
-import {hooks} from './store.js';
+import {hooks, prefs} from './store.js';
 import {startSync, syncHooks, syncSoon} from './sync.js';
 import {applyTheme} from './ui/theme.js';
 import {toast} from './ui/toast.js';
@@ -19,6 +19,7 @@ import {startReminders, syncReminders} from './logic/reminders.js';
 import {clearExports} from './logic/data.js';
 import {followPhotos, sharePhotos, tidyPhotos} from './logic/products.js';
 import {openLink} from './actions.js';
+import {checkRelease, updateHooks} from './update.js';
 import {report} from './report.js';
 
 document.querySelectorAll('[data-icon]').forEach(el => {
@@ -47,6 +48,10 @@ syncHooks.reachable = () => {
   sharePhotos();
 };
 diskHooks.failed = () => toast('Der Speicher ist voll. Bitte ein Backup exportieren.');
+updateHooks.changed = () => {
+  renderHome(false);
+  if (sheet?.kind === 'settings' && !sheet.page && !typingIn(topBody())) renderSheet();
+};
 try {
   startSync();
   applyTheme();
@@ -72,6 +77,7 @@ if (Native?.App) {
   Native.App.getInfo()
     .then(i => {
       appInfo.version = i.version;
+      if (prefs.updates) checkRelease();
     })
     .catch(e => report('app version', e));
   // on a cold start Capacitor holds the event back until this listener exists
