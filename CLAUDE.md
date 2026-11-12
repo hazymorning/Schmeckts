@@ -33,8 +33,8 @@ Do all of this without being asked, and do not stop before the end:
    failure until they are green.
 3. When the task is a new version: raise `version` in `app/package.json` and both `version` fields of
    `app/package-lock.json` in the same pull request, the server's version only if the server changed. Once the checks
-   are green, give the owner two steps: merge the pull request, then open
-   `https://github.com/hazymorning/Schmeckts/releases/new?tag=v<version>&title=v<version>` and publish.
+   are green, merge the pull request and run the workflow Release on `main` with `publish`: it tests, builds and
+   publishes `v<version>` with the APK, its text the version's news in `config.js` unless `notes` gives one.
 
 ## Commands
 
