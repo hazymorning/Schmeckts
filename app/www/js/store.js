@@ -24,6 +24,7 @@ const defaultPrefs = () => ({
   photoStamps: {},
   calendar: true,
   sheetDay: null,
+  updates: true,
 });
 export const hooks = {changed() {}, saved() {}};
 
@@ -67,6 +68,7 @@ function tidyPrefs(p) {
   out.lookup = out.lookup === true;
   out.serverPhoto = out.serverPhoto !== false;
   out.calendar = out.calendar !== false;
+  out.updates = out.updates !== false;
   out.sheetDay = /^\d{4}-\d{2}-\d{2}$/.test(out.sheetDay) ? out.sheetDay : null;
   delete out.aiKey;
   out.codes = out.codes && typeof out.codes === 'object' ? out.codes : {};

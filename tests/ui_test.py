@@ -10,6 +10,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from common import (
+    LATEST,
     NATIVE,
     PACK,
     PACK_LARGE,
@@ -915,9 +916,10 @@ async def test_scales(browser, url):
     await tap(pg, '.pend[data-id=meal000001] .pend-head')
     levels += await pg.evaluate(LEVELS % '#sheet')
     await tap(pg, '#sheet [data-action=close]')
+    dry, treat = ['gern', 'normal', 'wenig', 'liegen'], ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']
     check(
-        levels == [['gern', 'normal', 'wenig', 'liegen'], ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']] and rows == 2,
-        f'own scales for dry food and treats; the newest open meal is rated on the home page, the older one in its sheet {levels}',
+        levels == [dry, treat, treat] and rows == 2,
+        f'own scales for dry food and treats; every open meal keeps its scale on the home page, the older one too {levels}',
     )
     await tap(pg, '[data-sec=hist] [data-id=meal000002]')  # rated on another scale
     await tap(pg, '#sheet [data-r=liegen]', force=True)
@@ -1506,6 +1508,67 @@ NEWS = "import('./js/config.js').then(c => [...new Set(c.NEWS.map(n => 'neu:' + 
 CARD = '[data-sec=news]'
 
 
+async def test_update(browser, url):
+    print('updates: a newer version found at start, installed from its card or the settings, not asked with the switch off')
+    apk = 'https://github.com/hazymorning/Schmeckts/releases/download/v10.0.0/schmeckts.apk'
+    newest = {'tag_name': 'v10.0.0', 'assets': [{'name': 'schmeckts.apk', 'browser_download_url': apk}]}
+    asked = []
+
+    async def github(route):
+        asked.append(route.request.url)
+        await route.fulfill(json=newest)
+
+    ctx = await phone(browser)
+    await ctx.route(LATEST, github)
+    seed = await ctx.new_page()
+    await seed.goto(url)
+    await seed.evaluate('d => localStorage.setItem("__fs:db.json", d)', json.dumps(SAVED))
+    await seed.close()
+    pg, errors = await open_page(ctx, url, native=True)
+    await pg.wait_for_selector('[data-sec=update]')
+    card = await pg.inner_text('[data-sec=update]')
+    await tap(pg, '[data-sec=update] [data-action=update-install]')
+    check(
+        'Version 10.0.0 ist da.' in card and await calls(pg, 'install') == [{'url': apk}] and len(asked) == 1,
+        f'found at start, the card hands the APK to the installer {card}',
+    )
+    check(
+        await pg.locator('[data-sec=update] [data-action=update-install]:not([disabled])').count() == 1,
+        'back from the installer without updating, the card offers it again',
+    )
+    await pg.evaluate("window.__installError = 'update failed'")
+    await tap(pg, '[data-sec=update] [data-action=update-install]')
+    await pg.wait_for_function("document.querySelector('#toast span')?.textContent.startsWith('Das Update ließ sich nicht laden')")
+    await tap(pg, '[data-sec=update] [data-action=update-later]')
+    check(
+        await pg.locator('[data-sec=update]').count() == 0 and await pg.locator('[data-sec=remind]').count() == 1,
+        'a failed download says so; „Später“ takes the card away and the next question comes',
+    )
+    await settings(pg)
+    row = await pg.inner_text('#sheet [data-action=update-install]')
+    await tap(pg, '#sheet [data-action=update-auto]')
+    check(
+        'Version 10.0.0 installieren' in row and await state(pg, '!prefs.updates'),
+        f'the settings offer it too, and the check at start goes off {row}',
+    )
+    await pg.reload()
+    await started(pg)
+    check(len(asked) == 1 and await pg.locator('[data-sec=update]').count() == 0, 'with the switch off nothing is asked at start')
+    newest['tag_name'] = 'v9.9.9'
+    await settings(pg)
+    await tap(pg, '#sheet [data-action=update-check]')
+    await pg.wait_for_function("document.querySelector('#sheet [data-action=update-check] small')?.textContent === 'Du hast die neueste Version'")
+    check(len(asked) == 2, 'searched by hand: the same version is no update')
+    check(not real_errors(errors), f'no errors {real_errors(errors)}')
+    await ctx.close()
+
+    ctx = await phone(browser)
+    pg, errors = await open_page(ctx, url)
+    await settings(pg)
+    check(await pg.locator('#sheet [data-action^=update]').count() == 0, 'in the browser nothing to install, so no updates')
+    await ctx.close()
+
+
 async def test_news(browser, url):
     print('news after an update: never on a new phone or with sample data, hidden for good')
     ctx = await phone(browser)
@@ -1971,7 +2034,10 @@ async def test_local(browser, url):
     found = sorted({m.group(0) for t in seen for m in SERVER_WORDS.finditer(t)})
     check(not found and await pg.locator('#syncChip').is_hidden(), f'no word of a server, sync or recognition anywhere {found}')
     foreign = [r for r in requests if not r.startswith((url.rsplit('/', 1)[0], 'data:', 'blob:'))]
-    check(len(requests) > 20 and not foreign and await state(pg, '!prefs.lookup'), f'not one request beyond the app itself {foreign[:3]}')
+    check(
+        len(requests) > 20 and foreign == [LATEST] and await state(pg, '!prefs.lookup'),
+        f'nothing beyond the app itself but the one question for a newer version at start {foreign[:3]}',
+    )
     await settings(pg, 'backup')
     await tap(pg, '[data-action=export]')
     await tap(pg, '[data-action=export]')
@@ -3689,6 +3755,7 @@ run_tests(
         'suggestions': test_suggestions,
         'reminder': test_reminders,
         'reminder-buttons': test_reminder_buttons,
+        'update': test_update,
         'news': test_news,
         'feed-reminder': test_feed_remind,
         'pets': test_petbar,
