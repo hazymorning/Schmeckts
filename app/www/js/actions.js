@@ -7,6 +7,8 @@ import {db, hideHint, prefs, save, savePrefs} from './store.js';
 import {ServerError} from './api.js';
 import {checkServer, disconnect, isConnected, retrySync, startSession} from './sync.js';
 import {ai, aiCheck, aiTrouble, saveAi} from './ai.js';
+import {checkRelease, installRelease, release} from './update.js';
+import {report} from './report.js';
 import {getProduct, getServing, pname} from './derive.js';
 import {forgetPhoto, keptPhoto, photoSrc} from './photos.js';
 import {timing} from './recognize.js';
@@ -507,6 +509,30 @@ const ACTIONS = {
   },
   'ai-forget'() {
     forgetAiKey();
+  },
+  'update-check'() {
+    haptic('select');
+    checkRelease();
+  },
+  async 'update-install'() {
+    haptic('select');
+    try {
+      await installRelease();
+    } catch (e) {
+      report('update', e);
+      toast('Das Update ließ sich nicht laden. Versuch es später noch mal.');
+    }
+  },
+  'update-later'() {
+    release.later = true;
+    haptic('select');
+    update();
+  },
+  'update-auto'() {
+    prefs.updates = !prefs.updates;
+    savePrefs();
+    haptic('select');
+    renderSheet();
   },
   calendar() {
     prefs.calendar = !prefs.calendar;

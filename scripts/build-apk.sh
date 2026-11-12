@@ -39,6 +39,7 @@ if grep -Eq '"android.permission.(SCHEDULE|USE)_EXACT_ALARM"' <<<"$MANIFEST"; th
   echo "Error: the APK asks for the exact-alarm permission." >&2; rm -f "$OUT"; exit 1
 fi
 grep -q '"android.permission.POST_NOTIFICATIONS"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the notification permission." >&2; rm -f "$OUT"; exit 1; }
+grep -q '"android.permission.REQUEST_INSTALL_PACKAGES"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the permission to install updates." >&2; rm -f "$OUT"; exit 1; }
 grep -q '"barcode_ui"' <<<"$MANIFEST" || { echo "Error: the manifest is missing the scanner module (barcode_ui)." >&2; rm -f "$OUT"; exit 1; }
 if ! grep -q 'dataExtractionRules' <<<"$MANIFEST" || ! grep -q 'fullBackupContent' <<<"$MANIFEST"; then
   echo "Error: the manifest is missing the rules against cloud backup." >&2; rm -f "$OUT"; exit 1

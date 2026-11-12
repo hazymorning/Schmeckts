@@ -7,6 +7,7 @@ import {icon, sketch} from '../icons.js';
 import {DEMO, NEWS, observationOf, RATINGS, REMIND_ASKED, REMIND_DEFAULT} from '../config.js';
 import {db, loadError, prefs, savePrefs, storageOK} from '../store.js';
 import {isConnected} from '../sync.js';
+import {release} from '../update.js';
 import {
   calledNames,
   diary,
@@ -33,7 +34,6 @@ import {
   nameBlock,
   photoThumb,
   rateSlider,
-  resultBadges,
   cardHead,
   syncChip,
   thumbOf,
@@ -163,14 +163,14 @@ function homeHTML() {
   else
     html +=
       calsheetHTML() +
-      (remindHTML() || newsHTML() || hintHTML(m)) + // one question at a time
+      (updateHTML() || remindHTML() || newsHTML() || hintHTML(m)) + // one question at a time
       `<section class="card" data-sec="hist" style="view-transition-name:sec-hist">${cardHead('Verlauf', 'open-report', 'Alle Einträge')}${historyHTML()}</section>` +
       evaluationCard(m);
   return html;
 }
 
 const welcomeHTML = () => `<div class="welcome">
-  <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
+  <div class="hero"><img class="logo" src="img/schmeckts-icon.svg" alt=""></div>
   <h2>Was schmeckt deiner Katze?</h2>
   <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie viel deine Katze gefressen hat. So siehst du bald, was wirklich ankommt.</p>
   <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Katze anlegen</button>
@@ -185,18 +185,16 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
 
 // a pet rated here keeps its row while the meal stays in the card
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
-// each pet rates its newest meal here; older ones open their sheet
+// every open meal keeps its scale here, however many are waiting
 function pendingHTML(list) {
-  const multiHouse = db.pets.length > 1,
-    newest = new Map();
-  for (const s of list) for (const pid of rateRows(s)) if (!newest.has(pid)) newest.set(pid, s.id);
+  const multiHouse = db.pets.length > 1;
   return (
     `<section class="card" data-sec="pend" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul class="list">` +
     list
       .map(s => {
         const p = getProduct(s.productId),
-          ids = rateRows(s).filter(pid => newest.get(pid) === s.id);
-        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s)}`;
+          ids = rateRows(s);
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>`;
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
@@ -276,6 +274,16 @@ const goTo = ([where, label]) =>
     ? `<button class="btn primary" data-action="open-pet" data-id="${db.pets[0].id}">${label}</button>`
     : `<button class="btn primary" data-action="${where === 'evaluation' ? 'open-evaluation' : 'open-settings'}">${label}</button>`;
 // the newest news for this household, never beside sample data
+// a newer version found at start; „Später“ hides it until the next start
+function updateHTML() {
+  const r = release,
+    loading = r.state === 'loading';
+  if (r.later || (r.state !== 'found' && !loading)) return '';
+  return `<section class="card" data-sec="update" style="view-transition-name:sec-update"><h2>Neue Version</h2>
+    <p class="say">Version ${esc(r.version)} ist da.</p><p class="hint why">Das Update kommt direkt von GitHub, deine Einträge bleiben, wo sie sind.</p>
+    <div class="btn-row"><button class="btn primary" data-action="update-install"${loading ? ' disabled' : ''}>${loading ? `Lädt … ${Math.round(r.share * 100)} %` : 'Aktualisieren'}</button><button class="btn soft" data-action="update-later">Später</button></div></section>`;
+}
+
 function newsHTML() {
   const n = NEWS[0],
     [setting, offWhy] = n?.off || [],

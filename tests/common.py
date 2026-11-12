@@ -47,6 +47,8 @@ SHEBA, UPC = '4008429087455', '036000291452'  # valid test codes; UPC-A becomes 
 # schmeckts://feed in the app (window.__urlOpen).
 # Capacitor's own HTTP goes through the page's fetch, so the tests' routes answer it; as in the plugin, an HTTP error
 # status is an answer, not a failure.
+# Our own update plugin records install({url}) in window.__calls, reports half the download and fails with
+# window.__installError.
 NATIVE = """
 window.__calls = []; window.__back = null; window.__urlOpen = null;
 // How often the home page has been written: the splash should go after exactly one drawing of it
@@ -121,6 +123,10 @@ window.Capacitor = {isNativePlatform: () => true,
     return new Promise(done => setTimeout(() => { window.__ocrDone = (window.__ocrDone || 0) + 1; done(answer); }, window.__ocrDelay || 0)); }},
   CapacitorHttp: {request: o => fetch(o.url, {method: o.method, headers: o.headers, body: o.data == null ? undefined : JSON.stringify(o.data)})
     .then(async r => ({status: r.status, headers: {}, url: r.url, data: await r.json().catch(() => null)}))},
+  Update: {install: o => { window.__calls.push(['install', o]); (window.__updateListeners || []).forEach(fn => fn({share: 0.5}));
+      return window.__installError ? Promise.reject(new Error(window.__installError)) : Promise.resolve(); },
+    addListener: (e, fn) => { (window.__updateListeners ||= []).push(fn);
+      return Promise.resolve({remove: () => { window.__updateListeners = window.__updateListeners.filter(f => f !== fn); }}); }},
   Filesystem, LocalNotifications, FeedReminder, Share: {share: rec('share')}}, registerPlugin: name => window.Capacitor.Plugins[name]};
 """
 
@@ -262,6 +268,14 @@ async def until(pg, expr, timeout=10.0):
     return False
 
 
+# The update check never reaches GitHub from a test: unless a test routes it elsewhere, the newest release is an old one.
+LATEST = 'https://api.github.com/repos/hazymorning/Schmeckts/releases/latest'
+
+
+async def no_newer(route):
+    await route.fulfill(json={'tag_name': 'v0.0.1', 'assets': []})
+
+
 async def phone(browser, scheme='light', touch=False, motion=False, width=400, height=860, **kw):
     """One phone as a browser context, and the only place the tests make one: that way run_tests can see that
     every phone belongs to exactly one test and is closed again before the next one starts.
@@ -272,6 +286,7 @@ async def phone(browser, scheme='light', touch=False, motion=False, width=400, h
         has_touch=touch,
         **{'reduced_motion': 'no-preference' if motion else 'reduce', **kw},
     )
+    await ctx.route(LATEST, no_newer)
     mine = phones.get()
     if mine is not None:
         mine.append(ctx)
