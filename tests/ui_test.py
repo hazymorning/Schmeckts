@@ -915,9 +915,10 @@ async def test_scales(browser, url):
     await tap(pg, '.pend[data-id=meal000001] .pend-head')
     levels += await pg.evaluate(LEVELS % '#sheet')
     await tap(pg, '#sheet [data-action=close]')
+    dry, treat = ['gern', 'normal', 'wenig', 'liegen'], ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']
     check(
-        levels == [['gern', 'normal', 'wenig', 'liegen'], ['verputzt', 'spaeter', 'angeknabbert', 'unberuehrt']] and rows == 2,
-        f'own scales for dry food and treats; the newest open meal is rated on the home page, the older one in its sheet {levels}',
+        levels == [dry, treat, treat] and rows == 2,
+        f'own scales for dry food and treats; every open meal keeps its scale on the home page, the older one too {levels}',
     )
     await tap(pg, '[data-sec=hist] [data-id=meal000002]')  # rated on another scale
     await tap(pg, '#sheet [data-r=liegen]', force=True)

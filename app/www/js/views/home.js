@@ -33,7 +33,6 @@ import {
   nameBlock,
   photoThumb,
   rateSlider,
-  resultBadges,
   cardHead,
   syncChip,
   thumbOf,
@@ -185,18 +184,16 @@ const stepsHTML = () => `<section class="card" style="view-transition-name:sec-s
 
 // a pet rated here keeps its row while the meal stays in the card
 const rateRows = s => servingPets(s).filter(pid => !s.pets[pid].r || homeView.held.get(s.id)?.has(pid));
-// each pet rates its newest meal here; older ones open their sheet
+// every open meal keeps its scale here, however many are waiting
 function pendingHTML(list) {
-  const multiHouse = db.pets.length > 1,
-    newest = new Map();
-  for (const s of list) for (const pid of rateRows(s)) if (!newest.has(pid)) newest.set(pid, s.id);
+  const multiHouse = db.pets.length > 1;
   return (
     `<section class="card" data-sec="pend" style="view-transition-name:sec-pend"><h2>Wie war’s?</h2><ul class="list">` +
     list
       .map(s => {
         const p = getProduct(s.productId),
-          ids = rateRows(s).filter(pid => newest.get(pid) === s.id);
-        const main = `<span class="t-main">${nameBlock(s, p)}</span>${ids.length || !multiHouse ? '' : resultBadges(s)}`;
+          ids = rateRows(s);
+        const main = `<span class="t-main">${nameBlock(s, p)}</span>`;
         const head = hasPhoto(s, p)
           ? `<div class="pend-top">${photoThumb(s, p)}<button class="pend-head" data-action="open-serving" data-id="${s.id}">${main}</button></div>`
           : `<button class="pend-head" data-action="open-serving" data-id="${s.id}">${thumbOf(s, p)}${main}</button>`;
