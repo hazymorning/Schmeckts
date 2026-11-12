@@ -170,7 +170,7 @@ function homeHTML() {
 }
 
 const welcomeHTML = () => `<div class="welcome">
-  <div class="hero"><img class="logo light" src="img/schmeckts-mark.svg" alt=""><img class="logo dark" src="img/schmeckts-mark-dark.svg" alt=""></div>
+  <div class="hero"><img class="logo" src="img/schmeckts-icon.svg" alt=""></div>
   <h2>Was schmeckt deiner Katze?</h2>
   <p>Fotografier beim Füttern die Packung und sag später mit einem Tipp, wie viel deine Katze gefressen hat. So siehst du bald, was wirklich ankommt.</p>
   <div class="btn-col"><button class="btn primary" data-action="add-pet">${icon('plus')}Katze anlegen</button>
