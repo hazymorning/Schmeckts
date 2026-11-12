@@ -326,6 +326,12 @@ export const DEMO = 'demo'; // id prefix of sample data, removed on connecting
    is off. go: where the card leads, 'pet' being the pet editor and 'evaluation' „Vorlieben“. */
 export const NEWS = [
   {
+    v: '0.42.0',
+    title: 'Updates in der App',
+    say: 'Neue Versionen findet die App jetzt selbst. Ein Tipp auf „Aktualisieren“, und Android installiert sie über die alte.',
+    why: 'Dafür fragt sie beim Start kurz bei GitHub nach, abschalten lässt sich das in den Einstellungen. Außerdem bleibt die Bewertung auf der Startseite bei jeder offenen Mahlzeit stehen, und das App-Symbol hat eine neue Katze.',
+  },
+  {
     v: '0.41.0',
     title: 'Genauere Vorlieben',
     say: 'Die App erkennt jetzt, wenn eine Marke oder Konsistenz meist stehen bleibt, etwa Stückchen in Soße, und gibt dafür nicht mehr dem Geschmack die Schuld.',

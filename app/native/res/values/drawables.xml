@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- dark variant in drawable-night/splash_logo.xml -->
     <drawable name="splash_logo">@drawable/ic_launcher_foreground</drawable>
 </resources>

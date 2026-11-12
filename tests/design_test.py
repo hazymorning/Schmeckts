@@ -61,39 +61,40 @@ async def test_palette(browser, url):
 
 
 A = '{http://schemas.android.com/apk/res/android}'
-VECTORS = {
-    'drawable/ic_launcher_foreground.xml': 'app/www/img/schmeckts-mark.svg',
-    'drawable-night/splash_logo.xml': 'app/www/img/schmeckts-mark-dark.svg',
-    'drawable/ic_launcher_monochrome.xml': 'design/schmeckts-mark-mono.svg',
-}
+
+
+def layer(name):
+    """A vector in app/native/res/drawable: its group's position and its paths."""
+    root = ET.parse(ROOT / f'app/native/res/drawable/{name}.xml').getroot()
+    g = root.find('group')
+    return tuple(g.get(A + k) for k in ('scaleX', 'scaleY', 'translateX', 'translateY')), [x.get(A + 'pathData') for x in root.iter('path')]
+
+
+def svg_paths(path):
+    return re.findall(r'<path [^>]* d="([^"]*)"', (ROOT / path).read_text())
 
 
 def test_logo_files():
-    res = ROOT / 'app/native/res'
-    groups = set()
-    for vec, src in VECTORS.items():
-        root = ET.parse(res / vec).getroot()
-        g = root.find('group')
-        groups.add(tuple(g.get(A + k) for k in ('scaleX', 'scaleY', 'translateX', 'translateY')))
-        paths = [x.get(A + 'pathData') for x in root.iter('path')]
-        want = re.findall(r'<path [^>]* d="([^"]*)"', (ROOT / src).read_text())
-        check(paths == want, f'{vec}: the paths of {src}')
-    check(len(groups) == 1, f'icon, themed icon and dark splash share one position {groups}')
+    (at_ground, ground), (at_front, front), (at_mono, mono) = (
+        layer(n) for n in ('ic_launcher_background', 'ic_launcher_foreground', 'ic_launcher_monochrome')
+    )
+    check(ground + front == svg_paths('app/www/img/schmeckts-icon.svg'), 'ground and foreground of the icon: the paths of schmeckts-icon.svg')
+    check(mono == svg_paths('design/schmeckts-mark-mono.svg'), 'themed icon: the paths of design/schmeckts-mark-mono.svg')
+    check(at_ground == at_front == at_mono, f'the layers of the icon share one position {at_ground} {at_front} {at_mono}')
 
 
 async def test_logo(browser, url):
     ctx = await phone(browser)
     pg = await ctx.new_page()
     await pg.goto(url)
-    g = ET.parse(ROOT / 'app/native/res/drawable/ic_launcher_foreground.xml').getroot().find('group')
-    k, tx, ty = float(g.get(A + 'scaleX')), float(g.get(A + 'translateX')), float(g.get(A + 'translateY'))
-    await pg.set_content((WWW / 'img/schmeckts-mark.svg').read_text())
+    (k, _, tx, ty), front = layer('ic_launcher_foreground')
+    await pg.set_content('<svg xmlns="http://www.w3.org/2000/svg">' + ''.join(f'<path d="{d}"/>' for d in front) + '</svg>')
     r = await pg.evaluate(
         """([k, tx, ty]) => { let m = 0; for (const p of document.querySelectorAll('path')) { const L = p.getTotalLength();
       for (let i = 0; i <= 600; i++) { const q = p.getPointAtLength(L * i / 600); m = Math.max(m, Math.hypot(tx + k * q.x - 54, ty + k * q.y - 54)); } } return m; }""",
-        [k, tx, ty],
+        [float(k), float(tx), float(ty)],
     )
-    check(r <= 33, f'adaptive icon motif inside the 33 dp safe zone ({r:.1f})')
+    check(r <= 33, f'the foreground inside the 33 dp safe zone, so the splash shows all of it ({r:.1f})')
     await ctx.close()
 
 
@@ -191,8 +192,7 @@ async def test_views(browser, url, scheme):
     logo = await pg.eval_on_selector_all(
         '.welcome .hero img', "l => l.filter(i => i.getClientRects().length).map(i => [i.getAttribute('src'), i.naturalWidth > 0])"
     )
-    want = 'img/schmeckts-mark.svg' if scheme == 'light' else 'img/schmeckts-mark-dark.svg'
-    check(logo == [[want, True]], f'welcome logo for the {scheme} scheme {logo}')
+    check(logo == [['img/schmeckts-icon.svg', True]], f'the app icon on the welcome page ({scheme}) {logo}')
     await tap('[data-action=demo]')
     await scan()
     await tap('[data-sec=evaluation] [data-action=open-evaluation]')

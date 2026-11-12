@@ -28,14 +28,15 @@ the offset keeps it above builds from before the version restart at 0.1.0. ARM b
 
 1. Foundations: `dom`, `text`, `dates`, `report`, `native`, `reading`, `icons`, `config`, `fields`, `clock`, `disk`,
    `motion`, `content/*` (the texts of the overview card and the cat calendar)
-2. Data: `store`, `api`, `sync`, `smart`, `glance`, `derive`, `images`, `photos`, `recognize`, `ai`, `ocr`, `online`
+2. Data: `store`, `api`, `sync`, `smart`, `glance`, `derive`, `images`, `photos`, `recognize`, `ai`, `ocr`, `online`,
+   `update`
 3. Interface: `ui/*`
 4. Views: `views/*`
 5. Logic: `logic/*`
 6. Control: `actions`, `main`
 
-- A lower layer reaches an upper one through hooks (`hooks`, `syncHooks`, `diskHooks`, `setSheetView()`) that
-  `main.js` wires up.
+- A lower layer reaches an upper one through hooks (`hooks`, `syncHooks`, `diskHooks`, `updateHooks`,
+  `setSheetView()`) that `main.js` wires up.
 - Change data by mutating `db` and calling `save()`. Replace it wholesale only with `replaceDb()`.
 - Buttons carry `data-action`; the entry of that name in `ACTIONS` (`actions.js`) runs.
 - Views return HTML strings. Foreign text always goes through `esc()`.
@@ -90,10 +91,13 @@ connecting to a server.
 
 ## Without and with a server
 
-Without a server nothing goes out as long as the product lookup („Sortensuche im Internet“, off by default) stays
-off and no AI key of the phone's own is set; a test holds that. The phone reads the packaging text itself (ML Kit, on
-device), and one of the household's own varieties found on the packaging is served at once with undo. Google's
-barcode scanner in Play services sends its own usage data to Google.
+Without a server nothing goes out as long as the product lookup („Sortensuche im Internet“, off by default) stays off,
+no AI key of the phone's own is set and the update check is off; a test holds that. The update check (`prefs.updates`,
+on by default, only in the app) asks GitHub's API for the latest release once at start. A newer release's
+`schmeckts.apk` is loaded into the cache (`update/`, cleared on the next start) and handed to Android's installer,
+which asks before it replaces the app (`UpdatePlugin.java`, `REQUEST_INSTALL_PACKAGES`). The phone reads the packaging
+text itself (ML Kit, on device), and one of the household's own varieties found on the packaging is served at once
+with undo. Google's barcode scanner in Play services sends its own usage data to Google.
 
 With a key of its own („Fotos mit eigener KI erkennen“, `ai.js`) the phone sends packaging photos straight to that
 provider: Anthropic, OpenAI or Google, told apart by the key's prefix. The model is picked from the provider's model

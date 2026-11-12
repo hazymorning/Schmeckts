@@ -115,7 +115,9 @@ def android(fresh):
         '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />\n'
         # getUserMedia in the WebView needs this permission; without a camera the app falls back to the camera app
         '    <uses-permission android:name="android.permission.CAMERA" />\n'
-        '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n',
+        '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n'
+        # updates from GitHub go to Android's installer, which refuses apps without this
+        '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n',
     )
 
     edit(
