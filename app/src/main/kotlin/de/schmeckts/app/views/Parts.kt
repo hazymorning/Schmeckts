@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -630,6 +631,7 @@ fun Calendar(
                     Column(
                         Modifier
                             .weight(1f)
+                            .testTag("day-$k")
                             .clip(RoundedCornerShape(Radius.s))
                             .then(
                                 if (items.isNotEmpty()) {
@@ -813,7 +815,7 @@ private fun ObservationItem(
             if (multiHouse || ids.size > 1) ph.whoObserved(ids) else "",
             o.str("by")?.let { if (it.isNotEmpty()) "von $it" else "" } ?: "",
         ).filter { it.isNotEmpty() }.joinToString(", ")
-    ListRow(onClick = ui.on("open-observation", "id" to o.id), gap = if (plain) Space.s3 else 0.dp) {
+    ListRow(Modifier.testTag("row-${o.id}"), onClick = ui.on("open-observation", "id" to o.id), gap = if (plain) Space.s3 else 0.dp) {
         if (!plain) TimeNode(o.at) { Node(null) }
         Box(Modifier.padding(start = if (plain) 0.dp else Space.s2, end = if (plain) 0.dp else Space.s3)) {
             Sign(kind.icon, colors.tone(o.str("kind")))
@@ -851,7 +853,7 @@ private fun ServingItem(
             }
         }
     val note = s.str("note") ?: ""
-    ListRow(onClick = ui.on("open-serving", "id" to s.id), gap = if (plain) Space.s3 else 0.dp) {
+    ListRow(Modifier.testTag("row-${s.id}"), onClick = ui.on("open-serving", "id" to s.id), gap = if (plain) Space.s3 else 0.dp) {
         if (!plain) TimeNode(s.servedAt) { ph.barOf(s).let { Node(it.tone) } }
         Box(Modifier.padding(start = if (plain) 0.dp else Space.s2, end = if (plain) 0.dp else Space.s3)) { Thumb(s, p, Th.M) }
         Column(Modifier.weight(1f).padding(end = if (plain) 0.dp else Space.s2)) {
@@ -883,7 +885,7 @@ fun ShopRow(
                 mixed,
             ).filter { it.isNotEmpty() }.joinToString(", "),
         )
-    ListRow(onClick = ui.on("open-product", "id" to e.id)) {
+    ListRow(Modifier.testTag("shop-${e.id}"), onClick = ui.on("open-product", "id" to e.id)) {
         Thumb(null, p)
         TMain(esc(pname(p)), esc(sub))
         Strip(ratingsIn(m, listOf(e.id)))

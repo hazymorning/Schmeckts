@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -475,6 +476,7 @@ fun Chip(
     Row(
         modifier
             .press(onClick)
+            .semantics { selected = pressed }
             .clip(RoundedCornerShape(50))
             .background(bg)
             .border(Size.stroke, ring, RoundedCornerShape(50))
@@ -598,6 +600,7 @@ fun Seg(
                 Modifier
                     .weight(1f)
                     .press(o.onClick ?: { onPick(o.value) })
+                    .semantics { selected = on }
                     .then(if (on) Modifier.shadowLow(RoundedCornerShape(Radius.s)) else Modifier)
                     .clip(RoundedCornerShape(Radius.s))
                     .background(bg)

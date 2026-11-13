@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -1066,7 +1067,7 @@ private fun ReportView(state: SheetState) {
         }
         days.forEachIndexed { i, g ->
             stickyHeader(key = "d-" + g.key) {
-                Column(Modifier.background(colors.bg)) {
+                Column(Modifier.testTag("d-${g.key}").background(colors.bg)) {
                     if (i > 0) {
                         Gap(Space.s1)
                         Divider()

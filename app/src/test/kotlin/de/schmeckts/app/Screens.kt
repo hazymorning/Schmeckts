@@ -11,6 +11,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -248,6 +249,67 @@ abstract class ScreenTest {
     fun labelled(label: String) =
         rule.onAllNodesWithContentDescription(label, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
+    /** shown in the top layer, not on the page beneath it */
+    fun inSheet(text: String): Boolean {
+        val kind = sheet?.kind ?: return false
+        val pane =
+            androidx.compose.ui.test.SemanticsMatcher
+                .expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, kind)
+        return rule
+            .onAllNodes(
+                hasText(text, substring = true) and
+                    androidx.compose.ui.test
+                        .hasAnyAncestor(pane),
+                useUnmergedTree = true,
+            ).fetchSemanticsNodes()
+            .isNotEmpty()
+    }
+
+    /** the test tags starting with prefix, top to bottom, without it; within: inside the node so tagged; sheet: in the top layer */
+    fun tags(
+        prefix: String,
+        within: String? = null,
+        sheet: Boolean = false,
+    ): List<String> {
+        val tag = androidx.compose.ui.semantics.SemanticsProperties.TestTag
+        var m =
+            androidx.compose.ui.test.SemanticsMatcher("tag $prefix") {
+                it.config.getOrElseNullable(tag) { null }?.startsWith(prefix) ==
+                    true
+            }
+        if (within != null) {
+            m = m and
+                androidx.compose.ui.test
+                    .hasAnyAncestor(
+                        androidx.compose.ui.test
+                            .hasTestTag(within),
+                    )
+        }
+        val kind = this.sheet?.kind
+        if (sheet && kind != null) {
+            m = m and
+                androidx.compose.ui.test.hasAnyAncestor(
+                    androidx.compose.ui.test.SemanticsMatcher
+                        .expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, kind),
+                )
+        }
+        if (!sheet && within == null && kind != null) {
+            m = m and
+                !androidx.compose.ui.test.hasAnyAncestor(
+                    androidx.compose.ui.test.SemanticsMatcher
+                        .keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle),
+                )
+        }
+        return rule
+            .onAllNodes(m, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .sortedBy { it.boundsInRoot.top }
+            .map { it.config[tag].removePrefix(prefix) }
+    }
+
+    /** a chip or segment with this text, chosen */
+    fun chosen(text: String) = rule.onAllNodes(hasText(text) and isSelected()).fetchSemanticsNodes().isNotEmpty()
+
     fun node(text: String): SemanticsNodeInteraction = rule.onAllNodes(hasText(text, substring = true), useUnmergedTree = true)[0]
 
     fun tap(text: String) {
@@ -332,3 +394,16 @@ fun dbOf(
         "observations" to observations,
     ),
 )
+
+/** a db as the old tests put it in place: the records as they are, nothing tidied away */
+fun dbRaw(d: JsonElement): Db {
+    val o = d.obj()
+    val list = { c: String ->
+        o[c]
+            .asArray
+            .orEmpty()
+            .map { Rec(it.obj()) }
+            .toMutableList()
+    }
+    return Db(list("pets"), list("products"), list("servings"), list("observations"))
+}

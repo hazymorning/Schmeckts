@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.platform.testTag
 import de.schmeckts.app.DAY
 import de.schmeckts.app.Evaluation
 import de.schmeckts.app.GoodCount
@@ -294,6 +295,7 @@ private fun Ranked(
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
+                    .testTag("medal-$tone")
                     .offset(Space.s2, Space.s2)
                     .size(Size.picBadge)
                     .drawBehind { drawCircle(surface, size.minDimension / 2 + Size.stroke.toPx()) }
@@ -348,7 +350,7 @@ private fun SideRow(
     val several = m.pets.size > 1
     val said = if (t != null) ph.toRate(t, several) else ph.saidOf(e, side)
     val label = "${pname(p)}${if (brand.isNotEmpty()) " von $brand" else ""}. ${cap(markupless(said))}."
-    ListRow(onClick = ui.on("open-product", "id" to e.id), label = label) {
+    ListRow(Modifier.testTag("pick-${e.id}"), onClick = ui.on("open-product", "id" to e.id), label = label) {
         Ranked(p, side, medal = first)
         TMain(esc(pname(p)), esc(cap(listOf(brand, lower(markupless(said))).filter { it.isNotEmpty() }.joinToString(", "))))
         Strip(ratingsIn(m, listOf(e.id)), if (t != null && !several) t.need else 0)
@@ -591,7 +593,7 @@ private fun PlaceRow(
     val label =
         "${if (place > 0) "Platz $place: " else ""}${pname(p)}${if (brand.isNotEmpty()) " von $brand" else ""}. $said." +
             (if (away.isNotEmpty()) " ${cap(away)}." else "") + (if (fresh) " Neu dabei." else "")
-    ListRow(onClick = ui.on("open-product", "id" to e.id), label = label) {
+    ListRow(Modifier.testTag("place-${e.id}"), onClick = ui.on("open-product", "id" to e.id), label = label) {
         Ranked(p, side, place = place)
         Column(Modifier.weight(1f)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.s2), verticalAlignment = Alignment.CenterVertically) {

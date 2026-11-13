@@ -17,6 +17,7 @@ class FakePlatform : Platform {
     var photo: ByteArray? = null
     var installError: String? = null
     var shareCancelled = false
+    var copies = false // no share menu: the text goes to the clipboard
     val shared = mutableListOf<Pair<String, String>>()
 
     override val pictures = FakePictures()
@@ -31,7 +32,8 @@ class FakePlatform : Platform {
         text: String,
     ): String {
         calls.add("shareText" to text)
-        return "shared"
+        calls.add("shareTitle" to title)
+        return if (copies) "copied" else "shared"
     }
 
     override suspend fun shareFile(

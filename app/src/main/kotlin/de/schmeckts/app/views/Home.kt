@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -454,21 +455,21 @@ private fun ColumnScope.HomeContent() {
         g
     }
     if (m != null) {
-        Arrive(n++) { Overview(m, home.fresh) }
+        Arrive(n++, "overview") { Overview(m, home.fresh) }
         gap("overview")
     }
     if (pend.isNotEmpty()) {
         Gap(gap("card"))
-        Arrive(n++) { Pending(pend) }
+        Arrive(n++, "pend") { Pending(pend) }
     }
     if (m == null) {
         Gap(gap("card"))
-        Arrive(n++) { Steps() }
+        Arrive(n++, "steps") { Steps() }
         return
     }
     if (ph.prefs.calendar) {
         Gap(gap("calpad"))
-        Arrive(n++) { CalPad() }
+        Arrive(n++, "cal") { CalPad() }
     }
     val question: (@Composable () -> Unit)? =
         when {
@@ -488,10 +489,10 @@ private fun ColumnScope.HomeContent() {
         }
     if (question != null) {
         Gap(gap("card"))
-        Arrive(n++) { question() }
+        Arrive(n++, "question") { question() }
     }
     Gap(gap("card"))
-    Arrive(n++) {
+    Arrive(n++, "hist") {
         Card {
             CardHead("Verlauf", label = "Alle Einträge", onMore = ui.on("open-report"))
             History()
@@ -499,7 +500,7 @@ private fun ColumnScope.HomeContent() {
     }
     if (hasEvaluationCard(m)) {
         Gap(gap("card"))
-        Arrive(n) { EvaluationCard(m) }
+        Arrive(n, "evaluation") { EvaluationCard(m) }
     }
 }
 
@@ -507,6 +508,7 @@ private fun ColumnScope.HomeContent() {
 @Composable
 private fun Arrive(
     i: Int,
+    sec: String,
     content: @Composable () -> Unit,
 ) {
     watch()
@@ -522,10 +524,12 @@ private fun Arrive(
         }
     }
     Box(
-        Modifier.graphicsLayer {
-            alpha = f.value
-            translationY = (1f - f.value) * 10.dp.toPx()
-        },
+        Modifier
+            .testTag("sec-$sec")
+            .graphicsLayer {
+                alpha = f.value
+                translationY = (1f - f.value) * 10.dp.toPx()
+            },
     ) { content() }
 }
 
@@ -626,7 +630,7 @@ private fun Pending(list: List<Rec>) {
         CardTitle("Wie war’s?")
         list.forEachIndexed { i, s ->
             Leaving(s.id) {
-                Column {
+                Column(Modifier.testTag("pend-${s.id}")) {
                     if (i > 0) Divider(Size.picL + Space.s3)
                     PendItem(s)
                 }
