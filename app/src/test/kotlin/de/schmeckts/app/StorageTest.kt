@@ -67,8 +67,10 @@ class StorageTest {
                 File(dir, "queue.json").readText() == "[]",
         )
         phone.close()
+        File(dir, "photos").mkdirs()
+        File(dir, "photos/abcd1234.jpg").writeText("x")
         File(dir, "db.json").writeText("{kaputt")
-        phone = phoneIn(dir)
+        phone = phoneIn(dir, FakeHttp())
         val aside = dir.list()!!.filter { it.startsWith("db.corrupt-") }
         assertTrue(
             "a corrupted db.json is set aside, nothing is overwritten",
@@ -82,7 +84,30 @@ class StorageTest {
                 phone.store.state.epoch == "",
         )
         assertTrue("set aside, so the next start does not read it", !File(dir, "db.json").exists())
+        val photo = File(dir, "photos/abcd1234.jpg")
+        tidy(phone)
+        assertTrue("a packaging photo stays while the stored data could not be read: its variety may still be in there", photo.exists())
         phone.close()
+        File(dir, "db.json").writeText(savedDb().stringify())
+        phone = phoneIn(dir, FakeHttp())
+        tidy(phone)
+        assertTrue(
+            "readable data again, but the unreadable copy still lies set aside: its varieties may come back, so the photo stays",
+            photo.exists(),
+        )
+        phone.close()
+        File(dir, aside[0]).delete()
+        phone = phoneIn(dir, FakeHttp())
+        tidy(phone)
+        assertTrue("with readable data and nothing set aside, a photo whose variety is not in it is removed at the start", !photo.exists())
+        phone.close()
+    }
+
+    // what the start does with the photos, and time for it to reach the disk
+    private fun tidy(phone: Phone) {
+        phone.on { Main(this).logic.products.tidyPhotos() }
+        Thread.sleep(500)
+        phone.flushNow()
     }
 
     @Test
