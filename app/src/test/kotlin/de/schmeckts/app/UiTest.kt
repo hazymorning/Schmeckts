@@ -1384,3 +1384,282 @@ class UiNamingTest : ScreenTest() {
         check(sheet?.str("variety") == "gibtsnicht" && labelled("Sorte"), "no hit: what was typed becomes a new variety")
     }
 }
+
+class UiReminderTest : ScreenTest() {
+    private val notes get() = platform.notifications
+
+    private fun due() = notes.planned.map { Triple(it.serving, it.body, it.at) }
+
+    // a meal served ago minutes back, as the app enters it; its reminder follows from the data
+    private fun plan(
+        id: String,
+        ago: Int,
+        productId: String?,
+    ): Long {
+        val t = clock - ago * 60_000L
+        db.servings.add(0, Rec(j(meal(id, productId, t, mapOf(db.pets[0].id to null))).obj()))
+        phone.store.save()
+        idle(400)
+        return t
+    }
+
+    private fun rate(
+        id: String,
+        r: String,
+    ) {
+        val s = phone.derive.getServing(id)!!
+        s["pets"] = kotlinx.serialization.json.JsonObject(s.pets.mapValues { j(mapOf("r" to r, "at" to 1)) })
+        phone.store.save()
+        idle(400)
+    }
+
+    @Test
+    fun `reminders - permission, schedule, tap, cancel once rated, follow changes, own interval, reconcile at start`() {
+        notes.answer = "denied"
+        open()
+        act("demo")
+        idle(400)
+        db.pets.add(Rec(j(pet("tigerpet01", "Tiger")).obj()))
+        phone.store.save()
+        act("open-settings")
+        idle(400)
+        check(prefs.remind == 0 && !inSheet("3 Std."), "off by default, no steps shown")
+        act("remind-on")
+        idle(400)
+        check(
+            calls("requestPermissions").size == 1 && prefs.remind == 0 && sheet?.get("denied") == "remind",
+            "denied: asked once, stays off",
+        )
+        notes.granted = "prompt"
+        notes.answer = "granted"
+        act("remind-on")
+        idle(400)
+        check(prefs.remind == 180 && chosen("3 Std."), "granted: on with 3 hours")
+        restart()
+        act("feed")
+        act(
+            "serve",
+            "id" to
+                phone.derive
+                    .quickProducts(3)[0]
+                    .product.id,
+        )
+        idle(600)
+        val s = db.servings[0]
+        val n = notes.planned.firstOrNull()
+        check(
+            notes.planned.size == 1 &&
+                n != null &&
+                pname(phone.derive.getProduct(s.str("productId"))) in n.body &&
+                n.at == s.servedAt + 180 * 60_000L &&
+                n.serving == s.id &&
+                n.id > 0,
+            "serving schedules one inexact reminder, serving time plus 3 hours, naming the variety $n",
+        )
+        main.phone.scope.launch { main.logic.reminders.onAction("tap", n!!.serving, null) }
+        idle(400)
+        check(
+            level == listOf("serving", null, null) && sheet?.id == s.id && tags("level-", sheet = true).size == 6 * s.pets.size,
+            "a tap opens the meal",
+        )
+        var half = 1
+        s.pets.keys.toList().forEachIndexed { i, pid ->
+            if (i > 0) half = notes.planned.size
+            act("rate", "s" to s.id, "p" to pid, "r" to "top")
+            idle(400)
+        }
+        check(half == 1 && notes.planned.isEmpty(), "cancelled once all pets rated")
+        idle(2000)
+        val t0 = plan("ohnesorte001", 2, null)
+        plan("zualt0000001", 11, null)
+        check(due().map { it.first } == listOf("ohnesorte001"), "unknown food gets one, a meal older than 10 minutes none")
+        val lachs = db.products[0]
+        phone.derive.getServing("ohnesorte001")!!.let {
+            it.put("productId", lachs.id)
+            it["servedAt"] = num(it.servedAt - 5 * 60_000L)
+        }
+        phone.store.save()
+        idle(400)
+        val moved = due()
+        check(
+            moved.size == 1 && lachs.str("variety")!! in moved[0].second && moved[0].third == t0 - 5 * 60_000L + 180 * 60_000L,
+            "it follows naming and time $moved",
+        )
+        act("open-settings")
+        act("remind", "v" to "360")
+        idle(400)
+        val later = due()[0].third
+        val asked = calls("requestPermissions").size
+        act("remind-on")
+        idle(400)
+        check(
+            later == t0 - 5 * 60_000L + 360 * 60_000L && notes.planned.isEmpty() && calls("requestPermissions").size == asked,
+            "another step moves it, off cancels all",
+        )
+        act("remind-on")
+        idle(400)
+        check(prefs.remind == 360, "on again: the step chosen last")
+        act("remind-own")
+        idle(400)
+        type("Stunden, 1 bis $REMIND_MAX_H", "5")
+        idle(400)
+        val own = prefs.remind
+        for (bad in listOf("30", "0", "")) {
+            type("Stunden, 1 bis $REMIND_MAX_H", bad)
+            idle(400)
+        }
+        check(own == 300 && prefs.remind == 300, "own interval in hours, stored in minutes; out of range ignored")
+        act("settings-back")
+        idle(400)
+        val t1 = plan("loeschen0001", 0, lachs.id)
+        val planned = due().filter { it.first == "loeschen0001" }
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("serving", "id" to "loeschen0001"),
+        )
+        main.logic.editing.deleteServing("loeschen0001")
+        idle(400)
+        check(
+            planned.map {
+                it.third
+            } == listOf(t1 + 300 * 60_000L) &&
+                due().none { it.first == "loeschen0001" },
+            "own interval scheduled; meal deleted: cancelled",
+        )
+        plan("bleibt000001", 1, lachs.id)
+        rate("ohnesorte001", "top")
+        restart()
+        idle(400)
+        main.phone.scope.launch { main.logic.reminders.onAction("tap", "bleibt000001", null) }
+        idle(400)
+        check(
+            due().map { it.first } == listOf("bleibt000001"),
+            "at start-up reminders without an open meal go, the open one stays ${due()}",
+        )
+        check(level == listOf("serving", null, null) && sheet?.id == "bleibt000001", "a tap on a cold start opens the meal")
+        act("close")
+        act("open-settings")
+        idle(400)
+        check(shows("5") && prefs.remind == 300, "the own interval survives a restart")
+    }
+}
+
+class UiReminderButtonsTest : ScreenTest() {
+    private val notes get() = platform.notifications
+
+    private fun note(sid: String) = notes.planned.find { it.serving == sid }
+
+    private fun ask(
+        id: String,
+        pets: List<String>,
+        productId: String,
+    ) {
+        db.servings.add(0, Rec(j(meal(id, productId, clock, pets.associateWith { null })).obj()))
+        phone.store.save()
+        idle(400)
+    }
+
+    private fun setRating(
+        id: String,
+        pet: String,
+        r: String,
+    ) {
+        val s = phone.derive.getServing(id)!!
+        s["pets"] = kotlinx.serialization.json.JsonObject(s.pets + (pet to j(mapOf("r" to r, "at" to clock))))
+        phone.store.save()
+        idle(400)
+    }
+
+    private fun press(
+        action: String,
+        n: Note,
+    ) {
+        main.phone.scope.launch { main.logic.reminders.onAction(action, n.serving, n.pet) }
+        idle(400)
+    }
+
+    @Test
+    fun `reminder buttons - the best, a middling and the worst level, one open pet only, a rated meal opens instead`() {
+        val now = at("2025-06-17T12:00")
+        val rated =
+            listOf(
+                "lachs00001" to "top",
+                "lachs00001" to "gut",
+                "lachs00001" to "top",
+                "lachs00001" to "mittel",
+                "lachs00001" to "gut",
+            )
+        val household =
+            dbOf(
+                listOf(pet(M), pet(T, "Tiger")),
+                listOf(product("lachs00001"), product("trocken001", "Josera", "Rind", "Trockenfutter")),
+                rated.mapIndexed { i, (pid, r) -> meal("altmeal00$i", pid, now - (i + 1) * DAY, mapOf(M to r)) },
+            )
+        open(mapOf("db" to household, "prefs" to j(mapOf("remind" to 180))), now)
+        ask("einzeln0001", listOf(M), "lachs00001")
+        val n = note("einzeln0001")!!
+        check(
+            n.rate == listOf("top", "mittel", "schlecht") && n.pet == M && "Minka" in n.body,
+            "one open pet: a button for a good, a middling and a poor meal $n",
+        )
+        check(
+            listOf("top", "mittel", "schlecht").map {
+                RATINGS.getValue(it).short
+            } == listOf("Alles", "Halb", "Nix"),
+            "the buttons say the levels as the slider does",
+        )
+        val before = notes.planned.map { it.id to it.body }
+        main.logic.reminders.syncReminders()
+        idle(600)
+        check(notes.planned.map { it.id to it.body } == before, "a reconcile leaves the reminder as it was")
+        press("gut", n)
+        val ratedNow = (phone.derive.getServing("einzeln0001")!!.pets[M] as kotlinx.serialization.json.JsonObject)["r"].asString
+        check(
+            ratedNow == "gut" &&
+                toast != null &&
+                ui.toasts.undo != null &&
+                sheet == null &&
+                "einzeln0001" !in tags("pend-") &&
+                note("einzeln0001") == null,
+            "a button rates the meal with a toast to undo, opens nothing, and the reminder goes ($toast)",
+        )
+        act("undo")
+        check(
+            (phone.derive.getServing("einzeln0001")!!.pets[M] as kotlinx.serialization.json.JsonObject)["r"].asString == null,
+            "undone like a rating in the app",
+        )
+        setRating("einzeln0001", M, "top")
+        press("gut", n)
+        check(
+            level == listOf("serving", null, null) &&
+                (phone.derive.getServing("einzeln0001")!!.pets[M] as kotlinx.serialization.json.JsonObject)["r"].asString == "top",
+            "rated meanwhile: the button opens the meal and changes nothing",
+        )
+        act("close")
+        ask("zusammen01", listOf(M, T), "lachs00001")
+        val both = note("zusammen01")!!
+        setRating("zusammen01", T, "top")
+        val left = note("zusammen01")!!
+        check(
+            both.rate.isEmpty() &&
+                both.pet == null &&
+                "Tiger" in both.body &&
+                left.rate == listOf("top", "mittel", "schlecht") &&
+                left.pet == M &&
+                "Tiger" !in left.body,
+            "two open pets: no buttons; once one is rated, buttons for the other, and the text names only it $both $left",
+        )
+        // a reminder already due that Android may not have shown yet, inexact as it is
+        ask("ueberfaellig", listOf(M, T), "lachs00001")
+        clock += 181 * 60_000L
+        setRating("ueberfaellig", T, "gut")
+        val kept = note("ueberfaellig")
+        setRating("ueberfaellig", M, "gut")
+        check(
+            kept != null && kept.at < clock && note("ueberfaellig") == null,
+            "a reminder already due stays while its meal is open, and goes once the meal is rated",
+        )
+        ask("trocken01", listOf(M), "trocken001") // another scale, buttons of its own
+        check(note("trocken01")?.rate == quickOf(phone.derive.getProduct("trocken001")), "another scale: its own buttons")
+    }
+}

@@ -232,6 +232,7 @@ private fun Overview() {
                         "f-remind",
                         "remind",
                         keyboard = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        label = "Stunden, 1 bis $REMIND_MAX_H",
                         initial = (ph.prefs.remind / 60.0).let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() },
                         channel = "remind",
                     )
