@@ -67,14 +67,17 @@ class FakePlatform : Platform {
         return readings.removeFirstOrNull() ?: reading
     }
 
-    override suspend fun scanBarcode(onInstall: () -> Unit): String? {
+    override suspend fun scanBarcode(
+        formats: List<String>,
+        onInstall: () -> Unit,
+    ): String? {
         if (!scanModule) {
             onInstall()
             calls.add("installModule" to null)
             kotlinx.coroutines.delay(700)
             scanModule = true
         }
-        calls.add("scan" to null)
+        calls.add("scan" to formats)
         scanError?.let { throw java.io.IOException(it) }
         return barcode
     }

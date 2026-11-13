@@ -249,6 +249,25 @@ abstract class ScreenTest {
     fun labelled(label: String) =
         rule.onAllNodesWithContentDescription(label, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
+    /** every word on the screen, labels and field contents included, in lower case */
+    fun screenText(): String {
+        val p = androidx.compose.ui.semantics.SemanticsProperties
+        return rule
+            .onAllNodes(
+                androidx.compose.ui.test
+                    .SemanticsMatcher("any") { true },
+                useUnmergedTree = true,
+            ).fetchSemanticsNodes()
+            .joinToString("\n") { n ->
+                val c = n.config
+                listOfNotNull(
+                    c.getOrElseNullable(p.Text) { null }?.joinToString(" "),
+                    c.getOrElseNullable(p.ContentDescription) { null }?.joinToString(" "),
+                    c.getOrElseNullable(p.EditableText) { null }?.text,
+                ).joinToString(" ")
+            }.lowercase()
+    }
+
     /** shown in the top layer, not on the page beneath it */
     fun inSheet(text: String): Boolean {
         val kind = sheet?.kind ?: return false
@@ -343,6 +362,14 @@ abstract class ScreenTest {
         write()
         val f = File(dir, "$name.json")
         return if (f.exists()) parseJson(f.readText()) else null
+    }
+
+    /** a suspending call on the phone's own scope, the screen running meanwhile */
+    fun <T> on(block: suspend Phone.() -> T): T {
+        var out: Result<T>? = null
+        phone.scope.launch { out = runCatching { phone.block() } }
+        check(until(10_000) { out != null }, "done in time")
+        return out!!.getOrThrow()
     }
 
     fun write() {

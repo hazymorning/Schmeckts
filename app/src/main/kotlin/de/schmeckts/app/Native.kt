@@ -112,8 +112,11 @@ interface Platform {
     /** on-device text recognition; a failure reads as nothing */
     suspend fun readPhoto(b64: String): Reading
 
-    /** Google's scanner in Play services, its module installed first if missing; null when cancelled */
-    suspend fun scanBarcode(onInstall: () -> Unit): String?
+    /** Google's scanner in Play services for these formats, its module installed first if missing; null when cancelled */
+    suspend fun scanBarcode(
+        formats: List<String>,
+        onInstall: () -> Unit,
+    ): String?
 
     /** a file the person picks, as text; null when cancelled */
     suspend fun pickFile(): String?

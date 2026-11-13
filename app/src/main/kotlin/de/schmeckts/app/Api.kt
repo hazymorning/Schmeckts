@@ -32,13 +32,38 @@ private fun isHome(host: String): Boolean {
     return (h and 0xfe00) == 0xfc00 || (h and 0xffc0) == 0xfe80
 }
 
+// a host ending in a number is an IPv4 address in any form a browser takes (3232235777, 0xc0.168.1.1, 192.168.257)
+private fun dottedOf(host: String): String? {
+    val parts = host.removeSuffix(".").split(".")
+    if (!Regex("\\d+|0[xX][0-9a-fA-F]*").matches(parts.last())) return null
+    val bad = ServerError("input", "Das ist keine gültige Adresse.")
+    val n =
+        parts.map { p ->
+            when {
+                p.startsWith("0x", true) -> if (p.length == 2) 0L else p.substring(2).toLongOrNull(16)
+                p.length > 1 && p.startsWith("0") -> p.substring(1).toLongOrNull(8)
+                else -> p.toLongOrNull()
+            } ?: throw bad
+        }
+    if (n.size > 4 || n.dropLast(1).any { it > 255 } || n.last() >= 1L shl (8 * (5 - n.size))) throw bad
+    val ip = n.dropLast(1).fold(0L) { acc, x -> acc shl 8 or x } shl (8 * (5 - n.size)) or n.last()
+    return (3 downTo 0).joinToString(".") { (ip shr (8 * it) and 255).toString() }
+}
+
 // every address passes here, so plain http is refused outside the home network in one place
 fun normServer(s: String?): String {
     var v = (s ?: "").trim().replace(Regex("/+$"), "")
     if (v.isEmpty()) return ""
     if (!Regex("^https?://", RegexOption.IGNORE_CASE).containsMatchIn(v)) v = "http://$v"
-    val url = v.toHttpUrlOrNull() ?: throw ServerError("input", "Das ist keine gültige Adresse.")
-    if (url.scheme != "https" && !isHome(url.host)) throw ServerError("input", "Außerhalb des Heimnetzes geht es nur mit https.")
+    val host = Regex("^https?://(?:[^@/?#]*@)?(\\[[^]]*]|[^/?#:]*)", RegexOption.IGNORE_CASE).find(v)!!.groupValues[1]
+    val v6 = host.startsWith("[") // as written: OkHttp turns ::ffff:192.168.1.1 into an IPv4 address
+    val dotted = if (v6) null else dottedOf(host)
+    val url =
+        (if (dotted != null) v.replaceFirst(host, dotted) else v).toHttpUrlOrNull()
+            ?: throw ServerError("input", "Das ist keine gültige Adresse.")
+    if (url.scheme != "https" && !isHome(if (v6) host.lowercase() else url.host)) {
+        throw ServerError("input", "Außerhalb des Heimnetzes geht es nur mit https.")
+    }
     return v
 }
 

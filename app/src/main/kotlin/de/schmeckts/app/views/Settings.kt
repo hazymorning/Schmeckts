@@ -527,6 +527,7 @@ private fun ServerSection() {
                     imeAction = ImeAction.Next,
                 ),
             initial = ph.prefs.server,
+            label = "Adresse des Servers",
         )
     }
     if (!ph.sync.isConnected()) {

@@ -277,11 +277,22 @@ class AndroidPlatform(
     }
 
     // Play services drive the camera, so no camera permission is needed; their module is installed first if missing
-    override suspend fun scanBarcode(onInstall: () -> Unit): String? {
+    override suspend fun scanBarcode(
+        formats: List<String>,
+        onInstall: () -> Unit,
+    ): String? {
+        val wanted =
+            formats.map {
+                when (it) {
+                    "EAN_13" -> Barcode.FORMAT_EAN_13
+                    "EAN_8" -> Barcode.FORMAT_EAN_8
+                    else -> Barcode.FORMAT_UPC_A
+                }
+            }
         val options =
             GmsBarcodeScannerOptions
                 .Builder()
-                .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A)
+                .setBarcodeFormats(wanted[0], *wanted.drop(1).toIntArray())
                 .build()
         val act = activity ?: throw IllegalStateException("no screen")
         val scanner = GmsBarcodeScanning.getClient(act, options)

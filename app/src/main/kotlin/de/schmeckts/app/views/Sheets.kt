@@ -1006,7 +1006,7 @@ private fun Modifier.layoutWidePack() =
     layout { m, c ->
         val extra = Space.s4.roundToPx() * 2
         val p = m.measure(c.copy(minWidth = c.maxWidth + extra, maxWidth = c.maxWidth + extra))
-        layout(c.maxWidth, p.height - Space.s1.roundToPx()) { p.place(-Space.s4.roundToPx(), -Space.s1.roundToPx()) }
+        layout(c.maxWidth, (p.height - Space.s1.roundToPx()).coerceAtLeast(0)) { p.place(-Space.s4.roundToPx(), -Space.s1.roundToPx()) }
     }
 
 // counts only; whether they stand out is for the evaluation

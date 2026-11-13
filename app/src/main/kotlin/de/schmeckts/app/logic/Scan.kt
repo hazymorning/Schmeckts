@@ -4,6 +4,7 @@ import de.schmeckts.app.Rec
 import de.schmeckts.app.normBarcode
 import de.schmeckts.app.ui.SheetState
 
+private val FORMATS = listOf("EAN_13", "EAN_8", "UPC_A") // what cat food carries
 private const val FRONT = "Barcode unbekannt. Fotografier die Vorderseite."
 
 class Scan(
@@ -38,7 +39,7 @@ class Scan(
     private suspend fun run(feed: SheetState) {
         val raw =
             try {
-                ph.platform.scanBarcode { note(feed, "Der Scanner wird eingerichtet …") }
+                ph.platform.scanBarcode(FORMATS) { note(feed, "Der Scanner wird eingerichtet …") }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 return offerPhoto(feed, "Scannen klappt auf diesem Handy gerade nicht. Mach stattdessen ein Foto.")
