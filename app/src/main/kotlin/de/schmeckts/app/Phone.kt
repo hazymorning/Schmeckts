@@ -28,6 +28,7 @@ class Phone(
     val online = Online(store, http)
     val release = Release(platform, http)
     val recognize = Recognize(store, sync, api, ai, online, derive, platform)
+    val photos = Photos(dir, scope, io, store, sync, api)
 
     init {
         store.onSaved = { sync.syncSoon(400) }
