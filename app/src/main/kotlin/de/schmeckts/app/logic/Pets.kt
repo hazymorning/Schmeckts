@@ -10,9 +10,9 @@ import de.schmeckts.app.namesOf
 import de.schmeckts.app.norm
 import de.schmeckts.app.num
 import de.schmeckts.app.pets
-import de.schmeckts.app.uid
 import de.schmeckts.app.ui.Crop
 import de.schmeckts.app.ui.SheetState
+import de.schmeckts.app.uid
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -161,7 +161,15 @@ class Pets(
         if (isNew) db.pets.add(p)
         save()
         haptic("success")
-        leave(if (!isNew) "Gespeichert" else if (db.pets.size == 1) "Willkommen, $name!" else "$name ist dabei")
+        leave(
+            if (!isNew) {
+                "Gespeichert"
+            } else if (db.pets.size == 1) {
+                "Willkommen, $name!"
+            } else {
+                "$name ist dabei"
+            },
+        )
     }
 
     fun deletePet() {

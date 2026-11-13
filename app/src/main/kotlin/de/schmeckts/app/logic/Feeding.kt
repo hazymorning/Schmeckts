@@ -20,11 +20,11 @@ import de.schmeckts.app.petMap
 import de.schmeckts.app.pets
 import de.schmeckts.app.pname
 import de.schmeckts.app.report
-import de.schmeckts.app.truthy
 import de.schmeckts.app.textSquare
-import de.schmeckts.app.uid
+import de.schmeckts.app.truthy
 import de.schmeckts.app.ui.CameraFailed
 import de.schmeckts.app.ui.SheetState
+import de.schmeckts.app.uid
 import de.schmeckts.app.views.lower
 import de.schmeckts.app.views.record
 import kotlinx.coroutines.CancellationException
@@ -183,7 +183,9 @@ class Feeding(
     // the large copy for reading is made only once the meal is on screen; a failure reads the 1100 px copy instead
     private fun readable(img: Picture) =
         try {
-            ph.platform.pictures.resize(img, READ_MAX, READ_QUALITY).substringAfter(",")
+            ph.platform.pictures
+                .resize(img, READ_MAX, READ_QUALITY)
+                .substringAfter(",")
         } catch (e: Exception) {
             report("the photo for reading", e)
             ""
@@ -223,7 +225,15 @@ class Feeding(
         // fresh: once named, the meal is rated on the home page like any other
         if (local) {
             ui.sheets.openSheet(
-                SheetState("serving", "id" to s.id, "step" to "name", "fresh" to true, "brand" to "", "variety" to "", "type" to "Nassfutter"),
+                SheetState(
+                    "serving",
+                    "id" to s.id,
+                    "step" to "name",
+                    "fresh" to true,
+                    "brand" to "",
+                    "variety" to "",
+                    "type" to "Nassfutter",
+                ),
             )
         }
         toast(
@@ -359,7 +369,14 @@ class Feeding(
                 l.products.applyProduct(s, Details(details.brand, details.variety, details.type, details.texture))
                 found.via?.let { ph.recognize.seenBy[s.id] = it }
                 val sh = sheet
-                if (sh?.kind == "serving" && sh.id == s.id && sh.step == "name" && sh.str("brand").isEmpty() && sh.str("variety").isEmpty()) sh.step = null
+                if (sh?.kind == "serving" &&
+                    sh.id == s.id &&
+                    sh.step == "name" &&
+                    sh.str("brand").isEmpty() &&
+                    sh.str("variety").isEmpty()
+                ) {
+                    sh.step = null
+                }
             }
             details != null -> {
                 // read by the phone: a person confirms it while naming
@@ -421,7 +438,14 @@ class Feeding(
         val naming = sheet?.kind == "serving" && sheet?.id == s.id
         val said = "Erkannt: <b>${esc(pname(p))}</b>"
         val past = onRecord(p)
-        val tell = { toast(if (past.isNotEmpty()) addSentence(said, esc(past)) else said, { unrecognize(s.id, p.id, was) }, icon = "bowl", html = true) }
+        val tell = {
+            toast(
+                if (past.isNotEmpty()) addSentence(said, esc(past)) else said,
+                { unrecognize(s.id, p.id, was) },
+                icon = "bowl",
+                html = true,
+            )
+        }
         if (naming) afterClose(tell) else tell()
     }
 
@@ -503,7 +527,12 @@ class Feeding(
             sh[f] = v
             sh["error"] = ""
         }
-        if (typed.isEmpty()) sh.assign("type" to (guess["type"].asString?.ifEmpty { null } ?: sh.str("type")), "texture" to guess["texture"].asString)
+        if (typed.isEmpty()) {
+            sh.assign(
+                "type" to (guess["type"].asString?.ifEmpty { null } ?: sh.str("type")),
+                "texture" to guess["texture"].asString,
+            )
+        }
     }
 
     fun guessOf(s: Rec?): Array<Pair<String, Any?>> {
@@ -522,7 +551,11 @@ class Feeding(
             l.products.linkProduct(s, p)
         } else {
             // the variety has not arrived here yet
-            (ph.photos.mem[s.id] ?: s.str("photo")?.substringAfter(",", "")?.ifEmpty { null })?.let { ph.photos.keepPhoto(s.str("productId")!!, it, s.id) }
+            (
+                ph.photos.mem[s.id] ?: s.str("photo")?.substringAfter(",", "")?.ifEmpty {
+                    null
+                }
+            )?.let { ph.photos.keepPhoto(s.str("productId")!!, it, s.id) }
             for (k in listOf("photo", "status", "error", "autoPets", "guess")) s.remove(k)
             ph.photos.mem.remove(s.id)
             ph.recognize.memLines.remove(s.id)

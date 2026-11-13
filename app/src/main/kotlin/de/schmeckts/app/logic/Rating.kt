@@ -82,7 +82,11 @@ class Rating(
     ) {
         val s = d.getServing(sid) ?: return
         val inSheet = sheet?.kind == "serving" && sheet?.id == s.id
-        if (!inSheet) ui.home.held.getOrPut(s.id) { HashSet() }.add(pid) // the row stays until the pop has run
+        if (!inSheet) {
+            ui.home.held
+                .getOrPut(s.id) { HashSet() }
+                .add(pid) // the row stays until the pop has run
+        }
         launch {
             delay(Motion.STEP.toLong())
             update()
@@ -115,6 +119,10 @@ class Rating(
             ui.home.held.remove(sid)
             update()
         }
-        if (!ui.hosted) ui.home.leaving.remove(sid)?.invoke()
+        if (!ui.hosted) {
+            ui.home.leaving
+                .remove(sid)
+                ?.invoke()
+        }
     }
 }

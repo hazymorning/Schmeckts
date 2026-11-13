@@ -113,7 +113,18 @@ class Products(
     ): Rec {
         var p = d.findProduct(details.brand, details.variety)
         if (p == null) {
-            p = newProduct(Details(details.brand, details.variety, details.type, details.texture, details.userType, details.textureGiven, s.str("thumb")))
+            p =
+                newProduct(
+                    Details(
+                        details.brand,
+                        details.variety,
+                        details.type,
+                        details.texture,
+                        details.userType,
+                        details.textureGiven,
+                        s.str("thumb"),
+                    ),
+                )
         } else {
             if (details.userType && details.type in TYPES) p.put("type", details.type)
             applyTexture(p, details)

@@ -49,7 +49,10 @@ class Reminders(
 
     // served on this phone as it happened: a meal entered for the past, or on another phone, is not asked about
     private fun servedHere(s: Rec): Boolean {
-        val made = ph.store.state.clocks["servings"]?.get(s.id)?.get("_del") ?: return false
+        val made =
+            ph.store.state.clocks["servings"]
+                ?.get(s.id)
+                ?.get("_del") ?: return false
         val parts = made.split("-")
         val ms = parts.getOrNull(0)?.toLongOrNull() ?: return false
         return parts.getOrNull(2) == ph.clock.device && ms > 0 && ms - s.servedAt <= REMIND_MAX_AGE
@@ -76,12 +79,28 @@ class Reminders(
     // sure: the text once the server confirmed nothing was served since `since`
     private fun dayPart(at: Long): String {
         val h = hourOf(at) + minuteOf(at) / 60.0
-        return if (h < 10.5) "Heute Morgen" else if (h < 14) "Heute Mittag" else if (h < 17.5) "Heute Nachmittag" else "Heute Abend"
+        return if (h < 10.5) {
+            "Heute Morgen"
+        } else if (h < 14) {
+            "Heute Mittag"
+        } else if (h < 17.5) {
+            "Heute Nachmittag"
+        } else {
+            "Heute Abend"
+        }
     }
 
     private fun feedNotice(x: de.schmeckts.app.FeedDue): FeedNote {
         val body = "Um diese Zeit gibt es sonst Futter für ${calling(db.pets.map { it.id }, x.key)}."
-        return FeedNote(idOf("feed" + x.key), x.key, x.at, x.since, "Schon gefüttert?", body, "${dayPart(x.at)} ist noch nichts eingetragen. $body")
+        return FeedNote(
+            idOf("feed" + x.key),
+            x.key,
+            x.at,
+            x.since,
+            "Schon gefüttert?",
+            body,
+            "${dayPart(x.at)} ist noch nichts eingetragen. $body",
+        )
     }
 
     private suspend fun allowed(
@@ -156,7 +175,8 @@ class Reminders(
         val dismiss = fedToday(db, now).map { idOf("feed$it") }
         val server = if (ph.sync.isConnected()) prefs.server else ""
         val code = if (ph.sync.isConnected()) prefs.code else ""
-        val key = reminders.joinToString("|") { "${it.id},${it.at},${it.since},${it.body}" } + "/" + dismiss.joinToString(",") + "/$server/$code"
+        val key =
+            reminders.joinToString("|") { "${it.id},${it.at},${it.since},${it.body}" } + "/" + dismiss.joinToString(",") + "/$server/$code"
         if (key == lastFeed) return
         try {
             ph.platform.notifications.feed(reminders, dismiss, server, code)

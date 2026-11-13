@@ -94,20 +94,35 @@ class Data(
         val timing = ph.recognize.timing
         val fields =
             listOfNotNull(
-                "about" to JsonPrimitive(if (p != null) listOfNotNull(p.str("brand"), p.str("variety")).filter { it.isNotEmpty() }.joinToString(" ") else ""),
+                "about" to
+                    JsonPrimitive(
+                        if (p !=
+                            null
+                        ) {
+                            listOfNotNull(p.str("brand"), p.str("variety")).filter { it.isNotEmpty() }.joinToString(" ")
+                        } else {
+                            ""
+                        },
+                    ),
                 "taken" to JsonPrimitive(taken),
                 "app" to JsonPrimitive(ph.platform.version),
                 "width" to num(r.first.width),
                 "height" to num(r.first.height),
                 "ms" to num(r.first.ms),
                 if (timing) {
-                    "timings" to JsonObject(ph.recognize.timings.mapKeys { it.key.toString() }.mapValues { (_, v) -> JsonArray(v.map { num(it) }) })
+                    "timings" to
+                        JsonObject(
+                            ph.recognize.timings
+                                .mapKeys { it.key.toString() }
+                                .mapValues { (_, v) -> JsonArray(v.map { num(it) }) },
+                        )
                 } else {
                     null
                 },
                 "expected" to
                     jsonObject(
-                        "brand" to if (p != null) JsonPrimitive(p.str("brand") ?: "") else JsonNull, // null: not named yet, filled in by hand
+                        // null: not named yet, filled in by hand
+                        "brand" to if (p != null) JsonPrimitive(p.str("brand") ?: "") else JsonNull,
                         "variety" to if (p != null) JsonPrimitive(p.str("variety") ?: "") else JsonNull,
                         "type" to (p?.str("type")?.ifEmpty { null }?.let { JsonPrimitive(it) } ?: JsonNull),
                         "texture" to (p?.str("texture")?.ifEmpty { null }?.let { JsonPrimitive(it) } ?: JsonNull),
@@ -279,13 +294,37 @@ class Data(
     /** before connecting, so none of the sample reaches the household */
     fun purgeDemo() {
         val demo = { id: String -> id.startsWith(DEMO) }
-        val pets = db.pets.filter { demo(it.id) }.map { it.id }.toSet()
+        val pets =
+            db.pets
+                .filter { demo(it.id) }
+                .map { it.id }
+                .toSet()
         val onlyDemo = { s: Rec -> s.pets.isNotEmpty() && s.pets.keys.all { it in pets } }
-        val servings = db.servings.filter { demo(it.id) || onlyDemo(it) }.map { it.id }.toSet()
-        val used = db.servings.filter { it.id !in servings }.map { it.str("productId") }.toSet()
-        val fromDemo = db.servings.filter { it.id in servings }.map { it.str("productId") }.toSet()
-        val products = db.products.filter { it.id !in used && (demo(it.id) || it.id in fromDemo) }.map { it.id }.toSet()
-        val observations = db.observations.filter { demo(it.id) || onlyDemo(it) }.map { it.id }.toSet()
+        val servings =
+            db.servings
+                .filter { demo(it.id) || onlyDemo(it) }
+                .map { it.id }
+                .toSet()
+        val used =
+            db.servings
+                .filter { it.id !in servings }
+                .map { it.str("productId") }
+                .toSet()
+        val fromDemo =
+            db.servings
+                .filter { it.id in servings }
+                .map { it.str("productId") }
+                .toSet()
+        val products =
+            db.products
+                .filter { it.id !in used && (demo(it.id) || it.id in fromDemo) }
+                .map { it.id }
+                .toSet()
+        val observations =
+            db.observations
+                .filter { demo(it.id) || onlyDemo(it) }
+                .map { it.id }
+                .toSet()
         if (pets.isEmpty() && servings.isEmpty() && products.isEmpty() && observations.isEmpty()) return
         ph.store.purge(mapOf("pets" to pets, "products" to products, "servings" to servings, "observations" to observations))
         var touched = false // mixed records stay, minus the sample pet

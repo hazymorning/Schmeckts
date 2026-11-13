@@ -37,7 +37,13 @@ class Exchange(
     private fun markFor(device: String?): JsonElement? {
         val marks = prefs.exchange
         if (device != null) return (marks[device] as? JsonObject)?.get("mark")
-        return if (marks.isNotEmpty()) JsonPrimitive(marks.values.map { (it as? JsonObject)?.get("mark").asString ?: "" }.sorted()[0]) else null
+        return if (marks.isNotEmpty()) {
+            JsonPrimitive(
+                marks.values.map { (it as? JsonObject)?.get("mark").asString ?: "" }.sorted()[0],
+            )
+        } else {
+            null
+        }
     }
 
     // the mark moves on only once the device holds everything this phone has
@@ -157,5 +163,9 @@ class Exchange(
 /** today's date in UTC, as toISOString().slice(0, 10) gave it */
 fun utcDay(t: Long = Time.now()): String {
     val c = java.util.GregorianCalendar(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = t }
-    return "%04d-%02d-%02d".format(c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH))
+    return "%04d-%02d-%02d".format(
+        c.get(java.util.Calendar.YEAR),
+        c.get(java.util.Calendar.MONTH) + 1,
+        c.get(java.util.Calendar.DAY_OF_MONTH),
+    )
 }

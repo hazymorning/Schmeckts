@@ -82,6 +82,9 @@ class Ui(
     /** drawn on a screen; without one, what waits for an animation goes on at once */
     var hosted = false
 
+    /** the system's animations are off; set by the screen */
+    var reduced = false
+
     /** the field, by its id, to take the focus and the keyboard on its next draw */
     var wantFocus by mutableStateOf<String?>(null)
 

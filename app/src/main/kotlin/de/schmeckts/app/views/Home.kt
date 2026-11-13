@@ -134,7 +134,15 @@ fun HomeScreen() {
     val scroll = rememberScrollState()
     val scrolled by remember { derivedStateOf { scroll.value > 0 } }
     val still = reduceMotion
-    LaunchedEffect(ui.home.top) { if (ui.home.top > 0) if (still) scroll.scrollTo(0) else scroll.animateScrollTo(0) }
+    LaunchedEffect(ui.home.top) {
+        if (ui.home.top > 0) {
+            if (still) {
+                scroll.scrollTo(0)
+            } else {
+                scroll.animateScrollTo(0)
+            }
+        }
+    }
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Mood()
         Column(
