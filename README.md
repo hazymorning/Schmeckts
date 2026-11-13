@@ -3,21 +3,21 @@
   <img src=".github/readme/hero-light.svg" alt="Schmeckt’s? Eine App für Katzen mit Ansprüchen.">
 </picture></p>
 
-Mau weiß genau, was ihr schmeckt. Sie sagt es dir nur nicht.
+Mau weiß genau, was ihr schmeckt. Sie sagt es nur nicht. Irgendwas mit Thunfisch kommt zum Beispiel super an, meistens zumindest. Die Sorte, die so teuer war, fand sie am besten, zumindest gefühlt. Hat sie aktuell einfach wenig Hunger, oder liegt es am Essen? Und beim Einkaufen dann die Frage: Schmeckt ihr das, oder eher nicht? Lieber immer dasselbe kaufen oder viel Abwechslung? Aus diesen Fragen ist eines Tages in der Küche die Idee für diese App entstanden.
 
-Schmeckt’s? schreibt mit. Beim Füttern fotografierst du die Packung, später tippst du an, wie viel Mau gefressen hat. Nach ein paar Wochen weißt du es auch.
+Ein Futtertagebuch für Katzen hält allerdings niemand im Alltag durch, außer es ist wirklich maximal unkompliziert. Daher baut hier alles auf diesem Gedanken auf: Alles muss möglichst schnell und einfach sein, die App macht den Rest und schreibt mit. Beim Füttern fotografiert man die Packung, später wird dann angetippt, wie viel Mau gegessen hat. Nach ein paar Wochen gibt’s dann nützliche Auswertungen der Vorlieben und mehr.
 
 <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/readme/download-dark.svg"><img src=".github/readme/download-light.svg" width="224" alt="Download für Android"></picture></a><br>
 [So kommt die App aufs Handy](#how-to-install)
 
-- Liest die Sorte von der Packung ab, per Foto oder Barcode.
-- Kennt sechs Stufen von „Alles“ bis „Nix“, auch „nur die Soße geleckt“.
-- Zeigt, was ankommt und was stehen bleibt, und macht daraus eine Einkaufsliste.
-- Erinnert ans Füttern, falls Mau das mal vergisst.
-- Merkt, wenn Mau ein paar Tage schlechter frisst als sonst.
-- Kommt auch klar, wenn Mau nicht allein wohnt oder mehrere Leute füttern.
-- Hat einen Katzenkalender zum Abreißen. Freitags steht ein Flachwitz drauf.
-- Findet neue Versionen selbst und installiert sie auf einen Tipp.
+- Die Sorte erkennt die App am Barcode, oder sie liest sie direkt vom Foto der Packung ab.
+- Bewertet wird mit einem Tipp, von „Alles“ bis „Nix“. Dazwischen gibt es auch „Soße“, für die Tage, an denen nur die Soße geleckt wird.
+- Unter „Vorlieben“ sieht man, welche Sorten und Marken gut ankommen und welche eher stehen bleiben. Die Einkaufsliste ergibt sich daraus fast von selbst.
+- Frisst Mau ein paar Tage schlechter als sonst, sagt die App Bescheid.
+- Ans Füttern und ans Bewerten erinnert sie auf Wunsch auch.
+- Mehrere Katzen oder mehrere Leute, die füttern, sind kein Problem.
+- Neue Versionen findet die App selbst und installiert sie auf einen Tipp.
+- Und jeden Tag gibt es ein Blatt vom Katzenkalender, freitags mit Flachwitz.
 
 Weil Mau bekanntlich sehr auf ihre Privatsphäre achtet, bleibt bei Schmeckt’s? alles auf deinem Handy.
 
@@ -33,16 +33,16 @@ Weil Mau bekanntlich sehr auf ihre Privatsphäre achtet, bleibt bei Schmeckt’s
 <summary>So kommt die App aufs Handy</summary>
 <br>
 
-Im Play Store gibt es Schmeckt’s? nicht, nur hier. Android stellt deshalb beim Installieren ein paar Fragen.
+Im Play Store gibt es Schmeckt’s? nicht, nur hier auf GitHub. Deshalb fragt Android beim Installieren ein paar Dinge nach, das ist ganz normal.
 
 <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/readme/download-dark.svg"><img src=".github/readme/download-light.svg" width="224" alt="Download für Android"></picture></a>
 
-1. Öffne diese Seite auf dem Handy und tippe auf „Download für Android“. Falls der Browser vor der Datei warnt, lade sie trotzdem herunter.
-2. Öffne die Datei, sobald sie da ist. Später findest du sie als „schmeckts.apk“ in deinen Downloads.
-3. Beim ersten Mal musst du deinem Browser erlauben, Apps zu installieren. Tippe dazu auf „Einstellungen“, schalte „Aus dieser Quelle zulassen“ ein und geh zurück.
-4. Tippe auf „Installieren“. Danach liegt Schmeckt’s? bei deinen anderen Apps.
+1. Diese Seite auf dem Handy öffnen und auf „Download für Android“ tippen. Falls der Browser vor der Datei warnt, trotzdem herunterladen.
+2. Die Datei öffnen, sobald sie da ist. Später liegt sie auch als „schmeckts.apk“ in den Downloads.
+3. Beim ersten Mal muss man dem Browser erlauben, Apps zu installieren. Dazu auf „Einstellungen“ tippen, „Aus dieser Quelle zulassen“ einschalten und zurückgehen.
+4. Auf „Installieren“ tippen. Danach ist Schmeckt’s? bei den anderen Apps zu finden.
 
-Neue Versionen findet die App danach selbst. Beim ersten Update fragt Android noch einmal, diesmal ob Schmeckt’s? Apps installieren darf.
+Neue Versionen findet die App danach selbst. Beim ersten Update fragt Android noch einmal nach, diesmal, ob Schmeckt’s? Apps installieren darf.
 
 </details>
 
@@ -50,25 +50,25 @@ Neue Versionen findet die App danach selbst. Beim ersten Update fragt Android no
 <summary>Wenn dabei etwas hakt</summary>
 <br>
 
-Play Protect will die App vielleicht erst prüfen, weil sie nicht aus dem Play Store kommt. Das kannst du ruhig zulassen.
+Play Protect will die App vielleicht erst prüfen, weil sie nicht aus dem Play Store kommt. Das kann man ruhig zulassen.
 
-Lädst du eine neue Version doch mal von Hand, installier sie einfach über die alte. Lösch die alte App vorher nicht, sonst sind alle Einträge weg.
+Lädt man eine neue Version doch mal von Hand, installiert man sie einfach über die alte. Die alte App vorher bitte nicht löschen, sonst sind alle Einträge weg.
 
-Steht da „App nicht installiert“, ist meistens noch eine alte Testversion auf dem Handy. Sichere dann in den Einstellungen unter „Backup“ deine Einträge und lösch die alte App. Danach installierst du die neue und liest das Backup wieder ein.
+Kommt die Meldung „App nicht installiert“, ist meistens noch eine alte Testversion auf dem Handy. Dann in den Einstellungen unter „Backup“ die Einträge sichern, die alte App löschen, die neue installieren und das Backup wieder einlesen.
 
-Auf Handys ohne Google-Dienste geht alles bis auf den Barcode-Scanner, denn der kommt von Google.
+Auf Handys ohne Google-Dienste funktioniert alles bis auf den Barcode-Scanner, der kommt nämlich von Google.
 
-Ältere Versionen liegen [hier](https://github.com/hazymorning/Schmeckts/releases).
+Ältere Versionen gibt es [hier](https://github.com/hazymorning/Schmeckts/releases).
 
 </details>
 
 <details>
-<summary>Wenn ihr zu mehreren füttert</summary>
+<summary>Wenn mehrere füttern</summary>
 <br>
 
-Tragt in den Einstellungen eure Namen ein, dann steht bei jeder Mahlzeit, wer gefüttert hat. Neue Einträge schickt ihr euch über „Austausch von Hand“ als Datei zu, zum Beispiel per WhatsApp. Ein Konto braucht dafür keiner. Unter „Vorlieben“ steht dann auch, bei wem Mau besser frisst. Das kann zu Diskussionen führen.
+Am besten trägt jeder in den Einstellungen seinen Namen ein, dann steht bei jeder Mahlzeit, wer gefüttert hat. Neue Einträge schickt man sich über „Austausch von Hand“ als Datei, zum Beispiel per WhatsApp. Ein Konto braucht dafür keiner. Unter „Vorlieben“ steht dann übrigens auch, bei wem Mau besser frisst. Das kann zu Diskussionen führen.
 
-Wer sich mit Computern auskennt, kann zu Hause einen kleinen [Server](server/) hinstellen, nötig ist er nicht. Mit ihm gleichen sich die Handys von selbst ab, und auf Wunsch erkennt eine KI die Sorten auf den Fotos.
+Wer sich mit Computern auskennt, kann zu Hause auch einen kleinen [Server](server/) aufstellen, nötig ist das aber nicht. Dann gleichen sich die Handys von selbst ab, und auf Wunsch erkennt eine KI die Sorten auf den Fotos.
 
 </details>
 
@@ -76,15 +76,13 @@ Wer sich mit Computern auskennt, kann zu Hause einen kleinen [Server](server/) h
 <summary>Was das Handy doch verlässt</summary>
 <br>
 
-Du musst dich nirgends anmelden, und Werbung oder Tracking gibt es nicht. Ein paar Ausnahmen gibt es trotzdem.
+Anmelden muss man sich nirgends, und Werbung oder Tracking gibt es auch nicht. Ein paar Ausnahmen gibt es trotzdem.
 
-Beim Start fragt die App bei GitHub nach, ob es eine neue Version gibt. Dabei geht nur diese Frage raus, keine Einträge. In den Einstellungen unter „Updates“ lässt sich das abschalten.
+Beim Start fragt die App bei GitHub nach, ob es eine neue Version gibt. Dabei geht nur diese Frage raus, keine Einträge. Abschalten lässt sich das in den Einstellungen unter „Updates“.
 
-Der Barcode-Scanner kommt von Google. Laut Google schickt er allgemeine Daten mit, zum Beispiel welches Handy du hast. Bilder sind nicht dabei.
+Der Barcode-Scanner kommt von Google und schickt laut Google allgemeine Daten mit, zum Beispiel welches Handy man hat. Bilder sind nicht dabei.
 
-Alles andere passiert nur, wenn du es einschaltest. Mit der „Sortensuche im Internet“ schaut die App unbekannte Barcodes in zwei freien Datenbanken nach und schickt dabei nur die Nummer.
-
-Mit „Fotos mit eigener KI erkennen“ gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem dein Schlüssel ist. Steht bei euch ein Server, schickt er die Fotos an Anthropic, und dort erkennt eine KI die Sorte. Das lässt sich in den Einstellungen bei „Fotos über den Server erkennen“ abschalten.
+Alles andere passiert nur, wenn man es selbst einschaltet. Die „Sortensuche im Internet“ schaut unbekannte Barcodes in zwei freien Datenbanken nach und schickt dabei nur die Nummer. Mit „Fotos mit eigener KI erkennen“ gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem der eigene Schlüssel ist. Und steht zu Hause ein Server, schickt der die Fotos an Anthropic, damit dort eine KI die Sorte erkennt. Das lässt sich in den Einstellungen bei „Fotos über den Server erkennen“ abschalten.
 
 </details>
 
@@ -92,7 +90,7 @@ Mit „Fotos mit eigener KI erkennen“ gehen die Packungsfotos direkt an Anthro
 <summary>Fragen und Probleme</summary>
 <br>
 
-Fragen und Ideen sind im [Forum](https://github.com/hazymorning/Schmeckts/discussions) gut aufgehoben. Wenn etwas nicht richtig funktioniert, melde es bitte [hier](https://github.com/hazymorning/Schmeckts/issues/new/choose). Das Formular fragt nach der App-Version, die steht ganz unten in den Einstellungen.
+Fragen und Ideen sind im [Forum](https://github.com/hazymorning/Schmeckts/discussions) gut aufgehoben. Wenn etwas nicht richtig funktioniert, bitte [hier](https://github.com/hazymorning/Schmeckts/issues/new/choose) melden. Das Formular fragt nach der App-Version, die steht ganz unten in den Einstellungen.
 
 </details>
 
