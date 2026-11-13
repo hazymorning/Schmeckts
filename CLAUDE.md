@@ -31,17 +31,18 @@ Do all of this without being asked, and do not stop before the end:
 1. Lint and all suites green locally, commit, push.
 2. Open the pull request yourself (this file is the standing permission), then watch its checks and fix every
    failure until they are green.
-3. When the task is a new version: raise `version` in `app/package.json` and both `version` fields of
-   `app/package-lock.json` in the same pull request, the server's version only if the server changed. Once the checks
-   are green, merge the pull request and run the workflow Release on `main` with `publish`: it tests, builds and
-   publishes `v<version>` with the APK, its text the version's news in `config.js` unless `notes` gives one.
+3. When the task is a new version: raise `version` in `app/gradle.properties` in the same pull request, the server's
+   version only if the server changed. Once the checks are green, merge the pull request and run the workflow Release
+   on `main` with `publish`: it tests, builds and publishes `v<version>` with the APK, its text the version's news in
+   `app/src/main/resources/news.json` unless `notes` gives one.
 
 ## Commands
 
-- Cloud sessions get the test tools from `.claude/hooks/session-start.sh`. Elsewhere: Node 22, Go,
-  `pip install -r tests/requirements.txt` and `python3 -m playwright install chromium`.
-- `scripts/lint.sh` before every push.
-- `scripts/test.sh <suites>` while working, only what the change touches: `node` for pure modules (`smart`, `glance`,
-  `ocr`, `derive`), `ui design` for views and CSS, `storage sync go` for store, sync and server, `files` for
-  packaging and versions. All suites before pushing.
-- `scripts/setup-build-env.sh` and `scripts/build-apk.sh` only to build the APK.
+- Cloud sessions get the build and test tools from `.claude/hooks/session-start.sh`. Elsewhere:
+  `scripts/setup-build-env.sh` (JDK 21, Android SDK, Go) and `pip install -r tests/requirements.txt`.
+- `scripts/lint.sh` before every push; `./gradlew ktlintFormat` in `app` fixes the formatting.
+- While working, only the tests the change touches: `./gradlew testDebugUnitTest --tests '<Class>'` in `app` (pure
+  modules in plain JUnit, `Ui*` and `Design*` for views, `Storage*` and `Sync*` for store and sync), `scripts/test.sh go`
+  for the server, `scripts/test.sh files` for packaging and versions. `scripts/test.sh` (suites `go`, `app`, `files`)
+  before pushing.
+- `scripts/build-apk.sh` only to build the APK.

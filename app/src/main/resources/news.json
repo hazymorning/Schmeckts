@@ -1,5 +1,11 @@
 [
  {
+  "v": "0.43.0",
+  "title": "Direkt für Android",
+  "say": "Die App ist jetzt direkt für Android gebaut. Sie startet schneller, und Wischen und Zurückgehen fühlen sich an wie in anderen Android-Apps.",
+  "why": "Deine Einträge und Einstellungen bleiben, wie sie sind."
+ },
+ {
   "v": "0.42.0",
   "title": "Updates in der App",
   "say": "Neue Versionen findet die App jetzt selbst. Ein Tipp auf „Aktualisieren“, und Android installiert sie über die alte.",
