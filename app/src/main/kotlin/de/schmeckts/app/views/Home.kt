@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.zIndex
 import de.schmeckts.app.DEMO
 import de.schmeckts.app.Model
 import de.schmeckts.app.NEWS
@@ -479,7 +480,7 @@ private fun ColumnScope.HomeContent() {
     }
     if (ph.prefs.calendar) {
         Gap(gap("calpad"))
-        Arrive(n++, "cal") { CalPad() }
+        Arrive(n++, "cal", if (home.tearing) 1f else 0f) { CalPad() } // the sheet torn off falls over the cards below
     }
     val question: (@Composable () -> Unit)? =
         when {
@@ -519,6 +520,7 @@ private fun ColumnScope.HomeContent() {
 private fun Arrive(
     i: Int,
     sec: String,
+    z: Float = 0f,
     content: @Composable () -> Unit,
 ) {
     watch()
@@ -536,6 +538,7 @@ private fun Arrive(
     Box(
         Modifier
             .testTag("sec-$sec")
+            .zIndex(z)
             .graphicsLayer {
                 alpha = f.value
                 translationY = (1f - f.value) * 10.dp.toPx()

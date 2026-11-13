@@ -303,7 +303,7 @@ abstract class ScreenTest {
         return rule
             .onAllNodes(m, useUnmergedTree = true)
             .fetchSemanticsNodes()
-            .sortedBy { it.boundsInRoot.top }
+            .sortedBy { it.positionInRoot.y }
             .map { it.config[tag].removePrefix(prefix) }
     }
 

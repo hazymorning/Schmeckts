@@ -11,7 +11,11 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import de.schmeckts.app.ui.plainOf
+import de.schmeckts.app.views.catOf
 import de.schmeckts.app.views.insightSaid
+import de.schmeckts.app.views.sheetOn
+import de.schmeckts.app.views.sheetText
 import de.schmeckts.app.views.syncChip
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -2039,5 +2043,160 @@ class UiPetsTest : ScreenTest() {
             db.pets[0].str("name") == "Minka II" && db.pets[0].str("zukunft") == "x" && clockOf("zukunft") == before,
             "a field the editor does not know stays as it is, and is not sent again",
         )
+    }
+}
+
+class UiCalendarTest : ScreenTest() {
+    private fun text(t: Long) = sheetText(sheetOn(t).sheet, catOf(db.pets))
+
+    private fun back(t: Long) = sheetOn(t).sheet
+
+    private fun day(at: String) {
+        clock = at(at)
+        ui.update()
+        idle()
+    }
+
+    private fun cal(s: String) = within("sec-cal", s)
+
+    @Test
+    fun `calendar - a format a weekday, a sheet a day, the last one seen hanging over today's until torn off`() {
+        open(now = at("2026-09-28T12:00")) // a Monday, the calendar's first day on this phone
+        act("demo")
+        val monday = text(clock)
+        act("turn")
+        check(
+            cal("Montag, 28. September") &&
+                cal("KATZENLOGIK") &&
+                cal(plainOf(monday)) &&
+                !cal("Zum Abreißen tippen") &&
+                prefs.sheetDay == "2026-09-28" &&
+                ui.home.turned == null,
+            "first use: Monday’s Katzenlogik, nothing hanging over it, a tap does nothing",
+        )
+        val order = tags("sec-")
+        check(order.take(3) == listOf("overview", "pend", "cal"), "the overview, the meals to rate, then the calendar $order")
+        day("2026-09-29T08:00") // Tuesday morning
+        val tuesday = back(clock)
+        check(
+            cal("Dienstag, 29. September") &&
+                cal("STIMMT’S?") &&
+                cal("Montag, 28. September") &&
+                cal("Zum Abreißen tippen") &&
+                labelled("Gestriges Blatt abreißen"),
+            "a new day: yesterday’s sheet hangs over today’s as it was, its foot saying to tear it off",
+        )
+        act("tear")
+        check(
+            !cal("Montag, 28. September") && prefs.sheetDay == "2026-09-29" && labelled("Auflösung zeigen"),
+            "a tap tears it off, at once under reduced motion, and marks the day",
+        )
+        ui.update()
+        idle()
+        check(!cal("Zum Abreißen tippen"), "the same day nothing hangs any more")
+        act("turn")
+        val answer = cal(plainOf(sheetText(tuesday, catOf(db.pets), true))) && cal("${tuesday.verdict}.") && labelled("Behauptung zeigen")
+        ui.update()
+        idle()
+        val kept = cal("${tuesday.verdict}.")
+        act("turn")
+        check(
+            answer && kept && labelled("Auflösung zeigen") && !cal("${tuesday.verdict}."),
+            "today’s Stimmt’s? turns over to its answer led by the verdict, which stays, and back",
+        )
+        day("2026-08-08T12:00") // a Saturday, the clock put back
+        val saturday = cal("Samstag, 8. August") && cal("SPRACHE") && !cal("Zum Abreißen tippen")
+        day("2026-08-11T12:00") // three days later
+        val away = cal("Samstag, 8. August") && cal("Zum Abreißen tippen")
+        act("tear")
+        check(
+            saturday &&
+                away &&
+                !cal("Samstag, 8. August") &&
+                prefs.sheetDay == "2026-08-11" &&
+                prefs.hiddenHints.none { it.startsWith("blatt:") },
+            "the clock put back: nothing hangs; days away, the last one seen hangs and the days between are gone",
+        )
+        act("open-settings")
+        act("calendar")
+        act("settings-back")
+        val off = tags("sec-cal").isEmpty()
+        act("open-settings")
+        act("calendar")
+        act("settings-back")
+        check(off && tags("sec-cal").size == 1, "its switch in the settings takes it away and back")
+    }
+
+    @Test
+    fun `calendar - a count of sheets torn off and old milestones do no harm and go`() {
+        open(mapOf("db" to savedDb(), "prefs" to j(mapOf("torn" to 3, "milestones" to listOf("meals:50")))))
+        phone.store.savePrefs()
+        val p = saved("prefs")!!.obj()
+        check(
+            tags("sec-cal").size == 1 && "torn" !in p && "milestones" !in p,
+            "a count of sheets torn off, as 0.28 kept it, and the milestones shown up to 0.32 go",
+        )
+    }
+
+    @Test
+    fun `calendar - the sheet turns over and is stamped, one torn off falls over the card below`() {
+        open(now = at("2026-09-29T12:00"), reduce = false) // a Tuesday
+        act("demo")
+        idle(2000)
+        val turned = changes("sec-cal") { ui.act("turn") }
+        idle(1000)
+        check(turned && cal(plainOf(sheetText(back(clock), catOf(db.pets), true))), "Stimmt’s? turns over, then its answer shows")
+        day("2026-09-30T12:00")
+        idle(1000)
+        rule.mainClock.autoAdvance = false
+        ui.act("tear")
+        rule.mainClock.advanceTimeBy(300)
+        val below = tags("sec-").let { it[it.indexOf("cal") + 1] }
+        val over =
+            rule
+                .onNode(
+                    androidx.compose.ui.test
+                        .hasTestTag("sec-$below"),
+                ).captureToImage()
+                .asAndroidBitmap()
+        rule.mainClock.advanceTimeBy(2000)
+        val bare =
+            rule
+                .onNode(
+                    androidx.compose.ui.test
+                        .hasTestTag("sec-$below"),
+                ).captureToImage()
+                .asAndroidBitmap()
+        rule.mainClock.autoAdvance = true
+        idle(500)
+        check(!over.sameAs(bare), "the sheet torn off falls over the card below, not behind it")
+        check(!cal("Dienstag, 29. September") && prefs.sheetDay == "2026-09-30", "once it has fallen, today’s sheet is left")
+    }
+
+    // a picture of the tagged node a moment after the action and once all has settled; they differ while it moves
+    private fun changes(
+        tag: String,
+        action: () -> Unit,
+    ): Boolean {
+        rule.mainClock.autoAdvance = false
+        action()
+        rule.mainClock.advanceTimeBy(100)
+        val mid =
+            rule
+                .onNode(
+                    androidx.compose.ui.test
+                        .hasTestTag(tag),
+                ).captureToImage()
+                .asAndroidBitmap()
+        rule.mainClock.advanceTimeBy(1500)
+        val end =
+            rule
+                .onNode(
+                    androidx.compose.ui.test
+                        .hasTestTag(tag),
+                ).captureToImage()
+                .asAndroidBitmap()
+        rule.mainClock.autoAdvance = true
+        return !mid.sameAs(end)
     }
 }

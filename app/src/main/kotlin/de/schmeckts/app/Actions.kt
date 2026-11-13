@@ -609,6 +609,7 @@ class Actions(
             de.schmeckts.app.views
                 .sheetOn(Time.now())
                 .sheet
+        if (sheet.back == null) return // only a Stimmt’s? has a back
         ui.home.turned = if (ui.home.turned == sheet.id) null else sheet.id
         haptic()
         ui.update()
