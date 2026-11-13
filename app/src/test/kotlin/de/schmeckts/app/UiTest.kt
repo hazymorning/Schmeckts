@@ -1383,7 +1383,7 @@ class UiNamingTest : ScreenTest() {
                 click()
             }
         idle(600)
-        check(db.servings.size == meals + 1, "a quick second tap does not feed twice")
+        check(db.servings.size == meals + 1, "a quick second tap does not feed twice ${db.servings.size - meals}")
         act("feed")
         type("Marke oder Sorte suchen", "gibtsnicht")
         act("new-product", "v" to "gibtsnicht")

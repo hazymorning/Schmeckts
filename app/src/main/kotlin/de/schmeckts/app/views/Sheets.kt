@@ -965,7 +965,7 @@ private fun PackGroup(p: Rec) {
         }
         return
     }
-    Group {
+    Group(Modifier.testTag("pack-card")) {
         val img = imageOf(p.str("thumb"))
         val key = photoKey(null, p)
         // the packaging across the card's full width, its edge the line above the first row
@@ -987,6 +987,7 @@ private fun PackGroup(p: Rec) {
                     img,
                     null,
                     Modifier
+                        .testTag("pack-photo")
                         .fillMaxWidth()
                         .aspectRatio(4f / 3f)
                         .clip(RoundedCornerShape(topStart = Radius.l, topEnd = Radius.l)),

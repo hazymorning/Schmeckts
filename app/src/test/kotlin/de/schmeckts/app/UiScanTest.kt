@@ -1,6 +1,8 @@
 package de.schmeckts.app
 
 import android.app.Application
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import de.schmeckts.app.views.syncChip
 import org.junit.Test
@@ -822,18 +824,432 @@ class UiPhotoTest : ScreenTest() {
         val after = listOf(db.products.size, db.servings.size, db.products.any { it.obj("codes")?.get(SHEBA) != null })
         check(after == before + false, "deleted after an unknown code: no variety got the code $after")
         val reads = calls("processImage").size
-        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
-        platform.gate = gate
+        val gate = platform.hold("")
         snap { db.servings.firstOrNull()?.str("status") == "reading" }
         act("close")
         act("delete-serving", "id" to db.servings[0].id)
-        platform.gate = null
         gate.complete(Unit)
         idle(200)
         act("undo")
         check(
             until { db.servings.firstOrNull()?.str("status") == "noserver" } && calls("processImage").size == reads + 2,
             "deleted while read, undone: read again ${calls("processImage").size - reads}",
+        )
+    }
+}
+
+class UiNamingPhotoTest : ScreenTest() {
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    private fun snap(
+        photo: ByteArray = jpegOf(480, 360),
+        done: () -> Boolean = { db.servings.firstOrNull()?.str("status") == "noserver" },
+    ) {
+        platform.photo = photo
+        act("feed")
+        act("photo")
+        check(until(10_000) { done() }, "the photo served")
+        idle(400)
+    }
+
+    private val fields get() = listOf(fieldText("Marke"), fieldText("Sorte"))
+
+    private fun field(label: String) =
+        rule.onAllNodes(
+            androidx.compose.ui.test
+                .hasContentDescription(label) and
+                androidx.compose.ui.test
+                    .hasSetTextAction(),
+        )[0]
+
+    private fun focused(label: String) =
+        rule
+            .onAllNodes(
+                androidx.compose.ui.test
+                    .hasContentDescription(label) and
+                    androidx.compose.ui.test
+                        .hasSetTextAction() and
+                    androidx.compose.ui.test
+                        .isFocused(),
+            ).fetchSemanticsNodes()
+            .isNotEmpty()
+
+    // the lines read off the packaging, as chips for the variety, with whether each is pressed
+    private fun chips(): List<Pair<String, Boolean>> {
+        val p = androidx.compose.ui.semantics.SemanticsProperties
+        return rule
+            .onAllNodes(
+                androidx.compose.ui.test.SemanticsMatcher("line chip") {
+                    it.config.getOrElseNullable(p.ContentDescription) { null }?.any { d -> d.startsWith("Sorte: ") } == true
+                },
+            ).fetchSemanticsNodes()
+            .map { n -> n.config[p.ContentDescription][0].removePrefix("Sorte: ") to n.config.getOrElseNullable(p.Selected) { false }!! }
+    }
+
+    private fun chip(line: String) {
+        rule
+            .onAllNodes(
+                androidx.compose.ui.test
+                    .hasContentDescription("Sorte: $line"),
+            )[0]
+            .performClick()
+        idle(50)
+    }
+
+    @Test
+    fun `pack_lines - chips that set the variety, in memory only, none after server recognition`() {
+        onePet()
+        http.household()
+        platform.ocrText = "Katzenglück\nZarte Häppchen\nmit Huhn\n4 x 85 g\nZutaten: Fleisch"
+        snap { db.servings.firstOrNull()?.obj("guess") != null }
+        val all = chips().map { it.first }
+        field("Sorte").performClick()
+        type("Sorte", "Zart")
+        val got =
+            listOf("Zarte Häppchen", "mit Huhn", "mit Huhn").map { line ->
+                chip(line)
+                listOf(fieldText("Sorte"), chips().filter { it.second }.map { it.first }, focused("Sorte"))
+            }
+        chip("Katzenglück")
+        field("Sorte").performTextInput("x")
+        idle(50)
+        check(
+            all == listOf("Katzenglück", "Zarte Häppchen", "mit Huhn") &&
+                got ==
+                listOf(
+                    listOf("Zarte Häppchen", listOf("Zarte Häppchen"), true),
+                    listOf("mit Huhn", listOf("mit Huhn"), true),
+                    listOf("", emptyList<String>(), true),
+                ) &&
+                chips().none { it.second },
+            "a chip sets the variety, the next replaces it, the pressed one clears it, typing unpresses $all $got",
+        )
+        act("close")
+        idle(400)
+        val kept = listOf("db", "queue").joinToString { saved(it).toString() }
+        restart()
+        act("open-serving", "id" to db.servings[0].id)
+        check("Zarte Häppchen" !in kept && chips().isEmpty(), "the lines are never stored: gone after a restart")
+        act("close")
+        idle(400)
+        connect()
+        snap { db.servings[0].str("productId") != null }
+        act("open-serving", "id" to db.servings[0].id)
+        act("edit-name")
+        check(fields == listOf("Gourmet", "Gold Pastete") && chips().isEmpty(), "recognised by the server: no chips $fields")
+    }
+
+    private val meal get() =
+        db.servings[0].let { s ->
+            listOf(
+                s.str("productId"),
+                s.str("status"),
+                s.str("photo") != null,
+                s.str("thumb") != null,
+                s.obj("guess")?.let { listOf(it["brand"].asString, it["variety"].asString) },
+            )
+        }
+
+    @Test
+    fun `known_photo - served without the sheet, undo takes the recognition back, not the meal`() {
+        platform.pictures = AndroidPictures()
+        onePet()
+        http.household()
+        val now = Time.now()
+        db.products.add(Rec(j(product("sheba000001", "Sheba", "Lachs in Soße") + ("createdAt" to now)).obj()))
+        db.servings.add(0, Rec(j(meal("first0000001", "sheba000001", now - 86_400_000, mapOf(db.pets[0].id to "top"))).obj()))
+        phone.store.save()
+        ui.update()
+        idle(100)
+
+        fun photo(
+            text: String,
+            n: Int,
+        ): List<Any?> {
+            platform.ocrText = text
+            snap {
+                db.servings.size == n &&
+                    (
+                        db.servings[0].str(
+                            "productId",
+                        ) == "sheba000001" ||
+                            db.servings[0].str("status") == "noserver"
+                    )
+            }
+            return meal
+        }
+        var m = photo("SHEBA\nLachs in Soße\n85 g", 2)
+        check(
+            m == listOf("sheba000001", null, false, false, null) &&
+                sheet == null &&
+                ui.toasts.undo != null &&
+                phone.photos.keptPhoto("sheba000001"),
+            "served as that variety, no sheet, undo offered, the photo kept for the variety $m",
+        )
+        act("undo")
+        idle(400)
+        check(
+            meal == listOf(null, "noserver", true, true, listOf("Sheba", "Lachs in Soße")) &&
+                level == listOf("serving", null, "name") &&
+                fields == listOf("Sheba", "Lachs in Soße") &&
+                chips().isNotEmpty() &&
+                db.products.size == 1 &&
+                db.servings.size == 2 &&
+                phone.photos.keptPhoto("sheba000001"),
+            "undo takes the variety off, not the meal: naming opens with the reading, the variety keeps its photo $meal",
+        )
+        act("delete-serving")
+        idle(400)
+        check(db.servings.size == 1 && db.products.size == 1 && sheet == null, "deleted there, variety kept")
+        prefs.serverPhoto = false
+        connect()
+        m = photo("Sheba\nLachs in Soße", 2)
+        check(m.take(2) == listOf("sheba000001", null) && sheet == null, "in a household without server photos: served at once as well $m")
+        act("undo")
+        idle(400)
+        check(
+            meal == listOf(null, "noserver", true, true, listOf("Sheba", "Lachs in Soße")) && level == listOf("serving", null, "name"),
+            "and undo opens naming",
+        )
+    }
+
+    @Test
+    fun `skeleton - fields once patience runs out, typing meanwhile stays, the reading fills only empty fields`() {
+        onePet()
+        val gate = platform.hold("Whiskas\nRind in Gelee")
+        platform.photo = jpegOf(480, 360)
+        act("feed")
+        act("photo")
+        check(until { db.servings.firstOrNull()?.str("status") == "reading" && sheet?.kind == "serving" }, "reading")
+        val early = fieldText("Marke") != null
+        check(until(6000) { fieldText("Marke") != null }, "fields once patience runs out")
+        field("Marke").performClick()
+        type("Marke", "Animonda")
+        gate.complete(Unit)
+        check(until { db.servings[0].obj("guess") != null }, "read")
+        idle(400)
+        val s = db.servings[0]
+        check(
+            !early &&
+                fields == listOf("Animonda", "Rind in Gelee") &&
+                focused("Marke") &&
+                listOf(s.str("status"), s.obj("guess")!!["brand"].asString) == listOf("noserver", "Whiskas"),
+            "no fields while it reads at first; typed brand stays, the variety is filled, the focus stays $fields",
+        )
+    }
+
+    private fun snapshot() =
+        db.servings[0].let { s ->
+            listOf(
+                s.str("status"),
+                s.obj("guess")?.let { listOf(it["brand"].asString, it["variety"].asString) },
+                (s.str("thumb") ?: "").takeLast(32),
+                (s.str("photo") ?: "").takeLast(32),
+            )
+        } + listOf(fields)
+
+    private fun again(
+        text: String,
+        photo: ByteArray?,
+    ) {
+        platform.ocrText = text
+        platform.photo = photo
+        act("rephoto")
+    }
+
+    @Test
+    fun `rephoto - replaces the photo and reads it anew, a late old reading counts for nothing`() {
+        var fail = false
+        val photos = mutableListOf<String>()
+        platform.pictures = AndroidPictures()
+        onePet()
+        http.household(failing = { fail }, photos = photos)
+        platform.ocrText = "Whiskas\nRind in Gelee"
+        snap()
+        val first = snapshot()
+        platform.calls.clear()
+        again("Sheba\nLachs in Soße", jpegOf(3000, 2250))
+        check(
+            until {
+                db.servings[0]
+                    .obj("guess")
+                    ?.get("brand")
+                    .asString == "Sheba"
+            },
+            "read anew",
+        )
+        idle(400)
+        val second = snapshot()
+        check(
+            first.take(2) == listOf("noserver", listOf("Whiskas", "Rind in Gelee")) &&
+                second.take(2) == listOf("noserver", listOf("Sheba", "Lachs in Soße")) &&
+                second[4] == listOf("Sheba", "Lachs in Soße") &&
+                second.subList(2, 4) != first.subList(2, 4) &&
+                calls("capture").size == 1 &&
+                (calls("capture")[0] as String?).isNullOrEmpty(),
+            "a new photo replaces photo and thumbnail and is read anew",
+        )
+        again("Animonda\nCarny", null)
+        idle(400)
+        check(snapshot() == second, "cancelled: nothing changes")
+        val gate = platform.hold("Animonda\nCarny")
+        again("", jpegOf(480, 360))
+        check(until(6000) { fieldText("Marke") != null && db.servings[0].str("status") == "reading" }, "fields while it reads")
+        val waiting = listOf(db.servings[0].str("status"), shows("Neues Foto"))
+        again("Felix\nHuhn in Gelee", jpegOf(3000, 2250))
+        check(
+            until {
+                db.servings[0]
+                    .obj("guess")
+                    ?.get("brand")
+                    .asString == "Felix"
+            },
+            "the newer photo read",
+        )
+        gate.complete(Unit)
+        idle(200)
+        idle(400)
+        val late = snapshot()
+        check(
+            waiting == listOf("reading", true) &&
+                late.take(2) == listOf("noserver", listOf("Felix", "Huhn in Gelee")) &&
+                late[4] == listOf("Felix", "Huhn in Gelee"),
+            "a late old reading changes nothing $waiting $late",
+        )
+        act("close")
+        idle(400)
+        connect()
+        fail = true
+        platform.ocrText = ""
+        snap { db.servings.firstOrNull()?.str("status") == "waiting" }
+        act("open-serving", "id" to db.servings[0].id)
+        val link = shows("Neues Foto")
+        fail = false
+        again("", jpegOf(3000, 2250))
+        check(
+            until { db.servings[0].str("productId") != null && db.products.any { it.str("variety") == "Gold Pastete" } },
+            "recognised by the server",
+        )
+        check(link && photos.size == 2 && photos[0] != photos[1], "household: the new photo goes to the server ${photos.size}")
+    }
+}
+
+class UiProductPhotoTest : ScreenTest() {
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    // the variety's thumbnail, its photo file and its mark for a photo on the server
+    private fun photoOf(pid: String): List<String?> {
+        write()
+        val p = db.products.first { it.id == pid }
+        val f = File(dir, "photos/$pid.jpg")
+        val file =
+            if (f.exists()) {
+                java.util.Base64
+                    .getEncoder()
+                    .encodeToString(f.readBytes())
+            } else {
+                ""
+            }
+        return listOf((p.str("thumb") ?: "").takeLast(32), file.takeLast(32), p.str("sharedPhoto"))
+    }
+
+    private fun take(
+        photo: ByteArray,
+        pid: String,
+    ): Pair<List<String?>, List<String?>> {
+        platform.photo = photo
+        val old = photoOf(pid)
+        act("product-photo", "id" to pid)
+        check(until { (db.products.first { it.id == pid }.str("thumb") ?: "").takeLast(32) != old[0] }, "a new thumbnail")
+        idle(400)
+        return old to photoOf(pid)
+    }
+
+    private fun bounds(tag: String) =
+        rule
+            .onNode(
+                androidx.compose.ui.test
+                    .hasTestTag(tag),
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+            .boundsInRoot
+
+    @Test
+    fun `product_photo - thumbnail and file change from its sheets, cancel changes nothing, typed fields stay`() {
+        platform.pictures = AndroidPictures()
+        onePet()
+        platform.ocrText = "Whiskas\nRind in Gelee"
+        platform.photo = jpegOf(480, 360)
+        act("feed")
+        act("photo")
+        check(until { db.servings.firstOrNull()?.str("status") == "noserver" }, "the photo served")
+        idle(400)
+        act("save-name")
+        idle(400)
+        val pid = db.products[0].id
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to pid),
+        )
+        platform.calls.clear()
+        val (before, after) = take(jpegOf(3000, 2250), pid)
+        check(
+            before[1]!!.isNotEmpty() &&
+                after[0] != before[0] &&
+                after[1] != before[1] &&
+                after[2] == null &&
+                calls("capture").size == 1 &&
+                (calls("capture")[0] as String?).isNullOrEmpty(),
+            "food sheet: new thumbnail and file $after",
+        )
+        val card = bounds("pack-card")
+        val pic = bounds("pack-photo")
+        check(
+            pic.width == card.width && kotlin.math.abs(pic.width / pic.height - 4f / 3f) < 0.02f,
+            "the photo as wide as its card, cut to 4:3 $pic $card",
+        )
+        platform.photo = null
+        act("product-photo", "id" to pid)
+        idle(400)
+        check(photoOf(pid) == after, "cancelled: nothing changes")
+        act("close")
+        idle(400)
+        db.products.add(Rec(j(product("ohnefoto0001", "Felix", "Huhn") + ("createdAt" to Time.now())).obj()))
+        phone.store.save()
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to "ohnefoto0001"),
+        )
+        val wide = tags("pack-card", sheet = true).size
+        val (none, added) = take(jpegOf(480, 360), "ohnefoto0001")
+        check(
+            none.subList(0, 2) == listOf("", "") &&
+                added[0]!!.isNotEmpty() &&
+                added[1]!!.isNotEmpty() &&
+                listOf(wide, tags("pack-card", sheet = true).size) == listOf(0, 1),
+            "a variety without a photo gets one, and only then the picture across the card",
+        )
+        act("close")
+        idle(400)
+        act("open-serving", "id" to db.servings[0].id)
+        act("edit-name")
+        type("Marke", "Whiskas Neu")
+        val (old, new) = take(jpegOf(480, 360), pid)
+        check(
+            new[0] != old[0] && new[1] != old[1] && fieldText("Marke") == "Whiskas Neu",
+            "while naming: photo changes, typed brand stays",
         )
     }
 }

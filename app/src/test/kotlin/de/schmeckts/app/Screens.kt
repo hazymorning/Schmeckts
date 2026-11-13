@@ -140,7 +140,14 @@ abstract class ScreenTest {
     lateinit var dir: File
     var platform = FakePlatform()
     var http = FakeHttp()
-    var clock = 0L
+    private var base = 0L
+
+    // the phone's clock runs with the main looper's, so whatever lets the looper run moves it too, as on a phone
+    var clock: Long
+        get() = base + android.os.SystemClock.uptimeMillis()
+        set(v) {
+            base = v - android.os.SystemClock.uptimeMillis()
+        }
 
     init {
         berlin()
@@ -219,7 +226,6 @@ abstract class ScreenTest {
     /** lets the screen and the main thread run, the clock moved on by ms */
     fun idle(ms: Long = 0) {
         if (ms > 0) {
-            clock += ms
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms))
             rule.mainClock.advanceTimeBy(ms)
         }

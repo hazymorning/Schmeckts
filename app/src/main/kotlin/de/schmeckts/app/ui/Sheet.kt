@@ -251,9 +251,9 @@ class Sheets(
     }
 
     // a layer just shut still shows for a frame; a tap meant for it then is not one for what lies below
-    private var shutAt = 0L
+    private var shutAt = -1000L
 
-    fun isClosing() = base.closing != null || over.closing != null || System.nanoTime() - shutAt < 100_000_000L
+    fun isClosing() = base.closing != null || over.closing != null || android.os.SystemClock.uptimeMillis() - shutAt < 100
 
     fun closeSheet(): CompletableDeferred<Unit> {
         val l = top()
@@ -294,7 +294,7 @@ class Sheets(
 
     // redraws the page underneath, so the sheet's changes show there
     internal fun shut(l: Layer) {
-        shutAt = System.nanoTime()
+        shutAt = android.os.SystemClock.uptimeMillis()
         l.onClosed = null
         l.open = false
         l.state = null

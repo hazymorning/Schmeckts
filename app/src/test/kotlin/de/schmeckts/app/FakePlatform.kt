@@ -11,7 +11,11 @@ class FakePlatform : Platform {
     val readings = ArrayDeque<Reading>()
     var ocrResult: kotlinx.serialization.json.JsonObject? = null
     var ocrText: String? = null
-    var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null // set: reading waits until it completes
+    private var held: Pair<kotlinx.coroutines.CompletableDeferred<Unit>, String>? = null
+
+    /** the next reading only waits until the returned gate opens, then answers with text */
+    fun hold(text: String) = kotlinx.coroutines.CompletableDeferred<Unit>().also { held = it to text }
+
     var reading: Reading = UNREAD
     var readDelay = 0L
     var barcode: String? = null
@@ -67,9 +71,13 @@ class FakePlatform : Platform {
     override suspend fun readPhoto(b64: String): Reading {
         calls.add("processImage" to b64.length)
         if (readDelay > 0) kotlinx.coroutines.delay(readDelay)
-        gate?.await()
-        val text = ocrText
         val (w, h) = jpegSize(b64)
+        held?.let { (gate, text) ->
+            held = null
+            gate.await()
+            return readingOf(j(mapOf("text" to text, "blocks" to emptyList<Any>())).obj(), w, h)
+        }
+        val text = ocrText
         return readings.removeFirstOrNull()
             ?: ocrResult?.let { readingOf(it, w, h, readDelay) }
             ?: if (text != null) {
