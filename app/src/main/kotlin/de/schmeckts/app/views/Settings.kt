@@ -92,9 +92,10 @@ private fun Phone.aiSub() =
 @Composable
 fun SetGroup(
     label: String,
+    top: androidx.compose.ui.unit.Dp = Space.s5,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Label(label)
+    Label(label, top = top)
     Group(content = content)
 }
 
@@ -185,7 +186,8 @@ private fun Overview() {
     val notice = ph.syncInfo()
     val own = ph.prefs.remind > 0 && (s.bool("ownRemind") || ph.prefs.remind !in REMIND)
     if (ph.store.loadError != null) Banner("Die gespeicherten Daten konnten nicht gelesen werden. Bitte die App neu starten.")
-    SetGroup("Katzen") {
+    // the label's margin and the title's collapse, as in CSS
+    SetGroup("Katzen", top = Space.s5 - Space.s2) {
         ph.db.pets.forEachIndexed { i, p ->
             SetRow(ui.on("edit-pet", "id" to p.id), i == 0) {
                 Avatar(p, Av.S)
@@ -494,8 +496,8 @@ private fun ServerSection() {
         }
         if (s.str("connectError").isNotEmpty()) Note { T(s.str("connectError"), Type.small, color = colors.bad) }
     }
-    val addrField: @Composable () -> Unit = {
-        Label("Adresse des Servers")
+    val addrField: @Composable (Boolean) -> Unit = { afterHint ->
+        Label("Adresse des Servers", top = if (afterHint) Space.s5 - Space.s3 else Space.s5)
         SheetField(
             "f-server",
             "server",
@@ -515,7 +517,7 @@ private fun ServerSection() {
             Hint(
                 "Wenn ihr verbunden seid, sehen alle im Haushalt dieselben Katzen, Mahlzeiten und Bewertungen. Adresse und Code findest du auf dem Mini-PC unter „Schmeckt’s-Server einrichten“.",
             )
-            addrField()
+            addrField(true)
             codeRow()
         } else {
             Hint("Alle Daten bleiben auf diesem Handy. Mit einem Haushalt verbunden, sehen alle dieselben Katzen und Einträge.")
@@ -546,7 +548,7 @@ private fun ServerSection() {
         Addr(ph.prefs.server, false)
     } else {
         codeRow()
-        if (s.bool("editServer")) addrField() else Addr(ph.prefs.server, true)
+        if (s.bool("editServer")) addrField(false) else Addr(ph.prefs.server, true)
     }
     Column(Modifier.padding(top = Space.s2), verticalArrangement = Arrangement.spacedBy(Space.s2)) {
         if (!needCode) {

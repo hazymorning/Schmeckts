@@ -44,6 +44,7 @@ import de.schmeckts.app.shopGroups
 import de.schmeckts.app.ui.Badge
 import de.schmeckts.app.ui.Card
 import de.schmeckts.app.ui.CardHead
+import de.schmeckts.app.ui.CardTitle
 import de.schmeckts.app.ui.Gap
 import de.schmeckts.app.ui.IconBtn
 import de.schmeckts.app.ui.Label
@@ -437,7 +438,7 @@ private fun PageCard(
     content: @Composable () -> Unit,
 ) {
     Card {
-        M(title, Type.heading, Modifier.padding(bottom = Space.s1), colors.ink, balance = true)
+        CardTitle(title)
         content()
     }
 }
@@ -452,9 +453,13 @@ private fun HintLine(text: String) = M(text, Type.small, Modifier.padding(bottom
 @Composable
 private fun TasteBlock(t: de.schmeckts.app.Taste) {
     val names = TEXTURES.getValue("Nassfutter").items.associate { it.key to it.label }
+    var first = true
     val side: @Composable (String, List<TasteRow>, (String) -> String) -> Unit = { title, list, name ->
         if (list.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(top = Space.s4, bottom = Space.s2), horizontalArrangement = Arrangement.SpaceBetween) {
+            // after a bar its 12 and the heading's 16 collapse, as in CSS
+            val top = if (first) Space.s4 else Space.s4 - Space.s3
+            first = false
+            Row(Modifier.fillMaxWidth().padding(top = top, bottom = Space.s2), horizontalArrangement = Arrangement.SpaceBetween) {
                 T(title, Type.smallStrong, color = colors.muted)
                 T("gut gefressen", Type.smallStrong, color = colors.muted)
             }
@@ -829,7 +834,7 @@ private fun InsightsCard(x: Evaluation) {
         if (list.size > INSIGHTS) {
             CardHead("Erkenntnisse", "Mehr", "Alle Erkenntnisse", ui.on("open-level", "v" to "insights"))
         } else {
-            M("Erkenntnisse", Type.heading, Modifier.padding(bottom = Space.s1), colors.ink)
+            CardTitle("Erkenntnisse")
         }
         InsightRows(list.take(INSIGHTS))
     }

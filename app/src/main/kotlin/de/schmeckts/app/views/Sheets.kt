@@ -76,6 +76,7 @@ import de.schmeckts.app.ui.Btn
 import de.schmeckts.app.ui.BtnKind
 import de.schmeckts.app.ui.Card
 import de.schmeckts.app.ui.CardBtn
+import de.schmeckts.app.ui.CardTitle
 import de.schmeckts.app.ui.Chevron
 import de.schmeckts.app.ui.Chip
 import de.schmeckts.app.ui.Chips
@@ -238,7 +239,8 @@ private fun TimeRow(
     val ui = LocalUi.current
     ListRow(onClick = ui.on("pick", "field" to field, "id" to id), label = title, minHeight = Size.controlL) {
         Lead("clock")
-        Column(Modifier.weight(1f, fill = false)) {
+        // the title keeps its width; a long value such as a date wraps instead
+        Column {
             T(title, Type.bodyStrong, maxLines = 2)
             if (!by.isNullOrEmpty()) T("von $by", Type.small, Modifier.padding(top = Space.hair), colors.muted)
         }
@@ -252,9 +254,14 @@ private fun TimeRow(
 private fun LGroup(
     label: String,
     pad: Boolean = true,
+    first: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (label.isNotEmpty()) Label(label) else Gap(Space.s3)
+    if (label.isNotEmpty()) {
+        Label(label)
+    } else if (!first) {
+        Gap(Space.s3)
+    }
     Group(pad = pad, content = content)
 }
 
@@ -311,7 +318,6 @@ private fun ObservationView(state: SheetState) {
     val ids = o.pets.keys.filter { d.getPet(it) != null }
     val names = mealsBefore(ph.db, o).mapNotNull { d.getProduct(it.str("productId")) }.map { esc(pname(it)) }.distinct()
     SheetBody(esc(kind.label), ui.sheets) {
-        Gap(Space.s3)
         Group(pad = true) {
             Chips {
                 for ((k, x) in OBSERVATIONS) {
@@ -337,13 +343,14 @@ private fun ObservationView(state: SheetState) {
                         "${cap(kind.window)} davor ist keine Mahlzeit eingetragen."
                     },
                     Modifier.padding(top = Space.s2),
+                    bottom = 0.dp,
                 )
             }
         }
         if (ph.db.pets.size > 1) {
             LGroup("Bemerkt bei") {
                 PetChips("toggle-observation-pet", o.pets.keys)
-                if (ids.size > 1) Hint("Ob es ${esc(ph.whoObserved(ids))} war, ist offen.", Modifier.padding(top = Space.s2))
+                if (ids.size > 1) Hint("Ob es ${esc(ph.whoObserved(ids))} war, ist offen.", Modifier.padding(top = Space.s2), bottom = 0.dp)
             }
         }
         Gap(Space.s3)
@@ -504,8 +511,11 @@ private fun NameView(s: SheetState) {
                     ),
             )
         }
-        Suggestions(s, serving)
-        Label("Marke")
+        val hits = suggestions(s, serving)
+        Suggestions(s, hits)
+        // with nothing above it, the label's margin and the head's collapse, as in CSS
+        val bare = photo == null && status.isNullOrEmpty() && read.isEmpty() && product == null && hits.second.isEmpty()
+        Label("Marke", top = if (bare) Space.s5 - Space.s3 else Space.s5)
         SheetField(
             "f-brand",
             "brand",
@@ -622,31 +632,37 @@ private fun PackChips(
     }
 }
 
-// varieties the typed words fit, or for an unknown meal the usual ones
+// varieties the typed words fit, or for an unknown meal the usual ones; the title to show them under
 @Composable
-private fun Suggestions(
+private fun suggestions(
     s: SheetState,
     serving: Rec?,
-) {
-    val ui = LocalUi.current
-    val ph = ui.phone
+): Pair<String, List<Rec>> {
+    val ph = LocalUi.current.phone
     val skip = if (s.kind == "product") s.id else serving?.str("productId")
     val q = norm("${s.str("brand")} ${s.str("variety")}")
-    var title = "Meinst du?"
-    val hits =
-        if (q.length >= 2) {
-            val words = q.split(" ")
+    return if (q.length >= 2) {
+        val words = q.split(" ")
+        "Meinst du?" to
             ph.db.products
                 .filter { p ->
                     p.id != skip &&
                         words.all { norm("${p.str("brand") ?: ""} ${p.str("variety") ?: ""}").contains(it) }
                 }.take(4)
-        } else if (serving != null && serving.str("productId").isNullOrEmpty()) {
-            title = "Schon mal gehabt?"
-            ph.derive.quickProducts(4).map { it.product }
-        } else {
-            emptyList()
-        }
+    } else if (serving != null && serving.str("productId").isNullOrEmpty()) {
+        "Schon mal gehabt?" to ph.derive.quickProducts(4).map { it.product }
+    } else {
+        "" to emptyList()
+    }
+}
+
+@Composable
+private fun Suggestions(
+    s: SheetState,
+    found: Pair<String, List<Rec>>,
+) {
+    val ui = LocalUi.current
+    val (title, hits) = found
     if (hits.isEmpty()) return
     // renaming a variety into another one merges the two, so that takes a second tap
     val merge = s.kind == "product"
@@ -868,7 +884,7 @@ private fun ProductView(state: SheetState) {
             ) {
                 Counts(levels, counts)
             } else {
-                Hint(if (e.total > 0) OLD else "Noch nicht bewertet.", Modifier.padding(bottom = 0.dp))
+                Hint(if (e.total > 0) OLD else "Noch nicht bewertet.", bottom = 0.dp)
             }
         }
         Kaufen(e)
@@ -915,7 +931,6 @@ private fun PackGroup(p: Rec) {
     val inner: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
         TMain(esc(p.str("brand")?.ifEmpty { null } ?: p.str("variety")), typeOf(p))
     }
-    Gap(Space.s3)
     if (p.str("thumb").isNullOrEmpty()) {
         Group {
             ProdRow(null, p, "rename-product", "Umbenennen", inner = inner)
@@ -1019,7 +1034,7 @@ private fun ReportView(state: SheetState) {
     }
     PageList("Verlauf" + ph.forWhom(pet), ui.on("settings-back"), list, stuck) {
         item(key = "cal") {
-            Calendar(all.filter { it.servedAt >= addDays(weekStart(Time.now()), -7) }, modifier = Modifier.offset(y = -Space.s4))
+            Calendar(all.filter { it.servedAt >= addDays(weekStart(Time.now()), -7) }, top = 0.dp)
             if (days.isEmpty()) Hint("Noch nichts eingetragen, der Napf wartet auf seine Premiere.", Modifier.padding(top = Space.hair))
         }
         days.forEachIndexed { i, g ->
@@ -1085,7 +1100,7 @@ private fun ShopView() {
         end = if (types.isNotEmpty()) ({ IconBtn("share", "Liste teilen", onClick = ui.on("share-list")) }) else null,
     ) {
         Card {
-            T("Nachkaufen", Type.heading, Modifier.padding(bottom = Space.s1), colors.ink)
+            CardTitle("Nachkaufen")
             if (types.isEmpty()) {
                 Hint("Noch nichts zum Nachkaufen, erst mal probieren.", Modifier.padding(top = Space.hair))
             } else {
@@ -1098,14 +1113,14 @@ private fun ShopView() {
         if (g.nicht.isNotEmpty()) {
             Gap(Space.s4)
             Card {
-                T("Nicht mehr kaufen", Type.heading, Modifier.padding(bottom = Space.s1), colors.ink)
+                CardTitle("Nicht mehr kaufen")
                 Fold("nicht", g.nicht, m)
             }
         }
         if (unclear.isNotEmpty()) {
             Gap(Space.s4)
             Card {
-                T("Noch unklar", Type.heading, Modifier.padding(bottom = Space.s1), colors.ink)
+                CardTitle("Noch unklar")
                 Fold("unklar", unclear, m)
             }
         }
@@ -1152,8 +1167,17 @@ private fun PetView(s: SheetState) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
-                    .padding(top = Space.s4, bottom = Space.s2)
-                    .press(ui.on("pet-photo"), label = "Foto wählen"),
+                    .padding(
+                        top =
+                            if (de.schmeckts.app.ui
+                                    .isPage(s)
+                            ) {
+                                Space.s2
+                            } else {
+                                Space.s1
+                            },
+                        bottom = Space.s2,
+                    ).press(ui.on("pet-photo"), label = "Foto wählen"),
             ) {
                 Avatar(
                     de.schmeckts.app
@@ -1177,7 +1201,6 @@ private fun PetView(s: SheetState) {
         Box(Modifier.fillMaxWidth().padding(bottom = Space.s1), contentAlignment = Alignment.Center) {
             Link(if (photo.isNotEmpty()) "Foto ändern" else "Foto hinzufügen", onClick = ui.on("pet-photo"))
         }
-        Gap(Space.s3)
         Group {
             Row(
                 Modifier.fillMaxWidth().heightIn(min = Size.controlL).padding(vertical = Space.s3),
@@ -1230,7 +1253,7 @@ private fun PetView(s: SheetState) {
                     Btn("", BtnKind.SOFT, fill = false, icon = "plus", onClick = ui.on("add-nick"))
                 }
             }
-            Hint("Die App nennt deine Katze dann mal so, mal so.", Modifier.padding(top = Space.s2))
+            Hint("Die App nennt deine Katze dann mal so, mal so.", Modifier.padding(top = Space.s2), bottom = 0.dp)
         }
         LGroup("Geschlecht") {
             Chips {

@@ -576,6 +576,7 @@ fun Calendar(
     list: List<Rec>,
     week: Boolean = false,
     modifier: Modifier = Modifier,
+    top: Dp = Space.s4,
 ) {
     val ui = LocalUi.current
     val ph = ui.phone
@@ -590,7 +591,7 @@ fun Calendar(
     val first = addDays(noon, -(if (week) 6 else wd + 7))
     val todayKey = dayKey(now)
     val days = (0 until if (week) 7 else 14).map { addDays(first, it) }
-    Column(modifier.padding(top = Space.s4, bottom = Space.s3)) {
+    Column(modifier.padding(top = top, bottom = Space.s3)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.hair)) {
             for (d in days.take(7)) {
                 T(
@@ -702,11 +703,10 @@ fun DayLine(
             .fillMaxWidth()
             .padding(top = Space.s3, bottom = Space.hair)
             .padding(bottom = Space.hair),
-        horizontalArrangement = Arrangement.spacedBy(Space.s2),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom,
     ) {
-        T(dayLabel(g.t), Type.subheading, Modifier.weight(1f, fill = false))
-        Box(Modifier.weight(1f))
+        T(dayLabel(g.t), Type.subheading, Modifier.weight(1f, fill = false).padding(end = Space.s2))
         T(ph.fedLabel(g.items), Type.small, color = colors.muted)
     }
 }

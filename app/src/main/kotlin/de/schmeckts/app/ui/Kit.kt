@@ -129,7 +129,7 @@ fun Modifier.press(
         }
     }
 
-private fun TextStyle.wrap(balance: Boolean) = copy(lineBreak = if (balance) LineBreak.Heading else LineBreak.Paragraph)
+private fun TextStyle.wrap(balance: Boolean) = copy(lineBreak = if (balance) LineBreak.Heading else LineBreak.Simple)
 
 /** Text in a type style, the current colour unless one is given */
 @Composable
@@ -215,7 +215,8 @@ fun Hint(
     text: String,
     modifier: Modifier = Modifier,
     color: Color = colors.muted,
-) = M(text, Type.small, modifier.padding(bottom = Space.s3), color)
+    bottom: Dp = Space.s3, // none as the last thing in a group
+) = M(text, Type.small, modifier.padding(bottom = bottom), color)
 
 @Composable
 fun Card(
@@ -373,6 +374,7 @@ fun Btn(
     enabled: Boolean = true,
     busy: Boolean = false,
     fill: Boolean = true,
+    nowrap: Boolean = false,
     onClick: () -> Unit,
 ) {
     val p = colors
@@ -404,7 +406,7 @@ fun Btn(
             } else if (icon != null) {
                 Icon(icon, size = Size.iconS)
             }
-            T(label, Type.bodyStrong, align = TextAlign.Center)
+            T(label, Type.bodyStrong, align = TextAlign.Center, maxLines = if (nowrap) 1 else Int.MAX_VALUE, ellipsis = false)
         }
     }
 }
@@ -606,7 +608,7 @@ fun Seg(
             ) {
                 Ink(fg) {
                     if (o.icon != null) Icon(o.icon, size = Size.iconS)
-                    T(o.label, Type.smallStrong, maxLines = 1, ellipsis = false)
+                    T(o.label, Type.smallStrong, align = TextAlign.Center)
                 }
             }
         }
@@ -645,14 +647,17 @@ fun CardHead(
     Row(
         Modifier
             .fillMaxWidth()
+            .capTrim(Type.heading)
             .padding(bottom = Space.s1),
         horizontalArrangement = Arrangement.spacedBy(Space.s2),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        M(title, Type.heading, Modifier.weight(1f), colors.ink, balance = true)
+        M(title, Type.heading, Modifier.weight(1f).alignByBaseline(), colors.ink, balance = true)
         if (onMore != null) {
+            // the tap area reaches into the card's padding above, so the heading line keeps its height
             Row(
                 Modifier
+                    .alignByBaseline()
+                    .bleed(Space.s3, Space.s2)
                     .offset(x = Space.s3)
                     .press(onMore, label = label)
                     .clip(RoundedCornerShape(Radius.m))
@@ -668,6 +673,37 @@ fun CardHead(
             }
         }
     }
+}
+
+/** a card's heading, its room above the capitals trimmed so the inset looks as wide as at the sides */
+@Composable
+fun CardTitle(text: String) = M(text, Type.heading, Modifier.capTrim(Type.heading).padding(bottom = Space.s1), colors.ink, balance = true)
+
+/** the line's room above the capitals cut away, as text-box: trim-start cap did */
+fun Modifier.capTrim(style: TextStyle) =
+    layout { m, c ->
+        val p = m.measure(c)
+        val base = p[androidx.compose.ui.layout.FirstBaseline]
+        val cap = if (style.fontFamily == Faustina) 0.648f else 0.7f
+        val trim =
+            if (base ==
+                androidx.compose.ui.layout.AlignmentLine.Unspecified
+            ) {
+                0
+            } else {
+                maxOf(0, (base - cap * style.fontSize.toPx()).toInt())
+            }
+        layout(p.width, p.height - trim) { p.place(0, -trim) }
+    }
+
+/** taller than the room it takes, as negative margins made it */
+fun Modifier.bleed(
+    top: Dp,
+    bottom: Dp,
+) = layout { m, c ->
+    val p = m.measure(c)
+    val t = top.roundToPx()
+    layout(p.width, maxOf(0, p.height - t - bottom.roundToPx())) { p.place(0, -t) }
 }
 
 /** what ends a card: a line above, the action under it */

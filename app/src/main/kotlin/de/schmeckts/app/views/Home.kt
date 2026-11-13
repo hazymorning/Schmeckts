@@ -95,6 +95,7 @@ import de.schmeckts.app.ui.Btn
 import de.schmeckts.app.ui.BtnKind
 import de.schmeckts.app.ui.Card
 import de.schmeckts.app.ui.CardHead
+import de.schmeckts.app.ui.CardTitle
 import de.schmeckts.app.ui.Divider
 import de.schmeckts.app.ui.Gap
 import de.schmeckts.app.ui.Icon
@@ -564,7 +565,7 @@ private fun Welcome() {
 @Composable
 private fun Steps() {
     Card {
-        T("So geht’s", Type.heading, Modifier.padding(bottom = Space.s1), colors.ink)
+        CardTitle("So geht’s")
         Box(Modifier.fillMaxWidth().padding(top = Space.s3, bottom = Space.s1), contentAlignment = Alignment.Center) {
             Sketch("camera", size = Size.picXxl, color = colors.faint)
         }
@@ -610,7 +611,7 @@ private fun rOfPet(
 @Composable
 private fun Pending(list: List<Rec>) {
     Card {
-        T("Wie war’s?", Type.heading, Modifier.padding(bottom = Space.s1), colors.ink)
+        CardTitle("Wie war’s?")
         list.forEachIndexed { i, s ->
             Leaving(s.id) {
                 Column {
@@ -717,16 +718,15 @@ private fun PendItem(s: Rec) {
 private fun AskCard(
     title: String,
     body: @Composable ColumnScope.() -> Unit,
-    buttons: @Composable () -> Unit,
+    buttons: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit,
 ) {
     Card {
-        T(title, Type.heading, Modifier.padding(bottom = Space.s1), colors.ink, balance = true)
+        CardTitle(title)
         body()
         androidx.compose.foundation.layout.FlowRow(
             Modifier.fillMaxWidth().padding(top = Space.s4, bottom = Space.s3),
             horizontalArrangement = Arrangement.spacedBy(Space.s2),
             verticalArrangement = Arrangement.spacedBy(Space.s2),
-            maxItemsInEachRow = 2,
         ) { buttons() }
     }
 }
@@ -738,12 +738,12 @@ private fun Say(html: String) = M(html, Type.body, Modifier.padding(top = Space.
 private fun Why(html: String) = M(html, Type.small, Modifier.padding(top = Space.hair), colors.muted)
 
 @Composable
-private fun RowBtn(
+private fun androidx.compose.foundation.layout.FlowRowScope.RowBtn(
     label: String,
     kind: BtnKind,
     enabled: Boolean = true,
     onClick: () -> Unit,
-) = Btn(label, kind, Modifier.widthIn(min = 0.dp), enabled = enabled, onClick = onClick)
+) = Btn(label, kind, Modifier.weight(1f), enabled = enabled, fill = false, nowrap = true, onClick = onClick)
 
 private val HINT_TITLES =
     mapOf("appetit" to "Appetit", "stop" to "Nicht mehr kaufen?", "sosse" to "Frisst meist nur die Soße", "liebling" to "Nachkaufen?")
@@ -756,7 +756,9 @@ private fun HintCard(m: Model) {
     val h = m.hints[0]
     val e = h.id?.let { m.byId[it] }
     val pet = h.pet?.let { d.getPet(it) }
-    val hide: @Composable () -> Unit = { RowBtn("Ausblenden", BtnKind.SOFT, onClick = ui.on("hide-hint", "v" to hintKey(h))) }
+    val hide: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit = {
+        RowBtn("Ausblenden", BtnKind.SOFT, onClick = ui.on("hide-hint", "v" to hintKey(h)))
+    }
     if (h.kind == "appetit") {
         AskCard(HINT_TITLES.getValue(h.kind), {
             Say("${esc(d.calledNames(listOf(pet?.id ?: ""), "hint"))} frisst seit ein paar Tagen schlechter als sonst.")
