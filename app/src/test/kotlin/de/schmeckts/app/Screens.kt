@@ -307,6 +307,22 @@ abstract class ScreenTest {
             .map { it.config[tag].removePrefix(prefix) }
     }
 
+    /** shown inside the node with this test tag */
+    fun within(
+        tag: String,
+        text: String,
+    ) = rule
+        .onAllNodes(
+            hasText(text, substring = true) and
+                androidx.compose.ui.test
+                    .hasAnyAncestor(
+                        androidx.compose.ui.test
+                            .hasTestTag(tag),
+                    ),
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes()
+        .isNotEmpty()
+
     /** a chip or segment with this text, chosen */
     fun chosen(text: String) = rule.onAllNodes(hasText(text) and isSelected()).fetchSemanticsNodes().isNotEmpty()
 

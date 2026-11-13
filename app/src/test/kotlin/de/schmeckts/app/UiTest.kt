@@ -6,8 +6,10 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import de.schmeckts.app.views.insightSaid
 import de.schmeckts.app.views.syncChip
@@ -1855,5 +1857,187 @@ class UiFeedRemindTest : ScreenTest() {
         act("feed-remind")
         idle(400)
         check(plan().isEmpty() && !prefs.feedRemind, "off: the phone holds none")
+    }
+}
+
+class UiPetsTest : ScreenTest() {
+    private fun clockOf(field: String) =
+        phone.store.state.clocks["pets"]
+            ?.get(db.pets[0].id)
+            ?.get(field)
+
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    @Test
+    fun `petbar - only from two pets on, and it filters`() {
+        open()
+        act("demo")
+        check(tags("pets").isEmpty(), "one pet: no pet bar")
+        act("open-settings")
+        act("add-pet")
+        type("Name", "Tiger")
+        act("save-pet")
+        act("settings-back")
+        idle(400)
+        val ids = db.pets.map { it.id }
+        val bar = listOf("Alle", db.pets[0].str("name")!!, "Tiger").map { labelled(it) }
+        check(
+            tags("pets").size == 1 &&
+                bar.all { it } &&
+                chosen("Alle") ||
+                rule
+                    .onAllNodes(
+                        hasContentDescription("Alle") and
+                            androidx.compose.ui.test
+                                .isSelected(),
+                    ).fetchSemanticsNodes()
+                    .isNotEmpty(),
+            "two pets: the bar",
+        )
+        act("filter", "id" to ids[0])
+        check(prefs.activePet == ids[0], "the bar filters")
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("pet", "id" to ids[1]),
+        )
+        main.logic.pets.deletePet()
+        idle(400)
+        check(tags("pets").isEmpty(), "back to one pet: no bar")
+    }
+
+    @Test
+    fun `several - told apart without a photo, each counted on its own, each named at its slider`() {
+        val now = at("2025-06-17T12:00")
+        open(
+            mapOf(
+                "db" to
+                    dbOf(
+                        listOf(pet(M), pet(T, "Tiger")),
+                        listOf(product("lachs00001")),
+                        (0 until 3).map { meal("meal$it", "lachs00001", now - (it + 1) * DAY, mapOf(M to "top", T to "top")) } +
+                            meal("offen", "lachs00001", now - 3_600_000L, mapOf(M to null)),
+                    ),
+            ),
+            now,
+        )
+        check(within("pets", "M") && within("pets", "T"), "two cats without a photo go by their initials")
+        check(within("pend-offen", "Minka") && !within("pend-offen", "Tiger"), "a meal for one of them names it at its slider")
+        act("open-evaluation")
+        check(inSheet("Sheba, bei beiden alle 3 Mal alles gefressen"), "three meals for both read as three, not six")
+    }
+
+    @Test
+    fun `nicknames - added with Enter or the button, each once, a typed one kept on saving, the home card uses them in turn`() {
+        onePet()
+        act("open-settings")
+        act("edit-pet", "id" to db.pets[0].id)
+        val field =
+            rule.onNode(
+                hasContentDescription("Spitzname") and
+                    androidx.compose.ui.test
+                        .hasSetTextAction(),
+            )
+        field.performClick()
+        for (name in listOf("Mimi", "mimi", "Minka")) {
+            field.performTextReplacement(name)
+            field.performImeAction()
+            idle(50)
+        }
+        val focused = field.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Focused]
+        type("Spitzname", "Schnurrli")
+        act("add-nick")
+        val chips = listOf("Mimi", "Schnurrli", "Minka").filter { labelled("$it entfernen") }
+        type("Spitzname", "Minki")
+        act("save-pet")
+        val stored = { db.pets[0]["nicknames"].asArray?.map { it.asString } }
+        check(
+            chips == listOf("Mimi", "Schnurrli") && stored() == listOf("Mimi", "Schnurrli", "Minki"),
+            "each name once, never the pet’s own, one typed but not added comes along $chips",
+        )
+        check(focused, "Enter keeps the field and its keyboard")
+        act("edit-pet", "id" to db.pets[0].id)
+        act("drop-nick", "v" to "Schnurrli")
+        act("save-pet")
+        check(stored() == listOf("Mimi", "Minki"), "a tap on one removes it")
+        act("settings-back")
+        db.products.add(Rec(j(product("sorte00001")).obj()))
+        for (d in 1..7) {
+            db.servings.add(
+                0,
+                Rec(j(meal("meal00000$d", "sorte00001", at("2026-06-0${d}T08:00"), mapOf(db.pets[0].id to "gut"))).obj()),
+            )
+        }
+        phone.store.save()
+        val said =
+            (1..7).map { day ->
+                clock = at("2026-06-%02dT12:00".format(day))
+                ui.update()
+                idle()
+                listOf("Minka", "Mimi", "Minki").filter { within("sec-overview", it) }
+            }
+        check(
+            said.all {
+                it.isNotEmpty()
+            } &&
+                said.any { "Mimi" in it || "Minki" in it },
+            "the card names the pet each day, now and then by a nickname $said",
+        )
+        act("open-settings")
+        act("edit-pet", "id" to db.pets[0].id)
+        act("drop-nick", "v" to "Mimi")
+        act("drop-nick", "v" to "Minki")
+        act("save-pet")
+        check(!db.pets[0].has("nicknames"), "all removed: the field goes")
+    }
+
+    @Test
+    fun `birthday - from before 0_33 stays in the data, no field for it`() {
+        onePet()
+        db.pets[0].put("birthday", "2022-06-12")
+        phone.store.save()
+        idle(100)
+        val before = clockOf("birthday")
+        act("open-settings")
+        act("edit-pet", "id" to db.pets[0].id)
+        val field = labelled("Geburtstag")
+        type("Name", "Minka II")
+        act("save-pet")
+        check(
+            !field && db.pets[0].str("name") == "Minka II" && db.pets[0].str("birthday") == "2022-06-12" && clockOf("birthday") == before,
+            "no birthday field; the stored one is kept and not sent again",
+        )
+    }
+
+    @Test
+    fun `sex - none at first, saved, back to none drops the field, a field the editor does not know stays`() {
+        onePet()
+        act("open-settings")
+        act("edit-pet", "id" to db.pets[0].id)
+        val none = chosen("Keine Angabe")
+        act("set-sex", "v" to "f")
+        act("save-pet")
+        check(none && db.pets[0].str("sex") == "f", "none given at first, „Weiblich“ saved")
+        act("edit-pet", "id" to db.pets[0].id)
+        val shown = chosen("Weiblich")
+        act("set-sex", "v" to "")
+        act("save-pet")
+        check(shown && !db.pets[0].has("sex"), "shown again in the editor, „Keine Angabe“ drops the field")
+        db.pets[0].put("zukunft", "x")
+        phone.store.save()
+        idle(100)
+        val before = clockOf("zukunft")
+        act("edit-pet", "id" to db.pets[0].id)
+        type("Name", "Minka II")
+        act("save-pet")
+        check(
+            db.pets[0].str("name") == "Minka II" && db.pets[0].str("zukunft") == "x" && clockOf("zukunft") == before,
+            "a field the editor does not know stays as it is, and is not sent again",
+        )
     }
 }

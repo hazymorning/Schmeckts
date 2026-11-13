@@ -65,6 +65,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -275,6 +276,7 @@ private fun PetsBar() {
     Row(
         Modifier
             .wide()
+            .testTag("pets")
             .horizontalScroll(rememberScrollState())
             .semantics { contentDescription = "Katze auswählen" }
             .padding(horizontal = Space.gutter, vertical = Space.s3),
@@ -323,7 +325,10 @@ private fun PetChoice(
         Modifier
             .width(Size.picXl + Space.s2)
             .press(onClick, label = label)
-            .semantics { if (label == null) contentDescription = name },
+            .semantics {
+                if (label == null) contentDescription = name
+                selected = on
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Space.s1),
     ) {
