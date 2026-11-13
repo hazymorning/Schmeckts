@@ -11,6 +11,7 @@ class Phone(
     val dir: File,
     val main: CoroutineDispatcher,
     val io: CoroutineDispatcher,
+    val platform: Platform,
     val http: Http = OkHttp(),
     now: () -> Long = { Time.now() },
 ) {
@@ -24,6 +25,9 @@ class Phone(
     val sync = Sync(store, api, http, scope, ::report) { visible }
     val ai = Ai(disk, http) { store.db.products }.apply { load() }
     val derive = Derive(store)
+    val online = Online(store, http)
+    val release = Release(platform, http)
+    val recognize = Recognize(store, sync, api, ai, online, derive, platform)
 
     init {
         store.onSaved = { sync.syncSoon(400) }

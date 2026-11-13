@@ -56,7 +56,7 @@ class SyncTest {
                     Thread(it, "phone-main").apply { isDaemon = true }
                 }.asCoroutineDispatcher()
         return kotlinx.coroutines.runBlocking(main) {
-            Phone(dir, main, kotlinx.coroutines.Dispatchers.IO, net, now).also { it.sync.start() }
+            Phone(dir, main, kotlinx.coroutines.Dispatchers.IO, FakePlatform(), net, now).also { it.sync.start() }
         }
     }
 

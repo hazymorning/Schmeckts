@@ -18,9 +18,10 @@ fun tempDir(prefix: String = "phone"): File = Files.createTempDirectory("schmeck
 fun phoneIn(
     dir: File = tempDir(),
     http: Http = OkHttp(),
+    platform: Platform = FakePlatform(),
 ): Phone {
     val main = Executors.newSingleThreadExecutor { Thread(it, "phone-main").apply { isDaemon = true } }.asCoroutineDispatcher()
-    return runBlocking(main) { Phone(dir, main, kotlinx.coroutines.Dispatchers.IO, http) }
+    return runBlocking(main) { Phone(dir, main, kotlinx.coroutines.Dispatchers.IO, platform, http) }
 }
 
 /** Runs on the phone's main thread, as everything in the app does. */
