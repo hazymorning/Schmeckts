@@ -1,0 +1,141 @@
+{
+ "GREETINGS": [
+  [
+   0,
+   "Gute Nacht"
+  ],
+  [
+   5,
+   "Guten Morgen"
+  ],
+  [
+   11,
+   "Mahlzeit"
+  ],
+  [
+   14,
+   "Schönen Nachmittag"
+  ],
+  [
+   18,
+   "Guten Abend"
+  ],
+  [
+   22,
+   "Gute Nacht"
+  ]
+ ],
+ "WEEKEND": {
+  "0": "Schönen Sonntag",
+  "6": "Schönes Wochenende"
+ },
+ "ANCHORS": {
+  "none": [
+   "Noch ist nichts eingetragen. Die erste Mahlzeit trägst du unten über „Füttern“ ein.",
+   "Das Tagebuch ist noch leer. Nach dem ersten Füttern geht es hier los."
+  ],
+  "older": [
+   "Der letzte Eintrag ist {days} her. Willkommen zurück!",
+   "Zuletzt gab es {date} {what}."
+  ],
+  "fresh": [
+   "{name} hat {ago} {what} bekommen und {said}.",
+   "{Ago} gab es {what}. {All}.",
+   "{name} hat gerade {what} bekommen.",
+   "Eben gab es {what}.",
+   "{Ago} gab es {what}.",
+   "{name} wurde gerade gefüttert.",
+   "Eben wurde gefüttert."
+  ],
+  "firstFresh": [
+   "{name} hat {ago} zum ersten Mal {variety} bekommen und {said}.",
+   "{Ago} hat {name} zum ersten Mal {variety} bekommen und {said}.",
+   "{Ago} gab es zum ersten Mal {variety}. {All}.",
+   "{name} probiert gerade zum ersten Mal {variety}.",
+   "Eben gab es zum ersten Mal {variety}.",
+   "{variety} gibt es heute zum ersten Mal."
+  ],
+  "firstLast": [
+   "{name} hat {ago} zum ersten Mal {variety} bekommen und {said}.",
+   "{Ago} hat {name} zum ersten Mal {variety} bekommen und {said}.",
+   "{Ago} gab es zum ersten Mal {variety}. {All}.",
+   "{Ago} gab es zum ersten Mal {variety}.",
+   "{name} hat heute zum ersten Mal {variety} bekommen.",
+   "Heute gab es zum ersten Mal {variety}."
+  ],
+  "freshTreat": [
+   "{name} hat heute schon den {nthTreat} Snack bekommen.",
+   "Eben gab es schon den {nthTreat} Snack.",
+   "{name} hat gerade einen Snack bekommen.",
+   "Eben gab es einen Snack."
+  ],
+  "notYet": [
+   "{name} hat {ago} {what} bekommen und {said}.",
+   "{Ago} gab es {what}. {All}.",
+   "{name} hat zuletzt {ago} {what} bekommen.",
+   "Zuletzt gab es {ago} {what}.",
+   "{Ago} gab es zuletzt {what}.",
+   "Heute gab es noch keine Mahlzeit. Die letzte war {ago}."
+  ],
+  "last": [
+   "{name} hat {ago} {what} bekommen und {said}.",
+   "{Ago} hat {name} {what} bekommen und {said}.",
+   "Zuletzt hat {name} {ago} {what} bekommen und {said}.",
+   "{Ago} gab es {what}. {All}.",
+   "Zuletzt gab es {ago} {what}. {All}.",
+   "{name} hat {ago} {what} bekommen.",
+   "{Ago} gab es {what}.",
+   "Zuletzt gab es {ago} {what}.",
+   "Die letzte Mahlzeit war {ago}."
+  ]
+ },
+ "FACTS": {
+  "noted": [
+   "{noted}"
+  ],
+  "streakLeft": [
+   "Die letzten {k} Mahlzeiten kamen schlecht an.",
+   "{Wer} hat die letzten {k} Mahlzeiten kaum angerührt."
+  ],
+  "treatsNone": [
+   "Heute gab es noch keinen Snack.",
+   "{Wer} hatte heute noch keinen Snack."
+  ],
+  "streakGood": [
+   "Die letzten {k} Mahlzeiten kamen gut an.",
+   "Die letzten {k} Mahlzeiten hat {wer} gut gefressen."
+  ],
+  "week": [
+   "Diese Woche hat es {good} von {n} Mal gut geschmeckt.",
+   "{Wer} hat diese Woche {good} von {n} Mal gut gefressen."
+  ],
+  "favourite": [
+   "Am liebsten frisst {wer} zurzeit {fav}.",
+   "Am besten kommt gerade {fav} an."
+  ],
+  "treats": [
+   "Heute gab es schon {treats}.",
+   "{Wer} hatte heute schon {treats}."
+  ],
+  "count": [
+   "Heute gab es schon {count} Mahlzeiten.",
+   "{Wer} hat heute schon {count} Mahlzeiten bekommen."
+  ],
+  "sorts": [
+   "Diese Woche gab es {sorts} verschiedene Sorten.",
+   "{Wer} hat diese Woche {sorts} verschiedene Sorten bekommen."
+  ]
+ },
+ "NOTABLE": [
+  "noted",
+  "streakLeft",
+  "treatsNone"
+ ],
+ "NOTED": {
+  "vomit": "{Wer} {hat} heute erbrochen.",
+  "stink": "Heute gab es Stunk.",
+  "tired": "{Wer} {ist} heute besonders müde.",
+  "hungry": "{Wer} {war} heute extra hungrig.",
+  "happy": "{Wer} {ist} heute gut drauf."
+ }
+}

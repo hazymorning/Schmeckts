@@ -1,0 +1,78 @@
+[
+ {
+  "v": "0.42.0",
+  "title": "Updates in der App",
+  "say": "Neue Versionen findet die App jetzt selbst. Ein Tipp auf „Aktualisieren“, und Android installiert sie über die alte.",
+  "why": "Dafür fragt sie beim Start kurz bei GitHub nach, abschalten lässt sich das in den Einstellungen. Außerdem bleibt die Bewertung auf der Startseite bei jeder offenen Mahlzeit stehen, und das App-Symbol hat eine neue Katze."
+ },
+ {
+  "v": "0.41.0",
+  "title": "Genauere Vorlieben",
+  "say": "Die App erkennt jetzt, wenn eine Marke oder Konsistenz meist stehen bleibt, etwa Stückchen in Soße, und gibt dafür nicht mehr dem Geschmack die Schuld.",
+  "why": "„Nur ein bissl“ zählt jetzt als stehen gelassen, unter „Vorlieben“ stehen auch die Marken, und Futter, das deine Katze nie mochte, löst keine Appetit-Warnung mehr aus.",
+  "go": [
+   "evaluation",
+   "Vorlieben ansehen"
+  ]
+ },
+ {
+  "v": "0.40.0",
+  "title": "Fotos mit eigener KI",
+  "say": "Mit einem eigenen Schlüssel von Anthropic, OpenAI oder Google erkennt das Handy Packungsfotos jetzt selbst, auch ohne Server.",
+  "why": "Einfach unter „Scannen“ in den Einstellungen einfügen, die App prüft ihn gleich. Ein Haushalts-Server erkennt Fotos jetzt mit dem neuesten Claude-Modell.",
+  "go": [
+   "settings",
+   "Einstellungen öffnen"
+  ]
+ },
+ {
+  "v": "0.39.0",
+  "title": "Kalender im Feinschliff",
+  "say": "Im hellen Design hat der Katzenkalender jetzt einen braunen Rand statt eines schwarzen.",
+  "why": "Der Stempel neben dem Datum ist kleiner und passt so besser zur Überschrift."
+ },
+ {
+  "v": "0.38.0",
+  "title": "Klar gesagt",
+  "say": "Oben grüßt dich die App jetzt zur Tageszeit und sagt in einfachen Sätzen, wann es zuletzt was gab und wie es geschmeckt hat.",
+  "why": "Die Bewertungen heißen kürzer, der Stempel im Katzenkalender ist kleiner und die Flachwitze sind besser."
+ },
+ {
+  "v": "0.37.0",
+  "title": "Der Tag auf einen Blick",
+  "say": "Oben steht jetzt, wann es zuletzt was gab und wie es ankam, dazu etwas zum Tag: Snacks, Serien, die Woche oder der aktuelle Liebling.",
+  "why": "Im Katzenkalender gibt’s bessere Flachwitze, und die erste Mahlzeit des Tages zählt als Frühstück, wann immer sie kommt."
+ },
+ {
+  "v": "0.36.0",
+  "title": "Vorlieben auf einen Blick",
+  "say": "Unter „Vorlieben“ siehst du jetzt, welche Konsistenz und welcher Geschmack am besten ankommen.",
+  "why": "Bewerten steht auf der Startseite jetzt vor dem Katzenkalender, und Erkenntnisse kommen erst, wenn sie gut belegt sind.",
+  "go": [
+   "evaluation",
+   "Vorlieben ansehen"
+  ]
+ },
+ {
+  "v": "0.35.0",
+  "title": "Ganz für Katzen",
+  "say": "Schmeckt’s? ist jetzt eine reine Katzen-App und spricht überall von deiner Katze.",
+  "why": "An deinen Einträgen ändert sich nichts."
+ },
+ {
+  "v": "0.34.0",
+  "title": "Schneller fertig",
+  "say": "Ist die Packung benannt, bist du gleich wieder auf der Startseite. Die fragt jetzt nur noch eins auf einmal.",
+  "why": "Die Erinnerung ans Bewerten hat drei Knöpfe, auch für eine Mahlzeit, die stehen blieb.",
+  "off": [
+   "remind",
+   "Schalte die Erinnerung ans Bewerten ein, dann bewertest du gleich in der Benachrichtigung."
+  ]
+ },
+ {
+  "v": "0.33.0",
+  "title": "Mehr Luft",
+  "say": "Die Karten haben mehr Platz, und die App sagt jetzt überall „Sorte“ und „füttern“.",
+  "why": "Meldungen unten lassen sich zur Seite wegwischen."
+ }
+]

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- the app's ground, so nothing flashes at handover -->
-    <color name="splash_background">#EEEDE7</color>
-    <!-- same accent as the rating reminder (capacitor.config.json) -->
-    <color name="notification">#58603F</color>
-</resources>

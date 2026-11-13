@@ -1,29 +1,45 @@
 #!/usr/bin/env python3
-"""Checks across files that need no browser. Usage: python3 tests/files_test.py"""
+"""Checks across files that need no build. Usage: python3 tests/files_test.py"""
 
 import contextlib
 import importlib
 import io
-import json
 import pathlib
 import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from common import ROOT, WWW, check, failures
 
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+APP = ROOT / 'app'
+SRC = APP / 'src/main'
+failures = []
 sys.path.insert(0, str(ROOT / 'scripts'))
+
+
+def check(cond, text):
+    print(('  ok   ' if cond else '  FAIL ') + text)
+    if not cond:
+        failures.append(text)
+    return cond
+
+
+def version():
+    return re.search(r'^version=(\S+)$', (APP / 'gradle.properties').read_text(encoding='utf-8'), re.M)[1]
 
 
 def test_version_code():
     # Android refuses a lower versionCode than the installed one; builds before 0.1.0 reached 10400
-    prep = importlib.import_module('prepare')
     code = 0
-    for part in json.loads((ROOT / 'app/package.json').read_text())['version'].split('.'):
+    for part in version().split('.'):
         code = code * 100 + int(part)
-    code += prep.VERSION_OFFSET
-    src = (ROOT / 'scripts/prepare.py').read_text(encoding='utf-8')
-    check(code > 10400 and re.search(r'def appVersionCode = [\'"]\s*\+\s*str\(VERSION_OFFSET\)', src), f'versionCode {code} above 10400')
+    build = (APP / 'build.gradle.kts').read_text(encoding='utf-8')
+    formula = 'versionCode = 20000 + appVersion.split(".").fold(0) { acc, n -> acc * 100 + n.toInt() }'
+    check(20000 + code > 10400 and formula in build and 'versionName = appVersion' in build, f'versionCode {20000 + code} above 10400')
+    check(
+        not re.search(r'^\s*version\s*=', build, re.M) and 'version' not in (APP / 'settings.gradle.kts').read_text(encoding='utf-8'),
+        f'the version {version()} lives only in app/gradle.properties',
+    )
 
 
 def test_signing_key():
@@ -54,13 +70,13 @@ def test_server_version():
 
 def test_prompt():
     text = (ROOT / 'server/recognize-prompt.txt').read_text(encoding='utf-8').strip()
-    app = (WWW / 'js/ai.js').read_text(encoding='utf-8')
-    check(len(text) > 100 and f'`{text}`' in app, 'the phone with its own key asks as the server does')
+    app = (SRC / 'kotlin/de/schmeckts/app/Ai.kt').read_text(encoding='utf-8')
+    check(len(text) > 100 and f'"""{text}"""' in app, 'the phone with its own key asks as the server does')
 
 
 def test_android():
     a = '{http://schemas.android.com/apk/res/android}'
-    res = ROOT / 'app/native/res'
+    res = SRC / 'res'
     root = ET.parse(res / 'xml/shortcuts.xml').getroot()
     links = [x.find('intent').get(a + 'data') for x in root.findall('shortcut')]
     labels = {'@string/' + n for n in re.findall(r'name="(\w+)"', (res / 'values/strings_shortcuts.xml').read_text())}
@@ -71,12 +87,36 @@ def test_android():
         for x in root.findall('shortcut')
     )
     check(links == ['schmeckts://feed', 'schmeckts://scan', 'schmeckts://photo'] and ok, f'shortcuts with icons and labels {links}')
-    prep = (ROOT / 'scripts/prepare.py').read_text()
-    main = (ROOT / 'app/native/java/de/schmeckts/app/MainActivity.java').read_text()
+    manifest = ET.parse(SRC / 'AndroidManifest.xml').getroot()
+    app = manifest.find('application')
+    activity = {x.get(a + 'name'): x for x in app.findall('activity')}.get('.MainActivity')
+    filters = [] if activity is None else activity.findall('intent-filter')
+
+    def accepts(action, **data):
+        return any(
+            any(x.get(a + 'name') == action for x in f.findall('action'))
+            and any(all(d.get(a + k) == v for k, v in data.items()) for d in f.findall('data'))
+            for f in filters
+        )
+
+    receivers = {x.get(a + 'name'): x for x in app.findall('receiver')}
+    boot = {name: {x.get(a + 'name') for f in r.findall('intent-filter') for x in f.findall('action')} for name, r in receivers.items()}
     check(
-        all(x in prep for x in ('android:scheme="schmeckts"', '@xml/shortcuts', 'barcode_ui', '.FeedReceiver', 'BOOT_COMPLETED'))
-        and all(f'registerPlugin({x}.class)' in main for x in ('PhotoPlugin', 'FeedReminderPlugin')),
-        'manifest patches and plugins registered',
+        activity is not None
+        and activity.get(a + 'launchMode') == 'singleTask'
+        and accepts('android.intent.action.VIEW', scheme='schmeckts')
+        and accepts('android.intent.action.VIEW', mimeType='application/json')
+        and accepts('android.intent.action.SEND', mimeType='application/json')
+        and any(m.get(a + 'resource') == '@xml/shortcuts' for m in activity.findall('meta-data')),
+        'MainActivity takes the deep links, exchange files and shortcuts',
+    )
+    check(
+        any(m.get(a + 'value') == 'barcode_ui' for m in app.findall('meta-data'))
+        and all(
+            {'android.intent.action.BOOT_COMPLETED', 'android.intent.action.MY_PACKAGE_REPLACED'} <= boot.get(r, set())
+            for r in ('.FeedReceiver', '.RateReceiver')
+        ),
+        'scanner module with the app, reminders set again after a restart and an update',
     )
 
 

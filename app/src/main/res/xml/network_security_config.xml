@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- http is meant for the home network only, but Android cannot express address ranges here, so
+         normServer() in Api.kt enforces it for every request -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

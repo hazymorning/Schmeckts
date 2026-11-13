@@ -14,11 +14,9 @@ if [ "$TESTED" = "--tested" ]; then
 else
   "$ROOT/scripts/test.sh"   # no APK without green tests
 fi
-python3 "$ROOT/scripts/prepare.py"
 cd "$ROOT/app"
-VERSION="$(node -p "require('./package.json').version")"
-npx cap sync android
-(cd android && ./gradlew assembleRelease --no-daemon --console=plain -q)
+VERSION="$(sed -n 's/^version=//p' gradle.properties)"
+./gradlew assembleRelease --no-daemon --console=plain -q
 
 # the keystore is on disk only for the signing step
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
@@ -28,7 +26,7 @@ mkdir -p "$ROOT/dist"
 OUT="$ROOT/dist/schmeckts-$VERSION.apk"
 "$BUILD_TOOLS/apksigner" sign --ks "$TMP/key.jks" --ks-key-alias schmeckts \
   --ks-pass env:SCHMECKTS_PW --key-pass env:SCHMECKTS_PW --v4-signing-enabled false \
-  --out "$OUT" android/app/build/outputs/apk/release/app-release-unsigned.apk
+  --out "$OUT" build/outputs/apk/release/schmeckts-release-unsigned.apk
 "$BUILD_TOOLS/apksigner" verify "$OUT"
 
 # check the finished manifest
