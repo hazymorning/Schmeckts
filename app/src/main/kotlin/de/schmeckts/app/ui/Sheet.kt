@@ -250,7 +250,10 @@ class Sheets(
         tick++
     }
 
-    fun isClosing() = base.closing != null || over.closing != null
+    // a layer just shut still shows for a frame; a tap meant for it then is not one for what lies below
+    private var shutAt = 0L
+
+    fun isClosing() = base.closing != null || over.closing != null || System.nanoTime() - shutAt < 100_000_000L
 
     fun closeSheet(): CompletableDeferred<Unit> {
         val l = top()
@@ -291,6 +294,7 @@ class Sheets(
 
     // redraws the page underneath, so the sheet's changes show there
     internal fun shut(l: Layer) {
+        shutAt = System.nanoTime()
         l.onClosed = null
         l.open = false
         l.state = null

@@ -730,7 +730,7 @@ private fun ServeRows(
                 },
             ).filter { it.isNotEmpty() }.joinToString(", ")
         val past = ph.record(m.byId[p.id])
-        ListRow(onClick = ui.on("serve", "id" to p.id, "code" to code.ifEmpty { null })) {
+        ListRow(Modifier.testTag("serve-${p.id}"), onClick = ui.on("serve", "id" to p.id, "code" to code.ifEmpty { null })) {
             Thumb(null, p)
             TMain(esc(pname(p)), esc(meta)) {
                 if (past.isNotEmpty()) T(past, Type.small, Modifier.padding(top = Space.hair), colors.muted)
@@ -773,6 +773,7 @@ private fun FeedView(s: SheetState) {
                     "f-search",
                     "search",
                     placeholder = "Marke oder Sorte suchen",
+                    label = "Marke oder Sorte suchen",
                     keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Search),
                     channel = "search",
                     initial = s.str("search"),

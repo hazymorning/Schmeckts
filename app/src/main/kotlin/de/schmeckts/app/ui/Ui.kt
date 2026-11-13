@@ -72,11 +72,11 @@ class Ui(
         vararg data: Pair<String, String?>,
     ) = actions(name, data.mapNotNull { (k, v) -> v?.let { k to it } }.toMap())
 
-    /** a button's click; a closing layer takes no taps (SheetHost), so a quick second tap does not feed twice */
+    /** a button's click; while a layer closes nothing takes taps, so a quick second tap does not feed twice */
     fun on(
         name: String,
         vararg data: Pair<String, String?>,
-    ): () -> Unit = { act(name, *data) }
+    ): () -> Unit = { if (!sheets.isClosing()) act(name, *data) }
 
     val home = HomeState()
 

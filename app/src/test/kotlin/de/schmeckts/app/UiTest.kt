@@ -2,6 +2,7 @@ package de.schmeckts.app
 
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
@@ -1183,5 +1184,203 @@ class UiSlideTest : ScreenTest() {
         level("mittel").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         idle(400)
         check(rated() == "mittel", "keyboard and screen readers: the focused level rates")
+    }
+}
+
+class UiNamingTest : ScreenTest() {
+    private fun load(
+        products: List<Map<String, Any?>>,
+        meals: List<Map<String, Any?>>,
+    ) {
+        phone.store.replaceDb(dbRaw(dbOf(listOf(pet(M)), products, meals)))
+        phone.store.save()
+        ui.update()
+        idle()
+    }
+
+    private val brands = listOf("Sheba", "Felix", "Gourmet", "Whiskas", "Animonda", "Miamor", "Cosma", "Purizon", "Bozita", "Schesir")
+
+    // n varieties of their own brand, one meal each, days apart (0: an hour)
+    private fun sorts(
+        n: Int,
+        days: Int,
+    ) {
+        val levels = listOf("top", "gut", "mittel", "sosse", "schlecht")
+        load(
+            (0 until n).map { product("sorte%05d".format(it), brands[it % 10], "Sorte ${it + 1}", "Nassfutter", "createdAt" to it) },
+            (0 until n).map {
+                meal(
+                    "meal%06d".format(it),
+                    "sorte%05d".format(it),
+                    clock - 3_600_000L - (
+                        it * (
+                            if (days ==
+                                0
+                            ) {
+                                DAY / 24
+                            } else {
+                                days * DAY
+                            }
+                        )
+                    ),
+                    mapOf(M to levels[it % 5]),
+                )
+            },
+        )
+    }
+
+    private fun names() = tags("serve-", sheet = true).map { phone.derive.getProduct(it)!!.str("variety") }
+
+    @Test
+    fun `texture - set, cleared, replaced, gone with a type change, filled from keywords only when empty`() {
+        open()
+        val foods = listOf(product("nass0001"), product("trocken0001", "Josera", "Huhn in Soße", "Trockenfutter"))
+        load(foods, foods.mapIndexed { i, p -> meal("meal$i", p["id"] as String, clock - (i + 30) * 3_600_000L, mapOf(M to "top")) })
+        val tex = { phone.derive.getProduct("nass0001")!!.str("texture") }
+        val on = {
+            TEXTURES
+                .getValue("Nassfutter")
+                .items
+                .filter { chosen(it.label) }
+                .map { it.key }
+        }
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to "nass0001"),
+        )
+        val got =
+            listOf(listOf("block"), listOf("block"), listOf("gelee", "pastete")).map { picks ->
+                picks.forEach { act("set-texture", "v" to it) }
+                tex() to on()
+            }
+        check(
+            got == listOf("block" to listOf("block"), null to emptyList(), "pastete" to listOf("pastete")),
+            "a tap sets it, a second drops the field, another replaces it $got",
+        )
+        act("close")
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to "trocken0001"),
+        )
+        check(!inSheet("Fester Block"), "dry food: no choice")
+        act("close")
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to "nass0001"),
+        )
+        act("rename-product")
+        act("set-type", "v" to "Snack")
+        val snack = on()
+        act("set-type", "v" to "Sonstiges")
+        act("save-name")
+        val p = phone.derive.getProduct("nass0001")!!
+        check(snack.isEmpty() && p.str("type") == "Sonstiges" && !p.has("texture"), "another type drops it")
+        act("close")
+
+        fun nameNew(
+            variety: String,
+            pick: String? = null,
+            twice: Boolean = false,
+            kind: String = "Nassfutter",
+        ): String? {
+            act("feed")
+            act("new-product")
+            type("Marke", "Miamor")
+            type("Sorte", variety)
+            act("set-type", "v" to kind)
+            repeat((if (pick != null) 1 else 0) + (if (twice) 1 else 0)) { act("set-texture", "v" to pick) }
+            act("save-name")
+            idle(400)
+            return db.products.find { it.str("variety") == variety }?.str("texture")
+        }
+        val named =
+            listOf(
+                nameNew("Ragout in Gelee"),
+                nameNew("Filet in Soße", "mousse"),
+                nameNew("Huhn in Jelly", "gelee", twice = true),
+                nameNew("Knusperkissen", kind = "Snack"),
+                nameNew("Kaninchen"),
+            )
+        check(
+            named == listOf("gelee", "mousse", null, "knusprig", null),
+            "keywords fill an empty field only, a choice or a cleared field stays $named",
+        )
+        val products = main.logic.products
+
+        fun make(
+            variety: String,
+            texture: String?,
+            type: String = "Nassfutter",
+        ) = products
+            .newProduct(
+                de.schmeckts.app.logic
+                    .Details("Test", variety, type, texture),
+            ).str("texture")
+        val old =
+            products.newProduct(
+                de.schmeckts.app.logic
+                    .Details("Test", "Pute", "Nassfutter", "suppe"),
+            )
+        products.applyTexture(
+            old,
+            de.schmeckts.app.logic
+                .Details(texture = "gelee"),
+        )
+        val made =
+            listOf(
+                make("Huhn in Soße", "gelee"),
+                make("Rind in Soße", "knusprig"),
+                make("Ente in Soße", null),
+                make("Sticks", "weich", "Snack"),
+                make("Kroketten in Soße", "sosse", "Trockenfutter"),
+                old.str("texture"),
+            )
+        check(made == listOf("gelee", "sosse", "sosse", "weich", null, "suppe"), "a fitting recognised value beats keywords $made")
+    }
+
+    @Test
+    fun `suggestions - at most eight hits, a new variety from the search`() {
+        open()
+        sorts(3, 0)
+        act("feed")
+        check(names() == listOf("Sorte 1", "Sorte 2", "Sorte 3") && !labelled("Marke oder Sorte suchen"), "three: all suggested, no search")
+        act("close")
+        sorts(12, 0)
+        act("feed")
+        check(names() == listOf("Sorte 1", "Sorte 2", "Sorte 3"), "twelve: the three fed last")
+        type("Marke oder Sorte suchen", "Sorte")
+        check(names().size == 8, "at most eight hits")
+        type("Marke oder Sorte suchen", "sheba sorte 11")
+        val hit = names()
+        type("Marke oder Sorte suchen", "")
+        check(
+            hit == listOf("Sorte 11") && names() == listOf("Sorte 1", "Sorte 2", "Sorte 3"),
+            "brand and variety together; empty: suggestions $hit",
+        )
+        act("close")
+        db.products.first { it.str("variety") == "Sorte 2" }.put("kaufen", "nicht")
+        phone.store.save()
+        act("feed")
+        val offered = names()
+        type("Marke oder Sorte suchen", "sorte 2")
+        check(
+            offered == listOf("Sorte 1", "Sorte 3", "Sorte 4") && names() == listOf("Sorte 12", "Sorte 2"),
+            "a variety no longer bought is not suggested, the search still finds it, last $offered ${names()}",
+        )
+        val meals = db.servings.size
+        rule
+            .onNode(
+                androidx.compose.ui.test
+                    .hasTestTag("serve-sorte00011"),
+            ).performTouchInput {
+                click()
+                click()
+            }
+        idle(600)
+        check(db.servings.size == meals + 1, "a quick second tap does not feed twice")
+        act("feed")
+        type("Marke oder Sorte suchen", "gibtsnicht")
+        act("new-product", "v" to "gibtsnicht")
+        check(sheet?.str("variety") == "gibtsnicht" && labelled("Sorte"), "no hit: what was typed becomes a new variety")
     }
 }
