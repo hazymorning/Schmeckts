@@ -1374,7 +1374,7 @@ class UiCameraTest : ScreenTest() {
     private fun answer(granted: Boolean = false) {
         val shadow = org.robolectric.Shadows.shadowOf(rule.activity)
         val asked = shadow.nextStartedActivityForResult ?: return
-        val result = if (granted) android.content.pm.PackageManager.PERMISSION_GRANTED else android.content.pm.PackageManager.PERMISSION_DENIED
+        val result = if (granted) android.content.pm.PackageManager.PERMISSION_GRANTED else -1 // PERMISSION_DENIED
         val names = asked.intent.getStringArrayExtra("android.content.pm.extra.REQUEST_PERMISSIONS_NAMES")
         val data =
             android.content
