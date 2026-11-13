@@ -674,7 +674,8 @@ private fun Phone.petLine(
         }
     return when {
         t.kind == "gleich" -> "Bei $who läuft’s wie gehabt."
-        t.kind == "etwas" -> if (worse) "$who frisst zuletzt etwas schlechter, aber noch im Rahmen." else "$who frisst zuletzt etwas besser."
+        t.kind == "etwas" && worse -> "$who frisst zuletzt etwas schlechter, aber noch im Rahmen."
+        t.kind == "etwas" -> "$who frisst zuletzt etwas besser."
         t.cause == "tier" ->
             "$who frisst ${if (worse) "seit ein paar Wochen deutlich schlechter" else "gerade deutlich besser"}, auch bei den gewohnten Sorten."
         t.cause == "futter" ->
