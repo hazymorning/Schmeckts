@@ -93,6 +93,9 @@ class Ui(
         blur++
     }
 
+    /** the day the history page scrolls to next */
+    var jump by mutableStateOf<String?>(null)
+
     /** the photo button whose photo is being fetched */
     var photoBusy by mutableStateOf("")
 

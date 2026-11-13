@@ -1007,6 +1007,7 @@ fun SheetField(
     password: Boolean = false,
     initial: String? = null,
     channel: String = "field",
+    search: Boolean = false,
 ) {
     val ui = LocalUi.current
     val s = ui.sheet
@@ -1045,5 +1046,24 @@ fun SheetField(
         enabled = enabled,
         maxLength = maxLength,
         password = password,
+        lead = if (search) ({ Icon("search", size = Size.iconS, color = colors.faint) }) else null,
+        end =
+            if (search && typed.value.text.isNotEmpty()) {
+                {
+                    Icon(
+                        "close",
+                        Modifier.press({
+                            typed.value =
+                                androidx.compose.ui.text.input
+                                    .TextFieldValue("")
+                            ui.input(channel, key, "")
+                        }, label = "Leeren"),
+                        Size.iconS,
+                        colors.muted,
+                    )
+                }
+            } else {
+                null
+            },
     )
 }

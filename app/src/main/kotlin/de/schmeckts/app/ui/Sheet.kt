@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -653,3 +654,63 @@ fun SheetBody(
 /** the head of a sheet that is no list: title in the middle, no close button */
 @Composable
 fun PlainTitle(text: String) = M(text, Type.heading, Modifier.fillMaxWidth(), colors.ink, align = TextAlign.Center, balance = true)
+
+/** A page whose body is a lazy list, for the long history: the bar, the title as its first item, then the rest.
+ stuck: a sticky line is under the bar and draws the edge itself. */
+@Composable
+fun PageList(
+    title: String,
+    onBack: () -> Unit,
+    state: androidx.compose.foundation.lazy.LazyListState,
+    stuck: Boolean = false,
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+) {
+    val layer = LocalLayer.current
+    val scrolled by remember { derivedStateOf { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 0 } }
+    val titled by remember { derivedStateOf { state.firstVisibleItemIndex > 0 } }
+    LaunchedEffect(scrolled, titled) {
+        layer?.scrolled = scrolled
+        layer?.titled = titled
+    }
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.zIndex(1f)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(colors.bg)
+                    .heightIn(min = Size.bar)
+                    .padding(horizontal = Space.gutter),
+                horizontalArrangement = Arrangement.spacedBy(Space.s1),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBtn("back", "Zurück", Modifier.offset(x = -Space.s3), onClick = onBack)
+                val a by androidx.compose.animation.core.animateFloatAsState(
+                    if (titled) 1f else 0f,
+                    if (reduceMotion) {
+                        androidx.compose.animation.core
+                            .snap()
+                    } else {
+                        tween(Motion.FADE, easing = Motion.easeOut)
+                    },
+                    label = "bar title",
+                )
+                M(title, Type.heading, Modifier.weight(1f).alpha(a), maxLines = 1)
+            }
+            FadeEdge(scrolled && !stuck, Modifier.align(Alignment.BottomCenter).offset(y = Space.s5))
+        }
+        androidx.compose.foundation.lazy.LazyColumn(
+            Modifier.weight(1f).imePadding(),
+            state,
+            contentPadding =
+                androidx.compose.foundation.layout
+                    .PaddingValues(horizontal = Space.gutter),
+        ) {
+            item(key = "title") { M(title, Type.title, Modifier.padding(bottom = Space.s4), colors.ink, balance = true) }
+            content()
+            item(key = "foot") {
+                Box(Modifier.size(Space.s7))
+                Box(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            }
+        }
+    }
+}

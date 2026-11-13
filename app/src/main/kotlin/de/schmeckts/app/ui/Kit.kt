@@ -461,17 +461,21 @@ fun Chip(
     iconColor: Color? = null,
     lead: (@Composable () -> Unit)? = null,
     end: (@Composable () -> Unit)? = null,
+    toned: Tone? = null,
     onClick: (() -> Unit)?,
 ) {
     val p = colors
     val fade = if (reduceMotion) snap() else tween<Color>(Motion.FADE, easing = Motion.easeOut)
-    val bg by animateColorAsState(if (pressed) p.accent else raise, fade, label = "chip")
-    val fg by animateColorAsState(if (pressed) p.onAccent else p.ink, fade, label = "chip ink")
+    val on = if (toned != null) toned.cs else p.accent
+    val bg by animateColorAsState(if (pressed) on else raise, fade, label = "chip")
+    val fg by animateColorAsState(if (pressed && toned == null) p.onAccent else p.ink, fade, label = "chip ink")
+    val ring by animateColorAsState(if (pressed && toned != null) toned.c else Color.Transparent, fade, label = "chip ring")
     Row(
         modifier
             .press(onClick)
             .clip(RoundedCornerShape(50))
             .background(bg)
+            .border(Size.stroke, ring, RoundedCornerShape(50))
             .heightIn(min = Size.tapS)
             .padding(horizontal = Space.s4, vertical = Space.s2),
         horizontalArrangement = Arrangement.spacedBy(Space.s2),
@@ -479,7 +483,7 @@ fun Chip(
     ) {
         Ink(fg) {
             lead?.invoke()
-            if (icon != null) Icon(icon, size = Size.iconS, color = if (pressed) fg else iconColor ?: fg)
+            if (icon != null) Icon(icon, size = Size.iconS, color = if (pressed && toned == null) fg else iconColor ?: fg)
             T(label, Type.smallStrong, maxLines = 1)
             end?.invoke()
         }
