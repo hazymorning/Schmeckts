@@ -73,16 +73,20 @@ Wer sich mit Computern auskennt, kann zu Hause auch einen kleinen [Server](serve
 </details>
 
 <details>
-<summary>Was das Handy doch verlässt</summary>
+<summary>Datenschutz</summary>
 <br>
 
-Anmelden muss man sich nirgends, und Werbung oder Tracking gibt es auch nicht. Ein paar Ausnahmen gibt es trotzdem.
+Ein großes Thema bei der Entwicklung dieser App ist Datenschutz. Wir sind hier ja in Deutschland, und Deutsche finden Datenschutz einfach super spannend. Zumindest dann, wenn er nicht eingehalten wird. Also, auch wenn die App zugegeben etwas absurd ist, Datenschutz ist wichtig! Deshalb:
 
-Beim Start fragt die App bei GitHub nach, ob es eine neue Version gibt. Dabei geht nur diese Frage raus, keine Einträge. Abschalten lässt sich das in den Einstellungen unter „Updates“.
+Anmelden muss man sich nirgends, und Werbung oder Tracking gibt es auch nicht. Ein paar Ausnahmen, bei denen etwas rausgeht, gibt es trotzdem. Beim Start fragt die App bei GitHub nach, ob es eine neue Version gibt. Dabei geht nur diese Frage raus, keine Einträge. Abschalten lässt sich das in den Einstellungen unter „Updates“. Der Barcode-Scanner kommt von Google und schickt laut Google allgemeine Daten mit, zum Beispiel welches Handy man hat. Bilder sind nicht dabei.
 
-Der Barcode-Scanner kommt von Google und schickt laut Google allgemeine Daten mit, zum Beispiel welches Handy man hat. Bilder sind nicht dabei.
+Alles andere passiert nur, wenn man es selbst einschaltet. Die „Sortensuche im Internet“ schaut unbekannte Barcodes in zwei freien Datenbanken nach und schickt dabei nur die Nummer. Mit „Fotos mit eigener KI erkennen“ gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem der eigene Schlüssel ist. Und steht zu Hause ein Server, schickt der die Fotos an Anthropic, damit dort eine KI die Sorte erkennt. Das lässt sich in den Einstellungen unter „Fotos über den Server erkennen“ abschalten.
 
-Alles andere passiert nur, wenn man es selbst einschaltet. Die „Sortensuche im Internet“ schaut unbekannte Barcodes in zwei freien Datenbanken nach und schickt dabei nur die Nummer. Mit „Fotos mit eigener KI erkennen“ gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem der eigene Schlüssel ist. Und steht zu Hause ein Server, schickt der die Fotos an Anthropic, damit dort eine KI die Sorte erkennt. Das lässt sich in den Einstellungen bei „Fotos über den Server erkennen“ abschalten.
+---
+
+Viel musste ich nicht ändern. Ich habe die Tippfehler korrigiert und den ersten Satz aufgeteilt, damit die Pointe besser sitzt. Bei den Ausnahmen steht jetzt dabei, dass etwas rausgeht. Direkt nach „kein Tracking“ klingt es sonst nach Ausnahmen beim Tracking.
+
+Eine Sache betrifft noch den Inhalt: Die Erkennung über den Server lässt sich abschalten. Sie läuft also wohl automatisch, sobald ein Server da ist. Das passt nicht ganz zu „Alles andere passiert nur, wenn man es selbst einschaltet“, und genau so etwas finden die Leute aus dem ersten Absatz ja super spannend. Falls es so ist, würde „…wenn man es selbst einschaltet oder einrichtet“ das schon lösen.
 
 </details>
 
