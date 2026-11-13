@@ -1352,3 +1352,146 @@ class UiCropTest : ScreenTest() {
         )
     }
 }
+
+class UiCameraTest : ScreenTest() {
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    private val cam get() = ui.camera.open
+
+    private fun feedPhoto() {
+        act("feed")
+        act("photo")
+        idle(100)
+    }
+
+    // the system's question for the camera, still open when our camera closed, answered; Android asks one at a time
+    private fun answer(granted: Boolean = false) {
+        val shadow = org.robolectric.Shadows.shadowOf(rule.activity)
+        val asked = shadow.nextStartedActivityForResult ?: return
+        val result = if (granted) android.content.pm.PackageManager.PERMISSION_GRANTED else android.content.pm.PackageManager.PERMISSION_DENIED
+        val names = asked.intent.getStringArrayExtra("android.content.pm.extra.REQUEST_PERMISSIONS_NAMES")
+        val data =
+            android.content
+                .Intent()
+                .putExtra("android.content.pm.extra.REQUEST_PERMISSIONS_NAMES", names)
+                .putExtra("android.content.pm.extra.REQUEST_PERMISSIONS_RESULTS", IntArray(names?.size ?: 0) { result })
+        shadow.receiveResult(asked.intent, android.app.Activity.RESULT_OK, data)
+        idle(10)
+    }
+
+    // what the shutter hands over once the sensor has the still
+    private fun shutter(n: Int): Boolean {
+        ui.camera.close(jpegOf(1920, 1440))
+        answer()
+        check(until { db.servings.size == n && fieldText("Marke") != null }, "served from our camera")
+        idle(400)
+        return db.servings.size == n && db.servings[0].str("photo")!!.startsWith("data:image/jpeg") && !cam
+    }
+
+    @Test
+    fun `camera - our own camera serves at once, released on every way out, falls back to the camera app`() {
+        platform.camera = true
+        onePet()
+        feedPhoto()
+        check(cam && shows("Packung fotografieren") && labelled("Auslösen"), "feeding → photo: our camera with its shutter")
+        check(
+            shutter(1) &&
+                level == listOf("serving", null, "name") &&
+                db.servings[0].str("status") == "noserver" &&
+                db.servings[0].str("thumb") != null,
+            "the shutter serves at once and releases the camera, on to naming",
+        )
+        act("close")
+        idle(400)
+        val ways =
+            listOf<Pair<String, () -> Unit>>(
+                "cancel" to { tap("Abbrechen") },
+                "back button" to { back() },
+                "background" to {
+                    rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                    idle(10)
+                    rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+                },
+            )
+        for ((how, out) in ways) {
+            feedPhoto()
+            val opened = cam
+            out()
+            idle(400)
+            answer()
+            check(
+                opened && listOf(cam, db.servings.size, sheet?.kind) == listOf(false, 1, "feed"),
+                "$how: closed and released at once, nothing served, the feeding sheet stays",
+            )
+            act("close")
+            idle(400)
+        }
+        platform.barcode = SHEBA
+        act("feed")
+        act("scan")
+        check(until { cam }, "our camera for an unknown code")
+        val hint = ui.camera.hint
+        check(
+            shutter(2) && db.servings[0].str("scanCode") == SHEBA && hint!!.startsWith("Barcode unbekannt."),
+            "unknown barcode: our camera says why it opens, the code on the meal ($hint)",
+        )
+        act("close")
+        idle(400)
+        link("schmeckts://photo")
+        check(cam, "schmeckts://photo opens our camera")
+        platform.photo = jpegOf(480, 360)
+        platform.calls.clear()
+        ui.camera.fail(
+            de.schmeckts.app.ui
+                .CameraFailed("Das Foto ließ sich nicht aufnehmen."),
+        )
+        answer()
+        check(until { db.servings.size == 3 }, "served")
+        idle(400)
+        check(calls("capture").size == 1 && !cam, "no still from the sensor: the camera app takes the photo")
+        act("close")
+        idle(400)
+        platform.calls.clear()
+        feedPhoto()
+        val asked =
+            org.robolectric.Shadows
+                .shadowOf(rule.activity)
+                .lastRequestedPermission
+        check(cam && asked.requestedPermissions.toList() == listOf(android.Manifest.permission.CAMERA), "the camera asked for")
+        answer(false)
+        check(until { db.servings.size == 4 && fieldText("Marke") != null }, "served by the camera app")
+        idle(400)
+        check(calls("capture").size == 1 && !cam && db.servings.size == 4, "camera denied: the camera app serves")
+        act("close")
+        idle(400)
+        platform.photoError = "camera unavailable"
+        feedPhoto()
+        answer(false)
+        idle(400)
+        check(toast != null && db.servings.size == 4, "the camera app blocked as well: a notice, nothing served")
+        act("close")
+        idle(400)
+        platform.calls.clear()
+        main.logic.pets.openPet(db.pets[0].id)
+        idle(100)
+        act("pet-photo")
+        idle(100)
+        check(calls("pickImage").size == 1 && calls("capture").isEmpty() && !cam, "the profile picture comes from the gallery")
+    }
+
+    @Test
+    fun `no_camera - without a camera of its own, the camera app`() {
+        open()
+        act("demo")
+        act("feed")
+        act("photo")
+        idle(100)
+        check(calls("capture").size == 1 && !cam, "no camera: the camera app")
+    }
+}

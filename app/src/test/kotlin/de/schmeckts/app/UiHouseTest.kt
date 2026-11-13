@@ -3,6 +3,7 @@ package de.schmeckts.app
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performSemanticsAction
 import de.schmeckts.app.ui.SheetState
 import de.schmeckts.app.views.Exchanged
 import kotlinx.coroutines.Dispatchers
@@ -320,6 +321,166 @@ class UiPopupTest : ScreenTest() {
         check(
             swapped == listOf("settings", null) && layers == listOf(null, null),
             "a page over both replaces them, back leads home $swapped",
+        )
+    }
+}
+
+@org.robolectric.annotation.Config(qualifiers = "w360dp-h844dp-xxhdpi")
+class UiObservationsTest : ScreenTest() {
+    private fun obs() = db.observations.map { o -> listOf(o.str("kind"), o.pets.keys.sorted(), o.str("by")) }
+
+    // how far the chips are scrolled and how far they could be: the fade at the left shows from the first, at the right up to the last
+    private fun fades(scroll: Float): List<Boolean> {
+        val rail =
+            rule.onNode(
+                androidx.compose.ui.test
+                    .hasContentDescription("Beobachtung notieren"),
+                useUnmergedTree = true,
+            )
+        val range = androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange
+        val now = rail.fetchSemanticsNode().config[range].value()
+        rail.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(scroll - now, 0f) }
+        idle(50)
+        val r = rail.fetchSemanticsNode().config[range]
+        return listOf(r.value() > 0f, r.value() < r.maxValue())
+    }
+
+    // the left edge of each row's text in today's diary on the home page; a thumbnail without a photo shows a letter
+    private fun lefts(): List<Float> {
+        val text = androidx.compose.ui.semantics.SemanticsProperties.Text
+        return tags("row-", within = "sec-hist").map { id ->
+            rule
+                .onAllNodes(
+                    androidx.compose.ui.test
+                        .hasAnyAncestor(
+                            androidx.compose.ui.test
+                                .hasTestTag("row-$id"),
+                        ) and
+                        androidx.compose.ui.test.SemanticsMatcher
+                            .keyIsDefined(text),
+                    useUnmergedTree = true,
+                ).fetchSemanticsNodes()
+                .filter { it.config[text].joinToString().length > 1 }
+                .minOf { it.positionInRoot.x }
+        }
+    }
+
+    @Test
+    fun `observations - noted with one tap, undone, put right and deleted from the diary, per pet`() {
+        open(now = at("2026-06-12T12:00"))
+        act("demo")
+        idle(400)
+        prefs.name = "Anna"
+        val before = obs()
+        val words = OBSERVATIONS.values.map { it.label }
+        check(
+            words.size == 5 && words.all { it.split(" ").size <= 2 && labelled("$it notieren") },
+            "the chips always at hand, two words at most $words",
+        )
+        val px = 140 * rule.density.density
+        val f = listOf(0f, px, 100_000f, 0f).map { fades(it) }
+        check(
+            f[0] == f[3] && f[0] == listOf(false, true) && f[1] == listOf(true, true) && f[2] == listOf(true, false),
+            "the chips fade out at the left once scrolled, at the right while there are more $f",
+        )
+        act("observe", "v" to "tired")
+        val tired = toast
+        act("undo")
+        act("observe", "v" to "stink")
+        idle(400)
+        val after = obs()
+        val pet = db.pets[0].id
+        val told = toast
+        val noted = db.observations[0].id
+        check(
+            after[0] == listOf("stink", listOf(pet), "Anna") &&
+                after.size == before.size + 1 &&
+                words.all { labelled("$it notieren") } &&
+                noted in tags("row-", within = "sec-hist") &&
+                within("row-$noted", OBSERVATIONS.getValue("stink").label),
+            "a chip notes it at once, for the pet and by who noted it, in today’s diary under the chip’s word $after",
+        )
+        val l = lefts()
+        check(l.size > 1 && l.toSet().size == 1, "beside the meals of the day, its text in the same column $l")
+        act("undo")
+        idle(400)
+        check(obs() == before && noted !in tags("row-", within = "sec-hist"), "undo takes it back, from the diary too")
+        act("observe", "v" to "hungry")
+        idle(400)
+        val again = toast
+        check(
+            listOf(tired, told, again).all { it != null && it.startsWith("Notiert: ") && "Vorlieben" !in it },
+            "a note says what was noted and no more ($tired / $told / $again)",
+        )
+        val mine = db.observations[0].id
+        act("open-observation", "id" to mine)
+        val kinds = OBSERVATIONS.values.filter { chosen(it.label) }.map { it.label }
+        check(
+            kinds == listOf(OBSERVATIONS.getValue("hungry").label) && inSheet("Notiert") && !inSheet("Bemerkt bei"),
+            "its sheet: the kind pressed, its time, no pets to choose with one pet $kinds",
+        )
+        act("set-observation-kind", "v" to "tired")
+        platform.picked = at("2026-01-02T08:30")
+        act("pick", "field" to "obs-time", "id" to mine)
+        idle(100)
+        val o = db.observations.first { it.id == mine }
+        check(
+            o.str("kind") == "tired" && o.at == at("2026-01-02T08:30") && db.observations.last() === o,
+            "kind and time put right ${o.str("kind")}",
+        )
+        act("delete-observation", "id" to mine)
+        idle(400)
+        val gone = listOf(obs() == before, sheet != null)
+        act("undo")
+        idle(400)
+        check(gone == listOf(true, false) && db.observations.find { it.id == mine }?.str("kind") == "tired", "deleted, undone $gone")
+        act("open-report")
+        idle(400)
+        val first = tags("row-", sheet = true).first { id -> db.observations.any { it.id == id } }
+        act("open-observation", "id" to first)
+        idle(400)
+        val over =
+            listOf(
+                ui.sheets.base.state
+                    ?.kind,
+                ui.sheets.over.state
+                    ?.kind,
+            )
+        act("close")
+        idle(400)
+        check(over == listOf("report", "observation"), "in the history page it opens over the page")
+        act("settings-back")
+        idle(400)
+        db.pets.add(Rec(j(pet(T, "Tiger") + ("createdAt" to Time.now())).obj()))
+        phone.store.save()
+        ui.update()
+        idle(100)
+        act("observe", "v" to "stink")
+        idle(400)
+        val both = obs()[0][1]
+        act("open-observation", "id" to db.observations[0].id)
+        act("toggle-observation-pet", "id" to T)
+        val narrowed = obs()[0][1]
+        act("toggle-observation-pet", "id" to pet)
+        check(
+            both == listOf(pet, T).sorted() && narrowed == listOf(pet) && obs()[0][1] == listOf(pet),
+            "for all pets, narrowed, at least one $both $narrowed",
+        )
+        act("close")
+        idle(400)
+        act("filter", "id" to T)
+        act("observe", "v" to "hungry")
+        idle(400)
+        check(obs()[0].take(2) == listOf("hungry", listOf(T)), "with a pet chosen: noted for that pet ${obs()[0]}")
+        val count = obs().size
+        main.logic.pets.openPet(T)
+        idle(100)
+        main.logic.pets.deletePet()
+        idle(400)
+        val left = obs()
+        check(
+            left.size == count - 1 && left.none { T in (it[1] as List<*>) },
+            "a pet deleted: gone from the observations, those of it alone too",
         )
     }
 }

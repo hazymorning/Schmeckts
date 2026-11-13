@@ -63,8 +63,11 @@ class FakePlatform : Platform {
 
     override fun hasCamera() = camera
 
+    var photoError: String? = null // the camera app blocked
+
     override suspend fun takePhoto(hint: String?): ByteArray? {
         calls.add("capture" to hint)
+        photoError?.let { throw java.io.IOException(it) }
         return photo
     }
 
