@@ -1,5 +1,10 @@
 package de.schmeckts.app
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import org.junit.Test
 
 // Asking, merging, form errors, the mood picture and toasts: the rest of the old ui_test.py.
@@ -259,5 +264,157 @@ class UiToastTimeTest : ScreenTest() {
         val plain = lasts("Hunger notiert.", false)
         val long = lasts("Stunk notiert. Fenster auf! " + "Ein langer Satz, der etwas länger zu lesen ist. ".repeat(3))
         check(plain < short && short < long && long - short > 1500, "short with undo, short without, long: $short $plain $long ms")
+    }
+}
+
+class UiToastSwipeTest : ScreenTest() {
+    private var undone = 0
+
+    private val shown get() = ui.toasts.show
+
+    private fun show(text: String = "Hunger notiert."): androidx.compose.ui.geometry.Rect {
+        ui.toast(text, { undone++ })
+        idle(400)
+        return box()
+    }
+
+    private fun box() =
+        rule
+            .onNode(
+                androidx.compose.ui.test
+                    .hasTestTag("toast"),
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+            .boundsInRoot
+
+    private fun root() = rule.onRoot()
+
+    private fun drag(
+        x: Float,
+        y: Float,
+        dx: Float,
+    ) {
+        root().performTouchInput {
+            down(Offset(x, y))
+            repeat(5) { moveBy(Offset(dx / 5, 0f)) }
+            up()
+        }
+        idle(400)
+    }
+
+    @Test
+    fun `toast_swipe - swiped sideways it goes without undoing, held it stays, a tap on Rückgängig still undoes`() {
+        open()
+        var b = show()
+        root().performTouchInput { down(Offset(b.left + 20, b.center.y)) }
+        idle(20_000)
+        val held = shown
+        root().performTouchInput { up() }
+        idle(1000)
+        val after = shown
+        idle(20_000)
+        check(held && after && !shown, "held it stays, let go it goes after a while")
+
+        b = show()
+        root().performTouchInput {
+            down(Offset(b.left + 20, b.center.y))
+            moveBy(Offset(b.width / 4, 0f))
+        }
+        idle(50)
+        show()
+        idle(20_000)
+        val under = shown
+        root().performTouchInput {
+            moveBy(Offset(b.width / 6, 0f))
+            up()
+        }
+        idle(400)
+        check(
+            under && shown && undone == 0,
+            "a toast that comes while the finger is on the last one waits for it and takes no part of its swipe",
+        )
+
+        b = show()
+        drag(b.left + 20, b.center.y, 20f)
+        val back = listOf(shown, ui.toasts.swipe)
+        drag(b.left + 20, b.center.y, b.width / 2)
+        check(back == listOf(true, 0f) && !shown, "a short move snaps back, a long one sends it away $back")
+
+        show()
+        rule
+            .onNode(
+                androidx.compose.ui.test
+                    .hasText("Rückgängig"),
+                useUnmergedTree = true,
+            ).performClick()
+        idle(400)
+        val tapped = undone
+        b = show()
+        val button =
+            rule
+                .onNode(
+                    androidx.compose.ui.test
+                        .hasText("Rückgängig"),
+                    useUnmergedTree = true,
+                ).fetchSemanticsNode()
+                .boundsInRoot
+        drag(button.center.x, button.center.y, -b.width / 2)
+        check(tapped == 1 && undone == 1 && !shown, "a tap on its button undoes, a swipe that begins there does not")
+    }
+
+    // lines of the toast's text, and whether its button stands under it
+    private fun layout(text: String): List<Any> {
+        ui.toast(text, {})
+        idle(400)
+        val t =
+            rule.onNode(
+                androidx.compose.ui.test
+                    .hasText(text),
+                useUnmergedTree = true,
+            )
+        val lines = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        t.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(lines) }
+        val button =
+            rule
+                .onNode(
+                    androidx.compose.ui.test
+                        .hasText("Rückgängig"),
+                    useUnmergedTree = true,
+                ).fetchSemanticsNode()
+                .boundsInRoot
+        return listOf(lines[0].lineCount, button.top >= t.fetchSemanticsNode().boundsInRoot.bottom - 1)
+    }
+
+    @Test
+    fun `toast_swipe - two lines at most, the sheet drops a toast with nothing to undo, undo works while it closes`() {
+        open()
+        val sizes =
+            listOf("Eintrag gelöscht", "Notiert bei Minka oder Felix: extra hungrig. Vielleicht war die Portion knapp.").map { layout(it) }
+        check(sizes == listOf(listOf(1, false), listOf(2, true)), "beside the button, or over it where it needs the room $sizes")
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+        val kept =
+            listOf(false, true).map { undo ->
+                ui.toast("Willkommen, Minka!", if (undo) ({}) else null)
+                idle(100)
+                act("feed")
+                idle(400)
+                val k = shown
+                ui.sheets.closeAll()
+                idle(400)
+                k
+            }
+        check(kept == listOf(false, true), "a sheet opening drops a toast with nothing to undo, which would cover its last button $kept")
+        act("feed")
+        idle(400)
+        var done = false
+        ui.toast("Alles gefressen.", { done = true })
+        idle(100)
+        ui.sheets.closeSheet()
+        act("undo")
+        idle(400)
+        check(done, "its undo works while the sheet it sits in closes")
     }
 }

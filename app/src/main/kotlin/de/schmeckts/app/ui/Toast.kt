@@ -1,5 +1,6 @@
 package de.schmeckts.app.ui
 
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -78,7 +80,7 @@ class Toasts(
 
     private fun waitFor(ms: Long) {
         timer?.cancel()
-        ends = System.currentTimeMillis() + ms
+        ends = SystemClock.uptimeMillis() + ms
         timer =
             scope.launch {
                 delay(ms)
@@ -124,7 +126,7 @@ class Toasts(
 
     internal fun pressed() {
         down = true
-        left = ends - System.currentTimeMillis()
+        left = ends - SystemClock.uptimeMillis()
         timer?.cancel()
     }
 
@@ -192,6 +194,7 @@ fun ToastHost(
         val a = shown.value
         Box(
             Modifier
+                .testTag("toast")
                 .widthIn(max = minOf(maxWidth * 0.92f, 520.dp))
                 .graphicsLayer {
                     alpha = a
@@ -207,7 +210,7 @@ fun ToastHost(
                             awaitEachGesture {
                                 val first = awaitFirstDown(requireUnconsumed = false)
                                 toasts.pressed()
-                                val t0 = System.currentTimeMillis()
+                                var t = first.uptimeMillis
                                 var dx = 0f
                                 var swiped = false
                                 while (true) {
@@ -215,6 +218,7 @@ fun ToastHost(
                                     val c = e.changes.firstOrNull { it.id == first.id } ?: break
                                     if (!c.pressed) break
                                     dx += c.positionChange().x
+                                    t = c.uptimeMillis
                                     if (!swiped && abs(dx) > SLOP * density) {
                                         swiped = true
                                         toasts.dragging = true
@@ -224,7 +228,7 @@ fun ToastHost(
                                         c.consume()
                                     }
                                 }
-                                val v = abs(dx) / density / maxOf(1L, System.currentTimeMillis() - t0)
+                                val v = abs(dx) / density / maxOf(1L, t - first.uptimeMillis)
                                 toasts.released(swiped, dx, width, v, screen)
                             }
                         }
