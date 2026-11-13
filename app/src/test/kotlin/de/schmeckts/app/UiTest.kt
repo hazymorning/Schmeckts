@@ -1663,3 +1663,197 @@ class UiReminderButtonsTest : ScreenTest() {
         check(note("trocken01")?.rate == quickOf(phone.derive.getProduct("trocken001")), "another scale: its own buttons")
     }
 }
+
+class UiUpdateTest : ScreenTest() {
+    private val apk = "https://github.com/hazymorning/Schmeckts/releases/download/v10.0.0/schmeckts.apk"
+    private var tag = "v10.0.0"
+    private val asked = mutableListOf<String>()
+
+    private fun github() =
+        http.route("https://api.github.com/repos/hazymorning/Schmeckts/releases/latest") { _, url, _ ->
+            asked.add(url)
+            Http.Answer(200, """{"tag_name":"$tag","assets":[{"name":"schmeckts.apk","browser_download_url":"$apk"}]}""")
+        }
+
+    @Test
+    fun `update - a newer version found at start, installed from its card or the settings, not asked with the switch off`() {
+        github()
+        open(mapOf("db" to savedDb()))
+        check(until { shows("Version 10.0.0 ist da.") }, "found at start")
+        act("update-install")
+        idle(400)
+        check(calls("install") == listOf(apk) && asked.size == 1, "the card hands the APK to the installer")
+        check(shows("Aktualisieren"), "back from the installer without updating, the card offers it again")
+        platform.installError = "update failed"
+        act("update-install")
+        check(until { toast?.startsWith("Das Update ließ sich nicht laden") == true }, "a failed download says so")
+        act("update-later")
+        check(
+            !shows("Version 10.0.0 ist da.") && shows("Ans Bewerten erinnern?"),
+            "„Später“ takes the card away and the next question comes",
+        )
+        act("open-settings")
+        val row = inSheet("Version 10.0.0 installieren")
+        act("update-auto")
+        check(row && !prefs.updates, "the settings offer it too, and the check at start goes off")
+        restart()
+        idle(400)
+        check(asked.size == 1 && !shows("Version 10.0.0 ist da."), "with the switch off nothing is asked at start")
+        tag = "v9.9.9"
+        act("open-settings")
+        act("update-check")
+        check(until { inSheet("Du hast die neueste Version") } && asked.size == 2, "searched by hand: the same version is no update")
+    }
+}
+
+class UiNewsTest : ScreenTest() {
+    private val keys = NEWS.map { "neu:" + it.v }.distinct()
+
+    @Test
+    fun `news - a new phone has seen all news`() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        restart()
+        check(
+            keys.isNotEmpty() &&
+                keys.all {
+                    it in prefs.hiddenHints
+                } &&
+                !shows(NEWS[0].title),
+            "a new phone has seen all news ${prefs.hiddenHints}",
+        )
+    }
+
+    @Test
+    fun `news - an update with own pets brings the newest, once the reminder question is answered, hidden for good`() {
+        open(mapOf("db" to savedDb()))
+        val first = listOf(shows("Ans Bewerten erinnern?"), shows(NEWS[0].title))
+        act("hide-hint", "v" to REMIND_ASKED)
+        check(first == listOf(true, false) && shows(NEWS[0].title), "one question at a time $first")
+        act("hide-hint", "v" to "neu:${NEWS[0].v}")
+        restart()
+        check(!shows(NEWS[0].title), "hidden, also after a restart")
+    }
+
+    @Test
+    fun `news - many hidden hints, the oldest go, what is said once stays`() {
+        val many = keys + "tipp:beobachtung" + (0 until 330).map { d -> "appetit:lxpet00001:2025-%02d-%02d".format(d / 28 + 1, d % 28 + 1) }
+        open(mapOf("db" to savedDb(), "prefs" to j(mapOf("hiddenHints" to many))))
+        val kept = prefs.hiddenHints
+        check(
+            !shows(NEWS[0].title) && kept.size == 300 + keys.size + 1 && kept.containsAll(keys + "tipp:beobachtung"),
+            "the oldest go, what is said once stays",
+        )
+    }
+
+    @Test
+    fun `news - only sample data, no news`() {
+        val saved = savedDb()
+        val demo =
+            j(
+                saved +
+                    mapOf(
+                        "pets" to j(listOf(pet("demopet0001", "Mau"))),
+                        "servings" to
+                            j(saved["servings"].asArray!!.map { it.obj() + ("pets" to j(mapOf("demopet0001" to mapOf("r" to "gut")))) }),
+                    ),
+            )
+        open(mapOf("db" to demo))
+        check(!shows(NEWS[0].title), "only sample data: no news")
+    }
+}
+
+class UiFeedRemindTest : ScreenTest() {
+    private val notes get() = platform.notifications
+
+    private fun t(x: Long): String {
+        val c =
+            java.util.Calendar
+                .getInstance()
+                .apply { timeInMillis = x }
+        return "%02d-%02d %02d:%02d".format(
+            c.get(java.util.Calendar.MONTH) + 1,
+            c.get(java.util.Calendar.DAY_OF_MONTH),
+            c.get(java.util.Calendar.HOUR_OF_DAY),
+            c.get(java.util.Calendar.MINUTE),
+        )
+    }
+
+    private fun plan() = notes.feedSet.map { listOf(it.key, t(it.at), t(it.since)) }.sortedBy { it.joinToString() }
+
+    @Test
+    fun `feed remind - the usual times handed to the phone, with the server when connected`() {
+        val whenAt = (3..9).flatMap { d -> listOf("07:15", "18:30").map { at("2026-06-%02dT%s".format(d, it)) } }
+        open(
+            mapOf(
+                "db" to
+                    dbOf(
+                        listOf(pet(M)),
+                        listOf(product("nass000001"), product("snack000001", "Sheba", "Käse", "Snack")),
+                        whenAt.mapIndexed { i, w -> meal("meal%04d".format(i), "nass000001", w, mapOf(M to "gut")) },
+                    ),
+            ),
+            at("2026-06-10T12:00"),
+        )
+        act("open-settings")
+        notes.answer = "denied"
+        act("feed-remind")
+        idle(400)
+        val denied = listOf(prefs.feedRemind, plan())
+        notes.answer = "granted"
+        notes.granted = "prompt"
+        act("feed-remind")
+        idle(400)
+        check(denied == listOf(false, emptyList<List<String>>()) && prefs.feedRemind, "needs the permission, on once granted")
+        val plan = plan()
+        val slots = mapOf("1110" to listOf("19:15", "17:30"), "435" to listOf("08:00", "06:15"))
+        check(
+            plan.take(5) ==
+                listOf(
+                    listOf("2026-06-10|1110", "06-10 19:15", "06-10 17:30"),
+                    listOf("2026-06-11|1110", "06-11 19:15", "06-11 17:30"),
+                    listOf("2026-06-11|435", "06-11 08:00", "06-11 06:15"),
+                    listOf("2026-06-12|1110", "06-12 19:15", "06-12 17:30"),
+                    listOf("2026-06-12|435", "06-12 08:00", "06-12 06:15"),
+                ) &&
+                plan.all { (k, a, s) -> listOf(a.drop(6), s.drop(6)) == slots[k.split("|")[1]] } &&
+                notes.feedServer.isEmpty() &&
+                notes.feedCode.isEmpty(),
+            "one per usual time and day, 45 minutes late, from an hour before, none for this morning; no server alone ${plan.size}",
+        )
+        act("settings-back")
+        prefs.code = "K7PM-3QXD"
+        prefs.server = "http://192.168.178.20:8486"
+        main.logic.reminders.syncReminders()
+        idle(400)
+        val house = listOf(notes.feedServer, notes.feedCode, notes.feedSet.size)
+        prefs.code = ""
+        prefs.server = ""
+        main.logic.reminders.syncReminders()
+        idle(400)
+        check(
+            house == listOf("http://192.168.178.20:8486", "K7PM-3QXD", plan.size) && notes.feedServer.isEmpty(),
+            "server and code handed over while connected",
+        )
+        clock = at("2026-06-10T18:00")
+        main.logic.feeding.serveProduct("snack000001")
+        idle(400)
+        val snack = listOf(plan().size, notes.feedDismiss.size)
+        main.logic.feeding.serveProduct("nass000001")
+        idle(400)
+        check(
+            snack == listOf(plan.size, 0) && plan().map { it[0] } == plan.drop(1).map { it[0] } && notes.feedDismiss.size == 2,
+            "a treat changes nothing; a meal at the usual time drops today’s and dismisses shown ones $snack",
+        )
+        link("schmeckts://feed")
+        idle(400)
+        check(level == listOf("feed", null, null), "its tap opens the feeding sheet through schmeckts://feed")
+        act("close")
+        act("open-settings")
+        act("feed-remind")
+        idle(400)
+        check(plan().isEmpty() && !prefs.feedRemind, "off: the phone holds none")
+    }
+}

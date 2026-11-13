@@ -155,6 +155,7 @@ class FakeNotifications(
     var answer = "granted"
     var planned: List<Note> = emptyList()
     var feedSet: List<FeedNote> = emptyList()
+    var feedDismiss: List<Int> = emptyList()
     var feedServer = ""
     var feedCode = ""
 
@@ -179,6 +180,7 @@ class FakeNotifications(
     ) {
         calls.add("feedSet" to reminders.map { it.key })
         feedSet = reminders
+        feedDismiss = dismiss
         feedServer = server
         feedCode = code
     }
