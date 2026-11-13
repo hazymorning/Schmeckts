@@ -3,9 +3,9 @@
   <img src=".github/readme/hero-light.svg" alt="Schmeckt’s? Eine App für Katzen mit Ansprüchen.">
 </picture></p>
 
-Mau weiß genau, was ihr schmeckt. Sie sagt es nur nicht. Irgendwas mit Thunfisch kommt zum Beispiel super an, meistens zumindest. Die Sorte, die so teuer war, fand sie am besten, zumindest gefühlt. Hat sie aktuell einfach wenig Hunger, oder liegt es am Essen? Und beim Einkaufen dann die Frage: Schmeckt ihr das, oder eher nicht? Lieber immer dasselbe kaufen oder viel Abwechslung? Aus diesen Fragen ist eines Tages in der Küche die Idee für diese App entstanden.
+Mau weiß genau, was ihr schmeckt. Sie sagt es nur nicht. Irgendwas mit Thunfisch kommt zum Beispiel super an, meistens zumindest. Die eine Sorte, die so teuer war, fand sie am besten, zumindest gefühlt. Hat sie aktuell einfach wenig Hunger, oder liegt es am Essen? Und beim Einkaufen dann die Frage: Schmeckt ihr das, oder eher nicht? Lieber immer dasselbe kaufen oder viel Abwechslung? Aus diesen Fragen ist eines Tages in der Küche die Idee für diese App entstanden.
 
-Ein Futtertagebuch für Katzen hält allerdings niemand im Alltag durch, außer es ist wirklich maximal unkompliziert. Daher baut hier alles auf diesem Gedanken auf: Alles muss möglichst schnell und einfach sein, die App macht den Rest und schreibt mit. Beim Füttern fotografiert man die Packung, später wird dann angetippt, wie viel Mau gegessen hat. Nach ein paar Wochen gibt’s dann nützliche Auswertungen der Vorlieben und mehr.
+Ein Futtertagebuch für Katzen hält allerdings niemand im Alltag durch, außer es ist wirklich **maximal unkompliziert**. Und auf dem Gedanken baut die ganze App auf, alles muss möglichst schnell und einfach sein und die App macht den Rest und schreibt mit. Beim Füttern fotografiert man die Packung, später wird dann angetippt, wie viel Mau gegessen hat. Nach ein paar Wochen gibt’s dann nützliche Auswertungen der Vorlieben und mehr.
 
 <a href="https://github.com/hazymorning/Schmeckts/releases/latest/download/schmeckts.apk"><picture><source media="(prefers-color-scheme: dark)" srcset=".github/readme/download-dark.svg"><img src=".github/readme/download-light.svg" width="224" alt="Download für Android"></picture></a><br>
 [So kommt die App aufs Handy](#how-to-install)
