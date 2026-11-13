@@ -3,6 +3,7 @@ package de.schmeckts.app.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,6 +77,25 @@ class Ui(
         vararg data: Pair<String, String?>,
     ): () -> Unit = { act(name, *data) }
 
+    val home = HomeState()
+
+    /** the field, by its id, to take the focus and the keyboard on its next draw */
+    var wantFocus by mutableStateOf<String?>(null)
+
+    /** bumped to take the focus off any field, so its keyboard goes */
+    var blur by mutableIntStateOf(0)
+
+    fun focus(id: String) {
+        wantFocus = id
+    }
+
+    fun blurField() {
+        blur++
+    }
+
+    /** the photo button whose photo is being fetched */
+    var photoBusy by mutableStateOf("")
+
     /** the splash is gone and the cards rise in turn */
     var arrive by mutableStateOf(false)
     var splashGone by mutableStateOf(false)
@@ -100,4 +120,17 @@ fun rememberTyped(
     val t = remember(owner, key) { Typed(stored) }
     if (t.value.text != stored) t.value = TextFieldValue(stored, TextRange(stored.length))
     return t
+}
+
+/** fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets;
+ leaving: meals on their way out of it; turned: the Stimmt’s? sheet showing its back; filled: the feeding button's
+ bowl fills, once per serving */
+class HomeState {
+    var fresh by mutableStateOf<String?>(null)
+    val held = HashMap<String, MutableSet<String>>()
+    val leaving = mutableStateMapOf<String, () -> Unit>()
+    var turned by mutableStateOf<String?>(null)
+    var tearing by mutableStateOf(false)
+    var fills by mutableIntStateOf(0)
+    var due by mutableStateOf(false)
 }

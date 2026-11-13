@@ -166,7 +166,7 @@ fun T(
     )
 }
 
-/** text with <b> and entities */
+/** text with <b> and entities; strong: the colour of the bold parts, where it differs */
 @Composable
 fun M(
     html: String,
@@ -176,7 +176,20 @@ fun M(
     maxLines: Int = Int.MAX_VALUE,
     align: TextAlign? = null,
     balance: Boolean = false,
-) = T(markup(html), style, modifier, color, maxLines, align, balance)
+    strong: Color = Color.Unspecified,
+) = T(
+    markup(
+        html,
+        androidx.compose.ui.text
+            .SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = strong),
+    ),
+    style,
+    modifier,
+    color,
+    maxLines,
+    align,
+    balance,
+)
 
 /** what is drawn inside takes this colour, as currentColor did */
 @Composable
@@ -759,6 +772,7 @@ fun Field(
     end: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
     maxLength: Int = Int.MAX_VALUE,
+    password: Boolean = false,
 ) {
     val p = colors
     val source = remember { MutableInteractionSource() }
@@ -795,7 +809,13 @@ fun Field(
         singleLine = true,
         interactionSource = source,
         cursorBrush = SolidColor(p.accent),
-        visualTransformation = VisualTransformation.None,
+        visualTransformation =
+            if (password) {
+                androidx.compose.ui.text.input
+                    .PasswordVisualTransformation()
+            } else {
+                VisualTransformation.None
+            },
         decorationBox = { inner ->
             Row(
                 Modifier

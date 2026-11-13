@@ -1,10 +1,40 @@
 package de.schmeckts.app.views
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import de.schmeckts.app.DAY
 import de.schmeckts.app.GlanceOf
+import de.schmeckts.app.Model
+import de.schmeckts.app.OBSERVATIONS
 import de.schmeckts.app.Phone
 import de.schmeckts.app.RATINGS
 import de.schmeckts.app.Rec
+import de.schmeckts.app.Time
 import de.schmeckts.app.addDays
 import de.schmeckts.app.andList
 import de.schmeckts.app.cap
@@ -20,11 +50,27 @@ import de.schmeckts.app.dayNumber
 import de.schmeckts.app.dayStart
 import de.schmeckts.app.esc
 import de.schmeckts.app.flavoursOf
+import de.schmeckts.app.glance
 import de.schmeckts.app.hourOf
 import de.schmeckts.app.jsRound
 import de.schmeckts.app.pname
 import de.schmeckts.app.servedAt
 import de.schmeckts.app.typeOf
+import de.schmeckts.app.ui.Chip
+import de.schmeckts.app.ui.Disc
+import de.schmeckts.app.ui.Icon
+import de.schmeckts.app.ui.LocalUi
+import de.schmeckts.app.ui.M
+import de.schmeckts.app.ui.Motion
+import de.schmeckts.app.ui.Rail
+import de.schmeckts.app.ui.Size
+import de.schmeckts.app.ui.Space
+import de.schmeckts.app.ui.T
+import de.schmeckts.app.ui.Type
+import de.schmeckts.app.ui.colors
+import de.schmeckts.app.ui.press
+import de.schmeckts.app.ui.reduceMotion
+import de.schmeckts.app.ui.tone
 import de.schmeckts.app.weekday
 
 // Top of the home page, on the ground above the cards: a greeting, then how it goes at the bowl, in facts: the last
@@ -276,4 +322,157 @@ fun headOf(
     val h = hourOf(now)
     val hello = (if (h in 11..17) WEEKEND[weekday(now)] else null) ?: GREETINGS.last { h >= it.first }.second
     return if (name.isNotEmpty()) "$hello, ${esc(name)}" else hello
+}
+
+/** The overview on the ground, one cat large, several as a pair; just: the kind just noted, whose chip answers */
+@Composable
+fun Overview(
+    m: Model,
+    noted: String?,
+) {
+    val ui = LocalUi.current
+    val ph = ui.phone
+    val d = ph.derive
+    val pets = if (m.pet != null) listOfNotNull(d.getPet(m.pet)) else ph.db.pets.toList()
+    val one = if (pets.size == 1) pets[0] else null
+    val now = Time.now()
+    val ids = pets.map { it.id }
+    val fav =
+        d
+            .rankingModel()
+            .top
+            .firstOrNull()
+            ?.product
+    val seen = glance(ph.db, ids, now)
+    val c =
+        Card(
+            seen,
+            ids.size,
+            one?.let { d.calledNames(listOf(it.id), "head", now) },
+            if (fav != null && fav.id != seen.meal?.str("productId")) pname(fav) else null, // not the meal the card just told
+        )
+    val moment = ph.momentOf(c, now)
+    val due = seen.next?.due == true
+    SideEffect { ui.home.due = due } // a soft nudge at feeding time
+    val sleepy = moment in SLEEP
+    val just = noted?.let { d.getObservation(it)?.str("kind") }
+    Column(Modifier.padding(top = Space.s2)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // the photo grows with the width, so beside the sentence it keeps its proportion from 360 on
+            val big = (maxWidth * 0.26f).coerceIn(Size.picXxl, Size.picXxxl)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.s4), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.padding(bottom = Space.s3)) {
+                    if (one != null) {
+                        Box(Modifier.press(ui.on("open-pet", "id" to one.id), label = "${one.str("name")} bearbeiten")) {
+                            Avatar(one, Av.XXXL, Modifier.size(big))
+                        }
+                    } else {
+                        Box(Modifier.size(Size.picXxl)) {
+                            pets.take(2).forEachIndexed { i, pet ->
+                                val bg = colors.bg
+                                Avatar(
+                                    pet,
+                                    Av.L,
+                                    Modifier
+                                        .align(if (i == 0) Alignment.TopStart else Alignment.BottomEnd)
+                                        .then(
+                                            if (i == 1) {
+                                                Modifier.drawBehind { drawCircle(bg, size.minDimension / 2 + Size.stroke.toPx()) }
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
+                                )
+                            }
+                        }
+                    }
+                    if (sleepy) Snooze(Modifier.align(Alignment.TopEnd).padding(end = Space.s1))
+                }
+                Column(Modifier.weight(1f).padding(bottom = Space.s3)) {
+                    M(headOf(now, ph.prefs.name), Type.heading, Modifier.padding(bottom = Space.hair), colors.ink)
+                    M(ph.sentenceOf(c, now), Type.body, color = colors.ink)
+                }
+            }
+        }
+        ObserveRail(just)
+    }
+}
+
+// at night a z drifts up from the picture
+@Composable
+private fun Snooze(modifier: Modifier) {
+    val still = reduceMotion
+    val t = rememberInfiniteTransition(label = "snooze")
+    val f =
+        t.animateFloat(
+            0f,
+            1f,
+            infiniteRepeatable(tween((2.5 * Motion.LONG).toInt(), easing = Motion.easeOut), RepeatMode.Restart),
+            label = "z",
+        )
+    T(
+        "z",
+        Type.smallStrong,
+        modifier.graphicsLayer {
+            val x = if (still) 1f else f.value
+            alpha =
+                if (still) {
+                    0f
+                } else if (x < 0.3f) {
+                    x / 0.3f
+                } else {
+                    1f - (x - 0.3f) / 0.7f
+                }
+            translationX = 8.dp.toPx() * x
+            translationY = (4 - 18 * x).dp.toPx()
+            val k = 0.8f + 0.4f * x
+            scaleX = k
+            scaleY = k
+        },
+        colors.muted,
+    )
+}
+
+// always at hand, so noting takes one tap
+@Composable
+private fun ObserveRail(just: String?) {
+    val ui = LocalUi.current
+    Rail(Modifier.padding(top = Space.s1, bottom = Space.s3).semantics { contentDescription = "Beobachtung notieren" }) {
+        for ((k, o) in OBSERVATIONS) {
+            val t = colors.tone(k)
+            Chip(
+                o.label,
+                lead = {
+                    val pop = remember(just) { Animatable(if (just == k) 0.6f else 1f) }
+                    val still = reduceMotion
+                    LaunchedEffect(just) {
+                        if (just == k && !still) {
+                            pop.animateTo(
+                                1f,
+                                keyframes {
+                                    durationMillis = Motion.STEP
+                                    1.18f at (Motion.STEP * 0.55f).toInt() using
+                                        Motion.spring
+                                },
+                            )
+                        } else {
+                            pop.snapTo(1f)
+                        }
+                    }
+                    Disc(
+                        Size.picS,
+                        t?.cs ?: colors.surface2,
+                        Modifier
+                            .offset(x = -Space.s2)
+                            .graphicsLayer {
+                                scaleX = pop.value
+                                scaleY = pop.value
+                            },
+                    ) { Icon(o.icon, size = Size.iconS, color = t?.c ?: colors.muted) }
+                },
+                modifier = Modifier.semantics { contentDescription = "${o.label} notieren" },
+                onClick = ui.on("observe", "v" to k),
+            )
+        }
+    }
 }
