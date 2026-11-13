@@ -9,12 +9,12 @@ updates:
       actions:
         patterns: ['*']
 
-  - package-ecosystem: npm
+  - package-ecosystem: gradle
     directory: /app
     schedule:
       interval: monthly
     groups:
-      npm:
+      gradle:
         patterns: ['*']
 
   - package-ecosystem: pip
@@ -24,6 +24,3 @@ updates:
     groups:
       pip:
         patterns: ['*']
-    ignore:
-      # raised by hand together with the container image in tests.yml, which brings the matching Chromium
-      - dependency-name: playwright

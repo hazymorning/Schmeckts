@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The ground of app/www/img/schmeckts-icon.svg -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:scaleX="0.140625" android:scaleY="0.140625" android:translateX="18" android:translateY="18">
-        <path android:fillColor="#FFEEEDE7" android:pathData="M-128 -128H640V640H-128Z"/>
-        <path android:fillColor="#FFA3A97F" android:pathData="M-664 924A900 600 0 1 1 1136 924A900 600 0 1 1 -664 924Z"/>
-    </group>
-</vector>

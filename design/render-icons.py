@@ -1,4 +1,4 @@
-"""Renders the Android 7 launcher icons in app/native/res from app/www/img/schmeckts-icon.svg; Android 8 on uses the
+"""Renders the Android 7 launcher icons in app/src/main/res from design/schmeckts-icon.svg; Android 8 on uses the
 vectors. Run it again after changing the icon. Needs Playwright."""
 
 import asyncio
@@ -7,8 +7,8 @@ import re
 from playwright.async_api import async_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-RES = ROOT / 'app/native/res'
-SVG = (ROOT / 'app/www/img/schmeckts-icon.svg').read_text()
+RES = ROOT / 'app/src/main/res'
+SVG = (ROOT / 'design/schmeckts-icon.svg').read_text()
 DENS = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
 
 
