@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -638,8 +639,8 @@ fun Calendar(
                                     Modifier.press(ui.on("jump-day", "day" to k), label = label)
                                 } else {
                                     Modifier.semantics {
-                                        contentDescription =
-                                            label
+                                        contentDescription = label
+                                        disabled() // a day without entries is no button
                                     }
                                 },
                             ).alpha(if (later) de.schmeckts.app.ui.Alpha.DIM else 1f)

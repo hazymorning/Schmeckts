@@ -377,9 +377,12 @@ private fun ObservationView(state: SheetState) {
 private fun FieldSkeleton() {
     watch()
     val phase = shimmerPhase()
-    Skel(0.28f, Modifier.padding(top = Space.s5, bottom = Space.s2), height = 10.dp)
+    // as tall as a line of the label
+    val line = with(androidx.compose.ui.platform.LocalDensity.current) { Type.smallStrong.let { it.fontSize * it.lineHeight.value }.toDp() }
+    Skel(0.28f, Modifier.padding(top = Space.s5, bottom = Space.s2).testTag("skel-label"), height = line - Space.s1 * 2)
     Box(
         Modifier
+            .testTag("skel-field")
             .fillMaxWidth()
             .height(Size.control)
             .clip(RoundedCornerShape(Radius.m))
@@ -450,6 +453,7 @@ private fun NameView(s: SheetState) {
             val sheenPhase = shimmerPhase()
             val pic =
                 Modifier
+                    .testTag("name-photo")
                     .fillMaxWidth()
                     .height(150.dp)
                     .clip(RoundedCornerShape(Radius.l))
@@ -478,7 +482,7 @@ private fun NameView(s: SheetState) {
         when {
             reading ->
                 Note {
-                    Wait()
+                    Wait(Modifier.testTag("wait"))
                     T("Packung wird ${if (patient) "" else "noch "}gelesen …", Type.small, color = colors.muted)
                 }
             status == "recognizing" ->

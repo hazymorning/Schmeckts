@@ -558,6 +558,7 @@ private fun Welcome() {
     ) {
         Box(
             Modifier
+                .testTag("logo")
                 .padding(bottom = Space.s6)
                 .size(148.dp)
                 .shadowLow(CircleShape)

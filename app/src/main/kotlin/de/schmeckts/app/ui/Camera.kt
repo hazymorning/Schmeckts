@@ -39,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -163,7 +165,7 @@ fun CameraHost(camera: Camera) {
     }
     var taking by remember { mutableStateOf(false) }
     SchmecktsTheme("dark") {
-        Box(Modifier.fillMaxSize().background(colors.bg)) {
+        Box(Modifier.fillMaxSize().background(colors.bg).semantics { paneTitle = "camera" }) {
             request?.let { CameraXViewfinder(it, Modifier.fillMaxSize()) }
             camera.hint?.let { hint ->
                 M(

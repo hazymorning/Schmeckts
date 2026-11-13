@@ -5,6 +5,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -410,6 +411,9 @@ fun SchmecktsTheme(
         )
     val off = motionOff(LocalContext.current)
     CompositionLocalProvider(LocalPalette provides p, LocalReduceMotion provides off) {
-        MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+        MaterialTheme(colorScheme = scheme, typography = typography) {
+            // text without a colour of its own is ink, as the page's color was
+            CompositionLocalProvider(LocalContentColor provides p.ink, content = content)
+        }
     }
 }
