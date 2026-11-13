@@ -323,10 +323,8 @@ class Ai(
             try {
                 http.send(if (body != null) "POST" else "GET", url, headers, body?.stringify(), timeout)
             } catch (e: Http.Offline) {
-                throw AiFailure(
-                    "offline",
-                    if (e.timedOut) "${p.name} hat zu lange nicht geantwortet." else "${p.name} ist nicht erreichbar. Ist das Handy online?",
-                )
+                val said = if (e.timedOut) "hat zu lange nicht geantwortet." else "ist nicht erreichbar. Ist das Handy online?"
+                throw AiFailure("offline", "${p.name} $said")
             }
         val data = res.body?.let { runCatching { parseJson(it) }.getOrNull() }
         if (res.status != 200) throw refused(p, res.status, data?.stringify())
