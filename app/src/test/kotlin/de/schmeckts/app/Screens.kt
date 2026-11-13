@@ -36,12 +36,28 @@ import java.time.Duration
 
 /** HTTP for a phone on a test: what each address answers, everything else out of reach; asked keeps every request. */
 class FakeHttp : Http {
+    class Req(
+        val method: String,
+        val url: String,
+        val headers: Map<String, String>,
+        val body: String?,
+    )
+
     val asked = java.util.Collections.synchronizedList(mutableListOf<String>())
-    val routes = LinkedHashMap<String, (method: String, url: String, body: String?) -> Http.Answer>()
+    val sent = java.util.Collections.synchronizedList(mutableListOf<Req>())
+    val routes = LinkedHashMap<String, (Req) -> Http.Answer>()
 
     fun route(
         prefix: String,
         answer: (method: String, url: String, body: String?) -> Http.Answer,
+    ) {
+        routes[prefix] = { r -> answer(r.method, r.url, r.body) }
+    }
+
+    /** the same with the request's headers */
+    fun answer(
+        prefix: String,
+        answer: (Req) -> Http.Answer,
     ) {
         routes[prefix] = answer
     }
@@ -54,8 +70,10 @@ class FakeHttp : Http {
         timeoutMs: Long,
     ): Http.Answer {
         asked.add("$method $url")
+        val req = Req(method, url, headers, body)
+        sent.add(req)
         val r = routes.entries.firstOrNull { url.startsWith(it.key) } ?: throw Http.Offline(false, null)
-        return r.value(method, url, body)
+        return r.value(req)
     }
 
     override fun events(
@@ -266,6 +284,26 @@ abstract class ScreenTest {
                     c.getOrElseNullable(p.EditableText) { null }?.text,
                 ).joinToString(" ")
             }.lowercase()
+    }
+
+    /** what the field with this label holds */
+    fun fieldText(label: String) =
+        rule
+            .onAllNodes(hasContentDescription(label) and hasSetTextAction())
+            .fetchSemanticsNodes()
+            .firstOrNull()
+            ?.config
+            ?.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.EditableText) { null }
+            ?.text
+
+    /** connected to the household's server at SRV, as the old tests did it; a server set up before stays */
+    fun connect() {
+        if (SRV !in http.routes) http.household()
+        prefs.server = SRV
+        prefs.code = "K7PM-3QXD"
+        phone.store.savePrefs()
+        phone.sync.start()
+        check(until { phone.sync.status.state == "ok" }, "connected to the household server")
     }
 
     /** shown in the top layer, not on the page beneath it */

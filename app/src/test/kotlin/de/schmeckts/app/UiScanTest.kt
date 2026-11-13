@@ -313,3 +313,527 @@ class UiScanTest : ScreenTest() {
         check(until { db.servings.size == n + 4 && db.servings[0].str("productId") == huhn }, "cold start with schmeckts://scan")
     }
 }
+
+private const val OFF_HIT =
+    """{"status":1,"product":{"product_name_de":"Sheba Fresh Choice Huhn in Sauce 4x50g","brands":"Sheba, Mars",""" +
+        """"categories_tags":["en:cat-food","en:wet-cat-food"]}}"""
+
+/** a plain packaging as a camera's photo of this size: orange with a cream label in its middle */
+fun jpegOf(
+    w: Int,
+    h: Int,
+): ByteArray {
+    val b = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(b)
+    c.drawColor(android.graphics.Color.rgb(214, 120, 60))
+    val label = android.graphics.Paint().apply { color = android.graphics.Color.rgb(250, 240, 225) }
+    c.drawRect(w / 8f, h / 4f, w * 7 / 8f, h * 3 / 4f, label)
+    return java.io
+        .ByteArrayOutputStream()
+        .also { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, it) }
+        .toByteArray()
+}
+
+class UiRecognizeTest : ScreenTest() {
+    private var online = 0
+    private var failOnline = false
+    private var failServer = false
+
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    // schmeckts://ocr-dump shares the last reading as a fixture
+    private fun dump(): kotlinx.serialization.json.JsonObject? {
+        val before = platform.shared.size
+        link("schmeckts://ocr-dump")
+        idle(100)
+        return platform.shared
+            .drop(before)
+            .firstOrNull()
+            ?.let { parseJson(it.second).obj() }
+    }
+
+    private fun ident(
+        code: String = "",
+        photo: String = "",
+    ) = on { recognize.identify(code = code, photo = photo) }
+
+    private fun snap(
+        photo: ByteArray,
+        done: () -> Boolean,
+    ) {
+        platform.photo = photo
+        act("feed")
+        act("photo")
+        check(until(10_000) { done() }, "the photo served")
+        idle(400)
+    }
+
+    @Test
+    fun `recognize - known code, product lookup, server photo, text read on the phone`() {
+        for (base in listOf("https://world.openpetfoodfacts.org", "https://world.openfoodfacts.org")) {
+            http.route(base) { _, url, _ ->
+                online++
+                if (failOnline) {
+                    Http.Answer(500, "")
+                } else {
+                    Http.Answer(200, if ("openpetfoodfacts" in url && SHEBA in url) OFF_HIT else """{"status":0}""")
+                }
+            }
+        }
+        http.household(failing = { failServer })
+        platform.pictures = AndroidPictures()
+        onePet()
+        check(dump() == null, "ocr-dump before any reading: nothing shared")
+        val text = "Sheba\nNEU\nSelection in Sauce\nmit Lachs\n4 x 85 g\nZutaten: Fleisch 40 %"
+        platform.ocrText = text
+        snap(jpegOf(480, 360)) { db.servings.firstOrNull()?.obj("guess") != null }
+        val filled = listOf(fieldText("Marke"), fieldText("Sorte"), chosen("Nassfutter"))
+        val s = db.servings[0]
+        check(
+            filled == listOf("Sheba", "Selection in Sauce mit Lachs", true) &&
+                calls("processImage").size == 1 &&
+                s.str("status") == "noserver" &&
+                s.str("error") == null,
+            "without a server the phone reads the text and fills brand, variety and type $filled",
+        )
+        val read = node("Gelesen:").fetchSemanticsNode().boundsInRoot
+        val ok = node("Passt so").fetchSemanticsNode().boundsInRoot
+        check(ok.top > read.bottom && ok.top - read.bottom < 200, "what was read is confirmed with one tap right under it")
+        act("save-name")
+        idle(400)
+        val p = db.products[0]
+        check(
+            listOf(p.str("brand"), p.str("variety"), p.str("type"), p.str("texture")) ==
+                listOf("Sheba", "Selection in Sauce mit Lachs", "Nassfutter", "sosse") &&
+                db.servings[0].obj("guess") == null,
+            "confirmed: variety with texture",
+        )
+        val fixture = dump()!!
+        val expected = fixture["expected"]!!.obj()
+        check(
+            fixture["width"].asDouble == 480.0 &&
+                fixture["height"].asDouble == 360.0 &&
+                fixture["result"] == j(mapOf("text" to text, "blocks" to emptyList<Any>())) &&
+                listOf("brand", "variety", "type", "texture", "locked").map { expected[it]?.let { v -> v.asString ?: v.asBoolean } } ==
+                listOf("Sheba", "Selection in Sauce mit Lachs", "Nassfutter", "sosse", false) &&
+                fixture["ms"].asDouble!! >= 0,
+            "ocr-dump: the last reading with the photo size and what it was named $fixture",
+        )
+        val files = listOf("db", "prefs", "queue").joinToString { saved(it).toString() }
+        check("Zutaten: Fleisch" !in files, "the reading lives in memory only")
+        platform.ocrText = "Whiskas\nRind in Gelee"
+        val before = phone.recognize.last!!.at
+        snap(jpegOf(3000, 2250)) { phone.recognize.last!!.at > before }
+        val meal = db.servings[0]
+        val sizes =
+            listOf(
+                phone.recognize.last!!
+                    .first
+                    .let { it.width to it.height },
+                jpegSize(phone.photos.mem[meal.id]),
+                jpegSize(meal.str("photo")!!.substringAfter(",")),
+            )
+        check(sizes == listOf(2400 to 1800, 1100 to 825, 480 to 360), "a large photo is read at 2400 px, kept at 1100 and 480 $sizes")
+        act("close")
+        idle(400)
+        platform.ocrText = "SHEBA  selection-in-sauce mit LACHS 85g"
+        var got = ident(photo = "AAA")
+        check(
+            got.source == "text" &&
+                got.products.orEmpty().map { it.str("variety") } == listOf("Selection in Sauce mit Lachs") &&
+                got.details == null &&
+                got.lines.isNotEmpty(),
+            "a known variety found in the text, spelled differently: the variety itself ${got.source}",
+        )
+        platform.ocrText = "12345\n850 g"
+        got = ident(photo = "AAA")
+        check(got.source == "" && got.details == null, "no usable text: nothing")
+        platform.ocrText = ""
+        got = ident(code = SHEBA)
+        check(got.source == "" && online == 0, "product lookup off: no request")
+        prefs.lookup = true
+        got = ident(code = SHEBA)
+        val hit = got.details
+        check(
+            got.source == "online" &&
+                listOf(hit?.brand, hit?.variety, hit?.type) == listOf("Sheba", "Fresh Choice Huhn in Sauce", "Nassfutter") &&
+                prefs.codes[SHEBA]?.get("found").asBoolean == true,
+            "product lookup on: brand and variety tidied ${hit?.variety}",
+        )
+        val asked = online
+        ident(code = SHEBA)
+        val miss = ident(code = "96385074")
+        check(
+            online == asked + 2 && miss.source == "" && prefs.codes["96385074"]?.get("found").asBoolean == false,
+            "hit and miss remembered",
+        )
+        prefs.lookup = false
+        connect()
+        got = ident(photo = "AAA")
+        check(got.source == "server" && got.details?.variety == "Gold Pastete", "connected: the server recognises the photo")
+        act("open-settings")
+        val switch = prefs.serverPhoto
+        act("server-photo")
+        back()
+        platform.ocrText = "Whiskas\nRind in Gelee"
+        got = ident(photo = "AAA")
+        check(switch && !prefs.serverPhoto && got.source == "text", "server photos off: read on the phone")
+        prefs.serverPhoto = true
+        prefs.lookup = true
+        val chain = mutableListOf(ident(code = SHEBA, photo = "AAA").source)
+        failOnline = true
+        chain += ident(code = "96385074", photo = "AAA").source
+        failServer = true
+        chain += ident(code = "96385074", photo = "AAA").source
+        platform.ocrText = ""
+        chain += ident(code = "96385074", photo = "AAA").source
+        check(chain == listOf("online", "server", "text", ""), "each stage works and falls through to the next $chain")
+        db.products[0]["codes"] = j(mapOf(SHEBA to true))
+        check(ident(code = SHEBA, photo = "AAA").source == "codes", "a code known in the household beats everything")
+    }
+}
+
+private val OWN_KEY = "sk-proj-" + "Q".repeat(48) // an OpenAI key, as the phone takes it
+
+class UiOwnAiTest : ScreenTest() {
+    private var models = listOf("gpt-6.1-sol", "gpt-6-luna", "gpt-5.5", "chat-latest", "gpt-6.1-sol-2026-09-29")
+    private var gone = setOf<String>()
+    private var fail = false
+    private val sent = mutableListOf<FakeHttp.Req>() // what went to OpenAI with a body, then to the others
+    private val said = j(mapOf("brand" to "Felix", "variety" to "Huhn in Gelee", "type" to "Nassfutter")).stringify()
+
+    private fun json(
+        status: Int,
+        v: Any,
+    ) = Http.Answer(status, j(v).stringify())
+
+    private fun openai(r: FakeHttp.Req): Http.Answer {
+        if (r.headers["Authorization"] != "Bearer $OWN_KEY") {
+            return json(401, mapOf("error" to mapOf("message" to "Incorrect API key provided")))
+        }
+        if (r.url.endsWith("/v1/models")) {
+            return json(200, mapOf("object" to "list", "data" to models.map { mapOf("id" to it, "object" to "model", "created" to 1) }))
+        }
+        sent.add(r)
+        val body = parseJson(r.body!!).obj()
+        val model = body["model"].asString
+        return when {
+            model in gone -> json(404, mapOf("error" to mapOf("code" to "model_not_found")))
+            model == "gpt-7-sol" && "reasoning" in body ->
+                json(400, mapOf("error" to mapOf("message" to "Unsupported parameter: 'reasoning.effort'")))
+            fail -> json(500, mapOf("error" to mapOf("message" to "The server had an error")))
+            else -> {
+                val out =
+                    listOf(
+                        mapOf("type" to "reasoning", "summary" to emptyList<Any>()),
+                        mapOf("type" to "message", "content" to listOf(mapOf("type" to "output_text", "text" to said))),
+                    )
+                json(200, mapOf("status" to "completed", "output" to out))
+            }
+        }
+    }
+
+    private fun others(r: FakeHttp.Req): Http.Answer {
+        sent.add(r)
+        val listed = r.method == "GET"
+        return if ("anthropic" in r.url) {
+            val sonnet =
+                mapOf(
+                    "line" to "sonnet",
+                    "capabilities" to
+                        mapOf("image_input" to mapOf("supported" to true), "effort" to mapOf("low" to mapOf("supported" to true))),
+                )
+            val list =
+                listOf(
+                    mapOf("id" to "claude-haiku-9", "line" to "haiku"),
+                    mapOf("id" to "claude-sonnet-9", "lifecycle" to "deprecated") + sonnet,
+                    mapOf("id" to "claude-sonnet-8-5", "display_name" to "Claude Sonnet 8.5", "lifecycle" to "active") + sonnet,
+                )
+            val content = listOf(mapOf("type" to "thinking", "thinking" to ""), mapOf("type" to "text", "text" to said))
+            json(200, if (listed) mapOf("data" to list) else mapOf("content" to content))
+        } else {
+            val generate = mapOf("supportedGenerationMethods" to listOf("generateContent"))
+            val list =
+                listOf(
+                    mapOf("name" to "models/gemini-3.8-flash") + generate,
+                    mapOf("name" to "models/gemini-flash-latest", "displayName" to "Gemini Flash Latest") + generate,
+                    mapOf("name" to "models/embedding-9", "supportedGenerationMethods" to listOf("embedContent")),
+                )
+            val parts = listOf(mapOf("text" to "…", "thought" to true), mapOf("text" to said))
+            json(200, if (listed) mapOf("models" to list) else mapOf("candidates" to listOf(mapOf("content" to mapOf("parts" to parts)))))
+        }
+    }
+
+    private fun snap(done: () -> Boolean) {
+        platform.photo = jpegOf(480, 360)
+        act("feed")
+        act("photo")
+        check(until(10_000) { done() }, "the photo served")
+        idle(400)
+    }
+
+    private fun aiFile() = saved("ai").toString()
+
+    @Test
+    fun `own_ai - checked as it is pasted, asked before the server, a retired model replaced, the key kept to itself`() {
+        http.answer("https://api.openai.com", ::openai)
+        platform.pictures = AndroidPictures()
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+        act("open-settings")
+        act("ai-photo")
+        type("KI-Schlüssel", "ghp_" + "x".repeat(36))
+        check(until { sheet!!.str("aiError").isNotEmpty() }, "a wrong key answered")
+        val wrong = sheet!!.str("aiError")
+        val told = shows(wrong)
+        type("KI-Schlüssel", OWN_KEY)
+        val ok = until { phone.ai.model == "gpt-6.1-sol" } && OWN_KEY in aiFile()
+        idle(400)
+        check(
+            "kein Schlüssel von" in wrong && told && ok && shows("gpt-6.1-sol von OpenAI") && fieldText("KI-Schlüssel") == null,
+            "a wrong key is named as such; a working one is kept with the newest model of its middle line [$wrong]",
+        )
+        back()
+        snap { db.servings.firstOrNull()?.str("productId") != null }
+        val last = parseJson(sent.last().body!!).obj()
+        val content =
+            last["input"]!!
+                .asArray!![0]
+                .obj()["content"]!!
+                .asArray!!
+                .map { it.obj() }
+        check(
+            db.products.first { it.id == db.servings[0].str("productId") }.str("brand") == "Felix" &&
+                last["model"].asString == "gpt-6.1-sol" &&
+                last["store"].asBoolean == false &&
+                content.map { it["type"].asString } == listOf("input_image", "input_text") &&
+                content[0]["image_url"].asString!!.startsWith("data:image/jpeg;base64,/9j/") &&
+                calls("processImage").isEmpty(),
+            "a photo goes to OpenAI first and names the meal, nothing read on the phone",
+        )
+        act("open-serving", "id" to db.servings[0].id)
+        check(inSheet("von OpenAI erkannt"), "the meal says who recognised its photo")
+        act("close")
+        idle(400)
+        gone = setOf("gpt-6.1-sol")
+        models = listOf("gpt-6-luna", "gpt-7-sol")
+        snap { db.servings.size == 2 && db.servings[0].str("productId") != null }
+        val asked = sent.takeLast(3).map { parseJson(it.body!!).obj().let { b -> b["model"].asString to ("reasoning" in b) } }
+        check(
+            asked == listOf("gpt-6.1-sol" to true, "gpt-7-sol" to true, "gpt-7-sol" to false) &&
+                until { "gpt-7-sol" in aiFile() } &&
+                "Products already known" in
+                parseJson(sent.last().body!!)
+                    .obj()["input"]!!
+                    .asArray!![0]
+                    .obj()["content"]!!
+                    .asArray!![1]
+                    .obj()["text"]
+                    .asString!!,
+            "the model gone: the newest that fits takes over and is kept, asked without what it refuses $asked",
+        )
+        val photos = mutableListOf<String>()
+        http.household(photos = photos)
+        connect()
+        snap { db.servings.size == 3 && db.servings[0].str("productId") != null }
+        check(photos.isEmpty(), "both on: the own key answers, the server is not asked")
+        fail = true
+        snap { db.servings.size == 4 && db.servings[0].str("productId") != null }
+        act("open-serving", "id" to db.servings[0].id)
+        check(photos.size == 1 && inSheet("vom Server erkannt"), "the own key fails: the server steps in and says so")
+        act("close")
+        idle(400)
+        act("open-settings")
+        val serverSub = shows("eigene KI")
+        act("server-photo")
+        back()
+        platform.ocrText = "Whiskas\nRind in Gelee"
+        snap { db.servings.size == 5 && db.servings[0].obj("guess") != null }
+        check(
+            serverSub &&
+                photos.size == 1 &&
+                db.servings[0].str("error") == "OpenAI ist gerade gestört." &&
+                calls("processImage").size == 1,
+            "only the own key: the server is never asked, the phone reads the photo and the meal says why",
+        )
+        act("open-settings")
+        act("settings-page", "v" to "backup")
+        act("export")
+        val backup = platform.shared.filter { it.first.startsWith("schmeckts-backup") }.joinToString { it.second }
+        val leaks =
+            http.sent.filter { "api.openai.com" !in it.url && OWN_KEY in it.url + it.headers + (it.body ?: "") }.map { it.url }
+        val data = listOf("db", "prefs", "queue", "sync").joinToString { saved(it).toString() }
+        check(
+            leaks.isEmpty() && backup.isNotEmpty() && OWN_KEY !in backup && OWN_KEY !in data,
+            "the key goes only to OpenAI: not to the server, not into a backup, not into the data $leaks",
+        )
+        http.answer("https://api.anthropic.com", ::others)
+        http.answer("https://generativelanguage.googleapis.com", ::others)
+        sent.clear()
+        val got =
+            listOf("sk-ant-api03-" + "k".repeat(90), " AQ.Ab8" + "g".repeat(40) + "\n").map { key ->
+                on {
+                    val k = ai.check(key)
+                    ai.key = k.key
+                    ai.provider = k.provider
+                    ai.model = k.model
+                    ai.name = k.name
+                    val hit = ai.recognize("/9j/AAAA")
+                    listOf(ai.provider, ai.name, hit?.get("brand").asString)
+                }
+            }
+        val bodies = sent.filter { it.body != null }
+        val claude = bodies[1]
+        val gemini = bodies[3]
+        val claudeBody = parseJson(claude.body!!).obj()
+        val geminiBody = parseJson(gemini.body!!).obj()
+        check(
+            got == listOf(listOf("anthropic", "Claude Sonnet 8.5", "Felix"), listOf("google", "Gemini Flash Latest", "Felix")) &&
+                claude.headers["anthropic-version"] == "2023-06-01" &&
+                claudeBody["output_config"] == j(mapOf("effort" to "low")) &&
+                claudeBody["messages"]!!
+                    .asArray!![0]
+                    .obj()["content"]!!
+                    .asArray!![0]
+                    .obj()["source"]!!
+                    .obj()["data"]
+                    .asString == "/9j/AAAA" &&
+                gemini.headers["x-goog-api-key"] == "AQ.Ab8" + "g".repeat(40) &&
+                gemini.url.endsWith("/models/gemini-flash-latest:generateContent") &&
+                geminiBody["contents"]!!
+                    .asArray!![0]
+                    .obj()["parts"]!!
+                    .asArray!![0] == j(mapOf("inlineData" to mapOf("mimeType" to "image/jpeg", "data" to "/9j/AAAA"))),
+            "Anthropic and Google keys too: the newest active Sonnet, the Flash Google keeps current $got",
+        )
+    }
+}
+
+class UiPhotoTest : ScreenTest() {
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    private fun snap(
+        photo: ByteArray = jpegOf(480, 360),
+        done: () -> Boolean = { db.servings.firstOrNull()?.str("status") == "noserver" },
+    ) {
+        platform.photo = photo
+        act("feed")
+        act("photo")
+        check(until(10_000) { done() }, "the photo served")
+        idle(400)
+    }
+
+    // a corner of the thumbnail shows either the orange packaging or its cream label
+    private fun corners(): Pair<Int, List<String>> {
+        val bytes = android.util.Base64.decode(db.servings[0].str("thumb")!!.substringAfter(","), 0)
+        val b = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val px =
+            listOf(0.1 to 0.1, 0.9 to 0.1, 0.1 to 0.9, 0.9 to 0.9).map { (fx, fy) ->
+                val c = b.getPixel((fx * (b.width - 1)).toInt(), (fy * (b.height - 1)).toInt())
+                if (android.graphics.Color.green(c) > 180) "cream" else "orange"
+            }
+        return b.width to px
+    }
+
+    @Test
+    fun `text_thumb - the thumbnail shows the square around the text, the middle without places`() {
+        platform.pictures = AndroidPictures()
+        onePet()
+        platform.ocrText = "Sheba\nHuhn in Gelee"
+        snap { db.servings.firstOrNull()?.obj("guess") != null }
+        val middle = corners()
+        act("close")
+        idle(400)
+        // in the top left of the label, in the pixels of the large photo as it is read (2400 x 1800)
+        val lines = listOf(listOf("Whiskas", 350, 500, 1000, 650), listOf("Rind in Gelee", 350, 700, 1250, 850))
+        val blocks =
+            lines.map { (t, x0, y0, x1, y1) ->
+                mapOf(
+                    "lines" to listOf(mapOf("text" to t, "boundingBox" to mapOf("left" to x0, "top" to y0, "right" to x1, "bottom" to y1))),
+                )
+            }
+        platform.ocrResult = j(mapOf("text" to "Whiskas\nRind in Gelee", "blocks" to blocks)).obj()
+        snap(jpegOf(3000, 2250)) { db.servings.size == 2 && db.servings[0].obj("guess") != null } // the new meal, not the first one
+        val moved = corners()
+        check(
+            middle == (200 to List(4) { "orange" }) && moved == (200 to listOf("orange", "orange", "cream", "cream")),
+            "read without places: the middle; with them: up and to the left, where the text stands $middle $moved",
+        )
+        val thumb = db.servings[0].str("thumb")
+        act("save-name")
+        idle(400)
+        check(db.products.find { it.str("brand") == "Whiskas" }?.str("thumb") == thumb, "the variety named from it has that thumbnail")
+    }
+
+    @Test
+    fun `discard - a meal broken off after the photo, deleted from naming or its card, with undo, also while it is read`() {
+        onePet()
+        snap()
+        act("delete-serving")
+        idle(400)
+        var gone = listOf(sheet != null, db.servings.size, tags("pend-").size)
+        act("undo")
+        idle(400)
+        val s = db.servings.firstOrNull()
+        val back = listOf(db.servings.size, s?.str("productId"), s?.str("status"), s?.str("photo") != null, s?.str("thumb") != null)
+        check(gone == listOf(false, 0, 0) && back == listOf(1, null, "noserver", true, true), "deleted from naming; undo restores it $back")
+        act("delete-serving", "id" to db.servings[0].id)
+        idle(400)
+        gone = listOf(db.servings.size, tags("pend-").size)
+        act("undo")
+        idle(400)
+        val id = db.servings[0].id
+        check(
+            gone == listOf(0, 0) && db.servings.size == 1 && tags("level-", within = "pend-$id").isNotEmpty(),
+            "deleted from its card, undone $gone",
+        )
+        act("open-serving", "id" to id)
+        type("Marke", "Sheba")
+        type("Sorte", "Lachs")
+        act("save-name")
+        act("close")
+        idle(400)
+        val before = listOf(db.products.size, db.servings.size)
+        platform.barcode = SHEBA
+        act("feed")
+        act("scan")
+        check(
+            until { db.servings[0].str("scanCode") != null && db.servings[0].str("status") == "noserver" },
+            "an unknown code photographed",
+        )
+        idle(400)
+        act("delete-serving")
+        idle(400)
+        val after = listOf(db.products.size, db.servings.size, db.products.any { it.obj("codes")?.get(SHEBA) != null })
+        check(after == before + false, "deleted after an unknown code: no variety got the code $after")
+        val reads = calls("processImage").size
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        platform.gate = gate
+        snap { db.servings.firstOrNull()?.str("status") == "reading" }
+        act("close")
+        act("delete-serving", "id" to db.servings[0].id)
+        platform.gate = null
+        gate.complete(Unit)
+        idle(200)
+        act("undo")
+        check(
+            until { db.servings.firstOrNull()?.str("status") == "noserver" } && calls("processImage").size == reads + 2,
+            "deleted while read, undone: read again ${calls("processImage").size - reads}",
+        )
+    }
+}

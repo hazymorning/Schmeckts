@@ -7,8 +7,11 @@ class FakePlatform : Platform {
     override var version = "9.9.9"
     val calls: MutableList<Pair<String, Any?>> = Collections.synchronizedList(mutableListOf())
 
-    // the recogniser answers with the next of these, else with reading, after delay ms; failing makes it fail
+    // the recogniser answers with the next of these, else ocrText as the plugin gave it, else reading, after delay ms
     val readings = ArrayDeque<Reading>()
+    var ocrResult: kotlinx.serialization.json.JsonObject? = null
+    var ocrText: String? = null
+    var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null // set: reading waits until it completes
     var reading: Reading = UNREAD
     var readDelay = 0L
     var barcode: String? = null
@@ -20,7 +23,7 @@ class FakePlatform : Platform {
     var copies = false // no share menu: the text goes to the clipboard
     val shared = mutableListOf<Pair<String, String>>()
 
-    override val pictures = FakePictures()
+    override var pictures: Pictures = FakePictures()
     override val notifications = FakeNotifications(calls)
 
     override fun haptic(level: String) {
@@ -64,7 +67,16 @@ class FakePlatform : Platform {
     override suspend fun readPhoto(b64: String): Reading {
         calls.add("processImage" to b64.length)
         if (readDelay > 0) kotlinx.coroutines.delay(readDelay)
-        return readings.removeFirstOrNull() ?: reading
+        gate?.await()
+        val text = ocrText
+        val (w, h) = jpegSize(b64)
+        return readings.removeFirstOrNull()
+            ?: ocrResult?.let { readingOf(it, w, h, readDelay) }
+            ?: if (text != null) {
+                readingOf(j(mapOf("text" to text, "blocks" to emptyList<Any>())).obj(), w, h, readDelay)
+            } else {
+                reading
+            }
     }
 
     override suspend fun scanBarcode(
