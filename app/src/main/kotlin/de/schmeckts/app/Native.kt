@@ -112,6 +112,21 @@ interface Platform {
     /** Google's scanner in Play services, its module installed first if missing; null when cancelled */
     suspend fun scanBarcode(onInstall: () -> Unit): String?
 
+    /** a file the person picks, as text; null when cancelled */
+    suspend fun pickFile(): String?
+
+    /** a picture from the gallery or the files; null when cancelled */
+    suspend fun pickImage(): ByteArray?
+
+    /** a file another app handed over by its content or file URI, as text */
+    suspend fun readUri(uri: String): String
+
+    /** the system's date and time pickers, set to t and not past max; null when cancelled */
+    suspend fun pickDateTime(
+        t: Long,
+        max: Long,
+    ): Long?
+
     fun canUpdate(): Boolean
 
     /** loads the APK and hands it to Android's installer, which asks before it replaces the app */

@@ -73,6 +73,32 @@ class FakePlatform : Platform {
         return barcode
     }
 
+    // what the pickers hand back, null as if cancelled
+    var file: String? = null
+    var image: ByteArray? = null
+    val uris = HashMap<String, String>()
+    var picked: Long? = null
+
+    override suspend fun pickFile(): String? {
+        calls.add("pickFile" to null)
+        return file
+    }
+
+    override suspend fun pickImage(): ByteArray? {
+        calls.add("pickImage" to null)
+        return image
+    }
+
+    override suspend fun readUri(uri: String): String = uris[uri] ?: throw java.io.FileNotFoundException(uri)
+
+    override suspend fun pickDateTime(
+        t: Long,
+        max: Long,
+    ): Long? {
+        calls.add("pickDateTime" to t)
+        return picked?.coerceAtMost(max)
+    }
+
     override fun canUpdate() = true
 
     override suspend fun install(

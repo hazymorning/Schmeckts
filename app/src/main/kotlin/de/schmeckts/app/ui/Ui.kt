@@ -79,6 +79,9 @@ class Ui(
 
     val home = HomeState()
 
+    /** drawn on a screen; without one, what waits for an animation goes on at once */
+    var hosted = false
+
     /** the field, by its id, to take the focus and the keyboard on its next draw */
     var wantFocus by mutableStateOf<String?>(null)
 
@@ -136,4 +139,5 @@ class HomeState {
     var tearing by mutableStateOf(false)
     var fills by mutableIntStateOf(0)
     var due by mutableStateOf(false)
+    var top by mutableIntStateOf(0) // bumped to scroll the page to its top
 }
