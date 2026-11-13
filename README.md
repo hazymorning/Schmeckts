@@ -82,12 +82,6 @@ Anmelden muss man sich nirgends, und Werbung oder Tracking gibt es auch nicht. E
 
 Alles andere passiert nur, wenn man es selbst einschaltet. Die „Sortensuche im Internet“ schaut unbekannte Barcodes in zwei freien Datenbanken nach und schickt dabei nur die Nummer. Mit „Fotos mit eigener KI erkennen“ gehen die Packungsfotos direkt an Anthropic, OpenAI oder Google, je nachdem, von wem der eigene Schlüssel ist. Und steht zu Hause ein Server, schickt der die Fotos an Anthropic, damit dort eine KI die Sorte erkennt. Das lässt sich in den Einstellungen unter „Fotos über den Server erkennen“ abschalten.
 
----
-
-Viel musste ich nicht ändern. Ich habe die Tippfehler korrigiert und den ersten Satz aufgeteilt, damit die Pointe besser sitzt. Bei den Ausnahmen steht jetzt dabei, dass etwas rausgeht. Direkt nach „kein Tracking“ klingt es sonst nach Ausnahmen beim Tracking.
-
-Eine Sache betrifft noch den Inhalt: Die Erkennung über den Server lässt sich abschalten. Sie läuft also wohl automatisch, sobald ein Server da ist. Das passt nicht ganz zu „Alles andere passiert nur, wenn man es selbst einschaltet“, und genau so etwas finden die Leute aus dem ersten Absatz ja super spannend. Falls es so ist, würde „…wenn man es selbst einschaltet oder einrichtet“ das schon lösen.
-
 </details>
 
 <details>
