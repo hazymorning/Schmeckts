@@ -120,12 +120,14 @@ import de.schmeckts.app.ui.press
 import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.ui.shadowHigh
 import de.schmeckts.app.ui.shadowLow
+import de.schmeckts.app.ui.watch
 import androidx.compose.ui.geometry.Size as Area
 
 // The home page: the header, the pets, the cards and the feeding button
 
 @Composable
 fun HomeScreen() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     // what the page draws from: the data, the redraws asked for, the sync state
@@ -179,6 +181,7 @@ private fun Edge(
     top: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val bg = colors.bg
     val a by androidx.compose.animation.core.animateFloatAsState(
         if (on) 1f else 0f,
@@ -209,6 +212,7 @@ private fun Edge(
 
 @Composable
 private fun Top() {
+    watch()
     val ui = LocalUi.current
     val chip = ui.phone.syncChip()
     Row(
@@ -257,6 +261,7 @@ private fun Top() {
 
 @Composable
 private fun PetsBar() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     if (ph.db.pets.size < 2) return
@@ -306,6 +311,7 @@ private fun PetChoice(
     label: String? = null,
     pic: @Composable () -> Unit,
 ) {
+    watch()
     val p = colors
     Column(
         Modifier
@@ -334,6 +340,7 @@ private fun Modifier.width(w: Dp) = this.then(Modifier.widthIn(min = w, max = w)
 
 @Composable
 private fun Fab(modifier: Modifier) {
+    watch()
     val ui = LocalUi.current
     if (ui.phone.db.pets
             .isEmpty()
@@ -420,6 +427,7 @@ private fun Fab(modifier: Modifier) {
 /** one question at a time, then the history and „Vorlieben“ */
 @Composable
 private fun ColumnScope.HomeContent() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -501,6 +509,7 @@ private fun Arrive(
     i: Int,
     content: @Composable () -> Unit,
 ) {
+    watch()
     val ui = LocalUi.current
     val still = reduceMotion
     val f = remember { Animatable(if (ui.arrive && !still) 0f else 1f) }
@@ -522,6 +531,7 @@ private fun Arrive(
 
 @Composable
 private fun Welcome() {
+    watch()
     val ui = LocalUi.current
     Column(
         Modifier
@@ -564,6 +574,7 @@ private fun Welcome() {
 
 @Composable
 private fun Steps() {
+    watch()
     Card {
         CardTitle("So geht’s")
         Box(Modifier.fillMaxWidth().padding(top = Space.s3, bottom = Space.s1), contentAlignment = Alignment.Center) {
@@ -610,6 +621,7 @@ private fun rOfPet(
 // every open meal keeps its scale here, however many are waiting
 @Composable
 private fun Pending(list: List<Rec>) {
+    watch()
     Card {
         CardTitle("Wie war’s?")
         list.forEachIndexed { i, s ->
@@ -629,6 +641,7 @@ private fun Leaving(
     id: String,
     content: @Composable () -> Unit,
 ) {
+    watch()
     val ui = LocalUi.current
     val gone = ui.home.leaving[id]
     val state = remember(id) { MutableTransitionState(true) }
@@ -658,6 +671,7 @@ private fun Leaving(
 
 @Composable
 private fun PendItem(s: Rec) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -720,6 +734,7 @@ private fun AskCard(
     body: @Composable ColumnScope.() -> Unit,
     buttons: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit,
 ) {
+    watch()
     Card {
         CardTitle(title)
         body()
@@ -750,6 +765,7 @@ private val HINT_TITLES =
 
 @Composable
 private fun HintCard(m: Model) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -804,6 +820,7 @@ private fun remindShown(ui: Ui) = ui.phone.prefs.remind == 0 && REMIND_ASKED !in
 
 @Composable
 private fun RemindCard() {
+    watch()
     val ui = LocalUi.current
     AskCard("Ans Bewerten erinnern?", {
         Say("${REMIND_DEFAULT / 60} Stunden nach dem Füttern fragt die App, wie es geschmeckt hat.")
@@ -819,6 +836,7 @@ private fun updateShown(ui: Ui) = ui.phone.release.let { !it.later && (it.state 
 
 @Composable
 private fun UpdateCard() {
+    watch()
     val ui = LocalUi.current
     val r = ui.phone.release
     val loading = r.state == "loading"
@@ -844,6 +862,7 @@ private fun newsShown(ui: Ui): Boolean {
 
 @Composable
 private fun NewsCard() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val n = NEWS[0]
@@ -871,6 +890,7 @@ private fun NewsCard() {
 // Lists are newest first, so the loops stop at the calendar's first day and old data costs nothing
 @Composable
 private fun History() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -966,6 +986,7 @@ private fun face(
 
 @Composable
 private fun CalPad() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val now = Time.now()
@@ -1043,6 +1064,7 @@ private fun CalPad() {
 // over every sheet, so one torn off falls away under it: the binding and what is left of the sheets torn off
 @Composable
 private fun CalTop() {
+    watch()
     val p = colors
     Box(
         Modifier
@@ -1086,6 +1108,7 @@ private fun Path.scaled(k: Float): Path {
 // the sheet left hanging comes off at the perforation and falls over what lies below; today's is already in place
 @Composable
 private fun Tearable(old: Face) {
+    watch()
     val ui = LocalUi.current
     val fall = remember(old.date) { Animatable(0f) }
     LaunchedEffect(ui.home.tearing) {
@@ -1121,6 +1144,7 @@ private fun CalSheet(
     onClick: (() -> Unit)?,
     turnable: Boolean = false,
 ) {
+    watch()
     val p = colors
     val still = reduceMotion
     val turn = remember { Animatable(0f) }
@@ -1217,6 +1241,7 @@ private fun CalSheet(
 // the rubric, pressed on a little askew in worn ink: a heavy frame and a fine one inside it
 @Composable
 private fun Stamp(text: String) {
+    watch()
     val p = colors
     T(
         text.uppercase(),

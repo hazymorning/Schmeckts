@@ -1,6 +1,7 @@
 package de.schmeckts.app.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -111,6 +112,15 @@ class Ui(
 }
 
 val LocalUi = staticCompositionLocalOf<Ui> { error("no Ui") }
+
+/** what the views draw from changed: data saved, update(), renderSheet() */
+val LocalRev = compositionLocalOf { 0 }
+
+/** The views read records and settings that are no Compose state, so each one that does reads this too: a redraw then
+ reaches it even where its arguments stayed the same. */
+@Suppress("NOTHING_TO_INLINE")
+@Composable
+inline fun watch() = LocalRev.current
 
 /** A field of a sheet: what is typed goes to the sheet's state under key, as data-field did; a value set from
  elsewhere (a chip, a suggestion) shows at once with the cursor at its end. */

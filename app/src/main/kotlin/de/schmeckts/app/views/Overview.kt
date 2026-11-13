@@ -71,6 +71,7 @@ import de.schmeckts.app.ui.colors
 import de.schmeckts.app.ui.press
 import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.ui.tone
+import de.schmeckts.app.ui.watch
 import de.schmeckts.app.weekday
 
 // Top of the home page, on the ground above the cards: a greeting, then how it goes at the bowl, in facts: the last
@@ -330,6 +331,7 @@ fun Overview(
     m: Model,
     noted: String?,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -401,6 +403,7 @@ fun Overview(
 // at night a z drifts up from the picture
 @Composable
 private fun Snooze(modifier: Modifier) {
+    watch()
     val still = reduceMotion
     val t = rememberInfiniteTransition(label = "snooze")
     val f =
@@ -436,6 +439,7 @@ private fun Snooze(modifier: Modifier) {
 // always at hand, so noting takes one tap
 @Composable
 private fun ObserveRail(just: String?) {
+    watch()
     val ui = LocalUi.current
     Rail(Modifier.padding(top = Space.s1, bottom = Space.s3).semantics { contentDescription = "Beobachtung notieren" }) {
         for ((k, o) in OBSERVATIONS) {

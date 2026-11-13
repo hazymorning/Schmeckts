@@ -55,6 +55,7 @@ import de.schmeckts.app.ui.TMain
 import de.schmeckts.app.ui.Type
 import de.schmeckts.app.ui.Wait
 import de.schmeckts.app.ui.colors
+import de.schmeckts.app.ui.watch
 
 private val THEMES = listOf(Opt("system", "System"), Opt("light", "Hell"), Opt("dark", "Dunkel"))
 
@@ -95,6 +96,7 @@ fun SetGroup(
     top: androidx.compose.ui.unit.Dp = Space.s5,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    watch()
     Label(label, top = top)
     Group(content = content)
 }
@@ -109,6 +111,7 @@ private fun SetRow(
     state: String? = null,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
+    watch()
     if (!first) Divider(TEXT_AT)
     ListRow(
         Modifier.semantics {
@@ -130,6 +133,7 @@ private fun PageRow(
     subColor: Color = colors.muted,
     first: Boolean = false,
 ) {
+    watch()
     val ui = LocalUi.current
     SetRow(ui.on("settings-page", "v" to page), first) {
         Lead(icon)
@@ -147,6 +151,7 @@ private fun SwitchRow(
     on: Boolean,
     first: Boolean = false,
 ) {
+    watch()
     val ui = LocalUi.current
     SetRow(ui.on(action), first, Role.Switch, if (on) "an" else "aus") {
         Lead(icon)
@@ -164,6 +169,7 @@ private fun DoRow(
     enabled: Boolean = true,
     first: Boolean = false,
 ) {
+    watch()
     val ui = LocalUi.current
     SetRow(if (enabled) ui.on(action) else null, first) {
         Lead(icon, color = colors.accentInk)
@@ -174,11 +180,13 @@ private fun DoRow(
 /** under a row, in line with its text */
 @Composable
 private fun Under(content: @Composable ColumnScope.() -> Unit) {
+    watch()
     Column(Modifier.padding(start = TEXT_AT, bottom = Space.s3), content = content)
 }
 
 @Composable
 private fun Overview() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val s = ui.sheet!!
@@ -282,6 +290,7 @@ private fun Overview() {
 
 @Composable
 private fun Foot(house: Boolean) {
+    watch()
     val ph = LocalUi.current.phone
     Column(Modifier.fillMaxWidth().padding(top = Space.s6), horizontalAlignment = Alignment.CenterHorizontally) {
         val muted = colors.muted
@@ -310,6 +319,7 @@ private fun Foot(house: Boolean) {
 // pasted, the key is checked at once; once it works only its end is shown
 @Composable
 private fun AiBox() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val s = ui.sheet!!
@@ -367,6 +377,7 @@ private fun AiBox() {
 
 @Composable
 fun Note(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    watch()
     Row(
         Modifier.padding(top = Space.s3),
         horizontalArrangement = Arrangement.spacedBy(Space.s2),
@@ -384,6 +395,7 @@ private val ASKED =
 
 @Composable
 private fun UpdateGroup() {
+    watch()
     val ph = LocalUi.current.phone
     val r = ph.release
     if (!r.canUpdate()) return
@@ -407,6 +419,7 @@ private fun UpdateGroup() {
 
 @Composable
 private fun BackupPage() {
+    watch()
     val ui = LocalUi.current
     Hint("Eine Datei mit allem, was die App gespeichert hat. Ein Import ersetzt die Daten auf diesem Handy.")
     Column(verticalArrangement = Arrangement.spacedBy(Space.s2)) {
@@ -417,6 +430,7 @@ private fun BackupPage() {
 
 @Composable
 private fun ExchangePage() {
+    watch()
     val ui = LocalUi.current
     val ex = ui.sheet?.get("exchange") as? Exchanged
     Hint("Änderungen als Datei an ein anderes Handy geben und von dort empfangen. Die Datei enthält nur Einträge, keine Einstellungen.")
@@ -455,12 +469,14 @@ private val PRIVACY =
 
 @Composable
 private fun PrivacyPage() {
+    watch()
     for (t in PRIVACY) T(t, Type.body, Modifier.padding(bottom = Space.s3), colors.ink)
 }
 
 // only a sync started by hand shows progress; background syncs stay invisible
 @Composable
 private fun ServerSection() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val s = ui.sheet!!
@@ -567,6 +583,7 @@ private fun Addr(
     server: String,
     edit: Boolean,
 ) {
+    watch()
     val ui = LocalUi.current
     FlowRow(
         Modifier.padding(top = Space.s3),
@@ -582,6 +599,7 @@ private val PAGES = mapOf("house" to "Haushalt", "exchange" to "Austausch von Ha
 
 @Composable
 fun SettingsView() {
+    watch()
     val ui = LocalUi.current
     val s = ui.sheet ?: return
     val title = PAGES[s.page]

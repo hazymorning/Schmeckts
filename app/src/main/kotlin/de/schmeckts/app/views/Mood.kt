@@ -25,11 +25,13 @@ import androidx.compose.ui.unit.dp
 import de.schmeckts.app.imageOf
 import de.schmeckts.app.ui.LocalUi
 import de.schmeckts.app.ui.colors
+import de.schmeckts.app.ui.watch
 
 // Mood picture behind the header: the cat's photo out of focus, so it reads as a mood rather than a faded picture
 
 @Composable
 fun Mood() {
+    watch()
     val ph = LocalUi.current.phone
     val pet = if (ph.db.pets.size == 1) ph.db.pets[0] else ph.db.pets.find { it.id == ph.prefs.activePet }
     val img = imageOf(pet?.str("photo")) ?: return

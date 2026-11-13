@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -22,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import de.schmeckts.app.ui.CameraHost
+import de.schmeckts.app.ui.LocalRev
 import de.schmeckts.app.ui.LocalUi
 import de.schmeckts.app.ui.SchmecktsTheme
 import de.schmeckts.app.ui.SheetHost
@@ -36,13 +38,21 @@ import kotlinx.coroutines.launch
 
 private const val LATEST = 2500L // ms the splash stays at most
 
+/** the splash stays until the home page is drawn, or LATEST at most, so the app cannot hang on it */
+fun splashKept(
+    gone: Boolean,
+    since: Long,
+    now: Long,
+) = !gone && now - since < LATEST
+
 /** The whole screen: the home page, the two layers over it, the photo viewer, the camera and the toast on top. */
 @Composable
 fun AppScreen(main: Main) {
     val ui = main.ui
     val phone = main.phone
     SchmecktsTheme(phone.prefs.also { ui.tick }.theme) {
-        CompositionLocalProvider(LocalUi provides ui) {
+        val rev = ui.tick + 1009 * phone.store.revision + 1_000_003 * ui.sheets.tick
+        CompositionLocalProvider(LocalUi provides ui, LocalRev provides rev) {
             val still = reduceMotion
             DisposableEffect(ui) {
                 ui.hosted = true
@@ -99,8 +109,7 @@ class MainActivity : ComponentActivity() {
         app.platform.activity = this
         app.start()
         val since = System.currentTimeMillis()
-        // until the home page is drawn, or LATEST at most, so the app cannot hang on it
-        splash.setKeepOnScreenCondition { !main.ui.splashGone && System.currentTimeMillis() - since < LATEST }
+        splash.setKeepOnScreenCondition { splashKept(main.ui.splashGone, since, System.currentTimeMillis()) }
         splash.setOnExitAnimationListener { view ->
             main.ui.arrive = true
             view.view
@@ -122,10 +131,7 @@ class MainActivity : ComponentActivity() {
                 ) ||
                     main.ui.dark > 0
             LaunchedEffect(dark) { bars(dark) }
-            LaunchedEffect(Unit) {
-                delay(32) // two frames after the first drawing
-                main.ui.splashGone = true
-            }
+            SideEffect { main.ui.splashGone = true } // the home page is laid out: its first frame ends the splash
             AppScreen(main)
             // with nothing left to close, back sends the app to the background as other apps do
             if (Build.VERSION.SDK_INT < 31) BackHandler { moveTaskToBack(true) }

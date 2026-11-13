@@ -117,6 +117,7 @@ import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.ui.shimmer
 import de.schmeckts.app.ui.shimmerPhase
 import de.schmeckts.app.ui.tone
+import de.schmeckts.app.ui.watch
 import de.schmeckts.app.weekStart
 import de.schmeckts.app.whenStr
 
@@ -125,6 +126,7 @@ import de.schmeckts.app.whenStr
 /** the view of a sheet or page by its kind, as the old VIEWS */
 @Composable
 fun SheetView(state: SheetState) {
+    watch()
     val ui = LocalUi.current
     // what the views draw from: the data and the redraws asked for
     ui.sheets.tick
@@ -153,6 +155,7 @@ private fun Gone(
     title: String,
     text: String,
 ) {
+    watch()
     val ui = LocalUi.current
     SheetBody(title, ui.sheets) { Hint(text, Modifier.padding(top = Space.hair)) }
 }
@@ -167,6 +170,7 @@ private fun ProdRow(
     first: Boolean = true,
     inner: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
+    watch()
     val ui = LocalUi.current
     if (!first) Divider(Size.picS + Space.s3)
     if (ui.phone.photos.hasPhoto(s, p)) {
@@ -201,6 +205,7 @@ private fun photoLabel(
 
 @Composable
 private fun PhotoRow(p: Rec) {
+    watch()
     val ui = LocalUi.current
     Divider(Size.picS + Space.s3)
     ListRow(onClick = ui.on("product-photo", "id" to p.id), minHeight = Size.controlL) {
@@ -214,6 +219,7 @@ private fun PetChips(
     action: String,
     on: Set<String>,
 ) {
+    watch()
     val ui = LocalUi.current
     Chips {
         for (pet in ui.phone.db.pets) {
@@ -236,6 +242,7 @@ private fun TimeRow(
     field: String,
     id: String,
 ) {
+    watch()
     val ui = LocalUi.current
     ListRow(onClick = ui.on("pick", "field" to field, "id" to id), label = title, minHeight = Size.controlL) {
         Lead("clock")
@@ -257,6 +264,7 @@ private fun LGroup(
     first: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    watch()
     if (label.isNotEmpty()) {
         Label(label)
     } else if (!first) {
@@ -267,6 +275,7 @@ private fun LGroup(
 
 @Composable
 private fun ServingView(state: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -310,6 +319,7 @@ private fun ServingView(state: SheetState) {
 
 @Composable
 private fun ObservationView(state: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -364,6 +374,7 @@ private fun ObservationView(state: SheetState) {
 // as tall as the label and field it stands in for
 @Composable
 private fun FieldSkeleton() {
+    watch()
     val phase = shimmerPhase()
     Skel(0.28f, Modifier.padding(top = Space.s5, bottom = Space.s2), height = 10.dp)
     Box(
@@ -405,6 +416,7 @@ private fun Modifier.sheen(
 
 @Composable
 private fun NameView(s: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -571,6 +583,7 @@ private fun RetryNote(
     retry: String?,
     warn: Boolean,
 ) {
+    watch()
     val ui = LocalUi.current
     androidx.compose.foundation.layout.FlowRow(
         Modifier.padding(top = Space.s3),
@@ -585,6 +598,7 @@ private fun RetryNote(
 /** what a form still needs, under its field until that is filled in */
 @Composable
 private fun FieldError(s: SheetState) {
+    watch()
     val e = s.str("error")
     if (e.isNotEmpty()) T(e, Type.small, Modifier.padding(top = Space.s3).semantics { contentDescription = e }, colors.bad)
 }
@@ -597,6 +611,7 @@ private fun TextureChips(
     labelled: Boolean = false,
     note: String = "",
 ) {
+    watch()
     val ui = LocalUi.current
     val t = TEXTURES[de.schmeckts.app.typeOfName(type)] ?: return
     val chips: @Composable () -> Unit = {
@@ -619,6 +634,7 @@ private fun PackChips(
     value: String,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val ui = LocalUi.current
     Chips(modifier) {
         for (l in list) {
@@ -638,6 +654,7 @@ private fun suggestions(
     s: SheetState,
     serving: Rec?,
 ): Pair<String, List<Rec>> {
+    watch()
     val ph = LocalUi.current.phone
     val skip = if (s.kind == "product") s.id else serving?.str("productId")
     val q = norm("${s.str("brand")} ${s.str("variety")}")
@@ -661,6 +678,7 @@ private fun Suggestions(
     s: SheetState,
     found: Pair<String, List<Rec>>,
 ) {
+    watch()
     val ui = LocalUi.current
     val (title, hits) = found
     if (hits.isEmpty()) return
@@ -692,6 +710,7 @@ private fun ServeRows(
     entries: List<de.schmeckts.app.Listed>,
     code: String = "",
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val m = ph.derive.model()
@@ -722,6 +741,7 @@ private fun ServeRows(
 
 @Composable
 private fun FeedView(s: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -795,6 +815,7 @@ private fun Cta(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
+    watch()
     BoxBtn(modifier, primary, onClick) {
         Icon(icon, size = Size.iconL, stroke = Size.STROKE_L)
         Column(Modifier.weight(1f)) {
@@ -811,6 +832,7 @@ private const val OLD = "Die letzten Bewertungen sind über ein halbes Jahr alt.
 
 @Composable
 private fun Kaufen(e: Sort) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val pets = if (ph.db.pets.size > 1) ph.db.pets.filter { e.pets.containsKey(it.id) } else emptyList()
@@ -837,6 +859,7 @@ private fun Counts(
     levels: List<String>,
     counts: Map<String, Int>,
 ) {
+    watch()
     Column(Modifier.padding(top = Space.s3, bottom = Space.s1)) {
         Row(Modifier.fillMaxWidth()) {
             for (r in levels) {
@@ -859,6 +882,7 @@ private const val MEALS_SHOWN = 12 // the rest is on the history page
 
 @Composable
 private fun ProductView(state: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -927,6 +951,7 @@ private fun ProductView(state: SheetState) {
 // with a picture the packaging spans the card, without one the variety has the row a meal has
 @Composable
 private fun PackGroup(p: Rec) {
+    watch()
     val ui = LocalUi.current
     val inner: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
         TMain(esc(p.str("brand")?.ifEmpty { null } ?: p.str("variety")), typeOf(p))
@@ -985,6 +1010,7 @@ private fun Modifier.layoutWidePack() =
 // counts only; whether they stand out is for the evaluation
 @Composable
 private fun Noticed(p: Rec) {
+    watch()
     val ph = LocalUi.current.phone
     val after = observedAfter(ph.db, ph.db.pets.map { it.id }, Time.now(), p.id)
     if (after.isEmpty()) return
@@ -1007,6 +1033,7 @@ fun reportState(at: String? = null) = SheetState("report", "at" to at)
 
 @Composable
 private fun ReportView(state: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -1060,6 +1087,7 @@ private fun ShopList(
     m: de.schmeckts.app.Model,
     list: List<Sort>,
 ) {
+    watch()
     list.forEachIndexed { i, e ->
         if (i > 0) Divider(Size.picL + Space.s3)
         ShopRow(m, e)
@@ -1072,6 +1100,7 @@ private fun Fold(
     list: List<Sort>,
     m: de.schmeckts.app.Model,
 ) {
+    watch()
     val ui = LocalUi.current
     if (list.size <= FOLDED) return ShopList(m, list)
     val open = (ui.sheet?.get("open") as? Set<*>)?.contains(key) == true
@@ -1087,6 +1116,7 @@ private fun Fold(
 
 @Composable
 private fun ShopView() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val m = ph.derive.model()
@@ -1129,6 +1159,7 @@ private fun ShopView() {
 
 @Composable
 private fun CropView(s: SheetState) {
+    watch()
     val ui = LocalUi.current
     val img = s["cropImg"] as? ImageBitmap
     val c = s["crop"] as? Crop
@@ -1150,6 +1181,7 @@ private fun CropView(s: SheetState) {
 
 @Composable
 private fun PetView(s: SheetState) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     if (s.step == "crop") return CropView(s)

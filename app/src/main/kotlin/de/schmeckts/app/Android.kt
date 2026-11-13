@@ -232,6 +232,8 @@ class AndroidPlatform(
         }
     }
 
+    override fun hasCamera() = app.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+
     // the manifest declares the camera permission, so Android refuses the camera app while it is denied
     override suspend fun takePhoto(hint: String?): ByteArray? {
         val dir = File(app.cacheDir, "photo")

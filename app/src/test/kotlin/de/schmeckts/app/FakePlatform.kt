@@ -50,6 +50,10 @@ class FakePlatform : Platform {
         calls.add("clearExports" to null)
     }
 
+    var camera = false // the app's own camera; without one the camera app stands in
+
+    override fun hasCamera() = camera
+
     override suspend fun takePhoto(hint: String?): ByteArray? {
         calls.add("capture" to hint)
         return photo

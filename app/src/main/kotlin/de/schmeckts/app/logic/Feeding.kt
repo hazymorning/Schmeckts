@@ -129,6 +129,7 @@ class Feeding(
     // null on cancel or when nothing could take the photo
     private suspend fun packagingPhoto(hint: String): ByteArray? =
         try {
+            if (!ph.platform.hasCamera()) throw CameraFailed("Keine Kamera in dieser Umgebung.")
             ui.camera.openCamera(hint.ifEmpty { "Packung fotografieren" })
         } catch (e: CameraFailed) {
             report("our own camera", e)

@@ -103,6 +103,9 @@ interface Platform {
     /** a shared file stays in the cache until the receiving app has read it, then goes on the next start */
     fun clearExports()
 
+    /** a camera the app's own camera screen can use */
+    fun hasCamera(): Boolean
+
     /** the system camera app, for when the app's own camera cannot run; the photo as JPEG, null when cancelled */
     suspend fun takePhoto(hint: String?): ByteArray?
 

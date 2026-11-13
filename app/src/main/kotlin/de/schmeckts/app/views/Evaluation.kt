@@ -60,6 +60,7 @@ import de.schmeckts.app.ui.TMain
 import de.schmeckts.app.ui.Type
 import de.schmeckts.app.ui.colors
 import de.schmeckts.app.ui.tone
+import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
 
 // Evaluation card and page. The analysis is in Smart.kt, this only words it
@@ -283,6 +284,7 @@ private fun Ranked(
     medal: Boolean = false,
     place: Int = 0,
 ) {
+    watch()
     val (ic, tone) = SIDE.getValue(side)
     val c = colors.tone(tone)!!.c
     val surface = colors.surface
@@ -338,6 +340,7 @@ private fun SideRow(
     first: Boolean,
     t: Trial? = null,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val p = e.product
@@ -363,6 +366,7 @@ private fun SideList(
     r: Ranking,
     side: String,
 ) {
+    watch()
     val t = if (side == "top") candidate(r) else null
     val list = r.side(side).take(PICKS)
     if (t == null && list.isEmpty()) return
@@ -393,6 +397,7 @@ fun hasEvaluationCard(m: Model) = LocalUi.current.phone.hasEvaluationCard(m)
 // without a ranking, as for a pet on dry food only, the card shows what to buy again
 @Composable
 fun EvaluationCard(m: Model) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val r = ph.derive.rankingModel()
@@ -437,6 +442,7 @@ private fun PageCard(
     title: String,
     content: @Composable () -> Unit,
 ) {
+    watch()
     Card {
         CardTitle(title)
         content()
@@ -452,6 +458,7 @@ private fun HintLine(text: String) = M(text, Type.small, Modifier.padding(bottom
 // each brand, consistency and flavour with how many of its meals went down well, all of it in the words beside the bar
 @Composable
 private fun TasteBlock(t: de.schmeckts.app.Taste) {
+    watch()
     val names = TEXTURES.getValue("Nassfutter").items.associate { it.key to it.label }
     var first = true
     val side: @Composable (String, List<TasteRow>, (String) -> String) -> Unit = { title, list, name ->
@@ -502,6 +509,7 @@ private fun Portrait(
     r: Ranking,
     x: Evaluation,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val ids = m.pets
     val several = ids.size > 1
@@ -570,6 +578,7 @@ private fun PlaceRow(
     place: Int,
     side: String,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val p = e.product
@@ -608,6 +617,7 @@ private fun Places(
     list: List<Sort>,
     side: String,
 ) {
+    watch()
     list.forEachIndexed { i, e ->
         if (i > 0) {
             de.schmeckts.app.ui
@@ -624,6 +634,7 @@ private fun Lists(
     r: Ranking,
     x: Evaluation,
 ) {
+    watch()
     if (r.rated == 0) {
         return PageCard("Noch nichts bewertet") { SayLine("Bewerte ein paar Mahlzeiten, dann steht hier, was ankommt und was nicht.") }
     }
@@ -694,6 +705,7 @@ private fun TrendCard(
     m: Model,
     x: Evaluation,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val lines = x.trend
     val rows = mutableListOf<@Composable () -> Unit>()
@@ -753,6 +765,7 @@ private fun often(n: Int) = OFTEN.getOrNull(n - 1)?.let { it + "mal" } ?: "$n Ma
 
 @Composable
 private fun ObservedCard(x: Evaluation) {
+    watch()
     val ph = LocalUi.current.phone
     val o = x.observed
     if (o.kinds.isEmpty() && o.links.isEmpty()) return
@@ -786,6 +799,7 @@ private fun SplitCard(
     m: Model,
     r: Ranking,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     if (m.pet != null || r.split.isEmpty()) return
     val rows =
@@ -826,6 +840,7 @@ private fun InsightRows(list: List<Insight>) =
 
 @Composable
 private fun InsightsCard(x: Evaluation) {
+    watch()
     val ui = LocalUi.current
     val list = x.insights
     if (list.isEmpty()) return
@@ -844,6 +859,7 @@ private val BUYING = setOf("marke", "geschmack", "konsistenz", "sosse")
 
 @Composable
 fun InsightsPage() {
+    watch()
     val ui = LocalUi.current
     val list =
         ui.phone.derive
@@ -868,6 +884,7 @@ private fun TrialRow(
     t: Trial,
     best: Boolean = false,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val several = m.pets.size > 1
     ToldBtn(
@@ -883,6 +900,7 @@ private fun NextCard(
     r: Ranking,
     x: Evaluation,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val now = Time.now()
     val several = m.pets.size > 1
@@ -923,6 +941,7 @@ private fun Foot(
     m: Model,
     x: Evaluation,
 ) {
+    watch()
     val b = x.basis
     val parts = mutableListOf<String>()
     if (b.n > 0) {
@@ -951,6 +970,7 @@ private fun Foot(
 
 @Composable
 fun EvaluationPage() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive

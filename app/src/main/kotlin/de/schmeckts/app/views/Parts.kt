@@ -91,6 +91,7 @@ import de.schmeckts.app.ui.colors
 import de.schmeckts.app.ui.photoSource
 import de.schmeckts.app.ui.press
 import de.schmeckts.app.ui.tone
+import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
 
 // Building blocks shared by the views
@@ -238,6 +239,7 @@ fun Avatar(
     av: Av = Av.M,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     if (pet == null) return
     val ui = LocalUi.current
     val img = imageOf(pet.str("photo"))
@@ -281,6 +283,7 @@ fun Thumb(
     th: Th = Th.L,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val src = p?.str("thumb")?.ifEmpty { null } ?: s?.str("thumb")
     val img = imageOf(src)
     Box(
@@ -315,6 +318,7 @@ fun PhotoThumb(
     p: Rec?,
     th: Th = Th.L,
 ) {
+    watch()
     val ui = LocalUi.current
     if (!ui.phone.photos.hasPhoto(s, p)) return Thumb(s, p, th)
     val key = photoKey(s, p)
@@ -341,6 +345,7 @@ fun RowScope.NameBlock(
     p: Rec?,
     inSheet: Boolean = false,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val status = s.str("status")
     if (status == "recognizing" || status == "reading") {
@@ -389,6 +394,7 @@ fun RowScope.NameBlock(
 
 @Composable
 private fun RateBadge(r: String) {
+    watch()
     val t = colors.tone(rateTone(r))
     Badge(RATINGS.getValue(r).label, Modifier.padding(bottom = Space.s2), icon = "r_$r", tone = t)
 }
@@ -399,6 +405,7 @@ fun RateSliderFor(
     s: Rec,
     pid: String,
 ) {
+    watch()
     val ui = LocalUi.current
     val d = ui.phone.derive
     val scale = scaleOf(d.getProduct(s.str("productId")))
@@ -412,6 +419,7 @@ fun RateSliderFor(
 
 @Composable
 fun ScaleEnds(levels: List<String>) {
+    watch()
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         T(RATINGS.getValue(levels.first()).label, Type.caption, color = colors.muted)
         T(RATINGS.getValue(levels.last()).label, Type.caption, color = colors.muted)
@@ -424,6 +432,7 @@ private fun Mini(
     pet: Rec?,
     r: String?,
 ) {
+    watch()
     val ring = r?.let { colors.tone(rateTone(it))?.c } ?: colors.line
     val ground = colors.surface
     Box(
@@ -437,6 +446,7 @@ private fun Mini(
 
 @Composable
 fun ResultBadges(s: Rec) {
+    watch()
     val d = LocalUi.current.phone.derive
     val ids = d.servingPets(s)
     if (ids.size == 1) {
@@ -454,6 +464,7 @@ fun ResultBadges(s: Rec) {
 /** no arming: it can be undone from the toast */
 @Composable
 fun DeleteMealBtn(id: String) {
+    watch()
     val ui = LocalUi.current
     Btn("Eintrag löschen", BtnKind.QUIET, Modifier.padding(top = Space.s3), icon = "trash", onClick = ui.on("delete-serving", "id" to id))
 }
@@ -481,6 +492,7 @@ fun Segmented(
     options: List<Opt>,
     current: String?,
 ) {
+    watch()
     val ui = LocalUi.current
     Seg(options.map { SegOption(it.value, it.label, it.icon, ui.on(it.action ?: action, "v" to it.value)) }, current) {}
 }
@@ -495,6 +507,7 @@ fun ArmBtn(
     kind: BtnKind = BtnKind.DANGER,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val ui = LocalUi.current
     val on = ui.sheet?.get("armed") == key
     Btn(if (on) armedLabel else label, if (on) BtnKind.ARMED else kind, modifier, icon = icon, onClick = ui.on("arm", "then" to key))
@@ -542,6 +555,7 @@ private fun Bars(
     plus: Boolean,
     plusFirst: Boolean = false,
 ) {
+    watch()
     val p = colors
     Row(Modifier.height(Size.meter), horizontalArrangement = Arrangement.spacedBy(Space.hair), verticalAlignment = Alignment.Bottom) {
         val more: @Composable () -> Unit = { T("+", Type.captionStrong, Modifier.align(Alignment.CenterVertically), p.muted) }
@@ -578,6 +592,7 @@ fun Calendar(
     modifier: Modifier = Modifier,
     top: Dp = Space.s4,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val p = colors
@@ -661,6 +676,7 @@ fun Strip(
     r: Ratings,
     open: Int = 0,
 ) {
+    watch()
     if (r.keys.isEmpty()) return
     val counts = r.keys.groupingBy { it }.eachCount()
     val said =
@@ -697,6 +713,7 @@ fun DayLine(
     g: DayGroup,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     Row(
         modifier
@@ -722,6 +739,7 @@ fun DayItems(
     multiHouse: Boolean = false,
     plain: Boolean = false,
 ) {
+    watch()
     val p = colors
     Column {
         g.items.forEachIndexed { i, x ->
@@ -749,6 +767,7 @@ private fun TimeNode(
     t: Long,
     node: @Composable () -> Unit,
 ) {
+    watch()
     T(
         clockStr(t),
         Type.smallStrong.copy(fontFeatureSettings = "tnum"),
@@ -762,6 +781,7 @@ private fun TimeNode(
 
 @Composable
 private fun Node(tone: String?) {
+    watch()
     val p = colors
     val ground = p.surface
     val c = p.tone(tone)?.c
@@ -782,6 +802,7 @@ private fun ObservationItem(
     multiHouse: Boolean,
     plain: Boolean,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val kind = observationOf(o.str("kind"))
@@ -807,6 +828,7 @@ private fun ServingItem(
     multiHouse: Boolean,
     plain: Boolean,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val p = ph.derive.getProduct(s.str("productId"))
@@ -849,6 +871,7 @@ fun ShopRow(
     m: Model,
     e: Sort,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val p = e.product
@@ -880,6 +903,7 @@ fun ToldRow(
     say: String,
     why: String = "",
 ) {
+    watch()
     ListRow(top = true) {
         pic()
         Column(Modifier.weight(1f)) {
@@ -897,6 +921,7 @@ fun ToldBtn(
     why: String = "",
     end: @Composable () -> Unit = {},
 ) {
+    watch()
     val ui = LocalUi.current
     ListRow(onClick = ui.on("open-product", "id" to id), top = true) {
         Thumb(null, ui.phone.derive.getProduct(id), Th.M)
@@ -910,6 +935,7 @@ fun ToldBtn(
 
 @Composable
 fun ToldList(rows: List<@Composable () -> Unit>) {
+    watch()
     rows.forEachIndexed { i, r ->
         if (i > 0) Divider(Size.picM + Space.s3)
         r()
@@ -1009,6 +1035,7 @@ fun SheetField(
     channel: String = "field",
     search: Boolean = false,
 ) {
+    watch()
     val ui = LocalUi.current
     val s = ui.sheet
     val stored = if (channel == "field") (s?.get(key) as? String) ?: initial ?: "" else initial ?: ""
