@@ -19,17 +19,17 @@ Identify the brand and the variety. Answer with JSON ONLY, no markdown, in this 
 "variety" is the variety, short and in German, e.g. "Huhn in Soße" or "Lachs Pastete".
 Leave a value empty when it cannot be made out."""
 
-class Model(
+class AiModel(
     val id: String,
     val name: String?,
 )
 
 // the highest version in names like gpt-6.1-sol or gemini-3.8-flash
 private fun newest(
-    models: List<Model>,
+    models: List<AiModel>,
     re: Regex,
-): Model? {
-    fun v(m: Model) =
+): AiModel? {
+    fun v(m: AiModel) =
         re
             .find(m.id)!!
             .groupValues[1]
@@ -57,7 +57,7 @@ class Provider(
     val name: String,
     val models: String,
     val headers: (String) -> Map<String, String>,
-    val pick: (JsonElement?) -> Model?,
+    val pick: (JsonElement?) -> AiModel?,
     val url: (String) -> String,
     val lean: JsonObject,
     val body: (model: String, text: String, b64: String) -> JsonObject,
@@ -84,7 +84,7 @@ val PROVIDERS: Map<String, Provider> =
                         .firstOrNull { m ->
                             val can = m["capabilities"] as? JsonObject
                             can == null || ((can["image_input"] as? JsonObject)?.get("supported").truthy)
-                        }?.let { Model(it["id"].asString!!, it["display_name"].asString) }
+                        }?.let { AiModel(it["id"].asString!!, it["display_name"].asString) }
                 },
                 url = { "https://api.anthropic.com/v1/messages" },
                 lean = parseJson("""{"output_config":{"effort":"low"}}""") as JsonObject,
@@ -130,7 +130,7 @@ val PROVIDERS: Map<String, Provider> =
                     newest(
                         list(d, "data").mapNotNull {
                             it["id"].asString?.let { id ->
-                                Model(id, null)
+                                AiModel(id, null)
                             }
                         },
                         Regex("^gpt-(\\d+(?:\\.\\d+)?)(?:-sol)?$"),
@@ -184,7 +184,7 @@ val PROVIDERS: Map<String, Provider> =
                         list(d, "models")
                             .filter { m ->
                                 (m["supportedGenerationMethods"] as? JsonArray)?.any { it.asString == "generateContent" } == true
-                            }.map { Model((it["name"].asString ?: "").removePrefix("models/"), it["displayName"].asString) }
+                            }.map { AiModel((it["name"].asString ?: "").removePrefix("models/"), it["displayName"].asString) }
                     models.find { it.id == "gemini-flash-latest" } ?: newest(models, Regex("^gemini-(\\d+(?:\\.\\d+)?)-flash$"))
                 },
                 url = { model -> "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent" },
@@ -334,11 +334,11 @@ class Ai(
     private suspend fun pick(
         p: Provider,
         key: String,
-    ): Model {
+    ): AiModel {
         val found =
             p.pick(send(p, p.models, key, null, CHECK_TIMEOUT))
                 ?: throw AiFailure("model", "${p.name} hat für diesen Schlüssel kein passendes Modell.")
-        return Model(found.id, found.name ?: found.id)
+        return AiModel(found.id, found.name ?: found.id)
     }
 
     private suspend fun ask(

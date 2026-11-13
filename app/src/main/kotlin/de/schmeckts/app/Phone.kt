@@ -23,6 +23,7 @@ class Phone(
     val api = Api(store, http)
     val sync = Sync(store, api, http, scope, ::report) { visible }
     val ai = Ai(disk, http) { store.db.products }.apply { load() }
+    val derive = Derive(store)
 
     init {
         store.onSaved = { sync.syncSoon(400) }

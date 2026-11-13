@@ -208,7 +208,8 @@ class SyncTest {
                 db.products.add(
                     Rec(
                         parseJson(
-                            """{"id":"snackprod001","brand":"Dreamies","variety":"Käse","type":"Snack","codes":{},"createdAt":${Time.now()}}""",
+                            """{"id":"snackprod001","brand":"Dreamies","variety":"Käse","type":"Snack","codes":{},
+                            "createdAt":${Time.now()}}""",
                         ).obj(),
                     ),
                 )
@@ -309,7 +310,8 @@ class SyncTest {
                     0,
                     Rec(
                         parseJson(
-                            """{"id":"beob00000001","kind":"stink","at":${Time.now()},"pets":{"lxpet00001":true,"tigerpet0001":true},"by":"Anna"}""",
+                            """{"id":"beob00000001","kind":"stink","at":${Time.now()},
+                            "pets":{"lxpet00001":true,"tigerpet0001":true},"by":"Anna"}""",
                         ).obj(),
                     ),
                 )
@@ -370,7 +372,8 @@ class SyncTest {
                 db.products.add(
                     Rec(
                         parseJson(
-                            """{"id":"animprod0001","brand":"Animonda","variety":"Carny Rind","type":"Nassfutter","codes":{"$miss":true},"createdAt":${Time.now()}}""",
+                            """{"id":"animprod0001","brand":"Animonda","variety":"Carny Rind","type":"Nassfutter",
+                            "codes":{"$miss":true},"createdAt":${Time.now()}}""",
                         ).obj(),
                     ),
                 )

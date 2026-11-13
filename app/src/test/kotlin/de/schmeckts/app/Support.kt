@@ -34,7 +34,8 @@ fun JsonElement.obj(): JsonObject = this as JsonObject
 fun savedDb(): JsonObject =
     parseJson(
         """{"version":3,"pets":[{"id":"lxpet00001","name":"Minka","species":"Katze","photo":null,"createdAt":1750000000000}],
-        "products":[{"id":"lxprod0001","brand":"Sheba","variety":"Lachs","type":"Nassfutter","thumb":null,"lastPets":["lxpet00001"],"createdAt":1750000000000}],
+        "products":[{"id":"lxprod0001","brand":"Sheba","variety":"Lachs","type":"Nassfutter","thumb":null,
+        "lastPets":["lxpet00001"],"createdAt":1750000000000}],
         "servings":[""" +
             (0..2).joinToString(",") {
                 """{"id":"lxserv000$it","productId":"lxprod0001","servedAt":${1750000000000 + it * 86400000L},
