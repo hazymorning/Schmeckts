@@ -42,7 +42,7 @@ private fun compared(
 }
 
 @Suppress("UNCHECKED_CAST")
-fun insightTold(x: Insight): Told {
+fun insightSaid(x: Insight): Told {
     val a = x.a
     val b = x.b
     return when (x.kind) {
