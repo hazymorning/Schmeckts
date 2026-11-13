@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
@@ -107,6 +108,7 @@ fun CropStage(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(Radius.l))
             .background(p.surface2)
+            .testTag("crop")
             .pointerInput(c) {
                 detectTransformGestures { centroid, pan, zoom, _ ->
                     val stage = size.width.toDouble()

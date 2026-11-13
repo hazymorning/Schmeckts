@@ -1,8 +1,11 @@
 package de.schmeckts.app
 
 import android.app.Application
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import de.schmeckts.app.views.syncChip
 import org.junit.Test
@@ -1250,6 +1253,102 @@ class UiProductPhotoTest : ScreenTest() {
         check(
             new[0] != old[0] && new[1] != old[1] && fieldText("Marke") == "Whiskas Neu",
             "while naming: photo changes, typed brand stays",
+        )
+    }
+}
+
+class UiCropTest : ScreenTest() {
+    // four quadrants for cropping: red, green, blue, yellow
+    private fun quadrants(): ByteArray {
+        val b = android.graphics.Bitmap.createBitmap(800, 400, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(b)
+        val paint = android.graphics.Paint()
+        for ((rect, color) in listOf(
+            android.graphics.Rect(0, 0, 400, 200) to android.graphics.Color.rgb(220, 30, 30),
+            android.graphics.Rect(400, 0, 800, 200) to android.graphics.Color.rgb(30, 160, 60),
+            android.graphics.Rect(0, 200, 400, 400) to android.graphics.Color.rgb(30, 60, 220),
+            android.graphics.Rect(400, 200, 800, 400) to android.graphics.Color.rgb(230, 210, 40),
+        )) {
+            paint.color = color
+            c.drawRect(rect, paint)
+        }
+        return java.io
+            .ByteArrayOutputStream()
+            .also { b.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            .toByteArray()
+    }
+
+    private fun rect() = (sheet!!["crop"] as de.schmeckts.app.ui.Crop).rect().let { listOf(it.x, it.y, it.side) }
+
+    @Test
+    fun `crop - zoom and drag, applied at 320 px, cancel keeps the old one`() {
+        platform.pictures = AndroidPictures()
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+        main.logic.pets.openPet(db.pets[0].id)
+        idle(100)
+        platform.image = quadrants()
+        act("pet-photo")
+        idle(100)
+        check(sheet?.step == "crop", "cropping $level ${calls("pickImage")} $toast")
+        val start = rect()
+        rule
+            .onNode(
+                androidx.compose.ui.test
+                    .hasContentDescription("Zoom"),
+                useUnmergedTree = true,
+            ).performTouchInput {
+                click(
+                    Offset(
+                        width / 3f,
+                        centerY,
+                    ),
+                )
+            }
+        idle(50)
+        rule
+            .onNode(
+                androidx.compose.ui.test
+                    .hasTestTag("crop"),
+                useUnmergedTree = true,
+            ).performTouchInput {
+                down(center)
+                repeat(4) { moveBy(Offset(width / 8f, height / 8f)) }
+                up()
+            }
+        idle(50)
+        check(
+            listOf(start, rect()) == listOf(listOf(200, 0, 400), listOf(200, 0, 200)),
+            "opens on the whole middle; zoomed and dragged, it stops at the edge ${rect()}",
+        )
+        act("crop-apply")
+        val photo = sheet!!.str("photo")!!
+        val bytes = android.util.Base64.decode(photo.substringAfter(","), 0)
+        val b = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val red =
+            listOf(0.1 to 0.1, 0.9 to 0.1, 0.1 to 0.9, 0.9 to 0.9).all { (fx, fy) ->
+                val c = b.getPixel((fx * (b.width - 1)).toInt(), (fy * (b.height - 1)).toInt())
+                android.graphics.Color.red(c) > 150 && android.graphics.Color.green(c) < 100
+            }
+        check(
+            sheet!!.step == null && photo.startsWith("data:image/jpeg") && b.width == 320 && b.height == 320 && red,
+            "applied: 320 px, red quadrant ${b.width}",
+        )
+        act("save-pet")
+        idle(400)
+        check(db.pets[0].str("photo") == photo, "saved on the pet")
+        main.logic.pets.openPet(db.pets[0].id)
+        idle(100)
+        platform.image = jpegOf(480, 360)
+        act("pet-photo")
+        idle(100)
+        act("crop-cancel")
+        check(
+            sheet!!.step == null && sheet!!.str("photo") == photo && fieldText("Name") != null,
+            "cancel: back in the pet sheet, the picture stays",
         )
     }
 }
