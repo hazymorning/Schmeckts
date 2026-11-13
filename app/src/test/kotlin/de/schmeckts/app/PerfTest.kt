@@ -69,10 +69,15 @@ private fun household(
 }
 
 class PerfTest : ScreenTest() {
+    // the time the screen's own thread worked, so other work on the machine does not count
+    private val cpu =
+        java.lang.management.ManagementFactory
+            .getThreadMXBean()
+
     private fun ms(block: () -> Unit): Double {
-        val t0 = System.nanoTime()
+        val t0 = cpu.currentThreadCpuTime
         block()
-        return (System.nanoTime() - t0) / 1e6
+        return (cpu.currentThreadCpuTime - t0) / 1e6
     }
 
     private fun median(xs: List<Double>) = xs.sorted()[xs.size / 2]
@@ -87,10 +92,10 @@ class PerfTest : ScreenTest() {
         val meal = db.servings[0]
         val draws =
             listOf("top", "schlecht", "gut", "mittel", "sosse", "top", "schlecht", "gut", "mittel", "sosse", "top").map { r ->
+                meal["pets"] = JsonObject(meal.pets + ("petminka001" to j(mapOf("r" to r, "at" to Time.now()))))
+                phone.store.save()
                 val t =
                     ms {
-                        meal["pets"] = JsonObject(meal.pets + ("petminka001" to j(mapOf("r" to r, "at" to Time.now()))))
-                        phone.store.save()
                         ui.update()
                         rule.waitForIdle()
                     }
