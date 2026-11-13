@@ -297,11 +297,14 @@ private fun PetsBar() {
                 Modifier
                     .size(Size.picXl)
                     .drawBehind {
+                        // dashes three strokes long, spread evenly round the circle, as a dashed border is drawn
                         val w = Size.stroke.toPx()
+                        val r = size.minDimension / 2 - w / 2
+                        val period = 2 * Math.PI.toFloat() * r / (2 * Math.PI.toFloat() * r / (w * 4.5f)).toInt()
                         drawCircle(
                             faint,
-                            size.minDimension / 2 - w / 2,
-                            style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))),
+                            r,
+                            style = Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(w * 3, period - w * 3))),
                         )
                     },
                 contentAlignment = Alignment.Center,
