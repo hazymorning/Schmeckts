@@ -730,9 +730,12 @@ fun DayLine(
     }
 }
 
-// the columns of the history page's timeline: time, then the node on the line
-private val TL_TIME = 49.dp
-private val TL_NODE = 28.dp
+// the columns of the history page's timeline, time and then the node on the line, in em of the small type, so the
+// line stays centred on the dot at any font size
+private val tlTime: Dp
+    @Composable get() = with(androidx.compose.ui.platform.LocalDensity.current) { (Type.small.fontSize.toPx() * 3.5f).toDp() }
+private val tlNode: Dp
+    @Composable get() = with(androidx.compose.ui.platform.LocalDensity.current) { (Type.small.fontSize.toPx() * 2f).toDp() }
 
 /** plain: rows as in any card, the time in the small line; else the history page's timeline of times and dots */
 @Composable
@@ -743,6 +746,7 @@ fun DayItems(
 ) {
     watch()
     val p = colors
+    val x0 = tlTime + tlNode / 2
     Column {
         g.items.forEachIndexed { i, x ->
             if (plain && i > 0) Divider(Size.picM + Space.s3)
@@ -751,10 +755,10 @@ fun DayItems(
                     Modifier
                 } else {
                     Modifier.drawBehind {
-                        val x0 = (TL_TIME + TL_NODE / 2).toPx()
+                        val mid = x0.toPx()
                         val w = Size.stroke.toPx()
-                        if (i > 0) drawLine(p.line, Offset(x0, 0f), Offset(x0, size.height / 2), w)
-                        if (i < g.items.size - 1) drawLine(p.line, Offset(x0, size.height / 2), Offset(x0, size.height), w)
+                        if (i > 0) drawLine(p.line, Offset(mid, 0f), Offset(mid, size.height / 2), w)
+                        if (i < g.items.size - 1) drawLine(p.line, Offset(mid, size.height / 2), Offset(mid, size.height), w)
                     }
                 }
             Box(line) {
@@ -773,12 +777,12 @@ private fun TimeNode(
     T(
         clockStr(t),
         Type.smallStrong.copy(fontFeatureSettings = "tnum"),
-        Modifier.width(TL_TIME),
+        Modifier.width(tlTime),
         colors.muted,
         align = TextAlign.End,
         maxLines = 1,
     )
-    Box(Modifier.width(TL_NODE), contentAlignment = Alignment.Center) { node() }
+    Box(Modifier.width(tlNode), contentAlignment = Alignment.Center) { node() }
 }
 
 @Composable

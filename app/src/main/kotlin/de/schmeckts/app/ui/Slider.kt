@@ -131,7 +131,8 @@ fun RateSlider(
                                 event = null
                                 val c = e.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!c.pressed) {
-                                    up = true
+                                    // a cancelled one rates nothing: Compose hands it over without the touch event
+                                    up = e.motionEvent?.let { it.actionMasked != android.view.MotionEvent.ACTION_CANCEL } ?: false
                                     lastX = c.position.x
                                     break
                                 }

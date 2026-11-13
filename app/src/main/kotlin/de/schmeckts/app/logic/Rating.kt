@@ -86,6 +86,7 @@ class Rating(
             ui.home.held
                 .getOrPut(s.id) { HashSet() }
                 .add(pid) // the row stays until the pop has run
+            ui.home.kept = s.id
         }
         launch {
             delay(Motion.STEP.toLong())
@@ -108,6 +109,7 @@ class Rating(
         inSheet: Boolean,
     ) {
         holds.remove(sid)
+        if (ui.home.kept == sid) ui.home.kept = null
         val s = d.getServing(sid)
         if (s == null || !rated(s)) return // undone meanwhile, or given another pet
         if (inSheet) {

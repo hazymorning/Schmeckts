@@ -14,6 +14,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,8 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -122,6 +125,7 @@ import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.ui.shadowHigh
 import de.schmeckts.app.ui.shadowLow
 import de.schmeckts.app.ui.watch
+import kotlinx.coroutines.launch
 import androidx.compose.ui.geometry.Size as Area
 
 // The home page: the header, the pets, the cards and the feeding button
@@ -136,6 +140,7 @@ fun HomeScreen() {
     ph.store.revision
     val p = colors
     val scroll = rememberScrollState()
+    ui.home.scroll = scroll
     val scrolled by remember { derivedStateOf { scroll.value > 0 } }
     val still = reduceMotion
     LaunchedEffect(ui.home.top) {
@@ -626,11 +631,25 @@ private fun rOfPet(
 @Composable
 private fun Pending(list: List<Rec>) {
     watch()
+    val ui = LocalUi.current
     Card {
         CardTitle("Wie war’s?")
         list.forEachIndexed { i, s ->
             Leaving(s.id) {
-                Column(Modifier.testTag("pend-${s.id}")) {
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                Column(
+                    Modifier
+                        .testTag("pend-${s.id}")
+                        .onGloballyPositioned { c ->
+                            // a rating changes the text above its row; to the eye the row stays where it was
+                            val top = c.positionInRoot().y
+                            val was = ui.home.tops.put(s.id, top)
+                            if (ui.home.kept == s.id && was != null && kotlin.math.abs(top - was) > 0.5f) {
+                                ui.home.kept = null
+                                scope.launch { ui.home.scroll?.scrollBy(top - was) }
+                            }
+                        },
+                ) {
                     if (i > 0) Divider(Size.picL + Space.s3)
                     PendItem(s)
                 }

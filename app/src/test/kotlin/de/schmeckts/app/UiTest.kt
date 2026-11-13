@@ -1,14 +1,20 @@
 package de.schmeckts.app
 
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import de.schmeckts.app.views.insightSaid
 import de.schmeckts.app.views.syncChip
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import org.junit.Test
 import org.robolectric.Robolectric
+import org.robolectric.annotation.Config
 
 // The screens as a person uses them: the old ui_test.py, case by case. Taps go through the views' buttons or their actions.
 
@@ -923,5 +929,259 @@ class UiEvaluationTest : ScreenTest() {
         act("open-serving", "id" to "meal000000")
         act("rate", "s" to "meal000000", "p" to M, "r" to "normal")
         check(until(5000) { sheet == null }, "the last open pet rated: the sheet closes by itself")
+    }
+}
+
+class UiNarrowTest : ScreenTest() {
+    // text off the screen, or cut by its box; rails scroll, and a row's title is cut to two lines on purpose
+    private fun cut(): List<String> {
+        val width =
+            rule
+                .onAllNodes(
+                    androidx.compose.ui.test
+                        .isRoot(),
+                )[0]
+                .fetchSemanticsNode()
+                .boundsInRoot.width
+        val rail =
+            androidx.compose.ui.test.hasAnyAncestor(
+                androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(
+                    androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange,
+                ),
+            )
+        val text =
+            androidx.compose.ui.test.SemanticsMatcher
+                .keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.Text)
+        val bad = mutableListOf<String>()
+        for (n in rule.onAllNodes(text and !rail, useUnmergedTree = true).fetchSemanticsNodes()) {
+            val what = n.config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString().take(40)
+            if (n.boundsInRoot.width <= 0f) continue
+            if (n.boundsInRoot.left < -0.5f || n.boundsInRoot.right > width + 0.5f) bad.add("off the screen: $what")
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            n.config
+                .getOrElseNullable(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { null }
+                ?.action
+                ?.invoke(layouts)
+            val l = layouts.firstOrNull() ?: continue
+            if (l.layoutInput.maxLines == 2) continue
+            if (l.hasVisualOverflow) bad.add("cut: $what")
+        }
+        return bad
+    }
+
+    private fun walk(big: Boolean) {
+        if (big) org.robolectric.RuntimeEnvironment.setFontScale(1.3f)
+        open()
+        act("demo")
+        val pet = db.pets[0].id
+        db.products.add(Rec(j(product("trocken0001", "Josera", "Huhn", "Trockenfutter")).obj()))
+        db.products.add(Rec(j(product("snack0001", "Dreamies", "Käse", "Snack")).obj()))
+        listOf("trocken0001", "snack0001").forEachIndexed { i, p ->
+            db.servings.add(Rec(j(meal("narrow$i", p, clock - (i + 1) * 60_000L, mapOf(pet to null))).obj()))
+        }
+        db.servings.sortByDescending { it.servedAt }
+        phone.store.save()
+        ui.update()
+        idle()
+        val found = LinkedHashMap<String, List<String>>()
+        val look = { name: String -> cut().takeIf { it.isNotEmpty() }?.let { found[name] = it } }
+        val closed = {
+            ui.sheets.closeAll()
+            idle(400)
+        }
+        look("home")
+        for (a in listOf("open-evaluation", "open-report", "feed")) {
+            act(a)
+            idle(400)
+            look(a)
+            if (a != "feed") closed()
+        }
+        act("new-product")
+        look("new-product")
+        closed()
+        act("open-serving", "id" to db.servings.first { it.str("productId") != null && !it.str("productId").isNullOrEmpty() }.id)
+        look("serving")
+        closed()
+        act("open-settings")
+        look("settings")
+        for (page in listOf("house", "exchange", "backup", "privacy")) {
+            act("settings-page", "v" to page)
+            look(page)
+            act("settings-back")
+        }
+        closed()
+        act(
+            "open-product",
+            "id" to
+                phone.derive
+                    .rankingModel()
+                    .top[0]
+                    .id,
+        )
+        look("variety")
+        closed()
+        val meals = phone.derive.pendingServings().map { it.id }
+        for (m in meals) {
+            act("open-serving", "id" to m)
+            look(m)
+            closed()
+        }
+        check(meals.size >= 3 && found.isEmpty(), "nothing cut${if (big) " with a large font" else ""}, with all three scales $found")
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp-xxhdpi")
+    fun `narrow - at 360dp nothing is cut off on the home page, the pages and sheets, every rating scale`() = walk(false)
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp-xxhdpi")
+    fun `narrow - with a large system font nothing is cut off either`() = walk(true)
+}
+
+class UiMotionTest : ScreenTest() {
+    // a picture of the node now and once it has settled; they differ while it moves
+    private fun moves(
+        text: String,
+        action: () -> Unit,
+    ): Boolean {
+        rule.mainClock.autoAdvance = false
+        action()
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeBy(48)
+        val mid = rule.onAllNodes(hasText(text) or hasContentDescription(text))[0].captureToImage().asAndroidBitmap()
+        rule.mainClock.advanceTimeBy(1000)
+        val end = rule.onAllNodes(hasText(text) or hasContentDescription(text))[0].captureToImage().asAndroidBitmap()
+        rule.mainClock.autoAdvance = true
+        return !mid.sameAs(end)
+    }
+
+    @Test
+    fun `controls - a switch, a segment or a chip moves to its new state as if changed in place`() {
+        open(reduce = false)
+        act("demo")
+        idle(1000)
+        act("open-settings")
+        idle(1000)
+        val switch = moves("Katzenkalender") { ui.act("calendar") }
+        val seg = moves("Dunkel") { ui.act("theme", "v" to "dark") }
+        check(switch && seg, "the knob slides over and the track takes its colour, the segment its fill $switch $seg")
+    }
+}
+
+class UiSlideTest : ScreenTest() {
+    private lateinit var meal: String
+
+    private fun rated() =
+        (
+            phone.derive
+                .getServing(meal)
+                ?.pets
+                ?.values
+                ?.first() as? JsonObject
+        )?.get("r").asString
+
+    private fun level(r: String) =
+        rule.onNode(
+            androidx.compose.ui.test
+                .hasTestTag("level-$r") and
+                androidx.compose.ui.test
+                    .hasAnyAncestor(
+                        androidx.compose.ui.test
+                            .hasTestTag("pend-$meal"),
+                    ),
+            useUnmergedTree = true,
+        )
+
+    private fun center(r: String) = level(r).fetchSemanticsNode().boundsInRoot.center
+
+    private fun reopen() {
+        val s = phone.derive.getServing(meal)!!
+        s["pets"] = petMap(s.pets.keys.toList())
+        phone.store.save()
+        ui.home.held.clear()
+        ui.update()
+        idle(2000)
+    }
+
+    // a finger from one level towards another, steps moves of it, dy off the line; lifted unless cancel
+    private fun slide(
+        from: String,
+        to: String,
+        steps: Int = 5,
+        dy: Float = 0f,
+        cancel: Boolean = false,
+    ) {
+        val a = center(from)
+        val b = center(to)
+        level(from).performTouchInput {
+            down(center)
+            for (i in 1..steps) {
+                moveBy(
+                    androidx.compose.ui.geometry
+                        .Offset((b.x - a.x) / steps, if (i == 1) dy else 0f),
+                )
+            }
+            if (cancel) cancel() else up()
+        }
+        idle(400)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h800dp-xxhdpi")
+    fun `slide - one rating per gesture under a finger or the keyboard, none when scrolling or cancelled`() {
+        open()
+        act("demo")
+        meal = phone.derive.pendingServings()[0].id
+        idle(3000)
+        val y0 = center("gut").y
+        level("gut").performTouchInput {
+            down(center)
+            advanceEventTime(250) // a resting finger
+            up()
+        }
+        idle(400)
+        check(rated() == "gut", "lifting the finger rates once")
+        check(kotlin.math.abs(center("gut").y - y0) < 1, "the row stays under the finger, whatever the rating changes above it")
+        slide("gut", "top")
+        check(rated() == "top", "while the card stays, a slide puts it right")
+        act("undo")
+        check(rated() == "gut", "undo brings back the level before")
+        reopen()
+        slide("top", "eager", 10, 2f)
+        check(rated() == "eager", "a slide rates the level it ends on, once")
+        reopen()
+        val list =
+            rule.onAllNodes(
+                androidx.compose.ui.test
+                    .hasScrollAction(),
+            )[0]
+        level("mittel").performTouchInput {
+            down(center)
+            for (dy in 10 until 130 step 10) {
+                moveBy(
+                    androidx.compose.ui.geometry
+                        .Offset(1f, -10f),
+                )
+            }
+            up()
+        }
+        idle(400)
+        check(
+            rated() == null &&
+                list.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange].value() > 0f,
+            "moving up scrolls and rates nothing",
+        )
+        slide("gut", "eager", cancel = true)
+        check(rated() == null, "a cancelled slide rates nothing")
+        level("gut").performTouchInput { down(center) }
+        ui.update()
+        idle(50)
+        level("gut").performTouchInput { up() }
+        idle(400)
+        check(rated() == "gut", "a redraw waits for the finger to lift, so the rating counts")
+        reopen()
+        level("mittel").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        idle(400)
+        check(rated() == "mittel", "keyboard and screen readers: the focused level rates")
     }
 }

@@ -153,4 +153,9 @@ class HomeState {
     var fills by mutableIntStateOf(0)
     var due by mutableStateOf(false)
     var top by mutableIntStateOf(0) // bumped to scroll the page to its top
+
+    // the meal just rated in the card, whose row the next draw leaves under the finger; where each row was
+    var kept: String? = null
+    val tops = HashMap<String, Float>()
+    var scroll: androidx.compose.foundation.ScrollState? = null
 }
