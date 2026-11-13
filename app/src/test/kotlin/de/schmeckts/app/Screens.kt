@@ -140,6 +140,7 @@ abstract class ScreenTest {
     lateinit var dir: File
     var platform = FakePlatform()
     var http = FakeHttp()
+    var net: Http? = null // the real network in place of http
     private var base = 0L
 
     // the phone's clock runs with the main looper's, so whatever lets the looper run moves it too, as on a phone
@@ -176,7 +177,7 @@ abstract class ScreenTest {
     }
 
     private fun run(start: Boolean): Main {
-        main = Main(Phone(dir, Dispatchers.Main, Dispatchers.IO, platform, http))
+        main = Main(Phone(dir, Dispatchers.Main, Dispatchers.IO, platform, net ?: http))
         if (start) main.start()
         val first = shown == null
         shown = main
