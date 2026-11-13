@@ -1,6 +1,7 @@
 package de.schmeckts.app
 
 import android.app.Application
+import android.content.pm.PackageManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
@@ -333,6 +334,21 @@ fun jpegOf(
     c.drawColor(android.graphics.Color.rgb(214, 120, 60))
     val label = android.graphics.Paint().apply { color = android.graphics.Color.rgb(250, 240, 225) }
     c.drawRect(w / 8f, h / 4f, w * 7 / 8f, h * 3 / 4f, label)
+    // grain, as a camera has it, so no two parts of the file are alike
+    val px = IntArray(w * h)
+    b.getPixels(px, 0, w, 0, 0, w, h)
+    val r = java.util.Random(w * 31L + h)
+    for (i in px.indices) {
+        val d = r.nextInt(13) - 6
+        val p = px[i]
+        px[i] =
+            android.graphics.Color.rgb(
+                (android.graphics.Color.red(p) + d).coerceIn(0, 255),
+                (android.graphics.Color.green(p) + d).coerceIn(0, 255),
+                (android.graphics.Color.blue(p) + d).coerceIn(0, 255),
+            )
+    }
+    b.setPixels(px, 0, w, 0, 0, w, h)
     return java.io
         .ByteArrayOutputStream()
         .also { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, it) }
@@ -1374,7 +1390,7 @@ class UiCameraTest : ScreenTest() {
     private fun answer(granted: Boolean = false) {
         val shadow = org.robolectric.Shadows.shadowOf(rule.activity)
         val asked = shadow.nextStartedActivityForResult ?: return
-        val result = if (granted) android.content.pm.PackageManager.PERMISSION_GRANTED else -1 // PERMISSION_DENIED
+        val result = if (granted) PackageManager.PERMISSION_GRANTED else PackageManager.PERMISSION_DENIED
         val names = asked.intent.getStringArrayExtra("android.content.pm.extra.REQUEST_PERMISSIONS_NAMES")
         val data =
             android.content
@@ -1493,5 +1509,248 @@ class UiCameraTest : ScreenTest() {
         act("photo")
         idle(100)
         check(calls("capture").size == 1 && !cam, "no camera: the camera app")
+    }
+}
+
+class UiPhotoViewerTest : ScreenTest() {
+    private fun onePet() {
+        open()
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+    }
+
+    private fun snap(photo: ByteArray) {
+        platform.photo = photo
+        act("feed")
+        act("photo")
+        check(until { db.servings.firstOrNull()?.str("status") == "noserver" }, "the photo served")
+        idle(400)
+    }
+
+    private val viewer get() = ui.viewer.open
+
+    private fun photoButton(within: androidx.compose.ui.test.SemanticsMatcher) =
+        rule.onAllNodes(
+            androidx.compose.ui.test
+                .hasContentDescription("Foto vergrößern") and within,
+            useUnmergedTree = true,
+        )
+
+    private fun inPane(kind: String) =
+        androidx.compose.ui.test.hasAnyAncestor(
+            androidx.compose.ui.test.SemanticsMatcher
+                .expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, kind),
+        )
+
+    private val inPend get() =
+        androidx.compose.ui.test.hasAnyAncestor(
+            androidx.compose.ui.test
+                .hasTestTag("pend-${db.servings[0].id}"),
+        )
+
+    // the photo opened by its button, and the width of what the viewer shows
+    private fun viewed(button: androidx.compose.ui.test.SemanticsNodeInteractionCollection): Int? {
+        button[0].performClick()
+        until { viewer || toast != null }
+        idle(400)
+        return ui.viewer.image?.width
+    }
+
+    // a tap on the photo closes the viewer
+    private fun tapViewer() {
+        rule
+            .onAllNodes(
+                androidx.compose.ui.test
+                    .hasContentDescription("Foto der Packung"),
+                useUnmergedTree = true,
+            ).let {
+                it[it.fetchSemanticsNodes().size - 1].performClick()
+            }
+        check(until { !viewer }, "the viewer closed")
+        idle(400)
+    }
+
+    private fun files() =
+        File(dir, "photos")
+            .list()
+            .orEmpty()
+            .filter { it.endsWith(".jpg") }
+            .sorted()
+
+    private fun width(name: String) =
+        File(dir, "photos/$name").readBytes().let {
+            android.graphics.BitmapFactory
+                .decodeByteArray(it, 0, it.size)
+                ?.width ?: 0
+        }
+
+    @Test
+    fun `photo_viewer - opens large, kept as a file of the variety outside the data, follows it, tidied up`() {
+        platform.pictures = AndroidPictures()
+        onePet()
+        snap(jpegOf(3000, 2250))
+        check(viewed(photoButton(inPane("serving"))) == 1100 && sheet != null, "naming: the photo opens large over the sheet")
+        tapViewer()
+        type("Marke", "Sheba")
+        viewed(photoButton(inPane("serving")))
+        back()
+        check(until { !viewer }, "back closes the viewer")
+        idle(400)
+        val kept = listOf(sheet?.kind, sheet?.step, fieldText("Marke"))
+        check(kept == listOf("serving", "name", "Sheba"), "back closes the viewer only, naming keeps what was typed $kept")
+        act("close")
+        idle(400)
+        viewed(photoButton(inPend))
+        val over = listOf(viewer, sheet != null)
+        tap("Schließen")
+        check(until { !viewer }, "closed by its button")
+        idle(400)
+        act("open-serving", "id" to db.servings[0].id)
+        check(
+            over == listOf(true, false) && level == listOf("serving", null, "name"),
+            "home card: thumbnail opens the photo, the rest the meal",
+        )
+        type("Marke", "Sheba")
+        type("Sorte", "Lachs")
+        act("save-name")
+        idle(400)
+        var pid = db.servings[0].str("productId")!!
+        check(until { File(dir, "photos/$pid.jpg").exists() }, "the photo written")
+        write()
+        val file = File(dir, "photos/$pid.jpg").readBytes()
+        val inside =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(file)
+                .let { it.substring(it.length - 200, it.length - 100) } in
+                File(dir, "db.json").readText()
+        check(
+            !inside &&
+                width("$pid.jpg") == 1100 &&
+                listOf(db.servings[0].str("photo"), db.servings[0].str("thumb"), db.products[0].str("thumb") != null) ==
+                listOf(null, null, true),
+            "named: the large photo is a file of the variety outside db.json, the meal keeps none",
+        )
+        act("close")
+        idle(400)
+        act("open-serving", "id" to db.servings[0].id)
+        val fromFile = viewed(photoButton(inPane("serving")))
+        tapViewer()
+        act("edit-name")
+        type("Sorte", "Huhn")
+        act("save-name")
+        idle(400)
+        pid = db.servings[0].str("productId")!!
+        check(until { File(dir, "photos/$pid.jpg").exists() }, "the photo follows")
+        idle(400)
+        val moved = listOf(files(), db.products.map { listOf(it.str("variety"), it.str("thumb") != null) })
+        check(
+            fromFile == 1100 && moved == listOf(listOf("$pid.jpg"), listOf(listOf("Huhn", true))),
+            "opened from the file; it follows another variety $moved",
+        )
+        act("close")
+        idle(400)
+        restart()
+        check(viewed(photoButton(inPend)) == 1100, "after a restart it opens from the file")
+        tapViewer()
+        val good = File(dir, "photos/$pid.jpg").readBytes()
+        File(dir, "photos/$pid.jpg").writeText("kaputt")
+        restart()
+        viewed(photoButton(inPend))
+        check(
+            !viewer &&
+                toast != null &&
+                File(dir, "photos/$pid.jpg").readText() == "kaputt" &&
+                photoButton(inPend).fetchSemanticsNodes().size == 1,
+            "a photo that will not decode: a notice, the file stays",
+        )
+        File(dir, "photos/$pid.jpg").delete()
+        idle(4000)
+        viewed(photoButton(inPend))
+        check(
+            !viewer && toast != null && photoButton(inPend).fetchSemanticsNodes().isEmpty() && db.products[0].str("thumb") != null,
+            "a photo found nowhere is forgotten",
+        )
+        File(dir, "photos/$pid.jpg").writeBytes(good)
+        File(dir, "photos/zzzz9999.jpg").writeText("x")
+        restart()
+        idle(400)
+        val stray = files()
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to pid),
+        )
+        act("arm", "then" to "delete-product")
+        act("arm", "then" to "delete-product")
+        idle(400)
+        restart()
+        idle(400)
+        check(stray == listOf("$pid.jpg") && files().isEmpty(), "a file without its variety goes at the next start $stray")
+        snap(jpegOf(3000, 2250))
+        act("close")
+        idle(400)
+        restart()
+        act("open-serving", "id" to db.servings[0].id)
+        val small = viewed(photoButton(inPane("serving")))
+        tapViewer()
+        type("Marke", "Felix")
+        type("Sorte", "Huhn")
+        act("save-name")
+        idle(400)
+        val felix = db.servings[0].str("productId")!!
+        check(until { File(dir, "photos/$felix.jpg").exists() }, "the photo written")
+        idle(400)
+        check(listOf(small, width("$felix.jpg")) == listOf(480, 480), "named after a restart: the smaller photo the meal kept")
+        act("close")
+        act("open-settings")
+        act("arm", "then" to "wipe")
+        act("arm", "then" to "wipe")
+        idle(1000)
+        check(files().isEmpty(), "„Alle Daten löschen“ removes every photo")
+    }
+
+    @Test
+    fun `photo_viewer - named on another phone, the photo belongs to that variety and follows a merge there`() {
+        platform.pictures = AndroidPictures()
+        onePet()
+        snap(jpegOf(3000, 2250))
+        act("close")
+        idle(400)
+        val sid = db.servings[0].id
+        val rind = mapOf("brand" to "Animonda", "variety" to "Rind", "type" to "Nassfutter", "createdAt" to 1)
+
+        // a change from another phone, as the sync delivers it
+        fun remote(vararg list: Triple<String, String, Map<String, Any>>) {
+            val t = Time.now().toString().padStart(13, '0') + "-0000-fremd"
+            phone.store.merge(
+                list.map { (c, r, f) ->
+                    Remote.of(j(mapOf("c" to c, "r" to r, "f" to f.mapValues { (_, v) -> mapOf("v" to v, "t" to t) })))!!
+                },
+            )
+            idle(400)
+        }
+        remote(Triple("products", "fremdsorte01", rind), Triple("servings", sid, mapOf("productId" to "fremdsorte01")))
+        val handed =
+            until {
+                File(dir, "photos/fremdsorte01.jpg").exists() &&
+                    db.servings[0].str("photo") == null &&
+                    db.servings[0].str("status") == null
+            }
+        idle(400)
+        check(
+            handed && width("fremdsorte01.jpg") == 1100 && photoButton(inPend).fetchSemanticsNodes().size == 1,
+            "named elsewhere: the photo is that variety’s",
+        )
+        remote(
+            Triple("products", "fremdsorte02", rind + ("variety" to "Rind in Soße")),
+            Triple("servings", sid, mapOf("productId" to "fremdsorte02")),
+            Triple("products", "fremdsorte01", mapOf("_del" to true)),
+        )
+        check(until { File(dir, "photos/fremdsorte02.jpg").exists() }, "the photo follows")
+        restart()
+        idle(400)
+        check(files() == listOf("fremdsorte02.jpg"), "merged elsewhere: the photo follows, survives a restart ${files()}")
     }
 }

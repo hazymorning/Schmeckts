@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import de.schmeckts.app.imageOf
 import de.schmeckts.app.ui.LocalUi
@@ -39,6 +40,7 @@ fun Mood() {
     val p = colors
     Box(
         Modifier
+            .testTag("mood-${pet!!.id}")
             .fillMaxWidth()
             .height(260.dp + top)
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
