@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -157,6 +158,7 @@ fun RateSlider(
                         Box(
                             Modifier
                                 .weight(1f)
+                                .testTag("level-$r")
                                 .height(Size.tapS)
                                 .semantics {
                                     role = Role.Button

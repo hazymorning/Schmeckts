@@ -232,7 +232,7 @@ abstract class ScreenTest {
         vararg data: Pair<String, String?>,
     ) {
         ui.act(name, *data)
-        idle(10)
+        idle(50)
     }
 
     fun openSheet(state: SheetState) {

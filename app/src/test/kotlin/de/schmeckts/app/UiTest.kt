@@ -1,10 +1,9 @@
 package de.schmeckts.app
 
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
-import androidx.compose.ui.test.printToString
+import de.schmeckts.app.views.insightSaid
 import de.schmeckts.app.views.syncChip
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -94,21 +93,6 @@ class UiTest : ScreenTest() {
         idle(400)
         check(db.servings.size == before + 1, "a known variety served")
         val s = db.servings[0]
-        println(
-            "TREE " +
-                rule
-                    .onRoot(useUnmergedTree = true)
-                    .printToString(100)
-                    .lines()
-                    .filter { "Text" in it }
-                    .take(40)
-                    .joinToString(" || "),
-        )
-        println(
-            "DEBUG pend=${phone.derive.pendingServings().size} wie=${shows(
-                "Wie war’s?",
-            )} bew=${labelled("Bewertung")} sheet=$level alles=${labelled("Alles gefressen")}",
-        )
         rule.onAllNodes(hasContentDescription(RATINGS.getValue("gut").label), useUnmergedTree = true)[0].performClick()
         idle(400)
         check((s.pets.values.first() as JsonObject)["r"].asString == "gut", "rated with one tap")
@@ -638,5 +622,306 @@ class UiHistoryTest : ScreenTest() {
             i += 2
         }
         return seen.size
+    }
+}
+
+class UiEvaluationTest : ScreenTest() {
+    private fun dbFile(
+        pets: List<Map<String, Any?>>,
+        products: List<Map<String, Any?>>,
+        meals: List<Map<String, Any?>>,
+    ) = mapOf("db" to dbOf(pets, products, meals))
+
+    private fun load(
+        products: List<Map<String, Any?>>,
+        meals: List<Map<String, Any?>>,
+    ) {
+        phone.store.replaceDb(dbRaw(dbOf(listOf(pet(M)), products, meals)))
+        phone.store.save()
+        ui.update()
+        idle()
+    }
+
+    @Test
+    fun `evaluation - the card shows what goes down well and what is left, a row opens its sheet, the page has levels`() {
+        open()
+        act("demo")
+        val tops = tags("pick-", within = "sec-evaluation")
+        val r = phone.derive.rankingModel()
+        check(tops.isNotEmpty() && tops.size <= 4 && tops.first() == r.top.firstOrNull()?.id, "two sides of at most two rows $tops")
+        check(
+            tags("medal-", within = "sec-evaluation") ==
+                listOfNotNull(if (r.top.isNotEmpty()) "good" else null, if (r.flop.isNotEmpty()) "bad" else null),
+            "the best crowned and the worst with its bowl",
+        )
+        act("open-product", "id" to tops[0])
+        check(sheet?.kind == "product" && sheet?.id == tops[0], "a row opens its food sheet")
+        act("close")
+        act("open-evaluation")
+        val ranked = tags("place-", sheet = true)
+        val names = ranked.mapNotNull { phone.derive.getProduct(it)?.let(::pname) }
+        val m = phone.derive.model()
+        val portrait = phone.derive.evaluationModel()
+        check(
+            names.isNotEmpty() &&
+                names.none { n ->
+                    shows("${db.pets[0].str("name")} ist wählerisch: $n")
+                },
+            "the portrait names none of the varieties the lists below show",
+        )
+        val taste = portrait.taste
+        check(
+            taste.marke.isEmpty() &&
+                taste.konsistenz.isNotEmpty() &&
+                taste.geschmack.isNotEmpty() &&
+                listOf(taste.konsistenz, taste.geschmack).all { l ->
+                    l.map { it.good.toDouble() / it.n } ==
+                        l.map { it.good.toDouble() / it.n }.sortedDescending()
+                } &&
+                inSheet("Konsistenz") &&
+                inSheet("Geschmack"),
+            "the portrait’s taste profile: how often each consistency and flavour went down well, best first",
+        )
+        check(ranked.isNotEmpty() && m.pets.isNotEmpty(), "every row of a longer list shows its place")
+        check(inSheet("Tops") && inSheet("Flops"), "Tops and Flops, the titles plain words")
+    }
+
+    @Test
+    fun `insights - the three strongest on the card, all on its page for buying and for feeding, each with its counts`() {
+        val sorts =
+            listOf(
+                product("a", "Sheba", "Lachs in Soße"),
+                product("b", "Sheba", "Huhn in Soße"),
+                product("c", "Felix", "Lachs in Gelee"),
+                product("d", "Felix", "Huhn in Gelee"),
+                product("treat", "Dreamies", "Käse", "Snack"),
+            )
+        // a morning meal in jelly, eaten up; in the evening one in sauce two hours after a treat, licked
+        val meals =
+            (1..8).flatMap { d ->
+                listOf(
+                    meal("m$d", "cd"[d % 2].toString(), at("2026-06-0${d}T07:00"), mapOf(M to "top")),
+                    meal("t$d", "treat", at("2026-06-0${d}T17:00"), mapOf(M to "verputzt")),
+                    meal("e$d", "ab"[d % 2].toString(), at("2026-06-0${d}T19:00"), mapOf(M to "sosse")),
+                )
+            }
+        open(now = at("2026-06-12T12:00"))
+        load(sorts, meals)
+        act("open-evaluation")
+        val card =
+            listOf(
+                "Bisher kommt <b>Stückchen in Gelee</b> besser an als Stückchen in Soße." to
+                    "Stückchen in Gelee <b>8 von 8 Mal</b> gut gefressen, Stückchen in Soße 8 von 8 Mal.",
+            )
+        val said =
+            phone.derive
+                .evaluationModel()
+                .insights
+                .map { insightSaid(it) }
+        val plain =
+            said.map {
+                de.schmeckts.app.ui
+                    .plainOf(it.say) to
+                    de.schmeckts.app.ui
+                        .plainOf(it.why)
+            }
+        check(
+            plain.take(3) ==
+                listOf(
+                    "Bisher kommt Stückchen in Gelee besser an als Stückchen in Soße." to
+                        "Stückchen in Gelee 8 von 8 Mal gut gefressen, Stückchen in Soße 0 von 8 Mal.",
+                    "Bei Stückchen in Soße wird oft nur die Soße geleckt." to
+                        "8 von 8 Mal nur die Soße. Stückchen in Gelee dagegen 8 von 8 Mal gut gefressen.",
+                    "Die erste Mahlzeit am Tag kommt besser an als die letzte." to
+                        "Bei der ersten 8 von 8 Mal gut gefressen, bei der letzten 0 von 8 Mal.",
+                ) &&
+                plain.take(3).all { (a, b) -> inSheet(a) && inSheet(b) } &&
+                !inSheet(plain[3].first),
+            "the card: the three strongest, each a sentence over its counts $plain ${card.size}",
+        )
+        act("open-level", "v" to "insights")
+        val lvl = level
+        val page = plain.all { (a, b) -> inSheet(a) && inSheet(b) } && inSheet("Beim Kaufen") && inSheet("Beim Füttern")
+        act("settings-back")
+        check(
+            lvl == listOf("evaluation", "insights", null) &&
+                page &&
+                plain[3] ==
+                (
+                    "Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen." to
+                        "Nach Snacks 0 von 8 Mal gut gefressen, sonst 8 von 8 Mal."
+                ) &&
+                level == listOf("evaluation", null, null),
+            "„Mehr“ leads to all of them, for buying and for feeding, and back",
+        )
+    }
+
+    @Test
+    fun `candidate - no Top yet, the card names the variety closest to it, which Als Naechstes then leaves out`() {
+        val now = at("2025-06-17T12:00")
+        val rated =
+            listOf(
+                "ladenhueter" to listOf("schlecht", "schlecht", "mittel"),
+                "naechste1" to listOf("top", "gut"),
+                "naechste2" to listOf("top"),
+            )
+        val products = rated.map { (i, _) -> product(i, "Sheba", i.replaceFirstChar { it.uppercase() }) }
+        val meals =
+            rated.flatMapIndexed { k, (i, levels) ->
+                levels.mapIndexed { n, r ->
+                    meal(
+                        "$i-$n",
+                        i,
+                        now - (n + 1) * DAY - k * 3_600_000L,
+                        mapOf(M to r),
+                    )
+                }
+            }
+        open(dbFile(listOf(pet(M)), products, meals), now)
+        check(
+            tags("pick-", within = "sec-evaluation") == listOf("naechste1", "ladenhueter"),
+            "the closest variety stands under „Tops“, then the Flops",
+        )
+        check(
+            shows("Sheba, noch 1× bewerten") &&
+                shows("Sheba, 2 von 3 Mal fast nix gefressen") &&
+                tags("medal-", within = "sec-evaluation") == listOf("bad"),
+            "with what it lacks, uncrowned",
+        )
+        act("open-evaluation")
+        check(
+            inSheet("Auf gutem Weg") && inSheet("Naechste2") && tags("place-", sheet = true) == listOf("ladenhueter"),
+            "its card names it before the Flops, „Als Nächstes“ only the others",
+        )
+        act("settings-back")
+        load(products.take(1), meals.take(3))
+        check(!shows("Tops") && shows("Flops"), "nothing that goes down well: only what is left")
+    }
+
+    @Test
+    fun `record - a variety's tally where it is served, who it goes down best with`() {
+        val now = at("2026-06-12T12:00")
+        val rated =
+            linkedMapOf(
+                "lachs" to listOf("top", "top", "gut"),
+                "zaeh" to listOf("mittel", "mittel", "schlecht"),
+                "nie" to listOf("schlecht", "schlecht"),
+            )
+        val prods =
+            listOf(
+                product("lachs", "Sheba", "Lachs in Soße"),
+                product("zaeh", "Gourmet", "Rind Pastete"),
+                product("nie", "Whiskas", "Huhn"),
+            )
+        val meals =
+            rated.entries.flatMapIndexed { k, (i, levels) ->
+                levels.mapIndexed { n, r ->
+                    meal(
+                        "$i-$n",
+                        i,
+                        now - (n + 1) * DAY - k * 3_600_000L,
+                        mapOf(M to r),
+                    )
+                }
+            } +
+                meal("offen", "lachs", now - 2 * 3_600_000L, mapOf(M to null))
+        open(now = now)
+        load(prods, meals) // ids as short as these only as the old tests put them in place
+        check(shows("heute um 10:00"), "the open meal says its time as the feeding sheet does")
+        act("feed")
+        check(
+            inSheet("2 von 3 Mal die Hälfte gefressen") && !inSheet("Whiskas"),
+            "a variety that goes down badly shows its record in the list, one that goes down well does not",
+        )
+        act("close")
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to "nie"),
+        )
+        act("serve", "id" to "nie")
+        idle(400)
+        val told = toast ?: ""
+        act("undo")
+        openSheet(
+            de.schmeckts.app.ui
+                .SheetState("product", "id" to "lachs"),
+        )
+        act("serve", "id" to "lachs")
+        idle(400)
+        val plain = toast ?: ""
+        check(
+            "Zuletzt beide Male fast nix gefressen" in told && "Zuletzt" !in plain,
+            "the toast tells the record of one nobody buys any more ($told / $plain)",
+        )
+        val two = listOf(product("lachs", "Sheba", "Lachs in Soße"), product("zaeh", "Gourmet", "Rind Pastete"))
+        val byWho =
+            (1 until 15).flatMap { d ->
+                listOf("Anna" to 4, "Jonas" to -6).map { (who, h) ->
+                    meal(
+                        "f$d-$who",
+                        listOf("lachs", "zaeh")[d % 2],
+                        now - d * DAY - h * 3_600_000L,
+                        mapOf(
+                            M to if (who == "Anna" || d % 3 == 0) "top" else "sosse",
+                        ),
+                        "by" to who,
+                    )
+                }
+            }
+        load(two, byWho)
+        act("open-evaluation")
+        val card =
+            inSheet("Bei Anna kommen dieselben Sorten besser an als bei Jonas.") &&
+                inSheet("Bei Anna 14 von 14 Mal gut gefressen, bei Jonas 4 von 14 Mal.")
+        act("settings-back")
+        load(two, byWho.map { it + ("by" to "Anna") })
+        act("open-evaluation")
+        check(
+            card && !inSheet("dieselben Sorten"),
+            "who serves among the insights where several people feed and one clearly does better, never with one person",
+        )
+    }
+
+    @Test
+    fun `scales - dry food and treats have their own levels`() {
+        val now = at("2026-06-10T23:30")
+        val rated =
+            listOf(
+                Triple("trocken", null, 1),
+                Triple("snack", null, 2),
+                Triple("trocken", "gut", 20),
+                Triple("trocken", "gern", 21),
+                Triple("trocken", "liegen", 23),
+            )
+        open(
+            dbFile(
+                listOf(pet(M)),
+                listOf(product("trocken0001", "Josera", "", "Trockenfutter"), product("snack0001", "Dreamies", "", "Snack")),
+                rated.mapIndexed { i, (p, r, ago) -> meal("meal00000$i", p + "0001", now - ago * 3_600_000L, mapOf(M to r)) },
+            ),
+            now,
+        )
+        val dry = listOf("gern", "normal", "wenig", "liegen")
+        val treat = listOf("verputzt", "spaeter", "angeknabbert", "unberuehrt")
+        val levels = listOf(tags("level-", within = "pend-meal000000"), tags("level-", within = "pend-meal000001"))
+        act("open-serving", "id" to "meal000001")
+        val inSheetLevels = tags("level-", sheet = true)
+        act("close")
+        check(
+            levels + listOf(inSheetLevels) == listOf(dry, treat, treat) && tags("pend-") == listOf("meal000000", "meal000001"),
+            "own scales for dry food and treats; every open meal keeps its scale on the home page $levels",
+        )
+        act("open-serving", "id" to "meal000002") // rated on another scale
+        act("rate", "s" to "meal000002", "p" to M, "r" to "liegen")
+        check(
+            (phone.derive.getServing("meal000002")!!.pets[M] as kotlinx.serialization.json.JsonObject)["r"].asString == "liegen",
+            "a tap replaces a level from another scale",
+        )
+        idle(2000)
+        check(sheet != null, "a rating put right: the sheet stays open")
+        act("close")
+        act("open-serving", "id" to "meal000000")
+        act("rate", "s" to "meal000000", "p" to M, "r" to "normal")
+        check(until(5000) { sheet == null }, "the last open pet rated: the sheet closes by itself")
     }
 }
