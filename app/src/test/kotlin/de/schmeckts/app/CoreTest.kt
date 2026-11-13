@@ -167,7 +167,7 @@ class CoreTest {
     @Test
     fun `modules - layers reach upwards only through hooks`() {
         val root = File("src/main/kotlin/de/schmeckts/app")
-        val layer = mapOf("" to 0, "ui" to 1, "views" to 2, "logic" to 3)
+        val layer = mapOf("" to 0, "content" to 0, "ui" to 1, "views" to 2, "logic" to 3)
         val top = setOf("Actions.kt", "MainActivity.kt", "App.kt", "Receivers.kt")
         val wrong = mutableListOf<String>()
         for (file in root.walkTopDown().filter { it.isFile && it.extension == "kt" }) {
