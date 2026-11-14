@@ -189,7 +189,7 @@ class Pets(
         if (prefs.activePet == id) prefs.activePet = "all"
         save()
         savePrefs()
-        haptic("strong")
+        haptic("heavy")
         leave("${p.str("name")} entfernt")
     }
 }

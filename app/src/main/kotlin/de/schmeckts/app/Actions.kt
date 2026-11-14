@@ -103,7 +103,7 @@ class Actions(
         ai.model = ""
         ai.name = ""
         ai.save()
-        haptic("select")
+        haptic("heavy")
         ui.renderSheet()
         ui.toast("Schlüssel gelöscht", {
             ai.key = was[0]
@@ -117,6 +117,7 @@ class Actions(
 
     private fun disconnectServer() {
         ph.sync.disconnect()
+        haptic("heavy")
         ui.renderSheet()
         ui.update()
         toast("Verbindung getrennt. Die Daten bleiben auf diesem Handy.")

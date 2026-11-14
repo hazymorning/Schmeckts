@@ -64,7 +64,7 @@ class Data(
         prefs.activePet = "all"
         save()
         savePrefs()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast(if (house) "Alle Daten im Haushalt gelöscht" else "Alle Daten gelöscht")

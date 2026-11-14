@@ -151,7 +151,7 @@ class Editing(
             db.products.removeAll { it === p }
         }
         save()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast("Eintrag gelöscht", {
@@ -173,7 +173,7 @@ class Editing(
         if (p.obj("codes")?.containsKey(code) != true) return
         p["codes"] = JsonObject(p.obj("codes")!! - code)
         save()
-        haptic("strong")
+        haptic("heavy")
         renderSheet()
         toast("Barcode entfernt", {
             val cur = d.getProduct(p.id)
@@ -191,7 +191,7 @@ class Editing(
         db.products.removeAll { it.id == id }
         db.servings.removeAll { it.str("productId") == id }
         save()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast("${pname(p)} gelöscht")

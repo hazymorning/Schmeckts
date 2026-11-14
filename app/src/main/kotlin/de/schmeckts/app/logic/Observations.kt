@@ -102,7 +102,7 @@ class Observations(
         val o = d.getObservation(id) ?: return
         db.observations.removeAll { it === o }
         save()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast("Eintrag gelöscht", {
