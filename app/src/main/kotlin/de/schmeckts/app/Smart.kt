@@ -2114,7 +2114,7 @@ fun findings(
         .sortedByDescending { abs(gapOf(it)) }
 }
 
-private fun negative(t: Trait) = t.kind == "pack" || t.kind == "sosse" || gapOf(t) < 0
+private fun negative(t: Trait) = t.kind == "pack" || (t.kind in GROUPS && gapOf(t) < 0)
 
 /** The Steckbrief of one cat in its order, without words. light: without the feeding findings, as for the card. */
 fun profile(

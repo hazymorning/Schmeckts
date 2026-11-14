@@ -1975,6 +1975,21 @@ class SmartTest {
         val plain = house(listOf("A"), listOf("c1", "flop"), rate("c1", "A", listOf(t, t, t)) + rate("flop", "A", listOf(x, x)))
         val still = Moves(emptyList(), emptyList())
         assertEquals(listOf("liebling", "stehen"), profile(data = plain, moves = still, links = emptyList()).map { it.kind })
+        val licked =
+            house(
+                listOf("A"),
+                listOf(prod("s1", "variety" to "Huhn in Soße"), prod("s2", "variety" to "Rind in Soße"), "c1", "flop"),
+                rate("s1", "A", listOf(s, s, t, t)) + rate("s2", "A", listOf(s, t, t)) + rate("c1", "A", listOf(t, t, mi, t)) +
+                    rate("flop", "A", listOf(x, x)),
+            )
+        assertEquals(
+            "licking the sauce is no group left",
+            listOf("sosse", "stehen"),
+            profile(data = licked, moves = still, links = emptyList()).map { it.kind }.filter {
+                it in
+                    listOf("konsistenz", "sosse", "stehen")
+            },
+        )
         val none = house(listOf("A"), listOf("c1", "flop"), rate("c1", "A", listOf(t, mi)) + rate("flop", "A", listOf(x, x)))
         assertEquals(
             "no favourite yet",
