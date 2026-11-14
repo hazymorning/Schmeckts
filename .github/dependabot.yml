@@ -1,4 +1,4 @@
-# Monthly, one grouped pull request per ecosystem.
+# Monthly, one grouped pull request per ecosystem; workflows/dependabot.yml merges it once its tests pass.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -13,6 +13,9 @@ updates:
     directory: /app
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       gradle:
         patterns: ['*']
