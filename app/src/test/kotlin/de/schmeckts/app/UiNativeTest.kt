@@ -272,6 +272,11 @@ class UiSheetPullTest : ScreenTest() {
         platform.calls.clear()
         pull(40f)
         check(bumps().isEmpty() && sheet?.kind == "feed", "a short pull: nothing")
+        pullTo(start(), 125f)
+        lift(-10f, 100)
+        idle(800)
+        val drift = bumps()
+        check(drift == listOf("threshold") && sheet == null, "past it, the finger drifting up as it lets go: still closes $drift")
     }
 }
 

@@ -529,7 +529,7 @@ internal suspend fun Layer.release(
     armed = false
     val at = closeAt(density)
     // a flick needs some pull of its own, so a fling that only scrolled the content to its top does not close
-    if (held != level && v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
+    if (held != level && v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + maxOf(0f, v) * 0.15f >= at) {
         flung = maxOf(0f, v)
         sheets.closeSheet()
         val way = sheetHeight - drag
