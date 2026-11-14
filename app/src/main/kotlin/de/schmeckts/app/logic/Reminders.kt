@@ -203,7 +203,7 @@ class Reminders(
         if (actionId in RATINGS && ph.sync.reachable()) ph.sync.caughtUp(CATCH_UP)
         val s = d.getServing(serving) ?: return
         val open = pet != null && (s.pets[pet] as? JsonObject)?.let { !it["r"].truthy } == true
-        if (actionId in RATINGS && open && l.rating.rateMeal(s.id, pet!!, actionId)) {
+        if (actionId in RATINGS && open && l.rating.rateMeal(s.id, pet!!, actionId, feel = false)) {
             update()
             renderSheet()
         } else {

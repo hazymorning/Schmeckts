@@ -23,6 +23,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -215,5 +216,40 @@ class UiSwitchFeelTest : ScreenTest() {
         platform.notifications.answer = "granted"
         val allowed = felt { act("remind-on") }
         check(allowed == listOf("on") && prefs.remind > 0, "allowed: on $allowed")
+    }
+}
+
+class UiResultFeelTest : ScreenTest() {
+    private fun felt(action: () -> Unit): List<Any?> {
+        platform.calls.clear()
+        action()
+        idle(600)
+        return calls("haptic")
+    }
+
+    @Test
+    fun `haptic - a short no for a refused tap, one firm click for a result, none for a tap outside the app`() {
+        open(mapOf("db" to dbOf(listOf(pet("minka001")), listOf(product("sorte001")))))
+        act("add-pet")
+        val noName = felt { act("save-pet") }
+        check(noName == listOf("reject") && shows("Wie heißt deine Katze?"), "a cat without a name: a no and why $noName")
+        act("close")
+        idle(400)
+        val fed =
+            felt {
+                act("feed")
+                act("new-product")
+                type("Marke", "Miamor")
+                type("Sorte", "Ragout in Gelee")
+                act("save-name")
+            }
+        check(db.servings.size == 1 && fed == listOf("confirm"), "named and fed: one click $fed")
+        platform.file = """{"kind":"etwas anderes"}"""
+        val bad = felt { act("import") }
+        check(bad == listOf("reject") && toast == "Diese Datei ist kein gültiges Backup.", "no backup: a no $bad")
+        val sid = db.servings[0].id
+        val reminder = felt { phone.scope.launch { main.logic.reminders.onAction("gut", sid, "minka001") } }
+        val r = (db.servings[0].pets["minka001"] as JsonObject)["r"].asString
+        check(reminder.isEmpty() && r == "gut", "rated from the reminder: nothing in the app $reminder")
     }
 }

@@ -34,6 +34,11 @@ class Actions(
         undo: (() -> Unit)? = null,
     ) = ui.toast(text, undo)
 
+    private fun fail(text: String) {
+        haptic("reject")
+        toast(text)
+    }
+
     private suspend fun connectServer() {
         val s = sheet ?: return
         if (s.kind != "settings" || s.bool("connecting")) return
@@ -141,6 +146,7 @@ class Actions(
         ui.renderSheet()
         try {
             ph.sync.retrySync().await()
+            haptic(if (ph.sync.status.state == "ok") "confirm" else "reject")
         } finally {
             s["syncing"] = ""
             if (sheet === s) ui.renderSheet()
@@ -404,7 +410,7 @@ class Actions(
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         report("update", e)
-                        toast("Das Update ließ sich nicht laden. Versuch es später noch mal.")
+                        fail("Das Update ließ sich nicht laden. Versuch es später noch mal.")
                     }
                 }
             },
@@ -485,7 +491,7 @@ class Actions(
         val added = !pets.containsKey(id)
         if (!added) {
             if (pets.size == 1) {
-                toast("Mindestens eine Katze muss dabei sein.")
+                fail("Mindestens eine Katze muss dabei sein.")
                 return
             }
             s["pets"] = JsonObject(pets - id)
@@ -554,15 +560,15 @@ class Actions(
             return
         }
         away?.let {
-            toast(if (it.kind == "offline") "Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar." else it.message)
+            fail(if (it.kind == "offline") "Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar." else it.message)
             return
         }
-        if (!missing) return toast("Das Foto ließ sich nicht öffnen.")
+        if (!missing) return fail("Das Foto ließ sich nicht öffnen.")
         if (p != null) {
             ph.photos.forgetPhoto(p.id)
             if (p["sharedPhoto"].truthy && ph.sync.isConnected()) l.products.unsharePhoto(p)
         }
-        toast("Das Foto ist nicht mehr da.")
+        fail("Das Foto ist nicht mehr da.")
         if (sheet != null) ui.renderSheet() else ui.update()
     }
 

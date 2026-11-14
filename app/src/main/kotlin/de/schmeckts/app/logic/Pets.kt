@@ -83,7 +83,7 @@ class Pets(
     ) {
         val img = ph.platform.pictures.decode(bytes.toByteString().base64())
         if (img == null) {
-            toast("Das Foto ließ sich nicht lesen.")
+            fail("Das Foto ließ sich nicht lesen.")
             return
         }
         if (sheet !== s) return
@@ -119,7 +119,7 @@ class Pets(
         val list = nicks(s)
         val known = (listOf(s.str("name")) + list).any { sameName(it, nick) }
         if (!known && list.size >= NICKS) {
-            if (!quiet) toast("Sechs Spitznamen sind genug.")
+            if (!quiet) fail("Sechs Spitznamen sind genug.")
             return
         }
         if (!known) list.add(nick)
@@ -140,6 +140,7 @@ class Pets(
         val s = sheet ?: return
         val name = s.str("name").trim()
         if (name.isEmpty()) {
+            haptic("reject")
             l.editing.showError("Wie heißt deine Katze?")
             ui.focus("f-name")
             return

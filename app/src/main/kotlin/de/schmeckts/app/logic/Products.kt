@@ -53,7 +53,7 @@ class Products(
             if (ph.platform.shareText(list.title, list.text) == "copied") toast("Liste kopiert")
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            toast("Die Liste konnte nicht geteilt werden.") // shareText() already swallows a cancel
+            fail("Die Liste konnte nicht geteilt werden.") // shareText() already swallows a cancel
         }
     }
 

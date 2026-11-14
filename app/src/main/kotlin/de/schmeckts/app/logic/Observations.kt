@@ -73,7 +73,7 @@ class Observations(
         val added = !o.pets.containsKey(pid)
         if (!added) {
             if (o.pets.size == 1) {
-                toast("Mindestens eine Katze muss dabei sein.")
+                fail("Mindestens eine Katze muss dabei sein.")
                 return
             }
             o["pets"] = JsonObject(o.pets - pid)

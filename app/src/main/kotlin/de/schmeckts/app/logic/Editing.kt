@@ -27,11 +27,12 @@ class Editing(
         val s = sheet ?: return
         val details = detailsOfSheet()
         if (details.brand.isEmpty() && details.variety.isEmpty()) {
+            haptic("reject")
             showError("Bitte Marke oder Sorte eintragen.")
             ui.focus("f-brand")
             return
         }
-        haptic("success")
+        if (s.kind != "new") haptic("confirm") // a new variety is felt once it is served
         when (s.kind) {
             "serving" -> nameServing(s.id!!, details)
             "new" -> serveNewProduct(details)
@@ -115,10 +116,10 @@ class Editing(
     fun useProduct(pid: String) {
         val p = d.getProduct(pid) ?: return
         val s = sheet ?: return
-        haptic("select")
         when (s.kind) {
             "serving" -> {
                 val sv = d.getServing(s.id) ?: return
+                haptic("confirm")
                 l.feeding.refinePets(sv, p)
                 l.products.linkProduct(sv, p)
                 save()
@@ -128,6 +129,7 @@ class Editing(
             "product" -> {
                 val cur = d.getProduct(s.id)
                 if (cur != null && cur.id != p.id) {
+                    haptic("confirm")
                     l.products.mergeProducts(cur, p)
                     save()
                     s.id = p.id
