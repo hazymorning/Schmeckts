@@ -13,6 +13,8 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -459,6 +461,50 @@ class UiSheetSizeTest : ScreenTest() {
         idle(1000)
         val after = top()
         check(after > before && between > before && between < after, "the top moves down in steps, not at once $before $between $after")
+    }
+}
+
+class UiTypingTest : ScreenTest() {
+    private fun field(label: String) = rule.onAllNodes(hasContentDescription(label) and hasSetTextAction())[0]
+
+    // one key at a time, as the keyboard sends them
+    private fun keys(
+        label: String,
+        vararg keys: String,
+    ) = keys.forEach {
+        field(label).performTextInput(it)
+        idle(10)
+    }
+
+    @Test
+    fun `typing - a note, the name and the hours keep every key, a value set from elsewhere still shows`() {
+        val now = at("2025-06-17T12:00")
+        open(mapOf("prefs" to j(mapOf("remind" to 300))), now)
+        phone.store.replaceDb(
+            dbRaw(dbOf(listOf(pet(M)), listOf(product("lachs00001")), listOf(meal("meal000001", "lachs00001", now - 3_600_000, mapOf(M to "gut"))))),
+        )
+        phone.store.save()
+        act("open-serving", "id" to "meal000001")
+        keys("Notiz", "n", "e", "u")
+        val note = fieldText("Notiz")
+        idle(500)
+        check(note == "neu" && db.servings[0].str("note") == "neu", "the note keeps each key $note ${db.servings[0].str("note")}")
+        act("close")
+        idle(400)
+        act("open-settings")
+        keys("Dein Name", "A", "n", " ", "n", "a")
+        check(fieldText("Dein Name") == "An na" && prefs.name == "An na", "the name keeps each key ${fieldText("Dein Name")} ${prefs.name}")
+        field("Stunden, 1 bis 24").performTextClearance()
+        idle(10)
+        keys("Stunden, 1 bis 24", "1", "2")
+        idle(100)
+        check(fieldText("Stunden, 1 bis 24") == "12" && prefs.remind == 720, "the hours too ${fieldText("Stunden, 1 bis 24")} ${prefs.remind}")
+        act("close")
+        idle(400)
+        act("new-product")
+        keys("Marke", "S", "h")
+        act("pack-line", "field" to "brand", "v" to "Sheba")
+        check(fieldText("Marke") == "Sheba", "a value set from elsewhere replaces what was typed ${fieldText("Marke")}")
     }
 }
 

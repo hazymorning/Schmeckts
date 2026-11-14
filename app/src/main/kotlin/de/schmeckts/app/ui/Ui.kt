@@ -128,6 +128,9 @@ class Typed(
     initial: String,
 ) {
     var value by mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
+
+    // a field redrawn on its own still gets the stored value its caller had before the last key, so only a change counts
+    var seen = initial
 }
 
 @Composable
@@ -137,7 +140,11 @@ fun rememberTyped(
     stored: String,
 ): Typed {
     val t = remember(owner, key) { Typed(stored) }
-    if (t.value.text != stored) t.value = TextFieldValue(stored, TextRange(stored.length))
+    if (stored != t.seen) {
+        t.seen = stored
+        // some are stored trimmed, so a space just typed stays
+        if (t.value.text.trim() != stored.trim()) t.value = TextFieldValue(stored, TextRange(stored.length))
+    }
     return t
 }
 
