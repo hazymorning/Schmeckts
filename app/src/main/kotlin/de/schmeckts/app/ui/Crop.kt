@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -147,6 +148,7 @@ private fun ZoomBar(c: Crop) {
         Modifier
             .fillMaxWidth()
             .height(Size.tap)
+            .systemGestureExclusion() // the knob at its left end lies where the back gesture starts
             .semantics { contentDescription = "Zoom" }
             .pointerInput(c) {
                 fun at(x: Float) = c.zoom(1.0 + (x / size.width).coerceIn(0f, 1f) * (ZOOM_MAX - 1))

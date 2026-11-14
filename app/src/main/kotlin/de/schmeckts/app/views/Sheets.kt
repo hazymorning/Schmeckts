@@ -1173,7 +1173,7 @@ private fun CropView(s: SheetState) {
     val ui = LocalUi.current
     val img = s["cropImg"] as? ImageBitmap
     val c = s["crop"] as? Crop
-    SheetBody("Foto zuschneiden", ui.sheets, onBack = ui.on("crop-cancel")) {
+    SheetBody("Foto zuschneiden", ui.sheets, onBack = ui.on("crop-cancel"), step = true) {
         if (img != null && c != null) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(Modifier.semantics { contentDescription = "Ausschnitt verschieben" }) { CropStage(img, c) }

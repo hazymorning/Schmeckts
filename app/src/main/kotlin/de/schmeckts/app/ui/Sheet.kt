@@ -1,6 +1,7 @@
 package de.schmeckts.app.ui
 
 import androidx.activity.BackEventCompat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
@@ -157,6 +158,7 @@ class Layer {
     var settle: Job? = null // the spring back after a pull, stopped by the next touch
     var flung = 0f // px per second the finger let a closing sheet go with
     var armed = false // pulled far enough that letting go closes
+    var held = -1 // the level a step holds, such as cropping: a pull only gives and lets go
     var scrolled by mutableStateOf(false)
     var titled by mutableStateOf(false)
     var level by mutableIntStateOf(0) // a new level starts at rest, at the top
@@ -529,7 +531,7 @@ internal suspend fun Layer.release(
     armed = false
     val at = closeAt(density)
     // a flick needs some pull of its own, so a fling that only scrolled the content to its top does not close
-    if (v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
+    if (held != level && v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
         flung = maxOf(0f, v)
         sheets.closeSheet()
     } else if (still) {
@@ -548,8 +550,9 @@ private fun Layer.pullBy(
     dy: Float,
     density: Density,
 ) {
-    drag = maxOf(0f, drag + dy)
-    val on = drag >= closeAt(density)
+    val give = 120 * density.density
+    drag = maxOf(0f, drag + if (held == level && dy > 0f) dy * give / (give + drag) else dy)
+    val on = held != level && drag >= closeAt(density)
     if (on != armed) {
         armed = on
         sheets.haptic(if (on) "threshold" else "threshold-off")
@@ -682,18 +685,29 @@ private fun rememberLevelScroll(): ScrollState {
 }
 
 /** The head and body of a sheet or a page, decided by the layer, so one view can be both. back: for a step that is
- not a level of its own, such as cropping. end: a button at the end of the bar. */
+ not a level of its own, such as cropping. step: such a step; back ends it, and a pull cannot close the layer.
+ end: a button at the end of the bar. */
 @Composable
 fun SheetBody(
     title: String,
     sheets: Sheets,
     onBack: () -> Unit = { sheets.backPage() },
     end: (@Composable RowScope.() -> Unit)? = null,
+    step: Boolean = false,
     scroll: ScrollState = rememberLevelScroll(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val layer = LocalLayer.current
     val page = isPage(layer?.state)
+    if (step && layer != null) {
+        val mine = remember { layer.level }
+        // composed after the layer's own back handler, so it comes first
+        BackHandler(layer.level == mine && sheets.topLayer() == layer && layer.closing == null) { onBack() }
+        DisposableEffect(layer) {
+            layer.held = mine
+            onDispose { if (layer.held == mine) layer.held = -1 }
+        }
+    }
     var titleBottom by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     val scrolled by remember { derivedStateOf { scroll.value > 0 } }
     val titled by remember { derivedStateOf { scroll.value > 0 && scroll.value >= titleBottom } }

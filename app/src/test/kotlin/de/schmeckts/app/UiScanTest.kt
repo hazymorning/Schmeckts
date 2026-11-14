@@ -4,9 +4,11 @@ import android.app.Application
 import android.content.pm.PackageManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.test.core.app.ApplicationProvider
 import de.schmeckts.app.views.syncChip
 import org.junit.Test
@@ -1366,6 +1368,45 @@ class UiCropTest : ScreenTest() {
             sheet!!.step == null && sheet!!.str("photo") == photo && fieldText("Name") != null,
             "cancel: back in the pet sheet, the picture stays",
         )
+    }
+
+    // the areas of the screen kept from the system's back gesture
+    private fun kept(v: android.view.View = rule.activity.window.decorView): List<android.graphics.Rect> =
+        v.systemGestureExclusionRects +
+            ((v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).flatMap { kept(g.getChildAt(it)) } } ?: emptyList())
+
+    private fun cropping(name: String) {
+        type("Name", name)
+        platform.image = jpegOf(480, 360)
+        act("pet-photo")
+        idle(100)
+        check(sheet?.step == "crop", "cropping $level")
+    }
+
+    @Test
+    fun `crop - back and a pull leave only the cropping, the zoom is no back gesture`() {
+        platform.pictures = AndroidPictures()
+        open()
+        act("add-pet")
+        cropping("Minka")
+        val zoom = kept().map { it.height() }
+        val button = node("Abbrechen").fetchSemanticsNode().boundsInRoot
+        rule.onRoot().performTouchInput { swipe(button.center, button.center + Offset(0f, 320 * rule.density.density), 400) }
+        idle(800)
+        val pulled = level
+        back()
+        check(
+            zoom.isNotEmpty() && zoom.all { it <= 60 * rule.density.density } && pulled == listOf("pet", null, "crop"),
+            "while cropping the zoom bar is kept from the back gesture, a pull leaves the sheet as it is $zoom $pulled",
+        )
+        check(level == listOf("pet", null, null) && fieldText("Name") == "Minka" && kept().isEmpty(), "back: cropping ends, the name stays")
+        act("close")
+        idle(400)
+        act("open-settings")
+        act("add-pet")
+        cropping("Mia")
+        back()
+        check(level == listOf("settings", "pet", null) && fieldText("Name") == "Mia", "the same in the settings $level")
     }
 }
 
