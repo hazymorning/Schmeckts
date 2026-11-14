@@ -1548,7 +1548,7 @@ class SmartTest {
     }
 
     @Test
-    fun `held - a finding over its gate stays after one more good meal while still three standard errors off, and goes after four`() {
+    fun `held - a finding over its gate stays after one more good meal while still two standard errors off, and goes after four`() {
         fun sorts(
             brand: String,
             good: List<Int>,
@@ -1557,9 +1557,9 @@ class SmartTest {
             prod("${brand.lowercase()}$i", "brand" to brand, "variety" to "Sorte $i") to
                 rate("${brand.lowercase()}$i", "A", List(n) { if (it < k) t else x }, 30)
         }
-        val sheba = sorts("Sheba", listOf(4, 2, 1, 1, 1, 1, 0), 7)
-        val rest = sorts("Felix", listOf(5, 4, 4, 4), 8) + sorts("Whiskas", listOf(4, 4, 4), 8)
-        val since = listOf(t, t, x, x, x).mapIndexed { i, r -> Meal("sheba$i", mapOf("A" to r), 5 - i) }
+        val sheba = sorts("Sheba", listOf(3, 2, 2, 1, 1, 0), 4)
+        val rest = sorts("Felix", listOf(6, 6), 8) + sorts("Whiskas", listOf(6, 6), 8)
+        val since = (0..4).map { i -> Meal("sheba$i", mapOf("A" to t), 5 - i) }
 
         fun state(meals: List<Meal>): String {
             val db = house(listOf("A"), (sheba + rest).map { it.first }, meals)
@@ -1578,11 +1578,11 @@ class SmartTest {
         }
         val before = (sheba + rest).flatMap { it.second }
         assertEquals(
-            "10 of 49 against 29 of 56, then a gap under 0.3 at more than three standard errors, four more meals, and it goes",
+            "9 of 24 against 24 of 32 is 2.8 standard errors, one good meal on 2.7, four more on still over 2, and it goes",
             listOf("shown", "kept", "kept", "kept", "kept", "gone"),
             (0..5).map { state(before + since.take(it)) },
         )
-        assertEquals("the same from the start never passed the gate", "gone", state(before + rate("sheba6", "A", listOf(t), 30)))
+        assertEquals("the same from the start never passed the gate", "gone", state(before + rate("sheba5", "A", listOf(t), 30)))
     }
 
     private val mixedLine =
@@ -1732,7 +1732,7 @@ class SmartTest {
     ) = Block(0, 0, n, good, 0, 0, n - good, expected, vary, emptyMap())
 
     @Test
-    fun `appetite on Vorlieben - the home alarm while shown, a clear trend, the newest week at 2_5, an older at 3, else unauffaellig`() {
+    fun `appetite on Vorlieben - the home alarm, a clear trend, the newest week worse at 2_25, better or older at 3_5, else calm`() {
         val m = model(house(listOf("A"), listOf("p1"), emptyList()))
         val calm = block(10, 6, 6.0, 2.4)
 
@@ -1741,16 +1741,16 @@ class SmartTest {
             trend: List<Trend> = emptyList(),
             model: Model = m,
         ) = appetiteOf(model, "A", trend, weeks)?.let { listOf(it.state, it.dir) }
-        assertEquals(listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(10, 1, 6.0, 2.4))))
-        assertEquals(listOf("zuletzt-besser", 1), state(listOf(calm, block(10, 10, 5.0, 2.4))))
-        assertEquals("less than 2.5 standard errors", listOf("unauffaellig", 0), state(listOf(calm, block(10, 1, 5.5, 4.0))))
-        assertEquals("2.7 standard errors", listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(8, 1, 4.7, 1.9))))
-        assertEquals("an older week needs 3", listOf("unauffaellig", 0), state(listOf(block(8, 1, 4.7, 1.9), calm)))
-        assertEquals(listOf("wieder", -1), state(listOf(block(10, 1, 6.0, 2.4), calm)))
+        assertEquals("2.3 standard errors", listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(10, 2, 5.7, 2.56))))
+        assertEquals("2.2 is not", listOf("unauffaellig", 0), state(listOf(calm, block(10, 2, 5.5, 2.56))))
+        assertEquals("a better week needs 3.5", listOf("unauffaellig", 0), state(listOf(calm, block(10, 10, 5.2, 2.56))))
+        assertEquals(listOf("zuletzt-besser", 1), state(listOf(calm, block(10, 10, 4.2, 2.56))))
+        assertEquals("so does an older one", listOf("unauffaellig", 0), state(listOf(block(10, 1, 6.0, 2.56), calm)))
+        assertEquals(listOf("wieder", -1), state(listOf(block(10, 0, 6.0, 2.4), calm)))
         assertEquals(
-            "9 of 20 under what was expected is enough, 8 of 20 is not, however far beyond chance",
+            "6 of 20 under what was expected is enough, 5 of 20 is not, however far beyond chance",
             listOf(listOf("zuletzt-schwaecher", -1), listOf("unauffaellig", 0)),
-            listOf(state(listOf(calm, block(20, 5, 14.0, 2.0))), state(listOf(calm, block(20, 6, 14.0, 2.0)))),
+            listOf(state(listOf(calm, block(20, 8, 14.0, 2.0))), state(listOf(calm, block(20, 9, 14.0, 2.0)))),
         )
         assertEquals("a week of four is not judged", null, state(listOf(block(4, 0, 3.0, 0.5), block(10, 1, 6.0, 2.4))))
         assertEquals(null, state(emptyList()))

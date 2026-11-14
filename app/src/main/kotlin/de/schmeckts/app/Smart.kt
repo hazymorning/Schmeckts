@@ -1706,10 +1706,9 @@ private fun groupOf(
 ) = if (enoughIn(group) && enoughIn(rest)) insightOf(kind, sideIn(group, key), sideIn(rest), z, minGap) else null
 
 // Hysteresis without stored state: a group that just slipped under its full gate stays while it is still KEEP_Z
-// standard errors and KEEP_GAP apart, if the full gate held just before one of its KEEP_LOOKS newest ratings. KEEP_Z
-// lies above INSIGHT_GROUP, so only a gap that narrowed is held; lower, a cat that eats everything alike sees too
-// many lines in PersonasTest.
-private const val KEEP_Z = 3.0
+// standard errors and KEEP_GAP apart, if the full gate held just before one of its KEEP_LOOKS newest ratings. So one
+// good meal does not make a finding come and go.
+private const val KEEP_Z = 2.0
 private const val KEEP_GAP = 0.2
 private const val KEEP_LOOKS = 4
 
@@ -1824,9 +1823,9 @@ private object BLOCK {
     const val SPAN = 8 // blocks drawn at most
     const val MIN = 5 // ratings for a block to be judged
     const val PRIOR = 2 // pseudo ratings pulling a variety's expectation to the cat's share
-    const val Z = 2.5 // the newest judged block, one look
-    const val Z_PAST = 3.0 // an older judged block, up to seven looks
-    const val GAP = 0.45 // |good - expected| at least this share of the block's ratings; lower, chance flags weeks (PersonasTest)
+    const val Z = 2.25 // the newest judged block going worse, one look
+    const val Z_PAST = 3.5 // the newest going better or an older one: nothing to act on, so only beyond doubt
+    const val GAP = 0.3 // |good - expected| at least this share of the block's ratings
 }
 
 /** A seven-day block, from inclusive, to exclusive. seen: the notes about the cat in it, by kind. */
@@ -1922,7 +1921,9 @@ fun appetiteOf(
     if (judged.size < 2) return null
     val dir = { w: Block -> if (w.good < w.expected) -1 else 1 }
     val last = judged.last()
-    if (off(last, BLOCK.Z)) return Appetite(if (dir(last) < 0) "zuletzt-schwaecher" else "zuletzt-besser", last, dir(last))
+    if (off(last, if (dir(last) < 0) BLOCK.Z else BLOCK.Z_PAST)) {
+        return Appetite(if (dir(last) < 0) "zuletzt-schwaecher" else "zuletzt-besser", last, dir(last))
+    }
     val past = judged.dropLast(1).lastOrNull { off(it, BLOCK.Z_PAST) }
     return if (past != null) Appetite("wieder", past, dir(past)) else Appetite("unauffaellig")
 }
