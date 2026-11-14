@@ -75,6 +75,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -365,6 +366,7 @@ fun SheetHost(
     val closing = layer.closing
     val still = reduceMotion
     val shown = layer.shown
+    val focus = LocalFocusManager.current
     DisposableEffect(layer) {
         layer.hosted = true
         onDispose { layer.hosted = false }
@@ -373,6 +375,7 @@ fun SheetHost(
         if (layer.open && closing == null) {
             if (still) shown.snapTo(1f) else shown.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut))
         } else if (closing != null) {
+            focus.clearFocus() // the keyboard goes down with the layer, not after it
             if (layer.flung > 0f) layer.settle?.join() // release() carries a flicked sheet off
             if (!still && layer.drag < layer.sheetHeight) shown.animateTo(0f, tween(Motion.STEP, easing = Motion.easeIn))
             shown.snapTo(0f)

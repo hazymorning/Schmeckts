@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -118,6 +119,8 @@ fun CameraHost(camera: Camera) {
         onDispose { camera.hosted = false }
     }
     if (!camera.open) return
+    val focus = LocalFocusManager.current
+    LaunchedEffect(Unit) { focus.clearFocus() } // the keyboard would cover the shutter
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var allowed by remember {

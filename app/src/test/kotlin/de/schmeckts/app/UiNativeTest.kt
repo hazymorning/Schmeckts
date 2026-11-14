@@ -591,6 +591,48 @@ class UiKeyboardTest : ScreenTest() {
             "where typing is the point the keyboard comes $brand $cat",
         )
     }
+
+    @Test
+    fun `keyboard - goes down with the sheet, and before the camera or the photo opens`() {
+        platform.camera = true
+        open(reduce = false)
+        act("demo")
+        act("feed")
+        idle(600)
+        ui.focus("f-search")
+        idle()
+        val typing = focused()
+        rule.mainClock.autoAdvance = false
+        ui.act("close")
+        repeat(2) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        val closing = listOf(ui.sheets.base.closing != null, focused().isEmpty())
+        rule.mainClock.autoAdvance = true
+        idle(600)
+        check(typing == listOf("Marke oder Sorte suchen") && closing == listOf(true, true), "the keyboard goes as the sheet does $closing")
+        act("feed")
+        idle(600)
+        ui.focus("f-search")
+        idle()
+        act("photo")
+        val camera = listOf(ui.camera.open, focused().isEmpty())
+        ui.camera.close(null)
+        idle(400)
+        check(camera == listOf(true, true), "not over the shutter $camera")
+        platform.camera = false
+        platform.pictures = AndroidPictures()
+        platform.photo = jpegOf(1920, 1440)
+        act("photo")
+        check(until { sheet?.step == "name" }, "on to naming")
+        ui.focus("f-brand")
+        idle()
+        val naming = focused()
+        act("view-photo", "s" to sheet!!.id, "p" to "")
+        check(until { ui.viewer.open }, "the photo opens")
+        check(naming == listOf("Marke") && focused().isEmpty(), "not over the photo $naming")
+    }
 }
 
 class UiHomeAsideTest : ScreenTest() {

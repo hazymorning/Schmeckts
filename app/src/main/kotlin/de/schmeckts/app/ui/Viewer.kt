@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import kotlin.math.min
@@ -136,6 +137,8 @@ fun Modifier.photoSource(
 @Composable
 fun ViewerHost(viewer: Viewer) {
     val img = viewer.image ?: return
+    val focus = LocalFocusManager.current
+    LaunchedEffect(Unit) { focus.clearFocus() } // the keyboard would cover the photo
     val still = reduceMotion
     val zoom = remember(viewer.level) { Animatable(0f) }
     DisposableHosted(viewer)
