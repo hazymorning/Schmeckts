@@ -34,7 +34,7 @@ class Ui(
         Sheets(onOpen = {
             viewer.dropViewer() // opened from a link or notification over the photo viewer
             toasts.hidePlain()
-        })
+        }, haptic = { haptic(it) })
 
     /** bumped by update(): the home page draws anew */
     var tick by mutableIntStateOf(0)

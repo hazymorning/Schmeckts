@@ -151,6 +151,7 @@ class Layer {
     var sheetHeight by mutableFloatStateOf(Float.MAX_VALUE)
     var settle: Job? = null // the spring back after a pull, stopped by the next touch
     var flung = 0f // px per second the finger let a closing sheet go with
+    var armed = false // pulled far enough that letting go closes
     var scrolled by mutableStateOf(false)
     var titled by mutableStateOf(false)
     var level by mutableIntStateOf(0) // a new level starts at rest, at the top
@@ -159,6 +160,7 @@ class Layer {
 class Sheets(
     private val onOpen: () -> Unit = {},
     private val onShut: () -> Unit = {},
+    val haptic: (String) -> Unit = {},
 ) {
     val base = Layer()
     val over = Layer()
@@ -320,6 +322,7 @@ class Sheets(
         l.back = 0f
         l.sheetHeight = Float.MAX_VALUE
         l.flung = 0f
+        l.armed = false
         l.closing?.complete(Unit)
         l.closing = null
         onShut()
@@ -506,6 +509,7 @@ internal suspend fun Layer.release(
     v: Float,
     still: Boolean,
 ) {
+    armed = false
     val at = closeAt(density)
     // a flick needs some pull of its own, so a fling that only scrolled the content to its top does not close
     if (v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
@@ -520,6 +524,20 @@ internal suspend fun Layer.release(
 
 /** how far a pull let go at rest has to reach to close, in px: 110 dp, at most half the sheet */
 internal fun Layer.closeAt(density: Density) = minOf(110 * density.density, sheetHeight / 2)
+
+// the finger moved the sheet by dy px; the point from where letting go closes it is felt both ways
+private fun Layer.pullBy(
+    sheets: Sheets,
+    dy: Float,
+    density: Density,
+) {
+    drag = maxOf(0f, drag + dy)
+    val on = drag >= closeAt(density)
+    if (on != armed) {
+        armed = on
+        sheets.haptic(if (on) "threshold" else "threshold-off")
+    }
+}
 
 // Content scrolled to its top hands a downward pull to the sheet, and takes an upward one back first
 private class PullToClose(
@@ -539,7 +557,7 @@ private class PullToClose(
         layer.settle?.cancel()
         if (available.y >= 0 || layer.drag <= 0f) return Offset.Zero
         val used = maxOf(available.y, -layer.drag)
-        layer.drag += used
+        layer.pullBy(sheets, used, density)
         return Offset(0f, used)
     }
 
@@ -549,7 +567,7 @@ private class PullToClose(
         source: NestedScrollSource,
     ): Offset {
         if (source != NestedScrollSource.UserInput || available.y <= 0 || !mine()) return Offset.Zero
-        layer.drag += available.y
+        layer.pullBy(sheets, available.y, density)
         return Offset(0f, available.y)
     }
 
@@ -574,7 +592,7 @@ private fun Grip(
             .fillMaxWidth()
             .draggable(
                 rememberDraggableState { dy ->
-                    if (sheets.topLayer() == layer && layer.closing == null) layer.drag = maxOf(0f, layer.drag + dy)
+                    if (sheets.topLayer() == layer && layer.closing == null) layer.pullBy(sheets, dy, density)
                 },
                 Orientation.Vertical,
                 onDragStarted = { layer.settle?.cancel() },

@@ -92,7 +92,7 @@ fun AppScreen(main: Main) {
                 HomeScreen()
                 SheetHost(ui.sheets, ui.sheets.base) { SheetView(it) }
                 SheetHost(ui.sheets, ui.sheets.over) { SheetView(it) }
-                ToastHost(ui.toasts, ui.sheets.anyOpen()) { ui.haptic("select") }
+                ToastHost(ui.toasts, ui.sheets.anyOpen()) { ui.haptic(it) }
                 ViewerHost(ui.viewer)
                 CameraHost(ui.camera)
             }

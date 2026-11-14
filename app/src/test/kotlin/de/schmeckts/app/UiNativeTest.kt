@@ -47,11 +47,17 @@ class UiSheetPullTest : ScreenTest() {
         from: Offset,
         dy: Float,
     ) {
-        val d = rule.density.density
         rule.onRoot().performTouchInput { down(from) }
+        moveTo(dy)
+    }
+
+    // the finger moved slowly until the sheet is down by dy dp
+    private fun moveTo(dy: Float) {
+        val d = rule.density.density
+        val up = ui.sheets.base.drag > dy * d
         for (i in 0 until 400) {
-            if (ui.sheets.base.drag >= dy * d) break
-            rule.onRoot().performTouchInput { moveBy(Offset(0f, d), 10) }
+            if (if (up) ui.sheets.base.drag <= dy * d else ui.sheets.base.drag >= dy * d) break
+            rule.onRoot().performTouchInput { moveBy(Offset(0f, if (up) -d else d), 10) }
         }
     }
 
@@ -199,5 +205,30 @@ class UiSheetPullTest : ScreenTest() {
         idle(600)
         pull(40f)
         check(sheet?.kind == "feed" && ui.sheets.base.drag == 0f, "a slow short pull still springs back")
+    }
+
+    private fun bumps() = calls("haptic").filter { it == "threshold" || it == "threshold-off" }
+
+    @Test
+    fun `sheet - the point from where letting go closes is felt both ways`() {
+        open()
+        act("demo")
+        act("feed")
+        pullTo(start(), 150f)
+        lift(hold = 200)
+        idle(800)
+        val far = bumps()
+        check(far == listOf("threshold") && sheet == null, "pulled past it: one bump, and the sheet closes $far")
+        act("feed")
+        platform.calls.clear()
+        pullTo(start(), 150f)
+        moveTo(40f)
+        lift(hold = 200)
+        idle(800)
+        val back = bumps()
+        check(back == listOf("threshold", "threshold-off") && sheet?.kind == "feed", "back above it: felt again, the sheet stays $back")
+        platform.calls.clear()
+        pull(40f)
+        check(bumps().isEmpty() && sheet?.kind == "feed", "a short pull: nothing")
     }
 }

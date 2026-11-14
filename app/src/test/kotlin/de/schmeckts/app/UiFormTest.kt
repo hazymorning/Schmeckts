@@ -362,6 +362,20 @@ class UiToastSwipeTest : ScreenTest() {
         check(tapped == 1 && undone == 1 && !shown, "a tap on its button undoes, a swipe that begins there does not")
     }
 
+    @Test
+    fun `toast_swipe - the point from where letting go sends it away is felt`() {
+        open()
+        val b = show()
+        root().performTouchInput {
+            down(Offset(b.left + 20, b.center.y))
+            repeat(20) { moveBy(Offset(b.width / 20, 0f), 40) }
+            up()
+        }
+        idle(400)
+        val felt = calls("haptic").filter { it == "threshold" || it == "threshold-off" }
+        check(felt == listOf("threshold") && !shown && undone == 0, "a slow swipe past a third: one bump, then it goes $felt")
+    }
+
     // lines of the toast's text, and whether its button stands under it
     private fun layout(text: String): List<Any> {
         ui.toast(text, {})

@@ -154,7 +154,7 @@ class Toasts(
 fun ToastHost(
     toasts: Toasts,
     inSheet: Boolean,
-    haptic: () -> Unit,
+    haptic: (String) -> Unit,
 ) {
     val m = toasts.msg ?: return
     val p = colors
@@ -213,6 +213,7 @@ fun ToastHost(
                                 var t = first.uptimeMillis
                                 var dx = 0f
                                 var swiped = false
+                                var past = false // far enough that letting go sends it away
                                 while (true) {
                                     val e = awaitPointerEvent(PointerEventPass.Initial)
                                     val c = e.changes.firstOrNull { it.id == first.id } ?: break
@@ -226,6 +227,10 @@ fun ToastHost(
                                     if (swiped) {
                                         toasts.swipe = dx
                                         c.consume()
+                                        if (past != abs(dx) > width / 3) {
+                                            past = !past
+                                            haptic(if (past) "threshold" else "threshold-off")
+                                        }
                                     }
                                 }
                                 val v = abs(dx) / density / maxOf(1L, t - first.uptimeMillis)
@@ -271,7 +276,7 @@ fun ToastHost(
                 if (m.undo != null) {
                     Row(
                         Modifier
-                            .press({ toasts.undoNow(haptic) })
+                            .press({ toasts.undoNow { haptic("tap") } })
                             .clip(RoundedCornerShape(Radius.s))
                             .heightIn(min = Size.tapS)
                             .padding(horizontal = Space.s4, vertical = Space.s2),

@@ -477,7 +477,7 @@ class Actions(
                 val day = x["day"] ?: ""
                 if (sheet?.kind == "report") ui.jump = day else ui.sheets.openSheet(reportState("d-$day"))
             },
-            "undo" to { _ -> ui.toasts.undoNow { haptic("select") } },
+            "undo" to { _ -> ui.toasts.undoNow { haptic("tap") } },
         )
 
     private fun toggle(flip: () -> Unit) {
