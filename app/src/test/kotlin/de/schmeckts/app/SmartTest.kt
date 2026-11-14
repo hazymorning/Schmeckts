@@ -1548,29 +1548,24 @@ class SmartTest {
     }
 
     @Test
-    fun `held - a finding over its gate stays after one more good meal while still two standard errors off, and goes after four`() {
-        val brands =
-            listOf("s1" to "Sheba", "s2" to "Sheba", "f1" to "Felix", "f2" to "Felix", "w1" to "Whiskas", "w2" to "Whiskas")
-                .mapIndexed { i, (id, brand) ->
-                    prod(
-                        id,
-                        "brand" to brand,
-                        "variety" to listOf("Huhn", "Rind", "Lachs", "Pute", "Ente", "Kalb")[i],
-                    )
-                }
-        val rest =
-            rate("f1", "A", listOf(t, t, t), 30) + rate("f2", "A", listOf(t, t, x), 30) + rate("w1", "A", listOf(t, t, t), 30) +
-                rate("w2", "A", listOf(mi), 30)
-        val before = rate("s1", "A", listOf(x, x, x), 30) + rate("s2", "A", listOf(x, s, mi), 30)
-        val since =
-            listOf(Meal("s1", mapOf("A" to t), 5), Meal("s2", mapOf("A" to t), 4), Meal("s1", mapOf("A" to t), 3)) +
-                listOf(Meal("s2", mapOf("A" to x), 2), Meal("s1", mapOf("A" to x), 1))
+    fun `held - a finding over its gate stays after one more good meal while still three standard errors off, and goes after four`() {
+        fun sorts(
+            brand: String,
+            good: List<Int>,
+            n: Int,
+        ) = good.mapIndexed { i, k ->
+            prod("${brand.lowercase()}$i", "brand" to brand, "variety" to "Sorte $i") to
+                rate("${brand.lowercase()}$i", "A", List(n) { if (it < k) t else x }, 30)
+        }
+        val sheba = sorts("Sheba", listOf(4, 2, 1, 1, 1, 1, 0), 7)
+        val rest = sorts("Felix", listOf(5, 4, 4, 4), 8) + sorts("Whiskas", listOf(4, 4, 4), 8)
+        val since = listOf(t, t, x, x, x).mapIndexed { i, r -> Meal("sheba$i", mapOf("A" to r), 5 - i) }
 
         fun state(meals: List<Meal>): String {
-            val db = house(listOf("A"), brands, meals)
+            val db = house(listOf("A"), (sheba + rest).map { it.first }, meals)
             val m = model(db)
-            val sheba = m.sorts.filter { it.id.startsWith("s") }
-            val kept = held(m, "marke", "Sheba", sheba, m.sorts.filter { it !in sheba })
+            val mine = m.sorts.filter { it.id.startsWith("sheba") }
+            val kept = held(m, "marke", "Sheba", mine, m.sorts.filter { it !in mine })
             val shown = findings(db, m, now0).filter { it.kind == "marke" && it.key == "Sheba" }
             assertTrue(shown.size <= 1 && (kept == null || shown.single().insight!!.gap == kept.gap))
             return if (kept != null) {
@@ -1581,16 +1576,13 @@ class SmartTest {
                 "gone"
             }
         }
+        val before = (sheba + rest).flatMap { it.second }
         assertEquals(
-            "0 of 6 against 8 of 10, then 1 of 7 at 2.5 standard errors, and four more meals while it stays between 2 and 2.75",
+            "10 of 49 against 29 of 56, then a gap under 0.3 at more than three standard errors, four more meals, and it goes",
             listOf("shown", "kept", "kept", "kept", "kept", "gone"),
-            (0..5).map { state(rest + before + since.take(it)) },
+            (0..5).map { state(before + since.take(it)) },
         )
-        assertEquals(
-            "1 of 7 from the start never passed the gate",
-            "gone",
-            state(rest + rate("s1", "A", listOf(t, x, x, x), 30) + rate("s2", "A", listOf(x, s, mi), 30)),
-        )
+        assertEquals("the same from the start never passed the gate", "gone", state(before + rate("sheba6", "A", listOf(t), 30)))
     }
 
     private val mixedLine =
@@ -1740,7 +1732,7 @@ class SmartTest {
     ) = Block(0, 0, n, good, 0, 0, n - good, expected, vary, emptyMap())
 
     @Test
-    fun `appetite on Vorlieben - the home alarm while shown, a clear trend, the newest week at 2_5, an older at 3, else unauffällig`() {
+    fun `appetite on Vorlieben - the home alarm while shown, a clear trend, the newest week at 2_5, an older at 3, else unauffaellig`() {
         val m = model(house(listOf("A"), listOf("p1"), emptyList()))
         val calm = block(10, 6, 6.0, 2.4)
 
@@ -1749,17 +1741,18 @@ class SmartTest {
             trend: List<Trend> = emptyList(),
             model: Model = m,
         ) = appetiteOf(model, "A", trend, weeks)?.let { listOf(it.state, it.dir) }
-        assertEquals(listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(10, 2, 6.0, 2.4))))
-        assertEquals(listOf("zuletzt-besser", 1), state(listOf(calm, block(10, 10, 6.0, 2.4))))
-        assertEquals("3 under 6 is less than 2.5 standard errors", listOf("unauffaellig", 0), state(listOf(calm, block(10, 3, 6.0, 2.4))))
+        assertEquals(listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(10, 1, 6.0, 2.4))))
+        assertEquals(listOf("zuletzt-besser", 1), state(listOf(calm, block(10, 10, 5.0, 2.4))))
+        assertEquals("less than 2.5 standard errors", listOf("unauffaellig", 0), state(listOf(calm, block(10, 1, 5.5, 4.0))))
+        assertEquals("2.7 standard errors", listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(8, 1, 4.7, 1.9))))
+        assertEquals("an older week needs 3", listOf("unauffaellig", 0), state(listOf(block(8, 1, 4.7, 1.9), calm)))
         assertEquals(listOf("wieder", -1), state(listOf(block(10, 1, 6.0, 2.4), calm)))
-        assertEquals("an older week needs 3", listOf("unauffaellig", 0), state(listOf(block(10, 2, 6.0, 2.4), calm)))
         assertEquals(
-            "6 under 20 of 40 is far beyond chance, but not a quarter of the week",
-            listOf("unauffaellig", 0),
-            state(listOf(calm, block(40, 14, 20.0, 2.0))),
+            "9 of 20 under what was expected is enough, 8 of 20 is not, however far beyond chance",
+            listOf(listOf("zuletzt-schwaecher", -1), listOf("unauffaellig", 0)),
+            listOf(state(listOf(calm, block(20, 5, 14.0, 2.0))), state(listOf(calm, block(20, 6, 14.0, 2.0)))),
         )
-        assertEquals("a week of four is not judged", null, state(listOf(block(4, 0, 3.0, 0.5), block(10, 2, 6.0, 2.4))))
+        assertEquals("a week of four is not judged", null, state(listOf(block(4, 0, 3.0, 0.5), block(10, 1, 6.0, 2.4))))
         assertEquals(null, state(emptyList()))
         val worse = Trend("A", "deutlich", -1, GoodCount(12, 2), GoodCount(20, 15), "tier")
         assertEquals(listOf("schlechter", -1), state(listOf(calm, calm), listOf(worse)))

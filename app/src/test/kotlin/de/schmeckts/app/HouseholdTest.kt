@@ -136,7 +136,7 @@ class HouseholdTest {
     }
 
     @Test
-    fun `her appetite is unauffällig, and no week is ever flagged on the way`() {
+    fun `her appetite is unauffaellig, and no week is ever flagged on the way`() {
         val weeks = weeks(db0, m0, pet, end)
         assertEquals(
             listOf(listOf(13, 5, 5, 2, 1), listOf(14, 6, 1, 4, 3), listOf(13, 5, 2, 6, 0)),

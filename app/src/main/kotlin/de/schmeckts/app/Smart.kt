@@ -1706,9 +1706,10 @@ private fun groupOf(
 ) = if (enoughIn(group) && enoughIn(rest)) insightOf(kind, sideIn(group, key), sideIn(rest), z, minGap) else null
 
 // Hysteresis without stored state: a group that just slipped under its full gate stays while it is still KEEP_Z
-// standard errors and KEEP_GAP apart, if the full gate held just before one of its KEEP_LOOKS newest ratings. So one
-// good meal does not make a finding come and go.
-private const val KEEP_Z = 2.0
+// standard errors and KEEP_GAP apart, if the full gate held just before one of its KEEP_LOOKS newest ratings. KEEP_Z
+// lies above INSIGHT_GROUP, so only a gap that narrowed is held; lower, a cat that eats everything alike sees too
+// many lines in PersonasTest.
+private const val KEEP_Z = 3.0
 private const val KEEP_GAP = 0.2
 private const val KEEP_LOOKS = 4
 
@@ -1825,7 +1826,7 @@ private object BLOCK {
     const val PRIOR = 2 // pseudo ratings pulling a variety's expectation to the cat's share
     const val Z = 2.5 // the newest judged block, one look
     const val Z_PAST = 3.0 // an older judged block, up to seven looks
-    const val GAP = 0.25 // |good - expected| at least this share of the block's ratings
+    const val GAP = 0.45 // |good - expected| at least this share of the block's ratings; lower, chance flags weeks (PersonasTest)
 }
 
 /** A seven-day block, from inclusive, to exclusive. seen: the notes about the cat in it, by kind. */

@@ -8,6 +8,10 @@ import org.junit.Test
 // a cat with a clear habit the one that names it; notes that come at random are hardly ever tied to a variety, a
 // variety that upsets the stomach is. Seeded, so every run sees the same households.
 class PersonasTest {
+    init {
+        berlin()
+    }
+
     private val hour = 3_600_000L
     private val now = utc(2026, 10, 8, 20)
     private val houses = 200
@@ -36,6 +40,7 @@ class PersonasTest {
     }
 
     private class MealSeen(
+        val t: Long,
         val p: Map<String, Any?>,
         val again: Boolean,
         val first: Boolean,
@@ -54,11 +59,13 @@ class PersonasTest {
 
     // Two meals a day of ten wet varieties for DAYS days, now and then the same as the meal before, a treat on some
     // days, two people feeding. habit gives the chance of a good rating and the sauce share for one meal. In lines a
-    // brand comes in one consistency, and the lines in sauce mostly with chicken, as the shelves have them.
+    // brand comes in one consistency, and the lines in sauce mostly with chicken, as the shelves have them. A second
+    // cat rates the same meals by its own habit, with dice of its own.
     private fun household(
         seed: Long,
         habit: Habit = Habit(),
         lines: Boolean = false,
+        second: Habit? = null,
     ): Db {
         val rnd = Rnd(seed)
         val products =
@@ -78,6 +85,9 @@ class PersonasTest {
             }
         val db = Db()
         db.pets.add(rec(mapOf("id" to "cat", "name" to "Mau", "createdAt" to 1)))
+        if (second != null) db.pets.add(rec(mapOf("id" to "cat2", "name" to "Mimi", "createdAt" to 2)))
+        val cats = db.pets.map { it.id }
+        val dice = Rnd(seed + 2)
         products.forEach { db.products.add(rec(it)) }
         db.products.add(
             rec(
@@ -107,7 +117,7 @@ class PersonasTest {
                             "productId" to "snack",
                             "servedAt" to snack.toLong(),
                             "by" to "Anna",
-                            "pets" to mapOf("cat" to mapOf("r" to "verputzt")),
+                            "pets" to cats.associateWith { mapOf("r" to "verputzt") },
                         ),
                     ),
                 )
@@ -117,6 +127,7 @@ class PersonasTest {
                 val p = if (before != null && rnd() < 0.25) before else products[Math.floor(rnd() * 10).toInt()]
                 val meal =
                     MealSeen(
+                        t.toLong(),
                         p,
                         before === p,
                         p["id"] !in seen,
@@ -132,6 +143,8 @@ class PersonasTest {
                     )
                 seen.add(p["id"] as String)
                 val r = rating(rnd, habit.good(meal), habit.sauce(meal))
+                val rated = mutableMapOf("cat" to mapOf("r" to r))
+                if (second != null) rated["cat2"] = mapOf("r" to rating(dice, second.good(meal), second.sauce(meal)))
                 servings.add(
                     rec(
                         mapOf(
@@ -139,7 +152,7 @@ class PersonasTest {
                             "productId" to p["id"],
                             "servedAt" to t.toLong(),
                             "by" to meal.by,
-                            "pets" to mapOf("cat" to mapOf("r" to r)),
+                            "pets" to rated,
                         ),
                     ),
                 )
@@ -199,10 +212,65 @@ class PersonasTest {
         k: String,
     ) = (out[k] ?: 0).toDouble() / houses
 
+    // the week rule alone: the hint on home and the four-week trend come first on the page, but have tests of their own
+    private fun weekRule(db: Db): String? {
+        val m = analyze(db, Filter(), now)
+        return appetiteOf(Model(m.pet, m.pets, m.sorts, m.byId, m.rated, emptyList()), "cat", emptyList(), weeks(db, m, "cat", now))?.state
+    }
+
     @Test
-    fun `a cat that likes everything alike - after two months at most one household in sixteen sees an insight`() {
-        val out = shown()
+    fun `a cat that likes everything alike - after two months at most one household in sixteen sees a line beyond its favourite`() {
+        val out = linkedMapOf("any" to 0)
+        for (i in 1..houses) {
+            val db = household(i * 7919L)
+            val kinds =
+                findings(db, analyze(db, Filter(), now), now).map { it.kind } + listOfNotNull(weekRule(db)?.takeIf { it != "unauffaellig" })
+            if (kinds.isNotEmpty()) out["any"] = out.getValue("any") + 1
+            for (k in kinds.toSet()) out[k] = (out[k] ?: 0) + 1
+        }
         assertTrue("$out", share(out, "any") <= 1.0 / 16)
+    }
+
+    @Test
+    fun `a cat whose appetite drops in the last week - most households see it as zuletzt schwaecher`() {
+        val drop = Habit(good = { if (it.t > now - 7 * DAY) 0.2 else 0.6 })
+        val out = linkedMapOf<String, Int>()
+        for (i in 1..houses) {
+            val state = weekRule(household(i * 7919L, drop)) ?: "none"
+            out[state] = (out[state] ?: 0) + 1
+        }
+        assertTrue("$out", share(out, "zuletzt-schwaecher") >= 0.75)
+    }
+
+    private fun differs(
+        habit: Habit,
+        second: Habit,
+    ): Map<String, Int> {
+        val out = linkedMapOf("any" to 0)
+        for (i in 1..houses) {
+            val keys =
+                differ(
+                    household(i * 7919L, habit, second = second),
+                    listOf("cat", "cat2"),
+                    now,
+                ).map { "${it.kind}:${it.key}" }.toSet()
+            if (keys.isNotEmpty()) out["any"] = out.getValue("any") + 1
+            for (k in keys) out[k] = (out[k] ?: 0) + 1
+        }
+        return out
+    }
+
+    @Test
+    fun `two cats alike - at most one household in sixteen sees them differ`() {
+        val out = differs(Habit(), Habit())
+        assertTrue("$out", share(out, "any") <= 1.0 / 16)
+    }
+
+    @Test
+    fun `one cat leaves sauce, the other eats it - most households see them differ on sauce`() {
+        val sauce = { good: Double -> Habit(good = { if ("Soße" in (it.p["variety"] as String)) good else 0.6 }) }
+        val out = differs(sauce(0.15), sauce(0.8))
+        assertTrue("$out", share(out, "konsistenz:sosse") >= 0.75)
     }
 
     @Test
