@@ -110,7 +110,7 @@
   },
   {
    "id": "k151",
-   "text": "Mit 38 bis 39 Grad ist {deine Katze} wärmer als du. Kein Wunder, dass es auf dem Schoß so schön warm wird."
+   "text": "Mit 38 bis 39 Grad ist {deine Katze} wärmer als du. Auf dem Schoß wirkt das wie eine Wärmflasche."
   },
   {
    "id": "k047",
@@ -138,7 +138,7 @@
   },
   {
    "id": "k155",
-   "text": "Ab etwa drei Monaten fallen die Milchzähne aus. Man findet selten einen, meist verschluckt das Kätzchen sie."
+   "text": "Ab etwa drei Monaten fallen die Milchzähne aus. Gefunden wird selten einer, die meisten verschluckt das Kätzchen."
   },
   {
    "id": "k156",
@@ -202,7 +202,7 @@
   },
   {
    "id": "k067",
-   "text": "In einem Versuch zog die Hälfte der Katzen Zuwendung dem Futter vor. Wer bettelt, will manchmal nur dich."
+   "text": "Hauskatzen werden im Schnitt etwa 14 Jahre alt. Mischlinge leben meist etwas länger als Rassekatzen."
   },
   {
    "id": "k084",
@@ -264,7 +264,7 @@
   },
   {
    "id": "lo003",
-   "text": "Am besten schmeckt Trockenfutter, das man vorher auf den Boden geangelt hat."
+   "text": "Trockenfutter schmeckt erst, wenn man es mit der Pfote aus dem Napf geangelt hat."
   },
   {
    "id": "lo004",
@@ -304,9 +304,9 @@
   },
   {
    "id": "lo014",
-   "text": "Wer als Zweites heimkommt, trifft eine Katze, die noch nichts hatte. Sagt sie.",
-   "m": "Kommst du als Zweites heim, hatte {name} noch nichts. Sagt er.",
-   "f": "Kommst du als Zweites heim, hatte {name} noch nichts. Sagt sie."
+   "text": "Wer als Zweites heimkommt, trifft eine Katze, die noch nichts gekriegt hat. Sagt sie.",
+   "m": "Kommst du als Zweites heim, hat {name} noch nichts gekriegt. Sagt er.",
+   "f": "Kommst du als Zweites heim, hat {name} noch nichts gekriegt. Sagt sie."
   },
   {
    "id": "lo015",
@@ -318,7 +318,7 @@
   },
   {
    "id": "lo017",
-   "text": "Auch wer nur Gemüse schneidet, wird überwacht. Es könnte ja Fleisch kommen."
+   "text": "Auch wer nur Gemüse schneidet, wird überwacht. Es könnte ja noch Fleisch kommen."
   },
   {
    "id": "lo018",
@@ -671,16 +671,10 @@
    "back": "Löwen brüllen, schnurren aber nicht. Pumas und Geparden schnurren, können dafür nicht brüllen."
   },
   {
-   "id": "st029",
-   "text": "Katzen mögen es, wenn man sie langsam anblinzelt.",
-   "verdict": "Stimmt",
-   "back": "Im Versuch blinzelten sie zurück und kamen danach sogar Fremden eher näher."
-  },
-  {
    "id": "st031",
-   "text": "Katzen schnurren nur beim Ausatmen.",
-   "verdict": "Stimmt nicht",
-   "back": "Sie schnurren beim Ein- und beim Ausatmen, darum brummt es fast ohne Pause."
+   "text": "Mit acht Wochen ist ein Kätzchen bereit fürs neue Zuhause.",
+   "verdict": "Zu früh",
+   "back": "Wer länger bei Mutter und Geschwistern bleibt, wird seltener aggressiv. Forscher raten zu mindestens 14 Wochen."
   },
   {
    "id": "st032",
@@ -690,9 +684,9 @@
   },
   {
    "id": "st033",
-   "text": "Eine Katze kommt vom Baum so leicht runter, wie sie raufkommt.",
-   "verdict": "Stimmt nicht",
-   "back": "Ihre Krallen sind nach hinten gebogen und greifen nur beim Hochklettern. Runter geht es rückwärts."
+   "text": "Ein kleiner Katzenbiss ist harmlos.",
+   "verdict": "Nicht immer",
+   "back": "Spitze Zähne bringen Keime tief unter die Haut. Schwillt die Stelle an oder wird rot, schnell zum Arzt."
   },
   {
    "id": "st034",
@@ -734,7 +728,7 @@
    "id": "st040",
    "text": "Schon wenige Tage ohne Fressen können für eine Katze gefährlich sein.",
    "verdict": "Stimmt",
-   "back": "Die Leber kann verfetten, gerade bei dicken Katzen. Frisst {deine Katze} zwei Tage nichts, ab zum Tierarzt."
+   "back": "Die Leber kann verfetten, gerade bei dicken Katzen. Frisst {deine Katze} einen Tag lang nichts, ab zum Tierarzt."
   },
   {
    "id": "st041",
@@ -789,12 +783,6 @@
    "text": "Wohnungskatzen muss man nicht impfen.",
    "verdict": "Stimmt nicht",
    "back": "Das Virus der Katzenseuche kommt auch an Schuhen ins Haus. Dagegen sollte jede Katze geimpft sein."
-  },
-  {
-   "id": "st050",
-   "text": "Zeigt die Katze den Bauch, will sie gekrault werden.",
-   "verdict": "Nicht unbedingt",
-   "back": "Oft zeigt sie damit nur Vertrauen. Gekrault werden die meisten Katzen lieber an Wangen und Kinn."
   },
   {
    "id": "st051",
@@ -876,9 +864,9 @@
   },
   {
    "id": "st064",
-   "text": "Zwei Katzen kommen mit einem Klo aus.",
+   "text": "Aus einem Trinkbrunnen trinken Katzen mehr.",
    "verdict": "Kaum",
-   "back": "Faustregel: ein Klo pro Katze und eins dazu. Sonst sucht sich manche Katze eine andere Ecke."
+   "back": "In einem Versuch tranken sie daraus nur wenig mehr, ihr Urin blieb gleich konzentriert. Manche mögen Brunnen trotzdem."
   }
  ],
  "Kurios": [
@@ -1186,7 +1174,6 @@
    "id": "ti008",
    "text": "Unterm Winterfell sieht man kaum, ob eine Katze zugelegt hat. Die Rippen sollten leicht zu tasten sein.",
    "months": [
-    9,
     10,
     11
    ]
@@ -1230,10 +1217,6 @@
    "months": [
     12
    ]
-  },
-  {
-   "id": "ti014",
-   "text": "Nassfutter aus dem Kühlschrank leicht anwärmen. Körperwarm duftet es stärker, und {deine Katze} frisst lieber."
   },
   {
    "id": "ti015",
@@ -1294,10 +1277,6 @@
    "text": "Leckt {deine Katze} nur die Soße, probier den Geschmack mal als Pastete. Manchmal stören nur die Stückchen."
   },
   {
-   "id": "ti029",
-   "text": "Ist der Katze übel, keine neue Sorte anbieten. Was sie dann frisst, mag sie danach womöglich lange nicht mehr."
-  },
-  {
    "id": "ti030",
    "text": "Leckerlis zählen mit. Gibt es welche, kommt etwas weniger in den Napf, sonst nimmt {deine Katze} zu."
   },
@@ -1317,9 +1296,7 @@
   },
   {
    "id": "ti034",
-   "text": "Frisst eine Katze einen Tag nichts, gehört sie zum Tierarzt. Hungert sie länger, kann ihre Leber verfetten.",
-   "m": "Frisst {name} einen Tag nichts, gehört er zum Tierarzt. Hungert er länger, kann seine Leber verfetten.",
-   "f": "Frisst {name} einen Tag nichts, gehört sie zum Tierarzt. Hungert sie länger, kann ihre Leber verfetten."
+   "text": "Soll {deine Katze} abnehmen, dann langsam, etwa ein Prozent pro Woche. Den Plan dafür macht am besten der Tierarzt."
   },
   {
    "id": "ti035",
@@ -1365,11 +1342,11 @@
   },
   {
    "id": "ti044",
-   "text": "Milch lieber weglassen. Viele erwachsene Katzen vertragen den Milchzucker schlecht und bekommen Durchfall."
+   "text": "Auf dem Futter sollte „Alleinfuttermittel“ stehen. „Ergänzungsfuttermittel“ wie Leckerli reicht allein nicht."
   },
   {
    "id": "ti045",
-   "text": "Hundefutter taugt für Katzen nur als Ausnahme. Es enthält zu wenig von dem, was sie brauchen, etwa Taurin."
+   "text": "„Mit Huhn“ auf der Dose heißt nur: mindestens vier Prozent Huhn. „Reich an Huhn“ heißt mindestens 14 Prozent."
   },
   {
    "id": "ti046",
@@ -1381,11 +1358,11 @@
   },
   {
    "id": "ti048",
-   "text": "Keine Lilien in die Wohnung holen. Leckt die Katze Blütenstaub aus dem Fell, können ihre Nieren versagen."
+   "text": "Atmet {deine Katze} im Schlaf öfter als 30-mal pro Minute, lass das Herz untersuchen. Zählen geht leicht mit dem Handy."
   },
   {
    "id": "ti049",
-   "text": "Schmerzmittel für Menschen nie einer Katze geben. Schon eine halbe Tablette Paracetamol kann sie töten."
+   "text": "Katzenzähne lassen sich putzen, am besten täglich und mit Zahnpasta für Katzen. Früh angefangen, klappt es leichter."
   },
   {
    "id": "ti050",
@@ -1393,7 +1370,7 @@
   },
   {
    "id": "ti051",
-   "text": "Kippfenster sind eine Falle: Die Katze rutscht in den Spalt und kommt nicht mehr frei. Ein Gitter schützt."
+   "text": "Eine neue Katze erst ein paar Tage in ein eigenes Zimmer, dann langsam bekannt machen. Zu schnell gibt oft Streit."
   },
   {
    "id": "ti052",
@@ -1458,7 +1435,7 @@
   },
   {
    "id": "ti067",
-   "text": "Dosenreste abgedeckt kühlen und bald aufbrauchen. Rechtzeitig rausnehmen, kalt fressen Katzen schlechter."
+   "text": "Dosenreste abgedeckt kühlen und bald aufbrauchen. Vor dem Füttern etwas anwärmen, kalt fressen Katzen schlechter."
   },
   {
    "id": "ti069",
@@ -1470,7 +1447,7 @@
   },
   {
    "id": "ti071",
-   "text": "Erbricht eine Katze öfter, auch nur Haarballen, beim Tierarzt abklären lassen. Normal ist das nicht."
+   "text": "Krallen nur an der hellen Spitze kürzen. Im rosa Teil, dem Leben, verlaufen Nerven und Blutgefäße."
   },
   {
    "id": "ti072",
@@ -1478,7 +1455,7 @@
   },
   {
    "id": "ti073",
-   "text": "Fäden, Haargummis und Gummibänder wegräumen. Mit ihrer rauen Zunge spucken Katzen so was schlecht aus."
+   "text": "Haargummis und Gummibänder wegräumen. Mit ihrer rauen Zunge spucken Katzen so was schlecht aus."
   }
  ],
  "Warum?": [
@@ -1566,7 +1543,7 @@
    "id": "wa052",
    "text": "Warum jaulen manche Katzen tagelang und wälzen sich am Boden?",
    "verdict": "Rollig",
-   "back": "Unkastrierte Katzen werden ab dem Frühjahr alle paar Wochen rollig. Dann rufen sie nach einem Kater."
+   "back": "Unkastrierte Katzen werden ab Februar alle zwei, drei Wochen rollig, im Haus auch ganzjährig. Dann rufen sie Kater."
   },
   {
    "id": "wa015",
@@ -1582,8 +1559,8 @@
   },
   {
    "id": "wa051",
-   "text": "Warum geht {deine Katze} auf die andere los, wenn draußen eine fremde Katze sitzt?",
-   "verdict": "Umgeleitete Wut",
+   "text": "Warum geht eine Katze auf die andere los, wenn draußen eine fremde Katze sitzt?",
+   "verdict": "Falsche Adresse",
    "back": "Wer an die Fremde nicht rankommt, lässt den Ärger an dem aus, der gerade daneben sitzt."
   },
   {
@@ -1612,7 +1589,7 @@
    "m": "Warum sabbert {name}, wenn du ihn streichelst?",
    "f": "Warum sabbert {name}, wenn du sie streichelst?",
    "verdict": "Wohlgefühl",
-   "back": "Manche Katzen sabbern vor Entspannung. Sabbert eine auch sonst, sollte der Tierarzt ins Maul schauen."
+   "back": "Das kommt bei großer Entspannung vor, oft beim Treteln. Sabbert eine Katze auch sonst, ab zum Tierarzt."
   },
   {
    "id": "wa020",
@@ -1634,9 +1611,9 @@
   },
   {
    "id": "wa054",
-   "text": "Warum schlafen Katzen lieber auf der linken Seite?",
-   "verdict": "Fluchtbereit",
-   "back": "So sieht beim Aufwachen vor allem die rechte Hirnhälfte. Die erkennt Gefahr wohl am schnellsten."
+   "text": "Warum schlafen viele Katzen auf der linken Seite?",
+   "verdict": "Gefahr im Blick",
+   "back": "Fast zwei von drei tun das. Vermutlich erkennen sie so beim Aufwachen schneller, ob Gefahr droht."
   },
   {
    "id": "wa024",
@@ -1664,7 +1641,7 @@
   },
   {
    "id": "wa055",
-   "text": "Warum spritzt {deine Katze} im Stehen Urin an Wände und Möbel?",
+   "text": "Warum spritzen manche Katzen im Stehen Urin an Wände und Möbel?",
    "verdict": "Duftmarke",
    "back": "Das ist eine Nachricht an andere Katzen, kein Unfall. Auch kastrierte tun das, oft aus Stress."
   },
@@ -1672,7 +1649,7 @@
    "id": "wa029",
    "text": "Warum flieht {deine Katze} schon beim Anblick des Transportkorbs?",
    "verdict": "Erfahrung",
-   "back": "Kommt der Korb nur zum Tierarzt raus, merken Katzen sich das. Steht er immer da, wird er zum Möbel."
+   "back": "Katzen merken sich, was auf etwas folgt. Kommt der Korb nur vor dem Tierarzt raus, kündigt er den an."
   },
   {
    "id": "wa056",
@@ -1684,13 +1661,13 @@
    "id": "wa030",
    "text": "Warum rast {deine Katze} plötzlich wie wild durch die Wohnung?",
    "verdict": "Zu viel Energie",
-   "back": "Vermutlich ist das Energie, die sonst bei der Jagd draufgeht. Man sagt dazu: die fünf wilden Minuten."
+   "back": "Vermutlich geht so raus, was sonst die Jagd verbraucht. Man sagt dazu: die fünf wilden Minuten."
   },
   {
    "id": "wa057",
-   "text": "Warum hechelt {deine Katze} nach wildem Spiel wie ein Hund?",
+   "text": "Warum hechelt {deine Katze} nach dem Toben wie ein Hund?",
    "verdict": "Außer Puste",
-   "back": "Nach wildem Toben ist das kurz normal. Hechelt eine Katze länger oder ohne Anstrengung, ab zum Tierarzt."
+   "back": "Kurz danach ist das normal. Hechelt eine Katze länger oder schon in Ruhe, ab zum Tierarzt."
   },
   {
    "id": "wa031",
@@ -1708,7 +1685,7 @@
    "id": "wa058",
    "text": "Warum sitzt {deine Katze} ewig vor dem Sofa, unter dem der Ball verschwunden ist?",
    "verdict": "Lauerjagd",
-   "back": "Mäuse fangen Katzen meist durch Warten. Sie sitzen still vor dem Loch, bis sich etwas rührt."
+   "back": "Katzen fangen Mäuse meist durch Warten. Sie sitzen still vor dem Loch, bis sich etwas rührt."
   },
   {
    "id": "wa033",
@@ -1737,7 +1714,7 @@
   {
    "id": "wa037",
    "text": "Warum bringen manche Katzen ihr Spielzeug zurück, damit du es wirfst?",
-   "verdict": "Jagdspiel",
+   "verdict": "Eigene Idee",
    "back": "Fast alle haben sich das selbst beigebracht. Und Schluss macht meist die Katze."
   },
   {
@@ -1810,15 +1787,15 @@
   },
   {
    "id": "wa059",
-   "text": "Warum frisst {deine Katze} das Leckerli auf und lässt die Tablette liegen?",
-   "verdict": "Bitter",
-   "back": "Bitter schmecken Katzen, süß dagegen nicht. Und viele Tabletten sind bitter."
+   "text": "Warum wird ein Kätzchen ganz still, wenn die Mutter es im Nacken packt?",
+   "verdict": "Tragestarre",
+   "back": "So lässt es sich leicht tragen. Erwachsene Katzen sollte man aber nicht so packen, für sie ist das Stress."
   },
   {
    "id": "wa060",
    "text": "Warum frisst {deine Katze} lieber aus dem Napf als aus dem Fummelbrett?",
-   "verdict": "Bequemlichkeit",
-   "back": "Im Versuch fraßen die meisten Katzen lieber, was einfach dalag. Suchen tut ihnen trotzdem gut."
+   "verdict": "Lieber gratis",
+   "back": "Im Versuch fraßen die meisten Katzen, was einfach dalag. Ratten und sogar Giraffen arbeiten lieber dafür."
   },
   {
    "id": "wa061",
@@ -2070,7 +2047,7 @@
   },
   {
    "id": "sp063",
-   "text": "Wenn etwas faul ist, sitzt auf Spanisch eine Katze eingesperrt: „hay gato encerrado“."
+   "text": "Ist die Katze aus dem Haus, tanzen die Mäuse auf dem Tisch. Auf Englisch spielen sie bloß."
   },
   {
    "id": "sp065",

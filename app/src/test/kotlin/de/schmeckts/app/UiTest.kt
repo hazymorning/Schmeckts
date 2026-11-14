@@ -2159,7 +2159,9 @@ class UiCalendarTest : ScreenTest() {
 
     @Test
     fun `calendar - turning a sheet keeps its height, so nothing below it moves`() {
-        open(now = at("2026-09-29T12:00")) // a Tuesday
+        // the first Tuesday from 29 September whose answer is a line longer than its claim
+        val tuesdays = generateSequence(at("2026-09-29T12:00")) { it + 7 * DAY }
+        open(now = tuesdays.first { back(it).back!!.length > back(it).text.length + 43 })
         act("demo")
         val tuesday = back(clock)
 
