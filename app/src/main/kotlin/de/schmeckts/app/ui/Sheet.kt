@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -156,6 +157,7 @@ class Layer {
     var scrolled by mutableStateOf(false)
     var titled by mutableStateOf(false)
     var level by mutableIntStateOf(0) // a new level starts at rest, at the top
+    var kept: Pair<String, Int>? = null // the first level's key and scroll, to come back to
 }
 
 class Sheets(
@@ -202,6 +204,7 @@ class Sheets(
             l.closing = null
             l.drag = 0f
             l.back = 0f
+            l.kept = null
             l.open = true
             l.key = keyOf(state)
             l.level++
@@ -661,6 +664,20 @@ fun FadeEdge(
     )
 }
 
+// The first level of a layer is where back returns to, so it comes back scrolled as it was left; the others start at
+// the top. Kept only while it is the level shown: on its way out a view may already draw the next level's content.
+@Composable
+private fun rememberLevelScroll(): ScrollState {
+    val layer = LocalLayer.current
+    val first = remember { layer?.state?.let { it.page == null && it.step == null } == true }
+    val key = remember { layer?.key ?: "" }
+    val scroll = rememberScrollState(layer?.kept?.takeIf { first && it.first == key }?.second ?: 0)
+    if (first && layer != null) {
+        LaunchedEffect(scroll) { snapshotFlow { scroll.value }.collect { if (layer.key == key) layer.kept = key to it } }
+    }
+    return scroll
+}
+
 /** The head and body of a sheet or a page, decided by the layer, so one view can be both. back: for a step that is
  not a level of its own, such as cropping. end: a button at the end of the bar. */
 @Composable
@@ -669,7 +686,7 @@ fun SheetBody(
     sheets: Sheets,
     onBack: () -> Unit = { sheets.backPage() },
     end: (@Composable RowScope.() -> Unit)? = null,
-    scroll: ScrollState = rememberScrollState(),
+    scroll: ScrollState = rememberLevelScroll(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val layer = LocalLayer.current

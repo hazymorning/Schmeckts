@@ -328,3 +328,54 @@ class UiBackGestureTest : ScreenTest() {
         check(still == 0f && sheet == null, "with reduced motion the page does not follow the finger $still")
     }
 }
+
+class UiLevelScrollTest : ScreenTest() {
+    private val range = androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange
+
+    private fun body() =
+        rule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(range) and
+                hasAnyAncestor(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, sheet!!.kind)),
+            useUnmergedTree = true,
+        )[0]
+
+    private fun scrolled() = body().fetchSemanticsNode().config[range].value()
+
+    private fun scrollDown(): Float {
+        body().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(0f, 2000f) }
+        idle(100)
+        return scrolled()
+    }
+
+    @Test
+    fun `levels - back on a page it is where it was left, a level ahead and a page opened anew start at the top`() {
+        open()
+        act("demo")
+        act("open-settings")
+        val was = scrollDown()
+        act("settings-page", "v" to "backup")
+        val ahead = scrolled()
+        scrollDown()
+        act("settings-back")
+        val back = scrolled()
+        act("settings-page", "v" to "backup")
+        val again = scrolled()
+        act("settings-back")
+        act("edit-pet", "id" to db.pets[0].id)
+        act("settings-back")
+        val pet = scrolled()
+        act("close")
+        idle(100)
+        act("open-settings")
+        val anew = scrolled()
+        check(was > 0f && back == was && pet == was, "back from Backup and from a cat the overview is where it was $was $back $pet")
+        check(ahead == 0f && again == 0f && anew == 0f, "Backup and settings opened anew start at the top $ahead $again $anew")
+        act("close")
+        idle(100)
+        act("open-evaluation")
+        val eval = scrollDown()
+        act("open-level", "v" to "shop")
+        act("settings-back")
+        check(eval > 0f && scrolled() == eval, "the same in Vorlieben after Einkaufen $eval ${scrolled()}")
+    }
+}
