@@ -19,7 +19,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,8 +69,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.paneTitle
@@ -81,7 +81,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /* Sheets and pages share one layer: a page is a sheet that fills the screen and moves sideways. A sheet opened from a
@@ -146,6 +147,8 @@ class Layer {
     // the finger: sheets dragged down, the back gesture's share
     var drag by mutableFloatStateOf(0f)
     var back by mutableFloatStateOf(0f)
+    var sheetHeight by mutableFloatStateOf(Float.MAX_VALUE)
+    var settle: Job? = null // the spring back after a pull, stopped by the next touch
     var scrolled by mutableStateOf(false)
     var titled by mutableStateOf(false)
     var level by mutableIntStateOf(0) // a new level starts at rest, at the top
@@ -313,6 +316,7 @@ class Sheets(
         l.depth = 0
         l.drag = 0f
         l.back = 0f
+        l.sheetHeight = Float.MAX_VALUE
         l.closing?.complete(Unit)
         l.closing = null
         onShut()
@@ -359,9 +363,8 @@ fun SheetHost(
     if (!layer.open || state == null) return
     val page = isPage(state)
     val scope = rememberCoroutineScope()
-    var sheetHeight by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     val density = LocalDensity.current
-    val pull = remember(layer, still) { PullToClose(sheets, layer, density, still) }
+    val pull = remember(layer, still) { PullToClose(sheets, layer, density, still, scope) }
     PredictiveBackHandler(enabled = sheets.topLayer() == layer && closing == null) { events ->
         try {
             events.collect { e: BackEventCompat -> layer.back = e.progress }
@@ -377,7 +380,7 @@ fun SheetHost(
         Box(
             Modifier
                 .fillMaxSize()
-                .alpha(shown.value * (1f - 0.6f * (layer.drag / sheetHeight).coerceIn(0f, 1f)))
+                .alpha(shown.value * (1f - 0.6f * (layer.drag / layer.sheetHeight).coerceIn(0f, 1f)))
                 .background(colors.backdrop)
                 .clickable(remember { MutableInteractionSource() }, null) { if (closing == null) sheets.closeSheet() },
         )
@@ -401,10 +404,10 @@ fun SheetHost(
                         .widthIn(max = Space.pageWidth)
                         .fillMaxWidth()
                         .heightIn(max = with(density) { (h * 0.92f).toDp() })
-                        .onGloballyPositioned { sheetHeight = it.size.height.toFloat() }
+                        .onGloballyPositioned { layer.sheetHeight = it.size.height.toFloat() }
                         .nestedScroll(pull)
                         .graphicsLayer {
-                            val all = if (sheetHeight == Float.MAX_VALUE) h else sheetHeight
+                            val all = if (layer.sheetHeight == Float.MAX_VALUE) h else layer.sheetHeight
                             translationY = (1f - shown.value) * all + layer.drag + layer.back * all * 0.1f
                             val k = 1f - 0.05f * layer.back
                             scaleX = k
@@ -421,7 +424,7 @@ fun SheetHost(
                 if (page) {
                     Box(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
                 } else {
-                    Grip(sheets, layer)
+                    Grip(sheets, layer, scope)
                 }
                 CompositionLocalProvider(LocalLayer provides layer) {
                     Levels(layer, state, page, still, view)
@@ -487,22 +490,26 @@ private fun ColumnScope.Levels(
     }
 }
 
-/** Pulled down far enough or flung, the sheet closes; otherwise it springs back. dy in px, v in px per second. */
+/** Let go past closeAt, or flung down, the sheet closes; flung up or let go early, it springs back. v in px per second. */
 internal suspend fun Layer.release(
     sheets: Sheets,
     density: Density,
     v: Float,
     still: Boolean,
 ) {
-    val dy = drag / density.density
-    if (dy > 110 || (v / density.density > 700 && dy > 24)) {
+    val at = closeAt(density)
+    // a flick needs some pull of its own, so a fling that only scrolled the content to its top does not close
+    if (v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
         sheets.closeSheet()
     } else if (still) {
         drag = 0f
     } else {
-        animate(drag, 0f, v, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow)) { x, _ -> drag = x }
+        animate(drag, 0f, v, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow)) { x, _ -> drag = maxOf(0f, x) }
     }
 }
+
+/** how far a pull let go at rest has to reach to close, in px: 110 dp, at most half the sheet */
+internal fun Layer.closeAt(density: Density) = minOf(110 * density.density, sheetHeight / 2)
 
 // Content scrolled to its top hands a downward pull to the sheet, and takes an upward one back first
 private class PullToClose(
@@ -510,6 +517,7 @@ private class PullToClose(
     val layer: Layer,
     val density: Density,
     val still: Boolean,
+    val scope: CoroutineScope,
 ) : NestedScrollConnection {
     private fun mine() = sheets.topLayer() == layer && layer.closing == null
 
@@ -517,7 +525,9 @@ private class PullToClose(
         available: Offset,
         source: NestedScrollSource,
     ): Offset {
-        if (source != NestedScrollSource.UserInput || available.y >= 0 || layer.drag <= 0f) return Offset.Zero
+        if (source != NestedScrollSource.UserInput) return Offset.Zero
+        layer.settle?.cancel()
+        if (available.y >= 0 || layer.drag <= 0f) return Offset.Zero
         val used = maxOf(available.y, -layer.drag)
         layer.drag += used
         return Offset(0f, used)
@@ -533,34 +543,11 @@ private class PullToClose(
         return Offset(0f, available.y)
     }
 
+    // returns at once, so the content takes the next touch while the sheet still settles
     override suspend fun onPreFling(available: Velocity): Velocity {
         if (layer.drag <= 0f) return Velocity.Zero
-        layer.release(sheets, density, available.y, still)
+        layer.settle = scope.launch { layer.release(sheets, density, available.y, still) }
         return available
-    }
-}
-
-// swiping down on the grip or the head closes a sheet; a page leaves only by the arrow or back
-fun Modifier.dragToClose(
-    sheets: Sheets,
-    layer: Layer,
-    still: Boolean,
-) = pointerInput(layer) {
-    val velocity = VelocityTracker()
-    coroutineScope {
-        detectVerticalDragGestures(
-            onDragStart = { velocity.resetTracking() },
-            onDragEnd = {
-                val v = velocity.calculateVelocity().y
-                launch { layer.release(sheets, this@pointerInput, v, still) }
-            },
-            onDragCancel = { launch { layer.release(sheets, this@pointerInput, 0f, still) } },
-        ) { change, dy ->
-            if (sheets.topLayer() != layer || layer.closing != null) return@detectVerticalDragGestures
-            velocity.addPosition(change.uptimeMillis, change.position)
-            layer.drag = maxOf(0f, layer.drag + dy)
-            change.consume()
-        }
     }
 }
 
@@ -568,12 +555,23 @@ fun Modifier.dragToClose(
 private fun Grip(
     sheets: Sheets,
     layer: Layer,
+    scope: CoroutineScope,
 ) {
+    val still = reduceMotion
+    val density = LocalDensity.current
     Box(
         Modifier
             .fillMaxWidth()
-            .dragToClose(sheets, layer, reduceMotion)
-            .padding(vertical = Space.s2),
+            .draggable(
+                rememberDraggableState { dy ->
+                    if (sheets.topLayer() == layer && layer.closing == null) layer.drag = maxOf(0f, layer.drag + dy)
+                },
+                Orientation.Vertical,
+                onDragStarted = { layer.settle?.cancel() },
+                onDragStopped = { v ->
+                    if (layer.drag > 0f) layer.settle = scope.launch { layer.release(sheets, density, v, still) }
+                },
+            ).padding(vertical = Space.s2),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -703,7 +701,6 @@ fun SheetBody(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .then(if (layer != null) Modifier.dragToClose(sheets, layer, reduceMotion) else Modifier)
                     .padding(bottom = Space.s3),
                 horizontalArrangement = Arrangement.spacedBy(Space.s3),
                 verticalAlignment = Alignment.CenterVertically,
