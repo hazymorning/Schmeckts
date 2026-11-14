@@ -93,6 +93,19 @@ class UiLocalTest : ScreenTest() {
         val left = app.cacheDir.list()!!.sorted()
         check(left == listOf("other.json", "update"), "only the app's shared files are gone $left")
     }
+
+    @Test
+    fun `local - the point where letting go acts feels unlike a tap, and going back past it unlike crossing it`() {
+        val p = AndroidPlatform(ApplicationProvider.getApplicationContext()).apply { activity = rule.activity }
+        val felt =
+            listOf("select", "threshold", "threshold-off").map {
+                p.haptic(it)
+                org.robolectric.Shadows
+                    .shadowOf(rule.activity.window.decorView)
+                    .lastHapticFeedbackPerformed()
+            }
+        check(felt.toSet().size == 3, "three different feelings $felt")
+    }
 }
 
 private val OK_ADDRESSES =

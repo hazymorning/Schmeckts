@@ -157,6 +157,22 @@ class AndroidPlatform(
             when (level) {
                 "success" -> if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
                 "strong" -> if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
+                "threshold" ->
+                    if (Build.VERSION.SDK_INT >=
+                        34
+                    ) {
+                        HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE
+                    } else {
+                        HapticFeedbackConstants.CONTEXT_CLICK
+                    }
+                "threshold-off" ->
+                    if (Build.VERSION.SDK_INT >=
+                        34
+                    ) {
+                        HapticFeedbackConstants.GESTURE_THRESHOLD_DEACTIVATE
+                    } else {
+                        HapticFeedbackConstants.CLOCK_TICK
+                    }
                 else -> HapticFeedbackConstants.CLOCK_TICK
             }
         view.performHapticFeedback(kind) // nothing depends on it, a phone that cannot vibrate is ignored

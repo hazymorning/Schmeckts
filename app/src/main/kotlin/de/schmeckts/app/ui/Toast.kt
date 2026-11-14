@@ -276,7 +276,7 @@ fun ToastHost(
                 if (m.undo != null) {
                     Row(
                         Modifier
-                            .press({ toasts.undoNow { haptic("tap") } })
+                            .press({ toasts.undoNow { haptic("select") } })
                             .clip(RoundedCornerShape(Radius.s))
                             .heightIn(min = Size.tapS)
                             .padding(horizontal = Space.s4, vertical = Space.s2),
