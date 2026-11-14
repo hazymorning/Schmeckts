@@ -11,6 +11,12 @@ import android.view.HapticFeedbackConstants.SEGMENT_TICK
 import android.view.HapticFeedbackConstants.TOGGLE_OFF
 import android.view.HapticFeedbackConstants.TOGGLE_ON
 import android.view.HapticFeedbackConstants.VIRTUAL_KEY
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -62,5 +68,34 @@ class UiHeavyTest : ScreenTest() {
         idle(600)
         val felt = calls("haptic")
         check(db.servings.none { it.id == meal } && "heavy" in felt && "strong" !in felt && "reject" !in felt, "a firm click $felt")
+    }
+}
+
+class UiPressTest : ScreenTest() {
+    @Test
+    fun `press - a quick tap in the scrolling page shows on the control, which springs back`() {
+        open(reduce = false)
+        act("demo")
+        idle(2000)
+        val head = rule.onNode(hasContentDescription("Alle Einträge"), useUnmergedTree = true)
+        head.performScrollTo()
+        rule.onAllNodes(hasScrollAction())[0].performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 900f) } // clear of the feed button
+        idle(500)
+        val rest = head.fetchSemanticsNode().boundsInRoot.width
+        rule.mainClock.autoAdvance = false
+        head.performTouchInput {
+            down(center)
+            advanceEventTime(40)
+            up()
+        }
+        var least = rest
+        repeat(6) {
+            rule.mainClock.advanceTimeByFrame()
+            least = minOf(least, head.fetchSemanticsNode().boundsInRoot.width)
+        }
+        rule.mainClock.autoAdvance = true
+        idle(1000)
+        val after = head.fetchSemanticsNode().boundsInRoot.width
+        check(least < rest - 1f && kotlin.math.abs(after - rest) < 0.5f, "it gives and comes back $rest $least $after")
     }
 }
