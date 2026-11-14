@@ -92,6 +92,24 @@ Fragen und Ideen sind im [Forum](https://github.com/hazymorning/Schmeckts/discus
 
 </details>
 
+<details>
+<summary>Einsatz von KI</summary>
+<br>
+
+Eine App dieses Umfangs allein zu entwickeln, wäre zwar möglich, aber nur realistisch, wenn man sehr viel Zeit hat und nicht weiß, wohin damit. Deshalb hilft hier KI mit. Ohne sie gäbe es diese App vermutlich nicht.
+
+Einfach drauflos generiert wird trotzdem nicht. Denn so absurd es klingt: Ausgerechnet ein Futtertagebuch für Katzen muss ziemlich gut sein. Wenn das Eintragen nervt, macht es nach drei Tagen niemand mehr, und die Katze frisst wieder völlig undokumentiert. Eine einfache Bedienung ist hier also kein nettes Extra, sondern wirklich wichtig.
+
+Genauso wichtig:
+
+- Deine Daten bleiben lokal auf deinem Gerät.
+- Datenschutz wird ernst genommen, nicht nur behauptet.
+- Das Design wird von mir selbst sehr genau vorgegeben, da der typische "KI Look" wirklich nicht sein muss.
+
+Wer es genau wissen will: Der komplette Code liegt hier im Repo.
+
+</details>
+
 <!-- Wenn das Repo öffentlich ist, können diese Badges oben mit rein. Sie aktualisieren sich von selbst:
   <a href="https://github.com/hazymorning/Schmeckts/releases/latest"><img src="https://img.shields.io/github/v/release/hazymorning/Schmeckts?label=Version&color=58603F&labelColor=25261F" alt="Neueste Version"></a>
   <a href="https://github.com/hazymorning/Schmeckts/releases"><img src="https://img.shields.io/github/downloads/hazymorning/Schmeckts/total?label=Downloads&color=58603F&labelColor=25261F" alt="Downloads"></a>
