@@ -91,12 +91,12 @@ fun AppScreen(main: Main) {
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                // under a page the home page steps aside, and the back gesture draws it back in
+                // under a page the home page steps aside, and a back gesture that closes the page draws it back in
                 Box(
                     Modifier.graphicsLayer {
                         val l = ui.sheets.base
-                        translationX =
-                            if (still || !isPage(l.state)) 0f else -size.width / 4 * (l.shown.value * (1f - l.back)).coerceIn(0f, 1f)
+                        val b = if (l.leaving) l.back else 0f
+                        translationX = if (still || !isPage(l.state)) 0f else -size.width / 4 * (l.shown.value * (1f - b)).coerceIn(0f, 1f)
                     },
                 ) { HomeScreen() }
                 SheetHost(ui.sheets, ui.sheets.base) { SheetView(it) }

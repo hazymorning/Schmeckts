@@ -154,6 +154,7 @@ class Layer {
     var drag by mutableFloatStateOf(0f)
     var back by mutableFloatStateOf(0f)
     var edge = BackEventCompat.EDGE_LEFT // the side the back gesture came from
+    var leaving by mutableStateOf(true) // whether that gesture closes the layer, not only goes back a level
     var sheetHeight by mutableFloatStateOf(Float.MAX_VALUE)
     var settle: Job? = null // the spring back after a pull, stopped by the next touch
     var flung = 0f // px per second the finger let a closing sheet go with
@@ -244,9 +245,12 @@ class Sheets(
         }
     }
 
+    /** whether back closes the top layer, rather than going back a level */
+    fun backCloses() = over.state != null || sheet?.page == null || base.depth <= 1
+
     /** the back button and gesture */
     fun sheetBack() {
-        if (over.state == null && sheet?.page != null) backPage() else closeSheet()
+        if (backCloses()) closeSheet() else backPage()
     }
 
     private fun stepBack() {
@@ -388,7 +392,10 @@ fun SheetHost(
         try {
             var first = true
             events.collect { e: BackEventCompat ->
-                if (first) layer.edge = e.swipeEdge
+                if (first) {
+                    layer.edge = e.swipeEdge
+                    layer.leaving = sheets.backCloses()
+                }
                 first = false
                 back.snapTo(if (still) 0f else Motion.back.transform(e.progress))
                 layer.back = back.value
@@ -408,7 +415,7 @@ fun SheetHost(
                 .fillMaxSize()
                 .graphicsLayer {
                     val lit = shown.value - layer.drag / layer.sheetHeight
-                    alpha = (if (page) lit * (1f - 0.5f * layer.back) else lit).coerceIn(0f, 1f)
+                    alpha = (if (page && layer.leaving) lit * (1f - 0.5f * layer.back) else lit).coerceIn(0f, 1f)
                 }.background(colors.backdrop)
                 .clickable(remember { MutableInteractionSource() }, null) { if (closing == null) sheets.closeSheet() },
         )

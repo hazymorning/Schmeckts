@@ -471,7 +471,7 @@ class UiHomeAsideTest : ScreenTest() {
             .positionInRoot.x
 
     @Test
-    fun `home - steps aside under a page and comes back with the back gesture`() {
+    fun `home - steps aside under a page and comes back with a back gesture that closes it`() {
         open(reduce = false)
         act("demo")
         idle(1000)
@@ -484,22 +484,42 @@ class UiHomeAsideTest : ScreenTest() {
         act("open-settings")
         idle(600)
         val aside = x() - rest
+        act("settings-page", "v" to "backup")
+        idle(600)
         val d = rule.activity.onBackPressedDispatcher
         rule.mainClock.autoAdvance = false
-        rule.runOnUiThread {
-            d.dispatchOnBackStarted(BackEventCompat(0f, 400f, 0f, BackEventCompat.EDGE_LEFT))
-            d.dispatchOnBackProgressed(BackEventCompat(200f, 400f, 0.5f, BackEventCompat.EDGE_LEFT))
-        }
-        repeat(2) {
+
+        fun frame() {
             rule.mainClock.advanceTimeByFrame()
             shadowOf(Looper.getMainLooper()).idle()
         }
+
+        fun gesture() {
+            rule.runOnUiThread {
+                d.dispatchOnBackStarted(BackEventCompat(0f, 400f, 0f, BackEventCompat.EDGE_LEFT))
+                d.dispatchOnBackProgressed(BackEventCompat(200f, 400f, 0.5f, BackEventCompat.EDGE_LEFT))
+            }
+            repeat(2) { frame() }
+        }
+        gesture()
+        var furthest = x() - rest
+        rule.runOnUiThread { d.onBackPressed() }
+        repeat(30) {
+            frame()
+            if (kotlin.math.abs(x() - rest - aside) > kotlin.math.abs(furthest - aside)) furthest = x() - rest
+        }
+        val overview = level
+        gesture()
         val drawn = x() - rest
         rule.runOnUiThread { d.onBackPressed() }
         rule.mainClock.autoAdvance = true
         idle(600)
         check(sheet == null && x() == rest, "the page gone, home is back in place")
         check(aside < -w / 4f + 2f && aside > -w / 4f - 2f, "under the page home lies a quarter aside $aside")
+        check(
+            overview == listOf("settings", null, null) && kotlin.math.abs(furthest - aside) < 2f,
+            "back from Backup it stays aside $furthest",
+        )
         check(drawn > aside && drawn < 0f, "the back gesture draws it part of the way back $drawn")
     }
 }
