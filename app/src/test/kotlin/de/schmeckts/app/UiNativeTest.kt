@@ -167,4 +167,37 @@ class UiSheetPullTest : ScreenTest() {
         idle(800)
         check(half < 100f && short == "serving" && sheet == null, "short of half it springs back, past half it closes $half")
     }
+
+    @Test
+    fun `sheet - flicked down it goes on at the finger's speed`() {
+        open(reduce = false)
+        act("demo")
+        act("feed")
+        idle(600)
+        val d = rule.density.density
+        val from = start()
+        rule.mainClock.autoAdvance = false
+        rule.onRoot().performTouchInput { swipe(from, from + Offset(0f, 60 * d), 60) }
+        val top = area().top
+        var ms = 0L
+
+        fun frames(until: Long) {
+            while (ms < until) {
+                rule.mainClock.advanceTimeByFrame()
+                shadowOf(Looper.getMainLooper()).idle()
+                ms += 16
+            }
+        }
+        frames(50)
+        val moved = (area().top - top) / d
+        frames(350)
+        val gone = sheet == null
+        rule.mainClock.autoAdvance = true
+        idle(100)
+        check(moved >= 8f && gone, "no stop once the finger lets go: $moved dp in 50 ms, gone at once")
+        act("feed")
+        idle(600)
+        pull(40f)
+        check(sheet?.kind == "feed" && ui.sheets.base.drag == 0f, "a slow short pull still springs back")
+    }
 }

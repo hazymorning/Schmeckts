@@ -7,6 +7,7 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -149,6 +150,7 @@ class Layer {
     var back by mutableFloatStateOf(0f)
     var sheetHeight by mutableFloatStateOf(Float.MAX_VALUE)
     var settle: Job? = null // the spring back after a pull, stopped by the next touch
+    var flung = 0f // px per second the finger let a closing sheet go with
     var scrolled by mutableStateOf(false)
     var titled by mutableStateOf(false)
     var level by mutableIntStateOf(0) // a new level starts at rest, at the top
@@ -317,6 +319,7 @@ class Sheets(
         l.drag = 0f
         l.back = 0f
         l.sheetHeight = Float.MAX_VALUE
+        l.flung = 0f
         l.closing?.complete(Unit)
         l.closing = null
         onShut()
@@ -353,7 +356,13 @@ fun SheetHost(
         if (layer.open && closing == null) {
             if (still) shown.snapTo(1f) else shown.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut))
         } else if (closing != null) {
-            if (!still) shown.animateTo(0f, tween(Motion.STEP, easing = Motion.easeIn))
+            val all = layer.sheetHeight
+            if (!still && layer.flung > 0f && all < Float.MAX_VALUE) {
+                // on at the finger's speed, so a flicked sheet does not stop before it falls
+                shown.animateTo(0f, tween((all / layer.flung * 1000).toInt().coerceIn(120, Motion.STEP), easing = LinearEasing))
+            } else if (!still) {
+                shown.animateTo(0f, tween(Motion.STEP, easing = Motion.easeIn))
+            }
             shown.snapTo(0f)
             layer.onClosed?.invoke()
         } else {
@@ -376,11 +385,11 @@ fun SheetHost(
         }
     }
     Box(Modifier.fillMaxSize().semantics { paneTitle = state.kind }) {
-        // the dimming; a tap on it closes, as a tap beside the dialog did
+        // the dimming, as much as of the sheet is still on screen; a tap on it closes, as a tap beside the dialog did
         Box(
             Modifier
                 .fillMaxSize()
-                .alpha(shown.value * (1f - 0.6f * (layer.drag / layer.sheetHeight).coerceIn(0f, 1f)))
+                .graphicsLayer { alpha = (shown.value - layer.drag / layer.sheetHeight).coerceIn(0f, 1f) }
                 .background(colors.backdrop)
                 .clickable(remember { MutableInteractionSource() }, null) { if (closing == null) sheets.closeSheet() },
         )
@@ -500,6 +509,7 @@ internal suspend fun Layer.release(
     val at = closeAt(density)
     // a flick needs some pull of its own, so a fling that only scrolled the content to its top does not close
     if (v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
+        flung = maxOf(0f, v)
         sheets.closeSheet()
     } else if (still) {
         drag = 0f
