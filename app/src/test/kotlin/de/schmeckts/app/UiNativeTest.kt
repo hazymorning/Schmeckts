@@ -5,9 +5,12 @@ import androidx.activity.BackEventCompat
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import de.schmeckts.app.ui.SheetState
@@ -377,5 +380,41 @@ class UiLevelScrollTest : ScreenTest() {
         act("open-level", "v" to "shop")
         act("settings-back")
         check(eval > 0f && scrolled() == eval, "the same in Vorlieben after Einkaufen $eval ${scrolled()}")
+    }
+}
+
+class UiSheetSizeTest : ScreenTest() {
+    private val range = androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange
+
+    private fun top() =
+        rule
+            .onAllNodes(
+                SemanticsMatcher.keyIsDefined(range) and
+                    hasAnyAncestor(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, sheet!!.kind)),
+                useUnmergedTree = true,
+            )[0]
+            .fetchSemanticsNode()
+            .boundsInRoot.top
+
+    @Test
+    fun `sheet - its height glides when what it shows changes`() {
+        open(reduce = false)
+        act("demo")
+        act("feed")
+        idle(600)
+        val before = top()
+        rule.mainClock.autoAdvance = false
+        rule
+            .onAllNodes(hasContentDescription("Marke oder Sorte suchen") and hasSetTextAction())[0]
+            .performTextReplacement(db.products[0].str("variety") ?: "")
+        repeat(4) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        val between = top()
+        rule.mainClock.autoAdvance = true
+        idle(1000)
+        val after = top()
+        check(after > before && between > before && between < after, "the top moves down in steps, not at once $before $between $after")
     }
 }

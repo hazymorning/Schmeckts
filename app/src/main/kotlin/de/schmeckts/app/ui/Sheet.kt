@@ -6,9 +6,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -78,6 +80,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -748,11 +751,20 @@ fun SheetBody(
             }
         }
     } else {
+        // the content's own height glides, the keyboard's room follows the keyboard
         Column(
             Modifier
                 .verticalScroll(scroll)
                 .imePadding()
-                .padding(start = Space.gutter, end = Space.gutter, top = Space.s1),
+                .then(
+                    if (reduceMotion) {
+                        Modifier
+                    } else {
+                        Modifier.animateContentSize(
+                            spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntSize.VisibilityThreshold),
+                        )
+                    },
+                ).padding(start = Space.gutter, end = Space.gutter, top = Space.s1),
         ) {
             Row(
                 Modifier
