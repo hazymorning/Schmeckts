@@ -4,9 +4,11 @@ import android.app.Application
 import android.content.pm.PackageManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.test.core.app.ApplicationProvider
 import de.schmeckts.app.views.syncChip
 import org.junit.Test
@@ -1752,5 +1754,68 @@ class UiPhotoViewerTest : ScreenTest() {
         restart()
         idle(400)
         check(files() == listOf("fremdsorte02.jpg"), "merged elsewhere: the photo follows, survives a restart ${files()}")
+    }
+
+    // where the large photo is on screen
+    private fun shown() =
+        rule
+            .onAllNodes(
+                androidx.compose.ui.test
+                    .hasContentDescription("Foto der Packung"),
+                useUnmergedTree = true,
+            ).fetchSemanticsNodes()
+            .last()
+            .boundsInRoot
+
+    // the back gesture begun and drawn this far, not yet let go
+    private fun gesture(vararg progress: Float) {
+        val d = rule.activity.onBackPressedDispatcher
+        val edge = androidx.activity.BackEventCompat.EDGE_LEFT
+        rule.runOnUiThread {
+            d.dispatchOnBackStarted(androidx.activity.BackEventCompat(0f, 400f, 0f, edge))
+            for (p in progress) d.dispatchOnBackProgressed(androidx.activity.BackEventCompat(400f * p, 400f, p, edge))
+        }
+        idle(10)
+    }
+
+    @Test
+    fun `photo_viewer - swiped away or the back gesture takes it home, a short pull springs back`() {
+        platform.pictures = AndroidPictures()
+        open(reduce = false)
+        act("add-pet")
+        type("Name", "Minka")
+        act("save-pet")
+        idle(400)
+        snap(jpegOf(1200, 900))
+        act("close")
+        idle(400)
+        val dp = rule.density.density
+        viewed(photoButton(inPend))
+        val rest = shown()
+        rule.onRoot().performTouchInput {
+            down(center)
+            repeat(10) { moveBy(Offset(0f, 3 * dp), 60) }
+        }
+        idle(10)
+        val held = shown().top - rest.top
+        rule.onRoot().performTouchInput { up() }
+        idle(800)
+        check(held > 10 * dp && viewer && shown() == rest, "a slow short pull: the photo follows and comes back ${held / dp}")
+        rule.onRoot().performTouchInput { swipe(center, center + Offset(0f, 300 * dp), 300) }
+        idle(800)
+        check(!viewer, "swiped down: it goes")
+        viewed(photoButton(inPend))
+        gesture(0.5f)
+        val small = shown().width
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.dispatchOnBackCancelled() }
+        idle(800)
+        check(small < rest.width * 0.95f && viewer && shown() == rest, "the back gesture shrinks it, called off it grows back $small")
+        gesture(0.2f, 0.5f)
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+        idle(800)
+        check(!viewer, "the back gesture done: it goes")
+        viewed(photoButton(inPend))
+        tapViewer()
+        check(!viewer, "a tap still closes it")
     }
 }
