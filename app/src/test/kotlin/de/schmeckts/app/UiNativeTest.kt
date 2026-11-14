@@ -1,6 +1,7 @@
 package de.schmeckts.app
 
 import android.os.Looper
+import androidx.activity.BackEventCompat
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
@@ -230,5 +231,100 @@ class UiSheetPullTest : ScreenTest() {
         platform.calls.clear()
         pull(40f)
         check(bumps().isEmpty() && sheet?.kind == "feed", "a short pull: nothing")
+    }
+}
+
+class UiBackGestureTest : ScreenTest() {
+    private val range = androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange
+    private val dispatcher get() = rule.activity.onBackPressedDispatcher
+    private val layer get() = ui.sheets.base
+
+    // where the top layer's scrolling body is drawn now
+    private fun body() =
+        rule
+            .onAllNodes(
+                SemanticsMatcher.keyIsDefined(range) and
+                    hasAnyAncestor(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, sheet!!.kind)),
+                useUnmergedTree = true,
+            )[0]
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+    private fun width() =
+        rule
+            .onRoot()
+            .fetchSemanticsNode()
+            .size.width
+
+    private fun frames(n: Int) =
+        repeat(n) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+
+    // the system's back gesture begun from that edge and drawn on to progress
+    private fun swipe(
+        edge: Int,
+        progress: Float,
+    ) {
+        rule.runOnUiThread {
+            val x = if (edge == BackEventCompat.EDGE_LEFT) 0f else width().toFloat()
+            dispatcher.dispatchOnBackStarted(BackEventCompat(x, 400f, 0f, edge))
+            dispatcher.dispatchOnBackProgressed(BackEventCompat(x, 400f, progress, edge))
+        }
+        frames(2)
+    }
+
+    private fun commit() {
+        rule.runOnUiThread { dispatcher.onBackPressed() }
+        frames(1)
+    }
+
+    @Test
+    fun `back gesture - the page leans toward the finger's side and leaves from where it is`() {
+        open(reduce = false)
+        act("open-settings")
+        idle(600)
+        val w = width()
+        rule.mainClock.autoAdvance = false
+        swipe(BackEventCompat.EDGE_RIGHT, 0.5f)
+        val right = body()
+        rule.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
+        frames(3)
+        val easing = layer.back
+        frames(40)
+        val rest = layer.back
+        swipe(BackEventCompat.EDGE_LEFT, 0.5f)
+        val left = body()
+        commit()
+        val leaving = listOf(layer.back > 0f, layer.closing != null)
+        rule.mainClock.autoAdvance = true
+        idle(600)
+        check(right.center.x < w / 2f && right.right <= w && right.left >= 0f, "from the right edge it leans left, on screen $right")
+        check(easing > 0f && rest == 0f, "let go, it grows back over a few frames $easing")
+        check(left.center.x > w / 2f && left.right <= w, "from the left edge it leans right $left")
+        check(leaving == listOf(true, true) && sheet == null, "back: it closes from the pose the finger left it in $leaving")
+    }
+
+    @Test
+    fun `back gesture - a sheet closes from where the finger had it, without motion nothing follows`() {
+        open(reduce = false)
+        act("demo")
+        act("feed")
+        idle(600)
+        rule.mainClock.autoAdvance = false
+        swipe(BackEventCompat.EDGE_LEFT, 0.5f)
+        commit()
+        val leaving = listOf(layer.back > 0f, layer.closing != null)
+        rule.mainClock.autoAdvance = true
+        idle(600)
+        check(leaving == listOf(true, true) && sheet == null, "the sheet closes from its shrunken pose $leaving")
+        open()
+        act("open-settings")
+        swipe(BackEventCompat.EDGE_LEFT, 0.5f)
+        val still = layer.back
+        commit()
+        idle(100)
+        check(still == 0f && sheet == null, "with reduced motion the page does not follow the finger $still")
     }
 }

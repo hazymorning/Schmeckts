@@ -278,6 +278,7 @@ object Motion {
     val easeOut = CubicBezierEasing(0.22f, 1f, 0.36f, 1f) // to arrive
     val easeIn = CubicBezierEasing(0.5f, 0f, 0.75f, 0f) // to leave
     val spring = CubicBezierEasing(0.34f, 1.45f, 0.64f, 1f) // to confirm
+    val back = CubicBezierEasing(0.1f, 0.1f, 0f, 1f) // the back gesture's share, quick at first as on Android
 }
 
 val Figtree =

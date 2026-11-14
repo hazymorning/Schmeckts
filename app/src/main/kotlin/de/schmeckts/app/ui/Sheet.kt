@@ -148,6 +148,7 @@ class Layer {
     // the finger: sheets dragged down, the back gesture's share
     var drag by mutableFloatStateOf(0f)
     var back by mutableFloatStateOf(0f)
+    var edge = BackEventCompat.EDGE_LEFT // the side the back gesture came from
     var sheetHeight by mutableFloatStateOf(Float.MAX_VALUE)
     var settle: Job? = null // the spring back after a pull, stopped by the next touch
     var flung = 0f // px per second the finger let a closing sheet go with
@@ -377,13 +378,22 @@ fun SheetHost(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val pull = remember(layer, still) { PullToClose(sheets, layer, density, still, scope) }
+    val back = remember { Animatable(0f) }
+    val rest = { scope.launch { back.animateTo(0f, tween(Motion.STEP, easing = Motion.easeOut)) { layer.back = value } } }
     PredictiveBackHandler(enabled = sheets.topLayer() == layer && closing == null) { events ->
         try {
-            events.collect { e: BackEventCompat -> layer.back = e.progress }
-            layer.back = 0f
+            var first = true
+            events.collect { e: BackEventCompat ->
+                if (first) layer.edge = e.swipeEdge
+                first = false
+                back.snapTo(if (still) 0f else Motion.back.transform(e.progress))
+                layer.back = back.value
+            }
+            // a closing layer leaves from where the finger had it; a page that only goes back a level grows again
             sheets.sheetBack()
+            if (layer.closing == null) rest()
         } catch (e: CancellationException) {
-            scope.launch { layer.back = 0f }
+            rest()
             throw e
         }
     }
@@ -405,7 +415,8 @@ fun SheetHost(
                         .fillMaxSize()
                         .graphicsLayer {
                             val b = layer.back
-                            translationX = (1f - shown.value) * w + b * w * 0.1f
+                            val toward = if (layer.edge == BackEventCompat.EDGE_RIGHT) -1f else 1f
+                            translationX = (1f - shown.value) * w + toward * b * maxOf(0f, w / 20 - Space.s2.toPx())
                             scaleX = 1f - 0.1f * b
                             scaleY = 1f - 0.1f * b
                             shape = RoundedCornerShape(Radius.l * b)
