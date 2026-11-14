@@ -1534,6 +1534,23 @@ class SmartTest {
             packs(line, lineLeft.filter { it.p != "m2" } + rate("m2", "A", listOf(t, x)) + catzLiked),
         )
         assertEquals("two varieties are no line", emptyList<List<Any?>>(), packs(line, lineLeft.filter { it.p != "m3" } + catzLiked))
+        val five = rate("m1", "A", listOf(x, x)) + rate("m2", "A", listOf(x, s)) + rate("m3", "A", listOf(mi))
+        val liked = rate("c1", "A", listOf(t, t, t, t)) + rate("c2", "A", listOf(t, g, t, g))
+        assertEquals(
+            "five ratings are too few, however far off; the sixth makes it",
+            listOf(emptyList(), listOf("Miamor")),
+            listOf(packs(line, five + liked), packs(line, five + rate("m3", "A", listOf(x)) + liked)).map { l -> l.map { it[0] } },
+        )
+        val near =
+            rate("m1", "A", listOf(x, s, mi), 2) + rate("m2", "A", listOf(x, x), 2) + rate("m3", "A", listOf(s, x, mi), 2) +
+                rate("c1", "A", listOf(t, t, mi), 2) + rate("c2", "A", listOf(t, g), 2)
+        assertEquals(
+            "0 of 8 against 4 of 5, then one good meal: 1 of 9 is 2.6 standard errors off and kept, but never from the start",
+            listOf(listOf("Miamor"), listOf("Miamor"), emptyList()),
+            listOf(near, near + rate("m1", "A", listOf(t), 1), near + rate("m1", "A", listOf(t), 2)).map { l ->
+                packs(line, l).map { it[0] }
+            },
+        )
         assertEquals(
             "0 of 8 against 3 of 5 is 2.5 standard errors: not enough for a group",
             emptyList<List<Any?>>(),
