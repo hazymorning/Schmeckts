@@ -142,7 +142,7 @@ fun rememberTyped(
 }
 
 /** fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets;
- leaving: meals on their way out of it; turned: the Stimmt’s? sheet showing its back; filled: the feeding button's
+ leaving: meals on their way out of it; turned: the flip sheet showing its back; filled: the feeding button's
  bowl fills, once per serving */
 class HomeState {
     var fresh by mutableStateOf<String?>(null)

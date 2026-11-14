@@ -64,6 +64,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -980,14 +981,16 @@ private val tornPath by lazy { PathParser().parsePathString(TORN).toPath() }
 
 private class Face(
     val label: String,
+    val action: String,
     val date: String,
     val stamp: String,
     val text: String,
-    val hanging: Boolean,
+    val other: String?,
+    val foot: String?,
 )
 
-// A day's sheet: the date as its heading, its format stamped beside it, then the fact. Today's Stimmt’s? turns over on a
-// tap, its answer led by the verdict.
+// A day's sheet: the date as its heading, its format stamped beside it, then the fact. A Stimmt’s? or Warum? turns over
+// on a tap, its answer led by the verdict; left hanging, it is turned before it is torn off.
 private fun face(
     ui: Ui,
     date: Long,
@@ -995,27 +998,34 @@ private fun face(
 ): Face {
     val on = sheetOn(date)
     val sheet = on.sheet
-    val back = !hanging && sheet.back != null && ui.home.turned == sheet.id
-    val lead = if (back) "<b>${sheet.verdict}.</b> " else ""
+    val flips = sheet.back != null
+    val back = flips && ui.home.turned == sheet.id
+    val tear = hanging && (back || !flips)
+
+    fun side(answer: Boolean) = (if (answer) "<b>${sheet.verdict}.</b> " else "") + sheetText(sheet, catOf(ui.phone.db.pets), answer)
     // the day and its month stay together when the date needs two lines
     val day =
         de.schmeckts.app
             .weekdayDayMonth(date)
             .replaceFirst(". ", ". ")
     return Face(
-        if (hanging) {
-            "Gestriges Blatt abreißen"
-        } else if (sheet.back !=
-            null
-        ) {
-            (if (back) "Behauptung zeigen" else "Auflösung zeigen")
-        } else {
-            ""
+        when {
+            tear -> "Gestriges Blatt abreißen"
+            !flips -> ""
+            !back -> "Auflösung zeigen"
+            on.format == "Warum?" -> "Frage zeigen"
+            else -> "Behauptung zeigen"
         },
+        if (tear) "tear" else "turn",
         day,
         on.format,
-        lead + sheetText(sheet, catOf(ui.phone.db.pets), back),
-        hanging,
+        side(back),
+        if (flips) side(!back) else null,
+        when {
+            tear -> "Zum Abreißen tippen"
+            hanging -> "Zum Umdrehen tippen"
+            else -> null
+        },
     )
 }
 
@@ -1090,7 +1100,7 @@ private fun CalPad() {
     ) {
         val c = face(ui, now)
         val old = day?.let { face(ui, it, true) }
-        CalSheet(c, if (c.label.isNotEmpty() && old == null) ui.on("turn") else null, turnable = true)
+        CalSheet(c, if (c.label.isNotEmpty() && old == null) ui.on(c.action) else null)
         if (old != null) Tearable(old)
         CalTop()
     }
@@ -1169,7 +1179,7 @@ private fun Tearable(old: Face) {
                 alpha = 1f - g
             }
         },
-    ) { CalSheet(old, if (ui.home.tearing) null else ui.on("tear")) }
+    ) { CalSheet(old, if (ui.home.tearing) null else ui.on(old.action)) }
 }
 
 /** as wide as a card and set like one; the corner cut away for the curl */
@@ -1177,7 +1187,6 @@ private fun Tearable(old: Face) {
 private fun CalSheet(
     c: Face,
     onClick: (() -> Unit)?,
-    turnable: Boolean = false,
 ) {
     watch()
     val p = colors
@@ -1185,7 +1194,7 @@ private fun CalSheet(
     val turn = remember { Animatable(0f) }
     val shownText = remember { androidx.compose.runtime.mutableStateOf(c) }
     LaunchedEffect(c.text) {
-        if (!turnable || shownText.value.text == c.text) {
+        if (shownText.value.text == c.text || shownText.value.other != c.text) {
             shownText.value = c
             return@LaunchedEffect
         }
@@ -1257,16 +1266,20 @@ private fun CalSheet(
             T(f.date, Type.heading, Modifier.weight(1f), p.paperInk, balance = true)
             Stamp(f.stamp)
         }
-        M(f.text, Type.body, color = p.paperInk)
-        if (f.hanging) {
+        Box {
+            M(f.text, Type.body, color = p.paperInk)
+            // the other side, unseen, keeps the sheet as tall as its taller side, so turning it moves nothing below
+            if (f.other != null) M(f.other, Type.body, Modifier.alpha(0f).clearAndSetSemantics {}, p.paperInk)
+        }
+        if (f.foot != null) {
             Row(
                 Modifier.padding(top = Space.s3),
                 horizontalArrangement = Arrangement.spacedBy(Space.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Ink(p.paperMuted) {
-                    Icon("down", size = Size.iconS)
-                    T("Zum Abreißen tippen", Type.smallStrong)
+                    Icon(if (f.action == "tear") "down" else "repeat", size = Size.iconS)
+                    T(f.foot, Type.smallStrong)
                 }
             }
         }

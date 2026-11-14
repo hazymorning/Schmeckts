@@ -603,13 +603,16 @@ class Actions(
         if (!ui.hosted || ui.reduced) ui.update() else ui.home.tearing = true
     }
 
-    // today's Stimmt’s? turns over and back
+    // the flip sheet on top turns over and back, the one left hanging too, so a missed answer is not torn off unseen
     private fun turnSheet() {
+        val now = Time.now()
         val sheet =
             de.schmeckts.app.views
-                .sheetOn(Time.now())
-                .sheet
-        if (sheet.back == null) return // only a Stimmt’s? has a back
+                .sheetOn(
+                    de.schmeckts.app.views
+                        .hangingDay(prefs.sheetDay, now) ?: now,
+                ).sheet
+        if (sheet.back == null) return
         ui.home.turned = if (ui.home.turned == sheet.id) null else sheet.id
         haptic()
         ui.update()
