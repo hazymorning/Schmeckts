@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
@@ -2125,6 +2126,54 @@ class UiCalendarTest : ScreenTest() {
         act("calendar")
         act("settings-back")
         check(off && tags("sec-cal").size == 1, "its switch in the settings takes it away and back")
+    }
+
+    @Test
+    fun `calendar - a Stimmt's or Warum left hanging turns to its answer before it is torn off, so no answer is lost`() {
+        open(now = at("2026-10-02T12:00")) // a Friday, the calendar's first day on this phone
+        act("demo")
+        val friday = back(clock)
+        tap("Auflösung zeigen")
+        val answered = cal("${friday.verdict}.") && labelled("Frage zeigen")
+        tap("Frage zeigen")
+        check(
+            cal("WARUM?") && answered && !cal("${friday.verdict}.") && labelled("Auflösung zeigen"),
+            "today’s Warum? turns to its answer and back to the question",
+        )
+        day("2026-10-03T08:00") // Saturday, the answer not looked at
+        check(
+            cal("Freitag, 2. Oktober") && cal("Zum Umdrehen tippen") && !labelled("Gestriges Blatt abreißen"),
+            "yesterday’s Warum? hangs with its question, a tap turns it",
+        )
+        tap("Auflösung zeigen")
+        check(
+            cal("Freitag, 2. Oktober") &&
+                cal("${friday.verdict}.") &&
+                cal("Zum Abreißen tippen") &&
+                labelled("Gestriges Blatt abreißen"),
+            "its answer, still hanging, now to be torn off",
+        )
+        tap("Gestriges Blatt abreißen")
+        check(!cal("Freitag, 2. Oktober") && prefs.sheetDay == "2026-10-03", "then it comes off")
+    }
+
+    @Test
+    fun `calendar - turning a sheet keeps its height, so nothing below it moves`() {
+        open(now = at("2026-09-29T12:00")) // a Tuesday
+        act("demo")
+        val tuesday = back(clock)
+
+        fun height() =
+            rule
+                .onNode(hasTestTag("sec-cal"), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val front = height()
+        act("turn")
+        check(
+            tuesday.back!!.length > tuesday.text.length + 43 && cal("${tuesday.verdict}.") && height() == front,
+            "an answer a line longer than its claim, the sheet as tall as before: $front, ${height()}",
+        )
     }
 
     @Test
