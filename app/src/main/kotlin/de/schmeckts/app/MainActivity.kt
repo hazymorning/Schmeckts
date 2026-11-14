@@ -17,6 +17,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
@@ -30,6 +31,7 @@ import de.schmeckts.app.ui.SheetHost
 import de.schmeckts.app.ui.ToastHost
 import de.schmeckts.app.ui.ViewerHost
 import de.schmeckts.app.ui.isDark
+import de.schmeckts.app.ui.isPage
 import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.views.HomeScreen
 import de.schmeckts.app.views.SheetView
@@ -89,7 +91,14 @@ fun AppScreen(main: Main) {
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                HomeScreen()
+                // under a page the home page steps aside, and the back gesture draws it back in
+                Box(
+                    Modifier.graphicsLayer {
+                        val l = ui.sheets.base
+                        translationX =
+                            if (still || !isPage(l.state)) 0f else -size.width / 4 * (l.shown.value * (1f - l.back)).coerceIn(0f, 1f)
+                    },
+                ) { HomeScreen() }
                 SheetHost(ui.sheets, ui.sheets.base) { SheetView(it) }
                 SheetHost(ui.sheets, ui.sheets.over) { SheetView(it) }
                 ToastHost(ui.toasts, ui.sheets.anyOpen()) { ui.haptic(it) }

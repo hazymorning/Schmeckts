@@ -7,6 +7,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
@@ -416,5 +417,47 @@ class UiSheetSizeTest : ScreenTest() {
         idle(1000)
         val after = top()
         check(after > before && between > before && between < after, "the top moves down in steps, not at once $before $between $after")
+    }
+}
+
+class UiHomeAsideTest : ScreenTest() {
+    // where the home page's first section starts on screen
+    private fun x() =
+        rule
+            .onAllNodes(hasTestTag("sec-" + tags("sec-").first()), useUnmergedTree = true)[0]
+            .fetchSemanticsNode()
+            .positionInRoot.x
+
+    @Test
+    fun `home - steps aside under a page and comes back with the back gesture`() {
+        open(reduce = false)
+        act("demo")
+        idle(1000)
+        val w =
+            rule
+                .onRoot()
+                .fetchSemanticsNode()
+                .size.width
+        val rest = x()
+        act("open-settings")
+        idle(600)
+        val aside = x() - rest
+        val d = rule.activity.onBackPressedDispatcher
+        rule.mainClock.autoAdvance = false
+        rule.runOnUiThread {
+            d.dispatchOnBackStarted(BackEventCompat(0f, 400f, 0f, BackEventCompat.EDGE_LEFT))
+            d.dispatchOnBackProgressed(BackEventCompat(200f, 400f, 0.5f, BackEventCompat.EDGE_LEFT))
+        }
+        repeat(2) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        val drawn = x() - rest
+        rule.runOnUiThread { d.onBackPressed() }
+        rule.mainClock.autoAdvance = true
+        idle(600)
+        check(sheet == null && x() == rest, "the page gone, home is back in place")
+        check(aside < -w / 4f + 2f && aside > -w / 4f - 2f, "under the page home lies a quarter aside $aside")
+        check(drawn > aside && drawn < 0f, "the back gesture draws it part of the way back $drawn")
     }
 }

@@ -142,6 +142,7 @@ fun isPage(state: SheetState?) = state?.kind in PAGES
 
 class Layer {
     var state by mutableStateOf<SheetState?>(null)
+    val shown = Animatable(0f) // how far it has come in
     var key = ""
     var depth = 0 // levels back leads through before it closes
     var pageKeys = listOf<String>() // what openPage() added to the state, removed on the way back
@@ -359,7 +360,7 @@ fun SheetHost(
     val state = layer.state
     val closing = layer.closing
     val still = reduceMotion
-    val shown = remember { Animatable(0f) }
+    val shown = layer.shown
     DisposableEffect(layer) {
         layer.hosted = true
         onDispose { layer.hosted = false }
@@ -410,8 +411,10 @@ fun SheetHost(
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = (shown.value - layer.drag / layer.sheetHeight).coerceIn(0f, 1f) }
-                .background(colors.backdrop)
+                .graphicsLayer {
+                    val lit = shown.value - layer.drag / layer.sheetHeight
+                    alpha = (if (page) lit * (1f - 0.5f * layer.back) else lit).coerceIn(0f, 1f)
+                }.background(colors.backdrop)
                 .clickable(remember { MutableInteractionSource() }, null) { if (closing == null) sheets.closeSheet() },
         )
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
