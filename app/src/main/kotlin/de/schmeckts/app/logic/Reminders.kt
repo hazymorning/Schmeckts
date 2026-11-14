@@ -130,16 +130,23 @@ class Reminders(
         redraw: Boolean = true,
     ) {
         ph.store.hideHint(REMIND_ASKED) // chosen, so the home page need not ask
+        val was = prefs.remind > 0
         val ok = allowed(minutes > 0, "remind")
         prefs.remind = if (ok) tidyRemind(minutes.toDouble()) else 0
         if (prefs.remind > 0) lastStep = prefs.remind
         savePrefs()
         syncReminders()
+        if (!ok) {
+            haptic("reject")
+        } else if (redraw && was != prefs.remind > 0) {
+            haptic(if (prefs.remind > 0) "on" else "off")
+        }
         if (redraw || !ok) renderSheet() // a full redraw would interrupt typing in the hours field
     }
 
     suspend fun setFeedRemind(on: Boolean) {
         prefs.feedRemind = on && allowed(true, "feed")
+        if (on && !prefs.feedRemind) haptic("reject") else haptic(if (on) "on" else "off")
         savePrefs()
         syncReminders()
         renderSheet()

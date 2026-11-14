@@ -70,7 +70,8 @@ class Observations(
     /** several pets mean it is unclear which one it was */
     fun toggleObservationPet(pid: String) {
         val o = d.getObservation(sheet?.id) ?: return
-        if (o.pets.containsKey(pid)) {
+        val added = !o.pets.containsKey(pid)
+        if (!added) {
             if (o.pets.size == 1) {
                 toast("Mindestens eine Katze muss dabei sein.")
                 return
@@ -80,7 +81,7 @@ class Observations(
             o["pets"] = JsonObject(o.pets + (pid to JsonPrimitive(true)))
         }
         save()
-        haptic("select")
+        haptic(if (added) "on" else "off")
         renderSheet()
         update()
     }

@@ -106,8 +106,8 @@ class Editing(
     ) {
         val s = sheet ?: return
         if (field != "brand" && field != "variety") return
-        haptic("select")
         s[field] = if (hasLine(s.str(field), line)) "" else line
+        haptic(if (s.str(field) == line) "on" else "off")
         if (s.str(field).isNotEmpty()) s["error"] = ""
         renderSheet()
     }

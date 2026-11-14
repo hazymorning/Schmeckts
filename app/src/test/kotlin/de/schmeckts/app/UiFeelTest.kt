@@ -174,3 +174,46 @@ class UiCameraKeyTest : ScreenTest() {
         check(!ui.camera.open && !volume(), "closed: the key is left to the phone")
     }
 }
+
+class UiSwitchFeelTest : ScreenTest() {
+    private fun felt(action: () -> Unit): List<Any?> {
+        platform.calls.clear()
+        action()
+        idle(400)
+        return calls("haptic")
+    }
+
+    @Test
+    fun `haptic - switches feel on or off, a choice only when it changes, moving around not at all`() {
+        open()
+        act("demo")
+        act("open-settings")
+        idle(400)
+        val lookup =
+            felt {
+                act("lookup")
+                act("lookup")
+            }
+        check(lookup == listOf("on", "off") && !prefs.lookup, "on, then off $lookup")
+        val same = felt { act("theme", "v" to prefs.theme) }
+        val other = felt { act("theme", "v" to if (prefs.theme == "dark") "light" else "dark") }
+        check(same.isEmpty() && other == listOf("tap"), "the theme already chosen: nothing; another: a tap $same $other")
+        val around =
+            felt {
+                act("settings-page", "v" to "backup")
+                idle(400)
+                act("settings-back")
+                idle(400)
+                act("settings-page", "v" to "backup")
+                idle(400)
+                back()
+            }
+        check(around.isEmpty() && sheet?.page == null, "to Backup and back: nothing $around")
+        platform.notifications.answer = "denied"
+        val refused = felt { act("remind-on") }
+        check(refused == listOf("reject") && prefs.remind == 0, "notifications refused: a no, and the switch stays off $refused")
+        platform.notifications.answer = "granted"
+        val allowed = felt { act("remind-on") }
+        check(allowed == listOf("on") && prefs.remind > 0, "allowed: on $allowed")
+    }
+}

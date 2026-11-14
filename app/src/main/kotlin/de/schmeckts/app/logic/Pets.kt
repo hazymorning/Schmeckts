@@ -125,14 +125,14 @@ class Pets(
         if (!known) list.add(nick)
         s["nick"] = ""
         if (quiet) return
-        haptic("select")
+        haptic("on")
         renderSheet()
     }
 
     fun dropNick(nick: String) {
         val s = sheet ?: return
         s["nicknames"] = nicks(s).filter { it != nick }.toMutableList()
-        haptic("select")
+        haptic("off")
         renderSheet()
     }
 
