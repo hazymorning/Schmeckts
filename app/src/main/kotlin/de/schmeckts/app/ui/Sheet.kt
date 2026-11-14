@@ -757,8 +757,8 @@ fun SheetBody(
             Column(
                 Modifier
                     .weight(1f)
-                    .verticalScroll(scroll)
                     .imePadding()
+                    .verticalScroll(scroll)
                     .padding(horizontal = Space.gutter),
             ) {
                 M(
@@ -776,11 +776,11 @@ fun SheetBody(
             }
         }
     } else {
-        // the content's own height glides, the keyboard's room follows the keyboard
+        // the content's own height glides, the keyboard's room follows the keyboard and keeps the field in view above it
         Column(
             Modifier
-                .verticalScroll(scroll)
                 .imePadding()
+                .verticalScroll(scroll)
                 .then(
                     if (reduceMotion) {
                         Modifier

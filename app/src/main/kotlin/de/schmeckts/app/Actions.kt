@@ -216,6 +216,7 @@ class Actions(
                 } else {
                     ui.sheets.openSheet(SheetState("pet", *petState(null)))
                 }
+                ui.focus("f-name")
             },
             "edit-pet" to { x -> l.pets.openPet(x["id"] ?: "", true) },
             "open-pet" to { x -> l.pets.openPet(x["id"] ?: "") },
@@ -266,8 +267,10 @@ class Actions(
             },
             "scan" to { _ -> launch { l.scan.scan() } },
             "photo" to { _ -> launch { l.feeding.shootPhoto("", if (sheet?.kind == "feed") sheet!!.str("code") else "") } },
-            "new-product" to
-                { x -> ui.sheets.openSheet(SheetState("new", "brand" to "", "variety" to (x["v"] ?: ""), "type" to "Nassfutter")) },
+            "new-product" to { x ->
+                ui.sheets.openSheet(SheetState("new", "brand" to "", "variety" to (x["v"] ?: ""), "type" to "Nassfutter"))
+                ui.focus("f-brand")
+            },
             "rate" to { x -> l.rating.rate(x["s"] ?: "", x["p"] ?: "", x["r"] ?: "") },
             // a photo found nowhere is let go, and so is a sharedPhoto mark the server cannot back up
             "view-photo" to { x -> launch { viewPhoto(x["s"] ?: "", x["p"] ?: "") } },

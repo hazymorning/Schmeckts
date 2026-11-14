@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.activity.BackEventCompat
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
@@ -11,13 +12,18 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import de.schmeckts.app.ui.SheetState
 import org.junit.Test
 import org.robolectric.Shadows.shadowOf
@@ -480,9 +486,8 @@ class UiTypingTest : ScreenTest() {
     fun `typing - a note, the name and the hours keep every key, a value set from elsewhere still shows`() {
         val now = at("2025-06-17T12:00")
         open(mapOf("prefs" to j(mapOf("remind" to 300))), now)
-        phone.store.replaceDb(
-            dbRaw(dbOf(listOf(pet(M)), listOf(product("lachs00001")), listOf(meal("meal000001", "lachs00001", now - 3_600_000, mapOf(M to "gut"))))),
-        )
+        val meals = listOf(meal("meal000001", "lachs00001", now - 3_600_000, mapOf(M to "gut")))
+        phone.store.replaceDb(dbRaw(dbOf(listOf(pet(M)), listOf(product("lachs00001")), meals)))
         phone.store.save()
         act("open-serving", "id" to "meal000001")
         keys("Notiz", "n", "e", "u")
@@ -498,13 +503,93 @@ class UiTypingTest : ScreenTest() {
         idle(10)
         keys("Stunden, 1 bis 24", "1", "2")
         idle(100)
-        check(fieldText("Stunden, 1 bis 24") == "12" && prefs.remind == 720, "the hours too ${fieldText("Stunden, 1 bis 24")} ${prefs.remind}")
+        check(
+            fieldText("Stunden, 1 bis 24") == "12" && prefs.remind == 720,
+            "the hours too ${fieldText("Stunden, 1 bis 24")} ${prefs.remind}",
+        )
         act("close")
         idle(400)
         act("new-product")
         keys("Marke", "S", "h")
         act("pack-line", "field" to "brand", "v" to "Sheba")
         check(fieldText("Marke") == "Sheba", "a value set from elsewhere replaces what was typed ${fieldText("Marke")}")
+    }
+}
+
+class UiKeyboardTest : ScreenTest() {
+    private fun field(label: String) = rule.onAllNodes(hasContentDescription(label) and hasSetTextAction())[0]
+
+    private fun focused() =
+        rule
+            .onAllNodes(hasSetTextAction() and isFocused())
+            .fetchSemanticsNodes()
+            .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }?.first() }
+
+    // the keyboard as the system reports it to the screen, dp high
+    private fun keyboard(dp: Int) {
+        val px = (dp * rule.density.density).toInt()
+        rule.runOnUiThread {
+            val content = rule.activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+            val view = (content.getChildAt(0) as android.view.ViewGroup).getChildAt(0)
+            val ime = WindowInsetsCompat.Type.ime()
+            ViewCompat.dispatchApplyWindowInsets(
+                view,
+                WindowInsetsCompat
+                    .Builder()
+                    .setInsets(ime, Insets.of(0, 0, 0, px))
+                    .setVisible(ime, dp > 0)
+                    .build(),
+            )
+        }
+        idle(100)
+    }
+
+    // how far above the screen's bottom the field ends, in dp
+    private fun above(label: String): Float {
+        val root =
+            rule
+                .onRoot()
+                .fetchSemanticsNode()
+                .size.height
+        return (root - field(label).fetchSemanticsNode().boundsInRoot.bottom) / rule.density.density
+    }
+
+    @Test
+    fun `keyboard - the field typed in stays above it, a new variety and a new cat start typing`() {
+        open()
+        act("demo")
+        act("open-settings")
+        ui.focus("f-me")
+        idle()
+        keyboard(300)
+        idle(400)
+        val page = above("Dein Name")
+        keyboard(0)
+        act("close")
+        idle(400)
+        act("open-serving", "id" to db.servings[0].id)
+        field("Notiz").performClick()
+        idle()
+        keyboard(300)
+        idle(400)
+        val sheet = above("Notiz")
+        keyboard(0)
+        check(page >= 300f && sheet >= 300f, "on a page and in a sheet the field moves up over the keyboard $page $sheet")
+        act("close")
+        idle(400)
+        act("new-product")
+        val brand = focused()
+        act("close")
+        idle(400)
+        act("add-pet")
+        val cat = focused()
+        act("close")
+        idle(400)
+        act("open-pet", "id" to db.pets[0].id)
+        check(
+            brand == listOf("Marke") && cat == listOf("Name") && focused().isEmpty(),
+            "where typing is the point the keyboard comes $brand $cat",
+        )
     }
 }
 
