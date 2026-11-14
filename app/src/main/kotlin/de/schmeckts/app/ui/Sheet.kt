@@ -9,7 +9,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animate
@@ -323,6 +322,7 @@ class Sheets(
     internal fun shut(l: Layer) {
         shutAt = android.os.SystemClock.uptimeMillis()
         l.onClosed = null
+        l.settle?.cancel()
         l.open = false
         l.state = null
         l.key = ""
@@ -369,13 +369,8 @@ fun SheetHost(
         if (layer.open && closing == null) {
             if (still) shown.snapTo(1f) else shown.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut))
         } else if (closing != null) {
-            val all = layer.sheetHeight
-            if (!still && layer.flung > 0f && all < Float.MAX_VALUE) {
-                // on at the finger's speed, so a flicked sheet does not stop before it falls
-                shown.animateTo(0f, tween((all / layer.flung * 1000).toInt().coerceIn(120, Motion.STEP), easing = LinearEasing))
-            } else if (!still) {
-                shown.animateTo(0f, tween(Motion.STEP, easing = Motion.easeIn))
-            }
+            if (layer.flung > 0f) layer.settle?.join() // release() carries a flicked sheet off
+            if (!still && layer.drag < layer.sheetHeight) shown.animateTo(0f, tween(Motion.STEP, easing = Motion.easeIn))
             shown.snapTo(0f)
             layer.onClosed?.invoke()
         } else {
@@ -537,6 +532,12 @@ internal suspend fun Layer.release(
     if (held != level && v / density.density > -300 && drag > minOf(24 * density.density, at) && drag + v * 0.15f > at) {
         flung = maxOf(0f, v)
         sheets.closeSheet()
+        val way = sheetHeight - drag
+        if (still || flung == 0f || closing == null || way <= 0f) return
+        // on from the finger's speed, quicker if that was slow, so the sheet neither stops nor lingers before it is gone
+        val ms = (way / flung * 1000).toInt().coerceAtMost(Motion.STEP)
+        val s = flung * ms / 1000 / way
+        animate(drag, sheetHeight, 0f, tween(ms, easing = { u -> s * u + (1 - s) * u * u })) { x, _ -> drag = x }
     } else if (still) {
         drag = 0f
     } else {

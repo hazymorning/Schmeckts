@@ -3,7 +3,9 @@ package de.schmeckts.app
 import android.os.Looper
 import androidx.activity.BackEventCompat
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -81,6 +83,22 @@ class UiSheetPullTest : ScreenTest() {
     }
 
     private fun start() = area().let { Offset(it.center.x, it.top + it.height / 3) }
+
+    // how bright the screen is drawn above where a sheet's top rests
+    private fun shade(): Float {
+        val d = rule.density.density
+        val img = rule.onRoot().captureToImage().asAndroidBitmap()
+        var sum = 0f
+        var n = 0
+        for (y in (60 * d).toInt() until (200 * d).toInt() step 6) {
+            for (x in 0 until img.width step 6) {
+                val c = img.getPixel(x, y)
+                sum += android.graphics.Color.red(c) + android.graphics.Color.green(c) + android.graphics.Color.blue(c)
+                n++
+            }
+        }
+        return sum / n
+    }
 
     @Test
     fun `sheet - pulled down anywhere it closes, a short pull springs back`() {
@@ -188,24 +206,43 @@ class UiSheetPullTest : ScreenTest() {
         val d = rule.density.density
         val from = start()
         rule.mainClock.autoAdvance = false
+        val rest = area().top
+        val height = ui.sheets.base.sheetHeight
+        val dim = shade()
         rule.onRoot().performTouchInput { swipe(from, from + Offset(0f, 60 * d), 60) }
-        val top = area().top
-        var ms = 0L
-
-        fun frames(until: Long) {
-            while (ms < until) {
-                rule.mainClock.advanceTimeByFrame()
-                shadowOf(Looper.getMainLooper()).idle()
-                ms += 16
-            }
+        // the sheet's top frame by frame until it is gone, and every few frames how much of it is on screen and how dim
+        val tops = mutableListOf(area().top)
+        val dims = mutableListOf<Pair<Float, Float>>()
+        while (sheet != null && tops.size < 60) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+            if (sheet == null) break
+            tops += area().top
+            if (tops.size % 3 == 0) dims += (1 - (tops.last() - rest) / height) to shade()
         }
-        frames(50)
-        val moved = (area().top - top) / d
-        frames(350)
-        val gone = sheet == null
         rule.mainClock.autoAdvance = true
         idle(100)
-        check(moved >= 8f && gone, "no stop once the finger lets go: $moved dp in 50 ms, gone at once")
+        val clear = shade()
+        val speeds = tops.zipWithNext { a, b -> (b - a) / d * 1000 / 16 }
+        val still = speeds.indexOfFirst { it > 0f }
+        check(still in 0..1 && speeds[still] in 700f..1300f, "it goes on at once at the finger's 1000 dp/s $still $speeds")
+        check(sheet == null && speeds.size < 25, "and is gone soon ${speeds.size}")
+        val off = dims.filter { it.first in 0.1f..0.9f }.map { (share, s) -> share - (clear - s) / (clear - dim) }
+        check(off.size >= 2 && off.all { kotlin.math.abs(it) < 0.1f }, "the dimming goes as the sheet does $off")
+        act("feed")
+        idle(600)
+        pullTo(start(), 150f)
+        rule.mainClock.autoAdvance = false
+        lift(10f, 100)
+        var frames = 0
+        while (sheet != null && frames < 60) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+            frames++
+        }
+        rule.mainClock.autoAdvance = true
+        idle(100)
+        check(frames < 25, "let go slowly far down, it does not linger $frames")
         act("feed")
         idle(600)
         pull(40f)
