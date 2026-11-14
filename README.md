@@ -17,7 +17,7 @@ Ein Futtertagebuch für Katzen hält allerdings niemand im Alltag durch, außer 
 - Ans Füttern und ans Bewerten erinnert sie auf Wunsch auch.
 - Mehrere Katzen oder mehrere Leute, die füttern, sind kein Problem.
 - Neue Versionen findet die App selbst und installiert sie auf einen Tipp.
-- Und jeden Tag gibt es ein Blatt vom Katzenkalender, freitags mit Flachwitz.
+- Und jeden Tag gibt es ein Blatt vom Katzenkalender, freitags mit einer Frage zum Raten.
 
 Weil Mau bekanntlich sehr auf ihre Privatsphäre achtet, bleibt bei Schmeckt’s? alles auf deinem Handy.
 

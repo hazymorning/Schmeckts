@@ -16,7 +16,7 @@ import java.util.TimeZone
 // The cat calendar's turn of sheets and what the overview card and the calendar share; the texts are in content/
 
 // Sunday first, as getDay() counts
-val WEEK = listOf("Wissen", "Katzenlogik", "Stimmt’s?", "Kurios", "Wissen", "Flachwitz", "Sprache")
+val WEEK = listOf("Wissen", "Katzenlogik", "Stimmt’s?", "Kurios", "Tipp", "Warum?", "Sprache")
 
 // mixed once with a fixed seed, the same order on every phone
 private fun shuffled(
