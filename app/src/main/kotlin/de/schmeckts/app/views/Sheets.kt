@@ -139,7 +139,7 @@ fun SheetView(state: SheetState) {
         "new" -> NameView(state)
         "product" -> ProductView(state)
         "pet" -> PetView(state)
-        "settings" -> if (state.page == "pet") PetView(state) else SettingsView()
+        "settings" -> if (state.page == "pet") PetView(state) else SettingsView(state)
         "report" -> ReportView(state)
         // insights and shopping list are levels of the evaluation, so back returns there
         "evaluation" ->

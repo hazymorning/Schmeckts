@@ -266,3 +266,31 @@ class UiResultFeelTest : ScreenTest() {
         check(reminder.isEmpty() && r == "gut", "rated from the reminder: nothing in the app $reminder")
     }
 }
+
+class UiSettingsSlideTest : ScreenTest() {
+    private fun halfway(action: () -> Unit): Pair<Boolean, Boolean> {
+        rule.mainClock.autoAdvance = false
+        action()
+        androidx.compose.runtime.snapshots.Snapshot
+            .sendApplyNotifications()
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeBy(de.schmeckts.app.ui.Motion.STEP / 2L)
+        val both = shows("Dein Name") to shows("Mit Haushalt verbinden")
+        rule.mainClock.autoAdvance = true
+        idle(1000)
+        return both
+    }
+
+    @Test
+    fun `settings - a sub-page slides in over the overview, and back, each drawn as itself`() {
+        open(reduce = false)
+        act("open-settings")
+        idle(1000)
+        val there = halfway { ui.act("settings-page", "v" to "house") }
+        check(there == (true to true), "on the way to Haushalt both pages show $there")
+        check(!shows("Dein Name") && shows("Mit Haushalt verbinden"), "then only Haushalt")
+        val back = halfway { ui.act("settings-back") }
+        check(back == (true to true), "on the way back both pages show $back")
+        check(shows("Dein Name") && !shows("Mit Haushalt verbinden"), "then only the overview")
+    }
+}
