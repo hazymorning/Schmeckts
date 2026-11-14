@@ -1745,9 +1745,9 @@ class SmartTest {
         assertEquals(
             "from the 14th of May, the first rating on the 19th; the cat's share 4 of 7 pulls each variety's expectation",
             listOf(
-                listOf(at("2026-05-14"), 1, 0, 0.381, emptyMap<String, Int>()),
-                listOf(at("2026-05-21"), 3, 2, 1.638, mapOf("happy" to 2)),
-                listOf(at("2026-05-28"), 3, 2, 2.357, mapOf("tired" to 1)),
+                listOf(at("2026-05-14"), 1, 0, 0.457, emptyMap<String, Int>()),
+                listOf(at("2026-05-21"), 3, 2, 1.682, mapOf("happy" to 2)),
+                listOf(at("2026-05-28"), 3, 2, 2.143, mapOf("tired" to 1)),
             ),
             weeks.map { listOf(it.from, it.n, it.good, Math.round(it.expected * 1000) / 1000.0, it.seen) },
         )
@@ -1773,7 +1773,7 @@ class SmartTest {
     ) = Block(0, 0, n, good, 0, 0, n - good, expected, vary, emptyMap())
 
     @Test
-    fun `appetite on Vorlieben - the home alarm, a clear trend, the newest week worse at 2_25, better or older at 3_5, else calm`() {
+    fun `appetite on Vorlieben - the home alarm, a clear trend, the newest week worse at 2_25, better at 3_5, else calm`() {
         val m = model(house(listOf("A"), listOf("p1"), emptyList()))
         val calm = block(10, 6, 6.0, 2.4)
 
@@ -1786,12 +1786,11 @@ class SmartTest {
         assertEquals("2.2 is not", listOf("unauffaellig", 0), state(listOf(calm, block(10, 2, 5.5, 2.56))))
         assertEquals("a better week needs 3.5", listOf("unauffaellig", 0), state(listOf(calm, block(10, 10, 5.2, 2.56))))
         assertEquals(listOf("zuletzt-besser", 1), state(listOf(calm, block(10, 10, 4.2, 2.56))))
-        assertEquals("so does an older one", listOf("unauffaellig", 0), state(listOf(block(10, 1, 6.0, 2.56), calm)))
-        assertEquals(listOf("wieder", -1), state(listOf(block(10, 0, 6.0, 2.4), calm)))
+        assertEquals("an older week is not judged", listOf("unauffaellig", 0), state(listOf(block(10, 0, 6.0, 2.4), calm)))
         assertEquals(
-            "6 of 20 under what was expected is enough, 5 of 20 is not, however far beyond chance",
+            "7 of 20 under what was expected is enough, 6 of 20 is not, however far beyond chance",
             listOf(listOf("zuletzt-schwaecher", -1), listOf("unauffaellig", 0)),
-            listOf(state(listOf(calm, block(20, 8, 14.0, 2.0))), state(listOf(calm, block(20, 9, 14.0, 2.0)))),
+            listOf(state(listOf(calm, block(20, 7, 14.0, 2.0))), state(listOf(calm, block(20, 8, 14.0, 2.0)))),
         )
         assertEquals("a week of four is not judged", null, state(listOf(block(4, 0, 3.0, 0.5), block(10, 1, 6.0, 2.4))))
         assertEquals(null, state(emptyList()))
