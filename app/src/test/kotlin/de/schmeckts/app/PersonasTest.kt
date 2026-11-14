@@ -243,7 +243,7 @@ class PersonasTest {
     @Test
     fun `notes that come at random - after two months at most one household in ten sees one tied to a variety`() {
         var tied = 0
-        for (i in 1..houses) if (observed(noted(i * 7919L), listOf("cat"), now).links.isNotEmpty()) tied++
+        for (i in 1..houses) if (observed(noted(i * 7919L), listOf("cat"), now).isNotEmpty()) tied++
         assertTrue("$tied of $houses", tied.toDouble() / houses <= 0.1)
     }
 
@@ -251,7 +251,7 @@ class PersonasTest {
     fun `a variety that upsets the stomach - after two months vomiting is tied to it in most households`() {
         var found = 0
         for (i in 1..houses) {
-            val links = observed(noted(i * 7919L, true), listOf("cat"), now).links
+            val links = observed(noted(i * 7919L, true), listOf("cat"), now)
             if (links.any { it.kind == "vomit" && it.id == "p3" }) found++
         }
         assertTrue("$found of $houses", found.toDouble() / houses >= 0.8)

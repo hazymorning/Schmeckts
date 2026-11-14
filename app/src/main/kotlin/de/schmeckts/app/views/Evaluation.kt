@@ -42,7 +42,6 @@ import de.schmeckts.app.pname
 import de.schmeckts.app.poorOf
 import de.schmeckts.app.ratingsIn
 import de.schmeckts.app.shopGroups
-import de.schmeckts.app.ui.Badge
 import de.schmeckts.app.ui.Card
 import de.schmeckts.app.ui.CardHead
 import de.schmeckts.app.ui.CardTitle
@@ -62,7 +61,6 @@ import de.schmeckts.app.ui.Type
 import de.schmeckts.app.ui.colors
 import de.schmeckts.app.ui.tone
 import de.schmeckts.app.ui.watch
-import de.schmeckts.app.whenStr
 
 // Evaluation card and page. The analysis is in Smart.kt, this only words it
 
@@ -571,7 +569,7 @@ private fun Portrait(
     }
 }
 
-// x.moves.fresh: varieties that came onto their side within the last 30 days; place: 0 for the only one
+// place: 0 for the only one
 @Composable
 private fun PlaceRow(
     m: Model,
@@ -586,20 +584,16 @@ private fun PlaceRow(
     val p = e.product
     val brand = brandOf(p)
     val said = markupless(ph.saidOf(e, side))
-    val fresh = e.id in x.moves.fresh
     val now = Time.now()
     val at = if (side == "top") x.last[e.id] ?: 0L else 0L
     val away = if (at > 0 && now - at >= AWAY) "zuletzt vor ${lapse(at, now)}" else ""
     val label =
         "${if (place > 0) "Platz $place: " else ""}${pname(p)}${if (brand.isNotEmpty()) " von $brand" else ""}. $said." +
-            (if (away.isNotEmpty()) " ${cap(away)}." else "") + (if (fresh) " Neu dabei." else "")
+            (if (away.isNotEmpty()) " ${cap(away)}." else "")
     ListRow(Modifier.testTag("place-${e.id}"), onClick = ui.on("open-product", "id" to e.id), label = label) {
         Ranked(p, side, place = place)
         Column(Modifier.weight(1f)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.s2), verticalAlignment = Alignment.CenterVertically) {
-                T(pname(p), Type.bodyStrong, Modifier.weight(1f, fill = false), maxLines = 2)
-                if (fresh) Badge("neu")
-            }
+            T(pname(p), Type.bodyStrong, maxLines = 2)
             T(
                 cap(listOf(brand, lower(said), away).filter { it.isNotEmpty() }.joinToString(", ")),
                 Type.small,
@@ -761,28 +755,13 @@ private fun TrendCard(
     }
 }
 
-private val OFTEN = "ein zwei drei vier fünf sechs sieben acht neun zehn elf zwölf".split(" ")
-
-private fun often(n: Int) = OFTEN.getOrNull(n - 1)?.let { it + "mal" } ?: "$n Mal"
-
 @Composable
 private fun ObservedCard(x: Evaluation) {
     watch()
     val ph = LocalUi.current.phone
-    val o = x.observed
-    if (o.kinds.isEmpty() && o.links.isEmpty()) return
+    if (x.observed.isEmpty()) return
     val rows = mutableListOf<@Composable () -> Unit>()
-    for (k in o.kinds) {
-        val ob = observationOf(k.kind)
-        rows.add {
-            ToldRow(
-                { Sign(ob.icon, colors.tone(k.kind)) },
-                "${ob.label}, <b>${often(k.n)}</b> in den letzten vier Wochen.",
-                "Zuletzt ${whenStr(k.last)}${if (k.before > 0) ", in den acht Wochen davor ${often(k.before)}" else ""}.",
-            )
-        }
-    }
-    for (l in o.links) {
+    for (l in x.observed) {
         val ob = observationOf(l.kind)
         rows.add {
             ToldBtn(

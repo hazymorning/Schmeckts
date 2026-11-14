@@ -1,6 +1,5 @@
 package de.schmeckts.app
 
-import de.schmeckts.app.views.insightSaid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -369,21 +368,24 @@ class SmartTest {
         for ((text, want) in cases) assertEquals(text, want, flavoursOf(text))
     }
 
-    // Erkenntnisse as the page words them, strongest first: [kind, sentence, counts] without markup
+    // Erkenntnisse strongest first: [kind, a.key, a.good, a.n, b.key, b.good, b.n]; the meals lie within the 180 days
+    // the meal based ones look back, unless old
     private fun learned(
         db: Db,
         activePet: String = "all",
         now: Long = now0,
-    ) = insights(db, model(db, activePet, now = now), now).map {
-        val said = insightSaid(it)
-        listOf(it.kind, said.say.replace(Regex("<[^>]*>"), ""), said.why.replace(Regex("<[^>]*>"), ""))
+        old: Boolean = false,
+    ): List<List<Any?>> {
+        assertTrue("the meals lie within 180 days", old || db.servings.all { it.servedAt > now - 180 * DAY })
+        return insights(db, model(db, activePet, now = now), now).map { listOf(it.kind, it.a.key, it.a.good, it.a.n, it.b.key, it.b.good, it.b.n) }
     }
 
     private fun learnedOf(
         kind: String,
         db: Db,
         activePet: String = "all",
-    ) = learned(db, activePet).filter { it[0] == kind }.map { it.drop(1) }
+        old: Boolean = false,
+    ) = learned(db, activePet, old = old).filter { it[0] == kind }.map { it.drop(1) }
 
     private val four =
         listOf(
@@ -400,13 +402,7 @@ class SmartTest {
     fun `Erkenntnisse by brand and consistency - wet food, a group against the rest, two varieties rated twice a group`() {
         assertEquals(
             "a brand on the very varieties of a consistency says nothing more",
-            listOf(
-                listOf(
-                    "konsistenz",
-                    "Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.",
-                    "Stückchen in Soße 6 von 6 Mal gut gefressen, Stückchen in Gelee 0 von 6 Mal.",
-                ),
-            ),
+            listOf(listOf("konsistenz", "sosse", 6, 6, "gelee", 0, 6)),
             groupsOf(
                 house(
                     listOf("A"),
@@ -429,18 +425,12 @@ class SmartTest {
         fun brands(left: List<String>) =
             rate("a", "A", listOf(t, t, t)) + rate("b", "A", listOf(t, g, t)) + left.flatMap { rate(it, "A", listOf(x, s, x)) }
         assertEquals(
-            listOf("marke", "Bisher kommt Sheba besser an als Felix.", "Sheba 6 von 6 Mal gut gefressen, Felix 0 von 6 Mal."),
+            listOf("marke", "Sheba", 6, 6, "Felix", 0, 6),
             groupsOf(house(listOf("A"), mixed.take(4), brands(listOf("c", "d"))))[0],
         )
         assertEquals(
-            "the rest is named where it is one brand",
-            listOf(
-                listOf(
-                    "marke",
-                    "Bisher kommt Sheba besser an als andere Marken.",
-                    "Sheba 6 von 6 Mal gut gefressen, andere Marken 0 von 12 Mal.",
-                ),
-            ),
+            "the rest is named where it is one brand, and not where it is several",
+            listOf(listOf("marke", "Sheba", 6, 6, null, 0, 12)),
             groupsOf(house(listOf("A"), mixed, brands(listOf("c", "d", "e", "f")))),
         )
         val real =
@@ -455,13 +445,7 @@ class SmartTest {
             )
         assertEquals(
             "what does not go down well is said too, against food whose consistency is not known; the brand without sauce says the same",
-            listOf(
-                listOf(
-                    "konsistenz",
-                    "Bisher kommt Stückchen in Soße schlechter an als anderes Nassfutter.",
-                    "Stückchen in Soße 1 von 10 Mal gut gefressen, anderes Nassfutter 8 von 9 Mal.",
-                ),
-            ),
+            listOf(listOf("konsistenz", "sosse", 1, 10, null, 8, 9)),
             groupsOf(
                 house(
                     listOf("A"),
@@ -474,7 +458,7 @@ class SmartTest {
         )
         assertEquals(
             "four against four, one of them good: so few meals can fall that way by chance",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             groupsOf(
                 house(
                     listOf("A"),
@@ -486,21 +470,15 @@ class SmartTest {
         )
         assertEquals(
             "one variety a group: that is a verdict, not an insight",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             groupsOf(house(listOf("A"), listOf(four[0], four[2]), rate("a", "A", listOf(t, t)) + rate("c", "A", listOf(x, x)))),
         )
         val once =
             rate("a", "A", listOf(t)) + rate("b", "A", listOf(t, g, t)) + rate("c", "A", listOf(x, x, x)) + rate("d", "A", listOf(s, x, x))
-        assertEquals("a variety rated once does not make a group", emptyList<List<String>>(), groupsOf(house(listOf("A"), four, once)))
+        assertEquals("a variety rated once does not make a group", emptyList<List<Any?>>(), groupsOf(house(listOf("A"), four, once)))
         assertEquals(
             "but its rating counts in a group that has two varieties rated twice",
-            listOf(
-                listOf(
-                    "konsistenz",
-                    "Bisher kommt Stückchen in Soße besser an als Stückchen in Gelee.",
-                    "Stückchen in Soße 6 von 6 Mal gut gefressen, Stückchen in Gelee 0 von 6 Mal.",
-                ),
-            ),
+            listOf(listOf("konsistenz", "sosse", 6, 6, "gelee", 0, 6)),
             groupsOf(
                 house(
                     listOf("A"),
@@ -512,7 +490,7 @@ class SmartTest {
         val dry = four.map { it + ("type" to "Trockenfutter") }
         assertEquals(
             "dry food: no comparison",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             groupsOf(
                 house(
                     listOf("A"),
@@ -526,41 +504,6 @@ class SmartTest {
     }
 
     @Test
-    fun `Geschmacksprofil - brand, consistency and flavour of wet food with its good meals, best first, two varieties rated twice`() {
-        val db =
-            house(
-                listOf("A"),
-                four + prod("e", "brand" to "Felix", "variety" to "Rind Pastete"),
-                rate("a", "A", listOf(t, t, t)) + rate("b", "A", listOf(t, g, x)) + rate("c", "A", listOf(x, x, mi)) +
-                    rate("d", "A", listOf(g, x, x)) +
-                    rate("e", "A", listOf(x, x, x, x)),
-            )
-
-        fun of(list: List<TasteRow>) = list.map { listOf(it.key, it.good, it.n) }
-        val ta = taste(model(db))
-        assertEquals(listOf(listOf("Sheba", 5, 6), listOf("Felix", 1, 10)), of(ta.marke))
-        assertEquals(listOf(listOf("sosse", 5, 6), listOf("gelee", 1, 6)), of(ta.konsistenz))
-        assertEquals(listOf(listOf("Huhn", 3, 6), listOf("Lachs", 3, 6)), of(ta.geschmack))
-        val soft = house(listOf("A"), listOf(four[0], four[1]), rate("a", "A", listOf(t, t)) + rate("b", "A", listOf(x, x)))
-        assertEquals("one consistency alone has nothing to be set against", emptyList<TasteRow>(), taste(model(soft)).konsistenz)
-        val kinds = listOf("Huhn", "Rind", "Lachs", "Pute", "Ente", "Kalb")
-        val many =
-            house(
-                listOf("A"),
-                kinds.flatMap { listOf(prod(it + "1", "variety" to "$it in Soße"), prod(it + "2", "variety" to "$it in Gelee")) },
-                kinds.flatMapIndexed { i, k ->
-                    rate(k + "1", "A", if (i == 5) listOf(t, t) else listOf(t, t, x)) +
-                        rate(k + "2", "A", listOf(t, x))
-                },
-            )
-        assertEquals(
-            "the five most rated, the one rated least is left out however well it went",
-            listOf("Ente", "Huhn", "Lachs", "Pute", "Rind"),
-            taste(model(many)).geschmack.map { it.key },
-        )
-    }
-
-    @Test
     fun `Erkenntnisse by flavour - only against varieties of the same brand and consistency, two flavours count in both`() {
         val line =
             listOf(
@@ -570,13 +513,7 @@ class SmartTest {
                 prod("l1", "brand" to "Sheba", "variety" to "Lachs in Soße"),
             )
         assertEquals(
-            listOf(
-                listOf(
-                    "geschmack",
-                    "Bisher kommt Huhn besser an als andere Sorten derselben Marke.",
-                    "Mit Huhn 8 von 8 Mal gut gefressen, ohne 0 von 8 Mal.",
-                ),
-            ),
+            listOf(listOf("geschmack", "Huhn", 8, 8, null, 0, 8)),
             groupsOf(
                 house(
                     listOf("A"),
@@ -596,13 +533,7 @@ class SmartTest {
             )
         assertEquals(
             "chicken came mostly in sauce, and the sauce is to blame, not the chicken",
-            listOf(
-                listOf(
-                    "konsistenz",
-                    "Bisher kommt Pastete besser an als Stückchen in Soße.",
-                    "Pastete 9 von 9 Mal gut gefressen, Stückchen in Soße 0 von 6 Mal.",
-                ),
-            ),
+            listOf(listOf("konsistenz", "pastete", 9, 9, "sosse", 0, 6)),
             groupsOf(
                 house(
                     listOf("A"),
@@ -630,45 +561,44 @@ class SmartTest {
                     rate("n4", "A", listOf(x, mi, x)),
             )
         assertEquals(
-            listOf(
-                listOf(
-                    "Bisher kommt Stückchen in Gelee besser an als Pastete.",
-                    "Stückchen in Gelee 6 von 6 Mal gut gefressen, Pastete 0 von 6 Mal.",
-                ),
-            ),
+            listOf(listOf("gelee", 6, 6, "pastete", 0, 6)),
             learnedOf("konsistenz", db),
         )
     }
 
     @Test
     fun `Erkenntnisse on sauce - at least four in ten ratings of the varieties in sauce Nur Sosse, from five ratings`() {
-        fun sauce(meals: List<Meal>) =
-            learnedOf("sosse", house(listOf("A"), listOf("x") + four + prod("p", "variety" to "Rind Pastete"), meals))
+        // [only sauce, of n, the sauce's good and sauce tones, the texture to take instead with its good of n]
+        fun sauce(meals: List<Meal>): List<List<Any?>> {
+            val db = house(listOf("A"), listOf("x") + four + prod("p", "variety" to "Rind Pastete"), meals)
+            return insights(db, model(db), now0)
+                .filter { it.kind == "sosse" }
+                .map { listOf(it.k, it.n, it.a.good, it.a.sauce, it.b.key, it.b.good, it.b.n) }
+        }
         val licked = rate("a", "A", listOf(s, s, t, t, t)) + rate("b", "A", listOf(s, s, t, t, t))
-        val said = "Bei Stückchen in Soße wird oft nur die Soße geleckt."
-        assertEquals(listOf(listOf(said, "4 von 10 Mal nur die Soße.")), sauce(licked))
+        assertEquals(listOf(listOf(4, 10, 6, 4, null, 0, 0)), sauce(licked))
         assertEquals(
             "the texture that goes down well is named, not one that does not",
-            listOf(listOf(said, "4 von 10 Mal nur die Soße. Stückchen in Gelee dagegen 4 von 5 Mal gut gefressen.")),
+            listOf(listOf(4, 10, 6, 4, "gelee", 4, 5)),
             sauce(licked + rate("c", "A", listOf(t, t, x)) + rate("d", "A", listOf(t, g)) + rate("p", "A", listOf(x, x, x, x, t))),
         )
         assertEquals(
             "no texture goes down better: no advice",
-            listOf(listOf(said, "4 von 10 Mal nur die Soße.")),
+            listOf(listOf(4, 10, 6, 4, null, 0, 0)),
             sauce(
                 licked + rate("p", "A", listOf(x, x, x, x, t)),
             ),
         )
         assertEquals(
             "four ratings are too few",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             sauce(
                 rate("a", "A", listOf(s, s, t)) + rate("b", "A", listOf(s)),
             ),
         )
         assertEquals(
             "three in ten are not enough, and a variety not in sauce does not count",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             sauce(rate("a", "A", listOf(s, t, t, t, t)) + rate("b", "A", listOf(s, s, t, t, t)) + rate("x", "A", listOf(s, s))),
         )
     }
@@ -687,19 +617,17 @@ class SmartTest {
     @Test
     fun `Erkenntnisse on serving the same twice - a meal of the variety the pet had just before against one of another`() {
         fun again(meals: List<Pair<String?, String?>>) = learnedOf("wiederholung", house(listOf("A"), sortsAB, inTurn("A", meals)))
+        assertEquals(listOf(listOf(null, 0, 4, null, 5, 5)), again(again0))
+        assertEquals("three times again are too few", emptyList<List<Any?>>(), again(again0.drop(2)))
+        val old = inTurn("A", again0).map { Meal(it.p, it.rated, (it.ago as Int) + 180) }
         assertEquals(
-            listOf(
-                listOf(
-                    "Zweimal hintereinander dieselbe Sorte kommt schlechter an.",
-                    "Beim zweiten Mal 0 von 4 Mal gut gefressen, sonst 5 von 5 Mal.",
-                ),
-            ),
-            again(again0),
+            "meals older than 180 days do not count",
+            emptyList<List<Any?>>(),
+            learnedOf("wiederholung", house(listOf("A"), sortsAB, old), old = true),
         )
-        assertEquals("three times again are too few", emptyList<List<String>>(), again(again0.drop(2)))
         assertEquals(
             "the same again going down better is no help when buying or feeding",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             again(
                 again0.map { (sort, r) ->
                     sort to
@@ -745,30 +673,16 @@ class SmartTest {
 
     @Test
     fun `Erkenntnisse on new varieties - the first rating of each against the later ones, from five varieties served again`() {
-        fun fresh(meals: List<Meal>) = learnedOf("neu", house(listOf("A"), newSorts, meals))
-        assertEquals(
-            listOf(
-                listOf(
-                    "Neue Sorten kommen beim ersten Mal besser an als danach.",
-                    "Beim ersten Mal 5 von 6, danach 3 von 21 Mal gut gefressen.",
-                ),
-            ),
-            fresh(met("A", curious)),
-        )
-        assertEquals(
-            "every rating counts, however old",
-            listOf(
-                listOf(
-                    "Neue Sorten brauchen eine Weile, danach läuft es besser.",
-                    "Beim ersten Mal 1 von 5, danach 19 von 21 Mal gut gefressen.",
-                ),
-            ),
-            fresh(met("A", slow, 400)),
-        )
-        assertEquals("four varieties are too few", emptyList<List<String>>(), fresh(met("A", slow.take(4))))
+        fun fresh(
+            meals: List<Meal>,
+            old: Boolean = false,
+        ) = learnedOf("neu", house(listOf("A"), newSorts, meals), old = old)
+        assertEquals(listOf(listOf(null, 5, 6, null, 3, 21)), fresh(met("A", curious)))
+        assertEquals("every rating counts, however old", listOf(listOf(null, 1, 5, null, 19, 21)), fresh(met("A", slow, 400), true))
+        assertEquals("four varieties are too few", emptyList<List<Any?>>(), fresh(met("A", slow.take(4))))
         assertEquals(
             "a variety rated once and treats do not count",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             fresh(met("A", slow.take(4) + listOf(listOf("s5", x), listOf("snack", "unberuehrt", "verputzt", "verputzt")))),
         )
         val both = met("A", curious) + met("B", slow, 300)
@@ -812,22 +726,11 @@ class SmartTest {
             goodFirst: Int,
             goodLast: Int,
         ) = List(n) { i -> listOf(hours.first to (if (i < goodFirst) t else x), hours.second to (if (i < goodLast) t else x)) }
-        val firstBetter =
-            listOf(
-                listOf(
-                    "Die erste Mahlzeit am Tag kommt besser an als die letzte.",
-                    "Bei der ersten 8 von 8 Mal gut gefressen, bei der letzten 2 von 8 Mal.",
-                ),
-            )
+        val firstBetter = listOf(listOf(null, 8, 8, null, 2, 8))
         assertEquals(firstBetter, daytime(days(8, 7 to 18, 8, 2)))
         assertEquals(
             "the first meal comes at noon, and it is still the first",
-            listOf(
-                listOf(
-                    "Die letzte Mahlzeit am Tag kommt besser an als die erste.",
-                    "Bei der ersten 2 von 8 Mal gut gefressen, bei der letzten 8 von 8 Mal.",
-                ),
-            ),
+            listOf(listOf(null, 2, 8, null, 8, 8)),
             daytime(days(8, 12 to 19, 2, 8)),
         )
         assertEquals(
@@ -836,10 +739,10 @@ class SmartTest {
             daytime(days(8, 7 to 18, 8, 2).map { (a, b) -> listOf(a, 13 to x, b) } + listOf(listOf(8 to x), listOf(19 to t))),
         )
         assertEquals("a meal in the night still belongs to the day before", firstBetter, daytime(days(8, 7 to 25, 8, 2)))
-        assertEquals("three days are too few", emptyList<List<String>>(), daytime(days(3, 10 to 18, 3, 0)))
+        assertEquals("three days are too few", emptyList<List<Any?>>(), daytime(days(3, 10 to 18, 3, 0)))
         assertEquals(
             "4 of 4 against 1 of 4: wide apart, but that many meals can fall that way by chance",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             daytime(
                 days(
                     4,
@@ -850,7 +753,7 @@ class SmartTest {
             ),
         )
         assertEquals("28 of 40 against 16 of 40: exactly 0.3", 1, daytime(days(40, 8 to 19, 28, 16)).size)
-        assertEquals("28 of 40 against 20 of 40 are too close", emptyList<List<String>>(), daytime(days(40, 8 to 19, 28, 20)))
+        assertEquals("28 of 40 against 20 of 40 are too close", emptyList<List<Any?>>(), daytime(days(40, 8 to 19, 28, 20)))
     }
 
     @Test
@@ -873,24 +776,16 @@ class SmartTest {
 
         fun snacks(meals: List<Meal>) = learnedOf("snack", house(listOf("A"), listOf("a", "b", prod("snack", "type" to "Snack")), meals))
         val meals = listOf(1, 2, 3, 4).flatMap { after(it, x) } + listOf(5, 6, 7, 8).flatMap { plain(it, t) }
-        assertEquals(
-            listOf(
-                listOf(
-                    "Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen.",
-                    "Nach Snacks 0 von 4 Mal gut gefressen, sonst 4 von 4 Mal.",
-                ),
-            ),
-            snacks(meals),
-        )
+        assertEquals(listOf(listOf(null, 0, 4, null, 4, 4)), snacks(meals))
         assertEquals(
             "a treat three and a half hours before does not count",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             snacks(listOf(1, 2, 3, 4).flatMap { after(it, x, "14:30") } + listOf(5, 6, 7, 8).flatMap { plain(it, t) }),
         )
-        assertEquals("three meals after a treat are too few", emptyList<List<String>>(), snacks(meals.drop(2)))
+        assertEquals("three meals after a treat are too few", emptyList<List<Any?>>(), snacks(meals.drop(2)))
         assertEquals(
             "meals after treats going down better is no help",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             snacks(
                 listOf(1, 2, 3, 4).flatMap { after(it, t) } + listOf(5, 6, 7, 8).flatMap { plain(it, x) },
             ),
@@ -915,19 +810,11 @@ class SmartTest {
         }.flatten()
 
         fun feeder(meals: List<Meal>) = learnedOf("feeder", house(listOf("A"), listOf("a", "b", prod("s", "type" to "Snack")), meals))
-        assertEquals(
-            listOf(
-                listOf(
-                    "Bei Anna kommen dieselben Sorten besser an als bei Jonas.",
-                    "Bei Anna 10 von 10 Mal gut gefressen, bei Jonas 4 von 10 Mal.",
-                ),
-            ),
-            feeder(days({ t }, { if (it % 3 != 0) x else t })),
-        )
-        assertEquals("three meals each are too few", emptyList<List<String>>(), feeder(days({ t }, { x }, 3)))
+        assertEquals(listOf(listOf("Anna", 10, 10, listOf("Jonas"), 4, 10)), feeder(days({ t }, { if (it % 3 != 0) x else t })))
+        assertEquals("three meals each are too few", emptyList<List<Any?>>(), feeder(days({ t }, { x }, 3)))
         assertEquals(
             "Jonas serving the liked one more often does not make him better",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             feeder(
                 List(12) { meal("a", mapOf("A" to t), it + 0.5, "Anna") } + List(12) { meal("b", mapOf("A" to x), it + 0.6, "Anna") } +
                     List(12) { meal("a", mapOf("A" to t), it + 0.7, "Jonas") } + List(2) { meal("b", mapOf("A" to x), it + 0.8, "Jonas") },
@@ -935,7 +822,7 @@ class SmartTest {
         )
         assertEquals(
             "one person only",
-            emptyList<List<String>>(),
+            emptyList<List<Any?>>(),
             feeder(
                 days({ t }, { x }).map {
                     if (it.by ==
@@ -948,7 +835,7 @@ class SmartTest {
                 },
             ),
         )
-        assertEquals("treats do not count", emptyList<List<String>>(), feeder(days({ "verputzt" }, { "unberuehrt" }, 10, listOf("s", "s"))))
+        assertEquals("treats do not count", emptyList<List<Any?>>(), feeder(days({ "verputzt" }, { "unberuehrt" }, 10, listOf("s", "s"))))
     }
 
     @Test
@@ -1283,22 +1170,18 @@ class SmartTest {
         val m = model(db)
         val mv = moves(m, now0, ranking(m, now0))
         assertEquals(
-            "one rating since is no move, and what stood still is not new",
+            "one rating since is no move, and a variety new since is none either",
             listOf(
-                listOf("new", "warmed"),
                 listOf(listOf("cooled", 3, mapOf("top" to 3), 4, mapOf("sosse" to 3, "mittel" to 1))),
                 listOf("warmed"),
             ),
             listOf(
-                mv.fresh.sorted(),
                 mv.cooled.map {
                     listOf(it.id, it.before.n, it.before.counts, it.since.n, it.since.counts)
                 },
                 mv.warmed.map { it.id },
             ),
         )
-        val my = model(house(listOf("A"), listOf("new"), rate("new", "A", listOf(t, t, t), 5)))
-        assertEquals("in a young diary nothing is marked new", emptyList<String>(), moves(my, now0, ranking(my, now0)).fresh.toList())
     }
 
     @Test
@@ -1306,15 +1189,15 @@ class SmartTest {
         val db =
             house(
                 listOf("A"),
-                listOf("far", "near", "b", "c", "d"),
-                rate("far", "A", listOf(t, t, t), 250) + rate("far", "A", listOf(t, t, t), 10) + rate("near", "A", listOf(t, t, t), 200) +
-                    rate("near", "A", listOf(t, t, t), 10) + listOf("b", "c", "d").flatMap { rate(it, "A", listOf(t, t, t), 60) },
+                listOf("far", "near"),
+                rate("far", "A", listOf(x, x, x), 250) + rate("far", "A", listOf(t, t, t), 10) + rate("near", "A", listOf(x, x, x), 200) +
+                    rate("near", "A", listOf(t, t, t), 10),
             )
         val m = model(db)
         assertEquals(
             "thirty days ago the old ratings of „far“ already lay beyond the window, those of „near“ did not",
-            listOf("far"),
-            moves(m, now0, ranking(m, now0)).fresh.toList(),
+            listOf("near"),
+            moves(m, now0, ranking(m, now0)).warmed.map { it.id },
         )
     }
 
@@ -1325,12 +1208,13 @@ class SmartTest {
     }
 
     @Test
-    fun `nextUp - favourites gone for six weeks from their newest ratings however old, a second chance only where it pays`() {
+    fun `nextUp - favourites gone for six weeks from their newest ratings however old, all of them, a second chance only where it pays`() {
         val db =
             house(
                 listOf("A", "B"),
-                listOf("gone", "recent", prod("no", "kaufen" to "nicht"), "split", "first", prod("treat", "type" to "Snack")),
+                listOf("gone", "recent", prod("no", "kaufen" to "nicht"), "split", "first", prod("treat", "type" to "Snack"), "away1", "away2"),
                 rate("gone", "A", listOf(t, t, t), 300) + rate("recent", "A", listOf(t, t, t), 50) + rate("recent", "A", listOf(t), 3) +
+                    rate("away1", "A", listOf(t, t, t), 50) + rate("away2", "A", listOf(t, t, t, t), 60) +
                     rate(
                         "no",
                         "A",
@@ -1343,7 +1227,12 @@ class SmartTest {
         val r = ranking(m, now0)
 
         fun next(slow: List<String>) = nextUp(m, now0, r, lastOf(db), slow)
-        assertEquals(listOf(listOf("gone", 3, mapOf("top" to 3))), next(listOf("A")).missed.map { listOf(it.id, it.n, it.counts) })
+        assertEquals(
+            "the Tops among them, the best liked first",
+            listOf(listOf("away2", 4, mapOf("top" to 4)), listOf("gone", 3, mapOf("top" to 3)), listOf("away1", 3, mapOf("top" to 3))),
+            next(listOf("A")).missed.map { listOf(it.id, it.n, it.counts) },
+        )
+        assertTrue(ids(r.top).containsAll(listOf("away1", "away2", "recent")))
         assertEquals(listOf(listOf("first", "A")), next(listOf("A")).retry.map { listOf(it.id, it.pet) })
         assertEquals("only where slowStarters() says the pet needs a while", emptyList<Retry>(), next(listOf("B")).retry)
         val turned =
@@ -1360,22 +1249,6 @@ class SmartTest {
             listOf(listOf("flop"), listOf("mixed"), emptyList()),
             listOf(ids(rt.flop), ids(rt.split), nextUp(mt, now0, rt, lastOf(turned), emptyList()).missed.map { it.id }),
         )
-    }
-
-    @Test
-    fun `basis - the ratings the evaluation rests on, since when, and the types left out that have ratings`() {
-        val db =
-            house(
-                listOf("A"),
-                listOf("p1", prod("snack", "type" to "Snack"), prod("dry", "type" to "Trockenfutter")),
-                rate("p1", "A", listOf(t, g), 3) + rate("p1", "A", listOf(mi), 40) + rate("p1", "A", listOf(t), 400) +
-                    rate("snack", "A", listOf("verputzt"), 2),
-            )
-        val m = model(db)
-        val b = basis(m, ranking(m, now0))
-        assertEquals(listOf(3, now0 - 40 * DAY, listOf("Snack")), listOf(b.n, b.first, b.left))
-        val mt = model(house(listOf("A"), listOf("p1", "p2"), rate("p1", "A", listOf(t, t, t), 3) + rate("p2", "A", listOf(t), 1)))
-        assertEquals("only what the lists rest on, not a variety still being tried", 3, basis(mt, ranking(mt, now0)).n)
     }
 
     private val usual0 = daily("A", List(8) { "p1" to g }, 4)
@@ -1481,7 +1354,7 @@ class SmartTest {
         }
 
     @Test
-    fun `observations - how often each kind was noted, and a variety a kind about meals came after clearly more often`() {
+    fun `observations - a variety a kind about meals came after clearly more often, and by how much`() {
         val db =
             noted(
                 obsMeals,
@@ -1489,13 +1362,11 @@ class SmartTest {
                     Note("tired", 3, listOf("A"), 2) +
                     Note("tired", 40, listOf("A")),
             )
-        val o = observed(db, listOf("A"), now0)
-        assertEquals(listOf(listOf("stink", 6, 0), listOf("tired", 1, 1)), o.kinds.map { listOf(it.kind, it.n, it.before) })
-        assertEquals(now0 - 2 * DAY + 5 * 3_600_000L, o.kinds[0].last)
         assertEquals(
-            listOf(listOf("stink", "lachs", 6, 5, 20, 1)),
-            o.links.map {
-                listOf(it.kind, it.id, it.after.n, it.after.hit, it.other.n, it.other.hit)
+            "five of its six meals against one of twenty: 78 points more often",
+            listOf(listOf("stink", "lachs", 6, 5, 20, 1, 78)),
+            observed(db, listOf("A"), now0).map {
+                listOf(it.kind, it.id, it.after.n, it.after.hit, it.other.n, it.other.hit, it.gap.toInt())
             },
         )
         assertEquals(listOf(listOf("stink", 6, 5)), observedAfter(db, listOf("A"), now0, "lachs").map { listOf(it.kind, it.n, it.hit) })
@@ -1518,7 +1389,7 @@ class SmartTest {
             notes: List<Note>,
             meals: List<Meal> = obsMeals,
             pets: List<String> = listOf("A"),
-        ) = observed(noted(meals, notes), pets, now0).links.map { it.id }
+        ) = observed(noted(meals, notes), pets, now0).map { it.id }
         assertEquals(listOf("lachs"), links(stinks(listOf(2, 6, 10, 14))))
         assertEquals("a single stink after it is chance", emptyList<String>(), links(stinks(listOf(2))))
         assertEquals("as often after the others: nothing stands out", emptyList<String>(), links(stinks(listOf(2, 6, 3, 5, 7, 9))))
@@ -1548,8 +1419,18 @@ class SmartTest {
             listOf(5, 8).map { hours -> links(listOf(2, 6, 10, 14).map { Note("vomit", it, listOf("A"), hours) }) },
         )
         val before = noted(obsMeals, emptyList())
-        val o = observed(Db(before.pets, before.products, before.servings), listOf("A"), now0)
-        assertTrue("data from before observations", o.kinds.isEmpty() && o.links.isEmpty())
+        assertTrue("data from before observations", observed(Db(before.pets, before.products, before.servings), listOf("A"), now0).isEmpty())
+        val all =
+            noted(
+                obsMeals,
+                lachsDays.take(5).map { Note("stink", it, listOf("A")) } + lachsDays.take(4).map { Note("happy", it, listOf("A")) } +
+                    lachsDays.map { Note("hungry", it, listOf("A"), 2) } + lachsDays.take(4).map { Note("vomit", it, listOf("A")) },
+            )
+        assertEquals(
+            "every link, the widest first",
+            listOf("hungry", "stink", "happy", "vomit"),
+            observed(all, listOf("A"), now0).map { it.kind },
+        )
     }
 
     @Test
