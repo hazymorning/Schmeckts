@@ -11,12 +11,18 @@ import android.view.HapticFeedbackConstants.SEGMENT_TICK
 import android.view.HapticFeedbackConstants.TOGGLE_OFF
 import android.view.HapticFeedbackConstants.TOGGLE_ON
 import android.view.HapticFeedbackConstants.VIRTUAL_KEY
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -97,5 +103,44 @@ class UiPressTest : ScreenTest() {
         idle(1000)
         val after = head.fetchSemanticsNode().boundsInRoot.width
         check(least < rest - 1f && kotlin.math.abs(after - rest) < 0.5f, "it gives and comes back $rest $least $after")
+    }
+}
+
+class UiSlideFeelTest : ScreenTest() {
+    private fun level(r: String) =
+        rule.onNode(
+            hasTestTag("level-$r") and hasAnyAncestor(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "serving")),
+            useUnmergedTree = true,
+        )
+
+    private fun rated() = ((db.servings[0].pets.values.first() as JsonObject)["r"]).asString
+
+    @Test
+    fun `slide - one detent per level passed, nothing for the level it already holds`() {
+        val now = at("2025-06-17T12:00")
+        val m = meal("meal0001", "sorte001", now - 3_600_000, mapOf("minka001" to "gut"))
+        open(mapOf("db" to dbOf(listOf(pet("minka001")), listOf(product("sorte001")), listOf(m))), now)
+        act("open-serving", "id" to "meal0001")
+        idle(600)
+        platform.calls.clear()
+        level("gut").performTouchInput {
+            down(center)
+            advanceEventTime(250)
+            up()
+        }
+        idle(400)
+        check(calls("haptic").isEmpty() && rated() == "gut", "resting on the level it holds: nothing ${calls("haptic")}")
+        val a = level("gut").fetchSemanticsNode().boundsInRoot.center
+        val b = level("schlecht").fetchSemanticsNode().boundsInRoot.center
+        level("gut").performTouchInput {
+            down(center)
+            repeat(30) { moveBy(Offset((b.x - a.x) / 30, 0f), 20) }
+            up()
+        }
+        idle(400)
+        check(
+            calls("haptic") == listOf("tick", "tick", "tick", "tick", "confirm") && rated() == "schlecht",
+            "mittel, eager, sosse, schlecht, then the rating ${calls("haptic")}",
+        )
     }
 }

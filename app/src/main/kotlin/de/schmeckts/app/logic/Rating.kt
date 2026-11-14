@@ -38,7 +38,7 @@ class Rating(
         val pet = d.getPet(pid)
         s["pets"] = JsonObject(s.pets + (pid to jsonObject("r" to JsonPrimitive(r), "at" to num(Time.now()), "by" to d.byMe())))
         save()
-        haptic("success")
+        haptic("confirm")
         val rt = RATINGS.getValue(r)
         toast(
             "${rt.label}${if (db.pets.size > 1 && pet != null) " für " + pet.str("name") else ""}. ${rt.cheer}",

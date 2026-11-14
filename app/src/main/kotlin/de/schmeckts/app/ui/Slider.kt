@@ -2,9 +2,12 @@ package de.schmeckts.app.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,7 +93,16 @@ fun RateSlider(
             val w = maxWidth
             val stop = (w - Space.s1 * 2 - Space.hair * (n - 1)) / n
             val x = Space.s1 + (stop + Space.hair) * maxOf(at, 0) + (stop - Size.tapS) / 2
-            val moved by animateFloatAsState(x.value, if (still) snap() else tween(Motion.STEP, easing = Motion.easeOut), label = "thumb")
+            // under the finger it keeps up with it, let go it glides to the level
+            val glide: AnimationSpec<Float> =
+                if (still) {
+                    snap()
+                } else if (pointing != null) {
+                    spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessHigh)
+                } else {
+                    tween(Motion.STEP, easing = Motion.easeOut)
+                }
+            val moved by animateFloatAsState(x.value, glide, label = "thumb")
             val wash =
                 scale.mapIndexed { i, r -> (i + 0.5f) / n to (p.tone(rateTone(r))?.cs ?: p.surface2) }.toTypedArray()
             Box(
@@ -112,9 +124,10 @@ fun RateSlider(
                             fun slide(px: Float) {
                                 val r = scale[nearest(px)]
                                 if (r == pointing) return
+                                val before = pointing ?: current
                                 pointing = r
                                 slid = true
-                                haptic()
+                                if (r != before) haptic()
                             }
                             var lastX = down.position.x
                             // held still for the tap timeout: it shows where it lands

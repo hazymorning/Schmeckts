@@ -414,7 +414,7 @@ fun RateSliderFor(
     val cur = rOf(s.pets[pid])
     val pet = if (ui.phone.db.pets.size > 1) d.getPet(pid) else null
     if (cur != null && cur !in scale) RateBadge(cur)
-    RateSlider(scale, cur, if (pet != null) "Bewertung für ${pet.str("name")}" else "Bewertung", { ui.haptic("select") }) { r ->
+    RateSlider(scale, cur, if (pet != null) "Bewertung für ${pet.str("name")}" else "Bewertung", { ui.haptic("tick") }) { r ->
         ui.act("rate", "s" to s.id, "p" to pid, "r" to r)
     }
 }
