@@ -2093,12 +2093,15 @@ fun findings(
     val packs = packs(m)
     val found = (buyingOf(m) + if (feeding) feedingOf(db, m, now) else emptyList()).filterNotNull().toMutableList()
     val wet = wetOf(m)
-    val kept = mutableListOf<Insight>()
-    for (kind in listOf("marke", "konsistenz")) {
-        for (g in grouped(m, GROUPS.getValue(kind))) held(m, kind, g.key, g.sorts, wet.filter { it !in g.sorts })?.let { kept.add(it) }
+    // a kept group stands in for the one group of its kind byGroup() shows, never beside it
+    for (kind in listOf("konsistenz", "marke")) {
+        if (found.any { it.kind == kind }) continue
+        val x =
+            grouped(m, GROUPS.getValue(kind))
+                .mapNotNull { g -> held(m, kind, g.key, g.sorts, wet.filter { it !in g.sorts }) }
+                .maxWithOrNull(compareBy<Insight> { abs(it.gap) }.thenBy { it.gap }) ?: continue
+        if (found.none { it.kind == "konsistenz" && inside(x, it) }) found += x
     }
-    val textures = (found + kept).filter { it.kind == "konsistenz" }
-    found += kept.filter { x -> x.kind != "marke" || textures.none { inside(x, it) } }
     found.removeAll { x -> x.kind == "marke" && packs.any { it.brand == x.a.key } }
     val sauce = found.firstOrNull { it.kind == "sosse" }
     val i = found.indexOfFirst { it.kind == "konsistenz" && it.a.key == "sosse" }

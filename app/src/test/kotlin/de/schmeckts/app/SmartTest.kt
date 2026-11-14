@@ -1585,6 +1585,30 @@ class SmartTest {
         assertEquals("the same from the start never passed the gate", "gone", state(before + rate("sheba5", "A", listOf(t), 30)))
     }
 
+    @Test
+    fun `findings - a kept group only where none of its kind shows, never a mirror beside the one shown`() {
+        val products =
+            listOf("Huhn in Soße", "Rind in Soße", "Huhn Pastete", "Rind Pastete", "Huhn in Gelee", "Rind in Gelee")
+                .mapIndexed { i, v -> prod("p$i", "variety" to v) }
+        val before =
+            rate("p0", "A", listOf(x, x, x), 30) + rate("p1", "A", listOf(x, x, x), 30) + rate("p2", "A", listOf(t, t, t), 30) +
+                rate("p3", "A", listOf(t, t, t), 30) + rate("p4", "A", listOf(t, t, x), 30) + rate("p5", "A", listOf(t, t, x, x), 30)
+
+        fun textures(meals: List<Meal>): List<Any?> {
+            val db = house(listOf("A"), products, meals)
+            val m = model(db)
+            val paste = m.sorts.filter { it.id in listOf("p2", "p3") }
+            val kept = held(m, "konsistenz", "pastete", paste, m.sorts.filter { it !in paste })
+            return listOf(kept != null) + findings(db, m, now0).filter { it.kind == "konsistenz" }.map { it.key }
+        }
+        assertEquals("0 of 6 in sauce is further off than 6 of 6 as Pastete", listOf(false, "sosse"), textures(before))
+        assertEquals(
+            "one Pastete left: 6 of 7 slips under its gate and is kept, but sauce still shows",
+            listOf(true, "sosse"),
+            textures(before + rate("p2", "A", listOf(x), 1)),
+        )
+    }
+
     private val mixedLine =
         listOf(
             prod("m1", "brand" to "Miamor", "variety" to "Huhn in Sauce"),
