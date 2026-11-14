@@ -7,6 +7,9 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
@@ -58,8 +61,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -67,11 +74,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /* Sheets and pages share one layer: a page is a sheet that fills the screen and moves sideways. A sheet opened from a
@@ -349,6 +359,9 @@ fun SheetHost(
     if (!layer.open || state == null) return
     val page = isPage(state)
     val scope = rememberCoroutineScope()
+    var sheetHeight by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    val density = LocalDensity.current
+    val pull = remember(layer, still) { PullToClose(sheets, layer, density, still) }
     PredictiveBackHandler(enabled = sheets.topLayer() == layer && closing == null) { events ->
         try {
             events.collect { e: BackEventCompat -> layer.back = e.progress }
@@ -364,15 +377,13 @@ fun SheetHost(
         Box(
             Modifier
                 .fillMaxSize()
-                .alpha(shown.value)
+                .alpha(shown.value * (1f - 0.6f * (layer.drag / sheetHeight).coerceIn(0f, 1f)))
                 .background(colors.backdrop)
                 .clickable(remember { MutableInteractionSource() }, null) { if (closing == null) sheets.closeSheet() },
         )
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             val w = constraints.maxWidth.toFloat()
             val h = constraints.maxHeight.toFloat()
-            val density = LocalDensity.current
-            var sheetHeight by remember { mutableFloatStateOf(h) }
             val frame =
                 if (page) {
                     Modifier
@@ -391,8 +402,10 @@ fun SheetHost(
                         .fillMaxWidth()
                         .heightIn(max = with(density) { (h * 0.92f).toDp() })
                         .onGloballyPositioned { sheetHeight = it.size.height.toFloat() }
+                        .nestedScroll(pull)
                         .graphicsLayer {
-                            translationY = (1f - shown.value) * sheetHeight + layer.drag + layer.back * sheetHeight * 0.1f
+                            val all = if (sheetHeight == Float.MAX_VALUE) h else sheetHeight
+                            translationY = (1f - shown.value) * all + layer.drag + layer.back * all * 0.1f
                             val k = 1f - 0.05f * layer.back
                             scaleX = k
                             scaleY = k
@@ -474,29 +487,80 @@ private fun ColumnScope.Levels(
     }
 }
 
-// swiping down closes a sheet; a page leaves only by the arrow or back
+/** Pulled down far enough or flung, the sheet closes; otherwise it springs back. dy in px, v in px per second. */
+internal suspend fun Layer.release(
+    sheets: Sheets,
+    density: Density,
+    v: Float,
+    still: Boolean,
+) {
+    val dy = drag / density.density
+    if (dy > 110 || (v / density.density > 700 && dy > 24)) {
+        sheets.closeSheet()
+    } else if (still) {
+        drag = 0f
+    } else {
+        animate(drag, 0f, v, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow)) { x, _ -> drag = x }
+    }
+}
+
+// Content scrolled to its top hands a downward pull to the sheet, and takes an upward one back first
+private class PullToClose(
+    val sheets: Sheets,
+    val layer: Layer,
+    val density: Density,
+    val still: Boolean,
+) : NestedScrollConnection {
+    private fun mine() = sheets.topLayer() == layer && layer.closing == null
+
+    override fun onPreScroll(
+        available: Offset,
+        source: NestedScrollSource,
+    ): Offset {
+        if (source != NestedScrollSource.UserInput || available.y >= 0 || layer.drag <= 0f) return Offset.Zero
+        val used = maxOf(available.y, -layer.drag)
+        layer.drag += used
+        return Offset(0f, used)
+    }
+
+    override fun onPostScroll(
+        consumed: Offset,
+        available: Offset,
+        source: NestedScrollSource,
+    ): Offset {
+        if (source != NestedScrollSource.UserInput || available.y <= 0 || !mine()) return Offset.Zero
+        layer.drag += available.y
+        return Offset(0f, available.y)
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        if (layer.drag <= 0f) return Velocity.Zero
+        layer.release(sheets, density, available.y, still)
+        return available
+    }
+}
+
+// swiping down on the grip or the head closes a sheet; a page leaves only by the arrow or back
 fun Modifier.dragToClose(
     sheets: Sheets,
     layer: Layer,
+    still: Boolean,
 ) = pointerInput(layer) {
     val velocity = VelocityTracker()
-    var t0 = 0L
-    detectVerticalDragGestures(
-        onDragStart = {
-            velocity.resetTracking()
-            t0 = System.currentTimeMillis()
-        },
-        onDragEnd = {
-            val dy = layer.drag / density
-            val v = dy / maxOf(1L, System.currentTimeMillis() - t0)
-            if (dy > 110 || (v > 0.5f && dy > 24)) sheets.closeSheet() else layer.drag = 0f
-        },
-        onDragCancel = { layer.drag = 0f },
-    ) { change, dy ->
-        if (sheets.topLayer() != layer || layer.closing != null) return@detectVerticalDragGestures
-        velocity.addPosition(change.uptimeMillis, change.position)
-        layer.drag = maxOf(0f, layer.drag + dy)
-        change.consume()
+    coroutineScope {
+        detectVerticalDragGestures(
+            onDragStart = { velocity.resetTracking() },
+            onDragEnd = {
+                val v = velocity.calculateVelocity().y
+                launch { layer.release(sheets, this@pointerInput, v, still) }
+            },
+            onDragCancel = { launch { layer.release(sheets, this@pointerInput, 0f, still) } },
+        ) { change, dy ->
+            if (sheets.topLayer() != layer || layer.closing != null) return@detectVerticalDragGestures
+            velocity.addPosition(change.uptimeMillis, change.position)
+            layer.drag = maxOf(0f, layer.drag + dy)
+            change.consume()
+        }
     }
 }
 
@@ -508,7 +572,7 @@ private fun Grip(
     Box(
         Modifier
             .fillMaxWidth()
-            .dragToClose(sheets, layer)
+            .dragToClose(sheets, layer, reduceMotion)
             .padding(vertical = Space.s2),
         contentAlignment = Alignment.Center,
     ) {
@@ -639,7 +703,7 @@ fun SheetBody(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .then(if (layer != null) Modifier.dragToClose(sheets, layer) else Modifier)
+                    .then(if (layer != null) Modifier.dragToClose(sheets, layer, reduceMotion) else Modifier)
                     .padding(bottom = Space.s3),
                 horizontalArrangement = Arrangement.spacedBy(Space.s3),
                 verticalAlignment = Alignment.CenterVertically,
