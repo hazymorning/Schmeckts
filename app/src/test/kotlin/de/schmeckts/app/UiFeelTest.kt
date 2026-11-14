@@ -11,6 +11,7 @@ import android.view.HapticFeedbackConstants.SEGMENT_TICK
 import android.view.HapticFeedbackConstants.TOGGLE_OFF
 import android.view.HapticFeedbackConstants.TOGGLE_ON
 import android.view.HapticFeedbackConstants.VIRTUAL_KEY
+import android.view.KeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -113,7 +114,14 @@ class UiSlideFeelTest : ScreenTest() {
             useUnmergedTree = true,
         )
 
-    private fun rated() = ((db.servings[0].pets.values.first() as JsonObject)["r"]).asString
+    private fun rated() =
+        (
+            (
+                db.servings[0]
+                    .pets.values
+                    .first() as JsonObject
+            )["r"]
+        ).asString
 
     @Test
     fun `slide - one detent per level passed, nothing for the level it already holds`() {
@@ -142,5 +150,27 @@ class UiSlideFeelTest : ScreenTest() {
             calls("haptic") == listOf("tick", "tick", "tick", "tick", "confirm") && rated() == "schlecht",
             "mittel, eager, sosse, schlecht, then the rating ${calls("haptic")}",
         )
+    }
+}
+
+class UiCameraKeyTest : ScreenTest() {
+    private fun volume() = rule.activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_DOWN))
+
+    @Test
+    fun `camera - a volume key is the shutter while the camera is open, and only then`() {
+        platform.camera = true
+        open()
+        act("demo")
+        act("feed")
+        act("photo")
+        idle(100)
+        val taken = volume()
+        check(ui.camera.open && taken, "the camera takes the key")
+        tap("Abbrechen")
+        idle(400)
+        val shadow = org.robolectric.Shadows.shadowOf(rule.activity)
+        shadow.nextStartedActivityForResult?.let { shadow.receiveResult(it.intent, android.app.Activity.RESULT_CANCELED, null) }
+        idle(10)
+        check(!ui.camera.open && !volume(), "closed: the key is left to the phone")
     }
 }
