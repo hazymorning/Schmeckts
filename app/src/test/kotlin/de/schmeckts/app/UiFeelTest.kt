@@ -155,24 +155,37 @@ class UiSlideFeelTest : ScreenTest() {
 }
 
 class UiCameraKeyTest : ScreenTest() {
-    private fun volume() = rule.activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_DOWN))
+    private fun volume(
+        action: Int = KeyEvent.ACTION_DOWN,
+        repeat: Int = 0,
+    ): Boolean {
+        val taken = rule.activity.dispatchKeyEvent(KeyEvent(0L, 0L, action, KeyEvent.KEYCODE_VOLUME_DOWN, repeat))
+        idle(10)
+        return taken
+    }
 
     @Test
-    fun `camera - a volume key is the shutter while the camera is open, and only then`() {
+    fun `camera - a volume key press takes one photo while the camera is open, and only then`() {
         platform.camera = true
         open()
         act("demo")
         act("feed")
         act("photo")
         idle(100)
-        val taken = volume()
-        check(ui.camera.open && taken, "the camera takes the key")
+        check(ui.camera.open && ui.camera.shutter != null, "the camera is shown with its shutter")
+        var shots = 0
+        ui.camera.shutter = { shots++ }
+        check(volume() && shots == 1, "pressed: one photo $shots")
+        check(volume(repeat = 1) && volume(KeyEvent.ACTION_UP) && shots == 1, "held and let go: no more, and no volume change $shots")
+        tap("Auslösen")
+        check(shots == 2, "the button is the same shutter $shots")
         tap("Abbrechen")
         idle(400)
         val shadow = org.robolectric.Shadows.shadowOf(rule.activity)
         shadow.nextStartedActivityForResult?.let { shadow.receiveResult(it.intent, android.app.Activity.RESULT_CANCELED, null) }
         idle(10)
-        check(!ui.camera.open && !volume(), "closed: the key is left to the phone")
+        check(!ui.camera.open && ui.camera.shutter == null, "closed: the shutter let go")
+        check(!volume() && shots == 2, "closed: the key is left to the phone $shots")
     }
 }
 

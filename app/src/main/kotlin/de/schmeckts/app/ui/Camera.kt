@@ -81,6 +81,9 @@ class Camera(
         private set
     var hosted = false
 
+    // set while the camera is shown, for its button and the volume keys; a test counts shots through it
+    internal var shutter: (() -> Unit)? = null
+
     /** for the back button */
     fun closeCamera(): Boolean {
         if (!open) return false
@@ -218,6 +221,10 @@ fun CameraHost(camera: Camera) {
             },
         )
     }
+    DisposableEffect(Unit) {
+        camera.shutter = ::shoot
+        onDispose { camera.shutter = null }
+    }
     val keys = remember { FocusRequester() }
     LaunchedEffect(Unit) { keys.requestFocus() }
     SchmecktsTheme("dark") {
@@ -229,9 +236,9 @@ fun CameraHost(camera: Camera) {
                 .semantics { paneTitle = "camera" }
                 .focusRequester(keys)
                 .onPreviewKeyEvent { e ->
-                    // a volume key is the shutter, as in the phone's own camera
+                    // a volume key is the shutter, as in the phone's own camera; held down it still takes one photo
                     val volume = e.key == Key.VolumeUp || e.key == Key.VolumeDown
-                    if (volume && e.type == KeyEventType.KeyDown) shoot()
+                    if (volume && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) camera.shutter?.invoke()
                     volume
                 }.focusable(),
         ) {
@@ -267,7 +274,7 @@ fun CameraHost(camera: Camera) {
                         .align(Alignment.Center)
                         .size(94.dp) // 78 and the two rings around it
                         .graphicsLayer { alpha = if (taking) Alpha.BUSY else 1f }
-                        .press({ shoot() }, label = "Auslösen")
+                        .press({ camera.shutter?.invoke() }, label = "Auslösen")
                         .border(Size.stroke * 2, colors.ink, CircleShape)
                         .padding(Size.stroke * 2)
                         .border(Size.stroke * 2, colors.bg, CircleShape)
