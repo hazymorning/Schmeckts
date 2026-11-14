@@ -210,7 +210,10 @@ class Derive(
     // the home card needs only the ranking; the rest waits until the page opens
     fun rankingModel(): Ranking = cached("ranking", listOf(prefs.activePet)) { now -> ranking(model(), now) }
 
-    private fun petsShown() = if (prefs.activePet != "all" && getPet(prefs.activePet) != null) listOf(prefs.activePet) else db.pets.map { it.id }
+    private fun petsShown(): List<String> {
+        val pet = prefs.activePet.takeIf { getPet(it) != null }
+        return if (pet != null) listOf(pet) else db.pets.map { it.id }
+    }
 
     private fun profileOf(
         pid: String,

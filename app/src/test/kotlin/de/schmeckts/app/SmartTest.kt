@@ -377,7 +377,11 @@ class SmartTest {
         old: Boolean = false,
     ): List<List<Any?>> {
         assertTrue("the meals lie within 180 days", old || db.servings.all { it.servedAt > now - 180 * DAY })
-        return insights(db, model(db, activePet, now = now), now).map { listOf(it.kind, it.a.key, it.a.good, it.a.n, it.b.key, it.b.good, it.b.n) }
+        return insights(
+            db,
+            model(db, activePet, now = now),
+            now,
+        ).map { listOf(it.kind, it.a.key, it.a.good, it.a.n, it.b.key, it.b.good, it.b.n) }
     }
 
     private fun learnedOf(
@@ -1212,7 +1216,16 @@ class SmartTest {
         val db =
             house(
                 listOf("A", "B"),
-                listOf("gone", "recent", prod("no", "kaufen" to "nicht"), "split", "first", prod("treat", "type" to "Snack"), "away1", "away2"),
+                listOf(
+                    "gone",
+                    "recent",
+                    prod("no", "kaufen" to "nicht"),
+                    "split",
+                    "first",
+                    prod("treat", "type" to "Snack"),
+                    "away1",
+                    "away2",
+                ),
                 rate("gone", "A", listOf(t, t, t), 300) + rate("recent", "A", listOf(t, t, t), 50) + rate("recent", "A", listOf(t), 3) +
                     rate("away1", "A", listOf(t, t, t), 50) + rate("away2", "A", listOf(t, t, t, t), 60) +
                     rate(
@@ -1419,7 +1432,10 @@ class SmartTest {
             listOf(5, 8).map { hours -> links(listOf(2, 6, 10, 14).map { Note("vomit", it, listOf("A"), hours) }) },
         )
         val before = noted(obsMeals, emptyList())
-        assertTrue("data from before observations", observed(Db(before.pets, before.products, before.servings), listOf("A"), now0).isEmpty())
+        assertTrue(
+            "data from before observations",
+            observed(Db(before.pets, before.products, before.servings), listOf("A"), now0).isEmpty(),
+        )
         val all =
             noted(
                 obsMeals,
@@ -1461,5 +1477,546 @@ class SmartTest {
             assertTrue("$type", best == 0 && between > 0 && worst > between && worst == scaleOf(p).size - 1)
             assertTrue("$type", RATINGS.getValue(scaleOf(p)[between]).score < GOOD)
         }
+    }
+
+    // == Vorlieben ==
+
+    private fun tones(x: Side) = listOf(x.good, x.mid, x.sauce, x.bad)
+
+    private val line =
+        listOf(
+            prod("m1", "brand" to "Miamor", "variety" to "Huhn in Sauce"),
+            prod("m2", "brand" to "Miamor", "variety" to "Ente in Sauce"),
+            prod("m3", "brand" to "Miamor", "variety" to "Lachs in Sauce"),
+            prod("c1", "brand" to "Catz Finefood", "variety" to "Lamm"),
+            prod("c2", "brand" to "Catz Finefood", "variety" to "Pferd"),
+            prod("c3", "brand" to "Catz Finefood", "variety" to "Hirsch"),
+        )
+    private val lineLeft = rate("m1", "A", listOf(x, s, mi)) + rate("m2", "A", listOf(x, x)) + rate("m3", "A", listOf(s, x, mi))
+    private val catzLiked = rate("c1", "A", listOf(t, t, g)) + rate("c2", "A", listOf(t, g, t)) + rate("c3", "A", listOf(g, t, mi))
+
+    @Test
+    fun `packs - a whole brand line, each variety mostly left, against the rest at 2_75, named by its texture, none set to always`() {
+        fun packs(
+            products: List<Any>,
+            meals: List<Meal>,
+            pets: List<String> = listOf("A"),
+            activePet: String = "all",
+        ) = packs(model(house(pets, products, meals), activePet)).map {
+            listOf(it.brand, it.texture, ids(it.sorts).sorted(), tones(it.a), tones(it.b))
+        }
+        val miamor = listOf("Miamor", "sosse", listOf("m1", "m2", "m3"), listOf(0, 2, 2, 4), listOf(8, 1, 0, 0))
+        assertEquals(listOf(miamor), packs(line, lineLeft + catzLiked))
+        assertEquals(
+            "a line of different consistencies is named by its brand alone",
+            listOf(null),
+            packs(
+                line.map {
+                    if (it["id"] ==
+                        "m3"
+                    ) {
+                        prod("m3", "brand" to "Miamor", "variety" to "Lachs Pastete")
+                    } else {
+                        it
+                    }
+                },
+                lineLeft + catzLiked,
+            ).map { it[1] },
+        )
+        assertEquals(
+            "a variety of it set to always",
+            emptyList<List<Any?>>(),
+            packs(line.map { if (it["id"] == "m1") it + ("kaufen" to "immer") else it }, lineLeft + catzLiked),
+        )
+        assertEquals(
+            "one variety of it half eaten",
+            emptyList<List<Any?>>(),
+            packs(line, lineLeft.filter { it.p != "m2" } + rate("m2", "A", listOf(t, x)) + catzLiked),
+        )
+        assertEquals("two varieties are no line", emptyList<List<Any?>>(), packs(line, lineLeft.filter { it.p != "m3" } + catzLiked))
+        assertEquals(
+            "0 of 8 against 3 of 5 is 2.5 standard errors: not enough for a group",
+            emptyList<List<Any?>>(),
+            packs(line, lineLeft + rate("c1", "A", listOf(t, t, mi)) + rate("c2", "A", listOf(t, mi))),
+        )
+        val two = lineLeft + catzLiked + rate("c1", "B", listOf(t))
+        assertEquals(
+            "one cat at a time",
+            listOf(emptyList(), listOf(miamor)),
+            listOf(packs(line, two, listOf("A", "B")), packs(line, two, listOf("A", "B"), "A")),
+        )
+    }
+
+    @Test
+    fun `held - a finding over its gate stays after one more good meal while still two standard errors off, and goes after four`() {
+        val brands =
+            listOf("s1" to "Sheba", "s2" to "Sheba", "f1" to "Felix", "f2" to "Felix", "w1" to "Whiskas", "w2" to "Whiskas")
+                .mapIndexed { i, (id, brand) ->
+                    prod(
+                        id,
+                        "brand" to brand,
+                        "variety" to listOf("Huhn", "Rind", "Lachs", "Pute", "Ente", "Kalb")[i],
+                    )
+                }
+        val rest =
+            rate("f1", "A", listOf(t, t, t), 30) + rate("f2", "A", listOf(t, t, x), 30) + rate("w1", "A", listOf(t, t, t), 30) +
+                rate("w2", "A", listOf(mi), 30)
+        val before = rate("s1", "A", listOf(x, x, x), 30) + rate("s2", "A", listOf(x, s, mi), 30)
+        val since =
+            listOf(Meal("s1", mapOf("A" to t), 5), Meal("s2", mapOf("A" to t), 4), Meal("s1", mapOf("A" to t), 3)) +
+                listOf(Meal("s2", mapOf("A" to x), 2), Meal("s1", mapOf("A" to x), 1))
+
+        fun state(meals: List<Meal>): String {
+            val db = house(listOf("A"), brands, meals)
+            val m = model(db)
+            val sheba = m.sorts.filter { it.id.startsWith("s") }
+            val kept = held(m, "marke", "Sheba", sheba, m.sorts.filter { it !in sheba })
+            val shown = findings(db, m, now0).filter { it.kind == "marke" && it.key == "Sheba" }
+            assertTrue(shown.size <= 1 && (kept == null || shown.single().insight!!.gap == kept.gap))
+            return if (kept != null) {
+                "kept"
+            } else if (shown.isNotEmpty()) {
+                "shown"
+            } else {
+                "gone"
+            }
+        }
+        assertEquals(
+            "0 of 6 against 8 of 10, then 1 of 7 at 2.5 standard errors, and four more meals while it stays between 2 and 2.75",
+            listOf("shown", "kept", "kept", "kept", "kept", "gone"),
+            (0..5).map { state(rest + before + since.take(it)) },
+        )
+        assertEquals(
+            "1 of 7 from the start never passed the gate",
+            "gone",
+            state(rest + rate("s1", "A", listOf(t, x, x, x), 30) + rate("s2", "A", listOf(x, s, mi), 30)),
+        )
+    }
+
+    private val mixedLine =
+        listOf(
+            prod("m1", "brand" to "Miamor", "variety" to "Huhn in Sauce"),
+            prod("m2", "brand" to "Miamor", "variety" to "Ente in Sauce"),
+            prod("b1", "brand" to "Bozita", "variety" to "Rentier in Soße"),
+            prod("b2", "brand" to "Bozita", "variety" to "Pute in Soße"),
+            prod("c1", "brand" to "Catz Finefood", "variety" to "Lamm"),
+            prod("c2", "brand" to "Catz Finefood", "variety" to "Pferd"),
+            prod("c3", "brand" to "Catz Finefood", "variety" to "Hirsch"),
+        )
+    private val sauceLeft =
+        rate("m1", "A", listOf(x, mi)) + rate("m2", "A", listOf(mi, x)) + rate("b1", "A", listOf(g, s, mi)) +
+            rate("b2", "A", listOf(s, x, mi)) +
+            rate("c1", "A", listOf(t, t, g)) + rate("c2", "A", listOf(g, t, g)) + rate("c3", "A", listOf(t, g, mi))
+
+    private fun textureOf(
+        products: List<Any>,
+        meals: List<Meal>,
+    ): Insight? {
+        val db = house(listOf("A"), products, meals)
+        return insights(db, model(db), now0).firstOrNull { it.kind == "konsistenz" }
+    }
+
+    @Test
+    fun `mixedUp - a texture whose brands never come without it, a brand with four ratings on both sides clears it, more than three too`() {
+        fun mixed(
+            products: List<Any>,
+            meals: List<Meal>,
+        ) = mixedUp(textureOf(products, meals)!!)
+        assertEquals("by their ratings in it", listOf("Bozita", "Miamor"), mixed(mixedLine, sauceLeft))
+        val bozita = mixedLine + prod("b3", "brand" to "Bozita", "variety" to "Lamm")
+        assertEquals(
+            "three ratings without sauce are too few",
+            listOf("Bozita", "Miamor"),
+            mixed(
+                bozita,
+                sauceLeft + rate("b3", "A", listOf(t, t, t)),
+            ),
+        )
+        assertEquals("four are enough", emptyList<String>(), mixed(bozita, sauceLeft + rate("b3", "A", listOf(t, t, t, g))))
+        val more =
+            mixedLine + prod("s1", "brand" to "Sheba", "variety" to "Huhn in Soße") +
+                prod("f1", "brand" to "Felix", "variety" to "Rind in Soße")
+        assertEquals(
+            "four brands",
+            emptyList<String>(),
+            mixed(
+                more,
+                sauceLeft + rate("s1", "A", listOf(x, x)) + rate("f1", "A", listOf(x, mi)),
+            ),
+        )
+        assertEquals(
+            "a variety without a brand could be of any",
+            emptyList<String>(),
+            mixed(mixedLine + prod("u1", "variety" to "Huhn in Soße"), sauceLeft + rate("u1", "A", listOf(x, x))),
+        )
+        assertEquals("a texture only", emptyList<String>(), mixedUp(Insight("marke", Side("Miamor"), Side(), -0.5)))
+    }
+
+    @Test
+    fun `experiment - the brands without the texture, or the texture from a liked brand that never had it`() {
+        fun experiment(
+            products: List<Any>,
+            meals: List<Meal>,
+        ) = textureOf(products, meals)!!.let { x -> experimentOf(x, mixedUp(x)) }?.let { listOf(it.texture, it.worse, it.brands, it.liked) }
+        assertEquals(listOf("sosse", true, listOf("Bozita", "Miamor"), "Catz Finefood"), experiment(mixedLine, sauceLeft))
+        val catz = mixedLine + prod("c4", "brand" to "Catz Finefood", "variety" to "Huhn in Soße")
+        assertEquals(
+            "a liked brand that came in sauce is no test, and two brands are named at most",
+            listOf("sosse", true, listOf("Bozita", "Miamor"), null),
+            experiment(catz, sauceLeft + rate("c4", "A", listOf(x, x))),
+        )
+        val sauceLiked =
+            rate("m1", "A", listOf(t, t)) + rate("m2", "A", listOf(t, g)) + rate("b1", "A", listOf(t, t, g)) +
+                rate("b2", "A", listOf(g, t, t)) +
+                rate("c1", "A", listOf(x, x, mi)) + rate("c2", "A", listOf(x, s, x)) + rate("c3", "A", listOf(mi, x, x))
+        assertEquals(listOf("sosse", false, listOf("Bozita", "Miamor"), null), experiment(mixedLine, sauceLiked))
+        assertEquals(
+            "a brand rated four times on both sides: nothing to settle",
+            null,
+            experiment(mixedLine + prod("b3", "brand" to "Bozita", "variety" to "Lamm"), sauceLeft + rate("b3", "A", listOf(t, t, t, g))),
+        )
+    }
+
+    private fun note(
+        db: Db,
+        kind: String,
+        at: Long,
+        pets: List<String>,
+    ) {
+        db.observations.add(
+            Rec(
+                j(mapOf("id" to "o${db.observations.size}", "kind" to kind, "at" to at, "pets" to pets.associateWith { true }))
+                    as kotlinx.serialization.json.JsonObject,
+            ),
+        )
+        sortNewest(db.observations, "at")
+    }
+
+    @Test
+    fun `weeks - seven-day blocks back to the first rating, the expectation from the variety outside the week, notes per week`() {
+        val db =
+            house(
+                listOf("A", "B"),
+                listOf("p1", "p2", prod("snack", "type" to "Snack"), prod("dry", "type" to "Trockenfutter")),
+                rate("p1", "A", listOf(t), 1) + rate("p1", "A", listOf(t), 2) + rate("p1", "A", listOf(x), 3) +
+                    rate("p1", "A", listOf(t, t), 8) +
+                    rate("p2", "A", listOf(x), 10) + rate("p2", "A", listOf(x), 15) + rate("snack", "A", listOf("unberuehrt"), 1) +
+                    rate("dry", "A", listOf("liegen"), 2) + rate("p1", "A", listOf(x), -1) + rate("p1", "B", listOf(x, x), 2),
+            )
+        note(db, "tired", now0 - 2 * DAY, listOf("A"))
+        note(db, "happy", now0 - 9 * DAY, listOf("A"))
+        note(db, "happy", now0 - 9 * DAY + 3_600_000L, listOf("A", "B"))
+        note(db, "happy", now0 - 9 * DAY, listOf("B"))
+        note(db, "someday", now0 - 9 * DAY, listOf("A"))
+        val weeks = weeks(db, model(db), "A", now0)
+        assertEquals(
+            "from the 14th of May, the first rating on the 19th; the cat's share 4 of 7 pulls each variety's expectation",
+            listOf(
+                listOf(at("2026-05-14"), 1, 0, 0.381, emptyMap<String, Int>()),
+                listOf(at("2026-05-21"), 3, 2, 1.638, mapOf("happy" to 2)),
+                listOf(at("2026-05-28"), 3, 2, 2.357, mapOf("tired" to 1)),
+            ),
+            weeks.map { listOf(it.from, it.n, it.good, Math.round(it.expected * 1000) / 1000.0, it.seen) },
+        )
+        assertEquals(listOf<Any>(at("2026-06-04"), 0, 0, 1), listOf(weeks[2].to, weeks[2].mid, weeks[2].sauce, weeks[2].bad))
+        assertEquals("B's own", listOf(2), weeks(db, model(db), "B", now0).map { it.n })
+        val autumn = at("2026-10-28T12:00")
+        val dst = household(listOf("A"), listOf("p1"), rate("p1", "A", listOf(t), 10), autumn)
+        assertEquals(
+            "a block is seven calendar days across the clock change",
+            listOf(at("2026-10-15"), at("2026-10-22"), at("2026-10-29")),
+            weeks(dst, analyze(dst, Filter(), autumn), "A", autumn).let { w -> w.map { it.from } + w.last().to },
+        )
+        val long = house(listOf("A"), listOf("p1"), rate("p1", "A", listOf(t), 100) + rate("p1", "A", listOf(t), 1))
+        assertEquals("eight at most", 8, weeks(long, model(long), "A", now0).size)
+        assertEquals("without a rating none", emptyList<Block>(), weeks(long, model(long), "B", now0))
+    }
+
+    private fun block(
+        n: Int,
+        good: Int,
+        expected: Double,
+        vary: Double,
+    ) = Block(0, 0, n, good, 0, 0, n - good, expected, vary, emptyMap())
+
+    @Test
+    fun `appetite on Vorlieben - the home alarm while shown, a clear trend, the newest week at 2_5, an older at 3, else unauffällig`() {
+        val m = model(house(listOf("A"), listOf("p1"), emptyList()))
+        val calm = block(10, 6, 6.0, 2.4)
+
+        fun state(
+            weeks: List<Block>,
+            trend: List<Trend> = emptyList(),
+            model: Model = m,
+        ) = appetiteOf(model, "A", trend, weeks)?.let { listOf(it.state, it.dir) }
+        assertEquals(listOf("zuletzt-schwaecher", -1), state(listOf(calm, block(10, 2, 6.0, 2.4))))
+        assertEquals(listOf("zuletzt-besser", 1), state(listOf(calm, block(10, 10, 6.0, 2.4))))
+        assertEquals("3 under 6 is less than 2.5 standard errors", listOf("unauffaellig", 0), state(listOf(calm, block(10, 3, 6.0, 2.4))))
+        assertEquals(listOf("wieder", -1), state(listOf(block(10, 1, 6.0, 2.4), calm)))
+        assertEquals("an older week needs 3", listOf("unauffaellig", 0), state(listOf(block(10, 2, 6.0, 2.4), calm)))
+        assertEquals(
+            "6 under 20 of 40 is far beyond chance, but not a quarter of the week",
+            listOf("unauffaellig", 0),
+            state(listOf(calm, block(40, 14, 20.0, 2.0))),
+        )
+        assertEquals("a week of four is not judged", null, state(listOf(block(4, 0, 3.0, 0.5), block(10, 2, 6.0, 2.4))))
+        assertEquals(null, state(emptyList()))
+        val worse = Trend("A", "deutlich", -1, GoodCount(12, 2), GoodCount(20, 15), "tier")
+        assertEquals(listOf("schlechter", -1), state(listOf(calm, calm), listOf(worse)))
+        assertEquals(
+            "another cat's trend",
+            listOf("unauffaellig", 0),
+            state(listOf(calm, calm), listOf(Trend("B", "deutlich", -1, worse.recent, worse.before))),
+        )
+        assertEquals(
+            "„etwas“ is never said",
+            listOf("unauffaellig", 0),
+            state(listOf(calm, calm), listOf(Trend("A", "etwas", -1, worse.recent, worse.before))),
+        )
+        val db = house(listOf("A"), listOf("p1", "p2", "mies"), usual0 + low0)
+        assertEquals(listOf("tage", -1), state(listOf(calm, calm), listOf(worse), model(db)))
+        assertEquals(
+            "hidden on home, then not here either",
+            listOf("schlechter", -1),
+            state(listOf(calm, calm), listOf(worse), model(db, hidden = listOf("appetit:A:2026-06-03"))),
+        )
+    }
+
+    @Test
+    fun `favourites - only the own verdict, two named, from three the brand that holds most`() {
+        val db =
+            house(
+                listOf("A"),
+                listOf(
+                    prod("fav1", "brand" to "Sheba"),
+                    prod("fav2", "brand" to "Sheba"),
+                    prod("fav3", "brand" to "Felix"),
+                    prod("lean", "brand" to "Felix"),
+                    prod("pinned", "brand" to "Felix", "kaufen" to "immer"),
+                ),
+                rate("fav1", "A", listOf(t, t, t, t)) + rate("fav2", "A", listOf(t, t, g)) + rate("fav3", "A", listOf(g, g, t)) +
+                    rate("lean", "A", listOf(t, t, mi, mi, t)) + rate("pinned", "A", listOf(t, t, mi, mi, t)),
+            )
+        val r = ranking(model(db), now0)
+        assertEquals("a top leaning to good is none", listOf("fav1", "fav2", "fav3"), ids(favourites(r)))
+        assertTrue(ids(r.top).containsAll(listOf("lean", "pinned")))
+
+        fun brands(vararg names: String) =
+            mostly(names.mapIndexed { i, b -> model(house(listOf("A"), listOf(prod("p$i", "brand" to b)), emptyList())).sorts[0] })
+        assertEquals(listOf("Sheba"), brands("Sheba", "Felix", "Sheba"))
+        assertEquals("two thirds", listOf("Sheba", "Felix"), brands("Sheba", "Felix", "Sheba", "Whiskas"))
+        assertEquals(emptyList<String>(), brands("Sheba", "Felix", "Whiskas", "Gourmet", "Animonda"))
+        assertEquals("half is not most", listOf("Felix", "Sheba"), brands("Sheba", "Felix"))
+    }
+
+    @Test
+    fun `treats - from five ratings, every one good`() {
+        fun treats(meals: List<Meal>) =
+            treats(
+                model(
+                    house(
+                        listOf("A"),
+                        listOf(
+                            prod("s1", "type" to "Snack"),
+                            prod("s2", "type" to "Snack"),
+                            prod(
+                                "dry",
+                                "type" to "Trockenfutter",
+                            ),
+                        ),
+                        meals,
+                    ),
+                ),
+            )?.let { listOf(it.n, it.counts) }
+        val five = rate("s1", "A", listOf("verputzt", "verputzt", "verputzt")) + rate("s2", "A", listOf("verputzt", "spaeter"))
+        assertEquals(listOf(5, mapOf("verputzt" to 4, "spaeter" to 1)), treats(five))
+        assertEquals(null, treats(five.drop(1)))
+        assertEquals(null, treats(five + rate("s2", "A", listOf("angeknabbert"))))
+        assertEquals("their windows only", null, treats(rate("s1", "A", listOf("verputzt", "verputzt", "verputzt"), 200) + five.drop(3)))
+        assertEquals("dry food is no treat", null, treats(rate("dry", "A", List(5) { "gern" })))
+    }
+
+    @Test
+    fun `differ - paired meals only, a sign test per texture and brand, a brand inside a differing texture dropped`() {
+        val products =
+            listOf(
+                prod("s1", "brand" to "Sheba", "variety" to "Huhn in Soße"),
+                prod("s2", "brand" to "Sheba", "variety" to "Rind in Soße"),
+                prod("sg", "brand" to "Sheba", "variety" to "Pute in Gelee"),
+                prod("g1", "brand" to "Felix", "variety" to "Lachs in Gelee"),
+                prod("g2", "brand" to "Felix", "variety" to "Huhn in Gelee"),
+            )
+
+        fun sauce(n: Int) = (1..n).map { Meal(if (it % 2 == 0) "s1" else "s2", mapOf("A" to x, "B" to t), it) }
+        val gelee = (11..16).map { Meal(if (it % 2 == 0) "g1" else "g2", mapOf("A" to t, "B" to t), it) }
+        val alone = (17..21).map { Meal("s1", mapOf("A" to t), it) }
+
+        fun differ(meals: List<Meal>) =
+            house(listOf("A", "B"), products, meals).let { db -> differ(db, listOf("A", "B"), now0) }.map {
+                listOf(it.kind, it.key, it.a, it.b, it.ab, it.ba, it.shared, it.aGood, it.bGood)
+            }
+        assertEquals(
+            "B eats the sauce A leaves; Sheba is all sauce",
+            listOf(listOf("alles", null, "B", "A", 10, 0, 16, 16, 6), listOf("konsistenz", "sosse", "B", "A", 10, 0, 10, 10, 0)),
+            differ(sauce(10) + gelee + alone),
+        )
+        val sheba = listOf(Meal("sg", mapOf("A" to t, "B" to t), 22), Meal("sg", mapOf("A" to t, "B" to t), 23))
+        assertEquals(
+            "a brand with more than the sauce stands on its own",
+            listOf("alles", "konsistenz", "marke"),
+            differ(sauce(10) + gelee + sheba).map { it[0] },
+        )
+        assertEquals("8 to 0 is enough overall, not for a texture", listOf("alles"), differ(sauce(8) + gelee).map { it[0] })
+        val back = sauce(12) + (13..15).map { Meal("s1", mapOf("A" to t, "B" to x), it) }
+        assertEquals("12 to 3 can be chance", emptyList<List<Any?>>(), differ(back))
+        assertEquals("one cat", emptyList<Differ>(), differ(house(listOf("A"), products, sauce(10)), listOf("A"), now0))
+    }
+
+    @Test
+    fun `profile - the order of the lines, a pack's brand never also a brand line, sauce folded into its texture`() {
+        val days =
+            listOf(
+                "m1" to s,
+                "c1" to t,
+                "m2" to s,
+                "c2" to t,
+                "m3" to x,
+                "c3" to g,
+                "m1" to s,
+                "c1" to t,
+                "m2" to mi,
+                "c2" to g,
+                "m3" to s,
+                "c3" to t,
+                "m1" to x,
+                "c1" to t,
+                "c2" to mi,
+                "c3" to t,
+                "m2" to x,
+            )
+        val treats = (1..5).map { Meal("snack", mapOf("A" to "verputzt"), it + 0.5) }
+        val db = house(listOf("A"), line + prod("snack", "type" to "Snack"), daily("A", days, 1) + treats)
+        val m = model(db)
+        val r = ranking(m, now0)
+        val moved = Moves(listOf(Move("c2", Counted(3, mapOf("top" to 3)), Counted(2, mapOf("mittel" to 2)))), emptyList())
+        val link = Link("stink", "c1", Followed(6, 5), Followed(20, 1), 78.0)
+
+        fun profile(
+            trend: List<Trend> = emptyList(),
+            data: Db = db,
+            moves: Moves = moved,
+            links: List<Link> = listOf(link),
+        ): List<Trait> {
+            val mm = model(data)
+            val rr = ranking(mm, now0)
+            return profile(data, mm, rr, weeks(data, mm, "A", now0), trend, moves, links, now0)
+        }
+        val traits = profile()
+        assertEquals(listOf("liebling", "pack", "konsistenz", "snacks", "appetit", "neuerdings", "danach"), traits.map { it.kind })
+        assertEquals(listOf("c1", "c3", "c2"), traits[0].ids)
+        assertEquals(
+            "the line left in sauce",
+            listOf("Miamor", "sosse", 4, 8),
+            listOf(traits[1].key, traits[2].key, traits[2].insight?.k, traits[2].insight?.n),
+        )
+        assertEquals(listOf("unauffaellig", "stink-c1"), listOf(traits[4].key, traits[6].key))
+        assertTrue("its varieties are left, but the line says so", r.flop.any { it.verdict == "nicht" })
+        val worse = Trend("A", "deutlich", -1, GoodCount(12, 2), GoodCount(20, 15), "tier")
+        assertEquals(
+            "a worry leads, and the cat's own change explains the variety that cooled",
+            listOf("appetit", "liebling", "pack", "konsistenz", "snacks", "danach"),
+            profile(listOf(worse)).map { it.kind },
+        )
+        assertEquals(listOf("liebling", "pack"), cardTraits(traits, null).map { it.kind })
+        assertEquals("none naming the variety of the hint", listOf("liebling", "neuerdings"), cardTraits(traits, "m1").map { it.kind })
+        assertEquals(listOf("appetit", "liebling"), cardTraits(profile(listOf(worse)), null).map { it.kind })
+
+        val felix =
+            line.map { if (it["id"] == "m2") prod("m2", "brand" to "Miamor", "variety" to "Ente Pastete") else it } +
+                listOf(prod("f1", "brand" to "Felix", "variety" to "Rind"), prod("f2", "brand" to "Felix", "variety" to "Pute"))
+        val apart =
+            house(
+                listOf("A"),
+                felix.map {
+                    if (it["id"] ==
+                        "m3"
+                    ) {
+                        prod("m3", "brand" to "Miamor", "variety" to "Lachs")
+                    } else {
+                        it
+                    }
+                },
+                lineLeft + catzLiked + rate("f1", "A", listOf(t, mi, t)) + rate("f2", "A", listOf(mi, t, t)),
+            )
+        assertTrue(insights(apart, model(apart), now0).any { it.kind == "marke" && it.a.key == "Miamor" })
+        assertEquals(
+            "the line, not the brand",
+            listOf("pack" to "Miamor"),
+            findings(apart, model(apart), now0).filter { it.kind in listOf("pack", "marke") }.map { it.kind to it.key },
+        )
+
+        val plain = house(listOf("A"), listOf("c1", "flop"), rate("c1", "A", listOf(t, t, t)) + rate("flop", "A", listOf(x, x)))
+        val still = Moves(emptyList(), emptyList())
+        assertEquals(listOf("liebling", "stehen"), profile(data = plain, moves = still, links = emptyList()).map { it.kind })
+        val none = house(listOf("A"), listOf("c1", "flop"), rate("c1", "A", listOf(t, mi)) + rate("flop", "A", listOf(x, x)))
+        assertEquals(
+            "no favourite yet",
+            listOf(listOf("liebling", 0), listOf("stehen", 1)),
+            profile(data = none, moves = still, links = emptyList()).map { listOf(it.kind, it.ids.size) },
+        )
+    }
+
+    @Test
+    fun `nextPicks - all-good trials one meal from a verdict first, then missed favourites, the other trials, retries`() {
+        val db =
+            house(
+                listOf("A"),
+                listOf("two", "mixed", "near", "gone", "first", "settled"),
+                rate("near", "A", listOf(t, t), 5) + rate("mixed", "A", listOf(t, mi), 5) + rate("two", "A", listOf(t), 5) +
+                    rate("gone", "A", listOf(t, t, t), 300) + rate("first", "A", listOf(x), 10) + rate("settled", "A", listOf(t, t, t), 5),
+            )
+        val m = model(db)
+        val r = ranking(m, now0)
+        assertEquals(
+            listOf("near" to "trial", "gone" to "missed", "mixed" to "trial", "two" to "trial", "first" to "retry"),
+            nextPicks(r, nextUp(m, now0, r, lastOf(db), listOf("A"))).map { it.id to it.kind },
+        )
+    }
+
+    @Test
+    fun `shelf - every variety of Einkaufen in exactly one band`() {
+        val db =
+            house(
+                listOf("Minka", "Tiger"),
+                listOf(
+                    "yes",
+                    "split",
+                    "meh",
+                    "no",
+                    "open",
+                    "never",
+                    prod("pinned", "kaufen" to "nicht"),
+                    prod("dry", "type" to "Trockenfutter"),
+                ),
+                rate("yes", "Minka", listOf(t, t, t)) + rate("split", "Minka", listOf(t, t, t)) + rate("split", "Tiger", listOf(x, x)) +
+                    rate("meh", "Minka", listOf(t, mi, mi, t)) + rate("no", "Tiger", listOf(x, x)) + rate("open", "Minka", listOf(t)) +
+                    rate("dry", "Minka", listOf("gern", "gern", "gern")),
+            )
+        for (pet in listOf("all", "Minka", "Tiger")) {
+            val m = model(db, pet)
+            val g = shopGroups(m)
+            val bands = listOf(g.nachkaufen, g.geht, g.nicht, g.neu).map(::ids)
+            assertEquals(pet, bands.flatten().size, bands.flatten().toSet().size)
+            assertEquals(
+                pet,
+                m.sorts
+                    .filter { it.total > 0 || it.kaufen != null }
+                    .map { it.id }
+                    .toSet(),
+                bands.flatten().toSet(),
+            )
+            assertEquals(pet, bands.map { it.size }, shelf(m).let { listOf(it.buy, it.meh, it.stop, it.open) })
+        }
+        assertEquals(listOf(3, 1, 2, 1), shelf(model(db)).let { listOf(it.buy, it.meh, it.stop, it.open) })
     }
 }

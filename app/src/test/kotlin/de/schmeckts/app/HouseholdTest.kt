@@ -110,7 +110,13 @@ class HouseholdTest {
             listOf(listOf("Miamor", "sosse", 4, 0, 9)),
             packs(m0).map { listOf(it.brand, it.texture, it.sorts.size, it.a.good, it.a.n) },
         )
-        assertEquals(emptyList<Long>(), said.filter { x -> packs(x.m).any { it.brand == "Catz Finefood" || it.brand == "Bozita" } }.map { it.t })
+        assertEquals(
+            emptyList<Long>(),
+            said
+                .filter { x ->
+                    packs(x.m).any { it.brand == "Catz Finefood" || it.brand == "Bozita" }
+                }.map { it.t },
+        )
     }
 
     @Test

@@ -1748,8 +1748,14 @@ fun packs(m: Model): List<BrandLine> {
     for ((brand, sorts) in wet.groupBy(::brandOf)) {
         if (brand.isEmpty() || sorts.any { it.kaufen == "immer" }) continue
         val rest = wet.filter { brandOf(it) != brand }
-        val x = packOf(brand, seenOf(m, sorts), seenOf(m, rest), INSIGHT_GROUP, INSIGHT_GAP) ?: held(m, "pack", brand, sorts, rest) ?: continue
-        val texture = sorts.map { textureKey(it.product) }.toSet().singleOrNull()?.takeIf { it.isNotEmpty() }
+        val x =
+            packOf(brand, seenOf(m, sorts), seenOf(m, rest), INSIGHT_GROUP, INSIGHT_GAP) ?: held(m, "pack", brand, sorts, rest) ?: continue
+        val texture =
+            sorts
+                .map { textureKey(it.product) }
+                .toSet()
+                .singleOrNull()
+                ?.takeIf { it.isNotEmpty() }
         out.add(BrandLine(brand, texture, sorts, tallyOf(sorts, brand), restOf("marke", rest), x.gap))
     }
     return out.sortedBy { it.gap }
@@ -1796,7 +1802,13 @@ fun experimentOf(
                 .filter { it.n >= INSIGHT_RATINGS && it.good * 2 > it.n }
                 .sortedWith { a, b ->
                     val d = b.good.toDouble() / b.n - a.good.toDouble() / a.n
-                    if (d != 0.0) sign(d).toInt() else if (a.n != b.n) b.n - a.n else german.compare(a.key as String, b.key as String)
+                    if (d != 0.0) {
+                        sign(d).toInt()
+                    } else if (a.n != b.n) {
+                        b.n - a.n
+                    } else {
+                        german.compare(a.key as String, b.key as String)
+                    }
                 }.firstOrNull()
                 ?.key as String?
         } else {
@@ -1837,12 +1849,12 @@ fun weeks(
     pet: String,
     now: Long,
 ): List<Block> {
-    val by =
-        m.sorts
-            .filter { ranks(it.product) }
-            .associate { e -> e.id to e.pets[pet]?.list.orEmpty().filter { it.t <= now } }
-            .filterValues { it.isNotEmpty() }
-    val all = by.values.flatten()
+    val by = mutableListOf<List<Pt>>() // per variety
+    for (e in m.sorts) {
+        val list = (e.pets[pet]?.list ?: emptyList()).filter { it.t <= now }
+        if (ranks(e.product) && list.isNotEmpty()) by.add(list)
+    }
+    val all = by.flatten()
     if (all.isEmpty()) return emptyList()
     val first = all.minOf { it.t }
     val end = addDays(dayStart(now), 1)
@@ -1858,7 +1870,7 @@ fun weeks(
         val x = Side()
         var expected = 0.0
         var vary = 0.0
-        for (list in by.values) {
+        for (list in by) {
             val (inside, outside) = list.partition { it.t in from until to }
             if (inside.isEmpty()) continue
             val others = outside.filter { it.t > now - VERDICT_SPAN }
@@ -2032,9 +2044,9 @@ fun differ(
                         Both(if (typeOf(p) == TYPES[0]) textureKey(p) else "", (p.str("brand") ?: "").trim(), score(ra), score(rb))
                     }
                 }
+            val textures = both.filter { it.texture.isNotEmpty() }.groupBy { it.texture }
             val found =
-                listOfNotNull(differOf(a, b, "alles", null, both)) +
-                    both.filter { it.texture.isNotEmpty() }.groupBy { it.texture }.mapNotNull { (k, l) -> differOf(a, b, "konsistenz", k, l) }
+                listOfNotNull(differOf(a, b, "alles", null, both)) + textures.mapNotNull { (k, l) -> differOf(a, b, "konsistenz", k, l) }
             val apart = found.mapNotNull { it.key }.toSet()
             out += found
             for ((brand, l) in both.filter { it.brand.isNotEmpty() }.groupBy { it.brand }) {
@@ -2132,7 +2144,8 @@ fun profile(
     // a move the cat's own change explains is no news of the variety
     val own = { dir: Int -> trend.any { it.cause == "tier" && it.dir == dir && (pet == null || it.pet == pet) } }
     val moved = (if (own(-1)) emptyList() else moves.cooled) + (if (own(1)) emptyList() else moves.warmed)
-    if (moved.isNotEmpty()) out.add(Trait("neuerdings", ids = moved.map { it.id }, moves = moved, warmed = moved.all { it in moves.warmed }))
+    val warmed = moved.all { it in moves.warmed }
+    if (moved.isNotEmpty()) out.add(Trait("neuerdings", ids = moved.map { it.id }, moves = moved, warmed = warmed))
     for (l in links) out.add(Trait("danach", "${l.kind}-${l.id}", listOf(l.id), link = l))
     out += found.filter { it.kind !in BUYING }
     return out
