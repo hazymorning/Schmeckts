@@ -130,7 +130,14 @@ class Typed(
     var value by mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
 
     // a field redrawn on its own still gets the stored value its caller had before the last key, so only a change counts
-    var seen = initial
+    var seen: String? = initial
+    var focused = false
+
+    /** typing ended: the next draw shows the value in effect, such as the hours a number out of range did not change */
+    fun leave() {
+        focused = false
+        seen = null
+    }
 }
 
 @Composable

@@ -508,6 +508,17 @@ class UiTypingTest : ScreenTest() {
             fieldText("Stunden, 1 bis 24") == "12" && prefs.remind == 720,
             "the hours too ${fieldText("Stunden, 1 bis 24")} ${prefs.remind}",
         )
+        field("Stunden, 1 bis 24").performTextClearance()
+        field("Stunden, 1 bis 24").performImeAction()
+        idle(50)
+        val cleared = fieldText("Stunden, 1 bis 24")
+        keys("Stunden, 1 bis 24", "0")
+        field("Stunden, 1 bis 24").performImeAction()
+        idle(50)
+        check(
+            cleared == "12" && fieldText("Stunden, 1 bis 24") == "12" && prefs.remind == 720,
+            "once typing is done the field shows the hours in effect $cleared ${fieldText("Stunden, 1 bis 24")} ${prefs.remind}",
+        )
         act("close")
         idle(400)
         act("new-product")

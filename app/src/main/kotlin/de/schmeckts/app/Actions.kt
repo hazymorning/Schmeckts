@@ -674,10 +674,6 @@ class Actions(
         when {
             id == "f-server" && s.str("code").isEmpty() -> ui.focus("f-code")
             id == "f-code" || id == "f-server" -> launch { connectServer() }
-            id == "f-remind" -> {
-                ui.blurField()
-                ui.renderSheet()
-            }
             id == "f-ai" -> launch { checkAiKey() }
             id == "f-nick" -> l.pets.addNick()
             l.pets.editing(s) -> l.pets.savePet()
