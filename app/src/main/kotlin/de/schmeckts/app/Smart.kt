@@ -860,7 +860,7 @@ private fun wetOf(m: Model) = m.sorts.filter { it.n > 0 && typeOf(it.product) ==
 
 private fun enough(list: List<Sort>) = list.count { it.n >= TWO } >= TWO // so no single variety carries a side
 
-private fun tallyOf(
+fun tallyOf(
     list: List<Sort>,
     key: Any? = null,
 ): Side {
@@ -1311,7 +1311,7 @@ fun moves(
 
 // missed reads the newest ratings however old, since a variety not served for long has an empty window. retry is
 // a single poor rating by a pet that slowStarters() says needs a while with new food.
-private const val NEXT_NEWEST = 8
+const val NEXT_NEWEST = 8
 private const val NEXT_AWAY = 42 * DAY
 private const val NEXT_SPAN = 60 * DAY
 
@@ -1840,7 +1840,9 @@ class Block(
     val expected: Double,
     val vary: Double,
     val seen: Map<String, Int>,
-)
+) {
+    val judged get() = n >= BLOCK.MIN
+}
 
 /** Oldest first, the newest ending at the midnight after now; without treats and dry food. */
 fun weeks(
@@ -1997,14 +1999,19 @@ class Differ(
     val shared: Int,
     val aGood: Int,
     val bGood: Int,
+    val aSide: Side,
+    val bSide: Side,
 )
 
 private class Both(
     val texture: String,
     val brand: String,
-    val a: Int,
-    val b: Int,
-)
+    val ra: String,
+    val rb: String,
+) {
+    val a = score(ra)
+    val b = score(rb)
+}
 
 private fun differOf(
     a: String,
@@ -2021,7 +2028,13 @@ private fun differOf(
     val z = if (kind == "alles") DIFFER.Z_ALL else DIFFER.Z
     if (d == 0 || d.toDouble() * d < z * z * (ab + ba) || (aGood - bGood) * d <= 0) return null
     if (abs(aGood - bGood).toDouble() / list.size < DIFFER.GAP) return null
-    return if (d > 0) Differ(a, b, kind, key, ab, ba, list.size, aGood, bGood) else Differ(b, a, kind, key, ba, ab, list.size, bGood, aGood)
+    val sa = Side(a).also { x -> list.forEach { add(x, it.ra) } }
+    val sb = Side(b).also { x -> list.forEach { add(x, it.rb) } }
+    return if (d > 0) {
+        Differ(a, b, kind, key, ab, ba, list.size, aGood, bGood, sa, sb)
+    } else {
+        Differ(b, a, kind, key, ba, ab, list.size, bGood, aGood, sb, sa)
+    }
 }
 
 /** pets: in the household's order. The widest first. */
@@ -2043,7 +2056,7 @@ fun differ(
                     if (ra == null || rb == null) {
                         null
                     } else {
-                        Both(if (typeOf(p) == TYPES[0]) textureKey(p) else "", (p.str("brand") ?: "").trim(), score(ra), score(rb))
+                        Both(if (typeOf(p) == TYPES[0]) textureKey(p) else "", (p.str("brand") ?: "").trim(), ra, rb)
                     }
                 }
             val textures = both.filter { it.texture.isNotEmpty() }.groupBy { it.texture }

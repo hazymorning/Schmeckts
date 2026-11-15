@@ -1,11 +1,15 @@
 package de.schmeckts.app.views
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,10 +26,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size as Area
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -34,16 +47,23 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import de.schmeckts.app.Block
 import de.schmeckts.app.GOOD
 import de.schmeckts.app.House
 import de.schmeckts.app.Model
 import de.schmeckts.app.NO
+import de.schmeckts.app.OBSERVATIONS
 import de.schmeckts.app.PROVIDERS
 import de.schmeckts.app.Phone
+import de.schmeckts.app.Pt
 import de.schmeckts.app.RATINGS
 import de.schmeckts.app.Ratings
 import de.schmeckts.app.Rec
+import de.schmeckts.app.Shelf
+import de.schmeckts.app.Side
 import de.schmeckts.app.Sort
+import de.schmeckts.app.Stat
 import de.schmeckts.app.Tally
 import de.schmeckts.app.VERDICTS
 import de.schmeckts.app.addDays
@@ -53,11 +73,15 @@ import de.schmeckts.app.asString
 import de.schmeckts.app.at
 import de.schmeckts.app.cap
 import de.schmeckts.app.clockStr
+import de.schmeckts.app.dateOf
 import de.schmeckts.app.dayKey
 import de.schmeckts.app.dayLabel
+import de.schmeckts.app.dayMonth
 import de.schmeckts.app.esc
 import de.schmeckts.app.imageOf
 import de.schmeckts.app.isObservation
+import de.schmeckts.app.jsRound
+import de.schmeckts.app.monthOf
 import de.schmeckts.app.observationOf
 import de.schmeckts.app.pets
 import de.schmeckts.app.pname
@@ -65,6 +89,7 @@ import de.schmeckts.app.rOf
 import de.schmeckts.app.rateTone
 import de.schmeckts.app.ratingsIn
 import de.schmeckts.app.scaleOf
+import de.schmeckts.app.score
 import de.schmeckts.app.servedAt
 import de.schmeckts.app.sideOf
 import de.schmeckts.app.timeOf
@@ -74,10 +99,13 @@ import de.schmeckts.app.ui.Badge
 import de.schmeckts.app.ui.Btn
 import de.schmeckts.app.ui.BtnKind
 import de.schmeckts.app.ui.Divider
+import de.schmeckts.app.ui.Gap
 import de.schmeckts.app.ui.Icon
 import de.schmeckts.app.ui.ListRow
+import de.schmeckts.app.ui.LocalRaise
 import de.schmeckts.app.ui.LocalUi
 import de.schmeckts.app.ui.M
+import de.schmeckts.app.ui.Palette
 import de.schmeckts.app.ui.Radius
 import de.schmeckts.app.ui.RateSlider
 import de.schmeckts.app.ui.Seg
@@ -95,7 +123,7 @@ import de.schmeckts.app.ui.press
 import de.schmeckts.app.ui.tone
 import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
-
+import de.schmeckts.app.yearOf
 // Building blocks shared by the views
 
 /** A row that tells something: its picture (an icon), what it says and why, as markup */
@@ -691,6 +719,421 @@ fun Strip(
             r.more || r.keys.size > STRIP,
             plusFirst = true,
         )
+    }
+}
+
+// == Marks of „Vorlieben“: a rating is a dot filled as far as the bowl was eaten, a variety a square in its band's tone ==
+
+private val OFTEN =
+    listOf(
+        "einmal",
+        "zweimal",
+        "dreimal",
+        "viermal",
+        "fünfmal",
+        "sechsmal",
+        "siebenmal",
+        "achtmal",
+        "neunmal",
+        "zehnmal",
+        "elfmal",
+        "zwölfmal",
+    )
+
+fun often(n: Int) = if (n == 0) "nie" else OFTEN.getOrNull(n - 1) ?: "$n Mal"
+
+/** days from, to exclusive: „4. bis 10. Oktober“, „27. September bis 3. Oktober“ */
+fun spanOf(
+    from: Long,
+    to: Long,
+): String {
+    val last = addDays(to, -1)
+    val head = if (monthOf(from) == monthOf(last) && yearOf(from) == yearOf(last)) "${dateOf(from)}." else dayMonth(from)
+    return "$head bis ${dayMonth(last)}"
+}
+
+// what a mark stands on: the page or a card
+private val groundColor: Color
+    @Composable get() = if (LocalRaise.current != null) colors.surface else colors.bg
+
+/** r: null for a rating still to come */
+@Composable
+fun RatingDot(r: String?) {
+    val p = colors
+    val c = r?.let { p.tone(rateTone(it))?.c }
+    val share = if (r != null) score(r) / 100f else 0f
+    Canvas(Modifier.size(Size.dot)) {
+        val half = size.minDimension / 2
+        if (c == null) {
+            val w = Size.hairline.toPx()
+            drawCircle(p.muted, half - w / 2, style = Stroke(w))
+            return@Canvas
+        }
+        val w = Size.stroke.toPx()
+        val inner = half - w / 2
+        if (share > 0f) {
+            clipPath(Path().apply { addOval(Rect(center, inner)) }) {
+                val h = 2 * inner * share
+                drawRect(c, Offset(0f, center.y + inner - h), Area(size.width, h))
+            }
+        }
+        drawCircle(c, inner, style = Stroke(w))
+    }
+}
+
+/** keys oldest first; open: ratings still to come; split: the dot after a wider gap; said: the row tells it in words */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DotRow(
+    keys: List<String>,
+    open: Int = 0,
+    more: Boolean = false,
+    split: Int = -1,
+    said: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    if (keys.isEmpty() && open == 0) return
+    val words =
+        if (said) {
+            null
+        } else {
+            evidenceOf(de.schmeckts.app.Counted(keys.size, keys.groupingBy { it }.eachCount())) +
+                (if (open > 0) ", noch ${if (open == 1) "eine Bewertung" else "zwei Bewertungen"} offen" else "")
+        }
+    FlowRow(
+        modifier.clearAndSetSemantics { if (words != null) contentDescription = words },
+        horizontalArrangement = Arrangement.spacedBy(Space.s1),
+        verticalArrangement = Arrangement.spacedBy(Space.s1),
+    ) {
+        val mid = Modifier.align(Alignment.CenterVertically)
+        if (more) T("+", Type.captionStrong, mid, colors.muted)
+        keys.forEachIndexed { i, k -> Box(mid.padding(start = if (i == split) Space.s1 else 0.dp)) { RatingDot(k) } }
+        repeat(open) { Box(mid) { RatingDot(null) } }
+    }
+}
+
+/** A variety's ratings: one row for one cat, else a row for each cat that rated it, led by its picture. of: which of a
+ cat's ratings, newest first. */
+@Composable
+fun DotLines(
+    m: Model,
+    e: Sort,
+    modifier: Modifier = Modifier,
+    open: Int = 0,
+    pets: List<String> = m.pets,
+    of: (Stat) -> List<Pt> = { it.window },
+) {
+    val lines =
+        pets.mapNotNull { pid ->
+            val x = e.pets[pid] ?: return@mapNotNull null
+            val l = of(x)
+            if (l.isEmpty()) null else Triple(pid, l.reversed().map { it.r }, x.list.size > l.size)
+        }
+    if (m.pets.size <= 1) {
+        val l = lines.firstOrNull()
+        return DotRow(l?.second.orEmpty(), open, l?.third == true, modifier = modifier)
+    }
+    if (lines.isEmpty()) return
+    val d = LocalUi.current.phone.derive
+    Column(modifier.clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(Space.s1)) {
+        for ((pid, keys, more) in lines) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Avatar(d.getPet(pid), Av.XS)
+                Gap(Space.s2)
+                DotRow(keys, more = more)
+            }
+        }
+    }
+}
+
+private fun bands(s: Shelf) =
+    listOf(
+        Triple(s.buy, "nachkaufen", "good"),
+        Triple(s.meh, "geht so", "mid"),
+        Triple(s.stop, "nicht mehr kaufen", "bad"),
+        Triple(s.open, "noch offen", null),
+    )
+
+/** a band's square, filled in its tone, or an open outline */
+@Composable
+fun Swatch(tone: String?) {
+    val p = colors
+    val c = p.tone(tone)?.c
+    Canvas(Modifier.size(Size.dot)) {
+        if (c != null) {
+            drawRect(c)
+        } else {
+            val w = Size.hairline.toPx()
+            drawRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, size.height - w), style = Stroke(w))
+        }
+    }
+}
+
+/** The varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines */
+@Composable
+fun ShelfBar(
+    shelf: Shelf,
+    legend: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val list = bands(shelf)
+    val total = list.sumOf { it.first }
+    if (total == 0) return
+    val p = colors
+    val said = "Von $total Sorten: ${list.filter { it.first > 0 }.joinToString(", ") { "${it.first} ${it.second}" }}."
+    Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
+            if (total > 2 * per) {
+                val last = list.indexOfLast { it.first > 0 }
+                Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
+                    val w = Size.hairline.toPx()
+                    val gap = Space.hair.toPx()
+                    val h = size.height
+                    drawRoundRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), style = Stroke(w))
+                    clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
+                        var x = 0f
+                        list.forEachIndexed { i, (k, _, tone) ->
+                            val seg = size.width * k / total
+                            val c = p.tone(tone)?.c
+                            if (k > 0 && c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < last) gap else 0f, h))
+                            x += seg
+                        }
+                    }
+                }
+            } else {
+                val rows = (total + per - 1) / per
+                val fills = list.flatMap { (k, _, tone) -> List(k) { p.tone(tone)?.c } }
+                Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
+                    val d = Size.dot.toPx()
+                    val step = d + Space.s1.toPx()
+                    val w = Size.hairline.toPx()
+                    fills.forEachIndexed { i, c ->
+                        val at = Offset(i % per * step, i / per * step)
+                        if (c != null) {
+                            drawRect(c, at, Area(d, d))
+                        } else {
+                            drawRect(p.muted, at + Offset(w / 2, w / 2), Area(d - w, d - w), style = Stroke(w))
+                        }
+                    }
+                }
+            }
+        }
+        if (legend) {
+            Gap(Space.s2)
+            ShelfLegend(shelf)
+        }
+    }
+}
+
+/** shelf: each band with its count; null: the words alone, under several tallies */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ShelfLegend(shelf: Shelf?) {
+    val list =
+        if (shelf != null) {
+            bands(shelf).filter { it.first > 0 }
+        } else {
+            bands(Shelf(0, 0, 0, 0)).map { if (it.third == null) it.copy(second = "offen") else it }
+        }
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Space.s3),
+        verticalArrangement = Arrangement.spacedBy(Space.s1),
+    ) {
+        for ((k, word, tone) in list) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s1)) {
+                Swatch(tone)
+                if (shelf != null) {
+                    T("$k $word", Type.small.copy(fontFeatureSettings = "tnum"), color = colors.ink)
+                } else {
+                    T(word, Type.caption, color = colors.muted)
+                }
+            }
+        }
+    }
+}
+
+/** how one side's meals went down, by tone, each in proportion */
+@Composable
+fun OutcomeBar(
+    x: Side,
+    modifier: Modifier = Modifier,
+) {
+    val p = colors
+    val parts = listOf(x.good to p.good, x.mid to p.mid, x.sauce to p.sauce, x.bad to p.bad).filter { it.first > 0 }
+    Canvas(modifier.fillMaxWidth().height(Size.meter).clip(RoundedCornerShape(50))) {
+        val n = parts.sumOf { it.first }
+        if (n == 0) return@Canvas
+        val gap = Space.hair.toPx()
+        val room = size.width - gap * (parts.size - 1)
+        var at = 0f
+        for ((k, c) in parts) {
+            val w = room * k / n
+            drawRect(c, Offset(at, 0f), Area(w, size.height))
+            at += w + gap
+        }
+    }
+}
+
+/** one side of a comparison: what it says, as markup, and its meals */
+class Compared(
+    val text: String,
+    val side: Side,
+)
+
+@Composable
+fun CompareBars(
+    a: Compared,
+    b: Compared?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Space.s3)) {
+        for (l in listOfNotNull(a, b)) {
+            Column {
+                M(l.text, Type.small, color = colors.ink)
+                Gap(Space.s1)
+                OutcomeBar(l.side)
+            }
+        }
+    }
+}
+
+private fun weekSaid(w: Block): String {
+    val head = "Woche vom ${spanOf(w.from, w.to)}: "
+    if (w.n == 0) return head + "nichts bewertet."
+    val ate =
+        listOfNotNull(
+            "${often(w.n)} bewertet",
+            if (w.good > 0) "${often(w.good)} gut gefressen" else null,
+            if (w.mid > 0) "${often(w.mid)} die Hälfte" else null,
+            if (w.sauce + w.bad > 0) "${often(w.sauce + w.bad)} kaum" else null,
+        )
+    val noted =
+        OBSERVATIONS.keys.mapNotNull { k ->
+            val label = observationOf(k).label
+            w.seen[k]?.let { "${often(it)} ${if (k == "stink") label else lower(label)}" }
+        }
+    return head + ate.joinToString(", ") + ". Zu erwarten waren etwa ${jsRound(w.expected)}." +
+        (if (noted.isNotEmpty()) " Notiert: ${noted.joinToString(", ")}." else "")
+}
+
+// bottom up good, mid, sauce, bad, as tall as its share of the busiest week; the line what its varieties led to expect
+private fun DrawScope.drawWeek(
+    w: Block,
+    most: Int,
+    p: Palette,
+    ground: Color,
+) {
+    val h = size.height
+    val gap = Space.hair.toPx()
+    val parts = listOf(w.good to p.good, w.mid to p.mid, w.sauce to p.sauce, w.bad to p.bad).filter { it.first > 0 }
+    val room = h * w.n / most - gap * (parts.size - 1).coerceAtLeast(0)
+    var y = h
+    for ((k, c) in parts) {
+        val s = room * k / w.n
+        drawRect(c, Offset(0f, y - s), Area(size.width, s))
+        y -= s + gap
+    }
+    if (!w.judged) {
+        val l = Size.hairline.toPx()
+        drawRect(p.muted, Offset(l / 2, l / 2), Area(size.width - l, h - l), style = Stroke(l))
+    }
+    if (w.n == 0) return
+    val at = h - (h * w.expected / most).toFloat()
+    val over = Space.s1.toPx()
+    val st = Size.stroke.toPx()
+    drawLine(ground, Offset(-over, at), Offset(size.width + over, at), st + 2 * Size.hairline.toPx())
+    drawLine(p.ink, Offset(-over, at), Offset(size.width + over, at), st)
+}
+
+/** a column a week, oldest first, the notes of each under it */
+@Composable
+fun WeekChart(
+    weeks: List<Block>,
+    ground: Color = groundColor,
+) {
+    if (weeks.isEmpty()) return
+    val p = colors
+    val most = weeks.maxOf { it.n }.coerceAtLeast(1)
+    val first = weeks[0].from
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val k = weeks.size
+        val col = minOf((maxWidth - Space.s2 * (k - 1)) / k, Size.picXl)
+        Column(Modifier.width(col * k + Space.s2 * (k - 1))) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+                weeks.forEachIndexed { i, w ->
+                    Canvas(
+                        Modifier
+                            .width(col)
+                            .height(Size.chart)
+                            .testTag("week-${k - 1 - i}")
+                            .semantics { contentDescription = weekSaid(w) },
+                    ) { drawWeek(w, most, p, ground) }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(Size.hairline).background(p.line))
+            if (weeks.any { it.seen.isNotEmpty() }) {
+                Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+                    for (w in weeks) {
+                        Column(
+                            Modifier.width(col),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(Space.hair),
+                        ) {
+                            for (kind in OBSERVATIONS.keys) {
+                                val n = w.seen[kind] ?: continue
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Space.hair),
+                                ) {
+                                    Icon(observationOf(kind).icon, size = Size.iconXs, color = p.tone(kind)?.c ?: p.muted)
+                                    if (n > 1) T("$n", Type.caption.copy(fontFeatureSettings = "tnum"), color = p.muted)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+                T("ab ${dateOf(first)}.${monthOf(first)}.", Type.caption.copy(fontFeatureSettings = "tnum"), Modifier.weight(1f), p.muted)
+                T("bis heute", Type.caption, color = p.muted)
+            }
+        }
+    }
+}
+
+private const val PACK_SHOWN = 4
+
+/** the packagings of a group fanned out, the first on top */
+@Composable
+fun PackThumbs(
+    ids: List<String>,
+    ground: Color = groundColor,
+) {
+    val d = LocalUi.current.phone.derive
+    val list = ids.take(PACK_SHOWN)
+    Box(Modifier.clearAndSetSemantics {}) {
+        list.forEachIndexed { i, id ->
+            Thumb(
+                null,
+                d.getProduct(id),
+                Th.M,
+                Modifier
+                    .zIndex((list.size - i).toFloat())
+                    .padding(start = Space.s3 * i)
+                    .drawBehind {
+                        val st = Size.stroke.toPx()
+                        drawRoundRect(
+                            ground,
+                            Offset(-st, -st),
+                            Area(size.width + 2 * st, size.height + 2 * st),
+                            CornerRadius(
+                                Radius.s.toPx() + st,
+                            ),
+                        )
+                    },
+            )
+        }
     }
 }
 
