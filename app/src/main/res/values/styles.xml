@@ -9,6 +9,17 @@
 
     <style name="AppTheme.NoActionBar" parent="AppTheme" />
 
+    <!-- the system's date and time pickers in the app's colours; the app picks one by its own colour scheme -->
+    <style name="Picker" parent="android:Theme.Material.Light.Dialog">
+        <item name="android:colorAccent">@color/picker_accent</item>
+        <item name="android:colorBackground">@color/picker_surface</item>
+    </style>
+
+    <style name="Picker.Dark" parent="android:Theme.Material.Dialog">
+        <item name="android:colorAccent">@color/picker_accent_dark</item>
+        <item name="android:colorBackground">@color/picker_surface_dark</item>
+    </style>
+
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>

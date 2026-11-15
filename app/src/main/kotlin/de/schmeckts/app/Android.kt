@@ -141,6 +141,7 @@ class AndroidPlatform(
     private val app: Application,
 ) : Platform {
     var activity: ComponentActivity? = null
+    var dark = false // the app's colour scheme as chosen, for the system's own dialogs
     private val keys = AtomicInteger()
 
     override val version: String =
@@ -394,11 +395,13 @@ class AndroidPlatform(
         withContext(Dispatchers.Main) {
             val act: Activity = activity ?: return@withContext null
             val c = Calendar.getInstance().apply { timeInMillis = t }
+            val theme = if (dark) R.style.Picker_Dark else R.style.Picker
             val day =
                 suspendCancellableCoroutine<Triple<Int, Int, Int>?> { k ->
                     val d =
                         DatePickerDialog(
                             act,
+                            theme,
                             { _, y, m, dd -> k.resume(Triple(y, m, dd)) },
                             c.get(Calendar.YEAR),
                             c.get(Calendar.MONTH),
@@ -411,7 +414,14 @@ class AndroidPlatform(
             val time =
                 suspendCancellableCoroutine<Pair<Int, Int>?> { k ->
                     val d =
-                        TimePickerDialog(act, { _, h, m -> k.resume(h to m) }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true)
+                        TimePickerDialog(
+                            act,
+                            theme,
+                            { _, h, m -> k.resume(h to m) },
+                            c.get(Calendar.HOUR_OF_DAY),
+                            c.get(Calendar.MINUTE),
+                            true,
+                        )
                     d.setOnCancelListener { if (k.isActive) k.resume(null) }
                     d.show()
                 } ?: return@withContext null

@@ -124,14 +124,15 @@ class MainActivity : ComponentActivity() {
         }
         super.onCreate(savedInstanceState)
         setContent {
-            val dark =
+            val chosen =
                 isDark(
                     main.phone.prefs
                         .also { main.ui.tick }
                         .theme,
-                ) ||
-                    main.ui.dark > 0
+                )
+            val dark = chosen || main.ui.dark > 0
             LaunchedEffect(dark) { bars(dark) }
+            LaunchedEffect(chosen) { app.platform.dark = chosen }
             SideEffect { main.ui.splashGone = true } // the home page is laid out: its first frame ends the splash
             AppScreen(main)
             // with nothing left to close, back sends the app to the background as other apps do
