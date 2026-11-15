@@ -13,10 +13,10 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import de.schmeckts.app.ui.plainOf
 import de.schmeckts.app.views.catOf
-import de.schmeckts.app.views.insightSaid
 import de.schmeckts.app.views.sheetOn
 import de.schmeckts.app.views.sheetText
 import de.schmeckts.app.views.syncChip
+import de.schmeckts.app.views.times
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import org.junit.Test
@@ -110,18 +110,13 @@ class UiTest : ScreenTest() {
         idle(400)
         check((s.pets.values.first() as JsonObject)["r"].asString == "gut", "rated with one tap")
         act("open-evaluation")
-        act("open-level", "v" to "shop")
         check(
-            shopGroups(phone.derive.model()).nachkaufen.size >= 3 && shows("Nachkaufen"),
-            "the cart on „Vorlieben“ leads to the varieties to buy",
+            shopGroups(phone.derive.model()).nachkaufen.size >= 3 && tags("sort-", within = "shop").size >= 3 && inSheet("Nachkaufen"),
+            "„Vorlieben“ ends on the varieties to buy",
         )
-        act("settings-back")
         check(
-            shows("Erkenntnisse") &&
-                phone.derive
-                    .evaluationModel()
-                    .insights.size >= 2,
-            "insights on „Vorlieben“, each with its counts",
+            tags("trait-", sheet = true).any { it in setOf("marke", "konsistenz", "geschmack", "sosse") || it.startsWith("pack-") },
+            "the Steckbrief holds a finding for buying",
         )
         act("settings-back")
         act("open-settings")
@@ -674,7 +669,6 @@ class UiEvaluationTest : ScreenTest() {
         val ranked = tags("place-", sheet = true)
         val names = ranked.mapNotNull { phone.derive.getProduct(it)?.let(::pname) }
         val m = phone.derive.model()
-        val portrait = phone.derive.evaluationModel()
         check(
             names.isNotEmpty() &&
                 names.none { n ->
@@ -682,25 +676,12 @@ class UiEvaluationTest : ScreenTest() {
                 },
             "the portrait names none of the varieties the lists below show",
         )
-        val taste = portrait.taste
-        check(
-            taste.marke.isEmpty() &&
-                taste.konsistenz.isNotEmpty() &&
-                taste.geschmack.isNotEmpty() &&
-                listOf(taste.konsistenz, taste.geschmack).all { l ->
-                    l.map { it.good.toDouble() / it.n } ==
-                        l.map { it.good.toDouble() / it.n }.sortedDescending()
-                } &&
-                inSheet("Konsistenz") &&
-                inSheet("Geschmack"),
-            "the portrait’s taste profile: how often each consistency and flavour went down well, best first",
-        )
         check(ranked.isNotEmpty() && m.pets.isNotEmpty(), "every row of a longer list shows its place")
         check(inSheet("Tops") && inSheet("Flops"), "Tops and Flops, the titles plain words")
     }
 
     @Test
-    fun `insights - the three strongest on the card, all on its page for buying and for feeding, each with its counts`() {
+    fun `insights - every finding a line of the Steckbrief, buying before Beim Fuettern, each with both counts`() {
         val sorts =
             listOf(
                 product("a", "Sheba", "Lachs in Soße"),
@@ -721,51 +702,17 @@ class UiEvaluationTest : ScreenTest() {
         open(now = at("2026-06-12T12:00"))
         load(sorts, meals)
         act("open-evaluation")
-        val card =
-            listOf(
-                "Bisher kommt <b>Stückchen in Gelee</b> besser an als Stückchen in Soße." to
-                    "Stückchen in Gelee <b>8 von 8 Mal</b> gut gefressen, Stückchen in Soße 8 von 8 Mal.",
-            )
-        val said =
-            phone.derive
-                .evaluationModel()
-                .insights
-                .map { insightSaid(it) }
-        val plain =
-            said.map {
-                de.schmeckts.app.ui
-                    .plainOf(it.say) to
-                    de.schmeckts.app.ui
-                        .plainOf(it.why)
-            }
+        val found = insights(db, phone.derive.model(), Time.now())
+        val kinds = found.map { it.kind }
+        check(kinds == listOf("konsistenz", "sosse", "tageszeit", "snack"), "four findings $kinds")
         check(
-            plain.take(3) ==
-                listOf(
-                    "Bisher kommt Stückchen in Gelee besser an als Stückchen in Soße." to
-                        "Stückchen in Gelee 8 von 8 Mal gut gefressen, Stückchen in Soße 0 von 8 Mal.",
-                    "Bei Stückchen in Soße wird oft nur die Soße geleckt." to
-                        "8 von 8 Mal nur die Soße. Stückchen in Gelee dagegen 8 von 8 Mal gut gefressen.",
-                    "Die erste Mahlzeit am Tag kommt besser an als die letzte." to
-                        "Bei der ersten 8 von 8 Mal gut gefressen, bei der letzten 0 von 8 Mal.",
-                ) &&
-                plain.take(3).all { (a, b) -> inSheet(a) && inSheet(b) } &&
-                !inSheet(plain[3].first),
-            "the card: the three strongest, each a sentence over its counts $plain ${card.size}",
+            tags("trait-", sheet = true).filter { it in kinds } == kinds && inSheet("Beim Füttern"),
+            "every finding a line of the Steckbrief, buying before „Beim Füttern“",
         )
-        act("open-level", "v" to "insights")
-        val lvl = level
-        val page = plain.all { (a, b) -> inSheet(a) && inSheet(b) } && inSheet("Beim Kaufen") && inSheet("Beim Füttern")
-        act("settings-back")
         check(
-            lvl == listOf("evaluation", "insights", null) &&
-                page &&
-                plain[3] ==
-                (
-                    "Nach einem Snack bleibt beim nächsten Napf öfter etwas stehen." to
-                        "Nach Snacks 0 von 8 Mal gut gefressen, sonst 8 von 8 Mal."
-                ) &&
-                level == listOf("evaluation", null, null),
-            "„Mehr“ leads to all of them, for buying and for feeding, and back",
+            found.filter { it.kind != "sosse" }.all { x -> inSheet(times(x.a.good, x.a.n)) && inSheet(times(x.b.good, x.b.n)) } &&
+                inSheet("8 von 8 Mal nur die Soße geleckt"),
+            "each with both counts",
         )
     }
 

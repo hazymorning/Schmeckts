@@ -68,17 +68,6 @@ fun petMap(ids: List<String>) =
         },
     )
 
-class Evaluation(
-    val moves: Moves,
-    val trend: List<Trend>,
-    val insights: List<Insight>,
-    val taste: Taste,
-    val next: NextUp,
-    val observed: List<Link>,
-    val basis: Basis,
-    val last: Map<String, Long>,
-)
-
 class PetSummary(
     val pet: String,
     val traits: List<Trait>,
@@ -263,23 +252,6 @@ class Derive(
                     },
                 shop = shopGroups(m),
                 differ = if (m.pets.size >= 2) differ(db, m.pets, now) else emptyList(),
-                last = last,
-            )
-        }
-
-    fun evaluationModel(): Evaluation =
-        cached("evaluation", listOf(prefs.activePet)) { now ->
-            val m = model()
-            val r = rankingModel()
-            val last = lastServed()
-            Evaluation(
-                moves = moves(m, now, r),
-                trend = trend(db, m, now),
-                insights = insights(db, m, now),
-                taste = taste(m),
-                next = nextUp(m, now, r, last, slowStarters(m)),
-                observed = observed(db, m.pets, now),
-                basis = basis(m, r),
                 last = last,
             )
         }

@@ -30,7 +30,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size as Area
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -87,7 +86,6 @@ import de.schmeckts.app.pets
 import de.schmeckts.app.pname
 import de.schmeckts.app.rOf
 import de.schmeckts.app.rateTone
-import de.schmeckts.app.ratingsIn
 import de.schmeckts.app.scaleOf
 import de.schmeckts.app.score
 import de.schmeckts.app.servedAt
@@ -124,14 +122,9 @@ import de.schmeckts.app.ui.tone
 import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
 import de.schmeckts.app.yearOf
-// Building blocks shared by the views
+import androidx.compose.ui.geometry.Size as Area
 
-/** A row that tells something: its picture (an icon), what it says and why, as markup */
-class Told(
-    val icon: String,
-    val say: String,
-    val why: String = "",
-)
+// Building blocks shared by the views
 
 fun times(
     k: Int,
@@ -1315,37 +1308,6 @@ private fun ServingItem(
     }
 }
 
-/** e: a variety of the model m */
-@Composable
-fun ShopRow(
-    m: Model,
-    e: Sort,
-) {
-    watch()
-    val ui = LocalUi.current
-    val ph = ui.phone
-    val p = e.product
-    val mixed = if (e.kaufen == null && e.choice == "gemischt") "nur für ${ph.derive.petNames(e.yes)}" else ""
-    val sub =
-        cap(
-            listOf(
-                if (!p.str("variety").isNullOrEmpty()) p.str("brand") ?: "" else "",
-                mixed,
-            ).filter { it.isNotEmpty() }.joinToString(", "),
-        )
-    ListRow(Modifier.testTag("shop-${e.id}"), onClick = ui.on("open-product", "id" to e.id)) {
-        Thumb(null, p)
-        TMain(esc(pname(p)), esc(sub))
-        Strip(ratingsIn(m, listOf(e.id)))
-        if (e.kaufen != null) {
-            Box(Modifier.semantics { contentDescription = "Von dir festgelegt" }) { Icon("pin", size = Size.iconS, color = colors.muted) }
-        }
-    }
-}
-
-/** the two sides on „Vorlieben“, always with this icon in this tone */
-val SIDE = mapOf("top" to ("champ" to "good"), "flop" to ("flop" to "bad"))
-
 /** a row that tells: its picture, what it says and why, as markup */
 @Composable
 fun ToldRow(
@@ -1360,26 +1322,6 @@ fun ToldRow(
             M(say, Type.body)
             if (why.isNotEmpty()) M(why, Type.small, Modifier.padding(top = Space.hair), colors.muted)
         }
-    }
-}
-
-/** a row of a variety, with its packaging */
-@Composable
-fun ToldBtn(
-    id: String,
-    say: String,
-    why: String = "",
-    end: @Composable () -> Unit = {},
-) {
-    watch()
-    val ui = LocalUi.current
-    ListRow(onClick = ui.on("open-product", "id" to id), top = true) {
-        Thumb(null, ui.phone.derive.getProduct(id), Th.M)
-        Column(Modifier.weight(1f)) {
-            M(say, Type.body)
-            if (why.isNotEmpty()) M(why, Type.small, Modifier.padding(top = Space.hair), colors.muted)
-        }
-        Box(Modifier.align(Alignment.CenterVertically)) { end() }
     }
 }
 

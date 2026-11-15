@@ -979,31 +979,6 @@ private fun byGroups(m: Model): List<Insight?> {
     return listOf(if (brand != null && texture != null && inside(brand, texture)) null else brand, texture, byGroup(m, "geschmack"))
 }
 
-class TasteRow(
-    val key: String,
-    val n: Int,
-    val good: Int,
-)
-
-class Taste(
-    val marke: List<TasteRow>,
-    val konsistenz: List<TasteRow>,
-    val geschmack: List<TasteRow>,
-)
-
-// Geschmacksprofil: how each brand, consistency and flavour goes down, best first, the TASTE most rated; a side with
-// one group stays empty, as there is nothing to set it against
-private const val TASTE = 5
-
-fun taste(m: Model): Taste {
-    fun side(keysOf: (Rec) -> List<String>): List<TasteRow> {
-        val list = grouped(m, keysOf)
-        val most = list.sortedByDescending { it.n }.take(TASTE).toSet()
-        return if (list.size >= TWO) list.filter { it in most }.map { TasteRow(it.key, it.n, it.good) } else emptyList()
-    }
-    return Taste(side(GROUPS.getValue("marke")), side(GROUPS.getValue("konsistenz")), side(GROUPS.getValue("geschmack")))
-}
-
 // instead: the texture eaten best otherwise, mostly well and better than the sauce, as advice; none, no advice
 private fun inSauce(m: Model): Insight? {
     val wet = m.sorts.filter { typeOf(it.product) == TYPES[0] }
@@ -1385,30 +1360,6 @@ fun nextUp(
         },
         retry.sortedByDescending { it.second }.map { it.first },
     )
-}
-
-class Basis(
-    val n: Int,
-    val first: Long,
-    val left: List<String>,
-)
-
-fun basis(
-    m: Model,
-    r: Ranking,
-): Basis {
-    var n = 0
-    var first = Long.MAX_VALUE
-    for (e in r.top + r.flop + r.mid + r.split) {
-        n += e.n
-        for (pid in m.pets) for (x in e.pets[pid]?.window.orEmpty()) first = min(first, x.t)
-    }
-    val left =
-        m.sorts
-            .filter { it.total > 0 && !ranks(it.product) }
-            .map { typeOf(it.product) }
-            .toSet()
-    return Basis(n, first, UNRANKED.filter { it in left })
 }
 
 // gap, delay and lead in minutes; slot times are minutes since local midnight
