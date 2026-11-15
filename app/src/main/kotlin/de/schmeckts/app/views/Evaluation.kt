@@ -234,7 +234,7 @@ private fun Phone.waiting(
 ): String =
     when {
         r.stale -> "Die letzten Bewertungen sind über ein halbes Jahr alt. Nach ein paar neuen steht hier wieder, was ankommt."
-        r.settled > 0 && r.mid.isEmpty() ->
+        r.settled > 0 && r.mid.isEmpty() && r.split.isNotEmpty() ->
             "${esc(
                 derive.petNames(
                     m.pets.filter { pid ->
@@ -805,8 +805,8 @@ private fun SortRow(
     e: Sort,
     sub: String,
     label: String,
-    tag: String = "sort-${e.id}",
     modifier: Modifier = Modifier,
+    tag: String = "sort-${e.id}",
     said: ((String) -> String?)? = null,
     small: Boolean = false,
     dots: Boolean = true,
@@ -906,7 +906,7 @@ private fun ProofRows(
     list.forEachIndexed { i, e ->
         if (i > 0) Divider(smallIndent)
         val x = ph.rowSaid(e, c, branded = branded)
-        SortRow(c.m, e, sub?.invoke(e) ?: x.sub, x.label, "proof-${e.id}", small = true)
+        SortRow(c.m, e, sub?.invoke(e) ?: x.sub, x.label, tag = "proof-${e.id}", small = true)
     }
 }
 
@@ -1513,7 +1513,7 @@ private fun TestMeal(
         if (e != null) {
             val said = ui.phone.rowSaid(e, c)
             Row(Modifier.fillMaxWidth()) {
-                SortRow(c.m, e, said.sub, said.label, "versuch-${e.id}", Modifier.weight(1f))
+                SortRow(c.m, e, said.sub, said.label, Modifier.weight(1f), "versuch-${e.id}")
                 FeedBtn(e)
             }
         }
@@ -1876,7 +1876,8 @@ fun EvaluationCard(
     val r = d.rankingModel()
     val sum = d.summaryModel()
     val now = Time.now()
-    val pick = sum.pick?.let { ph.pickSaid(m, it, now) }
+    val first = sum.picks.firstOrNull { it.id != hint?.id }
+    val pick = first?.let { ph.pickSaid(m, it, now) }
     Card {
         CardHead("Vorlieben", label = "Alle Vorlieben", onMore = ui.on("open-evaluation"))
         if (sum.pets.size >= 2) {
@@ -1910,7 +1911,10 @@ fun EvaluationCard(
         }
         val s = sum.pets.firstOrNull()
         val c = Ctx(if (s != null) d.modelFor(s.pet) else m)
-        val lines = s?.let { cardTraits(it.traits, hint).mapNotNull { t -> ph.traitSaid(t, c)?.let { x -> t.kind to x } } }.orEmpty()
+        val kept = s?.let { cardTraits(it.traits, hint) }.orEmpty()
+        val lines = kept.mapNotNull { t -> ph.traitSaid(t, c)?.let { x -> t.kind to x } }
+        // what the hint above says leaves its place empty, no sentence that nothing shows yet
+        val told = s != null && cardTraits(s.traits, null).size > kept.size
         val body: @Composable (
             String,
         ) -> Unit = { text -> M(text, Type.body, Modifier.padding(top = Space.hair, bottom = Space.s3), colors.ink) }
@@ -1928,7 +1932,7 @@ fun EvaluationCard(
             r.stale -> {
                 body("Die letzten Bewertungen sind über ein halbes Jahr alt.")
                 if (s != null) ShelfBar(s.shelf, legend = true)
-                if (pick != null && sum.pick?.missed != null) {
+                if (pick != null && first?.missed != null) {
                     Gap(Space.s3)
                     Divider()
                     NextRow(m, pick, "pick-", dots = false)
@@ -1936,9 +1940,10 @@ fun EvaluationCard(
                     Gap(Space.s3)
                 }
             }
-            lines.isEmpty() && pick == null -> body(ph.waiting(m, r))
+            lines.isEmpty() && pick == null && !told -> body(ph.waiting(m, r))
             else -> {
-                val shown = lines.ifEmpty { listOfNotNull(ph.traitSaid(Trait("liebling"), c)?.let { "liebling" to it }) }
+                val none = s?.traits?.firstOrNull { it.kind == "liebling" && it.ids.isEmpty() }
+                val shown = lines.ifEmpty { listOfNotNull(none?.let { t -> ph.traitSaid(t, c)?.let { "liebling" to it } }) }
                 for ((kind, x) in shown) CardTrait(kind, x)
                 if (s != null) {
                     Gap(Space.s3)

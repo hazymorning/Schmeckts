@@ -150,7 +150,7 @@ class DeriveTest {
             "Tiger eats the jelly, said with his favourites, the only varieties in it",
             summary.pets[1].traits.any { it.kind == "liebling" && it.insight?.a?.key == "gelee" },
         )
-        assertEquals("neu", summary.pick?.id)
+        assertEquals("neu", summary.picks.firstOrNull()?.id)
         val own = derive.modelFor("tiger00001")
         phone.prefs.activePet = "tiger00001"
         assertEquals(derive.model().sorts.map { listOf(it.id, it.verdict, it.n) }, own.sorts.map { listOf(it.id, it.verdict, it.n) })

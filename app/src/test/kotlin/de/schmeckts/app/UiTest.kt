@@ -839,6 +839,26 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
+    fun `card - under a hint about the favourite, neither no favourite nor that variety again, nor a sentence that fails`() {
+        val now = at("2025-06-17T12:00")
+        val products = listOf(product("lachs00001", "Sheba", "Lachs"), product("huhn000001", "Sheba", "Huhn"))
+        val lachs = { ago: Long -> (1..3).map { meal("lachs$it", "lachs00001", now - (ago + it) * DAY, mapOf(M to "top")) } }
+        val huhn = listOf(meal("huhn1", "huhn000001", now - DAY / 2, mapOf(M to "top")))
+        open(dbFile(listOf(pet(M)), products.take(1), lachs(0)), now)
+        for (k in listOf(REMIND_ASKED, "neu:${NEWS[0].v}")) act("hide-hint", "v" to k)
+        idle()
+        val card = { listOf(tags("card-trait-", within = "sec-evaluation"), tags("pick-", within = "sec-evaluation")) }
+        val alone = listOf(shows("Nachkaufen?"), within("sec-evaluation", "einig")) to card()
+        load(products, huhn + lachs(0))
+        val trial = within("sec-evaluation", "Noch keine") to card()
+        load(products, huhn + lachs(50))
+        val missed = card()
+        check(alone == (listOf(true, false) to listOf(emptyList<String>(), emptyList())), "the hint says it all $alone")
+        check(trial == (false to listOf(emptyList<String>(), listOf("huhn000001"))), "a favourite there is, under the hint $trial")
+        check(missed[1] == listOf("huhn000001"), "the favourite long missed is the hint's, so the card names the next one $missed")
+    }
+
+    @Test
     fun `record - a variety's tally where it is served, who it goes down best with`() {
         val now = at("2026-06-12T12:00")
         val rated =

@@ -814,11 +814,11 @@ fun RatingDot(r: String?) {
 @Composable
 fun DotRow(
     keys: List<String>,
+    modifier: Modifier = Modifier,
     open: Int = 0,
     more: Boolean = false,
     split: Int = -1,
     said: Boolean = true,
-    modifier: Modifier = Modifier,
 ) {
     watch()
     if (keys.isEmpty() && open == 0) return
@@ -868,7 +868,7 @@ fun DotLines(
         val keys = l?.second.orEmpty()
         return when {
             keys.size + open == 0 -> if (sub.isNotEmpty()) T(sub, Type.small, modifier, p.muted) else Unit
-            sub.isEmpty() -> DotRow(keys, open, l?.third == true, modifier = modifier)
+            sub.isEmpty() -> DotRow(keys, modifier, open, l?.third == true)
             else -> InlineDots(keys, open, l?.third == true, sub, modifier)
         }
     }
@@ -930,7 +930,7 @@ private fun InlineDots(
     val dots =
         with(density) {
             InlineTextContent(Placeholder(wide.toSp(), (Size.dot + Space.s1).toSp(), PlaceholderVerticalAlign.TextCenter)) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { DotRow(keys, open, more) }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { DotRow(keys, open = open, more = more) }
             }
         }
     androidx.compose.material3.Text(

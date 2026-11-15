@@ -75,10 +75,10 @@ class PetSummary(
     val diary: Diary,
 )
 
-/** pets: the cat chosen, or every cat; pick: what to feed next in the filter */
+/** pets: the cat chosen, or every cat; picks: what to feed next in the filter */
 class Summary(
     val pets: List<PetSummary>,
-    val pick: Pick?,
+    val picks: List<Pick>,
 )
 
 /** traits and weeks for one cat only, differ for several */
@@ -232,7 +232,7 @@ class Derive(
                     val m = modelFor(pid)
                     PetSummary(pid, profileOf(pid, now, true), shelf(m, db.pets.size), diary(m))
                 },
-                picks(now).firstOrNull(),
+                picks(now),
             )
         }
 
