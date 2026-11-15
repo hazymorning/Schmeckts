@@ -55,8 +55,8 @@ import de.schmeckts.app.observationOf
 import de.schmeckts.app.ownGroups
 import de.schmeckts.app.pname
 import de.schmeckts.app.poorOf
-import de.schmeckts.app.rateTone
 import de.schmeckts.app.ranks
+import de.schmeckts.app.rateTone
 import de.schmeckts.app.sideOf
 import de.schmeckts.app.typeOf
 import de.schmeckts.app.ui.Card
@@ -244,7 +244,7 @@ private fun poorShare(g: Group) = poorOf(g.counts).toDouble() / g.n
 // a group whose varieties all lie in another one says nothing of its own, as a brand only made in sauce; of two with
 // the same varieties the first kind stays; one tried once does not count, as it makes no group either
 private fun widest(list: List<Named>): List<Named> {
-    val ids = list.map { p -> p.g.sorts.filter { it.n >= 2 }.map { it.id }.toSet() }
+    val ids = list.map { p -> p.g.sorts.mapNotNull { e -> e.id.takeIf { e.n >= 2 } } }
     return list.filterIndexed { i, _ ->
         ids.indices.none { j -> j != i && ids[j].containsAll(ids[i]) && (ids[j].size > ids[i].size || j < i) }
     }
@@ -314,20 +314,17 @@ private fun Phone.leavesOf(
     // a favourite of any of them keeps its group from being called left
     val favs = (r.top + if (one) emptyList() else pets.flatMap { derive.rankingFor(it).top }).map { it.id }.toSet()
     val own = pets.map { derive.modelFor(it) }
+    val mine = { p: Named -> if (one) listOf(p.g) else own.map { p.g.within(it) } }
+    val groups = KINDS.flatMap { k -> t.of(k).filter { it.key.isNotEmpty() }.map { Named(k, it) } }
     val left =
-        widest(
-            KINDS
-                .flatMap { k -> t.of(k).filter { it.key.isNotEmpty() }.map { Named(k, it) } }
-                .filter { p -> p.g.sorts.none { it.id in favs } && (if (one) listOf(p.g) else own.map { p.g.within(it) }).all { it?.verdict == "nicht" } },
-        ).sortedByDescending { poorShare(it.g) }
+        widest(groups.filter { p -> p.g.sorts.none { it.id in favs } && mine(p).all { it?.verdict == "nicht" } })
+            .sortedByDescending { poorShare(it.g) }
             .take(NAMED)
             .sortedBy { KINDS.indexOf(it.kind) }
     val e = r.flop.firstOrNull { e -> one || pets.all { pid -> e.pets[pid]?.let(::sideOf) == "flop" } }
     val what = if (left.isNotEmpty()) anded(left.map { nounOf(it, "bad") }) else listOf(Bit(shortName(e ?: return emptyList()), "bad"))
-    val often =
-        oftenOf(
-            if (left.isNotEmpty()) left.flatMap { p -> if (one) listOf(p.g.counts) else own.mapNotNull { p.g.within(it)?.counts } } else pets.map { windowOf(e!!, it) },
-        )
+    val counts = if (left.isNotEmpty()) left.flatMap { p -> mine(p).mapNotNull { it?.counts } } else pets.map { windowOf(e!!, it) }
+    val often = oftenOf(counts)
     // with several the cats come first, or the food would read as the one that leaves
     if (!one) return listOf(Bit("${if (pets.size == 2) "Beide" else "Alle"} lassen ")) + what + Bit(" $often stehen.")
     return capped(what) + Bit(" lässt ${if (named) pronOf(pets[0]) else petName(pets[0])} $often stehen.")
@@ -361,7 +358,8 @@ private fun Phone.leadOf(
         val fm = fishOrMeat(m)?.takeIf { it.clear }
         if (fm != null) {
             val (more, less) = if (fm.fish.good * fm.meat.n > fm.meat.good * fm.fish.n) "Fisch" to "Fleisch" else "Fleisch" to "Fisch"
-            sentences += listOf(Bit(more, "good"), Bit(" frisst ${if (likes.isEmpty()) petName(pid) else pronOf(pid)} deutlich lieber als $less."))
+            val who = if (likes.isEmpty()) petName(pid) else pronOf(pid)
+            sentences += listOf(Bit(more, "good"), Bit(" frisst $who deutlich lieber als $less."))
         }
         val leaves = leavesOf(rated, r, x.taste, likes.isNotEmpty() || fm != null)
         sentences += leaves
@@ -442,7 +440,8 @@ private fun marked(
             }
             pushStringAnnotation(TONE, b.tone)
             // a short name stays on one line
-            withStyle(SpanStyle(color = p.tone(b.tone)!!.c)) { append(if (b.text.length <= WHOLE) b.text.replace(' ', '\u00A0') else b.text) }
+            val whole = if (b.text.length <= WHOLE) b.text.replace(' ', '\u00A0') else b.text
+            withStyle(SpanStyle(color = p.tone(b.tone)!!.c)) { append(whole) }
             pop()
         }
     }
@@ -706,9 +705,12 @@ private fun Phone.toldIn(
     val pron = pronOf(pid)
     if (kind == "konsistenz") {
         val i = x.insights.firstOrNull { it.kind == "sosse" } ?: return null
-        return "Von Stückchen in Soße leckt $pron oft nur die Soße." + (i.instead?.let { " ${textureName(it.key)} frisst $pron lieber." } ?: "")
+        val instead = i.instead?.let { " ${textureName(it.key)} frisst $pron lieber." } ?: ""
+        return "Von Stückchen in Soße leckt $pron oft nur die Soße.$instead"
     }
-    if (kind == "geschmack" && fishOrMeat(m)?.clear == false) return "Ob Fisch oder Fleisch, macht bei ${petName(pid)} bisher keinen klaren Unterschied."
+    if (kind == "geschmack" && fishOrMeat(m)?.clear == false) {
+        return "Ob Fisch oder Fleisch, macht bei ${petName(pid)} bisher keinen klaren Unterschied."
+    }
     return null
 }
 
@@ -814,7 +816,8 @@ private fun Trials(
     if (r.stale || r.trials.isEmpty()) return
     val rated = ratedOf(m)
     ListCard("Noch im Test", "trials") {
-        Hint("Noch ein- oder zweimal füttern und bewerten, dann steht fest, wie sie${if (rated.size == 1) " bei ${ph.petName(rated[0])}" else ""} ankommen.")
+        val at = if (rated.size == 1) " bei ${ph.petName(rated[0])}" else ""
+        Hint("Noch ein- oder zweimal füttern und bewerten, dann steht fest, wie sie$at ankommen.")
         Folded(r.trials, "trials") { t: Trial -> SortRow(m, t.e, "trial", pets = listOf(t.pet), early = true) }
     }
 }
@@ -894,7 +897,8 @@ fun EvaluationPage() {
         if (ph.db.pets.size > 1) CatChips()
         if (r.rated == 0) {
             // dry food and treats have scales of their own and stay out of the comparison
-            val ask = "Bewerte ein paar Mahlzeiten${if (m.rated > 0) " mit Nassfutter" else ""}, dann steht hier, was ${d.petNames(m.pets)} schmeckt."
+            val wet = if (m.rated > 0) " mit Nassfutter" else ""
+            val ask = "Bewerte ein paar Mahlzeiten$wet, dann steht hier, was ${d.petNames(m.pets)} schmeckt."
             Column(Modifier.testTag("lead")) { Marked(listOf(Bit(ask))) }
             return@SheetBody
         }

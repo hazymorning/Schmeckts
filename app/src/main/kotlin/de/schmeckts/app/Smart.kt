@@ -871,7 +871,11 @@ fun fishOrMeat(m: Model): FishMeat? {
     for (e in wetOf(m)) {
         val f = flavoursOf(e.product.str("variety")).filter { it != "Käse" }
         val n = f.count { it in FISH }
-        if (f.isNotEmpty() && n == f.size) fish.add(e) else if (f.isNotEmpty() && n == 0) meat.add(e)
+        when {
+            f.isEmpty() -> continue
+            n == f.size -> fish.add(e)
+            n == 0 -> meat.add(e)
+        }
     }
     if (!enough(fish) || !enough(meat)) return null
     val a = tallyOf(fish, "Fisch")

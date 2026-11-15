@@ -980,7 +980,12 @@ class UiEvaluationTest : ScreenTest() {
         tapTag("chip-$tiger")
         val one = listOf(prefs.activePet, tags("split", sheet = true).size, within("lead", "Tiger"))
         tapTag("chip-$tiger")
-        val sides = { id: String -> m.pets.mapNotNull { pid -> m.byId.getValue(id).pets[pid]?.takeIf { it.n > 0 }?.let(::sideOf) } }
+
+        fun sides(id: String) =
+            m.byId
+                .getValue(id)
+                .pets.values
+                .mapNotNull { s -> sideOf(s).takeIf { s.n > 0 } }
         check(
             all.isNotEmpty() && all.all { "top" in sides(it) && "flop" in sides(it) },
             "in „Alle“ what one likes and the other leaves $all",
