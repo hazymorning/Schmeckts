@@ -40,7 +40,7 @@
   },
   {
    "id": "k147",
-   "text": "Am wichtigsten ist Katzen wohl Umami, das Herzhafte an Fleisch. Thunfisch hat davon besonders viel."
+   "text": "Beim Geschmack zählt für Katzen wohl vor allem Umami, das Herzhafte an Fleisch. Thunfisch hat davon besonders viel."
   },
   {
    "id": "k013",
@@ -48,7 +48,7 @@
   },
   {
    "id": "k093",
-   "text": "Katzenminze hält Mücken fern. Vielleicht wälzen sich Katzen darum darin: So haben sie den Duft im Fell."
+   "text": "Katzenminze hält Mücken fern. Vielleicht wälzen sich Katzen deshalb so gern darin: Der Duft bleibt im Fell."
   },
   {
    "id": "k014",
@@ -90,7 +90,7 @@
   },
   {
    "id": "k149",
-   "text": "Krallen wachsen in Schichten. Die alte Hülle löst sich beim Kratzen, darum liegen am Kratzbaum leere Krallen."
+   "text": "Am Kratzbaum liegt manchmal eine ganze Kralle. Das ist nur die alte Hülle, darunter ist längst eine neue."
   },
   {
    "id": "k031",
@@ -230,7 +230,7 @@
   },
   {
    "id": "k164",
-   "text": "Bänder halten die Krallen in Ruhe eingezogen. So bleiben sie spitz und klackern nicht auf dem Boden."
+   "text": "Katzen müssen ihre Krallen nicht einziehen, das machen Bänder von selbst. So bleiben sie spitz und klackern nicht."
   },
   {
    "id": "k165",
@@ -416,7 +416,7 @@
   },
   {
    "id": "lo044",
-   "text": "Ein schwarzer Pulli wird erst mit weißen Katzenhaaren richtig schön."
+   "text": "Die Katze legt sich auf den Pulli, auf dem man ihre Haare am besten sieht."
   },
   {
    "id": "lo046",
@@ -532,7 +532,7 @@
    "id": "st007",
    "text": "Schon Blütenstaub von Lilien kann eine Katze töten.",
    "verdict": "Stimmt",
-   "back": "Auch Taglilien. Pollen oder Vasenwasser können die Nieren zerstören, also gar nicht ins Haus."
+   "back": "Pollen oder Vasenwasser können die Nieren zerstören. Lilien und Taglilien also gar nicht ins Haus."
   },
   {
    "id": "st008",
@@ -574,7 +574,7 @@
    "id": "st014",
    "text": "Katzen kennen ihren Namen.",
    "verdict": "Stimmt",
-   "back": "Im Versuch erkannten sie ihn sogar zwischen ähnlich klingenden Wörtern, auch aus fremdem Mund."
+   "back": "Im Versuch hörten sie ihn aus ähnlichen Wörtern heraus. Ob sie dann auch kommen, ist eine andere Frage."
   },
   {
    "id": "st015",
@@ -706,7 +706,7 @@
    "id": "st038",
    "text": "Wohnungskatzen leben kürzer als Freigänger.",
    "verdict": "Eher umgekehrt",
-   "back": "Junge Katzen sterben am häufigsten auf der Straße. Davor sind Wohnungskatzen sicher."
+   "back": "Junge Katzen sterben am häufigsten im Straßenverkehr. Davor sind Wohnungskatzen sicher."
   },
   {
    "id": "st039",
@@ -783,8 +783,8 @@
   {
    "id": "st052",
    "text": "Knoblauch im Futter hält Flöhe fern.",
-   "verdict": "Stimmt nicht",
-   "back": "Dass es gegen Flöhe hilft, ist nicht belegt. Für Katzen ist Knoblauch sogar giftig."
+   "verdict": "Bloß nicht",
+   "back": "Dass er gegen Flöhe hilft, ist nicht belegt. Für Katzen ist Knoblauch aber giftig."
   },
   {
    "id": "st053",
@@ -898,7 +898,7 @@
   },
   {
    "id": "ku010",
-   "text": "1745 holte Zarin Elisabeth Mäusefänger aus Kasan in ihren Palast. Bis heute leben Katzen in der Eremitage."
+   "text": "1745 ließ Zarin Elisabeth Katzen aus Kasan holen, gegen die Mäuse im Palast. Noch heute leben Katzen in der Eremitage."
   },
   {
    "id": "ku011",
@@ -1260,11 +1260,11 @@
   },
   {
    "id": "ti027",
-   "text": "Bei ganz anderem Futter eine Woche lang täglich mehr unter das alte mischen. Sonst gibt es leicht Durchfall."
+   "text": "Auf ganz anderes Futter eine Woche lang nach und nach umstellen. Sonst gibt es leicht Durchfall."
   },
   {
    "id": "ti028",
-   "text": "Leckt {deine Katze} nur die Soße, probier mal eine Pastete. Manchmal stören nur die Stückchen."
+   "text": "Leckt {deine Katze} nur die Soße, probier es mal mit Pastete. Manchmal stören nur die Stückchen."
   },
   {
    "id": "ti030",
@@ -1360,7 +1360,7 @@
   },
   {
    "id": "ti051",
-   "text": "Die neue Katze erst ein paar Tage in ein eigenes Zimmer lassen. Langsames Kennenlernen erspart viel Streit."
+   "text": "Eine neue Katze erst ein paar Tage in einem eigenen Zimmer wohnen lassen. Langsames Kennenlernen spart Streit."
   },
   {
    "id": "ti052",
@@ -1405,7 +1405,7 @@
   },
   {
    "id": "ti062",
-   "text": "Die Chipnummer der Katze kostenlos in einem Haustierregister eintragen. Sonst führt sie zu niemandem."
+   "text": "Ein Chip allein bringt keine Katze nach Hause. Die Nummer muss in ein Haustierregister, und das kostet nichts."
   },
   {
    "id": "ti063",
@@ -1453,7 +1453,7 @@
    "id": "wa001",
    "text": "Warum gibt dir {deine Katze} Köpfchen?",
    "verdict": "Duftpost",
-   "back": "Katzen haben an Kopf und Wangen Duftdrüsen. Beim Reiben bekommst du ihren Duft ab, sie deinen."
+   "back": "Katzen haben an Stirn, Wangen und Kinn Duftdrüsen. Beim Reiben bekommst du ihren Duft ab, sie deinen."
   },
   {
    "id": "wa002",
@@ -1625,7 +1625,7 @@
    "id": "wa028",
    "text": "Warum kratzt {deine Katze} am Sofa, obwohl der Kratzbaum daneben steht?",
    "verdict": "Hier wohne ich",
-   "back": "Kratzen hinterlässt Duft und Spuren, am liebsten mitten im Zimmer. Dahin gehört der Kratzbaum."
+   "back": "Kratzen hinterlässt Duft und Spuren. Ein wackliger Kratzbaum verliert dabei gegen das feste Sofa."
   },
   {
    "id": "wa055",
@@ -1783,7 +1783,7 @@
    "id": "wa060",
    "text": "Warum frisst {deine Katze} lieber aus dem Napf als aus dem Fummelbrett?",
    "verdict": "Lieber gratis",
-   "back": "Im Versuch fraßen die meisten, was einfach dalag. Ratten arbeiten oft trotzdem fürs Futter."
+   "back": "Im Versuch fraßen die meisten, was einfach dalag. Ratten dagegen arbeiten gern fürs Futter."
   },
   {
    "id": "wa061",
@@ -1887,7 +1887,7 @@
   },
   {
    "id": "sp024",
-   "text": "Bei viel Arbeit sagt man in Japan: Ich würde sogar die Pfoten der Katze ausleihen."
+   "text": "Bei viel Arbeit sagt man in Japan: Ich würde mir sogar die Pfoten der Katze leihen."
   },
   {
    "id": "sp025",
@@ -1955,7 +1955,7 @@
   },
   {
    "id": "sp041",
-   "text": "Gut Ding will Weile haben. In Italien sagt man: Die eilige Katze bekommt blinde Junge."
+   "text": "Gut Ding will Weile haben. In Italien sagt man: Die eilige Katze bekommt blinde Junge. Die geduldige auch."
   },
   {
    "id": "sp042",
@@ -1975,7 +1975,7 @@
   },
   {
    "id": "sp046",
-   "text": "Ein Katzensprung ist so weit, wie eine Katze springt. Auf Englisch ist es ein Steinwurf: „a stone’s throw“."
+   "text": "Ein Katzensprung ist nicht weit. Wer je eine Katze aufs Regal hat springen sehen, findet das untertrieben."
   },
   {
    "id": "sp047",
@@ -1983,7 +1983,7 @@
   },
   {
    "id": "sp048",
-   "text": "Bei uns ist man eine Naschkatze, auf Englisch hat man einen süßen Zahn: „a sweet tooth“."
+   "text": "Bei uns ist man eine Naschkatze, auf Englisch hat man einen süßen Zahn. Dabei schmecken Katzen Süßes gar nicht."
   },
   {
    "id": "sp049",
