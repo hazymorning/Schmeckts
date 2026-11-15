@@ -213,9 +213,12 @@ class PersonasTest {
     ) = (out[k] ?: 0).toDouble() / houses
 
     // the week rule alone: the hint on home and the four-week trend come first on the page, but have tests of their own
-    private fun weekRule(db: Db): String? {
-        val m = analyze(db, Filter(), now)
-        return appetiteOf(Model(m.pet, m.pets, m.sorts, m.byId, m.rated, emptyList()), "cat", emptyList(), weeks(db, m, "cat", now))?.state
+    private fun weekRule(
+        db: Db,
+        at: Long = now,
+    ): String? {
+        val m = analyze(db, Filter(), at)
+        return appetiteOf(Model(m.pet, m.pets, m.sorts, m.byId, m.rated, emptyList()), "cat", emptyList(), weeks(db, m, "cat", at))?.state
     }
 
     @Test
@@ -232,14 +235,26 @@ class PersonasTest {
     }
 
     @Test
-    fun `a cat whose appetite drops in the last week - most households see it as zuletzt schwaecher`() {
+    fun `a cat that likes everything alike - opened daily for four weeks, at most one household in eight sees a week flagged`() {
+        val out = linkedMapOf("any" to 0)
+        for (i in 1..houses) {
+            val db = household(i * 7919L)
+            val states = (0 until 28).mapNotNull { k -> weekRule(db, now - k * DAY)?.takeIf { it != "unauffaellig" } }.toSet()
+            if (states.isNotEmpty()) out["any"] = out.getValue("any") + 1
+            for (s in states) out[s] = (out[s] ?: 0) + 1
+        }
+        assertTrue("$out", share(out, "any") <= 1.0 / 8)
+    }
+
+    @Test
+    fun `a cat whose appetite drops to a third in the last week - three households in five see it as zuletzt schwaecher`() {
         val drop = Habit(good = { if (it.t > now - 7 * DAY) 0.2 else 0.6 })
         val out = linkedMapOf<String, Int>()
         for (i in 1..houses) {
             val state = weekRule(household(i * 7919L, drop)) ?: "none"
             out[state] = (out[state] ?: 0) + 1
         }
-        assertTrue("$out", share(out, "zuletzt-schwaecher") >= 0.75)
+        assertTrue("$out", share(out, "zuletzt-schwaecher") >= 0.6)
     }
 
     private fun differs(

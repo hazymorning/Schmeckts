@@ -1796,10 +1796,10 @@ fun trialOf(
 private object BLOCK {
     const val SPAN = 8 // blocks drawn at most
     const val MIN = 5 // ratings for a block to be judged
-    const val PRIOR = 2 // pseudo ratings pulling a variety's expectation to the cat's share
-    const val Z = 2.25 // the newest judged block going worse, one look
-    const val Z_PAST = 3.5 // the newest going better or an older one: nothing to act on, so only beyond doubt
-    const val GAP = 0.3 // |good - expected| at least this share of the block's ratings
+    const val PRIOR = 4 // pseudo ratings pulling a variety's expectation to the cat's share
+    const val Z = 2.25 // the newest judged block going worse
+    const val Z_UP = 3.5 // going better: nothing to act on, so only beyond doubt
+    const val GAP = 0.35 // |good - expected| at least this share of the block's ratings
 }
 
 /** A seven-day block, from inclusive, to exclusive. seen: the notes about the cat in it, by kind; start: the day of the
@@ -1867,8 +1867,8 @@ fun weeks(
     }
 }
 
-/** state: tage, schlechter, besser, zuletzt-schwaecher, zuletzt-besser, wieder or unauffaellig; week: the block
- *  that was off; dir: -1 worse, 1 better. */
+/** state: tage, schlechter, besser, zuletzt-schwaecher, zuletzt-besser or unauffaellig; week: the block that was
+ *  off; dir: -1 worse, 1 better. */
 class Appetite(
     val state: String,
     val week: Block? = null,
@@ -1897,13 +1897,11 @@ fun appetiteOf(
     }
     val judged = weeks.filter { it.n >= BLOCK.MIN }
     if (judged.size < 2) return null
-    val dir = { w: Block -> if (w.good < w.expected) -1 else 1 }
+    // only the newest: the page is opened daily, and every older block judged again is one more chance of a false alarm
     val last = judged.last()
-    if (off(last, if (dir(last) < 0) BLOCK.Z else BLOCK.Z_PAST)) {
-        return Appetite(if (dir(last) < 0) "zuletzt-schwaecher" else "zuletzt-besser", last, dir(last))
-    }
-    val past = judged.dropLast(1).lastOrNull { off(it, BLOCK.Z_PAST) }
-    return if (past != null) Appetite("wieder", past, dir(past)) else Appetite("unauffaellig")
+    val dir = if (last.good < last.expected) -1 else 1
+    if (!off(last, if (dir < 0) BLOCK.Z else BLOCK.Z_UP)) return Appetite("unauffaellig")
+    return Appetite(if (dir < 0) "zuletzt-schwaecher" else "zuletzt-besser", last, dir)
 }
 
 // a top that only leans towards good is never called a favourite

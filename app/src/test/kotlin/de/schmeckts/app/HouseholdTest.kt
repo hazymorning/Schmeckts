@@ -142,14 +142,13 @@ class HouseholdTest {
             listOf(listOf(13, 5, 5, 2, 1), listOf(14, 6, 1, 4, 3), listOf(13, 5, 2, 6, 0)),
             weeks.map { listOf(it.n, it.good, it.mid, it.sauce, it.bad) },
         )
-        assertEquals(listOf(5.31, 5.23, 5.48), weeks.map { Math.round(it.expected * 100) / 100.0 })
+        assertEquals(listOf(5.25, 5.37, 5.39), weeks.map { Math.round(it.expected * 100) / 100.0 })
         assertEquals(listOf(emptyMap(), mapOf("tired" to 1, "happy" to 2), mapOf("happy" to 1)), weeks.map { it.seen })
         assertEquals(at("2026-09-20"), weeks[0].from)
         assertEquals("unauffaellig", appetiteOf(m0, pet, trend(db0, m0, end), weeks)?.state)
         val flagged =
             said.filter { x ->
-                val state = appetiteOf(x.m, pet, trend(x.db, x.m, x.t), weeks(x.db, x.m, pet, x.t))?.state
-                state == "wieder" || state?.startsWith("zuletzt") == true
+                appetiteOf(x.m, pet, trend(x.db, x.m, x.t), weeks(x.db, x.m, pet, x.t))?.state?.startsWith("zuletzt") == true
             }
         assertEquals(emptyList<Long>(), flagged.map { it.t })
     }
