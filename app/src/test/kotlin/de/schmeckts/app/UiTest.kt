@@ -760,7 +760,7 @@ class UiEvaluationTest : ScreenTest() {
             "each consistency, flavour and brand with its count and the bowl she usually leaves",
         )
         check(
-            within("lead", "Mau ist wählerisch") && within("lead", "lässt sie meist stehen") && inSheet("Bewertungen seit dem"),
+            within("lead", "Mau ist wählerisch") && within("lead", "lässt sie meist") && inSheet("Bewertungen seit dem"),
             "the sentence names the cat, what she likes and what she leaves; the foot what it rests on",
         )
     }
@@ -784,7 +784,7 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
-    fun `taste - jelly against sauce, each with the bowl she usually leaves, the finding said once the right way round`() {
+    fun `taste - jelly against sauce, each with the bowl she usually leaves, the better one first`() {
         val now = at("2025-06-17T12:00")
         val sauce = listOf("lachs", "huhn")
         val jelly = listOf("rind", "pute")
@@ -804,11 +804,11 @@ class UiEvaluationTest : ScreenTest() {
             "both consistencies with their counts and bowls",
         )
         check(
-            within("found-konsistenz", "Stückchen in Gelee kommt deutlich besser an als Stückchen in Soße"),
-            "a clear finding said under its kind, the right way round",
+            tags("group-", within = "taste").take(2) == listOf("Stückchen in Gelee", "Stückchen in Soße"),
+            "the one she eats more of first",
         )
         check(
-            within("lead", "Minka mag") && within("lead", "lässt sie meist stehen") && within("lead", "Soße"),
+            within("lead", "Minka mag") && within("lead", "lässt sie meist") && within("lead", "Soße"),
             "the sentence on top says the same",
         )
     }
@@ -838,7 +838,7 @@ class UiEvaluationTest : ScreenTest() {
         act("settings-back")
         rated(now, "naechste1" to listOf("top", "gut"), "naechste2" to listOf("top")).let { load(it.first, it.second) }
         check(
-            tags("card-", within = "sec-evaluation") == listOf("naechste1") && within("sec-evaluation", "noch einmal bewerten"),
+            tags("card-", within = "sec-evaluation") == listOf("naechste1") && within("sec-evaluation", "noch einmal füttern"),
             "nothing settled: the card names the variety furthest along",
         )
     }
@@ -975,27 +975,14 @@ class UiEvaluationTest : ScreenTest() {
         val mau = db.pets[0].id
         val tiger = secondCat()
         act("open-evaluation")
-        val split =
-            phone.derive
-                .rankingModel()
-                .split
-                .map { it.id }
+        val m = phone.derive.model()
         val all = tags("split-", within = "split")
         tapTag("chip-$tiger")
         val one = listOf(prefs.activePet, tags("split", sheet = true).size, within("lead", "Tiger"))
         tapTag("chip-$tiger")
+        val sides = { id: String -> m.pets.mapNotNull { pid -> m.byId.getValue(id).pets[pid]?.takeIf { it.n > 0 }?.let(::sideOf) } }
         check(
-            split.isNotEmpty() &&
-                all ==
-                split.take(
-                    if (split.size >
-                        4
-                    ) {
-                        3
-                    } else {
-                        split.size
-                    },
-                ),
+            all.isNotEmpty() && all.all { "top" in sides(it) && "flop" in sides(it) },
             "in „Alle“ what one likes and the other leaves $all",
         )
         check(one == listOf(tiger, 0, true), "a cat chosen: her page, no Geschmackssache $one")

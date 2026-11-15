@@ -787,16 +787,39 @@ class Group(
 /** the same varieties with one cat's ratings, where she rated enough of them to count */
 fun Group.within(m: Model): Group? = Group(key, sorts.mapNotNull { m.byId[it.id] }.filter { it.n > 0 }).takeIf { enough(it.sorts) }
 
-// the level in the middle of the ratings, the lower of two: a majority good gives a good one, a majority poor a poor one
+// The level in the middle of the ratings: a majority good gives a good one, a majority poor a poor one. Half good and
+// half poor is half eaten, as the verdict calls it neither.
 fun usualOf(counts: Map<String, Int>): String? {
-    var at = counts.values.sum() / 2
-    val levels = counts.entries.filter { it.key in RATINGS }.sortedWith(compareBy({ -score(it.key) }, { RATINGS.keys.indexOf(it.key) }))
-    for ((r, k) in levels) {
-        if (at < k) return r
-        at -= k
+    val levels =
+        counts.entries
+            .filter { it.key in RATINGS && it.value > 0 }
+            .sortedWith(compareBy({ -score(it.key) }, { RATINGS.keys.indexOf(it.key) }))
+            .flatMap { (r, k) -> List(k) { r } }
+    if (levels.isEmpty()) return null
+    val upper = levels[(levels.size - 1) / 2]
+    val lower = levels[levels.size / 2]
+    val portion = SCALES.getValue("portion")
+    return if (upper in portion && lower in portion && score(upper) >= NO && score(lower) < NO) {
+        "mittel"
+    } else {
+        lower
     }
-    return null
 }
+
+private val TONES = listOf("bad", "sauce", "mid", "good")
+
+private fun usualScore(g: Group) = usualOf(g.counts)?.let { TONES.indexOf(rateTone(it)) } ?: -1
+
+// the tone of the bowl she usually leaves first, so the colours step down the list; then how often it went down well
+private val byBowl =
+    Comparator<Group> { a, b ->
+        val u = usualScore(b) - usualScore(a)
+        if (u != 0) return@Comparator u
+        val d = b.good.toDouble() / b.n - a.good.toDouble() / a.n
+        if (d != 0.0) return@Comparator sign(d).toInt()
+        if (b.n != a.n) return@Comparator b.n - a.n
+        german.compare(a.key, b.key)
+    }
 
 // Wet food by group, the best share first. Every rating counts, but a group needs two varieties rated twice; a variety
 // naming two flavours counts in both.
@@ -809,12 +832,7 @@ private fun grouped(
     return by.entries
         .filter { enough(it.value) }
         .map { (key, sorts) -> Group(key, sorts) }
-        .sortedWith { a, b ->
-            val d = b.good.toDouble() / b.n - a.good.toDouble() / a.n
-            if (d != 0.0) return@sortedWith sign(d).toInt()
-            if (b.n != a.n) return@sortedWith b.n - a.n
-            german.compare(a.key, b.key)
-        }
+        .sortedWith(byBowl)
 }
 
 class Taste(
@@ -835,9 +853,31 @@ fun taste(m: Model): Taste {
         val g = list.singleOrNull() ?: return emptyList()
         val rest = wetOf(m).filter { it !in g.sorts }
         if (!enough(rest)) return emptyList()
-        return listOf(g, Group("", rest)).sortedByDescending { it.good.toDouble() / it.n }
+        return listOf(g, Group("", rest)).sortedWith(byBowl)
     }
     return Taste(side("konsistenz"), side("geschmack"), side("marke"))
+}
+
+/** fish against meat in the wet food, varieties of both left out; clear where the gap is a finding */
+class FishMeat(
+    val fish: Side,
+    val meat: Side,
+    val clear: Boolean,
+)
+
+fun fishOrMeat(m: Model): FishMeat? {
+    val fish = mutableListOf<Sort>()
+    val meat = mutableListOf<Sort>()
+    for (e in wetOf(m)) {
+        val f = flavoursOf(e.product.str("variety")).filter { it != "Käse" }
+        val n = f.count { it in FISH }
+        if (f.isNotEmpty() && n == f.size) fish.add(e) else if (f.isNotEmpty() && n == 0) meat.add(e)
+    }
+    if (!enough(fish) || !enough(meat)) return null
+    val a = tallyOf(fish, "Fisch")
+    val b = tallyOf(meat, "Fleisch")
+    if (a.n < INSIGHT_RATINGS || b.n < INSIGHT_RATINGS) return null
+    return FishMeat(a, b, insightOf("geschmack", a, b, INSIGHT_GROUP)?.takeIf { abs(it.gap) > 0 } != null)
 }
 
 // the rest by its name where it is all one group
