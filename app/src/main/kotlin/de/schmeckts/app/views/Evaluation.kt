@@ -1026,6 +1026,7 @@ private fun TraitBlock(
 private fun Traits(
     traits: List<Trait>,
     c: Ctx,
+    last: Boolean = true,
 ) {
     watch()
     val ph = LocalUi.current.phone
@@ -1054,13 +1055,14 @@ private fun Traits(
             "Neuem" to setOf("neu"),
         )
     val missing = topics.filter { (_, kinds) -> kinds.none { it in shown } }.map { it.first }
-    val last =
+    val end =
         when {
+            !last -> ""
             wet < CLEAR -> "Für mehr reicht es noch nicht. Mit jeder Bewertung kommt etwas dazu."
             missing.isNotEmpty() -> "Noch nichts Deutliches bei ${andList(missing)}."
             else -> ""
         }
-    if (last.isNotEmpty()) T(last, Type.small, Modifier.padding(top = Space.s3), colors.muted)
+    if (end.isNotEmpty()) T(end, Type.small, Modifier.padding(top = Space.s3), colors.muted)
 }
 
 private fun thousands(n: Int) = if (n < 1000) "$n" else String.format(Locale.GERMAN, "%,d", n)
@@ -1131,7 +1133,7 @@ private fun Steckbrief(
                     color = colors.ink,
                 )
             } else if (r.rated == 0) {
-                Traits(traits, c)
+                Traits(traits, c, last = false)
                 M(
                     "Bewertet sind bisher nur Trockenfutter und Snacks. Was davon ankommt, steht unten beim Einkaufen.",
                     Type.body,
