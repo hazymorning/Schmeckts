@@ -428,20 +428,23 @@ class UiShopTest : ScreenTest() {
     }
 
     @Test
-    fun `shop folds - what is no longer bought shows its first three at once, the rest behind one tap, what is open behind its own`() {
+    fun `shop folds - what is no longer bought behind one tap but what asks a decision, what is open behind its own`() {
         val now = at("2025-06-17T12:00")
         val left = (0 until 5).map { "stehen%04d".format(it) }
         val meh = (0 until 4).map { "gehtso%04d".format(it) }
+        val struck = "gestr00001"
         open(
             mapOf(
                 "db" to
                     dbOf(
                         listOf(pet(M)),
-                        (left + meh + "unklar0001").mapIndexed { n, i -> product(i, "Sheba", "Sorte $n") },
+                        (left + meh + "unklar0001").mapIndexed { n, i -> product(i, "Sheba", "Sorte $n") } +
+                            product(struck, "Sheba", "Gestrichen", "Nassfutter", "kaufen" to "nicht"),
                         left.flatMap { i -> (0 until 2).map { n -> meal("$i-$n", i, now - (n + 1) * DAY, mapOf(M to "schlecht")) } } +
                             meh.flatMap { i ->
                                 (0 until 3).map { n -> meal("$i-$n", i, now - (n + 1) * DAY - 3_600_000L, mapOf(M to "mittel")) }
                             } +
+                            (0 until 3).map { n -> meal("$struck-$n", struck, now - (n + 1) * DAY - 7_200_000L, mapOf(M to "top")) } +
                             meal("unklar0001-0", "unklar0001", now - DAY, mapOf(M to "mittel")),
                     ),
             ),
@@ -453,18 +456,16 @@ class UiShopTest : ScreenTest() {
         )
         val rows = { tags("sort-", within = "shop") }
         val shut = rows()
-        val links = tags("fold-", within = "shop") to inSheet("Alle fünf zeigen")
+        val links = tags("fold-", within = "shop")
         act("fold", "v" to "shop:nicht")
         val stop = rows()
         act("fold", "v" to "shop:offen")
         check(
-            listOf(shut, stop).map { l -> l.count { it in left } } == listOf(3, 5) && "unklar0001" !in stop && "unklar0001" in rows(),
-            "three at once, the rest after a tap, what is still open behind its own ${listOf(shut, stop)}",
+            listOf(shut, stop).map { l -> l.count { it in left } } == listOf(0, 5) && "unklar0001" !in stop && "unklar0001" in rows(),
+            "what the lines above tell after a tap, what is still open behind its own ${listOf(shut, stop)}",
         )
-        check(
-            meh.all { it in shut } && links == (listOf("shop:nicht", "shop:offen") to true),
-            "a band of four has nothing to unfold $links",
-        )
+        check(struck in shut && within("sort-$struck", "Von dir gestrichen"), "struck though it goes down well: shown at once $shut")
+        check(meh.all { it in shut } && links == listOf("shop:nicht", "shop:offen"), "a band of four has nothing to unfold $links")
     }
 
     @Test
@@ -796,11 +797,12 @@ class UiEvaluationTest : ScreenTest() {
                 .fetchSemanticsNodes()
                 .size
         }
-        val shut = jelly()
+        val shut = jelly() to tags("proof-", sheet = true).size
         tapTag("trait-liebling")
         check(
-            jelly() == shut + 1 && tags("proof-", sheet = true).size == 2 && !inSheet("8 von 8"),
-            "the favourites open on their rows and jelly against the rest; one brand on each side, so no grid of empty cells",
+            shut == (1 to 0) && jelly() == 1 && tags("proof-", sheet = true).size == 2 && !inSheet("8 von 8"),
+            "jelly against the rest stands with the favourites at once, a tap opens their rows; one brand on each side, so no grid " +
+                "of empty cells $shut",
         )
     }
 
@@ -833,6 +835,7 @@ class UiEvaluationTest : ScreenTest() {
             "the card names the variety one good meal from the shopping list",
         )
         act("open-evaluation")
+        act("fold", "v" to "shop:nicht")
         val band = top(hasText("nicht mehr kaufen", substring = true) and hasAnyAncestor(hasTestTag("shop")))
         check(
             tags("next-", within = "next") == listOf("naechste1", "naechste2") &&
@@ -1144,6 +1147,8 @@ class UiEvaluationTest : ScreenTest() {
         val kept = listOf(level, tags("proof-", sheet = true))
         tapTag("trait-pack-${pack.brand}")
         val closed = tags("proof-", sheet = true)
+        val calm = tags("week-", sheet = true)
+        tapTag("trait-appetit")
         val weeks = tags("week-", sheet = true)
         val lineIds = pack.sorts.map { it.id }
         check(
@@ -1153,12 +1158,13 @@ class UiEvaluationTest : ScreenTest() {
             "a line opens the varieties it rests on, its own first, then the others in its sauce $proof",
         )
         check(
-            closedSides == listOf(true, false) && openSides == listOf(false, true),
-            "open, brand by sauce stands in place of the two sides it splits up $closedSides $openSides",
+            closedSides == listOf(false, true) && openSides == closedSides,
+            "brand by sauce stands in place of the two sides it splits up, open or not $closedSides $openSides",
         )
         check(over == listOf("evaluation", listOf("product", null, null), proof[0]), "a row opens its sheet over the page $over")
         check(kept == listOf(listOf("evaluation", null, null), proof), "back returns to the page, its proof still open $kept")
-        check(closed.isEmpty() && weeks.size >= 2, "a second tap folds it; the weeks stand under their line, open $weeks")
+        check(closed.isEmpty(), "a second tap folds it $closed")
+        check(calm.isEmpty() && weeks.size >= 2, "weeks as expected stand under their line once it is opened $weeks")
         tapTag("trait-liebling")
         check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
     }
@@ -1167,9 +1173,11 @@ class UiEvaluationTest : ScreenTest() {
     fun `Vorlieben - a screen reader hears each week once, not the days and counts under the chart again`() {
         mau()
         act("open-evaluation")
+        tapTag("trait-appetit")
+        val page = hasAnyAncestor(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "evaluation"))
         val texts =
             rule
-                .onAllNodes(hasAnyAncestor(hasTestTag("profile")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
+                .onAllNodes(page and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
                 .fetchSemanticsNodes()
         val marks = texts.filter { it.config[SemanticsProperties.Text].joinToString("").matches(Regex("(ab )?[0-9.]+")) }
         val week = SemanticsMatcher("a week") { n -> n.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("week-") }
