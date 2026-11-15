@@ -92,7 +92,8 @@ fun AppScreen(main: Main) {
                 HomeScreen()
                 SheetHost(ui.sheets, ui.sheets.base) { SheetView(it) }
                 SheetHost(ui.sheets, ui.sheets.over) { SheetView(it) }
-                ToastHost(ui.toasts, ui.sheets.anyOpen()) { ui.haptic("select") }
+                // the toast rises over the feeding button as the sheet goes, not after
+                ToastHost(ui.toasts, ui.sheets.anyOpen() && ui.sheets.base.closing == null) { ui.haptic("select") }
                 ViewerHost(ui.viewer)
                 CameraHost(ui.camera)
             }

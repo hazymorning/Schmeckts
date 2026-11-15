@@ -2,6 +2,10 @@ package de.schmeckts.app.ui
 
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -14,8 +18,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,10 +41,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -69,6 +79,9 @@ class Toasts(
         private set
     var swipe by mutableFloatStateOf(0f)
     var dragging by mutableStateOf(false)
+
+    // the finger's speed in px/s as it let go, for the slide that follows; null: no fling, the toast just goes there
+    internal var flung: Float? = null
     private var count by mutableIntStateOf(0)
     private var timer: Job? = null
     private var ends = 0L
@@ -130,16 +143,19 @@ class Toasts(
         timer?.cancel()
     }
 
+    /** vx: the finger's speed as it let go, px/s */
     internal fun released(
         swiped: Boolean,
         dx: Float,
         width: Float,
-        v: Float,
+        vx: Float,
+        density: Float,
         screen: Float,
     ) {
         down = false
+        flung = if (swiped) vx else null
         dragging = false
-        if (swiped && (abs(dx) > width / 3 || (v > 0.5f && abs(dx) > 24f))) {
+        if (swiped && (abs(dx) > width / 3 || (abs(vx) / density > 500 && abs(dx) > 24f))) {
             swipe = sign(dx) * screen
             hideToast()
         } else {
@@ -149,7 +165,7 @@ class Toasts(
     }
 }
 
-/** At the foot of the screen, over everything; in a sheet lower, where the feeding button is not. */
+/** At the foot of the screen, over everything and above the keyboard; in a sheet lower, where the feeding button is not. */
 @Composable
 fun ToastHost(
     toasts: Toasts,
@@ -160,9 +176,9 @@ fun ToastHost(
     val p = colors
     val still = reduceMotion
     val shown = remember { Animatable(0f) }
+    // one replacing another changes in place
     LaunchedEffect(toasts.show, m.n) {
         if (toasts.show) {
-            shown.snapTo(0f)
             if (still) shown.snapTo(1f) else shown.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut))
         } else if (still) {
             shown.snapTo(0f)
@@ -172,20 +188,25 @@ fun ToastHost(
     }
     val slide = remember { Animatable(0f) }
     LaunchedEffect(toasts.swipe, toasts.dragging) {
-        if (toasts.dragging ||
-            still
-        ) {
+        val v = toasts.flung
+        toasts.flung = null
+        if (toasts.dragging || still || v == null) {
             slide.snapTo(toasts.swipe)
         } else {
-            slide.animateTo(toasts.swipe, tween(Motion.FADE, easing = Motion.easeOut))
+            slide.animateTo(toasts.swipe, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow), v)
         }
     }
+    val lift by animateDpAsState(
+        if (inSheet) 0.dp else Size.controlL + Space.s4,
+        if (still) snap() else tween(Motion.STEP, easing = Motion.easeOut),
+        label = "toast lift",
+    )
     val tone = p.tone(m.tone.removePrefix("r-").removePrefix("o-"))
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(bottom = if (inSheet) Space.s5 else Space.s5 + Size.controlL + Space.s4),
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+            .padding(bottom = Space.s5),
         contentAlignment = Alignment.BottomCenter,
     ) {
         val screen = constraints.maxWidth.toFloat()
@@ -194,10 +215,11 @@ fun ToastHost(
         val a = shown.value
         Box(
             Modifier
+                .offset { IntOffset(0, -lift.roundToPx()) }
                 .testTag("toast")
                 .widthIn(max = minOf(maxWidth * 0.92f, 520.dp))
                 .graphicsLayer {
-                    alpha = a
+                    alpha = a * (1f - 0.6f * (abs(slide.value) / size.width).coerceIn(0f, 1f))
                     val k = if (toasts.show) 1f else 0.96f + 0.04f * a
                     scaleX = k
                     scaleY = k
@@ -210,15 +232,16 @@ fun ToastHost(
                             awaitEachGesture {
                                 val first = awaitFirstDown(requireUnconsumed = false)
                                 toasts.pressed()
-                                var t = first.uptimeMillis
+                                val speed = VelocityTracker()
+                                speed.addPointerInputChange(first)
                                 var dx = 0f
                                 var swiped = false
                                 while (true) {
                                     val e = awaitPointerEvent(PointerEventPass.Initial)
                                     val c = e.changes.firstOrNull { it.id == first.id } ?: break
+                                    speed.addPointerInputChange(c)
                                     if (!c.pressed) break
                                     dx += c.positionChange().x
-                                    t = c.uptimeMillis
                                     if (!swiped && abs(dx) > SLOP * density) {
                                         swiped = true
                                         toasts.dragging = true
@@ -228,8 +251,7 @@ fun ToastHost(
                                         c.consume()
                                     }
                                 }
-                                val v = abs(dx) / density / maxOf(1L, t - first.uptimeMillis)
-                                toasts.released(swiped, dx, width, v, screen)
+                                toasts.released(swiped, dx, width, speed.calculateVelocity().x, density, screen)
                             }
                         }
                     } else {
