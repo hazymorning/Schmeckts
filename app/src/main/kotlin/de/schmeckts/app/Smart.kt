@@ -2197,13 +2197,16 @@ fun profile(
 
 private const val CARD_TRAITS = 2
 
-/** For the home card: a worry, the favourite, then the strongest other line; none that names the variety of the hint
- *  the card above shows. */
+/** For the home card: a worry, the favourite, then the strongest other line; none that says what the hint on the card
+ *  above says, of its variety or of the cat's appetite. */
 fun cardTraits(
     traits: List<Trait>,
-    hintId: String?,
+    hint: Hint?,
 ): List<Trait> {
-    val ok = traits.filter { hintId == null || hintId !in it.ids }
+    val told = { t: Trait ->
+        hint != null && ((hint.id != null && hint.id in t.ids) || (hint.kind == "appetit" && t.appetite?.hint?.pet == hint.pet))
+    }
+    val ok = traits.filterNot(told)
     val group = setOf("marke", "konsistenz", "geschmack")
     val third =
         listOf<(Trait) -> Boolean>(

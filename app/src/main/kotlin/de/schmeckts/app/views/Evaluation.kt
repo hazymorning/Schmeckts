@@ -28,9 +28,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -80,10 +80,10 @@ import de.schmeckts.app.jsRound
 import de.schmeckts.app.likingOf
 import de.schmeckts.app.mostly
 import de.schmeckts.app.observationOf
+import de.schmeckts.app.ownGroups
 import de.schmeckts.app.pets
 import de.schmeckts.app.pname
 import de.schmeckts.app.ratingsIn
-import de.schmeckts.app.shopGroups
 import de.schmeckts.app.tallyOf
 import de.schmeckts.app.textureKey
 import de.schmeckts.app.trialOf
@@ -775,7 +775,7 @@ private fun TraitRow(
                 }
                 end?.invoke()
                 if (tap != null) {
-                    if (open == null) Chevron() else Icon("chevron", Modifier.rotate(turn), Size.iconS, colors.faint)
+                    if (open == null) Chevron() else Icon("chevron", Modifier.graphicsLayer { rotationZ = turn }, Size.iconS, colors.faint)
                 }
             }
             if (said.sub.isNotEmpty()) M(said.sub, Type.small, Modifier.padding(top = Space.hair), colors.muted)
@@ -1140,9 +1140,8 @@ private fun TraitBlock(
                     fill = false,
                     onClick =
                         ui.on(
-                            "buy-many",
+                            "stop-many",
                             "ids" to line.third.joinToString(",") { it.id },
-                            "v" to "nicht",
                             "label" to line.second,
                         ),
                 )
@@ -1536,7 +1535,6 @@ private fun NextCard(
     }
 }
 
-/** a band of Einkaufen: its square and its name */
 @Composable
 private fun BandLabel(
     text: String,
@@ -1661,10 +1659,9 @@ private fun ShopCard(
     }
 }
 
-// label muted, value ink, in one line of text
 private fun saidLine(
     s: Said,
-    muted: androidx.compose.ui.graphics.Color,
+    muted: Color,
 ) = buildAnnotatedString {
     withStyle(SpanStyle(color = muted)) { append("${s.label}: ") }
     append(s.value)
@@ -1843,7 +1840,7 @@ private fun CatChips() {
 
 fun Phone.hasEvaluationCard(m: Model): Boolean {
     val r = derive.rankingModel()
-    return r.rated > 0 || shopGroups(m).nachkaufen.isNotEmpty()
+    return r.rated > 0 || ownGroups(m, db.pets.size).nachkaufen.isNotEmpty()
 }
 
 @Composable
@@ -1866,11 +1863,11 @@ private fun CardTrait(
     ) { T(saidLine(line, colors.muted), Type.body, color = if (s.quiet) colors.muted else colors.ink) }
 }
 
-/** hintId: the variety the question card above names, so the card does not say it twice */
+/** hint: the one the question card above shows, so the card does not say it twice */
 @Composable
 fun EvaluationCard(
     m: Model,
-    hintId: String? = null,
+    hint: de.schmeckts.app.Hint? = null,
 ) {
     watch()
     val ui = LocalUi.current
@@ -1888,7 +1885,7 @@ fun EvaluationCard(
                 val pet = d.getPet(s.pet)
                 val name = pet?.str("name") ?: ""
                 val c = Ctx(d.modelFor(s.pet))
-                val lines = cardTraits(s.traits, hintId).mapNotNull { ph.traitSaid(it, c) }
+                val lines = cardTraits(s.traits, hint).mapNotNull { ph.traitSaid(it, c) }
                 val none = if (s.diary.n == 0) "Noch nichts bewertet." else "Noch steht nichts fest."
                 ListRow(
                     Modifier.testTag("card-cat-${s.pet}"),
@@ -1913,7 +1910,7 @@ fun EvaluationCard(
         }
         val s = sum.pets.firstOrNull()
         val c = Ctx(if (s != null) d.modelFor(s.pet) else m)
-        val lines = s?.let { cardTraits(it.traits, hintId).mapNotNull { t -> ph.traitSaid(t, c)?.let { x -> t.kind to x } } }.orEmpty()
+        val lines = s?.let { cardTraits(it.traits, hint).mapNotNull { t -> ph.traitSaid(t, c)?.let { x -> t.kind to x } } }.orEmpty()
         val body: @Composable (
             String,
         ) -> Unit = { text -> M(text, Type.body, Modifier.padding(top = Space.hair, bottom = Space.s3), colors.ink) }
@@ -1922,7 +1919,7 @@ fun EvaluationCard(
             r.rated == 0 -> {
                 if (s != null) ShelfBar(s.shelf, legend = true, Modifier.padding(top = Space.s2))
                 Label("Nachkaufen", top = Space.s4)
-                shopGroups(m).nachkaufen.take(CARD_BUY).forEachIndexed { i, e ->
+                ownGroups(m, ph.db.pets.size).nachkaufen.take(CARD_BUY).forEachIndexed { i, e ->
                     if (i > 0) Divider(rowIndent)
                     val x = ph.rowSaid(e, c, "nachkaufen")
                     SortRow(m, e, x.sub, x.label)
@@ -1974,7 +1971,7 @@ fun EvaluationPage() {
     val still = reduceMotion
     LaunchedEffect(ph.prefs.activePet) { if (still) scroll.scrollTo(0) else scroll.animateScrollTo(0) }
     val picks = v.picks.mapNotNull { ph.pickSaid(m, it, c.now) }
-    val bands = bandsOf(v, v.picks.map { it.id }.toSet())
+    val bands = bandsOf(v, picks.map { it.e.id }.toSet())
     val household = ph.db.servings.none { s -> s.pets.values.any { de.schmeckts.app.rOf(it) != null } }
     SheetBody("Vorlieben", ui.sheets, onBack = ui.on("settings-back"), scroll = scroll) {
         if (ph.db.pets.size >= 2) {

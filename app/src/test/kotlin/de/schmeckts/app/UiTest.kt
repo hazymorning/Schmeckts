@@ -488,6 +488,41 @@ class UiShopTest : ScreenTest() {
             "the page leads to the shopping list",
         )
     }
+
+    @Test
+    fun `dry food - for a cat chosen beside another, the card lists what the cat eats, as its tally counts`() {
+        val now = at("2025-06-17T12:00")
+        open(
+            mapOf(
+                "db" to
+                    dbOf(
+                        listOf(pet(M), pet(T, "Tiger", "createdAt" to 2)),
+                        listOf(
+                            product("trocken0001", "Josera", "Huhn", "Trockenfutter"),
+                            product("trocken0002", "Josera", "Lamm", "Trockenfutter", "kaufen" to "immer"),
+                        ),
+                        (0 until 3).flatMap {
+                            listOf(
+                                meal("huhn$it", "trocken0001", now - (it + 1) * DAY, mapOf(T to "gern")),
+                                meal("lamm$it", "trocken0002", now - (it + 1) * DAY - 3_600_000, mapOf(T to "liegen", M to "gern")),
+                            )
+                        },
+                    ),
+            ),
+            now,
+        )
+        act("filter", "id" to T)
+        idle(400)
+        val card = tags("sort-", within = "sec-evaluation")
+        act("open-evaluation")
+        val stop =
+            phone.derive
+                .vorliebenModel()
+                .shop.nicht
+                .map { it.id }
+        check(card == listOf("trocken0001"), "what Tiger leaves is not under Nachkaufen on the card $card")
+        check(stop == listOf("trocken0002"), "on the page it stands with what Tiger leaves $stop")
+    }
 }
 
 class UiHistoryTest : ScreenTest() {
@@ -1072,6 +1107,27 @@ class UiEvaluationTest : ScreenTest() {
         )
         tapTag("trait-liebling")
         check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
+    }
+
+    @Test
+    fun `Vorlieben - a screen reader hears each week once, not the days and counts under the chart again`() {
+        mau()
+        act("open-evaluation")
+        tapTag("trait-appetit")
+        val texts =
+            rule
+                .onAllNodes(hasAnyAncestor(hasTestTag("profile")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
+                .fetchSemanticsNodes()
+        val marks = texts.filter { it.config[SemanticsProperties.Text].joinToString("").matches(Regex("(ab )?[0-9.]+")) }
+        val week = SemanticsMatcher("a week") { n -> n.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("week-") }
+        val weeks =
+            rule
+                .onAllNodes(week, true)
+                .fetchSemanticsNodes()
+                .map { it.config[SemanticsProperties.ContentDescription].joinToString() }
+        check(weeks.size >= 2 && weeks.any { "Notiert" in it }, "each week says its days and notes $weeks")
+        val loud = marks.filter { SemanticsProperties.HideFromAccessibility !in it.config }.map { it.config[SemanticsProperties.Text] }
+        check(marks.size >= 2 && loud.isEmpty(), "and is not read out twice $loud")
     }
 
     @Test

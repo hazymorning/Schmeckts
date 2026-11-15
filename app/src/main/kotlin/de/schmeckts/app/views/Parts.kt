@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -1183,6 +1184,8 @@ fun WeekChart(
                 .size.width
                 .toDp()
         }
+    // each column reads out its days and notes already
+    val silent = Modifier.semantics { hideFromAccessibility() }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val k = weeks.size
         val gap = Space.s2
@@ -1219,7 +1222,7 @@ fun WeekChart(
                                     horizontalArrangement = Arrangement.spacedBy(Space.hair),
                                 ) {
                                     Icon(observationOf(kind).icon, size = Size.iconS, color = p.tone(kind)?.c ?: p.muted)
-                                    if (n > 1) T("$n", day, color = p.muted)
+                                    if (n > 1) T("$n", day, silent, p.muted)
                                 }
                             }
                         }
@@ -1231,7 +1234,7 @@ fun WeekChart(
                 val align = if (widest <= col) Alignment.CenterHorizontally else Alignment.Start
                 weeks.forEachIndexed { i, w ->
                     Box(each) {
-                        if (dated(i)) T(weekDay(w), day, Modifier.wrapContentWidth(align, unbounded = true), p.muted)
+                        if (dated(i)) T(weekDay(w), day, silent.wrapContentWidth(align, unbounded = true), p.muted)
                     }
                 }
             }

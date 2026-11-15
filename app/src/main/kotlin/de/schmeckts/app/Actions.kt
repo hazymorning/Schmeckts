@@ -346,7 +346,7 @@ class Actions(
                 redrawAll()
             },
             "hint-buy" to { x -> hintBuy(x["id"] ?: "", x["v"] ?: "") },
-            "buy-many" to { x -> buyMany((x["ids"] ?: "").split(",").filter { it.isNotEmpty() }, x["v"] ?: "", x["label"] ?: "") },
+            "stop-many" to { x -> stopMany((x["ids"] ?: "").split(",").filter { it.isNotEmpty() }, x["label"] ?: "") },
             "remind-yes" to { _ ->
                 haptic("select")
                 launch {
@@ -543,28 +543,19 @@ class Actions(
     }
 
     // a whole line at once, one undo for all of it
-    private fun buyMany(
+    private fun stopMany(
         ids: List<String>,
-        v: String,
         label: String,
     ) {
-        val was = ids.mapNotNull { id -> d.getProduct(id)?.let { id to it.str("kaufen") } }.filter { it.second != v }
+        val was = ids.mapNotNull { id -> d.getProduct(id)?.let { id to it.str("kaufen") } }.filter { it.second != "nicht" }
         if (was.isEmpty()) return
-        l.products.setKaufen(was.associate { it.first to v })
+        l.products.setKaufen(was.associate { it.first to "nicht" })
         haptic("success")
         redrawAll()
-        val (said, ic, tone) =
-            if (v ==
-                "immer"
-            ) {
-                Triple("kommt auf die Einkaufsliste", "champ", "r-good")
-            } else {
-                Triple("wird nicht mehr gekauft", "flop", "r-bad")
-            }
-        ui.toast("$label $said.", {
+        ui.toast("$label wird nicht mehr gekauft.", {
             l.products.setKaufen(was.toMap())
             redrawAll()
-        }, ic, tone)
+        }, "flop", "r-bad")
     }
 
     private suspend fun viewPhoto(

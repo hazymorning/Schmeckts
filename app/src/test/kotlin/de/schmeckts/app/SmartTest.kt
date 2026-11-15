@@ -1984,8 +1984,20 @@ class SmartTest {
             profile(listOf(worse)).map { it.kind },
         )
         assertEquals(listOf("liebling", "pack"), cardTraits(traits, null).map { it.kind })
-        assertEquals("none naming the variety of the hint", listOf("liebling", "neuerdings"), cardTraits(traits, "m1").map { it.kind })
+        assertEquals(
+            "none naming the variety of the hint",
+            listOf("liebling", "neuerdings"),
+            cardTraits(traits, Hint("stop", "m1", "A", 0.0)).map { it.kind },
+        )
         assertEquals(listOf("appetit", "liebling"), cardTraits(profile(listOf(worse)), null).map { it.kind })
+        val weaker = Hint("appetit", null, "A", 0.0, 3, 0, 30, 24)
+        val fewer = listOf(Trait("appetit", "tage", appetite = Appetite("tage", dir = -1, hint = weaker))) + traits
+        assertEquals(listOf("appetit", "liebling"), cardTraits(fewer, null).map { it.kind })
+        assertEquals(
+            "the appetite the hint above tells is not told again",
+            listOf("liebling", "pack"),
+            cardTraits(fewer, weaker).map { it.kind },
+        )
 
         val felix =
             line.map { if (it["id"] == "m2") prod("m2", "brand" to "Miamor", "variety" to "Ente Pastete") else it } +

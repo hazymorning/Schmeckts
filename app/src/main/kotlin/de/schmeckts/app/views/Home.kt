@@ -506,12 +506,8 @@ private fun ColumnScope.HomeContent() {
         Arrive(n++, "question") { question() }
     }
     if (hasEvaluationCard(m)) {
-        // the variety the hint card names is not named again right under it
-        val hinted =
-            m.hints
-                .firstOrNull()
-                ?.takeIf { !updateShown(ui) && !remindShown(ui) && !newsShown(ui) }
-                ?.id
+        // what the hint card says is not said again right under it
+        val hinted = m.hints.firstOrNull()?.takeIf { !updateShown(ui) && !remindShown(ui) && !newsShown(ui) }
         Gap(gap("card"))
         Arrive(n++, "evaluation") { EvaluationCard(m, hinted) }
     }
