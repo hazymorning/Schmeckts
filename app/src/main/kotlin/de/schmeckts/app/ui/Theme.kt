@@ -255,8 +255,6 @@ object Size {
     val picXxxl = 112.dp
     val meter = 16.dp
     val meterW = 4.dp
-    val dot = 12.dp // a rating, a variety on the shelf
-    val chart = 80.dp // the week chart
     val hairline = 1.dp
     val stroke = 2.dp // every emphasised line
     val fieldRoom = 44.dp // the side of a field that holds an icon

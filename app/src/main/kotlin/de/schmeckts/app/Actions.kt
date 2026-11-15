@@ -254,6 +254,7 @@ class Actions(
                 }
                 ui.sheets.openSheet(SheetState("evaluation"))
             },
+            "open-level" to { x -> ui.sheets.openPage(x["v"] ?: "") },
             "open-server" to { _ -> ui.sheets.openSheet(SheetState("settings", "page" to "house")) },
             "connect" to { _ -> launch { connectServer() } },
             "connect-form" to { _ -> openConnect() },
@@ -268,11 +269,10 @@ class Actions(
             "serve" to { x ->
                 val id = x["id"] ?: ""
                 val code = x["code"] ?: ""
-                val pets = listOfNotNull(x["pet"])
                 val gone = ui.sheets.closeAll()
                 launch {
                     gone.await()
-                    l.feeding.serveProduct(id, code, pets) // the meal is rated on the home page
+                    l.feeding.serveProduct(id, code) // the meal is rated on the home page
                 }
             },
             "scan" to { _ -> launch { l.scan.scan() } },
@@ -359,7 +359,6 @@ class Actions(
                 redrawAll()
             },
             "hint-buy" to { x -> hintBuy(x["id"] ?: "", x["v"] ?: "") },
-            "stop-many" to { x -> stopMany((x["ids"] ?: "").split(",").filter { it.isNotEmpty() }, x["label"] ?: "") },
             "remind-yes" to { _ ->
                 launch {
                     l.reminders.setRemind(REMIND_DEFAULT)
@@ -474,15 +473,6 @@ class Actions(
                 launch { l.exchange.shareChanges(l.exchange.peerOf(peer)) }
             },
             "demo" to { _ -> l.data.loadDemo() },
-            "fold" to { x ->
-                val sh = sheet
-                val key = x["v"] ?: ""
-                if (sh != null) {
-                    val open = (sh["open"] as? Set<*>)?.filterIsInstance<String>()?.toSet().orEmpty()
-                    sh["open"] = if (key in open) open - key else open + key
-                    ui.renderSheet()
-                }
-            },
             "jump-day" to { x ->
                 val day = x["day"] ?: ""
                 if (sheet?.kind == "report") ui.jump = day else ui.sheets.openSheet(reportState("d-$day"))
@@ -543,22 +533,6 @@ class Actions(
             l.products.setKaufen(id, was)
             redrawAll()
         }, ic, tone)
-    }
-
-    // a whole line at once, one undo for all of it
-    private fun stopMany(
-        ids: List<String>,
-        label: String,
-    ) {
-        val was = ids.mapNotNull { id -> d.getProduct(id)?.let { id to it.str("kaufen") } }.filter { it.second != "nicht" }
-        if (was.isEmpty()) return
-        l.products.setKaufen(was.associate { it.first to "nicht" })
-        haptic("success")
-        redrawAll()
-        ui.toast("$label wird nicht mehr gekauft.", {
-            l.products.setKaufen(was.toMap())
-            redrawAll()
-        }, "flop", "r-bad")
     }
 
     private suspend fun viewPhoto(

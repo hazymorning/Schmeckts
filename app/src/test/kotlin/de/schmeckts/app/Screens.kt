@@ -13,6 +13,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -406,23 +407,28 @@ abstract class ScreenTest {
     /** a tap on the node with this test tag, in the top layer when one is open, scrolled into view first; as a screen
      *  reader taps, so a toast over it is no matter */
     fun tapTag(tag: String) {
-        val n = rule.onAllNodes(inTop(hasTestTag(tag)), useUnmergedTree = true)[0].performScrollTo()
+        val n = rule.onAllNodes(inTop(hasTestTag(tag)), useUnmergedTree = true)[0]
+        // a button in the bar does not scroll
+        if (rule
+                .onAllNodes(
+                    inTop(hasTestTag(tag) and hasAnyAncestor(hasScrollAction())),
+                    useUnmergedTree = true,
+                ).fetchSemanticsNodes()
+                .isNotEmpty()
+        ) {
+            n.performScrollTo()
+        }
         val clicks = SemanticsActions.OnClick in n.fetchSemanticsNode().config
         if (clicks) n.performSemanticsAction(SemanticsActions.OnClick) else n.performClick()
         idle(50)
     }
 
-    /** every proof and every folded list of the top layer opened, as taps on them would */
+    /** every folded list of the top layer opened, as taps on its link would */
     fun unfold() {
-        val shut = inTop(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "zugeklappt"))
-        for (i in 0 until 40) {
-            val n = rule.onAllNodes(shut, useUnmergedTree = true)
-            if (n.fetchSemanticsNodes().isEmpty()) break
-            n[0].performSemanticsAction(SemanticsActions.OnClick)
-            idle(50)
+        for (key in tags("fold-", sheet = sheet != null)) {
+            val shut = inTop(hasTestTag("fold-$key") and hasText("Alle", substring = true))
+            if (rule.onAllNodes(shut).fetchSemanticsNodes().isNotEmpty()) tapTag("fold-$key")
         }
-        val open = (sheet?.get("open") as? Set<*>).orEmpty()
-        for (key in tags("fold-", sheet = true)) if (key !in open) act("fold", "v" to key)
     }
 
     /** Tiger, who rated every meal the first cat rated, the other way round on its scale; Tiger's id */

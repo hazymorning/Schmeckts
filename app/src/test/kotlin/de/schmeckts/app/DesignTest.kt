@@ -396,7 +396,7 @@ abstract class DesignViews : ScreenTest() {
         bad += scanText()
         act("close")
         for (p in db.products) p["codes"] = j(mapOf("4001234567890" to true))
-        act("open-product", "id" to tags("pick-", within = "sec-evaluation").first())
+        act("open-product", "id" to tags("card-", within = "sec-evaluation").first())
         bad += scanText()
         act("close")
         val hist = { tags("row-", within = "sec-hist").first { id -> db.servings.any { it.id == id } } }
