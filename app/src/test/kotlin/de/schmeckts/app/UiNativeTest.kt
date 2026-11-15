@@ -569,12 +569,14 @@ class UiKeyboardTest : ScreenTest() {
         return (root - field(label).fetchSemanticsNode().boundsInRoot.bottom) / rule.density.density
     }
 
-    // with the clock held, n frames drawn
-    private fun frames(n: Int) =
-        repeat(n) {
+    // with the clock held, frame by frame while a field has the focus and what it was on is still there
+    private fun framesWhile(there: () -> Boolean) {
+        repeat(60) {
+            if (focused().isEmpty() || !there()) return
             rule.mainClock.advanceTimeByFrame()
             shadowOf(Looper.getMainLooper()).idle()
         }
+    }
 
     // the feed sheet's scrolling body
     private fun feedBody() =
@@ -634,11 +636,14 @@ class UiKeyboardTest : ScreenTest() {
         val cat = focused()
         rule.mainClock.autoAdvance = false
         ui.sheets.backPage()
-        frames(2)
-        val back = listOf(level, focused())
+        framesWhile { fieldText("Name") != null }
+        val back = listOf(level, fieldText("Name") != null, focused())
         rule.mainClock.autoAdvance = true
         idle(600)
-        check(cat == listOf("Name") && back == listOf(listOf("settings", null, null), emptyList<String>()), "and as a level goes $back")
+        check(
+            cat == listOf("Name") && back == listOf(listOf("settings", null, null), true, emptyList<String>()),
+            "and as a level goes $back",
+        )
         act("close")
         idle(600)
         act("feed")
@@ -648,11 +653,14 @@ class UiKeyboardTest : ScreenTest() {
         val typing = focused()
         rule.mainClock.autoAdvance = false
         ui.act("close")
-        frames(2)
+        framesWhile { ui.sheets.base.closing != null }
         val closing = listOf(ui.sheets.base.closing != null, focused().isEmpty())
         rule.mainClock.autoAdvance = true
         idle(600)
-        check(typing == listOf("Marke oder Sorte suchen") && closing == listOf(true, true), "the keyboard goes as the sheet does $closing")
+        check(
+            typing == listOf("Marke oder Sorte suchen") && closing == listOf(true, true),
+            "the keyboard goes as the sheet does $typing $closing",
+        )
         act("feed")
         idle(600)
         ui.focus("f-search")
