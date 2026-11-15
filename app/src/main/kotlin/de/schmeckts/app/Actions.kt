@@ -268,10 +268,11 @@ class Actions(
             "serve" to { x ->
                 val id = x["id"] ?: ""
                 val code = x["code"] ?: ""
+                val pets = listOfNotNull(x["pet"])
                 val gone = ui.sheets.closeAll()
                 launch {
                     gone.await()
-                    l.feeding.serveProduct(id, code) // the meal is rated on the home page
+                    l.feeding.serveProduct(id, code, pets) // the meal is rated on the home page
                 }
             },
             "scan" to { _ -> launch { l.scan.scan() } },

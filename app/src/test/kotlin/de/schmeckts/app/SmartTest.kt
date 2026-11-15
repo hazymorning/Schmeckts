@@ -1562,6 +1562,65 @@ class SmartTest {
             listOf(emptyList(), listOf(miamor)),
             listOf(packs(line, two, listOf("A", "B")), packs(line, two, listOf("A", "B"), "A")),
         )
+        val always = line.map { if (it["id"] == "m1") it + ("kaufen" to "immer") else it }
+        assertEquals(
+            "a variety set to always holds the line back, unless another cat likes it",
+            listOf(emptyList(), listOf("Miamor")),
+            listOf(listOf("A", "B") to emptyList(), listOf("A", "B") to rate("m1", "B", listOf(t, t, t))).map { (pets, more) ->
+                packs(always, lineLeft + catzLiked + more, pets, "A").map { it[0] }
+            },
+        )
+    }
+
+    @Test
+    fun `findings - a brand line that fails is left out of what a consistency is set against`() {
+        val products =
+            listOf(
+                prod("m1", "brand" to "Miamor", "variety" to "Huhn in Sauce"),
+                prod("m2", "brand" to "Miamor", "variety" to "Ente in Sauce"),
+                prod("b1", "brand" to "Bozita", "variety" to "Rentier in Soße"),
+                prod("b2", "brand" to "Bozita", "variety" to "Pute in Soße"),
+                prod("c1", "brand" to "Catz Finefood", "variety" to "Lamm"),
+                prod("c2", "brand" to "Catz Finefood", "variety" to "Pferd"),
+                prod("c3", "brand" to "Catz Finefood", "variety" to "Hirsch"),
+                prod("s1", "brand" to "Select Gold", "variety" to "Pute"),
+                prod("s2", "brand" to "Select Gold", "variety" to "Huhn"),
+            )
+        val sauce = listOf("m1", "m2", "b1", "b2").flatMap { rate(it, "A", listOf(t, t, t)) }
+        val others = rate("s1", "A", listOf(t, t)) + rate("s2", "A", listOf(t))
+
+        fun kinds(catz: List<String>): List<Any?> {
+            val db = house(listOf("A"), products, sauce + others + listOf("c1", "c2", "c3").flatMap { rate(it, "A", catz) })
+            return findings(db, model(db), now0).filter { it.kind in setOf("pack", "konsistenz", "marke") }.map { "${it.kind}:${it.key}" }
+        }
+        assertEquals(
+            "all in sauce eaten, Catz Finefood never: the brand fails, not what has no sauce",
+            listOf("pack:Catz Finefood"),
+            kinds(listOf(x, x, x)),
+        )
+        assertEquals("Catz Finefood eaten as well: nothing to tell", emptyList<Any?>(), kinds(listOf(t, t, g)))
+
+        val both =
+            listOf(
+                prod("m1", "brand" to "Miamor", "variety" to "Huhn in Sauce"),
+                prod("m2", "brand" to "Miamor", "variety" to "Ente in Sauce"),
+                prod("m3", "brand" to "Miamor", "variety" to "Huhn Pastete"),
+                prod("m4", "brand" to "Miamor", "variety" to "Ente Pastete"),
+                prod("s1", "brand" to "Sheba", "variety" to "Lachs in Sauce"),
+                prod("s2", "brand" to "Sheba", "variety" to "Pute in Sauce"),
+                prod("s3", "brand" to "Sheba", "variety" to "Lachs Pastete"),
+                prod("s4", "brand" to "Sheba", "variety" to "Pute Pastete"),
+                prod("c1", "brand" to "Catz Finefood", "variety" to "Lamm Pastete"),
+                prod("c2", "brand" to "Catz Finefood", "variety" to "Pferd Pastete"),
+            )
+        val left = listOf("m1", "m2", "m3", "m4").flatMap { rate(it, "A", listOf(x, x, x, x)) }
+        val eaten = listOf("s1", "s2", "s3", "s4", "c1", "c2").flatMap { rate(it, "A", listOf(t, t, t, t)) }
+        val db = house(listOf("A"), both, left + eaten)
+        assertEquals(
+            "a line left in sauce and as pastete alike stays on both sides, so sauce takes no blame for it",
+            listOf("pack:Miamor"),
+            findings(db, model(db), now0).filter { it.kind in setOf("pack", "konsistenz", "marke") }.map { "${it.kind}:${it.key}" },
+        )
     }
 
     @Test
@@ -1998,6 +2057,19 @@ class SmartTest {
             listOf("liebling", "pack"),
             cardTraits(fewer, weaker).map { it.kind },
         )
+        val struck = house(listOf("A"), line.map { if (it["brand"] == "Miamor") it + ("kaufen" to "nicht") else it }, daily("A", days, 1))
+        assertEquals(
+            "a line the owner has struck asks nothing more on the card",
+            listOf("liebling", "neuerdings"),
+            cardTraits(profile(data = struck), null, model(struck)).map { it.kind },
+        )
+        val catz = Trait("marke", "Catz Finefood", listOf("c1", "c2", "c3"), Insight("marke", Side("Catz Finefood"), Side(), 0.5))
+        val again = listOf(traits[0], catz, traits[4])
+        assertEquals(
+            "a brand every favourite comes from is the favourites told again",
+            listOf(listOf("liebling", "marke"), listOf("liebling", "neuerdings")),
+            listOf(cardTraits(again, null), cardTraits(again, null, m)).map { l -> l.map { it.kind } },
+        )
 
         val felix =
             line.map { if (it["id"] == "m2") prod("m2", "brand" to "Miamor", "variety" to "Ente Pastete") else it } +
@@ -2115,7 +2187,7 @@ class SmartTest {
         val next = nextUp(m2, now0, r2, lastOf(two), emptyList())
 
         fun picks(lines: Map<String, Set<String>>) =
-            nextPicks(r2, next, lines).map { p -> listOf(p.id, p.trial?.pet, p.trial?.need, p.trial?.handed) }
+            nextPicks(r2, next, lines).map { p -> listOf(p.id, p.trial?.pet, p.trial?.need, p.trial?.alone) }
         assertEquals(listOf(listOf("line", "A", 1, false)), picks(emptyMap()))
         assertEquals(
             "a trial from A's failing line goes to B, who is still trying it",
@@ -2123,6 +2195,25 @@ class SmartTest {
             picks(mapOf("A" to setOf("line"))),
         )
         assertEquals("in both cats' failing lines it goes", emptyList<Any>(), picks(mapOf("A" to setOf("line"), "B" to setOf("line"))))
+        assertEquals(
+            "one from B's failing line that B has had stays A's, for A alone",
+            listOf(listOf("line", "A", 1, true)),
+            picks(mapOf("B" to setOf("line"))),
+        )
+        val both =
+            house(
+                listOf("A", "B"),
+                listOf("line", "plain"),
+                rate("line", "A", listOf(t, t), 5) + rate("line", "B", listOf(t, t), 5) +
+                    rate("plain", "A", listOf(t, mi), 6) + rate("plain", "B", listOf(t), 6),
+            )
+        val m3 = model(both)
+        val r3 = ranking(m3, now0)
+        assertEquals(
+            "a trial for one cat from another's failing line comes after one that settles it for both",
+            listOf("plain", "line"),
+            nextPicks(r3, nextUp(m3, now0, r3, lastOf(both), emptyList()), mapOf("A" to setOf("line"))).map { it.id },
+        )
     }
 
     @Test

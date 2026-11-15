@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -176,10 +175,15 @@ fun evidenceOf(x: Tally): String {
     if (x.n == 0) return "Noch nicht bewertet"
     val levels = x.counts.keys.sortedByDescending { RATINGS.getValue(it).score }
     if (levels.size == 1) return cap("${times(x.n, x.n)} ${RATINGS.getValue(levels[0]).said}")
-    if (x.n ==
-        2
-    ) {
-        return "Einmal ${once(listOf(RATINGS.getValue(levels[0]).said, RATINGS.getValue(levels[1]).said)).joinToString(", einmal ")}"
+    if (x.n == 2) {
+        // a cat's two in the order they were given, as its dots run
+        val two =
+            (x as? Stat)
+                ?.window
+                ?.takeIf { it.size == 2 }
+                ?.map { it.r }
+                ?.reversed() ?: levels
+        return "Einmal ${once(two.map { RATINGS.getValue(it).said }).joinToString(", einmal ")}"
     }
     val sides =
         SIDES
@@ -782,7 +786,7 @@ private fun fillOf(r: String) =
     score(r).let { v ->
         when {
             v >= 100 -> 1f
-            v >= 70 -> 2 / 3f
+            v >= 70 -> 0.8f
             v >= 50 -> 0.5f
             v > 0 -> 0.25f
             else -> 0f
@@ -961,30 +965,33 @@ private fun bands(s: Shelf) =
         Triple(s.open, "noch offen", null),
     )
 
-// a square drawn as its outline, the line inside its bounds
-private fun DrawScope.outline(
-    c: Color,
+// still open as an outline, as a rating still to come is a ring, so it gives way to the ones that tell something
+private fun DrawScope.drawCell(
+    c: Color?,
     at: Offset,
     side: Float,
+    open: Color,
 ) {
+    if (c != null) return drawRect(c, at, Area(side, side))
     val w = Size.hairline.toPx()
-    drawRect(c, at + Offset(w / 2, w / 2), Area(side - w, side - w), style = Stroke(w))
+    drawRect(open, Offset(at.x + w / 2, at.y + w / 2), Area(side - w, side - w), style = Stroke(w))
 }
 
-/** a band's square in its tone; still open an outline */
+/** a band's square in its tone */
 @Composable
 fun Swatch(tone: String?) {
     watch()
     val p = colors
     val c = p.tone(tone)?.c
-    Canvas(Modifier.size(Size.dot)) { if (c != null) drawRect(c) else outline(p.muted, Offset.Zero, size.minDimension) }
+    Canvas(Modifier.size(Size.dot)) { drawCell(c, Offset.Zero, size.minDimension, p.faint) }
 }
 
-/** The varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines */
+/** The varieties of Einkaufen by band: a square each for those with a verdict, then how many are still open, in a word;
+ one bar where the squares would take more than a line */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ShelfBar(
     shelf: Shelf,
-    legend: Boolean,
     modifier: Modifier = Modifier,
 ) {
     watch()
@@ -993,66 +1000,71 @@ fun ShelfBar(
     if (total == 0) return
     val p = colors
     val said = "Von $total Sorten: ${list.filter { it.first > 0 }.joinToString(", ") { "${it.first} ${it.second}" }}."
-    // null: still open
     val marks = list.filter { it.first > 0 }.map { it.first to p.tone(it.third)?.c }
-    Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
-            if (total > 2 * per) {
-                Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
-                    val gap = Space.hair.toPx()
-                    val h = size.height
-                    var x = 0f
-                    clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
-                        marks.forEachIndexed { i, (k, c) ->
-                            val seg = size.width * k / total
-                            if (c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < marks.size - 1) gap else 0f, h))
-                            if (c != null) x += seg
-                        }
-                    }
-                    if (marks.last().second == null) {
-                        val w = Size.hairline.toPx()
-                        clipRect(left = x) {
-                            drawRoundRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), Stroke(w))
-                        }
-                        if (x > 0f) drawLine(p.muted, Offset(x + w / 2, 0f), Offset(x + w / 2, h), w)
+    val told = total - shelf.open
+    BoxWithConstraints(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
+        val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
+        if (told > per) {
+            Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
+                val gap = Space.hair.toPx()
+                val h = size.height
+                val w = Size.hairline.toPx()
+                // what is still open is the outline the told bands fill from the start
+                drawRoundRect(p.faint, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), style = Stroke(w))
+                var x = 0f
+                clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
+                    marks.forEachIndexed { i, (k, c) ->
+                        val seg = size.width * k / total
+                        if (c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < marks.size - 1) gap else 0f, h))
+                        x += seg
                     }
                 }
-            } else {
-                val rows = (total + per - 1) / per
-                // lines as even as they go, not one long and a stub
-                val even = (total + rows - 1) / rows
-                val cells = marks.flatMap { (k, c) -> List(k) { c } }
-                Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
-                    val d = Size.dot.toPx()
-                    val step = d + Space.s1.toPx()
-                    cells.forEachIndexed { i, c ->
-                        val at = Offset(i % even * step, i / even * step)
-                        if (c != null) drawRect(c, at, Area(d, d)) else outline(p.muted, at, d)
+            }
+        } else {
+            // the open ones as many empty squares would outweigh the told; one square and their count say it
+            val cells = marks.flatMap { (k, c) -> List(k) { c } }.filterNotNull()
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Space.s3),
+                verticalArrangement = Arrangement.spacedBy(Space.s1),
+            ) {
+                if (cells.isNotEmpty()) {
+                    Canvas(Modifier.align(Alignment.CenterVertically).size(Size.dot * cells.size + Space.s1 * (cells.size - 1), Size.dot)) {
+                        val d = Size.dot.toPx()
+                        val step = d + Space.s1.toPx()
+                        cells.forEachIndexed { i, c -> drawCell(c, Offset(i * step, 0f), d, p.faint) }
+                    }
+                }
+                if (shelf.open > 0) {
+                    Row(
+                        Modifier.align(Alignment.CenterVertically),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Space.s1),
+                    ) {
+                        Swatch(null)
+                        T("${shelf.open} noch offen", Type.small.copy(fontFeatureSettings = "tnum"), color = p.muted)
                     }
                 }
             }
         }
-        if (legend) {
-            Gap(Space.s2)
-            ShelfLegend(shelf)
-        }
     }
 }
 
-/** shelf: each band with its count; null: the words alone, under several tallies */
+/** shelf: each band with its count; null: the words of the told bands alone, under several tallies that count the open */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ShelfLegend(shelf: Shelf?) {
+fun ShelfLegend(
+    shelf: Shelf?,
+    modifier: Modifier = Modifier,
+) {
     watch()
     val list =
         if (shelf != null) {
             bands(shelf).filter { it.first > 0 }
         } else {
-            bands(Shelf(0, 0, 0, 0))
+            bands(Shelf(0, 0, 0, 0)).filter { it.third != null }
         }
     FlowRow(
-        Modifier.fillMaxWidth(),
+        modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Space.s3),
         verticalArrangement = Arrangement.spacedBy(Space.s1),
     ) {
@@ -1118,12 +1130,14 @@ fun CompareBars(
 private fun weekSaid(w: Block): String {
     val head = "${if (addDays(w.start, 1) >= w.to) "Am" else "Woche vom"} ${spanOf(w.start, w.to)}: "
     if (w.n == 0) return head + "nichts bewertet."
+    // in the legend's words
     val ate =
         listOfNotNull(
             "${often(w.n)} bewertet",
             if (w.good > 0) "${often(w.good)} gut gefressen" else null,
-            if (w.mid > 0) "${often(w.mid)} die Hälfte" else null,
-            if (w.sauce + w.bad > 0) "${often(w.sauce + w.bad)} kaum" else null,
+            if (w.mid > 0) "${often(w.mid)} die Hälfte gefressen" else null,
+            if (w.sauce > 0) "${often(w.sauce)} ein bissl oder nur Soße" else null,
+            if (w.bad > 0) "${often(w.bad)} fast nix" else null,
         )
     val noted =
         OBSERVATIONS.keys.mapNotNull { k ->
@@ -1134,14 +1148,15 @@ private fun weekSaid(w: Block): String {
     val expected =
         when {
             !w.judged -> ""
-            e == 0 -> " Erwartet war kaum eine gute Mahlzeit."
-            e == 1 -> " Erwartet war etwa eine gute Mahlzeit."
-            else -> " Erwartet waren etwa ${word(e)} gute Mahlzeiten."
+            e == 0 -> " Sonst bei diesen Sorten kaum eine gute Mahlzeit."
+            e == 1 -> " Sonst bei diesen Sorten etwa eine gute Mahlzeit."
+            else -> " Sonst bei diesen Sorten etwa ${word(e)} gute Mahlzeiten."
         }
     return head + ate.joinToString(", ") + "." + expected + (if (noted.isNotEmpty()) " Notiert: ${noted.joinToString(", ")}." else "")
 }
 
-// bottom up good, mid, sauce, bad, as tall as its share of the busiest week; the line what its varieties led to expect
+// bottom up good, mid, sauce, bad, as tall as its share of the busiest week, inset by Space.s1 each side; the line what
+// its varieties led to expect, across the inset too, so it stands out over the column as a mark
 private fun DrawScope.drawWeek(
     w: Block,
     most: Int,
@@ -1149,28 +1164,29 @@ private fun DrawScope.drawWeek(
     ground: Color,
 ) {
     val h = size.height
-    val gap = Space.hair.toPx()
+    val x = Space.s1.toPx()
+    val wide = size.width - 2 * x
     val parts = listOf(w.good to p.good, w.mid to p.mid, w.sauce to p.sauce, w.bad to p.bad).filter { it.first > 0 }
-    val room = h * w.n / most - gap * (parts.size - 1).coerceAtLeast(0)
+    val room = h * w.n / most
+    // the tones meet without a gap, so the line of what was expected is the only one across
     var y = h
     for ((k, c) in parts) {
         val s = room * k / w.n
-        drawRect(c, Offset(0f, y - s), Area(size.width, s))
-        y -= s + gap
+        drawRect(c, Offset(x, y - s), Area(wide, s))
+        y -= s
     }
     if (!w.judged) {
         if (w.n > 0) {
             val l = Size.hairline.toPx()
             val top = h - h * w.n / most
-            drawRect(p.muted, Offset(l / 2, top + l / 2), Area(size.width - l, h - top - l), style = Stroke(l))
+            drawRect(p.muted, Offset(x + l / 2, top + l / 2), Area(wide - l, h - top - l), style = Stroke(l))
         }
         return
     }
     val at = h - (h * w.expected / most).toFloat()
-    val over = Space.hair.toPx()
     val st = Size.stroke.toPx()
-    drawLine(ground, Offset(-over, at), Offset(size.width + over, at), st + Size.hairline.toPx())
-    drawLine(p.ink, Offset(-over, at), Offset(size.width + over, at), st)
+    drawLine(ground, Offset(0f, at), Offset(size.width, at), st + 2 * Size.hairline.toPx())
+    drawLine(p.ink, Offset(0f, at), Offset(size.width, at), st)
 }
 
 /** the first day of a week, as under its column: „27.9.“, „ab 1.11.“ for one cut short by the first rating */
@@ -1199,27 +1215,41 @@ fun WeekChart(
     val silent = Modifier.semantics { hideFromAccessibility() }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val k = weeks.size
-        val gap = Space.s2
-        // a few weeks fill the width, so the chart does not stop a third of the way
-        val col = ((maxWidth - gap * (k - 1)) / k).let { if (k <= 4) it else minOf(Size.picXl, it) }
-        val each = Modifier.width(col)
+        // a share of the width each, so no week seems missing, and in it a column, not a slab
+        val slot = maxWidth / k
+        val col = minOf(if (k <= 4) Size.picXxl else Size.picXl, slot - Space.s2 * 2)
+        val each = Modifier.width(slot)
         // a day under every column it fits beside, from the oldest; never past the end
-        val step = ceil((widest + Space.s1) / (col + gap)).toInt().coerceAtLeast(1)
-        val dated = { i: Int -> i % step == 0 && (col + gap) * (k - i) - gap >= widest }
-        Column(Modifier.width(col * k + gap * (k - 1))) {
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+        val step = ceil((widest + Space.s1) / slot).toInt().coerceAtLeast(1)
+        val dated = { i: Int -> i % step == 0 && slot * (k - i) >= widest }
+        Column(Modifier.fillMaxWidth()) {
+            Row {
                 weeks.forEachIndexed { i, w ->
-                    Canvas(
-                        each
-                            .height(Size.chart)
-                            .testTag("week-${k - 1 - i}")
-                            .semantics { contentDescription = weekSaid(w) },
-                    ) { drawWeek(w, most, p, ground) }
+                    Box(each, contentAlignment = Alignment.Center) {
+                        Canvas(
+                            Modifier
+                                .width(col + Space.s1 * 2)
+                                .height(Size.chart)
+                                .testTag("week-${k - 1 - i}")
+                                .semantics { contentDescription = weekSaid(w) },
+                        ) { drawWeek(w, most, p, ground) }
+                    }
                 }
             }
             Box(Modifier.fillMaxWidth().height(Size.hairline).background(p.line))
+            Row(Modifier.padding(top = Space.s1)) {
+                // under its column while it fits there, else from where its share starts on
+                val fits = widest <= slot
+                weeks.forEachIndexed { i, w ->
+                    Box(each, contentAlignment = if (fits) Alignment.TopCenter else Alignment.TopStart) {
+                        if (dated(i)) {
+                            T(weekDay(w), day, if (fits) silent else silent.wrapContentWidth(Alignment.Start, unbounded = true), p.muted)
+                        }
+                    }
+                }
+            }
             if (weeks.any { it.seen.isNotEmpty() }) {
-                Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                Row(Modifier.padding(top = Space.s1)) {
                     for (w in weeks) {
                         Column(
                             each,
@@ -1240,15 +1270,6 @@ fun WeekChart(
                     }
                 }
             }
-            Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                // under its column while it fits there, else from the column's start on
-                val align = if (widest <= col) Alignment.CenterHorizontally else Alignment.Start
-                weeks.forEachIndexed { i, w ->
-                    Box(each) {
-                        if (dated(i)) T(weekDay(w), day, silent.wrapContentWidth(align, unbounded = true), p.muted)
-                    }
-                }
-            }
         }
     }
 }
@@ -1264,8 +1285,6 @@ fun PackThumbs(
     watch()
     val d = LocalUi.current.phone.derive
     val list = ids.take(PACK_SHOWN)
-    // without photos the hidden packagings show as blank edges, so the last one says how many there are
-    val bare = list.none { imageOf(d.getProduct(it)?.str("thumb")) != null }
     Box(Modifier.clearAndSetSemantics {}) {
         list.forEachIndexed { i, id ->
             Thumb(
@@ -1288,15 +1307,6 @@ fun PackThumbs(
                     },
                 letter = i == 0,
             )
-        }
-        if (bare && list.size > 1) {
-            Box(
-                Modifier
-                    .zIndex(list.size + 1f)
-                    .padding(start = Space.s4 * (list.size - 1) + Th.M.side - Space.s4)
-                    .size(Space.s4, Th.M.side),
-                contentAlignment = Alignment.Center,
-            ) { T("${ids.size}", Type.captionStrong, color = colors.muted) }
         }
     }
 }

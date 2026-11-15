@@ -537,12 +537,12 @@ private fun sided(
     if (a.id < b.id) -1 else 1
 }
 
-/** handed: taken over from a cat whose failing line holds the variety */
+/** alone: for its cat only, as another cat's failing line holds the variety */
 class Trial(
     val e: Sort,
     val need: Int,
     val pet: String,
-    val handed: Boolean = false,
+    val alone: Boolean = false,
 )
 
 class Ranking(
@@ -949,15 +949,27 @@ private fun withSorts(
     rest: List<Sort>,
 ) = Insight(x.kind, x.a, x.b, x.gap, sorts, rest)
 
+// lines: brands that fail as a whole, left out of the rest so they do not make it look poor; one with varieties in the
+// group stays, or the group alone would carry it
+private fun restFor(
+    wet: List<Sort>,
+    group: List<Sort>,
+    lines: Set<String>,
+): List<Sort> {
+    val inside = group.map(::brandOf).toSet()
+    return wet.filter { it !in group && (brandOf(it) !in lines || brandOf(it) in inside) }
+}
+
 // each group against the rest of the wet food, the one furthest off; on a tie the better one
 private fun byGroup(
     m: Model,
     kind: String,
+    lines: Set<String> = emptySet(),
 ): Insight? {
     val wet = wetOf(m)
     var best: Insight? = null
     for (g in grouped(m, GROUPS.getValue(kind))) {
-        val rest = wet.filter { it !in g.sorts }
+        val rest = restFor(wet, g.sorts, if (kind == "geschmack") emptySet() else lines)
         if (!enough(rest)) continue
         val x = if (kind == "geschmack") sameLine(g, rest) else insightOf(kind, tallyOf(g.sorts, g.key), restOf(kind, rest), INSIGHT_GROUP)
         if (x != null &&
@@ -975,9 +987,12 @@ private fun inside(
     texture: Insight,
 ) = brand.sorts.all { (if (brand.gap * texture.gap > 0) texture.sorts else texture.rest).contains(it) }
 
-private fun byGroups(m: Model): List<Insight?> {
-    val brand = byGroup(m, "marke")
-    val texture = byGroup(m, "konsistenz")
+private fun byGroups(
+    m: Model,
+    lines: Set<String> = emptySet(),
+): List<Insight?> {
+    val brand = byGroup(m, "marke", lines)
+    val texture = byGroup(m, "konsistenz", lines)
     return listOf(if (brand != null && texture != null && inside(brand, texture)) null else brand, texture, byGroup(m, "geschmack"))
 }
 
@@ -1186,7 +1201,10 @@ private fun feeder(
     return best
 }
 
-private fun buyingOf(m: Model) = byGroups(m) + inSauce(m)
+private fun buyingOf(
+    m: Model,
+    lines: Set<String> = emptySet(),
+) = byGroups(m, lines) + inSauce(m)
 
 private fun feedingOf(
     db: Db,
@@ -1699,7 +1717,12 @@ fun packs(m: Model): List<BrandLine> {
     val wet = wetOf(m)
     val out = mutableListOf<BrandLine>()
     for ((brand, sorts) in wet.groupBy(::brandOf)) {
-        if (brand.isEmpty() || sorts.any { it.kaufen == "immer" }) continue
+        // a variety set to always holds the line back, unless it is there for another cat that likes it
+        if (brand.isEmpty() ||
+            sorts.any { e -> e.kaufen == "immer" && e.pets.none { (pid, x) -> pid !in m.pets && x.verdict == "nachkaufen" } }
+        ) {
+            continue
+        }
         val rest = wet.filter { brandOf(it) != brand }
         val x =
             packOf(brand, seenOf(m, sorts), seenOf(m, rest), INSIGHT_GROUP, INSIGHT_GAP) ?: held(m, "pack", brand, sorts, rest) ?: continue
@@ -1945,12 +1968,16 @@ class Pick(
 /** every rating so far of the cat the trial is for went down well */
 fun allGood(t: Trial) = (t.e.pets[t.pet] ?: t.e).let { goodOf(it.counts) == it.n }
 
-// a cat's trial of a variety from its own failing line goes to another cat still trying it, or goes
+// a cat's trial of a variety from its own failing line goes to another cat still trying it, or goes; one from another
+// cat's failing line stays the trying cat's alone
 private fun handOver(
     t: Trial,
     lines: Map<String, Set<String>>,
 ): Trial? {
-    if (t.e.id !in lines[t.pet].orEmpty()) return t
+    if (t.e.id !in lines[t.pet].orEmpty()) {
+        val refused = lines.any { (pid, ids) -> pid != t.pet && t.e.id in ids && (t.e.pets[pid]?.n ?: 0) > 0 }
+        return if (refused) Trial(t.e, t.need, t.pet, true) else t
+    }
     return t.e.pets.entries
         .filter { (pid, x) -> pid != t.pet && t.e.id !in lines[pid].orEmpty() && x.n in 1 until TRIAL_NEED && goodOf(x.counts) * 2 >= x.n }
         .maxByOrNull { it.value.n }
@@ -1958,7 +1985,8 @@ private fun handOver(
 }
 
 // a trial one good meal from the shopping list first, then favourites long missed, the other trials, second tries; no
-// trial the owner has already put on the list or struck. lines: per cat, the varieties of its failing lines.
+// trial the owner has already put on the list or struck. Last, a trial for one cat that another cat leaves, so what is
+// fed first is never what one of them is known to refuse. lines: per cat, the varieties of its failing lines.
 fun nextPicks(
     r: Ranking,
     next: NextUp,
@@ -1970,10 +1998,14 @@ fun nextPicks(
             .mapNotNull { handOver(it, lines) }
             .partition { it.need == 1 && allGood(it) }
     val trial = { t: Trial -> Pick(t.e.id, "trial", trial = t) }
+    val refused = { p: Pick ->
+        p.trial?.let { t -> t.alone || t.e.pets.any { (pid, x) -> pid != t.pet && x.n > 0 && x.verdict == "nicht" } } == true
+    }
     return (
         near.map(trial) + next.missed.map { Pick(it.id, "missed", missed = it) } + other.map(trial) +
             next.retry.map { Pick(it.id, "retry", retry = it) }
     ).distinctBy { it.id }
+        .sortedBy(refused)
 }
 
 // Da sind sie sich uneinig: two cats on the meals both rated, a sign test on those one ate well and the other hardly,
@@ -2104,14 +2136,15 @@ fun findings(
     feeding: Boolean = true,
 ): List<Trait> {
     val packs = packs(m)
-    val found = (buyingOf(m) + if (feeding) feedingOf(db, m, now) else emptyList()).filterNotNull().toMutableList()
+    val lines = packs.map { it.brand }.toSet()
+    val found = (buyingOf(m, lines) + if (feeding) feedingOf(db, m, now) else emptyList()).filterNotNull().toMutableList()
     val wet = wetOf(m)
     // a kept group stands in for the one group of its kind byGroup() shows, never beside it
     for (kind in listOf("konsistenz", "marke")) {
         if (found.any { it.kind == kind }) continue
         val x =
             grouped(m, GROUPS.getValue(kind))
-                .mapNotNull { g -> held(m, kind, g.key, g.sorts, wet.filter { it !in g.sorts }) }
+                .mapNotNull { g -> held(m, kind, g.key, g.sorts, restFor(wet, g.sorts, lines)) }
                 .maxWithOrNull(compareBy<Insight> { abs(it.gap) }.thenBy { it.gap }) ?: continue
         if (found.none { it.kind == "konsistenz" && inside(x, it) }) found += x
     }
@@ -2198,21 +2231,34 @@ fun profile(
 private const val CARD_TRAITS = 2
 
 /** For the home card: a worry, the favourite, then the strongest other line; none that says what the hint on the card
- *  above says, of its variety or of the cat's appetite. */
+ *  above says, of its variety or of the cat's appetite. m: the cat's model, so a line every favourite falls under is
+ *  not the favourites told again. */
 fun cardTraits(
     traits: List<Trait>,
     hint: Hint?,
+    m: Model? = null,
 ): List<Trait> {
     val told = { t: Trait ->
         hint != null && ((hint.id != null && hint.id in t.ids) || (hint.kind == "appetit" && t.appetite?.hint?.pet == hint.pet))
     }
-    val ok = traits.filterNot(told)
+    // what the owner has struck already asks nothing more of them
+    val struck = { t: Trait ->
+        val sorts = t.pack?.sorts ?: t.ids.map { m?.byId?.get(it) }
+        t.kind in setOf("pack", "stehen") && sorts.isNotEmpty() && sorts.all { it?.kaufen == "nicht" }
+    }
+    val ok = traits.filterNot { told(it) || struck(it) }
     val group = setOf("marke", "konsistenz", "geschmack")
+    val liked = ok.firstOrNull { (it.kind == "liebling" && it.ids.isNotEmpty()) || it.kind == "sorten" }
+    val again = { t: Trait ->
+        m != null &&
+            liked?.kind == "liebling" &&
+            liked.ids.all { id -> m.byId[id]?.let { t.key in GROUPS.getValue(t.kind)(it.product) } == true }
+    }
     val third =
         listOf<(Trait) -> Boolean>(
             { it.kind == "pack" },
             { it.kind in group && gapOf(it) < 0 },
-            { it.kind in group && gapOf(it) > 0 },
+            { it.kind in group && gapOf(it) > 0 && !again(it) },
             { it.kind == "sosse" },
             { it.kind == "stehen" },
             { it.kind == "neuerdings" },
@@ -2220,7 +2266,7 @@ fun cardTraits(
         ).firstNotNullOfOrNull { on -> ok.firstOrNull(on) }
     return listOfNotNull(
         ok.firstOrNull { it.kind == "appetit" && it.key in WORRY },
-        ok.firstOrNull { (it.kind == "liebling" && it.ids.isNotEmpty()) || it.kind == "sorten" },
+        liked,
         third,
     ).take(CARD_TRAITS)
 }

@@ -72,16 +72,19 @@ class Feeding(
         return s
     }
 
+    /** pets: for these cats only, which leaves the cats meals usually go to as they were; else for those */
     fun serveProduct(
         pid: String,
         scanCode: String = "",
+        pets: List<String> = emptyList(),
     ) {
         val p = d.getProduct(pid) ?: return
-        val ids = d.defaultPets(p).ids
+        val chosen = pets.filter { d.getPet(it) != null }
+        val ids = chosen.ifEmpty { d.defaultPets(p).ids }
         val s = meal(ids, scanCode)
         db.servings.add(0, s)
         l.products.linkProduct(s, p)
-        prefs.lastPets = ids
+        if (chosen.isEmpty()) prefs.lastPets = ids
         save()
         savePrefs()
         served(s.id)
