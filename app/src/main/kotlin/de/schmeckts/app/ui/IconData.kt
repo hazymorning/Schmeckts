@@ -246,6 +246,13 @@ val ICONS: Map<String, List<Stroke>> =
                 Stroke("M10.6 5.2a1.6 1.6 0 0 1 2.8 0l6.6 11.9a1.6 1.6 0 0 1-1.4 2.4H5.4A1.6 1.6 0 0 1 4 17.1z"),
                 Stroke("M12 9.8v3.7M12 16.4v.2"),
             ),
+        "repeat" to
+            listOf(
+                Stroke("M16.5 4.5l2.5 2.5-2.5 2.5"),
+                Stroke("M4.5 11.5V10a3 3 0 0 1 3-3H19"),
+                Stroke("M7.5 19.5L5 17l2.5-2.5"),
+                Stroke("M19.5 12.5V14a3 3 0 0 1-3 3H5"),
+            ),
         "refresh" to
             listOf(
                 Stroke("M19 12.5a7 7 0 0 1-12.4 4.1M5 11.5a7 7 0 0 1 12.4-4.1"),
