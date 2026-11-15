@@ -789,8 +789,18 @@ class UiEvaluationTest : ScreenTest() {
                 inSheet("8 Mal nur die Soße geleckt"),
             "each with both counts",
         )
+        val jelly = {
+            rule
+                .onAllNodes(hasText("In Gelee: ${times(8, 8)} gut gefressen", substring = true), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size
+        }
+        val shut = jelly()
         tapTag("trait-liebling")
-        check(inSheet("8 von 8") && inSheet("0 von 8"), "the favourites open on jelly against the rest, brand by brand")
+        check(
+            jelly() == shut + 1 && tags("proof-", sheet = true).size == 2 && !inSheet("8 von 8"),
+            "the favourites open on their rows and jelly against the rest; one brand on each side, so no grid of empty cells",
+        )
     }
 
     @Test
@@ -1038,8 +1048,10 @@ class UiEvaluationTest : ScreenTest() {
         act("filter", "id" to mau)
         idle(400)
         check(
-            tags("trait-pack-${pack.brand}", sheet = true).isNotEmpty() && tags("stop-", sheet = true).isEmpty(),
-            "no button for the whole line while another cat eats some of it",
+            tags("trait-pack-${pack.brand}", sheet = true).isNotEmpty() &&
+                tags("stop-", sheet = true).isEmpty() &&
+                within("trait-pack-${pack.brand}", "Tiger"),
+            "no button for the whole line while another cat eats some of it, and the line says who",
         )
     }
 
@@ -1164,6 +1176,18 @@ class UiEvaluationTest : ScreenTest() {
         val bands = (g.nachkaufen + g.geht + g.nicht + g.neu.filter { it.id !in picks }).map { it.id }
         check(picks.size >= 5 && shut.first.size == 3 && next() == picks, "Als Nächstes shows three, then every one in order ${next()}")
         check(shut.second.size < rows.size && rows.sorted() == bands.sorted(), "Einkaufen shows every variety of its bands once opened")
+        val brands =
+            phone.derive
+                .model()
+                .sorts
+                .filter { typeOf(it.product) == "Nassfutter" && it.n > 0 }
+                .groupBy { it.product.str("brand")!!.trim() }
+                .mapValues { tallyOf(it.value) }
+                .filterValues { it.n >= 2 }
+        check(
+            brands.size >= 3 && brands.all { (b, x) -> inSheet("$b: ${times(x.good, x.n)} gut gefressen") },
+            "each brand of wet food with its count, behind its own link",
+        )
     }
 
     @Test
