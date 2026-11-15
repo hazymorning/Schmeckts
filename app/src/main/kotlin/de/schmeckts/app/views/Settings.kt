@@ -250,7 +250,7 @@ private fun Overview() {
                 "name",
                 kind = FieldKind.IN_ROW,
                 placeholder = "z. B. Anna",
-                keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                 label = "Dein Name",
                 initial = ph.prefs.name,
                 channel = "setting",

@@ -682,6 +682,7 @@ class Actions(
             id == "f-nick" -> l.pets.addNick()
             l.pets.editing(s) -> l.pets.savePet()
             s.step == "name" || s.kind == "new" -> if (id == "f-brand") ui.focus("f-variety") else nameOrMerge()
+            else -> ui.blurField()
         }
     }
 

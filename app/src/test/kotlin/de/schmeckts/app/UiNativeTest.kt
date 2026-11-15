@@ -15,6 +15,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -632,6 +633,78 @@ class UiKeyboardTest : ScreenTest() {
         act("view-photo", "s" to sheet!!.id, "p" to "")
         check(until { ui.viewer.open }, "the photo opens")
         check(naming == listOf("Marke") && focused().isEmpty(), "not over the photo $naming")
+    }
+
+    // the field focused and its key on the keyboard pressed: who had the focus before, and who has it after
+    private fun enter(
+        id: String,
+        label: String,
+    ): List<List<String>> {
+        ui.focus(id)
+        idle()
+        val before = focused()
+        field(label).performImeAction()
+        idle(50)
+        return listOf(before, focused())
+    }
+
+    private fun tapText(text: String) {
+        rule.onAllNodes(hasText(text), useUnmergedTree = true)[0].performClick()
+        idle(50)
+    }
+
+    @Test
+    fun `keyboard - goes once typing is done - its own key, a tap beside the field, a swipe through the hits`() {
+        open()
+        act("demo")
+        act("open-serving", "id" to db.servings[0].id)
+        val note = enter("f-note", "Notiz")
+        act("close")
+        idle(400)
+        act("feed")
+        val search = enter("f-search", "Marke oder Sorte suchen")
+        act("close")
+        idle(400)
+        act("open-settings")
+        val name = enter("f-me", "Dein Name")
+        check(
+            listOf(note, search, name) == listOf("Notiz", "Marke oder Sorte suchen", "Dein Name").map { listOf(listOf(it), emptyList()) },
+            "the done and search keys end typing $note $search $name",
+        )
+        ui.focus("f-me")
+        idle()
+        tapText("Teilen")
+        check(focused().isEmpty() && level == listOf("settings", null, null), "a tap beside it on a page ends typing, the page stays")
+        act("close")
+        idle(400)
+        act("new-product")
+        tapText("Trockenfutter")
+        val chip = listOf(sheet!!.str("type"), focused())
+        tapText("Neue Sorte")
+        check(
+            chip == listOf("Trockenfutter", listOf("Marke")) && focused().isEmpty() && sheet?.kind == "new",
+            "a chip takes its own tap and leaves the keyboard, a tap on the title puts it away $chip",
+        )
+        act("close")
+        idle(400)
+        act("feed")
+        keyboard(300)
+        field("Marke oder Sorte suchen").performTextReplacement("e")
+        ui.focus("f-search")
+        idle(400)
+        val range = SemanticsProperties.VerticalScrollAxisRange
+        val feed = SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "feed")
+        val body = rule.onAllNodes(SemanticsMatcher.keyIsDefined(range) and hasAnyAncestor(feed), useUnmergedTree = true)[0]
+        val typing = focused()
+        val area = body.fetchSemanticsNode().boundsInRoot
+        rule.onRoot().performTouchInput { swipe(area.center, area.center - Offset(0f, 150 * rule.density.density), 300) }
+        idle(400)
+        val scrolled = body.fetchSemanticsNode().config[range].value()
+        keyboard(0)
+        check(
+            typing.isNotEmpty() && focused().isEmpty() && scrolled > 0f,
+            "a swipe through the hits scrolls them and puts the keyboard away $scrolled",
+        )
     }
 }
 

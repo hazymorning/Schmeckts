@@ -308,6 +308,7 @@ private fun ServingView(state: SheetState) {
                     Modifier.weight(1f),
                     placeholder = "Notiz, z. B. neue Packung",
                     kind = FieldKind.BARE,
+                    keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                     label = "Notiz",
                     initial = s.str("note") ?: "",
                     channel = "note",
@@ -759,7 +760,7 @@ private fun FeedView(s: SheetState) {
         return
     }
     val prods = d.quickProducts()
-    SheetBody("Was gibt’s heute?", ui.sheets) {
+    SheetBody("Was gibt’s heute?", ui.sheets, hideKeysOnScroll = true) {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
             Cta("barcode", "Barcode", "scannen", true, Modifier.weight(1f), ui.on("scan"))
             Cta("camera", "Foto", "aufnehmen", false, Modifier.weight(1f), ui.on("photo"))
@@ -778,7 +779,12 @@ private fun FeedView(s: SheetState) {
                     "search",
                     placeholder = "Marke oder Sorte suchen",
                     label = "Marke oder Sorte suchen",
-                    keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Search),
+                    keyboard =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Search,
+                        ),
                     channel = "search",
                     initial = s.str("search"),
                     search = true,

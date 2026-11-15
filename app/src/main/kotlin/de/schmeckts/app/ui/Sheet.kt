@@ -23,6 +23,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -67,12 +68,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -425,6 +428,8 @@ fun SheetHost(
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             val w = constraints.maxWidth.toFloat()
             val h = constraints.maxHeight.toFloat()
+            // a tap beside a field ends typing; buttons, chips and fields take their own taps first
+            val tapAside = Modifier.pointerInput(Unit) { detectTapGestures { focus.clearFocus() } }
             val frame =
                 if (page) {
                     Modifier
@@ -438,6 +443,7 @@ fun SheetHost(
                             shape = RoundedCornerShape(Radius.l * b)
                             clip = b > 0f
                         }.background(colors.bg)
+                        .then(tapAside)
                 } else {
                     Modifier
                         .widthIn(max = Space.pageWidth)
@@ -457,7 +463,7 @@ fun SheetHost(
                         }.shadowHigh(RoundedCornerShape(topStart = Radius.l, topEnd = Radius.l))
                         .clip(RoundedCornerShape(topStart = Radius.l, topEnd = Radius.l))
                         .background(colors.bg)
-                        .clickable(remember { MutableInteractionSource() }, null) {}
+                        .then(tapAside)
                 }
             Column(frame) {
                 if (page) {
@@ -613,6 +619,19 @@ private class PullToClose(
     }
 }
 
+private class HideKeys(
+    val focus: FocusManager,
+) : NestedScrollConnection {
+    override fun onPostScroll(
+        consumed: Offset,
+        available: Offset,
+        source: NestedScrollSource,
+    ): Offset {
+        if (source == NestedScrollSource.UserInput && consumed.y != 0f) focus.clearFocus()
+        return Offset.Zero
+    }
+}
+
 @Composable
 private fun Grip(
     sheets: Sheets,
@@ -700,7 +719,8 @@ private fun rememberLevelScroll(): ScrollState {
 
 /** The head and body of a sheet or a page, decided by the layer, so one view can be both. back: for a step that is
  not a level of its own, such as cropping. step: such a step; back ends it, and a pull cannot close the layer.
- end: a button at the end of the bar. */
+ end: a button at the end of the bar. hideKeysOnScroll: a swipe through the content puts the keyboard away, as in a list
+ of hits. */
 @Composable
 fun SheetBody(
     title: String,
@@ -709,10 +729,13 @@ fun SheetBody(
     end: (@Composable RowScope.() -> Unit)? = null,
     step: Boolean = false,
     scroll: ScrollState = rememberLevelScroll(),
+    hideKeysOnScroll: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val layer = LocalLayer.current
     val page = isPage(layer?.state)
+    val focus = LocalFocusManager.current
+    val keys = if (hideKeysOnScroll) Modifier.nestedScroll(remember(focus) { HideKeys(focus) }) else Modifier
     if (step && layer != null) {
         val mine = remember { layer.level }
         // composed after the layer's own back handler, so it comes first
@@ -761,6 +784,7 @@ fun SheetBody(
                 Modifier
                     .weight(1f)
                     .imePadding()
+                    .then(keys)
                     .verticalScroll(scroll)
                     .padding(horizontal = Space.gutter),
             ) {
@@ -783,6 +807,7 @@ fun SheetBody(
         Column(
             Modifier
                 .imePadding()
+                .then(keys)
                 .verticalScroll(scroll)
                 .then(
                     if (reduceMotion) {
