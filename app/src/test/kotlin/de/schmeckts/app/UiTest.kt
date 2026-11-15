@@ -428,7 +428,7 @@ class UiShopTest : ScreenTest() {
     }
 
     @Test
-    fun `shop folds - what is no longer bought behind one tap but what asks a decision, what is open behind its own`() {
+    fun `shop folds - what is no longer bought behind one tap but what asks a decision, a band of a few rows at once`() {
         val now = at("2025-06-17T12:00")
         val left = (0 until 5).map { "stehen%04d".format(it) }
         val meh = (0 until 4).map { "gehtso%04d".format(it) }
@@ -459,13 +459,12 @@ class UiShopTest : ScreenTest() {
         val links = tags("fold-", within = "shop")
         act("fold", "v" to "shop:nicht")
         val stop = rows()
-        act("fold", "v" to "shop:offen")
         check(
-            listOf(shut, stop).map { l -> l.count { it in left } } == listOf(0, 5) && "unklar0001" !in stop && "unklar0001" in rows(),
-            "what the lines above tell after a tap, what is still open behind its own ${listOf(shut, stop)}",
+            listOf(shut, stop).map { l -> l.count { it in left } } == listOf(0, 5) && "unklar0001" in shut,
+            "what the lines above tell after a tap, the one still open at once ${listOf(shut, stop)}",
         )
         check(struck in shut && within("sort-$struck", "Von dir gestrichen"), "struck though it goes down well: shown at once $shut")
-        check(meh.all { it in shut } && links == listOf("shop:nicht", "shop:offen"), "a band of four has nothing to unfold $links")
+        check(meh.all { it in shut } && links == listOf("shop:nicht"), "a band of four or one open row has nothing to unfold $links")
     }
 
     @Test
@@ -1208,7 +1207,7 @@ class UiEvaluationTest : ScreenTest() {
             "Als Nächstes shows three, then every one ${next()}",
         )
         check(shut.second.size < rows.size && rows.sorted() == bands.sorted(), "Einkaufen shows every variety of its bands once opened")
-        check(tags("fold-marken", sheet = true).isEmpty(), "the Miamor line answers the brand, so no list of brands repeats it")
+        check(!inSheet("Nach Marke"), "the Miamor line answers the brand, so no list of brands repeats it")
     }
 
     @Test
