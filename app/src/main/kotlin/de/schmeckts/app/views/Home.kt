@@ -1,6 +1,11 @@
 package de.schmeckts.app.views
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
@@ -8,9 +13,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -454,58 +462,46 @@ private fun ColumnScope.HomeContent() {
     if (ph.db.pets.isEmpty()) return Welcome()
     val open = d.pendingServings().toSet()
     val pend = ph.db.servings.filter { it in open || (home.held.containsKey(it.id) && rateRows(ui, it).isNotEmpty()) }
-    val m = if (ph.db.servings.isNotEmpty()) d.model() else null
-    var prev = ""
-    val gap = { kind: String ->
-        val g =
-            when {
-                prev == "" -> 0.dp
-                prev == "overview" -> Space.s2
-                prev == "calpad" -> Space.s3 + Space.s4
-                kind == "calpad" -> Space.s4
-                else -> Space.s4
-            }
-        prev = kind
-        g
+    // the card closes with the rows it last had, after the last one has left
+    val lastPend = remember { ArrayList<Rec>() }
+    if (pend.isNotEmpty()) {
+        lastPend.clear()
+        lastPend.addAll(pend)
     }
+    val m = if (ph.db.servings.isNotEmpty()) d.model() else null
+    // each card brings the gap below it, so one coming or going moves only what follows
     if (m != null) {
         Arrive(n++, "overview") { Overview(m, home.fresh) }
-        gap("overview")
+        Gap(Space.s2)
     }
-    if (pend.isNotEmpty()) {
-        Gap(gap("card"))
-        Arrive(n++, "pend") { Pending(pend) }
+    Optional(pend.isNotEmpty()) {
+        Arrive(n, "pend") { Pending(pend.ifEmpty { lastPend }) }
+        Gap(Space.s4)
     }
+    if (pend.isNotEmpty()) n++
     if (m == null) {
-        Gap(gap("card"))
-        Arrive(n++, "steps") { Steps() }
+        Arrive(n, "steps") { Steps() }
         return
     }
     if (ph.prefs.calendar) {
-        Gap(gap("calpad"))
         Arrive(n++, "cal", if (home.tearing) 1f else 0f) { CalPad() } // the sheet torn off falls over the cards below
+        Gap(Space.s3 + Space.s4)
     }
-    val question: (@Composable () -> Unit)? =
+    val ask =
         when {
-            updateShown(ui) -> {
-                { UpdateCard() }
-            }
-            remindShown(ui) -> {
-                { RemindCard() }
-            }
-            newsShown(ui) -> {
-                { NewsCard() }
-            }
-            m.hints.isNotEmpty() -> {
-                { HintCard(m) }
-            }
+            updateShown(ui) -> Ask("update")
+            remindShown(ui) -> Ask("remind")
+            newsShown(ui) -> Ask("news")
+            m.hints.isNotEmpty() -> Ask(hintKey(m.hints[0]), m.hints[0])
             else -> null
         }
-    if (question != null) {
-        Gap(gap("card"))
-        Arrive(n++, "question") { question() }
+    val lastAsk = remember { arrayOfNulls<Ask>(1) }
+    if (ask != null) lastAsk[0] = ask
+    Optional(ask != null) {
+        Arrive(n, "question") { (ask ?: lastAsk[0])?.let { Question(it, m) } }
+        Gap(Space.s4)
     }
-    Gap(gap("card"))
+    if (ask != null) n++
     Arrive(n++, "hist") {
         Card {
             CardHead("Verlauf", label = "Alle Einträge", onMore = ui.on("open-report"))
@@ -513,12 +509,71 @@ private fun ColumnScope.HomeContent() {
         }
     }
     if (hasEvaluationCard(m)) {
-        Gap(gap("card"))
+        Gap(Space.s4)
         Arrive(n, "evaluation") { EvaluationCard(m) }
     }
 }
 
-// the cards rise in turn as the splash fades
+/** the one card that asks: a new version, the reminder, news or a hint, by its key */
+private class Ask(
+    val key: String,
+    val hint: de.schmeckts.app.Hint? = null,
+)
+
+// a card that comes or goes makes room or closes the gap, rather than the page jumping
+@Composable
+private fun ColumnScope.Optional(
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val still = reduceMotion
+    AnimatedVisibility(
+        visible,
+        enter =
+            if (still) {
+                EnterTransition.None
+            } else {
+                expandVertically(tween(Motion.STEP, easing = Motion.easeOut), expandFrom = Alignment.Top) + fadeIn(tween(Motion.FADE))
+            },
+        exit =
+            if (still) {
+                ExitTransition.None
+            } else {
+                shrinkVertically(tween(Motion.STEP, easing = Motion.easeIn), shrinkTowards = Alignment.Top) + fadeOut(tween(Motion.FADE))
+            },
+    ) { Column { content() } }
+}
+
+// one question replaces another in place, the card taking the new one's height
+@Composable
+private fun Question(
+    ask: Ask,
+    m: Model,
+) {
+    val still = reduceMotion
+    AnimatedContent(
+        ask,
+        transitionSpec = {
+            if (still) {
+                ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
+            } else {
+                fadeIn(tween(Motion.FADE)) togetherWith fadeOut(tween(Motion.FADE)) using
+                    SizeTransform { _, _ -> tween(Motion.STEP, easing = Motion.easeOut) }
+            }
+        },
+        contentKey = { it.key },
+        label = "question",
+    ) { a ->
+        when (a.key) {
+            "update" -> UpdateCard()
+            "remind" -> RemindCard()
+            "news" -> NewsCard()
+            else -> a.hint?.let { HintCard(m, it) }
+        }
+    }
+}
+
+// the cards rise in turn as the splash fades; one that comes later is simply there
 @Composable
 private fun Arrive(
     i: Int,
@@ -529,9 +584,10 @@ private fun Arrive(
     watch()
     val ui = LocalUi.current
     val still = reduceMotion
-    val f = remember { Animatable(if (ui.arrive && !still) 0f else 1f) }
+    val splash = remember { !ui.arrive }
+    val f = remember { Animatable(1f) }
     LaunchedEffect(ui.arrive) {
-        if (ui.arrive && !still) {
+        if (ui.arrive && splash && !still) {
             f.snapTo(0f)
             f.animateTo(1f, tween(Motion.STEP, Motion.STAGGER * minOf(i, 3), Motion.easeOut))
         } else {
@@ -799,12 +855,14 @@ private val HINT_TITLES =
     mapOf("appetit" to "Appetit", "stop" to "Nicht mehr kaufen?", "sosse" to "Frisst meist nur die Soße", "liebling" to "Nachkaufen?")
 
 @Composable
-private fun HintCard(m: Model) {
+private fun HintCard(
+    m: Model,
+    h: de.schmeckts.app.Hint,
+) {
     watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
-    val h = m.hints[0]
     val e = h.id?.let { m.byId[it] }
     val pet = h.pet?.let { d.getPet(it) }
     val hide: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit = {

@@ -294,3 +294,91 @@ class UiSettingsSlideTest : ScreenTest() {
         check(shows("Dein Name") && !shows("Mit Haushalt verbinden"), "then only the overview")
     }
 }
+
+class UiHomeRoomTest : ScreenTest() {
+    private fun sec(name: String) = rule.onNode(hasTestTag("sec-$name"), useUnmergedTree = true).fetchSemanticsNode()
+
+    private fun top(sec: String) = sec(sec).positionInRoot.y
+
+    // the space between a card and the one above it
+    private fun gapAbove(sec: String): Float {
+        val all = tags("sec-")
+        val above = sec(all[all.indexOf(sec) - 1])
+        return top(sec) - above.positionInRoot.y - above.size.height
+    }
+
+    // the card's top, frame by frame, for ms after the action
+    private fun frames(
+        sec: String,
+        ms: Int = 1000,
+        action: () -> Unit,
+    ): List<Float> {
+        rule.mainClock.autoAdvance = false
+        val before = top(sec)
+        action()
+        val ys =
+            listOf(before) +
+                List(ms / 16) {
+                    androidx.compose.runtime.snapshots.Snapshot
+                        .sendApplyNotifications()
+                    org.robolectric.Shadows
+                        .shadowOf(android.os.Looper.getMainLooper())
+                        .idleFor(java.time.Duration.ofMillis(16))
+                    rule.mainClock.advanceTimeByFrame()
+                    top(sec)
+                }
+        rule.mainClock.autoAdvance = true
+        idle(1000)
+        return ys
+    }
+
+    private fun steps(ys: List<Float>) = ys.zipWithNext { a, b -> kotlin.math.abs(b - a) }
+
+    // moved up by more than least, no frame taking more than a fifth of the way
+    private fun glides(
+        ys: List<Float>,
+        least: Float,
+    ) = (ys.first() - ys.last()).let { it > least && steps(ys).max() < it / 5 }
+
+    private fun unrated() = db.servings.filter { s -> s.pets.values.any { !(it as JsonObject)["r"].truthy } }
+
+    private fun rateAll(s: Rec) {
+        for ((pid, v) in s.pets) if (!(v as JsonObject)["r"].truthy) ui.act("rate", "s" to s.id, "p" to pid, "r" to "gut")
+    }
+
+    @Test
+    fun `home - the last meal rated, its card closes up and the cards below follow it smoothly`() {
+        open(reduce = false)
+        act("demo")
+        idle(2000)
+        val dp = rule.density.density
+        unrated().drop(1).forEach { rateAll(it) }
+        idle(3000)
+        val last = unrated().single()
+        check(tags("sec-").contains("pend") && tags("pend-") == listOf(last.id), "one meal left to rate")
+        val ys = frames("hist", 3000) { rateAll(last) }
+        check(glides(ys, 50 * dp), "the cards below glide up ${ys.map { (it / dp).toInt() }}")
+        check("pend" !in tags("sec-") && tags("pend-").isEmpty(), "the card is gone")
+        val gap = gapAbove("hist")
+        restart()
+        idle(1000)
+        check(gap == gapAbove("hist"), "and the cards end where they always were $gap ${gapAbove("hist")}")
+    }
+
+    @Test
+    fun `home - a hint hidden, its card closes and the cards below glide up`() {
+        open(reduce = false)
+        act("demo")
+        idle(2000)
+        val dp = rule.density.density
+        val hints = { phone.derive.model().hints }
+        check(hints().isNotEmpty() && "question" in tags("sec-"), "a hint card")
+        while (hints().size > 1) {
+            act("hide-hint", "v" to hintKey(hints()[0]))
+            idle(1000)
+        }
+        val ys = frames("hist") { ui.act("hide-hint", "v" to hintKey(hints()[0])) }
+        check(glides(ys, 50 * dp), "the cards below glide up ${ys.map { (it / dp).toInt() }}")
+        check("question" !in tags("sec-"), "the card is gone")
+    }
+}
