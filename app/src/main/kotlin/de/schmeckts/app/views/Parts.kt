@@ -18,9 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,9 +47,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -792,8 +799,7 @@ fun RatingDot(r: String?) {
         val inner = half - w / 2
         drawCircle(c, inner, style = Stroke(w))
         if (share > 0f) {
-            // the contents kept off the ring, so a nearly full dot does not pass for a full one
-            val fill = inner - w / 2 - Size.hairline.toPx()
+            val fill = inner - w / 2
             clipPath(Path().apply { addOval(Rect(center, fill)) }) {
                 val h = 2 * fill * share
                 drawRect(c, Offset(0f, center.y + fill - h), Area(size.width, h))
@@ -834,8 +840,9 @@ fun DotRow(
     }
 }
 
-/** A variety's ratings: one row for one cat, else a row for each cat that rated it, led by its picture. of: which of a
- cat's ratings, newest first; said: a cat's verdict in words, after its dots. */
+/** A variety's ratings: one row for one cat, else a row for each cat that rated it, led by its name. of: which of a
+ cat's ratings, newest first; said: a cat's verdict in words, after its dots; sub: words after one cat's dots, under
+ several cats' lines. */
 @Composable
 fun DotLines(
     m: Model,
@@ -845,33 +852,93 @@ fun DotLines(
     pets: List<String> = m.pets,
     of: (Stat) -> List<Pt> = { it.window },
     said: ((String) -> String?)? = null,
+    sub: String = "",
 ) {
     watch()
+    val p = colors
     val lines =
         pets.mapNotNull { pid ->
             val x = e.pets[pid] ?: return@mapNotNull null
             val l = of(x)
             if (l.isEmpty()) null else Triple(pid, l.reversed().map { it.r }, x.list.size > l.size)
         }
-    if (m.pets.size <= 1) {
+    if (m.pets.size <= 1 || lines.isEmpty()) {
         val l = lines.firstOrNull()
-        return DotRow(l?.second.orEmpty(), open, l?.third == true, modifier = modifier)
+        val keys = l?.second.orEmpty()
+        return when {
+            keys.size + open == 0 -> if (sub.isNotEmpty()) T(sub, Type.small, modifier, p.muted) else Unit
+            sub.isEmpty() -> DotRow(keys, open, l?.third == true, modifier = modifier)
+            else -> InlineDots(keys, open, l?.third == true, sub, modifier)
+        }
     }
-    if (lines.isEmpty()) return
     val d = LocalUi.current.phone.derive
-    Column(modifier.clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(Space.s1)) {
-        for ((pid, keys, more) in lines) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Avatar(d.getPet(pid), Av.XS)
+    val names = lines.map { d.getPet(it.first)?.str("name") ?: "" }
+    val measure = rememberTextMeasurer()
+    // the dots of every cat start at one place
+    val slot =
+        with(LocalDensity.current) {
+            names.maxOf { measure.measure(it, Type.captionStrong).size.width }.toDp()
+        }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.s1)) {
+        lines.forEachIndexed { i, (pid, keys, more) ->
+            Row(Modifier.clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically) {
+                T(names[i], Type.captionStrong, Modifier.widthIn(min = slot), p.muted)
                 Gap(Space.s2)
                 DotRow(keys, more = more)
                 said?.invoke(pid)?.let {
                     Gap(Space.s2)
-                    T(it, Type.small, color = colors.muted)
+                    T(it, Type.small, color = p.muted)
                 }
             }
         }
+        // on a line of its own, or it reads as the last cat's
+        if (sub.isNotEmpty()) T(sub, Type.small, color = p.muted)
     }
+}
+
+// the dots as the first word of the line under them, so the words run on after them and wrap under them
+@Composable
+private fun InlineDots(
+    keys: List<String>,
+    open: Int,
+    more: Boolean,
+    sub: String,
+    modifier: Modifier,
+) {
+    val p = colors
+    val measure = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val n = keys.size + open
+    val plus =
+        if (more) {
+            with(density) {
+                measure
+                    .measure("+", Type.captionStrong)
+                    .size.width
+                    .toDp()
+            } + Space.s1
+        } else {
+            0.dp
+        }
+    val wide = Size.dot * n + Space.s1 * (n - 1) + plus + Space.s2
+    val text =
+        buildAnnotatedString {
+            appendInlineContent("dots", " ")
+            append(sub)
+        }
+    val dots =
+        with(density) {
+            InlineTextContent(Placeholder(wide.toSp(), (Size.dot + Space.s1).toSp(), PlaceholderVerticalAlign.TextCenter)) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { DotRow(keys, open, more) }
+            }
+        }
+    androidx.compose.material3.Text(
+        text,
+        modifier,
+        color = p.muted,
+        style = Type.small.copy(lineBreak = LineBreak.Simple),
+        inlineContent = mapOf("dots" to dots),
+    )
 }
 
 private fun bands(s: Shelf) =
@@ -941,12 +1008,14 @@ fun ShelfBar(
                 }
             } else {
                 val rows = (total + per - 1) / per
+                // lines as even as they go, not one long and a stub
+                val even = (total + rows - 1) / rows
                 val cells = marks.flatMap { (k, c) -> List(k) { c } }
                 Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
                     val d = Size.dot.toPx()
                     val step = d + Space.s1.toPx()
                     cells.forEachIndexed { i, c ->
-                        val at = Offset(i % per * step, i / per * step)
+                        val at = Offset(i % even * step, i / even * step)
                         if (c != null) drawRect(c, at, Area(d, d)) else outline(p.muted, at, d)
                     }
                 }
@@ -1050,7 +1119,13 @@ private fun weekSaid(w: Block): String {
             w.seen[k]?.let { "${often(it)} ${if (k == "stink") label else lower(label)}" }
         }
     val e = jsRound(w.expected).toInt()
-    val expected = if (w.judged) " Zu erwarten war ${if (e == 0) "fast nie" else "etwa ${often(e)}"} gut gefressen." else ""
+    val expected =
+        when {
+            !w.judged -> ""
+            e == 0 -> " Erwartet war kaum eine gute Mahlzeit."
+            e == 1 -> " Erwartet war etwa eine gute Mahlzeit."
+            else -> " Erwartet waren etwa ${word(e)} gute Mahlzeiten."
+        }
     return head + ate.joinToString(", ") + "." + expected + (if (noted.isNotEmpty()) " Notiert: ${noted.joinToString(", ")}." else "")
 }
 
@@ -1111,7 +1186,8 @@ fun WeekChart(
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val k = weeks.size
         val gap = Space.s2
-        val col = minOf(Size.picXl, (maxWidth - gap * (k - 1)) / k)
+        // a few weeks fill the width, so the chart does not stop a third of the way
+        val col = ((maxWidth - gap * (k - 1)) / k).let { if (k <= 4) it else minOf(Size.picXl, it) }
         val each = Modifier.width(col)
         // a day under every column it fits beside, from the oldest; never past the end
         val step = ceil((widest + Space.s1) / (col + gap)).toInt().coerceAtLeast(1)
