@@ -1878,7 +1878,8 @@ fun EvaluationCard(
     val now = Time.now()
     val first = sum.picks.firstOrNull { it.id != hint?.id }
     val pick = first?.let { ph.pickSaid(m, it, now) }
-    Card {
+    // grows as the hint card above shrinks, with its easing, so the page below moves one way
+    Card(Modifier.animateContentSize(if (reduceMotion) tween(0) else tween(Motion.STEP, easing = Motion.easeIn))) {
         CardHead("Vorlieben", label = "Alle Vorlieben", onMore = ui.on("open-evaluation"))
         if (sum.pets.size >= 2) {
             sum.pets.forEachIndexed { i, s ->

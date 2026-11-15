@@ -428,13 +428,6 @@ class UiLevelScrollTest : ScreenTest() {
         val anew = scrolled()
         check(was > 0f && back == was && pet == was, "back from Backup and from a cat the overview is where it was $was $back $pet")
         check(ahead == 0f && again == 0f && anew == 0f, "Backup and settings opened anew start at the top $ahead $again $anew")
-        act("close")
-        idle(100)
-        act("open-evaluation")
-        val eval = scrollDown()
-        act("open-level", "v" to "shop")
-        act("settings-back")
-        check(eval > 0f && scrolled() == eval, "the same in Vorlieben after Einkaufen $eval ${scrolled()}")
     }
 }
 

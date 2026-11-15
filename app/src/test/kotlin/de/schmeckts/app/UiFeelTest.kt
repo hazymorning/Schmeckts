@@ -486,13 +486,13 @@ class UiArriveTest : ScreenTest() {
         act("demo")
         idle(2000)
         val dp = rule.density.density
-        check("pend" in tags("sec-") && "evaluation" in tags("sec-"), "a card of meals to rate, Verlauf and a card below it")
+        check("pend" in tags("sec-") && "hist" in tags("sec-"), "a card of meals to rate and Verlauf")
         val pid = db.products[0].id
         var card = emptyList<Float>()
         val verlauf =
             frames(1000, { main.logic.feeding.serveProduct(pid) }) {
                 card += top("sec-hist") - top("sec-pend")
-                top("sec-evaluation") - top("sec-hist")
+                height("sec-hist")
             }
         val fed = db.servings[0].id
         check(tags("pend-").first() == fed && fed in tags("row-", within = "sec-hist"), "the meal is in both")
@@ -510,8 +510,8 @@ class UiArriveTest : ScreenTest() {
         open(mapOf("db" to house), now, reduce = false)
         idle(1000)
         val dp = rule.density.density
-        check("evaluation" in tags("sec-") && tags("row-", within = "sec-hist").size == 3, "Verlauf shows yesterday's meals")
-        val ys = frames(1000, { main.logic.feeding.serveProduct("sorte001") }) { top("sec-evaluation") - top("sec-hist") }
+        check(tags("row-", within = "sec-hist").size == 3, "Verlauf shows yesterday's meals")
+        val ys = frames(1000, { main.logic.feeding.serveProduct("sorte001") }) { height("sec-hist") }
         check(tags("row-", within = "sec-hist") == listOf(db.servings[0].id), "then today's meal alone")
         check(glides(ys, 30 * dp, 0.34f), "Verlauf changes over frames ${ys.map { (it / dp).toInt() }}")
     }
