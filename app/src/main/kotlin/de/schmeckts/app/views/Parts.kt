@@ -1059,7 +1059,7 @@ private fun DrawScope.drawWeek(
 }
 
 /** the first day of a week, as under its column: „27.9.“ */
-fun weekDay(w: Block) = "${dateOf(w.start)}.${monthOf(w.start)}."
+private fun weekDay(w: Block) = "${dateOf(w.start)}.${monthOf(w.start)}."
 
 /** a column a week across the width, oldest first, the notes of each and the day it starts under it */
 @Composable

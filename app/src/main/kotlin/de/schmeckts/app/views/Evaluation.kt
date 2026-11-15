@@ -764,7 +764,7 @@ private fun SortRow(
     }
 }
 
-// at a row's level of a Divider
+// where a row's text starts, for its divider and its button
 private val rowIndent = Size.picM + Space.s3
 
 private class RowSaid(
