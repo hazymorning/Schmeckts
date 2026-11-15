@@ -432,9 +432,14 @@ class UiLevelScrollTest : ScreenTest() {
         idle(100)
         act("open-evaluation")
         val eval = scrollDown()
-        act("open-level", "v" to "shop")
-        act("settings-back")
-        check(eval > 0f && scrolled() == eval, "the same in Vorlieben after Einkaufen $eval ${scrolled()}")
+        act("open-product", "id" to db.products[0].id)
+        val over = level
+        back()
+        idle(400)
+        check(
+            eval > 0f && over == listOf("product", null, null) && scrolled() == eval,
+            "the same in Vorlieben after a variety opened over it $eval $over ${scrolled()}",
+        )
     }
 }
 

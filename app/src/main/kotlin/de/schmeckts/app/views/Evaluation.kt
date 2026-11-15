@@ -2197,7 +2197,6 @@ private fun cardLines(
     return cardTraits(s.traits, hint, m).mapNotNull { t -> ph.traitSaid(t, c)?.let { t.kind to it.short() } }
 }
 
-// one line of the card
 @Composable
 private fun CardTrait(
     kind: String,
@@ -2229,7 +2228,9 @@ fun EvaluationCard(
     val now = Time.now()
     val first = sum.picks.firstOrNull { it.id != hint?.id }
     val pick = first?.let { ph.pickSaid(m, it, now) }
-    Card {
+    // lines the hint card above held back come in as it closes, on its curve, so Verlauf below glides up in one go
+    val still = reduceMotion
+    Card(Modifier.animateContentSize(if (still) tween(0) else tween(Motion.STEP, easing = Motion.easeIn))) {
         CardHead("Vorlieben", label = "Alle Vorlieben", onMore = ui.on("open-evaluation"))
         if (sum.pets.size >= 2) {
             sum.pets.forEachIndexed { i, s ->
