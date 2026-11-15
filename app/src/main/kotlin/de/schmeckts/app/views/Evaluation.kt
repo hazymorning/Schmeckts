@@ -605,8 +605,8 @@ private fun <T> Folded(
     )
 }
 
-/** A line of the Steckbrief: a press area with label, value, sub and what it compares, its picture at the end; under
- it an action, the week chart, and what it rests on. open: null without a proof. */
+/** A line of the Steckbrief: a press area with label, value and sub beside its picture, what it compares across the
+ width; under it the week chart, an action and what it rests on. open: null without a proof. */
 @Composable
 private fun TraitRow(
     tag: String,
@@ -630,7 +630,7 @@ private fun TraitRow(
         label = "down",
     )
     Column(Modifier.fillMaxWidth()) {
-        Row(
+        Column(
             Modifier
                 .testTag(tag)
                 .fillMaxWidth()
@@ -653,23 +653,24 @@ private fun TraitRow(
                 }.press(tap, Motion.PRESS_WIDE)
                 .heightIn(min = Size.tap)
                 .padding(top = Space.s3, bottom = if (chart != null) 0.dp else Space.s3),
-            horizontalArrangement = Arrangement.spacedBy(Space.s3),
         ) {
-            Column(Modifier.weight(1f)) {
-                T(said.label, Type.captionStrong, color = colors.muted)
-                T(said.value, Type.heading, color = if (said.quiet) colors.muted else colors.ink, balance = true)
-                if (said.sub.isNotEmpty()) M(said.sub, Type.small, Modifier.padding(top = Space.hair), colors.muted)
-                if (visual != null || said.a != null) {
-                    Gap(Space.s2)
-                    visual?.invoke()
-                    if (said.a != null) CompareBars(said.a, said.b)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.s3)) {
+                Column(Modifier.weight(1f)) {
+                    T(said.label, Type.captionStrong, color = colors.muted)
+                    T(said.value, Type.heading, color = if (said.quiet) colors.muted else colors.ink, balance = true)
+                    if (said.sub.isNotEmpty()) M(said.sub, Type.small, Modifier.padding(top = Space.hair), colors.muted)
                 }
-                if (said.note.isNotEmpty()) M(said.note, Type.small, Modifier.padding(top = Space.s3), colors.muted)
+                end?.invoke()
+                if (tap != null) {
+                    if (open == null) Chevron() else Icon("down", Modifier.rotate(turn), Size.iconS, colors.faint)
+                }
             }
-            end?.invoke()
-            if (tap != null) {
-                if (open == null) Chevron() else Icon("down", Modifier.rotate(turn), Size.iconS, colors.faint)
+            if (visual != null || said.a != null) {
+                Gap(Space.s2)
+                visual?.invoke()
+                if (said.a != null) CompareBars(said.a, said.b)
             }
+            if (said.note.isNotEmpty()) M(said.note, Type.small, Modifier.padding(top = Space.s3), colors.muted)
         }
         if (chart != null) {
             Gap(Space.s2)
@@ -777,7 +778,7 @@ private fun MixGrid(x: Insight) {
                 }.thenComparing({ it.key }, german),
             ).map { it.key }
     Column(Modifier.fillMaxWidth().padding(bottom = Space.s3)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = Space.s2)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = Space.s2), verticalAlignment = Alignment.Bottom) {
             Spacer(Modifier.weight(1.2f))
             Column(Modifier.weight(1f).padding(horizontal = Space.s2)) {
                 T(heads[0], Type.smallStrong, color = p.ink)
