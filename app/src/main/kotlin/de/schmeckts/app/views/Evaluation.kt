@@ -413,19 +413,14 @@ private fun Phone.traitSaid(
         }
         "pack" ->
             t.pack?.let { p ->
-                val k = p.sorts.size
                 val struck = p.sorts.all { derive.getProduct(it.id)?.str("kaufen") == "nicht" }
-                val sub =
-                    (
-                        if (p.a.good ==
-                            0
-                        ) {
-                            "Keine der ${word(k)} Sorten gut gefressen."
-                        } else {
-                            "Bei keiner der ${word(k)} Sorten mehr als die Hälfte gut gefressen."
-                        }
-                    ) +
-                        if (struck) " Von dir gestrichen." else ""
+                val n = word(p.sorts.size)
+                val said =
+                    when {
+                        p.a.good == 0 -> "Keine der $n Sorten gut gefressen."
+                        else -> "Bei keiner der $n Sorten mehr als die Hälfte gut gefressen."
+                    }
+                val sub = said + if (struck) " Von dir gestrichen." else ""
                 Said("Kommt gar nicht an", packLabel(p), sub, side("<b>${esc(packLabel(p))}</b>", p.a), side("Andere Sorten", p.b))
             }
         "marke" ->
@@ -885,22 +880,13 @@ private fun AppetiteChart(
     m: Model,
 ) {
     watch()
-    val p = colors
+    val noted = weeks.any { it.seen.isNotEmpty() }
+    val other = m.sorts.any { it.total > 0 && !ranks(it.product) }
     Column(Modifier.fillMaxWidth().padding(bottom = Space.s3)) {
         WeekChart(weeks)
         WeekLegend()
-        if (weeks.any {
-                it.seen.isNotEmpty()
-            }
-        ) {
-            T("Unter den Wochen steht, was notiert wurde.", Type.caption, Modifier.padding(top = Space.s1), p.muted)
-        }
-        if (m.sorts.any {
-                it.total > 0 && !ranks(it.product)
-            }
-        ) {
-            T("Ohne Snacks und Trockenfutter.", Type.caption, Modifier.padding(top = Space.s1), p.muted)
-        }
+        if (noted) T("Unter den Wochen steht, was notiert wurde.", Type.caption, Modifier.padding(top = Space.s1), colors.muted)
+        if (other) T("Ohne Snacks und Trockenfutter.", Type.caption, Modifier.padding(top = Space.s1), colors.muted)
     }
 }
 
@@ -988,14 +974,10 @@ private fun TraitBlock(
                     }
                     x != null -> {
                         val list = x.sorts.sortedWith(if (x.gap < 0 || t.kind == "sosse") worstFirst else worstFirst.reversed())
-                        if (t.kind == "konsistenz") {
-                            MixGrid(x)
-                            val phrase = PHRASES[x.a.key as? String]?.sorts
-                            if (phrase !=
-                                null
-                            ) {
-                                Label(if (list.size == 2) "Beide $phrase" else "Die ${word(list.size)} $phrase", top = Space.s2)
-                            }
+                        val phrase = PHRASES[x.a.key as? String]?.sorts
+                        if (t.kind == "konsistenz") MixGrid(x)
+                        if (t.kind == "konsistenz" && phrase != null) {
+                            Label(if (list.size == 2) "Beide $phrase" else "Die ${word(list.size)} $phrase", top = Space.s2)
                         }
                         ProofRows(c, list, branded = t.kind != "marke")
                     }
