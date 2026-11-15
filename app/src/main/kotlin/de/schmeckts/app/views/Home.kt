@@ -439,7 +439,7 @@ private fun Fab(modifier: Modifier) {
     }
 }
 
-/** one question at a time, then the history and „Vorlieben“ */
+/** one question at a time, then „Vorlieben“ and the history */
 @Composable
 private fun ColumnScope.HomeContent() {
     watch()
@@ -505,16 +505,22 @@ private fun ColumnScope.HomeContent() {
         Gap(gap("card"))
         Arrive(n++, "question") { question() }
     }
+    if (hasEvaluationCard(m)) {
+        // the variety the hint card names is not named again right under it
+        val hinted =
+            m.hints
+                .firstOrNull()
+                ?.takeIf { !updateShown(ui) && !remindShown(ui) && !newsShown(ui) }
+                ?.id
+        Gap(gap("card"))
+        Arrive(n++, "evaluation") { EvaluationCard(m, hinted) }
+    }
     Gap(gap("card"))
-    Arrive(n++, "hist") {
+    Arrive(n, "hist") {
         Card {
             CardHead("Verlauf", label = "Alle Einträge", onMore = ui.on("open-report"))
             History()
         }
-    }
-    if (hasEvaluationCard(m)) {
-        Gap(gap("card"))
-        Arrive(n, "evaluation") { EvaluationCard(m) }
     }
 }
 
