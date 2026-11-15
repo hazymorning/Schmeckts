@@ -786,7 +786,7 @@ private fun fillOf(r: String) =
     score(r).let { v ->
         when {
             v >= 100 -> 1f
-            v >= 70 -> 2 / 3f
+            v >= 70 -> 0.8f
             v >= 50 -> 0.5f
             v > 0 -> 0.25f
             else -> 0f
@@ -1226,10 +1226,12 @@ fun WeekChart(
             }
             Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 // under its column while it fits there, else from the column's start on
-                val align = if (widest <= col) Alignment.CenterHorizontally else Alignment.Start
+                val fits = widest <= col
                 weeks.forEachIndexed { i, w ->
-                    Box(each) {
-                        if (dated(i)) T(weekDay(w), day, silent.wrapContentWidth(align, unbounded = true), p.muted)
+                    Box(each, contentAlignment = if (fits) Alignment.TopCenter else Alignment.TopStart) {
+                        if (dated(i)) {
+                            T(weekDay(w), day, if (fits) silent else silent.wrapContentWidth(Alignment.Start, unbounded = true), p.muted)
+                        }
                     }
                 }
             }

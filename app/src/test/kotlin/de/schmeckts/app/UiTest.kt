@@ -723,7 +723,8 @@ class UiEvaluationTest : ScreenTest() {
         val lines = tags("card-trait-", within = "sec-evaluation")
         val pick = tags("pick-", within = "sec-evaluation")
         val loved = favourites(phone.derive.rankingModel())
-        val named = loved.size != 3 || loved.all { within("card-trait-liebling", pname(it.product)) }
+        val named =
+            loved.size < 3 || (within("card-trait-liebling", "Sorten") && loved.none { within("card-trait-liebling", pname(it.product)) })
         val first =
             phone.derive
                 .vorliebenModel()
@@ -734,7 +735,7 @@ class UiEvaluationTest : ScreenTest() {
             lines.size in 1..2 && first != null && pick == listOf(first) && tags("medal-").isEmpty(),
             "two lines at most, the first variety to feed next, no medals $lines $pick",
         )
-        check(named, "three favourites on the card by name")
+        check(named, "three favourites on the card told as on the page, not by three long names")
         tapTag("pick-$first")
         check(sheet?.kind == "product" && sheet?.id == first, "a row opens its food sheet")
         act("close")
@@ -827,12 +828,12 @@ class UiEvaluationTest : ScreenTest() {
         open(dbFile(listOf(pet(M)), products, meals), now)
         check(
             tags("pick-", within = "sec-evaluation") == listOf("naechste1") &&
-                within("sec-evaluation", "dann kommt die Sorte auf die Einkaufsliste") &&
+                within("sec-evaluation", "Noch einmal, dann auf die Einkaufsliste") &&
                 tags("medal-").isEmpty(),
             "the card names the variety one good meal from the shopping list",
         )
         act("open-evaluation")
-        val band = top(hasText("Nicht mehr kaufen") and hasAnyAncestor(hasTestTag("shop")))
+        val band = top(hasText("nicht mehr kaufen", substring = true) and hasAnyAncestor(hasTestTag("shop")))
         check(
             tags("next-", within = "next") == listOf("naechste1", "naechste2") &&
                 within("trait-liebling", "Noch keine") &&
@@ -1013,6 +1014,25 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
+    fun `Vorlieben - a meal one cat still needs is said as hers and fed to her alone`() {
+        val now = at("2026-06-12T12:00")
+        val tiger = "tigerpet01"
+        val products = listOf(product("lachs00001", "Sheba", "Lachs"))
+        val meals =
+            listOf(
+                meal("meal1001", "lachs00001", now - 2 * DAY, mapOf(M to "top", tiger to "top")),
+                meal("meal1002", "lachs00001", now - DAY, mapOf(M to "top")),
+            )
+        open(dbFile(listOf(pet(M), pet(tiger, "Tiger", "createdAt" to 2)), products, meals), now)
+        act("open-evaluation")
+        val said = within("next", "Für Minka noch einmal")
+        tapTag("feed-lachs00001")
+        idle(400)
+        val fed = db.servings[0].pets.keys
+        check(said && fed == setOf(M), "the label names her, the meal is for her alone $fed")
+    }
+
+    @Test
     fun `Vorlieben - Alle vier nicht mehr kaufen sets the whole line at once, one undo restores each choice`() {
         mau()
         val pack =
@@ -1106,7 +1126,10 @@ class UiEvaluationTest : ScreenTest() {
         val favourite = favourites(phone.derive.rankingModel()).single()
         act("open-evaluation")
         val shut = tags("proof-", sheet = true)
+        val sides = { listOf(inSheet("Andere Sorten: "), inSheet("nie bekommen")) }
+        val closedSides = sides()
         tapTag("trait-pack-${pack.brand}")
+        val openSides = sides()
         val proof = tags("proof-", sheet = true)
         tapTag("proof-${proof[0]}")
         val over =
@@ -1121,8 +1144,6 @@ class UiEvaluationTest : ScreenTest() {
         val kept = listOf(level, tags("proof-", sheet = true))
         tapTag("trait-pack-${pack.brand}")
         val closed = tags("proof-", sheet = true)
-        val calm = tags("week-", sheet = true)
-        tapTag("trait-appetit")
         val weeks = tags("week-", sheet = true)
         val lineIds = pack.sorts.map { it.id }
         check(
@@ -1131,12 +1152,13 @@ class UiEvaluationTest : ScreenTest() {
                 proof.sorted() == (lineIds + sauce).distinct().sorted(),
             "a line opens the varieties it rests on, its own first, then the others in its sauce $proof",
         )
+        check(
+            closedSides == listOf(true, false) && openSides == listOf(false, true),
+            "open, brand by sauce stands in place of the two sides it splits up $closedSides $openSides",
+        )
         check(over == listOf("evaluation", listOf("product", null, null), proof[0]), "a row opens its sheet over the page $over")
         check(kept == listOf(listOf("evaluation", null, null), proof), "back returns to the page, its proof still open $kept")
-        check(
-            closed.isEmpty() && calm.isEmpty() && weeks.size >= 2,
-            "a second tap folds it; weeks as the varieties led to expect wait behind their line $calm $weeks",
-        )
+        check(closed.isEmpty() && weeks.size >= 2, "a second tap folds it; the weeks stand under their line, open $weeks")
         tapTag("trait-liebling")
         check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
     }
@@ -1145,7 +1167,6 @@ class UiEvaluationTest : ScreenTest() {
     fun `Vorlieben - a screen reader hears each week once, not the days and counts under the chart again`() {
         mau()
         act("open-evaluation")
-        tapTag("trait-appetit")
         val texts =
             rule
                 .onAllNodes(hasAnyAncestor(hasTestTag("profile")) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
@@ -1174,19 +1195,41 @@ class UiEvaluationTest : ScreenTest() {
         unfold()
         val rows = tags("sort-", within = "shop")
         val bands = (g.nachkaufen + g.geht + g.nicht + g.neu.filter { it.id !in picks }).map { it.id }
-        check(picks.size >= 5 && shut.first.size == 3 && next() == picks, "Als Nächstes shows three, then every one in order ${next()}")
+        check(
+            picks.size >= 5 && shut.first == next().take(3) && next().sorted() == picks.sorted(),
+            "Als Nächstes shows three, then every one ${next()}",
+        )
         check(shut.second.size < rows.size && rows.sorted() == bands.sorted(), "Einkaufen shows every variety of its bands once opened")
-        val brands =
+        check(tags("fold-marken", sheet = true).isEmpty(), "the Miamor line answers the brand, so no list of brands repeats it")
+    }
+
+    @Test
+    fun `Vorlieben - where no line says anything of the brands, each brand with its count behind a link`() {
+        val brands = listOf("Sheba", "Felix", "Gourmet")
+        val products = brands.flatMap { b -> (1..2).map { i -> product("${b.lowercase()}0000$i", b, "Sorte $i") } }
+        val levels = listOf("top", "mittel", "sosse", "gut")
+        val now = at("2026-06-12T12:00")
+        // every variety alike: one meal of each level
+        val meals =
+            (0 until 24).map { k ->
+                val p = products[k % products.size]["id"] as String
+                meal("meal${k + 1000}", p, now - (k + 1) * DAY / 2, mapOf(M to levels[k / products.size]))
+            }
+        open(dbFile(listOf(pet(M)), products, meals), now)
+        act("open-evaluation")
+        val shut = inSheet("Nach Marke")
+        act("fold", "v" to "marken")
+        val counted =
             phone.derive
                 .model()
                 .sorts
-                .filter { typeOf(it.product) == "Nassfutter" && it.n > 0 }
-                .groupBy { it.product.str("brand")!!.trim() }
+                .groupBy { it.product.str("brand")!! }
                 .mapValues { tallyOf(it.value) }
-                .filterValues { it.n >= 2 }
         check(
-            brands.size >= 3 && brands.all { (b, x) -> inSheet("$b: ${times(x.good, x.n)} gut gefressen") },
-            "each brand of wet food with its count, behind its own link",
+            tags("trait-", sheet = true).none { it.startsWith("trait-marke") || it.startsWith("trait-pack") } &&
+                shut &&
+                counted.all { (b, x) -> inSheet("$b: ${times(x.good, x.n)}") },
+            "each brand with its count, behind its own link",
         )
     }
 

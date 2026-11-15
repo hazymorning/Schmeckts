@@ -1998,6 +1998,12 @@ class SmartTest {
             listOf("liebling", "pack"),
             cardTraits(fewer, weaker).map { it.kind },
         )
+        val struck = house(listOf("A"), line.map { if (it["brand"] == "Miamor") it + ("kaufen" to "nicht") else it }, daily("A", days, 1))
+        assertEquals(
+            "a line the owner has struck asks nothing more on the card",
+            listOf("liebling", "neuerdings"),
+            cardTraits(profile(data = struck), null, model(struck)).map { it.kind },
+        )
         val catz = Trait("marke", "Catz Finefood", listOf("c1", "c2", "c3"), Insight("marke", Side("Catz Finefood"), Side(), 0.5))
         val again = listOf(traits[0], catz, traits[4])
         assertEquals(
@@ -2130,6 +2136,20 @@ class SmartTest {
             picks(mapOf("A" to setOf("line"))),
         )
         assertEquals("in both cats' failing lines it goes", emptyList<Any>(), picks(mapOf("A" to setOf("line"), "B" to setOf("line"))))
+        val both =
+            house(
+                listOf("A", "B"),
+                listOf("line", "plain"),
+                rate("line", "A", listOf(t, t), 5) + rate("line", "B", listOf(t, t), 5) +
+                    rate("plain", "A", listOf(t, mi), 6) + rate("plain", "B", listOf(t), 6),
+            )
+        val m3 = model(both)
+        val r3 = ranking(m3, now0)
+        assertEquals(
+            "a trial for one cat from another's failing line comes after one that settles it for both",
+            listOf("plain", "line"),
+            nextPicks(r3, nextUp(m3, now0, r3, lastOf(both), emptyList()), mapOf("A" to setOf("line"))).map { it.id },
+        )
     }
 
     @Test

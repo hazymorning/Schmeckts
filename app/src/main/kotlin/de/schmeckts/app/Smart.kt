@@ -1958,7 +1958,8 @@ private fun handOver(
 }
 
 // a trial one good meal from the shopping list first, then favourites long missed, the other trials, second tries; no
-// trial the owner has already put on the list or struck. lines: per cat, the varieties of its failing lines.
+// trial the owner has already put on the list or struck. Last, a trial for one cat that another cat leaves, so what is
+// fed first is never what one of them is known to refuse. lines: per cat, the varieties of its failing lines.
 fun nextPicks(
     r: Ranking,
     next: NextUp,
@@ -1970,10 +1971,14 @@ fun nextPicks(
             .mapNotNull { handOver(it, lines) }
             .partition { it.need == 1 && allGood(it) }
     val trial = { t: Trial -> Pick(t.e.id, "trial", trial = t) }
+    val refused = { p: Pick ->
+        p.trial?.let { t -> t.handed || t.e.pets.any { (pid, x) -> pid != t.pet && x.n > 0 && x.verdict == "nicht" } } == true
+    }
     return (
         near.map(trial) + next.missed.map { Pick(it.id, "missed", missed = it) } + other.map(trial) +
             next.retry.map { Pick(it.id, "retry", retry = it) }
     ).distinctBy { it.id }
+        .sortedBy(refused)
 }
 
 // Da sind sie sich uneinig: two cats on the meals both rated, a sign test on those one ate well and the other hardly,
@@ -2208,7 +2213,12 @@ fun cardTraits(
     val told = { t: Trait ->
         hint != null && ((hint.id != null && hint.id in t.ids) || (hint.kind == "appetit" && t.appetite?.hint?.pet == hint.pet))
     }
-    val ok = traits.filterNot(told)
+    // what the owner has struck already asks nothing more of them
+    val struck = { t: Trait ->
+        val sorts = t.pack?.sorts ?: t.ids.map { m?.byId?.get(it) }
+        t.kind in setOf("pack", "stehen") && sorts.isNotEmpty() && sorts.all { it?.kaufen == "nicht" }
+    }
+    val ok = traits.filterNot { told(it) || struck(it) }
     val group = setOf("marke", "konsistenz", "geschmack")
     val liked = ok.firstOrNull { (it.kind == "liebling" && it.ids.isNotEmpty()) || it.kind == "sorten" }
     val again = { t: Trait ->

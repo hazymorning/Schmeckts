@@ -72,12 +72,14 @@ class Feeding(
         return s
     }
 
+    /** pets: for these cats only, else for the cats it usually goes to */
     fun serveProduct(
         pid: String,
         scanCode: String = "",
+        pets: List<String> = emptyList(),
     ) {
         val p = d.getProduct(pid) ?: return
-        val ids = d.defaultPets(p).ids
+        val ids = pets.filter { d.getPet(it) != null }.ifEmpty { d.defaultPets(p).ids }
         val s = meal(ids, scanCode)
         db.servings.add(0, s)
         l.products.linkProduct(s, p)
