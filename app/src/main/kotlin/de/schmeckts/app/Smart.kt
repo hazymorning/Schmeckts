@@ -1768,6 +1768,27 @@ fun experimentOf(
     return Experiment(x.a.key as String, x.gap < 0, mixed.take(2), liked)
 }
 
+/** A variety of the household that would answer the test meal, the least rated first; none she leaves or that is struck. */
+fun trialOf(
+    x: Experiment,
+    m: Model,
+): Sort? =
+    m.sorts
+        .filter { e ->
+            val b = brandOf(e)
+            val k = textureKey(e.product)
+            typeOf(e.product) == TYPES[0] &&
+                e.kaufen != "nicht" &&
+                e.verdict != "nicht" &&
+                k.isNotEmpty() &&
+                b.isNotEmpty() &&
+                if (x.worse) {
+                    (b in x.brands && k != x.texture) || (b == x.liked && k == x.texture)
+                } else {
+                    (b !in x.brands && k == x.texture) || (b == x.brands[0] && k != x.texture)
+                }
+        }.minWithOrNull(compareBy<Sort> { it.n }.thenComparing({ pname(it.product) }, german))
+
 // Appetit: the cat's meals in seven-day blocks back to its first rating, each against what its varieties led to
 // expect from the cat's other weeks, so a week of food it never liked is no alarm.
 private object BLOCK {
@@ -1779,7 +1800,8 @@ private object BLOCK {
     const val GAP = 0.3 // |good - expected| at least this share of the block's ratings
 }
 
-/** A seven-day block, from inclusive, to exclusive. seen: the notes about the cat in it, by kind. */
+/** A seven-day block, from inclusive, to exclusive. seen: the notes about the cat in it, by kind; start: the day of the
+ *  cat's first rating where the oldest block begins before it. */
 class Block(
     val from: Long,
     val to: Long,
@@ -1791,6 +1813,7 @@ class Block(
     val expected: Double,
     val vary: Double,
     val seen: Map<String, Int>,
+    val start: Long = from,
 ) {
     val judged get() = n >= BLOCK.MIN
 }
@@ -1838,7 +1861,7 @@ fun weeks(
                 .mapNotNull { o -> o.str("kind")?.takeIf { it in OBSERVATIONS } }
                 .groupingBy { it }
                 .eachCount()
-        Block(from, to, x.n, x.good, x.mid, x.sauce, x.bad, expected, vary, seen)
+        Block(from, to, x.n, x.good, x.mid, x.sauce, x.bad, expected, vary, seen, maxOf(from, dayStart(first)))
     }
 }
 
@@ -1884,7 +1907,8 @@ fun appetiteOf(
 // a top that only leans towards good is never called a favourite
 fun favourites(r: Ranking): List<Sort> = r.top.filter { it.verdict == "nachkaufen" }
 
-/** The brand that holds more than half of the varieties, or the two that hold at least two thirds; else none. */
+/** The brand that holds more than half of the varieties, or the two that hold at least two thirds and are not tied
+ *  with a third; else none. */
 fun mostly(sorts: List<Sort>): List<String> {
     val by =
         sorts
@@ -1894,7 +1918,8 @@ fun mostly(sorts: List<Sort>): List<String> {
             .entries
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenComparing({ it.key }, german))
     if (by.isNotEmpty() && by[0].value * 2 > sorts.size) return listOf(by[0].key)
-    if (by.size >= TWO && (by[0].value + by[1].value) * 3 >= sorts.size * 2) return listOf(by[0].key, by[1].key)
+    val two = by.size == TWO || (by.size > TWO && by[1].value > by[2].value)
+    if (two && (by[0].value + by[1].value) * 3 >= sorts.size * 2) return listOf(by[0].key, by[1].key)
     return emptyList()
 }
 
@@ -1917,12 +1942,13 @@ class Pick(
     val retry: Retry? = null,
 )
 
-// a trial one good meal from the shopping list first, then favourites long missed, the other trials, second tries
+// a trial one good meal from the shopping list first, then favourites long missed, the other trials, second tries; no
+// trial the owner has already put on the list or struck
 fun nextPicks(
     r: Ranking,
     next: NextUp,
 ): List<Pick> {
-    val (near, other) = r.trials.partition { it.need == 1 && goodOf(it.e.counts) == it.e.n }
+    val (near, other) = r.trials.filter { it.e.kaufen == null }.partition { it.need == 1 && goodOf(it.e.counts) == it.e.n }
     val trial = { t: Trial -> Pick(t.e.id, "trial", trial = t) }
     return (
         near.map(trial) + next.missed.map { Pick(it.id, "missed", missed = it) } + other.map(trial) +
@@ -2074,8 +2100,24 @@ fun findings(
         found[i] = Insight(x.kind, x.a, x.b, x.gap, x.sorts, x.rest, sauce.k, sauce.n, sauce.instead)
         found.remove(sauce)
     }
-    return (packs.map { p -> Trait("pack", p.brand, p.sorts.map { it.id }, pack = p) } + found.map(::traitOf))
+    return merged((packs.map { p -> Trait("pack", p.brand, p.sorts.map { it.id }, pack = p) } + found.map(::traitOf)))
         .sortedByDescending { abs(gapOf(it)) }
+}
+
+// A consistency left that never came without a failing line is the same story: the line carries it and says it may be
+// the consistency.
+private fun merged(traits: List<Trait>): List<Trait> {
+    val out = traits.toMutableList()
+    for (t in traits) {
+        val x = t.insight ?: continue
+        if (t.kind != "konsistenz" || x.gap >= 0) continue
+        val i = out.indexOfFirst { it.kind == "pack" && it.insight == null && it.pack?.texture == t.key && it.pack?.brand in t.mixed }
+        if (i < 0) continue
+        val p = out[i]
+        out[i] = Trait("pack", p.key, p.ids, x, p.pack, t.mixed)
+        out.remove(t)
+    }
+    return out
 }
 
 private fun negative(t: Trait) = t.kind == "pack" || (t.kind in GROUPS && gapOf(t) < 0)
@@ -2103,11 +2145,13 @@ fun profile(
     when {
         r.flat -> out.add(Trait("sorten"))
         favourites.isNotEmpty() -> out.add(Trait("liebling", ids = favourites.map { it.id }))
-        r.rated > 0 && !r.stale -> out.add(Trait("liebling"))
     }
     out += buying
     val left = r.flop.filter { it.verdict == "nicht" }
-    if (left.isNotEmpty() && buying.none(::negative)) out.add(Trait("stehen", ids = left.map { it.id }))
+    val licked = buying.filter { it.kind == "sosse" }.flatMap { it.ids }.toSet()
+    if (left.isNotEmpty() && buying.none(::negative) && left.count { it.id in licked } * 2 < left.size) {
+        out.add(Trait("stehen", ids = left.map { it.id }))
+    }
     treats(m)?.let { out.add(Trait("snacks", treats = it)) }
     if (appetite != null && !worry) out.add(appetite)
     // a move the cat's own change explains is no news of the variety
@@ -2116,6 +2160,8 @@ fun profile(
     val warmed = moved.all { it in moves.warmed }
     if (moved.isNotEmpty()) out.add(Trait("neuerdings", ids = moved.map { it.id }, moves = moved, warmed = warmed))
     for (l in links) out.add(Trait("danach", "${l.kind}-${l.id}", listOf(l.id), link = l))
+    // no favourite yet is said last, after what did show
+    if (!r.flat && favourites.isEmpty() && r.rated > 0 && !r.stale) out.add(Trait("liebling"))
     out += found.filter { it.kind !in BUYING }
     return out
 }

@@ -248,7 +248,9 @@ class Derive(
                 picks = picks(now, last),
                 experiment =
                     traits.firstNotNullOfOrNull { t ->
-                        t.insight?.takeIf { t.kind == "konsistenz" }?.let { experimentOf(it, t.mixed) }
+                        // a failing line is not the one to try again
+                        val mixed = t.pack?.let { p -> (t.mixed - p.brand).ifEmpty { t.mixed } } ?: t.mixed
+                        t.insight?.takeIf { t.kind == "konsistenz" || t.kind == "pack" }?.let { experimentOf(it, mixed) }
                     },
                 shop = shopGroups(m),
                 differ = if (m.pets.size >= 2) differ(db, m.pets, now) else emptyList(),
