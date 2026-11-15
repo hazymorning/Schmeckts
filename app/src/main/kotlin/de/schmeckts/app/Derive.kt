@@ -190,6 +190,11 @@ class Derive(
             Evaluation(taste(m), insights(db, m, now), basis(m), lastServed(), observed(db, m.pets, now))
         }
 
+    // one cat's own, so a page for several never says of all what holds for some
+    fun rankingFor(pid: String): Ranking = cached("ranking:$pid", emptyList()) { now -> ranking(modelFor(pid), now) }
+
+    fun tasteFor(pid: String): Taste = cached("taste:$pid", emptyList()) { taste(modelFor(pid)) }
+
     fun sortOf(id: String) = model().byId[id]
 
     fun pendingServings(): List<Rec> {

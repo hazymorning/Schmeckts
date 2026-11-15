@@ -773,12 +773,30 @@ fun tallyOf(
 
 private val german: Collator = Collator.getInstance(Locale.GERMAN)
 
+/** A flavour, consistency or brand over every rating of its varieties; verdict by the rule a variety goes by. */
 class Group(
     val key: String,
-    val n: Int,
-    val good: Int,
     val sorts: List<Sort>,
-)
+) {
+    val counts = HashMap<String, Int>().also { c -> for (e in sorts) for ((r, k) in e.counts) c.merge(r, k, Int::plus) }
+    val n = counts.values.sum()
+    val good = goodOf(counts)
+    val verdict = verdictOf(n, good, poorOf(counts))
+}
+
+/** the same varieties with one cat's ratings, where she rated enough of them to count */
+fun Group.within(m: Model): Group? = Group(key, sorts.mapNotNull { m.byId[it.id] }.filter { it.n > 0 }).takeIf { enough(it.sorts) }
+
+// the level in the middle of the ratings, the lower of two: a majority good gives a good one, a majority poor a poor one
+fun usualOf(counts: Map<String, Int>): String? {
+    var at = counts.values.sum() / 2
+    val levels = counts.entries.filter { it.key in RATINGS }.sortedWith(compareBy({ -score(it.key) }, { RATINGS.keys.indexOf(it.key) }))
+    for ((r, k) in levels) {
+        if (at < k) return r
+        at -= k
+    }
+    return null
+}
 
 // Wet food by group, the best share first. Every rating counts, but a group needs two varieties rated twice; a variety
 // naming two flavours counts in both.
@@ -790,7 +808,7 @@ private fun grouped(
     for (e in wetOf(m)) for (k in keysOf(e.product)) if (k.isNotEmpty()) by.getOrPut(k) { mutableListOf() }.add(e)
     return by.entries
         .filter { enough(it.value) }
-        .map { (key, sorts) -> tallyOf(sorts).let { Group(key, it.n, it.good, sorts) } }
+        .map { (key, sorts) -> Group(key, sorts) }
         .sortedWith { a, b ->
             val d = b.good.toDouble() / b.n - a.good.toDouble() / a.n
             if (d != 0.0) return@sortedWith sign(d).toInt()
@@ -817,8 +835,7 @@ fun taste(m: Model): Taste {
         val g = list.singleOrNull() ?: return emptyList()
         val rest = wetOf(m).filter { it !in g.sorts }
         if (!enough(rest)) return emptyList()
-        val x = tallyOf(rest)
-        return listOf(g, Group("", x.n, x.good, rest)).sortedByDescending { it.good.toDouble() / it.n }
+        return listOf(g, Group("", rest)).sortedByDescending { it.good.toDouble() / it.n }
     }
     return Taste(side("konsistenz"), side("geschmack"), side("marke"))
 }

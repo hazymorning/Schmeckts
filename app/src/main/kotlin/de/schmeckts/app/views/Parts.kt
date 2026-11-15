@@ -448,7 +448,7 @@ fun ScaleEnds(levels: List<String>) {
 
 /** a ring around a small avatar, in the tone of its rating */
 @Composable
-private fun Mini(
+fun Mini(
     pet: Rec?,
     r: String?,
 ) {

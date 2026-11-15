@@ -2,7 +2,7 @@
  {
   "v": "0.45.0",
   "title": "Vorlieben aufgeräumt",
-  "say": "„Vorlieben“ zeigt wieder auf einen Blick, was deine Katze am liebsten frisst und was nicht ankommt. Dazu zeigen Balken, was besser ankommt: welche Konsistenz, welcher Geschmack, welche Marke.",
+  "say": "„Vorlieben“ sagt oben in ein, zwei Sätzen, was deine Katze am liebsten frisst und was sie stehen lässt. Darunter zeigt der Napf bei jeder Sorte, jedem Geschmack, jeder Konsistenz und Marke, wie viel sie meistens frisst.",
   "why": "Die Einkaufsliste ist wieder oben rechts hinter dem Wagen.",
   "go": [
    "evaluation",

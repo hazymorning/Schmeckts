@@ -735,15 +735,15 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
-    fun `page - who it is about, the favourites, what goes down better, what is left and what is still tried, in that order`() {
+    fun `page - the sentence on top, the favourites, what is left, what goes down how and what is still tried, in that order`() {
         mau()
         act("open-evaluation")
         val r = phone.derive.rankingModel()
         val x = phone.derive.evaluationModel()
-        val cards = tags("", sheet = true).filter { it in setOf("head", "favourites", "flops", "split", "taste", "feeding", "trials") }
+        val cards = tags("", sheet = true).filter { it in setOf("lead", "favourites", "flops", "split", "taste", "feeding", "trials") }
         val want =
             listOfNotNull(
-                "head",
+                "lead",
                 "favourites".takeIf { r.top.isNotEmpty() },
                 "flops".takeIf { r.flop.isNotEmpty() },
                 "taste",
@@ -756,10 +756,13 @@ class UiEvaluationTest : ScreenTest() {
         check(tags("flop-", within = "flops") == shown(r.flop), "what is left, in its order")
         val groups = x.taste.konsistenz + x.taste.geschmack + x.taste.marke
         check(
-            groups.isNotEmpty() && groups.all { labelled(": ${it.good} von ${it.n} Mal gut gefressen") },
-            "each consistency, flavour and brand with its count",
+            groups.isNotEmpty() && groups.all { labelled(", ${it.good} von ${it.n} Mal gut gefressen, Mau meistens") },
+            "each consistency, flavour and brand with its count and the bowl she usually leaves",
         )
-        check(within("head", "Mau") && inSheet("Bewertungen seit dem"), "the head names the cat, the foot what it rests on")
+        check(
+            within("lead", "Mau ist wählerisch") && within("lead", "lässt sie meist stehen") && inSheet("Bewertungen seit dem"),
+            "the sentence names the cat, what she likes and what she leaves; the foot what it rests on",
+        )
     }
 
     @Test
@@ -781,7 +784,7 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
-    fun `taste - jelly against sauce as bars, the finding said under both, each the right way round`() {
+    fun `taste - jelly against sauce, each with the bowl she usually leaves, the finding said once the right way round`() {
         val now = at("2025-06-17T12:00")
         val sauce = listOf("lachs", "huhn")
         val jelly = listOf("rind", "pute")
@@ -796,13 +799,17 @@ class UiEvaluationTest : ScreenTest() {
         )
         act("open-evaluation")
         check(
-            labelled("Stückchen in Gelee: 8 von 8 Mal gut gefressen") && labelled("Stückchen in Soße: 0 von 8 Mal gut gefressen"),
-            "both consistencies with their counts",
+            labelled("Stückchen in Gelee, 8 von 8 Mal gut gefressen, Minka meistens alles gefressen") &&
+                labelled("Stückchen in Soße, 0 von 8 Mal gut gefressen, Minka meistens fast nix gefressen"),
+            "both consistencies with their counts and bowls",
         )
         check(
-            within("group-Stückchen in Gelee", "Kommt deutlich besser an") &&
-                within("group-Stückchen in Soße", "Kommt deutlich schlechter an"),
-            "a clear finding said under the bar it is about, each the right way round",
+            within("found-konsistenz", "Stückchen in Gelee kommt deutlich besser an als Stückchen in Soße"),
+            "a clear finding said under its kind, the right way round",
+        )
+        check(
+            within("lead", "Minka mag") && within("lead", "lässt sie meist stehen") && within("lead", "Soße"),
+            "the sentence on top says the same",
         )
     }
 
@@ -975,7 +982,7 @@ class UiEvaluationTest : ScreenTest() {
                 .map { it.id }
         val all = tags("split-", within = "split")
         tapTag("chip-$tiger")
-        val one = listOf(prefs.activePet, tags("split", sheet = true).size, within("head", "Tiger"))
+        val one = listOf(prefs.activePet, tags("split", sheet = true).size, within("lead", "Tiger"))
         tapTag("chip-$tiger")
         check(
             split.isNotEmpty() &&
@@ -994,7 +1001,36 @@ class UiEvaluationTest : ScreenTest() {
         check(one == listOf(tiger, 0, true), "a cat chosen: her page, no Geschmackssache $one")
         check(level == listOf("evaluation", null, null) && prefs.activePet == tiger, "a second tap on the chosen cat opens nothing $level")
         tapTag("chip-$mau")
-        check(prefs.activePet == mau && within("head", "Mau"), "the other cat")
+        check(prefs.activePet == mau && within("lead", "Mau"), "the other cat")
+    }
+
+    @Test
+    fun `two cats - said of both only what each one's own ratings say, each cat's ring on a group`() {
+        val now = at("2025-06-17T12:00")
+        val t = "tiger00001"
+        val sauce = listOf("lachs", "huhn")
+        val jelly = listOf("rind", "pute")
+        val prods =
+            (sauce + jelly).map {
+                val brand = if (it in sauce) "Sheba" else "Felix"
+                product(it, brand, "${it.replaceFirstChar { c -> c.uppercase() }} in ${if (it in sauce) "Soße" else "Gelee"}")
+            }
+        val meals =
+            (sauce + jelly).flatMapIndexed { k, i ->
+                (0 until 4).map { n ->
+                    meal("$i-$n", i, now - (n + 1) * DAY - k * 3_600_000L, mapOf(M to if (i in sauce) "schlecht" else "top", t to "top"))
+                }
+            }
+        open(dbFile(listOf(pet(M), pet(t, "Tiger", "sex" to "m")), prods, meals), now)
+        act("open-evaluation")
+        check(
+            within("lead", "Minka mag") && within("lead", "Tiger frisst") && !within("lead", "beide"),
+            "each cat by her own ratings, nothing said of both",
+        )
+        check(
+            labelled("Stückchen in Soße, 8 von 16 Mal gut gefressen, Minka meistens fast nix gefressen, Tiger meistens alles gefressen"),
+            "a group shows how much each cat usually eats of it",
+        )
     }
 
     @Test
