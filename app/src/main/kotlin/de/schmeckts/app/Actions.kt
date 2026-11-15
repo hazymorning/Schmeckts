@@ -235,9 +235,17 @@ class Actions(
                 ui.sheets.sheetBack()
             },
             "open-report" to { x -> ui.sheets.openSheet(reportState(x["v"])) },
-            "open-evaluation" to { _ -> ui.sheets.openSheet(SheetState("evaluation")) },
-            // the shopping list's folds start closed each time
-            "open-level" to { x -> ui.sheets.openPage(x["v"] ?: "", "open" to null) },
+            // pet: shows that cat, also on home afterwards
+            "open-evaluation" to { x ->
+                val pet = x["pet"]
+                if (pet != null && d.getPet(pet) != null && prefs.activePet != pet) {
+                    prefs.activePet = pet
+                    ph.store.savePrefs()
+                    haptic("select")
+                    ui.update()
+                }
+                ui.sheets.openSheet(SheetState("evaluation"))
+            },
             "open-server" to { _ -> ui.sheets.openSheet(SheetState("settings", "page" to "house")) },
             "connect" to { _ -> launch { connectServer() } },
             "connect-form" to { _ ->
@@ -338,6 +346,7 @@ class Actions(
                 redrawAll()
             },
             "hint-buy" to { x -> hintBuy(x["id"] ?: "", x["v"] ?: "") },
+            "buy-many" to { x -> buyMany((x["ids"] ?: "").split(",").filter { it.isNotEmpty() }, x["v"] ?: "", x["label"] ?: "") },
             "remind-yes" to { _ ->
                 haptic("select")
                 launch {
@@ -529,6 +538,31 @@ class Actions(
             }
         ui.toast("${pname(p)} $said.", {
             l.products.setKaufen(id, was)
+            redrawAll()
+        }, ic, tone)
+    }
+
+    // a whole line at once, one undo for all of it
+    private fun buyMany(
+        ids: List<String>,
+        v: String,
+        label: String,
+    ) {
+        val was = ids.mapNotNull { id -> d.getProduct(id)?.let { id to it.str("kaufen") } }.filter { it.second != v }
+        if (was.isEmpty()) return
+        l.products.setKaufen(was.associate { it.first to v })
+        haptic("success")
+        redrawAll()
+        val (said, ic, tone) =
+            if (v ==
+                "immer"
+            ) {
+                Triple("kommt auf die Einkaufsliste", "champ", "r-good")
+            } else {
+                Triple("wird nicht mehr gekauft", "flop", "r-bad")
+            }
+        ui.toast("$label $said.", {
+            l.products.setKaufen(was.toMap())
             redrawAll()
         }, ic, tone)
     }
