@@ -1027,8 +1027,17 @@ class UiEvaluationTest : ScreenTest() {
         idle()
         act("open-evaluation")
         val fed = listOf(tags("versuch-", within = "next"), within("shop", "Ein Versuch"))
+        act("settings-back")
+        db.servings.add(0, Rec(j(meal("bozmeal001", "bozpastete", clock - 60_000L, mapOf(db.pets[0].id to "top"))).obj()))
+        phone.store.save()
+        ui.update()
+        idle()
+        act("open-evaluation")
+        unfold()
+        val rows = tags("next-", within = "next") + tags("versuch-", within = "next") + tags("sort-", within = "shop")
         check(bought == listOf(true, true), "nothing at home answers it: something to buy $bought")
         check(fed == listOf(listOf("bozpastete"), false), "a variety at home answers it: something to feed $fed")
+        check(rows.count { it == "bozpastete" } == 1 && "bozpastete" in tags("versuch-", within = "next"), "once rated, still once $rows")
     }
 
     @Test
@@ -1044,10 +1053,12 @@ class UiEvaluationTest : ScreenTest() {
         open(dbFile(listOf(pet(M), pet(tiger, "Tiger", "createdAt" to 2)), products, meals), now)
         act("open-evaluation")
         val said = within("next", "Für Minka noch einmal")
+        val usual = prefs.lastPets
         tapTag("feed-lachs00001")
         idle(400)
         val fed = db.servings[0].pets.keys
         check(said && fed == setOf(M), "the label names her, the meal is for her alone $fed")
+        check(prefs.lastPets == usual, "whom meals usually go to stays as it was ${prefs.lastPets}")
     }
 
     @Test

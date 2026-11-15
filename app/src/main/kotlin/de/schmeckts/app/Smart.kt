@@ -949,8 +949,18 @@ private fun withSorts(
     rest: List<Sort>,
 ) = Insight(x.kind, x.a, x.b, x.gap, sorts, rest)
 
-// each group against the rest of the wet food, the one furthest off; on a tie the better one. lines: brands that fail as
-// a whole, left out of the rest a brand or consistency is set against, so they do not make the rest look poor.
+// lines: brands that fail as a whole, left out of the rest so they do not make it look poor; one with varieties in the
+// group stays, or the group alone would carry it
+private fun restFor(
+    wet: List<Sort>,
+    group: List<Sort>,
+    lines: Set<String>,
+): List<Sort> {
+    val inside = group.map(::brandOf).toSet()
+    return wet.filter { it !in group && (brandOf(it) !in lines || brandOf(it) in inside) }
+}
+
+// each group against the rest of the wet food, the one furthest off; on a tie the better one
 private fun byGroup(
     m: Model,
     kind: String,
@@ -959,7 +969,7 @@ private fun byGroup(
     val wet = wetOf(m)
     var best: Insight? = null
     for (g in grouped(m, GROUPS.getValue(kind))) {
-        val rest = wet.filter { it !in g.sorts && (kind == "geschmack" || brandOf(it) !in lines) }
+        val rest = restFor(wet, g.sorts, if (kind == "geschmack") emptySet() else lines)
         if (!enough(rest)) continue
         val x = if (kind == "geschmack") sameLine(g, rest) else insightOf(kind, tallyOf(g.sorts, g.key), restOf(kind, rest), INSIGHT_GROUP)
         if (x != null &&
@@ -2128,13 +2138,13 @@ fun findings(
     val packs = packs(m)
     val lines = packs.map { it.brand }.toSet()
     val found = (buyingOf(m, lines) + if (feeding) feedingOf(db, m, now) else emptyList()).filterNotNull().toMutableList()
-    val rest = wetOf(m).filter { brandOf(it) !in lines }
+    val wet = wetOf(m)
     // a kept group stands in for the one group of its kind byGroup() shows, never beside it
     for (kind in listOf("konsistenz", "marke")) {
         if (found.any { it.kind == kind }) continue
         val x =
             grouped(m, GROUPS.getValue(kind))
-                .mapNotNull { g -> held(m, kind, g.key, g.sorts, rest.filter { it !in g.sorts }) }
+                .mapNotNull { g -> held(m, kind, g.key, g.sorts, restFor(wet, g.sorts, lines)) }
                 .maxWithOrNull(compareBy<Insight> { abs(it.gap) }.thenBy { it.gap }) ?: continue
         if (found.none { it.kind == "konsistenz" && inside(x, it) }) found += x
     }

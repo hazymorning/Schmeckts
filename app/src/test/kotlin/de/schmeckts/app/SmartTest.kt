@@ -1599,6 +1599,28 @@ class SmartTest {
             kinds(listOf(x, x, x)),
         )
         assertEquals("Catz Finefood eaten as well: nothing to tell", emptyList<Any?>(), kinds(listOf(t, t, g)))
+
+        val both =
+            listOf(
+                prod("m1", "brand" to "Miamor", "variety" to "Huhn in Sauce"),
+                prod("m2", "brand" to "Miamor", "variety" to "Ente in Sauce"),
+                prod("m3", "brand" to "Miamor", "variety" to "Huhn Pastete"),
+                prod("m4", "brand" to "Miamor", "variety" to "Ente Pastete"),
+                prod("s1", "brand" to "Sheba", "variety" to "Lachs in Sauce"),
+                prod("s2", "brand" to "Sheba", "variety" to "Pute in Sauce"),
+                prod("s3", "brand" to "Sheba", "variety" to "Lachs Pastete"),
+                prod("s4", "brand" to "Sheba", "variety" to "Pute Pastete"),
+                prod("c1", "brand" to "Catz Finefood", "variety" to "Lamm Pastete"),
+                prod("c2", "brand" to "Catz Finefood", "variety" to "Pferd Pastete"),
+            )
+        val left = listOf("m1", "m2", "m3", "m4").flatMap { rate(it, "A", listOf(x, x, x, x)) }
+        val eaten = listOf("s1", "s2", "s3", "s4", "c1", "c2").flatMap { rate(it, "A", listOf(t, t, t, t)) }
+        val db = house(listOf("A"), both, left + eaten)
+        assertEquals(
+            "a line left in sauce and as pastete alike stays on both sides, so sauce takes no blame for it",
+            listOf("pack:Miamor"),
+            findings(db, model(db), now0).filter { it.kind in setOf("pack", "konsistenz", "marke") }.map { "${it.kind}:${it.key}" },
+        )
     }
 
     @Test

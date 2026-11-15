@@ -1521,7 +1521,6 @@ private fun Phone.saidOf(
     return raw.map { (t, s) -> t to s.without(t.kind == "sosse" && s.b?.text?.let(::plainOf) in drawn) }
 }
 
-// what showed nothing clear, or that there is too little yet
 // what showed nothing clear, and which of brand and flavour that leaves to look at oneself
 private class Closing(
     val end: String,
@@ -1702,13 +1701,12 @@ private fun Steckbrief(
     }
 }
 
-/** group: what the rows under one label share; status: the same as a sentence for one row on its own; label: the row
- read aloud; pet: the one cat the meal is for, among several */
+/** group: what the rows under one label share; label: the row read aloud; pet: the one cat the meal is for, among
+ several */
 private class PickSaid(
     val e: Sort,
     val group: String,
     val sub: String,
-    val status: String,
     val label: String,
     val open: Int,
     val pets: List<String>,
@@ -1745,7 +1743,6 @@ private fun Phone.pickSaid(
             e,
             group,
             lead(e),
-            status,
             "$head ${sentence(cap(lower(whyOf(e, true))))} $status",
             if (several) 0 else t.need,
             m.pets,
@@ -1762,7 +1759,6 @@ private fun Phone.pickSaid(
             e,
             "Gern gefressen, lange nicht gefüttert",
             joined(lead(e), "zuletzt vor ${lapse(v.at, now)}"),
-            status,
             "$head Davor $by${lower(evidenceOf(v))}. $status",
             0,
             v.by,
@@ -1772,7 +1768,7 @@ private fun Phone.pickSaid(
         val first = e.pets[x.pet] ?: return null
         val status = "${petName(m, x.pet, "next")} braucht bei Neuem oft einen zweiten Versuch."
         val was = "beim ersten Mal ${lower(evidenceOf(first))}"
-        return PickSaid(e, status.removeSuffix("."), joined(lead(e), was), status, "$head ${cap(was)}. $status", 0, listOf(x.pet)) {
+        return PickSaid(e, status.removeSuffix("."), joined(lead(e), was), "$head ${cap(was)}. $status", 0, listOf(x.pet)) {
             it.list.take(1)
         }
     }
@@ -1873,19 +1869,13 @@ private fun NextCard(
 private fun BandLabel(
     text: String,
     tone: String?,
-    first: Boolean = false,
     fold: String? = null,
     more: String = "Zeigen",
 ) {
     watch()
     val ui = LocalUi.current
     // a link's tap height stands around the words already
-    val top =
-        when {
-            first -> Space.s2
-            fold != null -> Space.s2
-            else -> Space.s5
-        }
+    val top = if (fold != null) Space.s2 else Space.s5
     Row(Modifier.fillMaxWidth().padding(top = top), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }, verticalAlignment = Alignment.CenterVertically) {
             Swatch(tone)
@@ -2336,10 +2326,11 @@ fun EvaluationPage() {
     val scroll = rememberScrollState()
     val still = reduceMotion
     LaunchedEffect(ph.prefs.activePet) { if (still) scroll.scrollTo(0) else scroll.animateScrollTo(0) }
-    val picks = v.picks.mapNotNull { ph.pickSaid(m, it, c.now) }
     // a test meal at home is fed, one not at home bought
     val test = c.experiment?.let { trialOf(it, c.m) }
-    val bands = ph.bandsOf(v, m, picks.map { it.e.id }.toSet())
+    // its variety stands under Ein Versuch alone, not again as a row to feed or still open
+    val picks = v.picks.filter { it.id != test?.id }.mapNotNull { ph.pickSaid(m, it, c.now) }
+    val bands = ph.bandsOf(v, m, picks.map { it.e.id }.toSet() + listOfNotNull(test?.id))
     val shop = !bands.empty && one?.diary?.n != 0
     val said = if (one != null) ph.saidOf(v.traits, c) else emptyList()
     SheetBody("Vorlieben", ui.sheets, onBack = ui.on("settings-back"), scroll = scroll) {
