@@ -1,12 +1,18 @@
 package de.schmeckts.app
 
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
@@ -110,8 +116,9 @@ class UiTest : ScreenTest() {
         idle(400)
         check((s.pets.values.first() as JsonObject)["r"].asString == "gut", "rated with one tap")
         act("open-evaluation")
+        val buy = shopGroups(phone.derive.model()).nachkaufen.map { it.id }
         check(
-            shopGroups(phone.derive.model()).nachkaufen.size >= 3 && tags("sort-", within = "shop").size >= 3 && inSheet("Nachkaufen"),
+            buy.size >= 3 && tags("sort-", within = "shop").count { it in buy } >= 3,
             "„Vorlieben“ ends on the varieties to buy",
         )
         check(
@@ -386,26 +393,22 @@ class UiShopTest : ScreenTest() {
     }
 
     @Test
-    fun `shop - a level of Vorlieben from the bar, the list shared as derive builds it, a row opens its food sheet over the page`() {
+    fun `shop - Einkaufen is a card of Vorlieben, the list shared as derive builds it, a row opens its food sheet over the page`() {
         demo()
         val want = phone.derive.shoppingList()
         act("open-evaluation")
-        act("open-level", "v" to "shop")
-        val lvl = level
-        act("settings-back")
+        val pid = shopGroups(phone.derive.model()).nachkaufen[0].id
         check(
-            lvl == listOf("evaluation", "shop", null) && level == listOf("evaluation", null, null),
-            "the cart in the bar opens it as a level, back returns to „Vorlieben“ $lvl",
+            level == listOf("evaluation", null, null) && pid in tags("sort-", within = "shop"),
+            "the shopping list is a card of „Vorlieben“, no level of its own $level",
         )
-        act("open-level", "v" to "shop")
         platform.copies = true
         act("share-list")
         check(toast == "Liste kopiert", "without a share menu the list goes to the clipboard")
         platform.copies = false
         act("share-list")
         check(calls("shareText").last() == want.text && calls("shareTitle").last() == want.title, "the share menu gets title and text")
-        val pid = shopGroups(phone.derive.model()).nachkaufen[0].id
-        act("open-product", "id" to pid)
+        tapTag("sort-$pid")
         val over =
             listOf(
                 ui.sheets.base.state
@@ -425,16 +428,20 @@ class UiShopTest : ScreenTest() {
     }
 
     @Test
-    fun `shop folds - what is no longer bought shows its first three at once, the rest behind one tap`() {
+    fun `shop folds - what is no longer bought shows its first three at once, the rest behind one tap, what is open behind its own`() {
         val now = at("2025-06-17T12:00")
         val left = (0 until 5).map { "stehen%04d".format(it) }
+        val meh = (0 until 4).map { "gehtso%04d".format(it) }
         open(
             mapOf(
                 "db" to
                     dbOf(
                         listOf(pet(M)),
-                        (left + "unklar0001").mapIndexed { n, i -> product(i, "Sheba", "Sorte $n") },
+                        (left + meh + "unklar0001").mapIndexed { n, i -> product(i, "Sheba", "Sorte $n") },
                         left.flatMap { i -> (0 until 2).map { n -> meal("$i-$n", i, now - (n + 1) * DAY, mapOf(M to "schlecht")) } } +
+                            meh.flatMap { i ->
+                                (0 until 3).map { n -> meal("$i-$n", i, now - (n + 1) * DAY - 3_600_000L, mapOf(M to "mittel")) }
+                            } +
                             meal("unklar0001-0", "unklar0001", now - DAY, mapOf(M to "mittel")),
                     ),
             ),
@@ -442,14 +449,21 @@ class UiShopTest : ScreenTest() {
         )
         openSheet(
             de.schmeckts.app.ui
-                .SheetState("evaluation", "page" to "shop"),
+                .SheetState("evaluation"),
         )
-        val rows = { (0 until 6).count { inSheet("Sorte $it") } }
+        val rows = { tags("sort-", within = "shop") }
         val shut = rows()
-        act("fold", "v" to "nicht")
+        val links = tags("fold-", within = "shop") to inSheet("Alle fünf zeigen")
+        act("fold", "v" to "shop:nicht")
+        val stop = rows()
+        act("fold", "v" to "shop:offen")
         check(
-            listOf(shut, rows()) == listOf(4, 6) && !shows("Alle 1 zeigen"),
-            "three at once, the rest after a tap; a short list has nothing to unfold ${listOf(shut, rows())}",
+            listOf(shut, stop).map { l -> l.count { it in left } } == listOf(3, 5) && "unklar0001" !in stop && "unklar0001" in rows(),
+            "three at once, the rest after a tap, what is still open behind its own ${listOf(shut, stop)}",
+        )
+        check(
+            meh.all { it in shut } && links == (listOf("shop:nicht", "shop:offen") to true),
+            "a band of four has nothing to unfold $links",
         )
     }
 
@@ -469,7 +483,10 @@ class UiShopTest : ScreenTest() {
         )
         check(shows("Nachkaufen") && shows("Huhn"), "the card on the home page names it")
         act("open-evaluation")
-        check(labelled("Einkaufen"), "the page leads to the shopping list")
+        check(
+            inSheet("Einkaufen") && tags("sort-", sheet = true) == listOf("trocken0001") && tags("sort-", within = "shop").isNotEmpty(),
+            "the page leads to the shopping list",
+        )
     }
 }
 
@@ -650,34 +667,48 @@ class UiEvaluationTest : ScreenTest() {
         idle()
     }
 
+    // where the first node that matches starts on its page, scrolled out of view or not
+    private fun top(m: SemanticsMatcher) =
+        rule
+            .onAllNodes(m, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .first()
+            .positionInRoot.y
+
+    // Mau's first three weeks as the household fixture has them, an hour after the last meal
+    private fun mau() {
+        val diary = fixture("household/mau.json")
+        open(mapOf("db" to diary), tidy(diary).servings.maxOf { it.servedAt } + 3_600_000L)
+    }
+
     @Test
-    fun `evaluation - the card shows what goes down well and what is left, a row opens its sheet, the page has levels`() {
+    fun `evaluation - the card shows two lines and what to feed next, a row opens its sheet, the page every variety to buy`() {
         open()
         act("demo")
-        val tops = tags("pick-", within = "sec-evaluation")
-        val r = phone.derive.rankingModel()
-        check(tops.isNotEmpty() && tops.size <= 4 && tops.first() == r.top.firstOrNull()?.id, "two sides of at most two rows $tops")
+        val lines = tags("card-trait-", within = "sec-evaluation")
+        val pick = tags("pick-", within = "sec-evaluation")
+        val first =
+            phone.derive
+                .vorliebenModel()
+                .picks
+                .firstOrNull()
+                ?.id
         check(
-            tags("medal-", within = "sec-evaluation") ==
-                listOfNotNull(if (r.top.isNotEmpty()) "good" else null, if (r.flop.isNotEmpty()) "bad" else null),
-            "the best crowned and the worst with its bowl",
+            lines.size in 1..2 && first != null && pick == listOf(first) && tags("medal-").isEmpty(),
+            "two lines at most, the first variety to feed next, no medals $lines $pick",
         )
-        act("open-product", "id" to tops[0])
-        check(sheet?.kind == "product" && sheet?.id == tops[0], "a row opens its food sheet")
+        tapTag("pick-$first")
+        check(sheet?.kind == "product" && sheet?.id == first, "a row opens its food sheet")
         act("close")
         act("open-evaluation")
-        val ranked = tags("place-", sheet = true)
-        val names = ranked.mapNotNull { phone.derive.getProduct(it)?.let(::pname) }
-        val m = phone.derive.model()
-        check(
-            names.isNotEmpty() &&
-                names.none { n ->
-                    shows("${db.pets[0].str("name")} ist wählerisch: $n")
-                },
-            "the portrait names none of the varieties the lists below show",
-        )
-        check(ranked.isNotEmpty() && m.pets.isNotEmpty(), "every row of a longer list shows its place")
-        check(inSheet("Tops") && inSheet("Flops"), "Tops and Flops, the titles plain words")
+        val favourites = favourites(phone.derive.rankingModel()).map { it.id }
+        tapTag("trait-liebling")
+        check(favourites.size > 2 && tags("proof-", sheet = true) == favourites, "the favourites line opens on the favourites")
+        unfold()
+        val shown = tags("sort-", within = "shop") + tags("next-", within = "next")
+        val g = shopGroups(phone.derive.model())
+        val all = (g.nachkaufen + g.geht + g.nicht + g.neu).map { it.id }
+        check(all.all { it in shown }, "every variety of Einkaufen in its card or under Als Nächstes ${all - shown.toSet()}")
     }
 
     @Test
@@ -705,8 +736,11 @@ class UiEvaluationTest : ScreenTest() {
         val found = insights(db, phone.derive.model(), Time.now())
         val kinds = found.map { it.kind }
         check(kinds == listOf("konsistenz", "sosse", "tageszeit", "snack"), "four findings $kinds")
+        val label = top(hasText("Beim Füttern"))
         check(
-            tags("trait-", sheet = true).filter { it in kinds } == kinds && inSheet("Beim Füttern"),
+            tags("trait-", sheet = true).filter { it in kinds } == kinds &&
+                top(hasTestTag("trait-sosse")) < label &&
+                label < top(hasTestTag("trait-tageszeit")),
             "every finding a line of the Steckbrief, buying before „Beim Füttern“",
         )
         check(
@@ -717,7 +751,7 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
-    fun `candidate - no Top yet, the card names the variety closest to it, which Als Naechstes then leaves out`() {
+    fun `candidate - no favourite yet, the card names the variety one good meal from the list, the page every trial`() {
         val now = at("2025-06-17T12:00")
         val rated =
             listOf(
@@ -739,23 +773,26 @@ class UiEvaluationTest : ScreenTest() {
             }
         open(dbFile(listOf(pet(M)), products, meals), now)
         check(
-            tags("pick-", within = "sec-evaluation") == listOf("naechste1", "ladenhueter"),
-            "the closest variety stands under „Tops“, then the Flops",
-        )
-        check(
-            shows("Sheba, noch 1× bewerten") &&
-                shows("Sheba, 2 von 3 Mal fast nix gefressen") &&
-                tags("medal-", within = "sec-evaluation") == listOf("bad"),
-            "with what it lacks, uncrowned",
+            tags("pick-", within = "sec-evaluation") == listOf("naechste1") &&
+                within("sec-evaluation", "dann kommt sie auf die Einkaufsliste") &&
+                tags("medal-").isEmpty(),
+            "the card names the variety one good meal from the shopping list",
         )
         act("open-evaluation")
+        val band = top(hasText("Nicht mehr kaufen") and hasAnyAncestor(hasTestTag("shop")))
         check(
-            inSheet("Auf gutem Weg") && inSheet("Naechste2") && tags("place-", sheet = true) == listOf("ladenhueter"),
-            "its card names it before the Flops, „Als Nächstes“ only the others",
+            tags("next-", within = "next") == listOf("naechste1", "naechste2") &&
+                within("trait-liebling", "Noch keine") &&
+                tags("sort-", within = "shop") == listOf("ladenhueter") &&
+                top(hasTestTag("sort-ladenhueter")) > band,
+            "Als Nächstes holds both trials, no favourite yet, what is left under Nicht mehr kaufen",
         )
         act("settings-back")
         load(products.take(1), meals.take(3))
-        check(!shows("Tops") && shows("Flops"), "nothing that goes down well: only what is left")
+        check(
+            tags("pick-", within = "sec-evaluation").isEmpty() && tags("card-trait-", within = "sec-evaluation").all { it == "stehen" },
+            "nothing that goes down well: only what is left",
+        )
     }
 
     @Test
@@ -830,15 +867,15 @@ class UiEvaluationTest : ScreenTest() {
             }
         load(two, byWho)
         act("open-evaluation")
-        val card =
-            inSheet("Bei Anna kommen dieselben Sorten besser an als bei Jonas.") &&
-                inSheet("Bei Anna 14 von 14 Mal gut gefressen, bei Jonas 4 von 14 Mal.")
+        val line =
+            within("trait-feeder", "Frisst bei Anna besser als bei Jonas") &&
+                within("trait-feeder", "Von Anna gefüttert: ${times(14, 14)} gut gefressen")
         act("settings-back")
         load(two, byWho.map { it + ("by" to "Anna") })
         act("open-evaluation")
         check(
-            card && !inSheet("dieselben Sorten"),
-            "who serves among the insights where several people feed and one clearly does better, never with one person",
+            line && tags("trait-feeder", sheet = true).isEmpty(),
+            "who serves is a line of the Steckbrief where several people feed and one clearly does better, never with one person",
         )
     }
 
@@ -883,6 +920,188 @@ class UiEvaluationTest : ScreenTest() {
         act("open-serving", "id" to "meal000000")
         act("rate", "s" to "meal000000", "p" to M, "r" to "normal")
         check(until(5000) { sheet == null }, "the last open pet rated: the sheet closes by itself")
+    }
+
+    @Test
+    fun `Vorlieben - Fuettern on a row serves that variety, lands on home, undo takes it back`() {
+        open()
+        act("demo")
+        act("open-evaluation")
+        val id = tags("feed-", within = "next").first()
+        val before = db.servings.size
+        tapTag("feed-$id")
+        idle(400)
+        val made = db.servings[0].id
+        val served = listOf(db.servings.size - before, db.servings[0].str("productId"), sheet?.kind, toast != null)
+        act("undo")
+        idle(400)
+        check(served == listOf(1, id, null, true), "served at once, the page closed, a toast to undo it $served")
+        check(db.servings.size == before && db.servings.none { it.id == made } && sheet == null, "undo takes the meal back")
+    }
+
+    @Test
+    fun `Vorlieben - Alle vier nicht mehr kaufen sets the whole line at once, one undo restores each choice`() {
+        mau()
+        val pack =
+            phone.derive
+                .vorliebenModel()
+                .traits
+                .first { it.kind == "pack" }
+                .pack!!
+        val ids = pack.sorts.map { it.id }
+        val kaufen = { ids.map { phone.derive.getProduct(it)?.str("kaufen") } }
+        phone.derive.getProduct(ids.last())!!.put("kaufen", "nicht")
+        phone.store.save()
+        ui.update()
+        idle()
+        val was = kaufen()
+        act("open-evaluation")
+        tapTag("stop-${pack.brand}")
+        idle(400)
+        val set = kaufen()
+        val stop = shopGroups(phone.derive.model()).nicht.map { it.id }
+        val told = toast != null && tags("stop-", sheet = true).isEmpty() && within("trait-pack-${pack.brand}", "Von dir gestrichen")
+        val folds = "shop:nicht" in tags("fold-", within = "shop")
+        act("undo")
+        idle(400)
+        check(ids.size == 4 && set.all { it == "nicht" } && stop.containsAll(ids), "the whole line no longer bought $set")
+        check(told && folds, "the button gives way to the line saying so, the band grows and folds")
+        check(
+            was.last() == "nicht" && kaufen() == was && tags("stop-", sheet = true) == listOf(pack.brand),
+            "one undo restores each choice, the one made before stays ${kaufen()}",
+        )
+    }
+
+    private fun pageScroll() =
+        rule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+                hasAnyAncestor(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "evaluation")),
+            useUnmergedTree = true,
+        )[0]
+
+    @Test
+    fun `Vorlieben - the cat chips switch the page and home, a second tap never opens the pet`() {
+        open()
+        act("demo")
+        val mau = db.pets[0].id
+        val tiger = secondCat()
+        check(
+            prefs.activePet == "all" && tags("card-cat-", within = "sec-evaluation") == listOf(mau, tiger),
+            "in „Alle“ the home card has a line for each cat",
+        )
+        tapTag("card-cat-$tiger")
+        val opened = listOf(level, prefs.activePet, tags("profile", sheet = true).size)
+        tapTag("chip-all")
+        val all = listOf(prefs.activePet, tags("cat-", sheet = true), tags("profile", sheet = true).size)
+        rule.onAllNodes(hasTestTag("shop"), useUnmergedTree = true)[0].performScrollTo()
+        val down = pageScroll().fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        rule.onAllNodes(hasTestTag("chip-$mau"), useUnmergedTree = true)[0].performSemanticsAction(SemanticsActions.OnClick)
+        idle(400)
+        val up = pageScroll().fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        tapTag("chip-$mau")
+        check(
+            opened == listOf(listOf("evaluation", null, null), tiger, 1),
+            "a cat's line on home opens the page for that cat $opened",
+        )
+        check(all == listOf("all", listOf(mau, tiger), 0), "„Alle“ shows each cat in short $all")
+        check(down > 0f && up == 0f && prefs.activePet == mau, "another cat starts the page at its top $down $up")
+        check(level == listOf("evaluation", null, null), "a second tap on the chosen cat opens nothing $level")
+        act("settings-back")
+        check(
+            tags("card-cat-", within = "sec-evaluation").isEmpty() && tags("card-trait-", within = "sec-evaluation").isNotEmpty(),
+            "home shows the cat chosen on the page",
+        )
+    }
+
+    @Test
+    fun `Vorlieben - a line opens its proof, the proof's rows open their sheets, back returns to the opened page`() {
+        mau()
+        val traits = phone.derive.vorliebenModel().traits
+        val pack = traits.first { it.kind == "pack" }.pack!!
+        val texture = traits.first { it.kind == "konsistenz" }.insight!!
+        val favourite = favourites(phone.derive.rankingModel()).single()
+        act("open-evaluation")
+        val shut = tags("proof-", sheet = true)
+        tapTag("trait-pack-${pack.brand}")
+        val proof = tags("proof-", sheet = true)
+        tapTag("proof-${proof[0]}")
+        val over =
+            listOf(
+                ui.sheets.base.state
+                    ?.kind,
+                level,
+                sheet?.id,
+            )
+        back()
+        idle(400)
+        val kept = listOf(level, tags("proof-", sheet = true))
+        tapTag("trait-pack-${pack.brand}")
+        val closed = tags("proof-", sheet = true)
+        tapTag("trait-konsistenz")
+        val rows = tags("proof-", sheet = true)
+        check(shut.isEmpty() && proof.sorted() == pack.sorts.map { it.id }.sorted(), "a line opens the varieties it rests on $proof")
+        check(over == listOf("evaluation", listOf("product", null, null), proof[0]), "a row opens its sheet over the page $over")
+        check(kept == listOf(listOf("evaluation", null, null), proof), "back returns to the page, its proof still open $kept")
+        check(closed.isEmpty() && rows.sorted() == texture.sorts.map { it.id }.sorted(), "a second tap folds it, another opens $rows")
+        tapTag("trait-liebling")
+        check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
+    }
+
+    @Test
+    fun `Vorlieben - every list folds open completely, nothing is dropped`() {
+        mau()
+        act("open-evaluation")
+        val v = phone.derive.vorliebenModel()
+        val picks = v.picks.map { it.id }
+        val g = v.shop
+        val next = { tags("next-", within = "next").filter { it != "versuch" } }
+        val shut = next() to tags("sort-", within = "shop")
+        unfold()
+        val rows = tags("sort-", within = "shop")
+        val bands = (g.nachkaufen + g.geht + g.nicht + g.neu.filter { it.id !in picks }).map { it.id }
+        check(picks.size >= 5 && shut.first.size == 3 && next() == picks, "Als Nächstes shows three, then every one in order ${next()}")
+        check(shut.second.size < rows.size && rows.sorted() == bands.sorted(), "Einkaufen shows every variety of its bands once opened")
+    }
+
+    @Test
+    fun `Vorlieben - no percent sign, and no variety twice except a long unfed favourite`() {
+        mau()
+        act("open-evaluation")
+        unfold()
+        val percent = "%" in screenText()
+        act("settings-back")
+        val now = clock
+        val rated =
+            listOf(
+                "lachs" to listOf(50, 51, 52).map { it to "top" },
+                "huhn" to listOf(2, 3).map { it to "top" },
+                "rind" to listOf(4, 5).map { it to "schlecht" },
+                "pute" to listOf(6, 7, 8).map { it to "mittel" },
+                "ente" to listOf(9 to "mittel"),
+            )
+        load(
+            rated.map { (i, _) -> product("${i}00001", "Sheba", i.replaceFirstChar { it.uppercase() }) },
+            rated.flatMap { (i, l) -> l.map { (d, r) -> meal("$i$d-0001", "${i}00001", now - d * DAY, mapOf(M to r)) } },
+        )
+        act("open-evaluation")
+        unfold()
+        val rows = tags("next-", within = "next").filter { it != "versuch" } + tags("sort-", within = "shop")
+        val twice =
+            rows
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
+        check(!percent && "%" !in screenText(), "no percent sign")
+        check(rows.size == 6 && twice == setOf("lachs00001"), "each variety once, a favourite long unfed also under Als Nächstes $rows")
+    }
+
+    @Test
+    fun `home - the Vorlieben card stands above the history`() {
+        open()
+        act("demo")
+        val order = tags("sec-")
+        check(order.indexOf("evaluation") in 0 until order.indexOf("hist"), "the card before the history $order")
     }
 }
 
@@ -948,6 +1167,10 @@ class UiNarrowTest : ScreenTest() {
             act(a)
             idle(400)
             look(a)
+            if (a == "open-evaluation") {
+                unfold()
+                look("$a, all of it")
+            }
             if (a != "feed") closed()
         }
         act("new-product")
@@ -980,6 +1203,13 @@ class UiNarrowTest : ScreenTest() {
             look(m)
             closed()
         }
+        secondCat()
+        look("home, two cats")
+        act("open-evaluation")
+        look("Alle")
+        unfold()
+        look("Alle, all of it")
+        closed()
         check(meals.size >= 3 && found.isEmpty(), "nothing cut${if (big) " with a large font" else ""}, with all three scales $found")
     }
 
