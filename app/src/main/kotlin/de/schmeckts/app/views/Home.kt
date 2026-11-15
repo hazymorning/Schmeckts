@@ -28,8 +28,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -53,6 +55,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -66,9 +69,11 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
@@ -137,6 +142,7 @@ import de.schmeckts.app.ui.shadowHigh
 import de.schmeckts.app.ui.shadowLow
 import de.schmeckts.app.ui.watch
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Size as Area
 
 // The home page: the header, the pets, the cards and the feeding button
@@ -1105,7 +1111,7 @@ private fun face(
         if (flips) side(!back) else null,
         when {
             tear -> "Zum Abreißen tippen"
-            hanging -> "Zum Umdrehen tippen"
+            flips -> "Zum Umdrehen tippen"
             else -> null
         },
     )
@@ -1129,9 +1135,28 @@ private fun CalPad() {
     val day = hangingDay(if (stored == null || stored > today) today else stored, now)
     val p = colors
     val shade = p.paperShade
+    val still = reduceMotion
+    val scope = rememberCoroutineScope()
+    // the pad's height: it grows with a taller sheet at once and shrinks to a shorter one slowly, so once a sheet is
+    // torn off the cards below move up instead of jumping
+    val room = remember { Animatable(0f) }
     Box(
         Modifier
             .fillMaxWidth()
+            .layout { m, c ->
+                val h = m.maxIntrinsicHeight(c.maxWidth)
+                if (h.toFloat() != room.targetValue) {
+                    scope.launch {
+                        val to = h.toFloat()
+                        if (still || to > room.value) room.snapTo(to) else room.animateTo(to, tween(Motion.STEP, easing = Motion.easeOut))
+                    }
+                }
+                val shown = if (still) h else maxOf(h, room.value.roundToInt())
+                val pad = m.measure(c.copy(minHeight = shown, maxHeight = shown))
+                layout(pad.width, pad.height) { pad.place(0, 0) }
+            }
+            // a sheet left hanging and today's under it are as tall as the taller one, as on a real pad
+            .height(IntrinsicSize.Max)
             .drawBehind {
                 // six sheet edges under the pad
                 val edge = Space.s3.toPx()
@@ -1199,14 +1224,17 @@ private fun CalTop() {
             .height(Space.s2 + Space.s3)
             .drawBehind {
                 val torn = Space.s1.toPx()
-                val h = size.height - torn
-                val k = h / 14f
-                val tile = 300f * k
+                val k = (size.height - torn) / 14f
+                // the tiles in one path, so no seam shows where two meet
+                val edge = Path()
                 var x = 0f
                 while (x < size.width) {
-                    translate(x, torn + 1.dp.toPx()) { drawPath(tornPath.scaled(k), p.paperShade) }
-                    translate(x, torn) { drawPath(tornPath.scaled(k), p.paperTorn) }
-                    x += tile
+                    edge.addPath(tornPath.scaled(k), Offset(x, 0f))
+                    x += 300f * k
+                }
+                clipRect {
+                    translate(0f, torn + 1.dp.toPx()) { drawPath(edge, p.paperShade) }
+                    translate(0f, torn) { drawPath(edge, p.paperTorn) }
                 }
                 val r = Radius.paperTop.toPx()
                 drawRoundRect(
@@ -1246,7 +1274,7 @@ private fun Tearable(old: Face) {
         }
     }
     Box(
-        Modifier.graphicsLayer {
+        Modifier.fillMaxHeight().graphicsLayer {
             val f = fall.value
             transformOrigin = TransformOrigin(0.85f, 0f)
             if (f < 0.18f) {
@@ -1258,7 +1286,8 @@ private fun Tearable(old: Face) {
                 translationX = -18.dp.toPx() * g
                 translationY = 3.dp.toPx() + (size.height * 1.2f - 3.dp.toPx()) * g
                 rotationZ = -2.5f - 8.5f * g
-                alpha = 1f - g
+                // mostly gone before it lies over the text of the card below
+                alpha = (1f - g) * (1f - g)
             }
         },
     ) { CalSheet(old, if (ui.home.tearing) null else ui.on(old.action)) }
@@ -1295,8 +1324,11 @@ private fun CalSheet(
     Column(
         Modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .graphicsLayer {
-                rotationY = 90f * turn.value
+                // turned over the binding, as a calendar sheet is
+                transformOrigin = TransformOrigin(0.5f, 0f)
+                rotationX = 90f * turn.value
                 cameraDistance = 600.dp.toPx() / density * 8
             }.then(if (onClick != null) Modifier.press(onClick, Motion.PRESS_WIDE, label = c.label) else Modifier)
             .drawWithContent {
@@ -1368,6 +1400,8 @@ private fun CalSheet(
     }
 }
 
+private const val STAMP_SCALE = 0.8f
+
 // the rubric, pressed on a little askew in worn ink: a heavy frame and a fine one inside it
 @Composable
 private fun Stamp(text: String) {
@@ -1377,10 +1411,16 @@ private fun Stamp(text: String) {
         text.uppercase(),
         Type.captionStrong.copy(letterSpacing = Type.TRACK_STAMP.em),
         Modifier
-            .graphicsLayer {
+            .layout { m, c ->
+                // as wide as it is drawn, so the date has the room the scale leaves
+                val stamp = m.measure(c.copy(minWidth = 0, minHeight = 0))
+                val w = (stamp.width * STAMP_SCALE).roundToInt()
+                val h = (stamp.height * STAMP_SCALE).roundToInt()
+                layout(w, h) { stamp.place(w - stamp.width, (h - stamp.height) / 2) }
+            }.graphicsLayer {
                 rotationZ = -4f
-                scaleX = 0.8f
-                scaleY = 0.8f
+                scaleX = STAMP_SCALE
+                scaleY = STAMP_SCALE
                 transformOrigin = TransformOrigin(1f, 0.5f)
             }.border(Size.stroke, p.paperMuted, RoundedCornerShape(Radius.stamp))
             .padding(Space.hair)

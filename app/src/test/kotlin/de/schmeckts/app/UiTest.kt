@@ -17,6 +17,8 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import de.schmeckts.app.ui.Size
+import de.schmeckts.app.ui.Space
 import de.schmeckts.app.ui.plainOf
 import de.schmeckts.app.views.catOf
 import de.schmeckts.app.views.sheetOn
@@ -2356,6 +2358,26 @@ class UiCalendarTest : ScreenTest() {
 
     private fun cal(s: String) = within("sec-cal", s)
 
+    private fun height(m: SemanticsMatcher) =
+        rule
+            .onAllNodes(m, useUnmergedTree = true)[0]
+            .fetchSemanticsNode()
+            .size.height
+
+    // the strip left of the foot's words, where its icon sits, holds more than the paper's colour
+    private fun footIcon(words: String): Boolean {
+        val pad = rule.onNode(hasTestTag("sec-cal"), useUnmergedTree = true).performScrollTo()
+        val image = pad.captureToImage().asAndroidBitmap()
+        val at = pad.fetchSemanticsNode().boundsInRoot
+        val t = rule.onAllNodes(hasText(words), useUnmergedTree = true)[0].fetchSemanticsNode().boundsInRoot
+        val icon = rule.density.run { (Size.iconS + Space.s2).toPx() }
+        val colours = HashSet<Int>()
+        for (x in (t.left - at.left - icon).toInt() until (t.left - at.left).toInt()) {
+            for (y in (t.top - at.top).toInt() until (t.bottom - at.top).toInt()) colours.add(image.getPixel(x, y))
+        }
+        return colours.size > 1
+    }
+
     @Test
     fun `calendar - a format a weekday, a sheet a day, the last one seen hanging over today's until torn off`() {
         open(now = at("2026-09-28T12:00")) // a Monday, the calendar's first day on this phone
@@ -2436,6 +2458,7 @@ class UiCalendarTest : ScreenTest() {
             cal("WARUM?") && answered && !cal("${friday.verdict}.") && labelled("Auflösung zeigen"),
             "today’s Warum? turns to its answer and back to the question",
         )
+        check(cal("Zum Umdrehen tippen") && footIcon("Zum Umdrehen tippen"), "its foot says it turns, its icon beside the words")
         day("2026-10-03T08:00") // Saturday, the answer not looked at
         check(
             cal("Freitag, 2. Oktober") && cal("Zum Umdrehen tippen") && !labelled("Gestriges Blatt abreißen"),
@@ -2472,6 +2495,48 @@ class UiCalendarTest : ScreenTest() {
             tuesday.back!!.length > tuesday.text.length + 43 && cal("${tuesday.verdict}.") && height() == front,
             "an answer a line longer than its claim, the sheet as tall as before: $front, ${height()}",
         )
+    }
+
+    @Test
+    fun `calendar - a short sheet left hanging is as tall as today's, so it covers it whole`() {
+        open(now = at("2026-10-05T12:00")) // a Monday, its Katzenlogik shorter than Tuesday's Stimmt’s?
+        act("demo")
+        day("2026-10-06T08:00")
+        val pad = height(hasTestTag("sec-cal"))
+        val hanging = height(hasContentDescription("Gestriges Blatt abreißen"))
+        act("tear")
+        val today = height(hasContentDescription("Auflösung zeigen"))
+        check(hanging == pad && today == pad, "the sheet left hanging, the pad, today’s sheet alone: $hanging, $pad, $today")
+    }
+
+    @Test
+    fun `calendar - once a taller sheet is torn off, the cards below slide up and do not jump`() {
+        open(now = at("2026-09-29T12:00"), reduce = false) // a Tuesday
+        act("demo")
+        idle(2000)
+        act("turn")
+        idle(1000)
+        day("2026-09-30T12:00") // its answer, with a foot, hangs over Wednesday’s Kurios
+        idle(1000)
+        val below = tags("sec-").let { it[it.indexOf("cal") + 1] }
+
+        fun top() =
+            rule
+                .onNode(hasTestTag("sec-$below"), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .positionInRoot.y
+        rule.mainClock.autoAdvance = false
+        ui.act("tear")
+        val tops = mutableListOf(top())
+        repeat(70) {
+            rule.mainClock.advanceTimeBy(16)
+            tops.add(top())
+        }
+        rule.mainClock.autoAdvance = true
+        idle(500)
+        val moved = tops.first() - tops.last()
+        val step = tops.zipWithNext { a, b -> a - b }.max()
+        check(!cal("Dienstag, 29. September") && moved > 0 && step < moved / 3, "up by $moved, at most $step a frame")
     }
 
     @Test
