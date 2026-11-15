@@ -141,11 +141,13 @@ fun rememberTyped(
     return t
 }
 
-/** fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets;
+/** fresh: the entry just made; arriving: where its row has yet to open, once each ("pend:<id>", "hist:<id>");
+ held: rated meals kept in the card a moment longer, with their pets;
  leaving: meals on their way out of it; turned: the Stimmt’s? sheet showing its back; filled: the feeding button's
  bowl fills, once per serving */
 class HomeState {
     var fresh by mutableStateOf<String?>(null)
+    val arriving = HashSet<String>()
     val held = HashMap<String, MutableSet<String>>()
     val leaving = mutableStateMapOf<String, () -> Unit>()
     var turned by mutableStateOf<String?>(null)
@@ -158,4 +160,10 @@ class HomeState {
     var kept: String? = null
     val tops = HashMap<String, Float>()
     var scroll: androidx.compose.foundation.ScrollState? = null
+
+    fun made(id: String) {
+        fresh = id
+        arriving.clear()
+        arriving += listOf("pend:$id", "hist:$id")
+    }
 }

@@ -40,7 +40,7 @@ class Observations(
         db.observations.add(0, o)
         save()
         haptic("success")
-        ui.home.fresh = o.id
+        ui.home.made(o.id)
         update()
         val seen = observationOf(kind)
         val said = if (db.pets.size > 1) seen.said.replace("Notiert", "Notiert bei ${ph.whoObserved(ids)}") else seen.said

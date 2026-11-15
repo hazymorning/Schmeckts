@@ -1,6 +1,7 @@
 package de.schmeckts.app.views
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -50,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,7 +82,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.zIndex
 import de.schmeckts.app.DEMO
-import de.schmeckts.app.Model
 import de.schmeckts.app.NEWS
 import de.schmeckts.app.R
 import de.schmeckts.app.RATINGS
@@ -474,7 +475,7 @@ private fun ColumnScope.HomeContent() {
         Gap(Space.s2)
     }
     Optional(pend.isNotEmpty()) {
-        Arrive(n, "pend") { Pending(pend.ifEmpty { lastPend }) }
+        Arrive(n, "pend", rise = false) { Pending(pend.ifEmpty { lastPend }) }
         Gap(Space.s4)
     }
     if (pend.isNotEmpty()) n++
@@ -491,13 +492,18 @@ private fun ColumnScope.HomeContent() {
             updateShown(ui) -> Ask("update")
             remindShown(ui) -> Ask("remind")
             newsShown(ui) -> Ask("news")
-            m.hints.isNotEmpty() -> Ask(hintKey(m.hints[0]), m.hints[0])
+            m.hints.isNotEmpty() -> m.hints[0].let { Ask(hintKey(it), it, it.id?.let(m.byId::get)) }
             else -> null
         }
+    // what each card last asked, so one on its way out still shows it
+    val asked = remember { HashMap<String, Ask>() }
     val lastAsk = remember { arrayOfNulls<Ask>(1) }
-    if (ask != null) lastAsk[0] = ask
+    if (ask != null) {
+        asked[ask.key] = ask
+        lastAsk[0] = ask
+    }
     Optional(ask != null) {
-        Arrive(n, "question") { (ask ?: lastAsk[0])?.let { Question(it, m) } }
+        Arrive(n, "question", rise = false) { (ask ?: lastAsk[0])?.let { Question(it, asked) } }
         Gap(Space.s4)
     }
     if (ask != null) n++
@@ -513,10 +519,11 @@ private fun ColumnScope.HomeContent() {
     }
 }
 
-/** the one card that asks: a new version, the reminder, news or a hint, by its key */
+/** the one card that asks: a new version, the reminder, news or a hint with its variety, by its key */
 private class Ask(
     val key: String,
     val hint: de.schmeckts.app.Hint? = null,
+    val sort: de.schmeckts.app.Sort? = null,
 )
 
 // a card that comes or goes makes room or closes the gap, rather than the page jumping
@@ -547,46 +554,45 @@ private fun ColumnScope.Optional(
 @Composable
 private fun Question(
     ask: Ask,
-    m: Model,
+    asked: Map<String, Ask>,
 ) {
     val still = reduceMotion
-    AnimatedContent(
-        ask,
-        transitionSpec = {
-            if (still) {
-                ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
-            } else {
-                fadeIn(tween(Motion.FADE)) togetherWith fadeOut(tween(Motion.FADE)) using
-                    SizeTransform { _, _ -> tween(Motion.STEP, easing = Motion.easeOut) }
-            }
-        },
-        contentKey = { it.key },
-        label = "question",
-    ) { a ->
-        when (a.key) {
+    AnimatedContent(ask.key, transitionSpec = { swap(still) }, label = "question") { k ->
+        val a = if (k == ask.key) ask else asked[k]
+        when (k) {
             "update" -> UpdateCard()
             "remind" -> RemindCard()
             "news" -> NewsCard()
-            else -> a.hint?.let { HintCard(m, it) }
+            else -> a?.hint?.let { HintCard(it, a.sort) }
         }
     }
 }
 
-// the cards rise in turn as the splash fades; one that comes later is simply there
+// one content gives way to another in place, the card taking the new one's height
+private fun AnimatedContentTransitionScope<*>.swap(still: Boolean) =
+    if (still) {
+        ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
+    } else {
+        fadeIn(tween(Motion.FADE)) togetherWith fadeOut(tween(Motion.FADE)) using
+            SizeTransform { _, _ -> tween(Motion.STEP, easing = Motion.easeOut) }
+    }
+
+// the cards rise in turn as the splash fades, and one that comes later rises too, unless it opens its own room (rise)
 @Composable
 private fun Arrive(
     i: Int,
     sec: String,
     z: Float = 0f,
+    rise: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     watch()
     val ui = LocalUi.current
     val still = reduceMotion
     val splash = remember { !ui.arrive }
-    val f = remember { Animatable(1f) }
+    val f = remember { Animatable(if (rise && ui.arrive && !still) 0f else 1f) }
     LaunchedEffect(ui.arrive) {
-        if (ui.arrive && splash && !still) {
+        if (ui.arrive && (splash || rise) && !still) {
             f.snapTo(0f)
             f.animateTo(1f, tween(Motion.STEP, Motion.STAGGER * minOf(i, 3), Motion.easeOut))
         } else {
@@ -702,23 +708,25 @@ private fun Pending(list: List<Rec>) {
     Card {
         CardTitle("Wie war’s?")
         list.forEachIndexed { i, s ->
-            Leaving(s.id) {
-                val scope = androidx.compose.runtime.rememberCoroutineScope()
-                Column(
-                    Modifier
-                        .testTag("pend-${s.id}")
-                        .onGloballyPositioned { c ->
-                            // a rating changes the text above its row; to the eye the row stays where it was
-                            val top = c.positionInRoot().y
-                            val was = ui.home.tops.put(s.id, top)
-                            if (ui.home.kept == s.id && was != null && kotlin.math.abs(top - was) > 0.5f) {
-                                ui.home.kept = null
-                                scope.launch { ui.home.scroll?.scrollBy(top - was) }
-                            }
-                        },
-                ) {
-                    if (i > 0) Divider(Size.picL + Space.s3)
-                    PendItem(s)
+            key(s.id) {
+                Leaving(s.id) {
+                    val scope = androidx.compose.runtime.rememberCoroutineScope()
+                    Column(
+                        Modifier
+                            .testTag("pend-${s.id}")
+                            .onGloballyPositioned { c ->
+                                // a rating changes the text above its row; to the eye the row stays where it was
+                                val top = c.positionInRoot().y
+                                val was = ui.home.tops.put(s.id, top)
+                                if (ui.home.kept == s.id && was != null && kotlin.math.abs(top - was) > 0.5f) {
+                                    ui.home.kept = null
+                                    scope.launch { ui.home.scroll?.scrollBy(top - was) }
+                                }
+                            },
+                    ) {
+                        if (i > 0) Divider(Size.picL + Space.s3)
+                        PendItem(s)
+                    }
                 }
             }
         }
@@ -735,7 +743,7 @@ private fun Leaving(
     val ui = LocalUi.current
     val gone = ui.home.leaving[id]
     val still = reduceMotion
-    val state = remember(id) { MutableTransitionState(still || ui.home.fresh != id).apply { targetState = true } }
+    val state = remember(id) { MutableTransitionState(!ui.home.arriving.remove("pend:$id") || still).apply { targetState = true } }
     if (gone != null) state.targetState = false
     LaunchedEffect(state.isIdle, state.currentState) {
         if (!state.currentState && state.isIdle) {
@@ -857,14 +865,13 @@ private val HINT_TITLES =
 
 @Composable
 private fun HintCard(
-    m: Model,
     h: de.schmeckts.app.Hint,
+    e: de.schmeckts.app.Sort?,
 ) {
     watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
-    val e = h.id?.let { m.byId[it] }
     val pet = h.pet?.let { d.getPet(it) }
     val hide: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit = {
         RowBtn("Ausblenden", BtnKind.SOFT, onClick = ui.on("hide-hint", "v" to hintKey(h)))
@@ -1008,20 +1015,35 @@ private fun History() {
     val day = if (days.getValue(today).isNotEmpty() || seen.getValue(today).isNotEmpty()) today else yesterday
     val shown = diary(days.getValue(day), seen.getValue(day))
     val multiHouse = ph.db.pets.size > 1 && ph.prefs.activePet == "all"
+    val fed = recent.isNotEmpty() || ph.db.servings.any { d.servingPets(it).isNotEmpty() }
+    // the day on its way out keeps what it showed; the first entry of a new day comes in with it, not opening a place too
+    val last = remember { HashMap<String, List<Rec>>() }
+    val was = remember { arrayOf(day) }
+    if (was[0] != day) {
+        was[0] = day
+        ui.home.arriving.removeAll { it.startsWith("hist:") }
+    }
+    last[day] = shown
+    val still = reduceMotion
     Calendar(recent, week = true)
-    if (shown.isNotEmpty()) {
-        for (g in dayGroups(shown)) {
-            DayLine(g)
-            DayItems(g, multiHouse, plain = true)
+    AnimatedContent(day, transitionSpec = { swap(still) }, label = "history") { k ->
+        val list = if (k == day) shown else last[k].orEmpty()
+        Column {
+            if (list.isNotEmpty()) {
+                for (g in dayGroups(list)) {
+                    DayLine(g)
+                    DayItems(g, multiHouse, plain = true)
+                }
+            } else if (fed) {
+                de.schmeckts.app.ui
+                    .Hint("Heute noch nicht gefüttert, der Napf langweilt sich.", Modifier.padding(top = Space.hair))
+            } else {
+                de.schmeckts.app.ui.Empty(
+                    "Noch nichts eingetragen, der Napf wartet auf seine Premiere.",
+                    modifier = Modifier.padding(top = Space.hair),
+                )
+            }
         }
-    } else if (recent.isNotEmpty() || ph.db.servings.any { d.servingPets(it).isNotEmpty() }) {
-        de.schmeckts.app.ui
-            .Hint("Heute noch nicht gefüttert, der Napf langweilt sich.", Modifier.padding(top = Space.hair))
-    } else {
-        de.schmeckts.app.ui.Empty(
-            "Noch nichts eingetragen, der Napf wartet auf seine Premiere.",
-            modifier = Modifier.padding(top = Space.hair),
-        )
     }
 }
 

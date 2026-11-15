@@ -1047,6 +1047,8 @@ private fun ReportView(state: SheetState) {
     val pet = d.model().pet
     val all = d.servingsInFilter()
     val days = dayGroups(diary(all, d.observationsInFilter()))
+    // where each day's line is in the list, after the title and the calendar
+    val heads = days.runningFold(2) { at, g -> at + 1 + g.items.size }
     val list = rememberLazyListState()
     val multiHouse = ph.db.pets.size > 1 && pet == null
     // the first day line under the bar draws the edge itself
@@ -1055,7 +1057,7 @@ private fun ReportView(state: SheetState) {
         val at = state["at"] as? String ?: return@LaunchedEffect
         state["at"] = null
         val i = days.indexOfFirst { "d-" + it.key == at }
-        if (i >= 0) list.scrollToItem(2 + i * 2)
+        if (i >= 0) list.scrollToItem(heads[i])
     }
     val still = reduceMotion
     LaunchedEffect(ui.jump) {
@@ -1063,10 +1065,10 @@ private fun ReportView(state: SheetState) {
         ui.jump = null
         val i = days.indexOfFirst { it.key == key }
         if (i >= 0) {
-            if (still) list.scrollToItem(2 + i * 2) else list.animateScrollToItem(2 + i * 2)
+            if (still) list.scrollToItem(heads[i]) else list.animateScrollToItem(heads[i])
         }
     }
-    // days glide into place when a meal comes or goes
+    // entries glide into place when one comes or goes
     val fade = if (still) null else tween<Float>(Motion.FADE)
     val place = if (still) null else tween<androidx.compose.ui.unit.IntOffset>(Motion.STEP, easing = Motion.easeOut)
     PageList("Verlauf" + ph.forWhom(pet), ui.on("settings-back"), list, stuck) {
@@ -1085,10 +1087,12 @@ private fun ReportView(state: SheetState) {
                         }
                         DayLine(g)
                     }
-                    FadeEdge(stuck && list.firstVisibleItemIndex == 2 + i * 2, Modifier.align(Alignment.BottomCenter).offset(y = Space.s5))
+                    FadeEdge(stuck && list.firstVisibleItemIndex == heads[i], Modifier.align(Alignment.BottomCenter).offset(y = Space.s5))
                 }
             }
-            item(key = "i-" + g.key) { Box(Modifier.animateItem(fade, place, fade)) { DayItems(g, multiHouse) } }
+            items(g.items.size, key = { j -> "i-" + g.items[j].id }) { j ->
+                Box(Modifier.animateItem(fade, place, fade)) { DayItem(g, j, multiHouse) }
+            }
         }
     }
 }

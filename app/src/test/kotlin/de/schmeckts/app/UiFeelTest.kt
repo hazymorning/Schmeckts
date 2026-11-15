@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -336,6 +337,25 @@ private fun ScreenTest.top(tag: String) =
         .fetchSemanticsNode()
         .positionInRoot.y
 
+// the height of the node with this tag, 0 without one
+private fun ScreenTest.height(tag: String) =
+    rule
+        .onAllNodes(hasTestTag(tag), useUnmergedTree = true)
+        .fetchSemanticsNodes()
+        .firstOrNull()
+        ?.size
+        ?.height
+        ?.toFloat() ?: 0f
+
+private fun ScreenTest.frame() {
+    androidx.compose.runtime.snapshots.Snapshot
+        .sendApplyNotifications()
+    org.robolectric.Shadows
+        .shadowOf(android.os.Looper.getMainLooper())
+        .idleFor(java.time.Duration.ofMillis(16))
+    rule.mainClock.advanceTimeByFrame()
+}
+
 class UiHomeRoomTest : ScreenTest() {
     private fun sec(name: String) = rule.onNode(hasTestTag("sec-$name"), useUnmergedTree = true).fetchSemanticsNode()
 
@@ -369,6 +389,76 @@ class UiHomeRoomTest : ScreenTest() {
         restart()
         idle(1000)
         check(gap == gapAbove("hist"), "and the cards end where they always were $gap ${gapAbove("hist")}")
+    }
+
+    @Test
+    fun `home - a card that comes after the start rises into place as the first ones did`() {
+        open(reduce = false)
+        ui.arrive = true
+        idle(400)
+        val dp = rule.density.density
+        val title = hasText("Verlauf") and hasAnyAncestor(hasTestTag("sec-hist"))
+        val ys =
+            frames(1000, { ui.act("demo") }) {
+                rule
+                    .onAllNodes(title, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .firstOrNull()
+                    ?.let { it.positionInRoot.y - top("sec-hist") } ?: Float.NaN
+            }.filter { !it.isNaN() }
+        check(ys.first() - ys.last() > 5 * dp && ys.takeLast(2).distinct().size == 1, "Verlauf rises into place ${ys.map { it / dp }}")
+    }
+
+    @Test
+    fun `home - one hint giving way to the next keeps fading out when the page is drawn again meanwhile`() {
+        open(reduce = false)
+        act("demo")
+        idle(2000)
+        val hints = { phone.derive.model().hints }
+        check(hints().size >= 2, "two hints")
+        val hide = hasText("Ausblenden") and hasAnyAncestor(hasTestTag("sec-question"))
+        val cards = { rule.onAllNodes(hide, useUnmergedTree = true).fetchSemanticsNodes().size }
+        rule.mainClock.autoAdvance = false
+        ui.act("hide-hint", "v" to hintKey(hints()[0]))
+        repeat(4) { frame() }
+        val fading = cards()
+        ui.update()
+        repeat(2) { frame() }
+        val drawn = cards()
+        rule.mainClock.autoAdvance = true
+        idle(1000)
+        check(listOf(fading, drawn, cards()) == listOf(2, 2, 1), "the last one fades out, then the next one stays ${listOf(fading, drawn)}")
+    }
+
+    @Test
+    fun `home - a hint whose variety is deleted on another phone closes with its content`() {
+        val now = at("2025-06-17T12:00")
+        val day = 86_400_000L
+        val meals =
+            listOf(
+                meal("meal0001", "sorte001", now - day, mapOf("minka001" to "schlecht")),
+                meal("meal0002", "sorte001", now - 2 * day, mapOf("minka001" to "schlecht")),
+                meal("meal0003", "sorte002", now - day - 3_600_000, mapOf("minka001" to "gut")),
+            )
+        val house = dbOf(listOf(pet("minka001")), listOf(product("sorte001"), product("sorte002", variety = "Huhn")), meals)
+        val prefs = j(mapOf("remind" to 180, "hiddenHints" to NEWS.map { "neu:" + it.v }))
+        open(mapOf("db" to house, "prefs" to prefs), now, reduce = false)
+        idle(1000)
+        val dp = rule.density.density
+        check(
+            phone.derive
+                .model()
+                .hints
+                .map { it.kind } == listOf("stop") &&
+                "question" in tags("sec-"),
+            "a hint for the variety",
+        )
+        val above = tags("sec-").let { it[it.indexOf("question") - 1] }
+        val t = Time.now().toString().padStart(13, '0') + "-0000-fremd"
+        val gone = Remote.of(j(mapOf("c" to "products", "r" to "sorte001", "f" to mapOf("_del" to mapOf("v" to true, "t" to t)))))!!
+        val ys = frames(1000, { phone.store.merge(listOf(gone)) }) { top("sec-hist") - top("sec-$above") - height("sec-$above") }
+        check("question" !in tags("sec-"), "the hint is gone with its variety")
+        check(glides(ys, 30 * dp, 0.34f), "the card closes over frames ${ys.map { (it / dp).toInt() }}")
     }
 
     @Test
@@ -411,6 +501,40 @@ class UiArriveTest : ScreenTest() {
     }
 
     @Test
+    fun `fed - the first meal of the day takes the place of yesterday's in Verlauf over frames`() {
+        val now = at("2025-06-17T12:00")
+        val day = 86_400_000L
+        val yesterday = (1..3).map { meal("gestern$it", "sorte00${it % 2 + 1}", now - day - it * 3_600_000L, mapOf("minka001" to "gut")) }
+        val before = (2..5).map { meal("frueher$it", "sorte001", now - it * day, mapOf("minka001" to "gut")) }
+        val house = dbOf(listOf(pet("minka001")), listOf(product("sorte001"), product("sorte002", variety = "Huhn")), yesterday + before)
+        open(mapOf("db" to house), now, reduce = false)
+        idle(1000)
+        val dp = rule.density.density
+        check("evaluation" in tags("sec-") && tags("row-", within = "sec-hist").size == 3, "Verlauf shows yesterday's meals")
+        val ys = frames(1000, { main.logic.feeding.serveProduct("sorte001") }) { top("sec-evaluation") - top("sec-hist") }
+        check(tags("row-", within = "sec-hist") == listOf(db.servings[0].id), "then today's meal alone")
+        check(glides(ys, 30 * dp, 0.34f), "Verlauf changes over frames ${ys.map { (it / dp).toInt() }}")
+    }
+
+    @Test
+    fun `fed - the new meal opens its place once, and is simply there when its row comes back`() {
+        val now = at("2025-06-17T12:00")
+        val felix = meal("meal0001", "sorte001", now - 3_600_000, mapOf("felix001" to null))
+        val sheba = product("sorte001", "Sheba", "Lachs", "Nassfutter", "lastPets" to listOf("minka001"))
+        open(mapOf("db" to dbOf(listOf(pet("minka001"), pet("felix001", "Felix")), listOf(sheba), listOf(felix))), now, reduce = false)
+        idle(1000)
+        main.logic.feeding.serveProduct("sorte001")
+        idle(2000)
+        val fed = db.servings[0].id
+        act("filter", "id" to "felix001")
+        idle(1000)
+        check(fed !in tags("pend-") && fed !in tags("row-", within = "sec-hist"), "Felix's: the meal for Minka is not there")
+        val ys = frames(600, { ui.act("filter", "id" to "all") }) { height("sec-pend") + height("sec-hist") }
+        check(fed in tags("pend-") && fed in tags("row-", within = "sec-hist"), "all cats: it is back")
+        check(ys.drop(3).distinct().size == 1, "at once, without opening its place again ${ys.map { it.toInt() }}")
+    }
+
+    @Test
     fun `history - a meal deleted, the days below glide up while its sheet closes`() {
         open(reduce = false)
         act("demo")
@@ -425,10 +549,24 @@ class UiArriveTest : ScreenTest() {
         ui.jump = second
         idle(1000)
         val third = tags("d-", sheet = true).let { it[it.indexOf(second) + 1] }
+        val below = tags("row-", sheet = true).let { it[it.indexOf(meals[0].id) + 1] }
         act("open-serving", "id" to meals[0].id)
         idle(600)
-        val ys = frames(1000, { ui.act("delete-serving") }) { top("d-$third") }
+        var row = emptyList<Float>()
+        val ys =
+            frames(1000, { ui.act("delete-serving") }) {
+                row +=
+                    rule
+                        .onNode(
+                            hasTestTag("row-$below") and
+                                hasAnyAncestor(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "report")),
+                            useUnmergedTree = true,
+                        ).fetchSemanticsNode()
+                        .positionInRoot.y
+                top("d-$third")
+            }
         check(db.servings.none { it.id == meals[0].id }, "the meal is gone")
         check(glides(ys, 30 * dp, 0.34f), "the next day moves up over frames ${ys.map { (it / dp).toInt() }}")
+        check(glides(row, 30 * dp, 0.34f), "and so does the entry below it that day ${row.map { (it / dp).toInt() }}")
     }
 }

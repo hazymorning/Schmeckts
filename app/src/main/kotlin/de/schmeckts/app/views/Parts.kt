@@ -756,29 +756,37 @@ fun DayItems(
     plain: Boolean = false,
 ) {
     watch()
-    val p = colors
-    val x0 = tlTime + tlNode / 2
     Column {
-        g.items.forEachIndexed { i, x ->
-            if (plain && i > 0) Divider(Size.picM + Space.s3)
-            val line =
-                if (plain) {
-                    Modifier
-                } else {
-                    Modifier.drawBehind {
-                        val mid = x0.toPx()
-                        val w = Size.stroke.toPx()
-                        if (i > 0) drawLine(p.line, Offset(mid, 0f), Offset(mid, size.height / 2), w)
-                        if (i < g.items.size - 1) drawLine(p.line, Offset(mid, size.height / 2), Offset(mid, size.height), w)
-                    }
-                }
-            key(x.id) {
-                Arriving(x.id, plain) {
-                    Box(line) {
-                        if (isObservation(x)) ObservationItem(x, multiHouse, plain) else ServingItem(x, multiHouse, plain)
-                    }
-                }
+        g.items.forEachIndexed { i, x -> key(x.id) { DayItem(g, i, multiHouse, plain) } }
+    }
+}
+
+/** the day's entry at i, as DayItems draws it */
+@Composable
+fun DayItem(
+    g: DayGroup,
+    i: Int,
+    multiHouse: Boolean = false,
+    plain: Boolean = false,
+) {
+    val p = colors
+    val x = g.items[i]
+    val x0 = tlTime + tlNode / 2
+    if (plain && i > 0) Divider(Size.picM + Space.s3)
+    val line =
+        if (plain) {
+            Modifier
+        } else {
+            Modifier.drawBehind {
+                val mid = x0.toPx()
+                val w = Size.stroke.toPx()
+                if (i > 0) drawLine(p.line, Offset(mid, 0f), Offset(mid, size.height / 2), w)
+                if (i < g.items.size - 1) drawLine(p.line, Offset(mid, size.height / 2), Offset(mid, size.height), w)
             }
+        }
+    Arriving(x.id, plain) {
+        Box(line) {
+            if (isObservation(x)) ObservationItem(x, multiHouse, plain) else ServingItem(x, multiHouse, plain)
         }
     }
 }
@@ -796,7 +804,7 @@ private fun Arriving(
     if (!on) return content()
     val ui = LocalUi.current
     val still = reduceMotion
-    val state = remember { MutableTransitionState(still || ui.home.fresh != id).apply { targetState = true } }
+    val state = remember { MutableTransitionState(!ui.home.arriving.remove("hist:$id") || still).apply { targetState = true } }
     AnimatedVisibility(state, enter = if (still) EnterTransition.None else arriving) { content() }
 }
 

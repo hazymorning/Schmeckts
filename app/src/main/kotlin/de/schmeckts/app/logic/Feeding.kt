@@ -106,7 +106,7 @@ class Feeding(
 
     private fun served(id: String) {
         haptic("confirm")
-        ui.home.fresh = id
+        ui.home.made(id)
         ui.home.fills++
         l.reminders.syncReminders()
     }
