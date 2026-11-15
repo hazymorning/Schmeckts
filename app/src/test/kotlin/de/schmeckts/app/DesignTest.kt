@@ -7,9 +7,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.graphics.PathParser
@@ -18,6 +21,7 @@ import de.schmeckts.app.ui.Faustina
 import de.schmeckts.app.ui.Figtree
 import de.schmeckts.app.ui.LIGHT
 import de.schmeckts.app.ui.Palette
+import de.schmeckts.app.ui.Space
 import kotlinx.coroutines.launch
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -223,8 +227,9 @@ class DesignLogoTest {
     }
 }
 
-/** Visible text in the top layer: at 4.5:1 against what lies beneath it, in Figtree or Faustina, one bold per sentence at most. */
-fun ScreenTest.scanText(): List<String> {
+/** Visible text in the top layer: at 4.5:1 against what lies beneath it, in Figtree or Faustina, one bold per sentence at most.
+ *  below: where the clear part starts; on a scrolled page a line just under its bar may be cut by the edge. */
+fun ScreenTest.scanText(below: Float = 0f): List<String> {
     idle(400)
     val bmp = rule.onRoot().captureToImage().asAndroidBitmap()
     val pane = sheetPane()
@@ -241,7 +246,7 @@ fun ScreenTest.scanText(): List<String> {
     val d = rule.density.density
     val clear =
         androidx.compose.ui.geometry
-            .Rect(0f, 32 * d, bmp.width.toFloat(), bmp.height - 96 * d)
+            .Rect(0f, max(32 * d, below), bmp.width.toFloat(), bmp.height - 96 * d)
     val over =
         listOf(
             androidx.compose.ui.test
@@ -342,6 +347,30 @@ abstract class DesignViews : ScreenTest() {
         return px.distinct().size > 4
     }
 
+    // the top layer screen by screen down to its end
+    private fun scanPage(): List<String> {
+        val bad = mutableListOf<String>()
+        val pane = SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, sheet!!.kind)
+        val page =
+            rule.onAllNodes(
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and hasAnyAncestor(pane),
+                useUnmergedTree = true,
+            )[0]
+        val step =
+            rule
+                .onRoot()
+                .fetchSemanticsNode()
+                .size.height * 0.6f
+        val edge = page.fetchSemanticsNode().boundsInRoot.top + Space.s5.value * rule.density.density
+        repeat(40) {
+            val range = page.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+            bad += scanText(if (range.value() > 0f) edge else 0f)
+            if (range.value() >= range.maxValue()) return bad
+            page.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, step) }
+        }
+        return bad
+    }
+
     fun walk(scheme: String) {
         val bad = mutableListOf<String>()
         platform.pictures = AndroidPictures()
@@ -352,13 +381,9 @@ abstract class DesignViews : ScreenTest() {
         idle(1000)
         bad += scanText()
         act("open-evaluation")
-        bad += scanText()
-        ui.sheets.openPage("insights")
-        bad += scanText()
-        act("settings-back")
-        act("open-level", "v" to "shop")
-        bad += scanText()
-        act("settings-back")
+        bad += scanPage()
+        unfold()
+        bad += scanPage()
         act("settings-back")
         act("open-settings")
         bad += scanText()
@@ -430,6 +455,12 @@ abstract class DesignViews : ScreenTest() {
         act("open-serving", "id" to hist())
         bad += scanText()
         act("close")
+        secondCat()
+        act("open-evaluation")
+        bad += scanPage()
+        unfold()
+        bad += scanPage()
+        act("settings-back")
         act("open-settings")
         act("arm", "then" to "wipe")
         act("arm", "then" to "wipe")

@@ -287,7 +287,7 @@ class UiPopupTest : ScreenTest() {
         idle(600)
         act("open-evaluation")
         idle(600)
-        val first = tags("pick-", sheet = true).ifEmpty { tags("place-", sheet = true) }.first()
+        val first = tags("sort-", sheet = true).first()
         act("open-product", "id" to first)
         idle(600)
         val product = layers
@@ -305,9 +305,7 @@ class UiPopupTest : ScreenTest() {
         )
         act("open-evaluation")
         idle(600)
-        act("open-level", "v" to "shop")
-        idle(600)
-        act("open-product", "id" to tags("shop-", sheet = true).first())
+        act("open-product", "id" to tags("sort-", sheet = true).last())
         idle(600)
         openSheet(
             de.schmeckts.app.ui

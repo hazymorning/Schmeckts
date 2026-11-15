@@ -537,10 +537,12 @@ private fun sided(
     if (a.id < b.id) -1 else 1
 }
 
+/** handed: taken over from a cat whose failing line holds the variety */
 class Trial(
     val e: Sort,
     val need: Int,
     val pet: String,
+    val handed: Boolean = false,
 )
 
 class Ranking(
@@ -788,19 +790,28 @@ private const val DAY_BEGINS = 4 // a meal before this hour still belongs to the
 private const val AFTER_SNACK = 3 * 3_600_000L
 private const val TWO = 2 // varieties in a group, ratings of a variety
 
-/** One side of an insight: a group (key) and how many of its meals went down well. */
+/** One side of an insight: a group (key), how many of its meals went down well, and the others by their tone. */
 class Side(
     val key: Any? = null,
     var n: Int = 0,
     var good: Int = 0,
+    var mid: Int = 0,
+    var sauce: Int = 0,
+    var bad: Int = 0,
 )
 
 private fun add(
     x: Side,
     r: String,
+    k: Int = 1,
 ) {
-    x.n++
-    if (score(r) >= GOOD) x.good++
+    x.n += k
+    when (rateTone(r)) {
+        "good" -> x.good += k
+        "mid" -> x.mid += k
+        "sauce" -> x.sauce += k
+        else -> x.bad += k
+    }
 }
 
 class SauceTally(
@@ -828,16 +839,17 @@ private fun insightOf(
     a: Side,
     b: Side,
     z: Double = INSIGHT_Z,
+    minGap: Double = INSIGHT_GAP,
 ): Insight? {
     if (a.n < INSIGHT_RATINGS || b.n < INSIGHT_RATINGS) return null
     val gap = (a.good.toDouble() * b.n - b.good.toDouble() * a.n) / (a.n.toDouble() * b.n)
     val p = (a.good + b.good).toDouble() / (a.n + b.n)
-    return if (abs(gap) >= INSIGHT_GAP && gap * gap >= z * z * p * (1 - p) * (1.0 / a.n + 1.0 / b.n)) Insight(kind, a, b, gap) else null
+    return if (abs(gap) >= minGap && gap * gap >= z * z * p * (1 - p) * (1.0 / a.n + 1.0 / b.n)) Insight(kind, a, b, gap) else null
 }
 
 private fun worse(x: Insight?) = x?.takeIf { it.gap < 0 } // where only that way round helps
 
-private fun textureKey(p: Rec): String = textureOf(p, p.str("texture"))?.key ?: guessTexture(p) ?: ""
+fun textureKey(p: Rec): String = textureOf(p, p.str("texture"))?.key ?: guessTexture(p) ?: ""
 
 private val GROUPS: Map<String, (Rec) -> List<String>> =
     mapOf(
@@ -850,10 +862,14 @@ private fun wetOf(m: Model) = m.sorts.filter { it.n > 0 && typeOf(it.product) ==
 
 private fun enough(list: List<Sort>) = list.count { it.n >= TWO } >= TWO // so no single variety carries a side
 
-private fun tallyOf(
+fun tallyOf(
     list: List<Sort>,
     key: Any? = null,
-) = Side(key, list.sumOf { it.n }, list.sumOf { goodOf(it.counts) })
+): Side {
+    val x = Side(key)
+    for (e in list) for ((r, k) in e.counts) add(x, r, k)
+    return x
+}
 
 private val german: Collator = Collator.getInstance(Locale.GERMAN)
 
@@ -943,7 +959,7 @@ private fun byGroup(
     for (g in grouped(m, GROUPS.getValue(kind))) {
         val rest = wet.filter { it !in g.sorts }
         if (!enough(rest)) continue
-        val x = if (kind == "geschmack") sameLine(g, rest) else insightOf(kind, Side(g.key, g.n, g.good), restOf(kind, rest), INSIGHT_GROUP)
+        val x = if (kind == "geschmack") sameLine(g, rest) else insightOf(kind, tallyOf(g.sorts, g.key), restOf(kind, rest), INSIGHT_GROUP)
         if (x != null &&
             (best == null || abs(x.gap) > abs(best.gap) || (abs(x.gap) == abs(best.gap) && x.gap > 0))
         ) {
@@ -965,41 +981,19 @@ private fun byGroups(m: Model): List<Insight?> {
     return listOf(if (brand != null && texture != null && inside(brand, texture)) null else brand, texture, byGroup(m, "geschmack"))
 }
 
-class TasteRow(
-    val key: String,
-    val n: Int,
-    val good: Int,
-)
-
-class Taste(
-    val marke: List<TasteRow>,
-    val konsistenz: List<TasteRow>,
-    val geschmack: List<TasteRow>,
-)
-
-// Geschmacksprofil: how each brand, consistency and flavour goes down, best first, the TASTE most rated; a side with
-// one group stays empty, as there is nothing to set it against
-private const val TASTE = 5
-
-fun taste(m: Model): Taste {
-    fun side(keysOf: (Rec) -> List<String>): List<TasteRow> {
-        val list = grouped(m, keysOf)
-        val most = list.sortedByDescending { it.n }.take(TASTE).toSet()
-        return if (list.size >= TWO) list.filter { it in most }.map { TasteRow(it.key, it.n, it.good) } else emptyList()
-    }
-    return Taste(side(GROUPS.getValue("marke")), side(GROUPS.getValue("konsistenz")), side(GROUPS.getValue("geschmack")))
-}
-
 // instead: the texture eaten best otherwise, mostly well and better than the sauce, as advice; none, no advice
 private fun inSauce(m: Model): Insight? {
     val wet = m.sorts.filter { typeOf(it.product) == TYPES[0] }
     val by = LinkedHashMap<String, SauceTally>()
+    val sides = HashMap<String, Side>()
     for (e in wet) {
         val key = textureKey(e.product)
         val x = by.getOrPut(key) { SauceTally(key) }
         x.n += e.n
         x.good += goodOf(e.counts)
         x.sosse += e.counts["sosse"] ?: 0
+        val side = sides.getOrPut(key) { Side(key) }
+        for ((r, k) in e.counts) add(side, r, k)
     }
     val sauce = by["sosse"]
     if (sauce == null || sauce.n < SAUCE_RATINGS || sauce.sosse.toDouble() / sauce.n < SAUCE_SHARE) return null
@@ -1015,7 +1009,16 @@ private fun inSauce(m: Model): Insight? {
                 val d = b.good.toDouble() / b.n - a.good.toDouble() / a.n
                 if (d != 0.0) sign(d).toInt() else b.n - a.n
             }.firstOrNull()
-    return Insight("sosse", Side(), Side(), sauce.sosse.toDouble() / sauce.n, k = sauce.sosse, n = sauce.n, instead = instead)
+    return Insight(
+        "sosse",
+        sides.getValue("sosse"),
+        instead?.let { sides.getValue(it.key) } ?: Side(),
+        sauce.sosse.toDouble() / sauce.n,
+        wet.filter { it.n > 0 && textureKey(it.product) == "sosse" },
+        k = sauce.sosse,
+        n = sauce.n,
+        instead = instead,
+    )
 }
 
 private class PetMeal(
@@ -1029,7 +1032,8 @@ private class PetMeals(
     val snacks: MutableList<Long> = mutableListOf(),
 )
 
-// each pet's meals up to now, oldest first, without treats and dry food, unknown food as id null; and its treats
+// each pet's meals of the verdicts' span, oldest first, without treats and dry food, unknown food as id null; and its
+// treats
 private fun mealsOf(
     db: Db,
     pets: List<String>,
@@ -1041,7 +1045,7 @@ private fun mealsOf(
     for (i in db.servings.indices.reversed()) {
         val s = db.servings[i]
         val type = types[s.str("productId")]
-        if (s.servedAt > now || type == "Trockenfutter") continue
+        if (s.servedAt > now || s.servedAt <= now - VERDICT_SPAN || type == "Trockenfutter") continue
         for ((pid, x) in s.pets) {
             val mine = out[pid] ?: continue
             if (type ==
@@ -1152,7 +1156,7 @@ private fun feeder(
             .filter(::ranks)
             .map { it.id }
             .toSet()
-    val per = LinkedHashMap<String, MutableList<Pair<String, Boolean>>>() // variety → [(by, good)], newest first
+    val per = LinkedHashMap<String, MutableList<Pair<String, String>>>() // variety → [(by, rating)], newest first
     for (s in db.servings) {
         if (s.servedAt <= now - VERDICT_SPAN) break // the meals are kept newest first
         val by = (s.str("by") ?: "").trim()
@@ -1160,7 +1164,7 @@ private fun feeder(
         if (s.servedAt > now || by.isEmpty() || pid0 !in meal) continue
         for (pid in m.pets) {
             val r = rOf(s.pets[pid])
-            if (r != null) per.getOrPut(pid0!!) { mutableListOf() }.add(by to (score(r) >= GOOD))
+            if (r != null) per.getOrPut(pid0!!) { mutableListOf() }.add(by to r)
         }
     }
     val names = LinkedHashSet<String>()
@@ -1173,10 +1177,8 @@ private fun feeder(
             val a = list.filter { it.first == name }
             val b = list.filter { it.first != name }
             val k = min(a.size, b.size)
-            mine.n += k
-            theirs.n += k
-            mine.good += a.take(k).count { it.second }
-            theirs.good += b.take(k).count { it.second }
+            a.take(k).forEach { add(mine, it.second) }
+            b.take(k).forEach { add(theirs, it.second) }
         }
         val x = insightOf("feeder", mine, theirs)
         if (x != null && x.gap > 0 && !(best != null && best.gap >= x.gap)) best = x
@@ -1184,22 +1186,26 @@ private fun feeder(
     return best
 }
 
+private fun buyingOf(m: Model) = byGroups(m) + inSauce(m)
+
+private fun feedingOf(
+    db: Db,
+    m: Model,
+    now: Long,
+): List<Insight?> {
+    val meals = mealsOf(db, m.pets, now)
+    return listOf(repeat(meals), newSorts(m, m.pets), daytime(meals), afterSnacks(meals), feeder(db, m, now))
+}
+
 fun insights(
     db: Db,
     m: Model,
     now: Long,
-): List<Insight> {
-    val meals = mealsOf(db, m.pets, now)
-    return (byGroups(m) + listOf(inSauce(m), repeat(meals), newSorts(m, m.pets), daytime(meals), afterSnacks(meals), feeder(db, m, now)))
-        .filterNotNull()
-        .sortedByDescending { abs(it.gap) }
-}
+): List<Insight> = (buyingOf(m) + feedingOf(db, m, now)).filterNotNull().sortedByDescending { abs(it.gap) }
 
 // Sides as they stood MOVE_DAYS ago, worked out the same way as now. A move needs a real change in the good share,
-// since drifting across a line on the same ratings is no news; fresh needs MOVE_FROM settled varieties back then, or
-// in a young diary everything would be new.
+// since drifting across a line on the same ratings is no news.
 private const val MOVE_DAYS = 30
-private const val MOVE_FROM = 3
 private const val MOVE_BEFORE = 3
 private const val MOVE_SINCE = 2
 private const val MOVE_GAP = 30
@@ -1212,7 +1218,6 @@ class Move(
 )
 
 class Moves(
-    val fresh: Set<String>,
     val cooled: List<Move>,
     val warmed: List<Move>,
 )
@@ -1225,7 +1230,6 @@ fun moves(
     val start = addDays(dayStart(now), 1 - MOVE_DAYS)
     val side = HashMap<String, String>()
     for (k in listOf("top", "flop", "mid", "split", "thin")) r.side(k).forEach { side[it.id] = k }
-    val fresh = LinkedHashSet<String>()
     val cooled = mutableListOf<Move>()
     val warmed = mutableListOf<Move>()
 
@@ -1237,7 +1241,6 @@ fun moves(
         val since: Counted,
     )
     val seen = mutableListOf<Seen>()
-    var settled = 0
     for (e in m.sorts) {
         val now0 = side[e.id] ?: continue
         val pets =
@@ -1256,7 +1259,6 @@ fun moves(
             } else {
                 "thin"
             }
-        if (was != "thin") settled++
         val since =
             m.pets.flatMap { pid ->
                 e.pets[pid]
@@ -1277,23 +1279,18 @@ fun moves(
             MOVE_GAP.toLong() * x.since.n * x.before.n
     }
     for (x in seen) {
-        if (x.was == x.is_) continue
-        val real = moved(x)
-        if ((x.is_ == "top" || x.is_ == "flop") && settled >= MOVE_FROM && (x.was !in LEVEL || real)) fresh.add(x.e.id)
-        if (real && x.was == "top") cooled.add(Move(x.e.id, x.before, x.since))
-        if (real && x.is_ == "top") warmed.add(Move(x.e.id, x.before, x.since))
+        if (x.was == x.is_ || !moved(x)) continue
+        if (x.was == "top") cooled.add(Move(x.e.id, x.before, x.since))
+        if (x.is_ == "top") warmed.add(Move(x.e.id, x.before, x.since))
     }
-    return Moves(fresh, cooled, warmed)
+    return Moves(cooled, warmed)
 }
 
 // missed reads the newest ratings however old, since a variety not served for long has an empty window. retry is
 // a single poor rating by a pet that slowStarters() says needs a while with new food.
-private const val NEXT_NEWEST = 8
+const val NEXT_NEWEST = 8
 private const val NEXT_AWAY = 42 * DAY
-private const val NEXT_MISSED = 2
 private const val NEXT_SPAN = 60 * DAY
-private const val NEXT_RETRY = 2
-private const val NEXT_SHOWN = 5
 
 class Missed(
     val id: String,
@@ -1322,16 +1319,11 @@ fun nextUp(
     last: Map<String, Long>,
     slow: List<String>,
 ): NextUp {
-    val shown =
-        r.top
-            .take(NEXT_SHOWN)
-            .map { it.id }
-            .toSet()
     val flop = r.flop.map { it.id }.toSet()
     val missed = mutableListOf<Missed>()
     val retry = mutableListOf<Pair<Retry, Long>>()
     for (e in m.sorts) {
-        if (!ranks(e.product) || e.kaufen == "nicht" || e.id in shown || e.id in flop) continue
+        if (!ranks(e.product) || e.kaufen == "nicht" || e.id in flop) continue
         val mine = m.pets.mapNotNull { pid -> e.pets[pid]?.takeIf { it.list.isNotEmpty() }?.let { pid to it } }
         if (mine.isEmpty()) continue
         val at = last[e.id] ?: 0L
@@ -1364,37 +1356,12 @@ fun nextUp(
         }
     }
     return NextUp(
-        missed
-            .sortedWith { a, b ->
-                val d = likingOf(b) - likingOf(a)
-                if (d != 0.0) sign(d).toInt() else a.at.compareTo(b.at)
-            }.take(NEXT_MISSED),
-        retry.sortedByDescending { it.second }.take(NEXT_RETRY).map { it.first },
+        missed.sortedWith { a, b ->
+            val d = likingOf(b) - likingOf(a)
+            if (d != 0.0) sign(d).toInt() else a.at.compareTo(b.at)
+        },
+        retry.sortedByDescending { it.second }.map { it.first },
     )
-}
-
-class Basis(
-    val n: Int,
-    val first: Long,
-    val left: List<String>,
-)
-
-fun basis(
-    m: Model,
-    r: Ranking,
-): Basis {
-    var n = 0
-    var first = Long.MAX_VALUE
-    for (e in r.top + r.flop + r.mid + r.split) {
-        n += e.n
-        for (pid in m.pets) for (x in e.pets[pid]?.window.orEmpty()) first = min(first, x.t)
-    }
-    val left =
-        m.sorts
-            .filter { it.total > 0 && !ranks(it.product) }
-            .map { typeOf(it.product) }
-            .toSet()
-    return Basis(n, first, UNRANKED.filter { it in left })
 }
 
 // gap, delay and lead in minutes; slot times are minutes since local midnight
@@ -1518,14 +1485,11 @@ fun nextMeal(
 }
 
 // Observations never change a rating, a verdict or a place. Several pets on one means one of them or all.
-private const val OBSERVED_RECENT = 28 * DAY
-private const val OBSERVED_BEFORE = 56 * DAY
 private const val OBSERVED_SPAN = 180 * DAY
 private const val OBSERVED_MEALS = 4
 private const val OBSERVED_HITS = 2
 private const val OBSERVED_GAP = 30
 private const val OBSERVED_Z = 3.5
-private const val OBSERVED_SHOWN = 3
 private const val HOUR = 3_600_000L
 
 private fun concerns(
@@ -1580,24 +1544,13 @@ private fun followed(
     return out
 }
 
-class KindSeen(
-    val kind: String,
-    var n: Int = 0,
-    var before: Int = 0,
-    var last: Long = 0,
-)
-
+/** gap: in points, how much more often the kind followed this variety than the others */
 class Link(
     val kind: String,
     val id: String,
     val after: Followed,
     val other: Followed,
-    val gap: Double = 0.0,
-)
-
-class Observed(
-    val kinds: List<KindSeen>,
-    val links: List<Link>,
+    val gap: Double,
 )
 
 // A link also needs OBSERVED_Z pooled standard errors, as in trend(), so a lucky run is no news; it is that high since
@@ -1606,22 +1559,7 @@ fun observed(
     db: Db,
     pets: List<String>,
     now: Long,
-): Observed {
-    val cut = now - OBSERVED_RECENT
-    val back = cut - OBSERVED_BEFORE
-    val per = LinkedHashMap<String, KindSeen>()
-    for (o in db.observations) {
-        val kind = o.str("kind") ?: continue
-        if (o.at > now || o.at <= back || !concerns(o, pets)) continue
-        val x = per.getOrPut(kind) { KindSeen(kind) }
-        if (o.at > cut) {
-            x.n++
-            x.last = max(x.last, o.at)
-        } else {
-            x.before++
-        }
-    }
-    val kinds = per.values.filter { it.n > 0 }.sortedWith(compareByDescending<KindSeen> { it.n }.thenByDescending { it.last })
+): List<Link> {
     val links = mutableListOf<Link>()
     for (kind in OBSERVATIONS.keys.filter { OBSERVATIONS.getValue(it).about == "meal" }) {
         if (db.observations.none { it.str("kind") == kind }) continue
@@ -1637,8 +1575,7 @@ fun observed(
             if (apart >= OBSERVED_GAP * of && apart >= OBSERVED_Z * se * of) links.add(Link(kind, id, after, other, apart / of))
         }
     }
-    val sorted = links.sortedWith(compareByDescending<Link> { it.gap }.thenByDescending { it.after.n })
-    return Observed(kinds, sorted.take(OBSERVED_SHOWN).map { Link(it.kind, it.id, it.after, it.other) })
+    return links.sortedWith(compareByDescending<Link> { it.gap }.thenByDescending { it.after.n })
 }
 
 class After(
@@ -1657,3 +1594,669 @@ fun observedAfter(
         .filter { k -> OBSERVATIONS.getValue(k).about == "meal" && db.observations.any { it.str("kind") == k } }
         .map { kind -> (followed(db, pets, now, kind, id)[id] ?: Followed()).let { After(kind, it.n, it.hit) } }
         .filter { it.hit > 0 }
+
+// == Vorlieben: what a cat is like as an eater, every line from a tested rule ==
+
+private fun brandOf(e: Sort) = (e.product.str("brand") ?: "").trim()
+
+// a variety's window ratings, as they stand or as they stood before some time
+private class Seen(
+    val e: Sort,
+    val list: List<Pt>,
+)
+
+private fun seenOf(
+    m: Model,
+    sorts: List<Sort>,
+) = sorts.map { e -> Seen(e, m.pets.flatMap { e.pets[it]?.window.orEmpty() }) }
+
+private fun before(
+    list: List<Seen>,
+    t: Long,
+) = list.map { s -> Seen(s.e, s.list.filter { it.t < t }) }
+
+private fun sideIn(
+    list: List<Seen>,
+    key: Any? = null,
+) = Side(key).also { x -> list.forEach { s -> s.list.forEach { add(x, it.r) } } }
+
+private fun enoughIn(list: List<Seen>) = list.count { it.list.size >= TWO } >= TWO
+
+// Kommt gar nicht an: a whole brand line of wet food, each variety mostly left, against the rest as a brand is. Its
+// label names the consistency the line shares, so inside() is not applied.
+private const val PACK_SORTS = 3
+private const val PACK_RATINGS = 6
+
+class BrandLine(
+    val brand: String,
+    val texture: String?,
+    val sorts: List<Sort>,
+    val a: Side,
+    val b: Side,
+    val gap: Double,
+)
+
+private fun packOf(
+    brand: String,
+    group: List<Seen>,
+    rest: List<Seen>,
+    z: Double,
+    minGap: Double,
+): Insight? {
+    val rated = group.filter { it.list.isNotEmpty() }
+    if (rated.size < PACK_SORTS || rated.sumOf { it.list.size } < PACK_RATINGS || !enoughIn(rest)) return null
+    if (rated.any { s -> s.list.count { score(it.r) >= GOOD } * 2 >= s.list.size }) return null
+    return worse(insightOf("marke", sideIn(rated, brand), sideIn(rest), z, minGap))
+}
+
+private fun groupOf(
+    kind: String,
+    key: String,
+    group: List<Seen>,
+    rest: List<Seen>,
+    z: Double,
+    minGap: Double,
+) = if (enoughIn(group) && enoughIn(rest)) insightOf(kind, sideIn(group, key), sideIn(rest), z, minGap) else null
+
+// Hysteresis without stored state: a group that just slipped under its full gate stays while it is still KEEP_Z
+// standard errors and KEEP_GAP apart, if the full gate held just before one of its KEEP_LOOKS newest ratings. So one
+// good meal does not make a finding come and go.
+private const val KEEP_Z = 2.0
+private const val KEEP_GAP = 0.2
+private const val KEEP_LOOKS = 4
+
+/** kind: marke or konsistenz, or pack for a brand line; key: the brand or consistency. Null when the group passes its
+ *  full gate now, or is not held. */
+fun held(
+    m: Model,
+    kind: String,
+    key: String,
+    sorts: List<Sort>,
+    rest: List<Sort>,
+): Insight? {
+    val gate = { g: List<Seen>, r: List<Seen>, z: Double, gap: Double ->
+        if (kind == "pack") packOf(key, g, r, z, gap) else groupOf(kind, key, g, r, z, gap)
+    }
+    val group = seenOf(m, sorts)
+    val others = seenOf(m, rest)
+    if (gate(group, others, INSIGHT_GROUP, INSIGHT_GAP) != null) return null
+    val x = gate(group, others, KEEP_Z, KEEP_GAP) ?: return null
+    val looks =
+        group
+            .flatMap { s -> s.list.map { it.t } }
+            .sortedDescending()
+            .take(KEEP_LOOKS)
+            .distinct()
+    val was = looks.any { t -> (gate(before(group, t), before(others, t), INSIGHT_GROUP, INSIGHT_GAP)?.gap ?: 0.0) * x.gap > 0 }
+    if (!was) return null
+    val k = if (kind == "pack") "marke" else kind
+    return Insight(k, tallyOf(sorts, key), restOf(k, rest), x.gap, sorts, rest)
+}
+
+/** m: one cat's model. Worst first. */
+fun packs(m: Model): List<BrandLine> {
+    if (m.pets.size != 1) return emptyList()
+    val wet = wetOf(m)
+    val out = mutableListOf<BrandLine>()
+    for ((brand, sorts) in wet.groupBy(::brandOf)) {
+        if (brand.isEmpty() || sorts.any { it.kaufen == "immer" }) continue
+        val rest = wet.filter { brandOf(it) != brand }
+        val x =
+            packOf(brand, seenOf(m, sorts), seenOf(m, rest), INSIGHT_GROUP, INSIGHT_GAP) ?: held(m, "pack", brand, sorts, rest) ?: continue
+        val texture =
+            sorts
+                .map { textureKey(it.product) }
+                .toSet()
+                .singleOrNull()
+                ?.takeIf { it.isNotEmpty() }
+        out.add(BrandLine(brand, texture, sorts, tallyOf(sorts, brand), restOf("marke", rest), x.gap))
+    }
+    return out.sortedBy { it.gap }
+}
+
+private const val MIXED_BRANDS = 3
+
+/** The brands a consistency never came without, most rated first, so the consistency cannot be told from them; empty
+ *  when a brand rated INSIGHT_RATINGS times on both sides tells them apart. */
+fun mixedUp(x: Insight): List<String> {
+    if (x.kind != "konsistenz") return emptyList()
+    val inside = LinkedHashMap<String, Int>()
+    for (e in x.sorts) inside[brandOf(e)] = (inside[brandOf(e)] ?: 0) + e.n
+    // a variety without a brand could be of any
+    if ("" in inside || inside.size > MIXED_BRANDS) return emptyList()
+    val outside = x.rest.groupBy(::brandOf).mapValues { (_, l) -> l.sumOf { it.n } }
+    if (inside.any { (brand, n) -> n >= INSIGHT_RATINGS && (outside[brand] ?: 0) >= INSIGHT_RATINGS }) return emptyList()
+    return inside.entries
+        .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenComparing({ it.key }, german))
+        .map { it.key }
+}
+
+/** A test meal that would tell a mixed-up consistency from its brands. liked: for one that goes down worse, a brand
+ *  that goes down well and never came in it. */
+class Experiment(
+    val texture: String,
+    val worse: Boolean,
+    val brands: List<String>,
+    val liked: String?,
+)
+
+fun experimentOf(
+    x: Insight,
+    mixed: List<String>,
+): Experiment? {
+    if (mixed.isEmpty()) return null
+    val inside = x.sorts.map(::brandOf).toSet()
+    val liked =
+        if (x.gap < 0) {
+            x.rest
+                .filter { brandOf(it).isNotEmpty() && brandOf(it) !in inside }
+                .groupBy(::brandOf)
+                .map { (brand, l) -> tallyOf(l, brand) }
+                .filter { it.n >= INSIGHT_RATINGS && it.good * 2 > it.n }
+                .sortedWith { a, b ->
+                    val d = b.good.toDouble() / b.n - a.good.toDouble() / a.n
+                    if (d != 0.0) {
+                        sign(d).toInt()
+                    } else if (a.n != b.n) {
+                        b.n - a.n
+                    } else {
+                        german.compare(a.key as String, b.key as String)
+                    }
+                }.firstOrNull()
+                ?.key as String?
+        } else {
+            null
+        }
+    return Experiment(x.a.key as String, x.gap < 0, mixed.take(2), liked)
+}
+
+/** A variety of the household that would answer the test meal, the least rated first; none she leaves or that is struck. */
+fun trialOf(
+    x: Experiment,
+    m: Model,
+): Sort? =
+    m.sorts
+        .filter { e ->
+            val b = brandOf(e)
+            val k = textureKey(e.product)
+            typeOf(e.product) == TYPES[0] &&
+                e.kaufen != "nicht" &&
+                e.verdict != "nicht" &&
+                k.isNotEmpty() &&
+                b.isNotEmpty() &&
+                if (x.worse) {
+                    (b in x.brands && k != x.texture) || (b == x.liked && k == x.texture)
+                } else {
+                    (b !in x.brands && k == x.texture) || (b == x.brands[0] && k != x.texture)
+                }
+        }.minWithOrNull(compareBy<Sort> { it.n }.thenComparing({ pname(it.product) }, german))
+
+// Appetit: the cat's meals in seven-day blocks back to its first rating, each against what its varieties led to
+// expect from the cat's other weeks, so a week of food it never liked is no alarm.
+private object BLOCK {
+    const val SPAN = 8 // blocks drawn at most
+    const val MIN = 5 // ratings for a block to be judged
+    const val PRIOR = 4 // pseudo ratings pulling a variety's expectation to the cat's share
+    const val Z = 2.25 // the newest judged block going worse
+    const val Z_UP = 3.5 // going better: nothing to act on, so only beyond doubt
+    const val GAP = 0.35 // |good - expected| at least this share of the block's ratings
+}
+
+/** A seven-day block, from inclusive, to exclusive. seen: the notes about the cat in it, by kind; start: the day of the
+ *  cat's first rating where the oldest block begins before it. */
+class Block(
+    val from: Long,
+    val to: Long,
+    val n: Int,
+    val good: Int,
+    val mid: Int,
+    val sauce: Int,
+    val bad: Int,
+    val expected: Double,
+    val vary: Double,
+    val seen: Map<String, Int>,
+    val start: Long = from,
+) {
+    val judged get() = n >= BLOCK.MIN
+}
+
+/** Oldest first, the newest ending at the midnight after now; without treats and dry food. */
+fun weeks(
+    db: Db,
+    m: Model,
+    pet: String,
+    now: Long,
+): List<Block> {
+    val by = mutableListOf<List<Pt>>() // per variety
+    for (e in m.sorts) {
+        val list = (e.pets[pet]?.list ?: emptyList()).filter { it.t <= now }
+        if (ranks(e.product) && list.isNotEmpty()) by.add(list)
+    }
+    val all = by.flatten()
+    if (all.isEmpty()) return emptyList()
+    val first = all.minOf { it.t }
+    val end = addDays(dayStart(now), 1)
+    val spans =
+        (0 until BLOCK.SPAN)
+            .map { k -> addDays(end, -7 * (k + 1)) to addDays(end, -7 * k) }
+            .takeWhile { it.second > first }
+            .reversed()
+    val drawn = all.filter { it.t >= spans[0].first }
+    if (drawn.isEmpty()) return emptyList()
+    val share = drawn.count { score(it.r) >= GOOD }.toDouble() / drawn.size
+    return spans.map { (from, to) ->
+        val x = Side()
+        var expected = 0.0
+        var vary = 0.0
+        for (list in by) {
+            val (inside, outside) = list.partition { it.t in from until to }
+            if (inside.isEmpty()) continue
+            val others = outside.filter { it.t > now - VERDICT_SPAN }
+            val p = (others.count { score(it.r) >= GOOD } + BLOCK.PRIOR * share) / (others.size + BLOCK.PRIOR)
+            inside.forEach { add(x, it.r) }
+            expected += p * inside.size
+            vary += p * (1 - p) * inside.size
+        }
+        val seen =
+            db.observations
+                .filter { it.at in from until to && it.at <= now && it.pets[pet] != null }
+                .mapNotNull { o -> o.str("kind")?.takeIf { it in OBSERVATIONS } }
+                .groupingBy { it }
+                .eachCount()
+        Block(from, to, x.n, x.good, x.mid, x.sauce, x.bad, expected, vary, seen, maxOf(from, dayStart(first)))
+    }
+}
+
+/** state: tage, schlechter, besser, zuletzt-schwaecher, zuletzt-besser or unauffaellig; week: the block that was
+ *  off; dir: -1 worse, 1 better. */
+class Appetite(
+    val state: String,
+    val week: Block? = null,
+    val dir: Int = 0,
+    val trend: Trend? = null,
+    val hint: Hint? = null,
+)
+
+private fun off(
+    w: Block,
+    z: Double,
+): Boolean {
+    val d = w.good - w.expected
+    return d * d >= z * z * w.vary && abs(d) / w.n >= BLOCK.GAP
+}
+
+fun appetiteOf(
+    m: Model,
+    pet: String,
+    trend: List<Trend>,
+    weeks: List<Block>,
+): Appetite? {
+    m.hints.firstOrNull { it.kind == "appetit" && it.pet == pet }?.let { return Appetite("tage", dir = -1, hint = it) }
+    trend.firstOrNull { it.pet == pet && it.kind == "deutlich" }?.let {
+        return Appetite(if (it.dir < 0) "schlechter" else "besser", dir = it.dir, trend = it)
+    }
+    val judged = weeks.filter { it.n >= BLOCK.MIN }
+    if (judged.size < 2) return null
+    // only the newest: the page is opened daily, and every older block judged again is one more chance of a false alarm
+    val last = judged.last()
+    val dir = if (last.good < last.expected) -1 else 1
+    if (!off(last, if (dir < 0) BLOCK.Z else BLOCK.Z_UP)) return Appetite("unauffaellig")
+    return Appetite(if (dir < 0) "zuletzt-schwaecher" else "zuletzt-besser", last, dir)
+}
+
+// a top that only leans towards good is never called a favourite
+fun favourites(r: Ranking): List<Sort> = r.top.filter { it.verdict == "nachkaufen" }
+
+/** The brand that holds more than half of the varieties, or the two that hold at least two thirds and are not tied
+ *  with a third; else none. */
+fun mostly(sorts: List<Sort>): List<String> {
+    val by =
+        sorts
+            .groupingBy(::brandOf)
+            .eachCount()
+            .filterKeys { it.isNotEmpty() }
+            .entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenComparing({ it.key }, german))
+    if (by.isNotEmpty() && by[0].value * 2 > sorts.size) return listOf(by[0].key)
+    val two = by.size == TWO || (by.size > TWO && by[1].value > by[2].value)
+    if (two && (by[0].value + by[1].value) * 3 >= sorts.size * 2) return listOf(by[0].key, by[1].key)
+    return emptyList()
+}
+
+private const val TREATS_RATINGS = 5
+
+/** The cat's treats in their windows, when there are enough and every one went down well. */
+fun treats(m: Model): Counted? {
+    val counts = LinkedHashMap<String, Int>()
+    for (e in m.sorts) if (typeOf(e.product) == "Snack") for ((r, k) in e.counts) counts[r] = (counts[r] ?: 0) + k
+    val n = counts.values.sum()
+    return if (n >= TREATS_RATINGS && goodOf(counts) == n) Counted(n, counts) else null
+}
+
+/** kind: trial, missed or retry */
+class Pick(
+    val id: String,
+    val kind: String,
+    val trial: Trial? = null,
+    val missed: Missed? = null,
+    val retry: Retry? = null,
+)
+
+/** every rating so far of the cat the trial is for went down well */
+fun allGood(t: Trial) = (t.e.pets[t.pet] ?: t.e).let { goodOf(it.counts) == it.n }
+
+// a cat's trial of a variety from its own failing line goes to another cat still trying it, or goes
+private fun handOver(
+    t: Trial,
+    lines: Map<String, Set<String>>,
+): Trial? {
+    if (t.e.id !in lines[t.pet].orEmpty()) return t
+    return t.e.pets.entries
+        .filter { (pid, x) -> pid != t.pet && t.e.id !in lines[pid].orEmpty() && x.n in 1 until TRIAL_NEED && goodOf(x.counts) * 2 >= x.n }
+        .maxByOrNull { it.value.n }
+        ?.let { (pid, x) -> Trial(t.e, TRIAL_NEED - x.n, pid, true) }
+}
+
+// a trial one good meal from the shopping list first, then favourites long missed, the other trials, second tries; no
+// trial the owner has already put on the list or struck. lines: per cat, the varieties of its failing lines.
+fun nextPicks(
+    r: Ranking,
+    next: NextUp,
+    lines: Map<String, Set<String>> = emptyMap(),
+): List<Pick> {
+    val (near, other) =
+        r.trials
+            .filter { it.e.kaufen == null }
+            .mapNotNull { handOver(it, lines) }
+            .partition { it.need == 1 && allGood(it) }
+    val trial = { t: Trial -> Pick(t.e.id, "trial", trial = t) }
+    return (
+        near.map(trial) + next.missed.map { Pick(it.id, "missed", missed = it) } + other.map(trial) +
+            next.retry.map { Pick(it.id, "retry", retry = it) }
+    ).distinctBy { it.id }
+}
+
+// Da sind sie sich uneinig: two cats on the meals both rated, a sign test on those one ate well and the other hardly,
+// overall, per consistency and per brand. A brand all in one consistency that differs says nothing of its own.
+private object DIFFER {
+    const val Z = 3.0
+    const val Z_ALL = 2.75
+    const val GAP = 0.3
+}
+
+/** a eats it more often than b; ab: meals a ate well and b hardly, ba the other way round; kind: alles, konsistenz or
+ *  marke */
+class Differ(
+    val a: String,
+    val b: String,
+    val kind: String,
+    val key: String?,
+    val ab: Int,
+    val ba: Int,
+    val shared: Int,
+    val aGood: Int,
+    val bGood: Int,
+    val aSide: Side,
+    val bSide: Side,
+)
+
+private class Both(
+    val texture: String,
+    val brand: String,
+    val ra: String,
+    val rb: String,
+) {
+    val a = score(ra)
+    val b = score(rb)
+}
+
+private fun differOf(
+    a: String,
+    b: String,
+    kind: String,
+    key: String?,
+    list: List<Both>,
+): Differ? {
+    val ab = list.count { it.a >= GOOD && it.b < NO }
+    val ba = list.count { it.b >= GOOD && it.a < NO }
+    val aGood = list.count { it.a >= GOOD }
+    val bGood = list.count { it.b >= GOOD }
+    val d = ab - ba
+    val z = if (kind == "alles") DIFFER.Z_ALL else DIFFER.Z
+    if (d == 0 || d.toDouble() * d < z * z * (ab + ba) || (aGood - bGood) * d <= 0) return null
+    if (abs(aGood - bGood).toDouble() / list.size < DIFFER.GAP) return null
+    val sa = Side(a).also { x -> list.forEach { add(x, it.ra) } }
+    val sb = Side(b).also { x -> list.forEach { add(x, it.rb) } }
+    return if (d > 0) {
+        Differ(a, b, kind, key, ab, ba, list.size, aGood, bGood, sa, sb)
+    } else {
+        Differ(b, a, kind, key, ba, ab, list.size, bGood, aGood, sb, sa)
+    }
+}
+
+/** pets: in the household's order. The widest first. */
+fun differ(
+    db: Db,
+    pets: List<String>,
+    now: Long,
+): List<Differ> {
+    val products = db.products.filter(::ranks).associateBy { it.id }
+    val meals = db.servings.filter { it.servedAt > now - VERDICT_SPAN && it.servedAt <= now && it.str("productId") in products }
+    val out = mutableListOf<Differ>()
+    for ((i, a) in pets.withIndex()) {
+        for (b in pets.drop(i + 1)) {
+            val both =
+                meals.mapNotNull { s ->
+                    val ra = rOf(s.pets[a])
+                    val rb = rOf(s.pets[b])
+                    val p = products.getValue(s.str("productId")!!)
+                    if (ra == null || rb == null) {
+                        null
+                    } else {
+                        Both(if (typeOf(p) == TYPES[0]) textureKey(p) else "", (p.str("brand") ?: "").trim(), ra, rb)
+                    }
+                }
+            val textures = both.filter { it.texture.isNotEmpty() }.groupBy { it.texture }
+            val found =
+                listOfNotNull(differOf(a, b, "alles", null, both)) + textures.mapNotNull { (k, l) -> differOf(a, b, "konsistenz", k, l) }
+            val apart = found.filter { it.key != null }
+            out += found
+            for ((brand, l) in both.filter { it.brand.isNotEmpty() }.groupBy { it.brand }) {
+                val keys = l.map { it.texture }.toSet()
+                val d = differOf(a, b, "marke", brand, l) ?: continue
+                // all in a consistency they differ on, or all outside one the other cat prefers: the same split
+                if (apart.any { x -> keys == setOf(x.key) || (x.key !in keys && x.a == d.b) }) continue
+                out.add(d)
+            }
+        }
+    }
+    return out.sortedByDescending { abs(it.ab - it.ba) }
+}
+
+/** A line of the Steckbrief: kind as in the catalogue, the varieties behind it in ids, and what it rests on. */
+class Trait(
+    val kind: String,
+    val key: String? = null,
+    val ids: List<String> = emptyList(),
+    val insight: Insight? = null,
+    val pack: BrandLine? = null,
+    val mixed: List<String> = emptyList(),
+    val appetite: Appetite? = null,
+    val moves: List<Move> = emptyList(),
+    val warmed: Boolean = false,
+    val link: Link? = null,
+    val treats: Counted? = null,
+)
+
+private val BUYING = setOf("pack", "marke", "konsistenz", "geschmack", "sosse")
+private val WORRY = setOf("tage", "schlechter", "zuletzt-schwaecher")
+
+private fun gapOf(t: Trait) = t.pack?.gap ?: t.insight?.gap ?: 0.0
+
+private fun traitOf(x: Insight) =
+    Trait(x.kind, x.a.key as? String, x.sorts.map { it.id }, x, mixed = if (x.kind == "konsistenz") mixedUp(x) else emptyList())
+
+/** The tested findings of one cat, buying and feeding, widest first. feeding = false skips the feeding ones. */
+fun findings(
+    db: Db,
+    m: Model,
+    now: Long,
+    feeding: Boolean = true,
+): List<Trait> {
+    val packs = packs(m)
+    val found = (buyingOf(m) + if (feeding) feedingOf(db, m, now) else emptyList()).filterNotNull().toMutableList()
+    val wet = wetOf(m)
+    // a kept group stands in for the one group of its kind byGroup() shows, never beside it
+    for (kind in listOf("konsistenz", "marke")) {
+        if (found.any { it.kind == kind }) continue
+        val x =
+            grouped(m, GROUPS.getValue(kind))
+                .mapNotNull { g -> held(m, kind, g.key, g.sorts, wet.filter { it !in g.sorts }) }
+                .maxWithOrNull(compareBy<Insight> { abs(it.gap) }.thenBy { it.gap }) ?: continue
+        if (found.none { it.kind == "konsistenz" && inside(x, it) }) found += x
+    }
+    found.removeAll { x -> x.kind == "marke" && packs.any { it.brand == x.a.key } }
+    val sauce = found.firstOrNull { it.kind == "sosse" }
+    val i = found.indexOfFirst { it.kind == "konsistenz" && it.a.key == "sosse" }
+    if (sauce != null && i >= 0) {
+        val x = found[i]
+        found[i] = Insight(x.kind, x.a, x.b, x.gap, x.sorts, x.rest, sauce.k, sauce.n, sauce.instead)
+        found.remove(sauce)
+    }
+    return merged((packs.map { p -> Trait("pack", p.brand, p.sorts.map { it.id }, pack = p) } + found.map(::traitOf)))
+        .sortedByDescending { abs(gapOf(it)) }
+}
+
+// A consistency left that never came without a failing line is the same story: the line carries it and says it may be
+// the consistency.
+private fun merged(traits: List<Trait>): List<Trait> {
+    val out = traits.toMutableList()
+    for (t in traits) {
+        val x = t.insight ?: continue
+        if (t.kind != "konsistenz" || x.gap >= 0) continue
+        val i = out.indexOfFirst { it.kind == "pack" && it.insight == null && it.pack?.texture == t.key && it.pack?.brand in t.mixed }
+        if (i < 0) continue
+        val p = out[i]
+        out[i] = Trait("pack", p.key, p.ids, x, p.pack, t.mixed)
+        out.remove(t)
+    }
+    return out
+}
+
+private fun negative(t: Trait) = t.kind == "pack" || (t.kind in GROUPS && gapOf(t) < 0)
+
+/** The Steckbrief of one cat in its order, without words. light: without the feeding findings, as for the card. */
+fun profile(
+    db: Db,
+    m: Model,
+    r: Ranking,
+    weeks: List<Block>,
+    trend: List<Trend>,
+    moves: Moves,
+    links: List<Link>,
+    now: Long,
+    light: Boolean = false,
+): List<Trait> {
+    val pet = m.pets.singleOrNull()
+    val appetite = pet?.let { appetiteOf(m, it, trend, weeks) }?.let { Trait("appetit", it.state, appetite = it) }
+    val worry = appetite?.key in WORRY
+    val found = findings(db, m, now, !light)
+    val out = mutableListOf<Trait>()
+    if (worry) out.add(appetite!!)
+    val favourites = favourites(r)
+    val ids = favourites.map { it.id }
+    // a consistency only favourites came in, that cannot be told from their brand, is told with them
+    val liked =
+        found.firstOrNull { t ->
+            !r.flat && t.kind == "konsistenz" && gapOf(t) > 0 && t.mixed.isNotEmpty() && t.insight?.n == 0 && ids.containsAll(t.ids)
+        }
+    when {
+        r.flat -> out.add(Trait("sorten"))
+        favourites.isNotEmpty() -> out.add(Trait("liebling", ids = ids, insight = liked?.insight, mixed = liked?.mixed.orEmpty()))
+    }
+    val buying = found.filter { it.kind in BUYING && it !== liked }
+    out += buying
+    val left = r.flop.filter { it.verdict == "nicht" }
+    val licked = buying.filter { it.kind == "sosse" }.flatMap { it.ids }.toSet()
+    if (left.isNotEmpty() && buying.none(::negative) && left.count { it.id in licked } * 2 < left.size) {
+        out.add(Trait("stehen", ids = left.map { it.id }))
+    }
+    if (appetite != null && !worry) out.add(appetite)
+    treats(m)?.let { out.add(Trait("snacks", treats = it)) }
+    // a move the cat's own change explains is no news of the variety
+    val own = { dir: Int -> trend.any { it.cause == "tier" && it.dir == dir && (pet == null || it.pet == pet) } }
+    val moved = (if (own(-1)) emptyList() else moves.cooled) + (if (own(1)) emptyList() else moves.warmed)
+    val warmed = moved.all { it in moves.warmed }
+    if (moved.isNotEmpty()) out.add(Trait("neuerdings", ids = moved.map { it.id }, moves = moved, warmed = warmed))
+    for (l in links) out.add(Trait("danach", "${l.kind}-${l.id}", listOf(l.id), link = l))
+    // no favourite yet is said last, after what did show
+    if (!r.flat && favourites.isEmpty() && r.rated > 0 && !r.stale) out.add(Trait("liebling"))
+    out += found.filter { it.kind !in BUYING }
+    return out
+}
+
+private const val CARD_TRAITS = 2
+
+/** For the home card: a worry, the favourite, then the strongest other line; none that says what the hint on the card
+ *  above says, of its variety or of the cat's appetite. */
+fun cardTraits(
+    traits: List<Trait>,
+    hint: Hint?,
+): List<Trait> {
+    val told = { t: Trait ->
+        hint != null && ((hint.id != null && hint.id in t.ids) || (hint.kind == "appetit" && t.appetite?.hint?.pet == hint.pet))
+    }
+    val ok = traits.filterNot(told)
+    val group = setOf("marke", "konsistenz", "geschmack")
+    val third =
+        listOf<(Trait) -> Boolean>(
+            { it.kind == "pack" },
+            { it.kind in group && gapOf(it) < 0 },
+            { it.kind in group && gapOf(it) > 0 },
+            { it.kind == "sosse" },
+            { it.kind == "stehen" },
+            { it.kind == "neuerdings" },
+            { it.kind == "danach" },
+        ).firstNotNullOfOrNull { on -> ok.firstOrNull(on) }
+    return listOfNotNull(
+        ok.firstOrNull { it.kind == "appetit" && it.key in WORRY },
+        ok.firstOrNull { (it.kind == "liebling" && it.ids.isNotEmpty()) || it.kind == "sorten" },
+        third,
+    ).take(CARD_TRAITS)
+}
+
+/** The varieties of Einkaufen per band: nachkaufen, geht so, nicht mehr kaufen, noch offen. */
+class Shelf(
+    val buy: Int,
+    val meh: Int,
+    val stop: Int,
+    val open: Int,
+)
+
+/** Einkaufen for one cat beside others: a variety set to always that this cat leaves stands with what it leaves */
+fun ownGroups(
+    m: Model,
+    cats: Int = 1,
+): ShopGroups {
+    val g = shopGroups(m)
+    if (cats < 2 || m.pets.size != 1) return g
+    val (left, buy) = g.nachkaufen.partition { it.kaufen == "immer" && it.verdict == "nicht" }
+    return ShopGroups(buy, g.nicht + left, g.geht, g.neu)
+}
+
+fun shelf(
+    m: Model,
+    cats: Int = 1,
+): Shelf = ownGroups(m, cats).let { Shelf(it.nachkaufen.size, it.geht.size, it.nicht.size, it.neu.size) }
+
+/** Every rating in the filter, of every type, and when the first was given; first is 0 without one. */
+class Diary(
+    val n: Int,
+    val first: Long,
+)
+
+fun diary(m: Model): Diary =
+    Diary(
+        m.sorts.sumOf { it.total },
+        m.sorts.flatMap { e -> m.pets.flatMap { e.pets[it]?.list.orEmpty() } }.minOfOrNull { it.t } ?: 0L,
+    )

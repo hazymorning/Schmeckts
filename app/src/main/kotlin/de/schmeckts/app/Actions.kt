@@ -243,9 +243,17 @@ class Actions(
             "settings-page" to { x -> ui.sheets.openPage(x["v"] ?: "") },
             "settings-back" to { _ -> ui.sheets.sheetBack() },
             "open-report" to { x -> ui.sheets.openSheet(reportState(x["v"])) },
-            "open-evaluation" to { _ -> ui.sheets.openSheet(SheetState("evaluation")) },
-            // the shopping list's folds start closed each time
-            "open-level" to { x -> ui.sheets.openPage(x["v"] ?: "", "open" to null) },
+            // pet: shows that cat, also on home afterwards
+            "open-evaluation" to { x ->
+                val pet = x["pet"]
+                if (pet != null && d.getPet(pet) != null && prefs.activePet != pet) {
+                    prefs.activePet = pet
+                    ph.store.savePrefs()
+                    haptic("select")
+                    ui.update()
+                }
+                ui.sheets.openSheet(SheetState("evaluation"))
+            },
             "open-server" to { _ -> ui.sheets.openSheet(SheetState("settings", "page" to "house")) },
             "connect" to { _ -> launch { connectServer() } },
             "connect-form" to { _ -> openConnect() },
@@ -350,6 +358,7 @@ class Actions(
                 redrawAll()
             },
             "hint-buy" to { x -> hintBuy(x["id"] ?: "", x["v"] ?: "") },
+            "stop-many" to { x -> stopMany((x["ids"] ?: "").split(",").filter { it.isNotEmpty() }, x["label"] ?: "") },
             "remind-yes" to { _ ->
                 launch {
                     l.reminders.setRemind(REMIND_DEFAULT)
@@ -533,6 +542,22 @@ class Actions(
             l.products.setKaufen(id, was)
             redrawAll()
         }, ic, tone)
+    }
+
+    // a whole line at once, one undo for all of it
+    private fun stopMany(
+        ids: List<String>,
+        label: String,
+    ) {
+        val was = ids.mapNotNull { id -> d.getProduct(id)?.let { id to it.str("kaufen") } }.filter { it.second != "nicht" }
+        if (was.isEmpty()) return
+        l.products.setKaufen(was.associate { it.first to "nicht" })
+        haptic("success")
+        redrawAll()
+        ui.toast("$label wird nicht mehr gekauft.", {
+            l.products.setKaufen(was.toMap())
+            redrawAll()
+        }, "flop", "r-bad")
     }
 
     private suspend fun viewPhoto(

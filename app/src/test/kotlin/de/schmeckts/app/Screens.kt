@@ -7,15 +7,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import de.schmeckts.app.ui.SheetState
@@ -23,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -389,6 +397,50 @@ abstract class ScreenTest {
 
     /** a chip or segment with this text, chosen */
     fun chosen(text: String) = rule.onAllNodes(hasText(text) and isSelected()).fetchSemanticsNodes().isNotEmpty()
+
+    private fun inTop(m: SemanticsMatcher): SemanticsMatcher {
+        val kind = sheet?.kind ?: return m
+        return m and hasAnyAncestor(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, kind))
+    }
+
+    /** a tap on the node with this test tag, in the top layer when one is open, scrolled into view first; as a screen
+     *  reader taps, so a toast over it is no matter */
+    fun tapTag(tag: String) {
+        val n = rule.onAllNodes(inTop(hasTestTag(tag)), useUnmergedTree = true)[0].performScrollTo()
+        val clicks = SemanticsActions.OnClick in n.fetchSemanticsNode().config
+        if (clicks) n.performSemanticsAction(SemanticsActions.OnClick) else n.performClick()
+        idle(50)
+    }
+
+    /** every proof and every folded list of the top layer opened, as taps on them would */
+    fun unfold() {
+        val shut = inTop(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "zugeklappt"))
+        for (i in 0 until 40) {
+            val n = rule.onAllNodes(shut, useUnmergedTree = true)
+            if (n.fetchSemanticsNodes().isEmpty()) break
+            n[0].performSemanticsAction(SemanticsActions.OnClick)
+            idle(50)
+        }
+        val open = (sheet?.get("open") as? Set<*>).orEmpty()
+        for (key in tags("fold-", sheet = true)) if (key !in open) act("fold", "v" to key)
+    }
+
+    /** Tiger, who rated every meal the first cat rated, the other way round on its scale; Tiger's id */
+    fun secondCat(): String {
+        val id = "tigerpet01"
+        db.pets.add(Rec(j(pet(id, "Tiger", "createdAt" to 2)).obj()))
+        for (s in db.servings) {
+            val was = s.pets.values.firstOrNull { rOf(it) != null } as? JsonObject ?: continue
+            val k = rOf(was)!!
+            val scale = SCALES.values.first { k in it }
+            val r = scale[scale.size - 1 - scale.indexOf(k)]
+            s["pets"] = JsonObject(s.pets + (id to JsonObject(was + ("r" to JsonPrimitive(r)))))
+        }
+        phone.store.save()
+        ui.update()
+        idle(400)
+        return id
+    }
 
     fun node(text: String): SemanticsNodeInteraction = rule.onAllNodes(hasText(text, substring = true), useUnmergedTree = true)[0]
 

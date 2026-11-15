@@ -6,12 +6,16 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +24,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -31,28 +39,51 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import de.schmeckts.app.Block
 import de.schmeckts.app.GOOD
 import de.schmeckts.app.House
 import de.schmeckts.app.Model
 import de.schmeckts.app.NO
+import de.schmeckts.app.OBSERVATIONS
 import de.schmeckts.app.PROVIDERS
 import de.schmeckts.app.Phone
+import de.schmeckts.app.Pt
 import de.schmeckts.app.RATINGS
 import de.schmeckts.app.Ratings
 import de.schmeckts.app.Rec
+import de.schmeckts.app.Shelf
+import de.schmeckts.app.Side
 import de.schmeckts.app.Sort
+import de.schmeckts.app.Stat
 import de.schmeckts.app.Tally
 import de.schmeckts.app.VERDICTS
 import de.schmeckts.app.addDays
@@ -62,18 +93,22 @@ import de.schmeckts.app.asString
 import de.schmeckts.app.at
 import de.schmeckts.app.cap
 import de.schmeckts.app.clockStr
+import de.schmeckts.app.dateOf
 import de.schmeckts.app.dayKey
 import de.schmeckts.app.dayLabel
+import de.schmeckts.app.dayMonth
 import de.schmeckts.app.esc
 import de.schmeckts.app.imageOf
 import de.schmeckts.app.isObservation
+import de.schmeckts.app.jsRound
+import de.schmeckts.app.monthOf
 import de.schmeckts.app.observationOf
 import de.schmeckts.app.pets
 import de.schmeckts.app.pname
 import de.schmeckts.app.rOf
 import de.schmeckts.app.rateTone
-import de.schmeckts.app.ratingsIn
 import de.schmeckts.app.scaleOf
+import de.schmeckts.app.score
 import de.schmeckts.app.servedAt
 import de.schmeckts.app.sideOf
 import de.schmeckts.app.timeOf
@@ -83,11 +118,14 @@ import de.schmeckts.app.ui.Badge
 import de.schmeckts.app.ui.Btn
 import de.schmeckts.app.ui.BtnKind
 import de.schmeckts.app.ui.Divider
+import de.schmeckts.app.ui.Gap
 import de.schmeckts.app.ui.Icon
 import de.schmeckts.app.ui.ListRow
+import de.schmeckts.app.ui.LocalRaise
 import de.schmeckts.app.ui.LocalUi
 import de.schmeckts.app.ui.M
 import de.schmeckts.app.ui.Motion
+import de.schmeckts.app.ui.Palette
 import de.schmeckts.app.ui.Radius
 import de.schmeckts.app.ui.RateSlider
 import de.schmeckts.app.ui.Seg
@@ -106,15 +144,11 @@ import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.ui.tone
 import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
+import de.schmeckts.app.yearOf
+import kotlin.math.ceil
+import androidx.compose.ui.geometry.Size as Area
 
 // Building blocks shared by the views
-
-/** A row that tells something: its picture (an icon), what it says and why, as markup */
-class Told(
-    val icon: String,
-    val say: String,
-    val why: String = "",
-)
 
 fun times(
     k: Int,
@@ -155,7 +189,7 @@ fun evidenceOf(x: Tally): String {
             }.filter { it.first > 0 }
             .sortedByDescending { it.first }
     if (sides[0].first * 2 > x.n) return cap("${times(sides[0].first, x.n)} ${sides[0].second}")
-    return "Mal so, mal so: ${once(sides.map { it.second }).mapIndexed { i, said -> "${sides[i].first}× $said" }.joinToString(", ")}"
+    return "Mal so, mal so: ${once(sides.map { it.second }).mapIndexed { i, said -> "${often(sides[i].first)} $said" }.joinToString(", ")}"
 }
 
 // a closing word all phrases share is said once, at the end: „einmal fast alles, einmal die Hälfte gefressen“
@@ -289,12 +323,14 @@ enum class Th(
     XL(Size.picXl),
 }
 
+/** letter: the brand's initial where there is no photo; off where another packaging covers it */
 @Composable
 fun Thumb(
     s: Rec?,
     p: Rec?,
     th: Th = Th.L,
     modifier: Modifier = Modifier,
+    letter: Boolean = true,
 ) {
     watch()
     val src = p?.str("thumb")?.ifEmpty { null } ?: s?.str("thumb")
@@ -309,6 +345,7 @@ fun Thumb(
         when {
             img != null -> Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             p == null -> Icon("camera", size = th.side * 0.46f, color = colors.faint)
+            !letter -> {}
             else ->
                 T(
                     (p.str("brand")?.ifEmpty { null } ?: p.str("variety")?.ifEmpty { null } ?: "?").trim().take(1).uppercase(),
@@ -705,6 +742,565 @@ fun Strip(
     }
 }
 
+// == Marks of „Vorlieben“: a rating is a dot filled as far as the bowl was eaten, a variety a square in its band's tone ==
+
+private val OFTEN =
+    listOf(
+        "einmal",
+        "zweimal",
+        "dreimal",
+        "viermal",
+        "fünfmal",
+        "sechsmal",
+        "siebenmal",
+        "achtmal",
+        "neunmal",
+        "zehnmal",
+        "elfmal",
+        "zwölfmal",
+    )
+
+fun often(n: Int) = if (n == 0) "nie" else OFTEN.getOrNull(n - 1) ?: "$n Mal"
+
+/** days from, to exclusive: „4. bis 10. Oktober“, „27. September bis 3. Oktober“ */
+fun spanOf(
+    from: Long,
+    to: Long,
+): String {
+    val last = addDays(to, -1)
+    if (last <= from) return dayMonth(from)
+    val head = if (monthOf(from) == monthOf(last) && yearOf(from) == yearOf(last)) "${dateOf(from)}." else dayMonth(from)
+    return "$head bis ${dayMonth(last)}"
+}
+
+// what a mark stands on: the page or a card
+private val groundColor: Color
+    @Composable get() = if (LocalRaise.current != null) colors.surface else colors.bg
+
+// how full a dot is, in steps that stay apart at its size: all, most, half, a little, nothing
+private fun fillOf(r: String) =
+    score(r).let { v ->
+        when {
+            v >= 100 -> 1f
+            v >= 70 -> 2 / 3f
+            v >= 50 -> 0.5f
+            v > 0 -> 0.25f
+            else -> 0f
+        }
+    }
+
+/** r: null for a rating still to come */
+@Composable
+fun RatingDot(r: String?) {
+    watch()
+    val p = colors
+    val c = r?.let { p.tone(rateTone(it))?.c }
+    val share = if (r != null) fillOf(r) else 0f
+    Canvas(Modifier.size(Size.dot)) {
+        val half = size.minDimension / 2
+        if (c == null) {
+            val w = Size.hairline.toPx()
+            drawCircle(p.muted, half - w / 2, style = Stroke(w))
+            return@Canvas
+        }
+        if (share >= 1f) {
+            drawCircle(c, half)
+            return@Canvas
+        }
+        val w = Size.stroke.toPx()
+        val inner = half - w / 2
+        drawCircle(c, inner, style = Stroke(w))
+        if (share > 0f) {
+            val fill = inner - w / 2
+            clipPath(Path().apply { addOval(Rect(center, fill)) }) {
+                val h = 2 * fill * share
+                drawRect(c, Offset(0f, center.y + fill - h), Area(size.width, h))
+            }
+        }
+    }
+}
+
+/** keys oldest first; open: ratings still to come; split: the dot after a wider gap; said: the row tells it in words */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DotRow(
+    keys: List<String>,
+    modifier: Modifier = Modifier,
+    open: Int = 0,
+    more: Boolean = false,
+    split: Int = -1,
+    said: Boolean = true,
+) {
+    watch()
+    if (keys.isEmpty() && open == 0) return
+    val words =
+        if (said) {
+            null
+        } else {
+            evidenceOf(de.schmeckts.app.Counted(keys.size, keys.groupingBy { it }.eachCount())) +
+                (if (open > 0) ", noch ${if (open == 1) "eine Bewertung" else "zwei Bewertungen"} offen" else "")
+        }
+    FlowRow(
+        modifier.clearAndSetSemantics { if (words != null) contentDescription = words },
+        horizontalArrangement = Arrangement.spacedBy(Space.s1),
+        verticalArrangement = Arrangement.spacedBy(Space.s1),
+    ) {
+        val mid = Modifier.align(Alignment.CenterVertically)
+        if (more) T("+", Type.captionStrong, mid, colors.muted)
+        keys.forEachIndexed { i, k -> Box(mid.padding(start = if (i == split) Space.s1 else 0.dp)) { RatingDot(k) } }
+        repeat(open) { Box(mid) { RatingDot(null) } }
+    }
+}
+
+/** A variety's ratings: one row for one cat, else a row for each cat that rated it, led by its name. of: which of a
+ cat's ratings, newest first; said: a cat's verdict in words, after its dots; sub: words after one cat's dots, under
+ several cats' lines. */
+@Composable
+fun DotLines(
+    m: Model,
+    e: Sort,
+    modifier: Modifier = Modifier,
+    open: Int = 0,
+    pets: List<String> = m.pets,
+    of: (Stat) -> List<Pt> = { it.window },
+    said: ((String) -> String?)? = null,
+    sub: String = "",
+) {
+    watch()
+    val p = colors
+    val lines =
+        pets.mapNotNull { pid ->
+            val x = e.pets[pid] ?: return@mapNotNull null
+            val l = of(x)
+            if (l.isEmpty()) null else Triple(pid, l.reversed().map { it.r }, x.list.size > l.size)
+        }
+    if (m.pets.size <= 1 || lines.isEmpty()) {
+        val l = lines.firstOrNull()
+        val keys = l?.second.orEmpty()
+        return when {
+            keys.size + open == 0 -> if (sub.isNotEmpty()) T(sub, Type.small, modifier, p.muted) else Unit
+            sub.isEmpty() -> DotRow(keys, modifier, open, l?.third == true)
+            else -> InlineDots(keys, open, l?.third == true, sub, modifier)
+        }
+    }
+    val d = LocalUi.current.phone.derive
+    val names = lines.map { d.getPet(it.first)?.str("name") ?: "" }
+    val measure = rememberTextMeasurer()
+    // the dots of every cat start at one place
+    val slot =
+        with(LocalDensity.current) {
+            names.maxOf { measure.measure(it, Type.captionStrong).size.width }.toDp()
+        }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.s1)) {
+        lines.forEachIndexed { i, (pid, keys, more) ->
+            Row(Modifier.clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically) {
+                T(names[i], Type.captionStrong, Modifier.widthIn(min = slot), p.muted)
+                Gap(Space.s2)
+                DotRow(keys, more = more)
+                said?.invoke(pid)?.let {
+                    Gap(Space.s2)
+                    T(it, Type.small, color = p.muted)
+                }
+            }
+        }
+        // on a line of its own, or it reads as the last cat's
+        if (sub.isNotEmpty()) T(sub, Type.small, color = p.muted)
+    }
+}
+
+// the dots as the first word of the line under them, so the words run on after them and wrap under them
+@Composable
+private fun InlineDots(
+    keys: List<String>,
+    open: Int,
+    more: Boolean,
+    sub: String,
+    modifier: Modifier,
+) {
+    val p = colors
+    val measure = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val n = keys.size + open
+    val plus =
+        if (more) {
+            with(density) {
+                measure
+                    .measure("+", Type.captionStrong)
+                    .size.width
+                    .toDp()
+            } + Space.s1
+        } else {
+            0.dp
+        }
+    val wide = Size.dot * n + Space.s1 * (n - 1) + plus + Space.s2
+    val text =
+        buildAnnotatedString {
+            appendInlineContent("dots", " ")
+            append(sub)
+        }
+    val dots =
+        with(density) {
+            InlineTextContent(Placeholder(wide.toSp(), (Size.dot + Space.s1).toSp(), PlaceholderVerticalAlign.TextCenter)) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { DotRow(keys, open = open, more = more) }
+            }
+        }
+    androidx.compose.material3.Text(
+        text,
+        modifier,
+        color = p.muted,
+        style = Type.small.copy(lineBreak = LineBreak.Simple),
+        inlineContent = mapOf("dots" to dots),
+    )
+}
+
+private fun bands(s: Shelf) =
+    listOf(
+        Triple(s.buy, "nachkaufen", "good"),
+        Triple(s.meh, "geht so", "mid"),
+        Triple(s.stop, "nicht mehr kaufen", "bad"),
+        Triple(s.open, "noch offen", null),
+    )
+
+// a square drawn as its outline, the line inside its bounds
+private fun DrawScope.outline(
+    c: Color,
+    at: Offset,
+    side: Float,
+) {
+    val w = Size.hairline.toPx()
+    drawRect(c, at + Offset(w / 2, w / 2), Area(side - w, side - w), style = Stroke(w))
+}
+
+/** a band's square in its tone; still open an outline */
+@Composable
+fun Swatch(tone: String?) {
+    watch()
+    val p = colors
+    val c = p.tone(tone)?.c
+    Canvas(Modifier.size(Size.dot)) { if (c != null) drawRect(c) else outline(p.muted, Offset.Zero, size.minDimension) }
+}
+
+/** The varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines */
+@Composable
+fun ShelfBar(
+    shelf: Shelf,
+    legend: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    watch()
+    val list = bands(shelf)
+    val total = list.sumOf { it.first }
+    if (total == 0) return
+    val p = colors
+    val said = "Von $total Sorten: ${list.filter { it.first > 0 }.joinToString(", ") { "${it.first} ${it.second}" }}."
+    // null: still open
+    val marks = list.filter { it.first > 0 }.map { it.first to p.tone(it.third)?.c }
+    Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
+            if (total > 2 * per) {
+                Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
+                    val gap = Space.hair.toPx()
+                    val h = size.height
+                    var x = 0f
+                    clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
+                        marks.forEachIndexed { i, (k, c) ->
+                            val seg = size.width * k / total
+                            if (c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < marks.size - 1) gap else 0f, h))
+                            if (c != null) x += seg
+                        }
+                    }
+                    if (marks.last().second == null) {
+                        val w = Size.hairline.toPx()
+                        clipRect(left = x) {
+                            drawRoundRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), Stroke(w))
+                        }
+                        if (x > 0f) drawLine(p.muted, Offset(x + w / 2, 0f), Offset(x + w / 2, h), w)
+                    }
+                }
+            } else {
+                val rows = (total + per - 1) / per
+                // lines as even as they go, not one long and a stub
+                val even = (total + rows - 1) / rows
+                val cells = marks.flatMap { (k, c) -> List(k) { c } }
+                Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
+                    val d = Size.dot.toPx()
+                    val step = d + Space.s1.toPx()
+                    cells.forEachIndexed { i, c ->
+                        val at = Offset(i % even * step, i / even * step)
+                        if (c != null) drawRect(c, at, Area(d, d)) else outline(p.muted, at, d)
+                    }
+                }
+            }
+        }
+        if (legend) {
+            Gap(Space.s2)
+            ShelfLegend(shelf)
+        }
+    }
+}
+
+/** shelf: each band with its count; null: the words alone, under several tallies */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ShelfLegend(shelf: Shelf?) {
+    watch()
+    val list =
+        if (shelf != null) {
+            bands(shelf).filter { it.first > 0 }
+        } else {
+            bands(Shelf(0, 0, 0, 0))
+        }
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Space.s3),
+        verticalArrangement = Arrangement.spacedBy(Space.s1),
+    ) {
+        for ((k, word, tone) in list) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.s1)) {
+                Swatch(tone)
+                if (shelf != null) {
+                    T("$k $word", Type.small.copy(fontFeatureSettings = "tnum"), color = colors.ink)
+                } else {
+                    T(word, Type.caption, color = colors.muted)
+                }
+            }
+        }
+    }
+}
+
+/** how one side's meals went down, by tone, each in proportion */
+@Composable
+fun OutcomeBar(
+    x: Side,
+    modifier: Modifier = Modifier,
+) {
+    watch()
+    val p = colors
+    val parts = listOf(x.good to p.good, x.mid to p.mid, x.sauce to p.sauce, x.bad to p.bad).filter { it.first > 0 }
+    Canvas(modifier.fillMaxWidth().height(Size.meter).clip(RoundedCornerShape(50))) {
+        val n = parts.sumOf { it.first }
+        if (n == 0) return@Canvas
+        val gap = Space.hair.toPx()
+        val room = size.width - gap * (parts.size - 1)
+        var at = 0f
+        for ((k, c) in parts) {
+            val w = room * k / n
+            drawRect(c, Offset(at, 0f), Area(w, size.height))
+            at += w + gap
+        }
+    }
+}
+
+/** one side of a comparison: what it says, as markup, and its meals */
+class Compared(
+    val text: String,
+    val side: Side,
+)
+
+@Composable
+fun CompareBars(
+    a: Compared,
+    b: Compared?,
+) {
+    watch()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.s3)) {
+        for (l in listOfNotNull(a, b)) {
+            Column {
+                M(l.text, Type.small, color = colors.ink)
+                Gap(Space.s1)
+                OutcomeBar(l.side)
+            }
+        }
+    }
+}
+
+private fun weekSaid(w: Block): String {
+    val head = "${if (addDays(w.start, 1) >= w.to) "Am" else "Woche vom"} ${spanOf(w.start, w.to)}: "
+    if (w.n == 0) return head + "nichts bewertet."
+    val ate =
+        listOfNotNull(
+            "${often(w.n)} bewertet",
+            if (w.good > 0) "${often(w.good)} gut gefressen" else null,
+            if (w.mid > 0) "${often(w.mid)} die Hälfte" else null,
+            if (w.sauce + w.bad > 0) "${often(w.sauce + w.bad)} kaum" else null,
+        )
+    val noted =
+        OBSERVATIONS.keys.mapNotNull { k ->
+            val label = observationOf(k).label
+            w.seen[k]?.let { "${often(it)} ${if (k == "stink") label else lower(label)}" }
+        }
+    val e = jsRound(w.expected).toInt()
+    val expected =
+        when {
+            !w.judged -> ""
+            e == 0 -> " Erwartet war kaum eine gute Mahlzeit."
+            e == 1 -> " Erwartet war etwa eine gute Mahlzeit."
+            else -> " Erwartet waren etwa ${word(e)} gute Mahlzeiten."
+        }
+    return head + ate.joinToString(", ") + "." + expected + (if (noted.isNotEmpty()) " Notiert: ${noted.joinToString(", ")}." else "")
+}
+
+// bottom up good, mid, sauce, bad, as tall as its share of the busiest week; the line what its varieties led to expect
+private fun DrawScope.drawWeek(
+    w: Block,
+    most: Int,
+    p: Palette,
+    ground: Color,
+) {
+    val h = size.height
+    val gap = Space.hair.toPx()
+    val parts = listOf(w.good to p.good, w.mid to p.mid, w.sauce to p.sauce, w.bad to p.bad).filter { it.first > 0 }
+    val room = h * w.n / most - gap * (parts.size - 1).coerceAtLeast(0)
+    var y = h
+    for ((k, c) in parts) {
+        val s = room * k / w.n
+        drawRect(c, Offset(0f, y - s), Area(size.width, s))
+        y -= s + gap
+    }
+    if (!w.judged) {
+        if (w.n > 0) {
+            val l = Size.hairline.toPx()
+            val top = h - h * w.n / most
+            drawRect(p.muted, Offset(l / 2, top + l / 2), Area(size.width - l, h - top - l), style = Stroke(l))
+        }
+        return
+    }
+    val at = h - (h * w.expected / most).toFloat()
+    val over = Space.hair.toPx()
+    val st = Size.stroke.toPx()
+    drawLine(ground, Offset(-over, at), Offset(size.width + over, at), st + Size.hairline.toPx())
+    drawLine(p.ink, Offset(-over, at), Offset(size.width + over, at), st)
+}
+
+/** the first day of a week, as under its column: „27.9.“, „ab 1.11.“ for one cut short by the first rating */
+private fun weekDay(w: Block) = "${if (w.start > w.from) "ab " else ""}${dateOf(w.start)}.${monthOf(w.start)}."
+
+/** a column a week, oldest first, the notes of each and the day it starts under it */
+@Composable
+fun WeekChart(
+    weeks: List<Block>,
+    ground: Color = groundColor,
+) {
+    watch()
+    if (weeks.isEmpty()) return
+    val p = colors
+    val most = weeks.maxOf { it.n }.coerceAtLeast(1)
+    val day = Type.caption.copy(fontFeatureSettings = "tnum")
+    val measure = rememberTextMeasurer()
+    val widest =
+        with(LocalDensity.current) {
+            measure
+                .measure(if (weeks[0].start > weeks[0].from) "ab 30.12." else "30.12.", day)
+                .size.width
+                .toDp()
+        }
+    // each column reads out its days and notes already
+    val silent = Modifier.semantics { hideFromAccessibility() }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val k = weeks.size
+        val gap = Space.s2
+        // a few weeks fill the width, so the chart does not stop a third of the way
+        val col = ((maxWidth - gap * (k - 1)) / k).let { if (k <= 4) it else minOf(Size.picXl, it) }
+        val each = Modifier.width(col)
+        // a day under every column it fits beside, from the oldest; never past the end
+        val step = ceil((widest + Space.s1) / (col + gap)).toInt().coerceAtLeast(1)
+        val dated = { i: Int -> i % step == 0 && (col + gap) * (k - i) - gap >= widest }
+        Column(Modifier.width(col * k + gap * (k - 1))) {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                weeks.forEachIndexed { i, w ->
+                    Canvas(
+                        each
+                            .height(Size.chart)
+                            .testTag("week-${k - 1 - i}")
+                            .semantics { contentDescription = weekSaid(w) },
+                    ) { drawWeek(w, most, p, ground) }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(Size.hairline).background(p.line))
+            if (weeks.any { it.seen.isNotEmpty() }) {
+                Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    for (w in weeks) {
+                        Column(
+                            each,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(Space.hair),
+                        ) {
+                            for (kind in OBSERVATIONS.keys) {
+                                val n = w.seen[kind] ?: continue
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Space.hair),
+                                ) {
+                                    Icon(observationOf(kind).icon, size = Size.iconS, color = p.tone(kind)?.c ?: p.muted)
+                                    if (n > 1) T("$n", day, silent, p.muted)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                // under its column while it fits there, else from the column's start on
+                val align = if (widest <= col) Alignment.CenterHorizontally else Alignment.Start
+                weeks.forEachIndexed { i, w ->
+                    Box(each) {
+                        if (dated(i)) T(weekDay(w), day, silent.wrapContentWidth(align, unbounded = true), p.muted)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val PACK_SHOWN = 4
+
+/** the packagings of a group fanned out, the first on top */
+@Composable
+fun PackThumbs(
+    ids: List<String>,
+    ground: Color = groundColor,
+) {
+    watch()
+    val d = LocalUi.current.phone.derive
+    val list = ids.take(PACK_SHOWN)
+    // without photos the hidden packagings show as blank edges, so the last one says how many there are
+    val bare = list.none { imageOf(d.getProduct(it)?.str("thumb")) != null }
+    Box(Modifier.clearAndSetSemantics {}) {
+        list.forEachIndexed { i, id ->
+            Thumb(
+                null,
+                d.getProduct(id),
+                Th.M,
+                Modifier
+                    .zIndex((list.size - i).toFloat())
+                    .padding(start = Space.s4 * i)
+                    .drawBehind {
+                        val st = Size.stroke.toPx()
+                        drawRoundRect(
+                            ground,
+                            Offset(-st, -st),
+                            Area(size.width + 2 * st, size.height + 2 * st),
+                            CornerRadius(
+                                Radius.s.toPx() + st,
+                            ),
+                        )
+                    },
+                letter = i == 0,
+            )
+        }
+        if (bare && list.size > 1) {
+            Box(
+                Modifier
+                    .zIndex(list.size + 1f)
+                    .padding(start = Space.s4 * (list.size - 1) + Th.M.side - Space.s4)
+                    .size(Space.s4, Th.M.side),
+                contentAlignment = Alignment.Center,
+            ) { T("${ids.size}", Type.captionStrong, color = colors.muted) }
+        }
+    }
+}
+
 class DayGroup(
     val key: String,
     val t: Long,
@@ -912,37 +1508,6 @@ private fun ServingItem(
     }
 }
 
-/** e: a variety of the model m */
-@Composable
-fun ShopRow(
-    m: Model,
-    e: Sort,
-) {
-    watch()
-    val ui = LocalUi.current
-    val ph = ui.phone
-    val p = e.product
-    val mixed = if (e.kaufen == null && e.choice == "gemischt") "nur für ${ph.derive.petNames(e.yes)}" else ""
-    val sub =
-        cap(
-            listOf(
-                if (!p.str("variety").isNullOrEmpty()) p.str("brand") ?: "" else "",
-                mixed,
-            ).filter { it.isNotEmpty() }.joinToString(", "),
-        )
-    ListRow(Modifier.testTag("shop-${e.id}"), onClick = ui.on("open-product", "id" to e.id)) {
-        Thumb(null, p)
-        TMain(esc(pname(p)), esc(sub))
-        Strip(ratingsIn(m, listOf(e.id)))
-        if (e.kaufen != null) {
-            Box(Modifier.semantics { contentDescription = "Von dir festgelegt" }) { Icon("pin", size = Size.iconS, color = colors.muted) }
-        }
-    }
-}
-
-/** the two sides on „Vorlieben“, always with this icon in this tone */
-val SIDE = mapOf("top" to ("champ" to "good"), "flop" to ("flop" to "bad"))
-
 /** a row that tells: its picture, what it says and why, as markup */
 @Composable
 fun ToldRow(
@@ -957,26 +1522,6 @@ fun ToldRow(
             M(say, Type.body)
             if (why.isNotEmpty()) M(why, Type.small, Modifier.padding(top = Space.hair), colors.muted)
         }
-    }
-}
-
-/** a row of a variety, with its packaging */
-@Composable
-fun ToldBtn(
-    id: String,
-    say: String,
-    why: String = "",
-    end: @Composable () -> Unit = {},
-) {
-    watch()
-    val ui = LocalUi.current
-    ListRow(onClick = ui.on("open-product", "id" to id), top = true) {
-        Thumb(null, ui.phone.derive.getProduct(id), Th.M)
-        Column(Modifier.weight(1f)) {
-            M(say, Type.body)
-            if (why.isNotEmpty()) M(why, Type.small, Modifier.padding(top = Space.hair), colors.muted)
-        }
-        Box(Modifier.align(Alignment.CenterVertically)) { end() }
     }
 }
 

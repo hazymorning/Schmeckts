@@ -1,6 +1,5 @@
 package de.schmeckts.app.views
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -70,14 +69,10 @@ import de.schmeckts.app.rateTone
 import de.schmeckts.app.ratingsIn
 import de.schmeckts.app.scaleOf
 import de.schmeckts.app.servedAt
-import de.schmeckts.app.shopGroups
 import de.schmeckts.app.typeOf
 import de.schmeckts.app.ui.BoxBtn
 import de.schmeckts.app.ui.Btn
 import de.schmeckts.app.ui.BtnKind
-import de.schmeckts.app.ui.Card
-import de.schmeckts.app.ui.CardBtn
-import de.schmeckts.app.ui.CardTitle
 import de.schmeckts.app.ui.Chevron
 import de.schmeckts.app.ui.Chip
 import de.schmeckts.app.ui.Chips
@@ -141,13 +136,7 @@ fun SheetView(state: SheetState) {
         "pet" -> PetView(state)
         "settings" -> if (state.page == "pet") PetView(state) else SettingsView(state)
         "report" -> ReportView(state)
-        // insights and shopping list are levels of the evaluation, so back returns there
-        "evaluation" ->
-            when (state.page) {
-                "insights" -> InsightsPage()
-                "shop" -> ShopView()
-                else -> EvaluationPage()
-            }
+        "evaluation" -> EvaluationPage()
     }
 }
 
@@ -1098,83 +1087,6 @@ private fun ReportView(state: SheetState) {
             }
             items(g.items.size, key = { j -> "i-" + g.items[j].id }) { j ->
                 Box(Modifier.animateItem(fade, place, fade)) { DayItem(g, j, multiHouse) }
-            }
-        }
-    }
-}
-
-private const val FOLDED = 3 // rows a fold shows before the rest
-
-@Composable
-private fun ShopList(
-    m: de.schmeckts.app.Model,
-    list: List<Sort>,
-) {
-    watch()
-    list.forEachIndexed { i, e ->
-        if (i > 0) Divider(Size.picL + Space.s3)
-        ShopRow(m, e)
-    }
-}
-
-@Composable
-private fun Fold(
-    key: String,
-    list: List<Sort>,
-    m: de.schmeckts.app.Model,
-) {
-    watch()
-    val ui = LocalUi.current
-    if (list.size <= FOLDED) return ShopList(m, list)
-    val open = (ui.sheet?.get("open") as? Set<*>)?.contains(key) == true
-    ShopList(m, list.take(FOLDED))
-    Column(Modifier.animateContentSize(if (reduceMotion) tween(0) else tween(Motion.STEP, easing = Motion.easeOut))) {
-        if (open) {
-            Divider(Size.picL + Space.s3)
-            ShopList(m, list.drop(FOLDED))
-        }
-    }
-    CardBtn(if (open) "Weniger" else "Alle ${list.size} zeigen", onClick = ui.on("fold", "v" to key))
-}
-
-@Composable
-private fun ShopView() {
-    watch()
-    val ui = LocalUi.current
-    val ph = ui.phone
-    val m = ph.derive.model()
-    val g = shopGroups(m)
-    val types = TYPES.map { t -> t to g.nachkaufen.filter { typeOf(it.product) == t } }.filter { it.second.isNotEmpty() }
-    val unclear = g.geht + g.neu
-    SheetBody(
-        "Einkaufen" + ph.forWhom(m.pet),
-        ui.sheets,
-        onBack = ui.on("settings-back"),
-        end = if (types.isNotEmpty()) ({ IconBtn("share", "Liste teilen", onClick = ui.on("share-list")) }) else null,
-    ) {
-        Card {
-            CardTitle("Nachkaufen")
-            if (types.isEmpty()) {
-                Hint("Noch nichts zum Nachkaufen, erst mal probieren.", Modifier.padding(top = Space.hair))
-            } else {
-                for ((t, l) in types) {
-                    Label(t, top = Space.s2)
-                    ShopList(m, l)
-                }
-            }
-        }
-        if (g.nicht.isNotEmpty()) {
-            Gap(Space.s4)
-            Card {
-                CardTitle("Nicht mehr kaufen")
-                Fold("nicht", g.nicht, m)
-            }
-        }
-        if (unclear.isNotEmpty()) {
-            Gap(Space.s4)
-            Card {
-                CardTitle("Noch unklar")
-                Fold("unklar", unclear, m)
             }
         }
     }

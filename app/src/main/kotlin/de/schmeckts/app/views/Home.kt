@@ -448,7 +448,7 @@ private fun Fab(modifier: Modifier) {
     }
 }
 
-/** one question at a time, then the history and „Vorlieben“ */
+/** one question at a time, then „Vorlieben“ and the history */
 @Composable
 private fun ColumnScope.HomeContent() {
     watch()
@@ -508,15 +508,16 @@ private fun ColumnScope.HomeContent() {
         Gap(Space.s4)
     }
     if (ask != null) n++
-    Arrive(n++, "hist") {
+    if (hasEvaluationCard(m)) {
+        // what the hint card says is not said again right under it
+        Arrive(n++, "evaluation") { EvaluationCard(m, ask?.hint) }
+        Gap(Space.s4)
+    }
+    Arrive(n, "hist") {
         Card {
             CardHead("Verlauf", label = "Alle Einträge", onMore = ui.on("open-report"))
             History()
         }
-    }
-    if (hasEvaluationCard(m)) {
-        Gap(Space.s4)
-        Arrive(n, "evaluation") { EvaluationCard(m) }
     }
 }
 
