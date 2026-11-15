@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -624,15 +625,18 @@ private class PullToClose(
     }
 }
 
+// a scroll that brings a focused field into view also comes as user input, so only one under a finger counts
 private class HideKeys(
     val focus: FocusManager,
 ) : NestedScrollConnection {
+    var touching = false
+
     override fun onPostScroll(
         consumed: Offset,
         available: Offset,
         source: NestedScrollSource,
     ): Offset {
-        if (source == NestedScrollSource.UserInput && consumed.y != 0f) focus.clearFocus()
+        if (touching && source == NestedScrollSource.UserInput && consumed.y != 0f) focus.clearFocus()
         return Offset.Zero
     }
 }
@@ -740,7 +744,18 @@ fun SheetBody(
     val layer = LocalLayer.current
     val page = isPage(layer?.state)
     val focus = LocalFocusManager.current
-    val keys = if (hideKeysOnScroll) Modifier.nestedScroll(remember(focus) { HideKeys(focus) }) else Modifier
+    val hide = remember(focus) { HideKeys(focus) }
+    val keys =
+        if (hideKeysOnScroll) {
+            Modifier
+                .pointerInput(hide) {
+                    awaitPointerEventScope {
+                        while (true) hide.touching = awaitPointerEvent(PointerEventPass.Initial).changes.any { it.pressed }
+                    }
+                }.nestedScroll(hide)
+        } else {
+            Modifier
+        }
     if (step && layer != null) {
         val mine = remember { layer.level }
         // composed after the layer's own back handler, so it comes first

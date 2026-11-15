@@ -4,9 +4,11 @@ import android.os.Looper
 import androidx.activity.BackEventCompat
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -28,6 +30,7 @@ import androidx.core.view.WindowInsetsCompat
 import de.schmeckts.app.ui.SheetState
 import org.junit.Test
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 // How the app handles under the finger, as a phone app does.
 
@@ -573,6 +576,14 @@ class UiKeyboardTest : ScreenTest() {
             shadowOf(Looper.getMainLooper()).idle()
         }
 
+    // the feed sheet's scrolling body
+    private fun feedBody() =
+        rule.onAllNodes(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+                hasAnyAncestor(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "feed")),
+            useUnmergedTree = true,
+        )[0]
+
     @Test
     fun `keyboard - the field typed in stays above it, a new variety and a new cat start typing`() {
         open()
@@ -722,8 +733,7 @@ class UiKeyboardTest : ScreenTest() {
         ui.focus("f-search")
         idle(400)
         val range = SemanticsProperties.VerticalScrollAxisRange
-        val feed = SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "feed")
-        val body = rule.onAllNodes(SemanticsMatcher.keyIsDefined(range) and hasAnyAncestor(feed), useUnmergedTree = true)[0]
+        val body = feedBody()
         val typing = focused()
         val area = body.fetchSemanticsNode().boundsInRoot
         rule.onRoot().performTouchInput { swipe(area.center, area.center - Offset(0f, 150 * rule.density.density), 300) }
@@ -733,6 +743,34 @@ class UiKeyboardTest : ScreenTest() {
         check(
             typing.isNotEmpty() && focused().isEmpty() && scrolled > 0f,
             "a swipe through the hits scrolls them and puts the keyboard away $scrolled",
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp-xxhdpi")
+    fun `keyboard - stays when the field tapped is brought into view`() {
+        val search = "Marke oder Sorte suchen"
+        open()
+        act("demo")
+        act("feed")
+        field(search).performTextReplacement("e")
+        ui.blurField()
+        idle(400)
+        val range = SemanticsProperties.VerticalScrollAxisRange
+        val body = feedBody()
+        val area = body.fetchSemanticsNode().boundsInRoot
+        val f = field(search).fetchSemanticsNode().boundsInRoot
+        body.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, f.top - area.top + f.height / 2) }
+        idle(400)
+        val half = field(search).fetchSemanticsNode().boundsInRoot
+        val before = body.fetchSemanticsNode().config[range].value()
+        rule.onRoot().performTouchInput { click(Offset(half.left + half.width / 3, half.bottom - half.height / 3)) }
+        idle(400)
+        val after = body.fetchSemanticsNode().config[range].value()
+        val shown = field(search).fetchSemanticsNode().boundsInRoot
+        check(
+            half.top <= area.top && half.height < f.height && focused() == listOf(search) && after < before && shown.height >= f.height,
+            "the field half out of view is tapped, scrolled into view, and keeps the keyboard ${focused()} $before $after",
         )
     }
 }
