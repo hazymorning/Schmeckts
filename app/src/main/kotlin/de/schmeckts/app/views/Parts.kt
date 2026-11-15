@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -176,10 +175,15 @@ fun evidenceOf(x: Tally): String {
     if (x.n == 0) return "Noch nicht bewertet"
     val levels = x.counts.keys.sortedByDescending { RATINGS.getValue(it).score }
     if (levels.size == 1) return cap("${times(x.n, x.n)} ${RATINGS.getValue(levels[0]).said}")
-    if (x.n ==
-        2
-    ) {
-        return "Einmal ${once(listOf(RATINGS.getValue(levels[0]).said, RATINGS.getValue(levels[1]).said)).joinToString(", einmal ")}"
+    if (x.n == 2) {
+        // a cat's two in the order they were given, as its dots run
+        val two =
+            (x as? Stat)
+                ?.window
+                ?.takeIf { it.size == 2 }
+                ?.map { it.r }
+                ?.reversed() ?: levels
+        return "Einmal ${once(two.map { RATINGS.getValue(it).said }).joinToString(", einmal ")}"
     }
     val sides =
         SIDES
@@ -961,23 +965,13 @@ private fun bands(s: Shelf) =
         Triple(s.open, "noch offen", null),
     )
 
-// a square drawn as its outline, the line inside its bounds
-private fun DrawScope.outline(
-    c: Color,
-    at: Offset,
-    side: Float,
-) {
-    val w = Size.hairline.toPx()
-    drawRect(c, at + Offset(w / 2, w / 2), Area(side - w, side - w), style = Stroke(w))
-}
-
-/** a band's square in its tone; still open an outline */
+/** a band's square in its tone; still open in the colour of a line, so it gives way to the ones that tell something */
 @Composable
 fun Swatch(tone: String?) {
     watch()
     val p = colors
-    val c = p.tone(tone)?.c
-    Canvas(Modifier.size(Size.dot)) { if (c != null) drawRect(c) else outline(p.muted, Offset.Zero, size.minDimension) }
+    val c = p.tone(tone)?.c ?: p.line
+    Canvas(Modifier.size(Size.dot)) { drawRect(c) }
 }
 
 /** The varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines */
@@ -993,8 +987,7 @@ fun ShelfBar(
     if (total == 0) return
     val p = colors
     val said = "Von $total Sorten: ${list.filter { it.first > 0 }.joinToString(", ") { "${it.first} ${it.second}" }}."
-    // null: still open
-    val marks = list.filter { it.first > 0 }.map { it.first to p.tone(it.third)?.c }
+    val marks = list.filter { it.first > 0 }.map { it.first to (p.tone(it.third)?.c ?: p.line) }
     Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
@@ -1006,16 +999,9 @@ fun ShelfBar(
                     clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
                         marks.forEachIndexed { i, (k, c) ->
                             val seg = size.width * k / total
-                            if (c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < marks.size - 1) gap else 0f, h))
-                            if (c != null) x += seg
+                            drawRect(c, Offset(x, 0f), Area(seg - if (i < marks.size - 1) gap else 0f, h))
+                            x += seg
                         }
-                    }
-                    if (marks.last().second == null) {
-                        val w = Size.hairline.toPx()
-                        clipRect(left = x) {
-                            drawRoundRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), Stroke(w))
-                        }
-                        if (x > 0f) drawLine(p.muted, Offset(x + w / 2, 0f), Offset(x + w / 2, h), w)
                     }
                 }
             } else {
@@ -1026,10 +1012,7 @@ fun ShelfBar(
                 Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
                     val d = Size.dot.toPx()
                     val step = d + Space.s1.toPx()
-                    cells.forEachIndexed { i, c ->
-                        val at = Offset(i % even * step, i / even * step)
-                        if (c != null) drawRect(c, at, Area(d, d)) else outline(p.muted, at, d)
-                    }
+                    cells.forEachIndexed { i, c -> drawRect(c, Offset(i % even * step, i / even * step), Area(d, d)) }
                 }
             }
         }
@@ -1149,14 +1132,14 @@ private fun DrawScope.drawWeek(
     ground: Color,
 ) {
     val h = size.height
-    val gap = Space.hair.toPx()
     val parts = listOf(w.good to p.good, w.mid to p.mid, w.sauce to p.sauce, w.bad to p.bad).filter { it.first > 0 }
-    val room = h * w.n / most - gap * (parts.size - 1).coerceAtLeast(0)
+    val room = h * w.n / most
+    // the tones meet without a gap, so the line of what was expected is the only one across
     var y = h
     for ((k, c) in parts) {
         val s = room * k / w.n
         drawRect(c, Offset(0f, y - s), Area(size.width, s))
-        y -= s + gap
+        y -= s
     }
     if (!w.judged) {
         if (w.n > 0) {
@@ -1199,9 +1182,10 @@ fun WeekChart(
     val silent = Modifier.semantics { hideFromAccessibility() }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val k = weeks.size
-        val gap = Space.s2
-        // a few weeks fill the width, so the chart does not stop a third of the way
-        val col = ((maxWidth - gap * (k - 1)) / k).let { if (k <= 4) it else minOf(Size.picXl, it) }
+        // wide columns keep apart, so the ends of their lines do not read as one line across
+        val gap = if (k <= 4) Space.s4 else Space.s2
+        // a few weeks get wide columns, so the chart does not stop a third of the way, yet not so wide they read as slabs
+        val col = minOf(if (k <= 4) Size.picXxxl else Size.picXl, (maxWidth - gap * (k - 1)) / k)
         val each = Modifier.width(col)
         // a day under every column it fits beside, from the oldest; never past the end
         val step = ceil((widest + Space.s1) / (col + gap)).toInt().coerceAtLeast(1)
@@ -1264,8 +1248,6 @@ fun PackThumbs(
     watch()
     val d = LocalUi.current.phone.derive
     val list = ids.take(PACK_SHOWN)
-    // without photos the hidden packagings show as blank edges, so the last one says how many there are
-    val bare = list.none { imageOf(d.getProduct(it)?.str("thumb")) != null }
     Box(Modifier.clearAndSetSemantics {}) {
         list.forEachIndexed { i, id ->
             Thumb(
@@ -1288,15 +1270,6 @@ fun PackThumbs(
                     },
                 letter = i == 0,
             )
-        }
-        if (bare && list.size > 1) {
-            Box(
-                Modifier
-                    .zIndex(list.size + 1f)
-                    .padding(start = Space.s4 * (list.size - 1) + Th.M.side - Space.s4)
-                    .size(Space.s4, Th.M.side),
-                contentAlignment = Alignment.Center,
-            ) { T("${ids.size}", Type.captionStrong, color = colors.muted) }
         }
     }
 }
