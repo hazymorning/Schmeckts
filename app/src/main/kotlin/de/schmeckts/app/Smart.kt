@@ -849,7 +849,7 @@ private fun insightOf(
 
 private fun worse(x: Insight?) = x?.takeIf { it.gap < 0 } // where only that way round helps
 
-private fun textureKey(p: Rec): String = textureOf(p, p.str("texture"))?.key ?: guessTexture(p) ?: ""
+fun textureKey(p: Rec): String = textureOf(p, p.str("texture"))?.key ?: guessTexture(p) ?: ""
 
 private val GROUPS: Map<String, (Rec) -> List<String>> =
     mapOf(
@@ -2075,8 +2075,7 @@ fun differ(
     return out.sortedByDescending { abs(it.ab - it.ba) }
 }
 
-/** A line of the Steckbrief: kind as in the catalogue, the varieties behind it in ids, and what it rests on; left: the
- *  varieties of one brand the cat leaves, all outside the consistency it prefers. */
+/** A line of the Steckbrief: kind as in the catalogue, the varieties behind it in ids, and what it rests on. */
 class Trait(
     val kind: String,
     val key: String? = null,
@@ -2089,7 +2088,6 @@ class Trait(
     val warmed: Boolean = false,
     val link: Link? = null,
     val treats: Counted? = null,
-    val left: List<String> = emptyList(),
 )
 
 private val BUYING = setOf("pack", "marke", "konsistenz", "geschmack", "sosse")
@@ -2183,17 +2181,7 @@ fun profile(
     val left = r.flop.filter { it.verdict == "nicht" }
     val licked = buying.filter { it.kind == "sosse" }.flatMap { it.ids }.toSet()
     if (left.isNotEmpty() && buying.none(::negative) && left.count { it.id in licked } * 2 < left.size) {
-        // one brand left that never came in the consistency the cat prefers is the other side of that line
-        val brand = brandOf(left[0]).takeIf { b -> left.size > 1 && b.isNotEmpty() && left.all { brandOf(it) == b } }
-        val i =
-            out.indexOfFirst { t ->
-                brand != null && t.kind == "konsistenz" && gapOf(t) > 0 && t.insight!!.sorts.none { brandOf(it) == brand }
-            }
-        if (i >= 0) {
-            out[i] = out[i].let { t -> Trait(t.kind, t.key, t.ids, t.insight, mixed = t.mixed, left = left.map { it.id }) }
-        } else {
-            out.add(Trait("stehen", ids = left.map { it.id }))
-        }
+        out.add(Trait("stehen", ids = left.map { it.id }))
     }
     if (appetite != null && !worry) out.add(appetite)
     treats(m)?.let { out.add(Trait("snacks", treats = it)) }

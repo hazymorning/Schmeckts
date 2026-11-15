@@ -2070,9 +2070,9 @@ class SmartTest {
             )
         val left = profile(data = sauce, moves = still, links = emptyList())
         assertEquals(
-            "a brand left that never came in the sauce it prefers is told with the sauce",
-            listOf(listOf("konsistenz", listOf("k1", "k2", "k3"))),
-            left.filter { it.kind in listOf("konsistenz", "stehen") }.map { listOf(it.kind, it.left.sorted()) },
+            "a brand left that never came in the sauce it prefers is a line of its own, right after the sauce",
+            listOf("konsistenz" to listOf("b1", "b2", "m1", "m2"), "stehen" to listOf("k1", "k2", "k3")),
+            left.filter { it.kind in listOf("konsistenz", "stehen") }.map { it.kind to it.ids.sorted() },
         )
         val none = house(listOf("A"), listOf("c1", "flop"), rate("c1", "A", listOf(t, mi)) + rate("flop", "A", listOf(x, x)))
         assertEquals(

@@ -687,6 +687,8 @@ class UiEvaluationTest : ScreenTest() {
         act("demo")
         val lines = tags("card-trait-", within = "sec-evaluation")
         val pick = tags("pick-", within = "sec-evaluation")
+        val loved = favourites(phone.derive.rankingModel())
+        val named = loved.size != 3 || loved.all { within("card-trait-liebling", pname(it.product)) }
         val first =
             phone.derive
                 .vorliebenModel()
@@ -697,6 +699,7 @@ class UiEvaluationTest : ScreenTest() {
             lines.size in 1..2 && first != null && pick == listOf(first) && tags("medal-").isEmpty(),
             "two lines at most, the first variety to feed next, no medals $lines $pick",
         )
+        check(named, "three favourites on the card by name")
         tapTag("pick-$first")
         check(sheet?.kind == "product" && sheet?.id == first, "a row opens its food sheet")
         act("close")
@@ -975,6 +978,14 @@ class UiEvaluationTest : ScreenTest() {
             was.last() == "nicht" && kaufen() == was && tags("stop-", sheet = true) == listOf(pack.brand),
             "one undo restores each choice, the one made before stays ${kaufen()}",
         )
+        val mau = db.pets[0].id
+        secondCat()
+        act("filter", "id" to mau)
+        idle(400)
+        check(
+            tags("trait-pack-${pack.brand}", sheet = true).isNotEmpty() && tags("stop-", sheet = true).isEmpty(),
+            "no button for the whole line while another cat eats some of it",
+        )
     }
 
     private fun pageScroll() =
@@ -1043,6 +1054,8 @@ class UiEvaluationTest : ScreenTest() {
         val kept = listOf(level, tags("proof-", sheet = true))
         tapTag("trait-pack-${pack.brand}")
         val closed = tags("proof-", sheet = true)
+        val calm = tags("week-", sheet = true)
+        tapTag("trait-appetit")
         val weeks = tags("week-", sheet = true)
         val lineIds = pack.sorts.map { it.id }
         check(
@@ -1053,7 +1066,10 @@ class UiEvaluationTest : ScreenTest() {
         )
         check(over == listOf("evaluation", listOf("product", null, null), proof[0]), "a row opens its sheet over the page $over")
         check(kept == listOf(listOf("evaluation", null, null), proof), "back returns to the page, its proof still open $kept")
-        check(closed.isEmpty() && weeks.size >= 2, "a second tap folds it; the weeks show without one $weeks")
+        check(
+            closed.isEmpty() && calm.isEmpty() && weeks.size >= 2,
+            "a second tap folds it; weeks as the varieties led to expect wait behind their line $calm $weeks",
+        )
         tapTag("trait-liebling")
         check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
     }
@@ -1105,6 +1121,23 @@ class UiEvaluationTest : ScreenTest() {
                 .keys
         check(!percent && "%" !in screenText(), "no percent sign")
         check(rows.size == 6 && twice == setOf("lachs00001"), "each variety once, a favourite long unfed also under Als Nächstes $rows")
+    }
+
+    @Test
+    fun `Vorlieben - nothing rated yet, no shopping list on the card or the page, a button to feed instead`() {
+        val now = at("2026-06-12T12:00")
+        val pinned = listOf(product("immer0001", "Sheba", "Lachs", "Nassfutter", "kaufen" to "immer"))
+        open(dbFile(listOf(pet(M)), pinned, emptyList()), now)
+        val card = tags("sort-", within = "sec-evaluation") + tags("pick-", within = "sec-evaluation")
+        load(pinned + product("huhn0001", "Sheba", "Huhn"), listOf(meal("m1", "huhn0001", now - DAY, mapOf(M to "top"))))
+        db.pets.add(Rec(j(pet("tigerpet01", "Tiger", "createdAt" to 2)).obj()))
+        phone.store.save()
+        act("open-evaluation", "pet" to "tigerpet01")
+        check(card.isEmpty(), "the card lists nothing to buy before anything is rated $card")
+        check(
+            tags("shop", sheet = true).isEmpty() && inSheet("Füttern") && tags("profile", sheet = true).isNotEmpty(),
+            "a cat with nothing rated beside one that has: no shopping list, a button to feed",
+        )
     }
 
     @Test
