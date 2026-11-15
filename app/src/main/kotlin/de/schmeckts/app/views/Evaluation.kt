@@ -370,7 +370,7 @@ private fun Phone.groupSaid(
         k == 1 -> list[0].let { e -> Said(one, nameOf(e), esc(joined(brand(e), lower(whyOf(e)) + if (liked) away(e, c) else ""))) }
         k == 2 -> Said(many, "${nameOf(list[0])} und ${nameOf(list[1])}", esc(brandsOf(list)))
         whole != null -> {
-            // other varieties of the brand still open count where all of it is drawn, so these say they are counted apart
+            // where more of the brand is rated, the sum says it is of these alone
             val apart = c.m.sorts.any { e -> e !in list && brand(e) == whole && e.n > 0 }
             Said(
                 many,
