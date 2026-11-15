@@ -2198,21 +2198,29 @@ fun profile(
 private const val CARD_TRAITS = 2
 
 /** For the home card: a worry, the favourite, then the strongest other line; none that says what the hint on the card
- *  above says, of its variety or of the cat's appetite. */
+ *  above says, of its variety or of the cat's appetite. m: the cat's model, so a line every favourite falls under is
+ *  not the favourites told again. */
 fun cardTraits(
     traits: List<Trait>,
     hint: Hint?,
+    m: Model? = null,
 ): List<Trait> {
     val told = { t: Trait ->
         hint != null && ((hint.id != null && hint.id in t.ids) || (hint.kind == "appetit" && t.appetite?.hint?.pet == hint.pet))
     }
     val ok = traits.filterNot(told)
     val group = setOf("marke", "konsistenz", "geschmack")
+    val liked = ok.firstOrNull { (it.kind == "liebling" && it.ids.isNotEmpty()) || it.kind == "sorten" }
+    val again = { t: Trait ->
+        m != null &&
+            liked?.kind == "liebling" &&
+            liked.ids.all { id -> m.byId[id]?.let { t.key in GROUPS.getValue(t.kind)(it.product) } == true }
+    }
     val third =
         listOf<(Trait) -> Boolean>(
             { it.kind == "pack" },
             { it.kind in group && gapOf(it) < 0 },
-            { it.kind in group && gapOf(it) > 0 },
+            { it.kind in group && gapOf(it) > 0 && !again(it) },
             { it.kind == "sosse" },
             { it.kind == "stehen" },
             { it.kind == "neuerdings" },
@@ -2220,7 +2228,7 @@ fun cardTraits(
         ).firstNotNullOfOrNull { on -> ok.firstOrNull(on) }
     return listOfNotNull(
         ok.firstOrNull { it.kind == "appetit" && it.key in WORRY },
-        ok.firstOrNull { (it.kind == "liebling" && it.ids.isNotEmpty()) || it.kind == "sorten" },
+        liked,
         third,
     ).take(CARD_TRAITS)
 }

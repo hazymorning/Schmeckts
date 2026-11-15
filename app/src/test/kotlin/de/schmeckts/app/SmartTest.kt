@@ -1998,6 +1998,13 @@ class SmartTest {
             listOf("liebling", "pack"),
             cardTraits(fewer, weaker).map { it.kind },
         )
+        val catz = Trait("marke", "Catz Finefood", listOf("c1", "c2", "c3"), Insight("marke", Side("Catz Finefood"), Side(), 0.5))
+        val again = listOf(traits[0], catz, traits[4])
+        assertEquals(
+            "a brand every favourite comes from is the favourites told again",
+            listOf(listOf("liebling", "marke"), listOf("liebling", "neuerdings")),
+            listOf(cardTraits(again, null), cardTraits(again, null, m)).map { l -> l.map { it.kind } },
+        )
 
         val felix =
             line.map { if (it["id"] == "m2") prod("m2", "brand" to "Miamor", "variety" to "Ente Pastete") else it } +
