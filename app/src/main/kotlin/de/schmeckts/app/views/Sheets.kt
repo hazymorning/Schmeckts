@@ -1066,6 +1066,9 @@ private fun ReportView(state: SheetState) {
             if (still) list.scrollToItem(2 + i * 2) else list.animateScrollToItem(2 + i * 2)
         }
     }
+    // days glide into place when a meal comes or goes
+    val fade = if (still) null else tween<Float>(Motion.FADE)
+    val place = if (still) null else tween<androidx.compose.ui.unit.IntOffset>(Motion.STEP, easing = Motion.easeOut)
     PageList("Verlauf" + ph.forWhom(pet), ui.on("settings-back"), list, stuck) {
         item(key = "cal") {
             Calendar(all.filter { it.servedAt >= addDays(weekStart(Time.now()), -7) }, top = 0.dp)
@@ -1074,7 +1077,7 @@ private fun ReportView(state: SheetState) {
         days.forEachIndexed { i, g ->
             stickyHeader(key = "d-" + g.key) {
                 // the fade hangs below the stuck line and takes no room of its own
-                Box {
+                Box(Modifier.animateItem(fade, place, fade)) {
                     Column(Modifier.testTag("d-${g.key}").background(colors.bg)) {
                         if (i > 0) {
                             Gap(Space.s1)
@@ -1085,7 +1088,7 @@ private fun ReportView(state: SheetState) {
                     FadeEdge(stuck && list.firstVisibleItemIndex == 2 + i * 2, Modifier.align(Alignment.BottomCenter).offset(y = Space.s5))
                 }
             }
-            item(key = "i-" + g.key) { DayItems(g, multiHouse) }
+            item(key = "i-" + g.key) { Box(Modifier.animateItem(fade, place, fade)) { DayItems(g, multiHouse) } }
         }
     }
 }

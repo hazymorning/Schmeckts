@@ -13,7 +13,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
@@ -533,7 +532,7 @@ private fun ColumnScope.Optional(
             if (still) {
                 EnterTransition.None
             } else {
-                expandVertically(tween(Motion.STEP, easing = Motion.easeOut), expandFrom = Alignment.Top) + fadeIn(tween(Motion.FADE))
+                arriving
             },
         exit =
             if (still) {
@@ -726,7 +725,7 @@ private fun Pending(list: List<Rec>) {
     }
 }
 
-// a meal rated in full leaves its card with a short movement
+// a meal just fed opens its place in the card; rated in full it leaves with a short movement
 @Composable
 private fun Leaving(
     id: String,
@@ -735,7 +734,8 @@ private fun Leaving(
     watch()
     val ui = LocalUi.current
     val gone = ui.home.leaving[id]
-    val state = remember(id) { MutableTransitionState(true) }
+    val still = reduceMotion
+    val state = remember(id) { MutableTransitionState(still || ui.home.fresh != id).apply { targetState = true } }
     if (gone != null) state.targetState = false
     LaunchedEffect(state.isIdle, state.currentState) {
         if (!state.currentState && state.isIdle) {
@@ -744,7 +744,7 @@ private fun Leaving(
                 ?.invoke()
         }
     }
-    if (reduceMotion && gone != null) {
+    if (still && gone != null) {
         LaunchedEffect(id) {
             ui.home.leaving
                 .remove(id)
@@ -753,6 +753,7 @@ private fun Leaving(
     }
     AnimatedVisibility(
         state,
+        enter = if (still) EnterTransition.None else arriving,
         exit =
             fadeOut(tween(Motion.STEP, easing = Motion.easeIn)) +
                 slideOutVertically(tween(Motion.STEP, easing = Motion.easeIn)) { -it / 20 } +

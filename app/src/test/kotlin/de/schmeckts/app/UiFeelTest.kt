@@ -295,50 +295,56 @@ class UiSettingsSlideTest : ScreenTest() {
     }
 }
 
+// what measure gives, frame by frame, for ms after the action
+private fun ScreenTest.frames(
+    ms: Int,
+    action: () -> Unit,
+    measure: () -> Float,
+): List<Float> {
+    rule.mainClock.autoAdvance = false
+    val before = measure()
+    action()
+    val ys =
+        listOf(before) +
+            List(ms / 16) {
+                androidx.compose.runtime.snapshots.Snapshot
+                    .sendApplyNotifications()
+                org.robolectric.Shadows
+                    .shadowOf(android.os.Looper.getMainLooper())
+                    .idleFor(java.time.Duration.ofMillis(16))
+                rule.mainClock.advanceTimeByFrame()
+                measure()
+            }
+    rule.mainClock.autoAdvance = true
+    idle(1000)
+    return ys
+}
+
+// changed by more than least, no frame taking more than share of the way
+private fun glides(
+    ys: List<Float>,
+    least: Float,
+    share: Float = 0.2f,
+): Boolean {
+    val way = kotlin.math.abs(ys.last() - ys.first())
+    return way > least && ys.zipWithNext { a, b -> kotlin.math.abs(b - a) }.max() < way * share
+}
+
+private fun ScreenTest.top(tag: String) =
+    rule
+        .onNode(hasTestTag(tag), useUnmergedTree = true)
+        .fetchSemanticsNode()
+        .positionInRoot.y
+
 class UiHomeRoomTest : ScreenTest() {
     private fun sec(name: String) = rule.onNode(hasTestTag("sec-$name"), useUnmergedTree = true).fetchSemanticsNode()
-
-    private fun top(sec: String) = sec(sec).positionInRoot.y
 
     // the space between a card and the one above it
     private fun gapAbove(sec: String): Float {
         val all = tags("sec-")
         val above = sec(all[all.indexOf(sec) - 1])
-        return top(sec) - above.positionInRoot.y - above.size.height
+        return top("sec-$sec") - above.positionInRoot.y - above.size.height
     }
-
-    // the card's top, frame by frame, for ms after the action
-    private fun frames(
-        sec: String,
-        ms: Int = 1000,
-        action: () -> Unit,
-    ): List<Float> {
-        rule.mainClock.autoAdvance = false
-        val before = top(sec)
-        action()
-        val ys =
-            listOf(before) +
-                List(ms / 16) {
-                    androidx.compose.runtime.snapshots.Snapshot
-                        .sendApplyNotifications()
-                    org.robolectric.Shadows
-                        .shadowOf(android.os.Looper.getMainLooper())
-                        .idleFor(java.time.Duration.ofMillis(16))
-                    rule.mainClock.advanceTimeByFrame()
-                    top(sec)
-                }
-        rule.mainClock.autoAdvance = true
-        idle(1000)
-        return ys
-    }
-
-    private fun steps(ys: List<Float>) = ys.zipWithNext { a, b -> kotlin.math.abs(b - a) }
-
-    // moved up by more than least, no frame taking more than a fifth of the way
-    private fun glides(
-        ys: List<Float>,
-        least: Float,
-    ) = (ys.first() - ys.last()).let { it > least && steps(ys).max() < it / 5 }
 
     private fun unrated() = db.servings.filter { s -> s.pets.values.any { !(it as JsonObject)["r"].truthy } }
 
@@ -356,7 +362,7 @@ class UiHomeRoomTest : ScreenTest() {
         idle(3000)
         val last = unrated().single()
         check(tags("sec-").contains("pend") && tags("pend-") == listOf(last.id), "one meal left to rate")
-        val ys = frames("hist", 3000) { rateAll(last) }
+        val ys = frames(3000, { rateAll(last) }) { top("sec-hist") }
         check(glides(ys, 50 * dp), "the cards below glide up ${ys.map { (it / dp).toInt() }}")
         check("pend" !in tags("sec-") && tags("pend-").isEmpty(), "the card is gone")
         val gap = gapAbove("hist")
@@ -377,8 +383,52 @@ class UiHomeRoomTest : ScreenTest() {
             act("hide-hint", "v" to hintKey(hints()[0]))
             idle(1000)
         }
-        val ys = frames("hist") { ui.act("hide-hint", "v" to hintKey(hints()[0])) }
+        val ys = frames(1000, { ui.act("hide-hint", "v" to hintKey(hints()[0])) }) { top("sec-hist") }
         check(glides(ys, 50 * dp), "the cards below glide up ${ys.map { (it / dp).toInt() }}")
         check("question" !in tags("sec-"), "the card is gone")
+    }
+}
+
+class UiArriveTest : ScreenTest() {
+    @Test
+    fun `fed - the new meal opens its place in the card and in Verlauf`() {
+        open(reduce = false)
+        act("demo")
+        idle(2000)
+        val dp = rule.density.density
+        check("pend" in tags("sec-") && "evaluation" in tags("sec-"), "a card of meals to rate, Verlauf and a card below it")
+        val pid = db.products[0].id
+        var card = emptyList<Float>()
+        val verlauf =
+            frames(1000, { main.logic.feeding.serveProduct(pid) }) {
+                card += top("sec-hist") - top("sec-pend")
+                top("sec-evaluation") - top("sec-hist")
+            }
+        val fed = db.servings[0].id
+        check(tags("pend-").first() == fed && fed in tags("row-", within = "sec-hist"), "the meal is in both")
+        check(glides(card, 30 * dp, 0.34f), "the card makes room for it ${card.map { (it / dp).toInt() }}")
+        check(glides(verlauf, 30 * dp, 0.34f), "Verlauf makes room for it ${verlauf.map { (it / dp).toInt() }}")
+    }
+
+    @Test
+    fun `history - a meal deleted, the days below glide up while its sheet closes`() {
+        open(reduce = false)
+        act("demo")
+        idle(2000)
+        val dp = rule.density.density
+        act("open-report")
+        idle(600)
+        val days = tags("d-", sheet = true)
+        val second = days[1]
+        val meals = db.servings.filter { dayKey(it.servedAt) == second }
+        check(meals.size >= 2, "a day with a few meals $days")
+        ui.jump = second
+        idle(1000)
+        val third = tags("d-", sheet = true).let { it[it.indexOf(second) + 1] }
+        act("open-serving", "id" to meals[0].id)
+        idle(600)
+        val ys = frames(1000, { ui.act("delete-serving") }) { top("d-$third") }
+        check(db.servings.none { it.id == meals[0].id }, "the meal is gone")
+        check(glides(ys, 30 * dp, 0.34f), "the next day moves up over frames ${ys.map { (it / dp).toInt() }}")
     }
 }
