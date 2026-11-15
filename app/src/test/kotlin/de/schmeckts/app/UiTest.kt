@@ -745,7 +745,7 @@ class UiEvaluationTest : ScreenTest() {
         )
         check(
             found.filter { it.kind != "sosse" }.all { x -> inSheet(times(x.a.good, x.a.n)) && inSheet(times(x.b.good, x.b.n)) } &&
-                inSheet("8 von 8 Mal nur die Soße geleckt"),
+                inSheet("8 Mal nur die Soße geleckt"),
             "each with both counts",
         )
     }
@@ -774,7 +774,7 @@ class UiEvaluationTest : ScreenTest() {
         open(dbFile(listOf(pet(M)), products, meals), now)
         check(
             tags("pick-", within = "sec-evaluation") == listOf("naechste1") &&
-                within("sec-evaluation", "dann kommt sie auf die Einkaufsliste") &&
+                within("sec-evaluation", "dann kommt die Sorte auf die Einkaufsliste") &&
                 tags("medal-").isEmpty(),
             "the card names the variety one good meal from the shopping list",
         )
@@ -1017,8 +1017,9 @@ class UiEvaluationTest : ScreenTest() {
     fun `Vorlieben - a line opens its proof, the proof's rows open their sheets, back returns to the opened page`() {
         mau()
         val traits = phone.derive.vorliebenModel().traits
-        val pack = traits.first { it.kind == "pack" }.pack!!
-        val texture = traits.first { it.kind == "konsistenz" }.insight!!
+        val line = traits.first { it.kind == "pack" }
+        val pack = line.pack!!
+        val sauce = line.insight!!.sorts.map { it.id }
         val favourite = favourites(phone.derive.rankingModel()).single()
         act("open-evaluation")
         val shut = tags("proof-", sheet = true)
@@ -1037,12 +1038,18 @@ class UiEvaluationTest : ScreenTest() {
         val kept = listOf(level, tags("proof-", sheet = true))
         tapTag("trait-pack-${pack.brand}")
         val closed = tags("proof-", sheet = true)
-        tapTag("trait-konsistenz")
-        val rows = tags("proof-", sheet = true)
-        check(shut.isEmpty() && proof.sorted() == pack.sorts.map { it.id }.sorted(), "a line opens the varieties it rests on $proof")
+        tapTag("trait-appetit")
+        val weeks = tags("week-", sheet = true)
+        val lineIds = pack.sorts.map { it.id }
+        check(
+            shut.isEmpty() &&
+                proof.take(lineIds.size).sorted() == lineIds.sorted() &&
+                proof.sorted() == (lineIds + sauce).distinct().sorted(),
+            "a line opens the varieties it rests on, its own first, then the others in its sauce $proof",
+        )
         check(over == listOf("evaluation", listOf("product", null, null), proof[0]), "a row opens its sheet over the page $over")
         check(kept == listOf(listOf("evaluation", null, null), proof), "back returns to the page, its proof still open $kept")
-        check(closed.isEmpty() && rows.sorted() == texture.sorts.map { it.id }.sorted(), "a second tap folds it, another opens $rows")
+        check(closed.isEmpty() && weeks.size >= 2, "a second tap folds it, another opens $weeks")
         tapTag("trait-liebling")
         check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
     }
@@ -2110,7 +2117,7 @@ class UiPetsTest : ScreenTest() {
         check(within("pets", "M") && within("pets", "T"), "two cats without a photo go by their initials")
         check(within("pend-offen", "Minka") && !within("pend-offen", "Tiger"), "a meal for one of them names it at its slider")
         act("open-evaluation")
-        check(inSheet("Sheba, bei beiden alle 3 Mal alles gefressen"), "three meals for both read as three, not six")
+        check(labelled("Bei beiden alle 3 Mal alles gefressen"), "three meals for both read as three, not six")
     }
 
     @Test

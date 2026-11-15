@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -43,6 +45,7 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -122,6 +125,7 @@ import de.schmeckts.app.ui.tone
 import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
 import de.schmeckts.app.yearOf
+import kotlin.math.ceil
 import androidx.compose.ui.geometry.Size as Area
 
 // Building blocks shared by the views
@@ -165,7 +169,7 @@ fun evidenceOf(x: Tally): String {
             }.filter { it.first > 0 }
             .sortedByDescending { it.first }
     if (sides[0].first * 2 > x.n) return cap("${times(sides[0].first, x.n)} ${sides[0].second}")
-    return "Mal so, mal so: ${once(sides.map { it.second }).mapIndexed { i, said -> "${sides[i].first}× $said" }.joinToString(", ")}"
+    return "Mal so, mal so: ${once(sides.map { it.second }).mapIndexed { i, said -> "${often(sides[i].first)} $said" }.joinToString(", ")}"
 }
 
 // a closing word all phrases share is said once, at the end: „einmal fast alles, einmal die Hälfte gefressen“
@@ -744,6 +748,7 @@ fun spanOf(
     to: Long,
 ): String {
     val last = addDays(to, -1)
+    if (last <= from) return dayMonth(from)
     val head = if (monthOf(from) == monthOf(last) && yearOf(from) == yearOf(last)) "${dateOf(from)}." else dayMonth(from)
     return "$head bis ${dayMonth(last)}"
 }
@@ -752,13 +757,25 @@ fun spanOf(
 private val groundColor: Color
     @Composable get() = if (LocalRaise.current != null) colors.surface else colors.bg
 
+// how full a dot is, in steps that stay apart at its size: all, most, half, a little, nothing
+private fun fillOf(r: String) =
+    score(r).let { v ->
+        when {
+            v >= 100 -> 1f
+            v >= 70 -> 2 / 3f
+            v >= 50 -> 0.5f
+            v > 0 -> 0.25f
+            else -> 0f
+        }
+    }
+
 /** r: null for a rating still to come */
 @Composable
 fun RatingDot(r: String?) {
     watch()
     val p = colors
     val c = r?.let { p.tone(rateTone(it))?.c }
-    val share = if (r != null) score(r) / 100f else 0f
+    val share = if (r != null) fillOf(r) else 0f
     Canvas(Modifier.size(Size.dot)) {
         val half = size.minDimension / 2
         if (c == null) {
@@ -766,15 +783,21 @@ fun RatingDot(r: String?) {
             drawCircle(p.muted, half - w / 2, style = Stroke(w))
             return@Canvas
         }
+        if (share >= 1f) {
+            drawCircle(c, half)
+            return@Canvas
+        }
         val w = Size.stroke.toPx()
         val inner = half - w / 2
+        drawCircle(c, inner, style = Stroke(w))
         if (share > 0f) {
-            clipPath(Path().apply { addOval(Rect(center, inner)) }) {
-                val h = 2 * inner * share
-                drawRect(c, Offset(0f, center.y + inner - h), Area(size.width, h))
+            // the contents kept off the ring, so a nearly full dot does not pass for a full one
+            val fill = inner - w / 2 - Size.hairline.toPx()
+            clipPath(Path().apply { addOval(Rect(center, fill)) }) {
+                val h = 2 * fill * share
+                drawRect(c, Offset(0f, center.y + fill - h), Area(size.width, h))
             }
         }
-        drawCircle(c, inner, style = Stroke(w))
     }
 }
 
@@ -853,23 +876,17 @@ private fun bands(s: Shelf) =
         Triple(s.open, "noch offen", null),
     )
 
-/** a band's square, filled in its tone, or an open outline */
+/** a band's square in its tone; still open in the quiet tone of decoration */
 @Composable
 fun Swatch(tone: String?) {
     watch()
     val p = colors
-    val c = p.tone(tone)?.c
-    Canvas(Modifier.size(Size.dot)) {
-        if (c != null) {
-            drawRect(c)
-        } else {
-            val w = Size.hairline.toPx()
-            drawRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, size.height - w), style = Stroke(w))
-        }
-    }
+    val c = p.tone(tone)?.c ?: p.faint
+    Canvas(Modifier.size(Size.dot)) { drawRect(c) }
 }
 
-/** The varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines */
+/** The decided varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines;
+ *  those still open only in the legend */
 @Composable
 fun ShelfBar(
     shelf: Shelf,
@@ -882,48 +899,38 @@ fun ShelfBar(
     if (total == 0) return
     val p = colors
     val said = "Von $total Sorten: ${list.filter { it.first > 0 }.joinToString(", ") { "${it.first} ${it.second}" }}."
+    val decided = list.filter { it.third != null && it.first > 0 }.map { it.first to p.tone(it.third)!!.c }
+    val shown = decided.sumOf { it.first }
     Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
-            if (total > 2 * per) {
-                val last = list.indexOfLast { it.first > 0 }
-                Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
-                    val w = Size.hairline.toPx()
-                    val gap = Space.hair.toPx()
-                    val h = size.height
-                    drawRoundRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), style = Stroke(w))
-                    clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
-                        var x = 0f
-                        list.forEachIndexed { i, (k, _, tone) ->
-                            val seg = size.width * k / total
-                            val c = p.tone(tone)?.c
-                            if (k > 0 && c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < last) gap else 0f, h))
-                            x += seg
+        if (shown > 0) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
+                if (shown > 2 * per) {
+                    Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
+                        val gap = Space.hair.toPx()
+                        val h = size.height
+                        clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
+                            var x = 0f
+                            decided.forEachIndexed { i, (k, c) ->
+                                val seg = size.width * k / shown
+                                drawRect(c, Offset(x, 0f), Area(seg - if (i < decided.size - 1) gap else 0f, h))
+                                x += seg
+                            }
                         }
                     }
-                }
-            } else {
-                val rows = (total + per - 1) / per
-                val fills = list.flatMap { (k, _, tone) -> List(k) { p.tone(tone)?.c } }
-                Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
-                    val d = Size.dot.toPx()
-                    val step = d + Space.s1.toPx()
-                    val w = Size.hairline.toPx()
-                    fills.forEachIndexed { i, c ->
-                        val at = Offset(i % per * step, i / per * step)
-                        if (c != null) {
-                            drawRect(c, at, Area(d, d))
-                        } else {
-                            drawRect(p.muted, at + Offset(w / 2, w / 2), Area(d - w, d - w), style = Stroke(w))
-                        }
+                } else {
+                    val rows = (shown + per - 1) / per
+                    val fills = decided.flatMap { (k, c) -> List(k) { c } }
+                    Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
+                        val d = Size.dot.toPx()
+                        val step = d + Space.s1.toPx()
+                        fills.forEachIndexed { i, c -> drawRect(c, Offset(i % per * step, i / per * step), Area(d, d)) }
                     }
                 }
             }
+            if (legend) Gap(Space.s2)
         }
-        if (legend) {
-            Gap(Space.s2)
-            ShelfLegend(shelf)
-        }
+        if (legend) ShelfLegend(shelf)
     }
 }
 
@@ -1003,7 +1010,7 @@ fun CompareBars(
 }
 
 private fun weekSaid(w: Block): String {
-    val head = "Woche vom ${spanOf(w.from, w.to)}: "
+    val head = "${if (addDays(w.start, 1) >= w.to) "Am" else "Woche vom"} ${spanOf(w.start, w.to)}: "
     if (w.n == 0) return head + "nichts bewertet."
     val ate =
         listOfNotNull(
@@ -1038,9 +1045,10 @@ private fun DrawScope.drawWeek(
         drawRect(c, Offset(0f, y - s), Area(size.width, s))
         y -= s + gap
     }
-    if (!w.judged) {
+    if (!w.judged && w.n > 0) {
         val l = Size.hairline.toPx()
-        drawRect(p.muted, Offset(l / 2, l / 2), Area(size.width - l, h - l), style = Stroke(l))
+        val top = h - h * w.n / most
+        drawRect(p.muted, Offset(l / 2, top + l / 2), Area(size.width - l, h - top - l), style = Stroke(l))
     }
     if (w.n == 0) return
     val at = h - (h * w.expected / most).toFloat()
@@ -1050,7 +1058,10 @@ private fun DrawScope.drawWeek(
     drawLine(p.ink, Offset(-over, at), Offset(size.width + over, at), st)
 }
 
-/** a column a week, oldest first, the notes of each under it */
+/** the first day of a week, as under its column: „27.9.“ */
+fun weekDay(w: Block) = "${dateOf(w.start)}.${monthOf(w.start)}."
+
+/** a column a week across the width, oldest first, the notes of each and the day it starts under it */
 @Composable
 fun WeekChart(
     weeks: List<Block>,
@@ -1060,16 +1071,27 @@ fun WeekChart(
     if (weeks.isEmpty()) return
     val p = colors
     val most = weeks.maxOf { it.n }.coerceAtLeast(1)
-    val first = weeks[0].from
+    val day = Type.caption.copy(fontFeatureSettings = "tnum")
+    val measure = rememberTextMeasurer()
+    val widest =
+        with(LocalDensity.current) {
+            measure
+                .measure("30.12.", day)
+                .size.width
+                .toDp()
+        }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val k = weeks.size
-        val col = minOf((maxWidth - Space.s2 * (k - 1)) / k, Size.picXl)
-        Column(Modifier.width(col * k + Space.s2 * (k - 1))) {
+        val col = (maxWidth - Space.s2 * (k - 1)) / k
+        // a day under every column it fits beside, from the oldest; never past the end
+        val step = ceil((widest + Space.s1) / (col + Space.s2)).toInt().coerceAtLeast(1)
+        val dated = { i: Int -> i % step == 0 && (col + Space.s2) * (k - i) - Space.s2 >= widest }
+        Column(Modifier.fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
                 weeks.forEachIndexed { i, w ->
                     Canvas(
                         Modifier
-                            .width(col)
+                            .weight(1f)
                             .height(Size.chart)
                             .testTag("week-${k - 1 - i}")
                             .semantics { contentDescription = weekSaid(w) },
@@ -1081,7 +1103,7 @@ fun WeekChart(
                 Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
                     for (w in weeks) {
                         Column(
-                            Modifier.width(col),
+                            Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(Space.hair),
                         ) {
@@ -1091,8 +1113,8 @@ fun WeekChart(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(Space.hair),
                                 ) {
-                                    Icon(observationOf(kind).icon, size = Size.iconXs, color = p.tone(kind)?.c ?: p.muted)
-                                    if (n > 1) T("$n", Type.caption.copy(fontFeatureSettings = "tnum"), color = p.muted)
+                                    Icon(observationOf(kind).icon, size = Size.iconS, color = p.tone(kind)?.c ?: p.muted)
+                                    if (n > 1) T("$n", day, color = p.muted)
                                 }
                             }
                         }
@@ -1100,8 +1122,11 @@ fun WeekChart(
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
-                T("ab ${dateOf(first)}.${monthOf(first)}.", Type.caption.copy(fontFeatureSettings = "tnum"), Modifier.weight(1f), p.muted)
-                T("bis heute", Type.caption, color = p.muted)
+                weeks.forEachIndexed { i, w ->
+                    Box(Modifier.weight(1f)) {
+                        if (dated(i)) T(weekDay(w), day, Modifier.wrapContentWidth(Alignment.Start, unbounded = true), p.muted)
+                    }
+                }
             }
         }
     }
