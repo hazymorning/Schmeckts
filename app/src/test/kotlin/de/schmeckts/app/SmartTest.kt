@@ -2128,7 +2128,7 @@ class SmartTest {
         val next = nextUp(m2, now0, r2, lastOf(two), emptyList())
 
         fun picks(lines: Map<String, Set<String>>) =
-            nextPicks(r2, next, lines).map { p -> listOf(p.id, p.trial?.pet, p.trial?.need, p.trial?.handed) }
+            nextPicks(r2, next, lines).map { p -> listOf(p.id, p.trial?.pet, p.trial?.need, p.trial?.alone) }
         assertEquals(listOf(listOf("line", "A", 1, false)), picks(emptyMap()))
         assertEquals(
             "a trial from A's failing line goes to B, who is still trying it",

@@ -1625,7 +1625,7 @@ private fun Phone.pickSaid(
         val again = if (t.need == 1) "einmal" else "zweimal"
         // when every cat that rated it is as far along, one meal settles it for all and no name is needed
         val rated = m.pets.map { pid -> e.pets[pid]?.n ?: 0 }.filter { it > 0 }
-        val alike = !t.handed && rated.all { it == e.pets[t.pet]?.n }
+        val alike = !t.alone && rated.all { it == e.pets[t.pet]?.n }
         val name = if (several && !alike) derive.getPet(t.pet)?.str("name") else null
         val all =
             when {
