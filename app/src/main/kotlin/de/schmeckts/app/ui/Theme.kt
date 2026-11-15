@@ -235,7 +235,6 @@ object Radius {
 }
 
 object Size {
-    val iconXs = 12.dp // in a medal
     val iconS = 20.dp // inside controls
     val icon = 24.dp // on its own
     val iconM = 28.dp // a level on the rating slider
@@ -247,7 +246,6 @@ object Size {
     val control = 52.dp
     val controlL = 56.dp // feeding button, settings row
     val bar = 56.dp
-    val picBadge = 18.dp
     val picXs = 24.dp
     val picS = 32.dp
     val picM = 40.dp
