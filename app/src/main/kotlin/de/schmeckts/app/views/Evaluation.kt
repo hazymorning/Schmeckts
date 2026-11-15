@@ -37,12 +37,14 @@ import de.schmeckts.app.Evaluation
 import de.schmeckts.app.Group
 import de.schmeckts.app.Insight
 import de.schmeckts.app.Model
+import de.schmeckts.app.NO
 import de.schmeckts.app.Phone
 import de.schmeckts.app.Pt
 import de.schmeckts.app.RATINGS
 import de.schmeckts.app.Ranking
 import de.schmeckts.app.Sort
 import de.schmeckts.app.TYPES
+import de.schmeckts.app.Tally
 import de.schmeckts.app.Taste
 import de.schmeckts.app.Time
 import de.schmeckts.app.Trial
@@ -57,6 +59,7 @@ import de.schmeckts.app.pname
 import de.schmeckts.app.poorOf
 import de.schmeckts.app.ranks
 import de.schmeckts.app.rateTone
+import de.schmeckts.app.score
 import de.schmeckts.app.sideOf
 import de.schmeckts.app.typeOf
 import de.schmeckts.app.ui.Card
@@ -98,7 +101,7 @@ private const val CARD_ROWS = 2 // rows of a side on the home card
 private const val JUDGE = 4 // settled varieties before the lead calls a cat picky or easy to please
 private const val AWAY = 42 * DAY // a favourite unserved this long says since when
 private const val NAMED = 2 // groups or favourites one sentence names
-private const val WHOLE = 18 // letters of a marked name kept on one line
+private const val WHOLE = 24 // letters of a marked name kept on one line
 
 private val TEXTURE_SAID =
     mapOf(
@@ -111,6 +114,9 @@ private val TEXTURE_SAID =
     )
 
 private fun textureName(key: Any?) = TEXTURE_SAID[key] ?: (key as? String ?: "")
+
+// in a sentence, where the block is the object
+private fun textureSaid(key: Any?) = if (key == "block") "den festen Block" else textureName(key)
 
 private fun brandOf(e: Sort) = if (!e.product.str("variety").isNullOrEmpty()) (e.product.str("brand") ?: "").trim() else ""
 
@@ -177,6 +183,14 @@ private fun ateOf(
 private fun Phone.ateSaid(ate: List<Ate>) =
     ate.joinToString(", ") { "${petName(it.pet)} ${it.r?.let { r -> "meistens ${RATINGS.getValue(r).said}" } ?: "noch offen"}" }
 
+// Left only where the bowl it usually leaves is a poor one, so a list of what is left never shows half eaten; the
+// feeding list still tells such a variety's record.
+private fun sideIn(x: Tally): String {
+    val s = sideOf(x)
+    val poor = usualOf(x.counts)?.let { score(it) < NO } == true
+    return if (s == "flop" && x.verdict != "nicht" && !poor) "mid" else s
+}
+
 // the cats with ratings of wet food, as one with none likes and leaves nothing yet
 private fun ratedOf(m: Model) = m.pets.filter { pid -> m.sorts.any { ranks(it.product) && (it.pets[pid]?.n ?: 0) > 0 } }.ifEmpty { m.pets }
 
@@ -189,8 +203,8 @@ private fun Eats(
     watch()
     if (ate.isEmpty()) return
     if (ratedOf(m).size == 1) {
-        val r = ate[0].r ?: return
-        Icon("r_$r", color = colors.tone(rateTone(r))!!.c)
+        val r = ate[0].r
+        if (r == null) Icon("unrated", color = colors.muted) else Icon("r_$r", color = colors.tone(rateTone(r))!!.c)
         return
     }
     val d = LocalUi.current.phone.derive
@@ -232,7 +246,11 @@ private fun anded(items: List<List<Bit>>): List<Bit> =
 private fun nounOf(
     p: Named,
     tone: String,
-) = if (p.kind == "marke") listOf(Bit("die Sorten von "), Bit(p.g.key, tone)) else listOf(Bit(groupName(p.kind, p.g.key), tone))
+) = when (p.kind) {
+    "marke" -> listOf(Bit("die Sorten von "), Bit(p.g.key, tone))
+    "konsistenz" -> listOf(Bit(textureSaid(p.g.key), tone))
+    else -> listOf(Bit(p.g.key, tone))
+}
 
 private fun namedOf(
     t: Taste,
@@ -321,7 +339,7 @@ private fun Phone.leavesOf(
             .sortedByDescending { poorShare(it.g) }
             .take(NAMED)
             .sortedBy { KINDS.indexOf(it.kind) }
-    val e = r.flop.firstOrNull { e -> one || pets.all { pid -> e.pets[pid]?.let(::sideOf) == "flop" } }
+    val e = r.flop.firstOrNull { e -> if (one) sideIn(e) == "flop" else pets.all { pid -> e.pets[pid]?.let(::sideIn) == "flop" } }
     val what = if (left.isNotEmpty()) anded(left.map { nounOf(it, "bad") }) else listOf(Bit(shortName(e ?: return emptyList()), "bad"))
     val counts = if (left.isNotEmpty()) left.flatMap { p -> mine(p).mapNotNull { it?.counts } } else pets.map { windowOf(e!!, it) }
     val often = oftenOf(counts)
@@ -568,14 +586,14 @@ private fun LeadBlock(
 ) {
     watch()
     val ph = LocalUi.current.phone
-    val l = ph.leadOf(m, r, x, m.pets.size == 1 && x.taste.konsistenz.isNotEmpty())
+    val l = ph.leadOf(m, r, x, ratedOf(m).size == 1 && x.taste.konsistenz.isNotEmpty())
     Column(Modifier.fillMaxWidth().testTag("lead")) {
         Marked(l.bits)
         if (l.note.isNotEmpty()) M(esc(l.note), Type.body, Modifier.padding(top = Space.s3), colors.muted)
     }
     // the appetite rule already weighs each variety by what it got before, so a drop it finds is not the food
     for (h in m.hints.filter { it.kind == "appetit" }) {
-        val who = if (m.pets.size > 1) "${ph.petName(h.pet ?: "")} frisst" else "Frisst"
+        val who = "${ph.petName(h.pet ?: "")} frisst"
         val said =
             "$who seit ein paar Tagen schlechter als sonst: zuletzt ${times(h.good, h.n)} gut gefressen, " +
                 "davor ${times(h.goodBefore, h.before)}. An den Sorten liegt es nicht, die kamen vorher besser an."
@@ -611,14 +629,11 @@ private fun listsOf(
     m: Model,
     r: Ranking,
 ): Lists {
-    if (ratedOf(m).size == 1) return Lists(r.top, r.flop, emptyList())
-    val sides = { e: Sort -> m.pets.mapNotNull { pid -> e.pets[pid]?.takeIf { it.n > 0 }?.let(::sideOf) } }
-    val torn = { e: Sort -> sides(e).let { "top" in it && "flop" in it } }
-    return Lists(
-        r.top.filter { e -> sides(e).all { it == "top" } },
-        r.flop.filter { e -> sides(e).all { it == "flop" } },
-        (r.split + (r.top + r.flop + r.mid).filter(torn)).distinct(),
-    )
+    if (ratedOf(m).size == 1) return Lists(r.top, r.flop.filter { sideIn(it) == "flop" }, emptyList())
+    val sides = { e: Sort -> m.pets.mapNotNull { pid -> e.pets[pid]?.let(::sideIn) } }
+    val all = r.top + r.split + r.mid + r.flop
+    val with = { side: String, not: String -> all.filter { e -> sides(e).let { side in it && not !in it } }.distinct() }
+    return Lists(with("top", "flop"), with("flop", "top"), all.filter { e -> sides(e).let { "top" in it && "flop" in it } }.distinct())
 }
 
 @Composable
@@ -653,7 +668,7 @@ private fun Flops(
 private fun Phone.leaves(m: Model) =
     ratedOf(m).let {
         when {
-            it.size > 1 -> "Lassen sie stehen"
+            it.size > 1 -> "Bleibt stehen"
             pronOf(it[0]) == "er" -> "Lässt er stehen"
             else -> "Lässt sie stehen"
         }
@@ -668,7 +683,7 @@ private fun Split(
     watch()
     if (split.isEmpty()) return
     ListCard("Geschmackssache", "split") {
-        Hint(if (m.pets.size == 2) "Die eine mag sie, die andere lässt sie stehen." else "Manche mögen sie, andere lassen sie stehen.")
+        Hint(if (ratedOf(m).size == 2) "Die eine mag sie, die andere lässt sie stehen." else "Manche mögen sie, andere lassen sie stehen.")
         Folded(split, "split") { e -> SortRow(m, e, "split") }
     }
 }
@@ -705,13 +720,21 @@ private fun Phone.toldIn(
     val pron = pronOf(pid)
     if (kind == "konsistenz") {
         val i = x.insights.firstOrNull { it.kind == "sosse" } ?: return null
-        val instead = i.instead?.let { " ${textureName(it.key)} frisst $pron lieber." } ?: ""
+        val instead = i.instead?.let { " ${cap(textureSaid(it.key))} frisst $pron lieber." } ?: ""
         return "Von Stückchen in Soße leckt $pron oft nur die Soße.$instead"
     }
-    if (kind == "geschmack" && fishOrMeat(m)?.clear == false) {
-        return "Ob Fisch oder Fleisch, macht bei ${petName(pid)} bisher keinen klaren Unterschied."
+    // a clear difference is in the sentence on top, and a verdict on the fish row says more than a leaning
+    val fm = fishOrMeat(m)
+    val judged = x.taste.geschmack.any { it.key == "Fisch" && it.verdict != "geht" }
+    if (kind != "geschmack" || fm == null || fm.clear || judged) return null
+    val fish = fm.fish.good * fm.meat.n
+    val meat = fm.meat.good * fm.fish.n
+    val name = petName(pid)
+    return when {
+        fish < meat -> "Fisch kommt bei $name bisher etwas schlechter an als Fleisch, aber noch nicht deutlich."
+        fish > meat -> "Fisch kommt bei $name bisher etwas besser an als Fleisch, aber noch nicht deutlich."
+        else -> "Ob Fisch oder Fleisch, macht bei $name bisher keinen Unterschied."
     }
-    return null
 }
 
 // each flavour, consistency and brand, the bowl she usually leaves first
@@ -818,7 +841,7 @@ private fun Trials(
     ListCard("Noch im Test", "trials") {
         val at = if (rated.size == 1) " bei ${ph.petName(rated[0])}" else ""
         Hint("Noch ein- oder zweimal füttern und bewerten, dann steht fest, wie sie$at ankommen.")
-        Folded(r.trials, "trials") { t: Trial -> SortRow(m, t.e, "trial", pets = listOf(t.pet), early = true) }
+        Folded(r.trials, "trials") { t: Trial -> SortRow(m, t.e, "trial", early = true) }
     }
 }
 
@@ -831,7 +854,7 @@ private fun Foot(x: Evaluation) {
     val parts = mutableListOf<String>()
     if (b.n > 0) {
         val date = dayMonth(b.first) + if (yearOf(b.first) == yearOf(Time.now())) "" else " ${yearOf(b.first)}"
-        parts.add("Beruht auf ${b.n} Bewertungen seit dem $date.")
+        parts.add("Beruht auf ${if (b.n == 1) "einer Bewertung" else "${b.n} Bewertungen"} seit dem $date.")
     }
     if (b.left.isNotEmpty()) {
         parts.add(
@@ -926,7 +949,8 @@ private fun ShopRow(
     watch()
     val ph = LocalUi.current.phone
     val sub = if (e.kaufen == null && e.choice == "gemischt") "nur für ${ph.derive.petNames(e.yes)}" else ""
-    SortRow(m, e, "shop", if (e.kaufen != null) listOf(sub, "von dir festgelegt").filter { it.isNotEmpty() }.joinToString(", ") else sub)
+    val said = if (e.kaufen != null) listOf(sub, "von dir festgelegt").filter { it.isNotEmpty() }.joinToString(", ") else sub
+    SortRow(m, e, "shop", said, early = true)
 }
 
 @Composable
@@ -954,13 +978,10 @@ fun ShopPage() {
                 }
             }
         }
-        // what „Vorlieben“ lists as left is not bought again either, though no rule says so yet
-        val (left, open) = g.geht.partition { it.kaufen == null && sideOf(it) == "flop" }
-        val stop = g.nicht + left
-        if (stop.isNotEmpty()) {
-            ListCard("Nicht mehr kaufen", "stop") { Folded(stop, "stop") { e -> ShopRow(m, e) } }
+        if (g.nicht.isNotEmpty()) {
+            ListCard("Nicht mehr kaufen", "stop") { Folded(g.nicht, "stop") { e -> ShopRow(m, e) } }
         }
-        val unclear = open + g.neu
+        val unclear = g.geht + g.neu
         if (unclear.isNotEmpty()) {
             ListCard("Noch unklar", "unclear") { Folded(unclear, "unclear") { e -> ShopRow(m, e) } }
         }
@@ -1014,7 +1035,7 @@ fun EvaluationCard(m: Model) {
             }
             lists.top.isNotEmpty() || lists.flop.isNotEmpty() || lists.split.isNotEmpty() -> {
                 for ((side, list) in listOf("good" to lists.top, "bad" to lists.flop, "mid" to lists.split)) {
-                    if (list.isEmpty() || side == "mid" && (lists.top + lists.flop).isNotEmpty()) continue
+                    if (list.isEmpty() || side == "mid" && lists.top.isNotEmpty()) continue
                     SideLabel(
                         when (side) {
                             "good" -> "Am liebsten"

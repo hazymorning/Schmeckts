@@ -806,11 +806,10 @@ fun usualOf(counts: Map<String, Int>): String? {
     }
 }
 
-private val TONES = listOf("bad", "sauce", "mid", "good")
+// the bowls of the sauce tone count as one, a bit eaten and the sauce licked off are as good as each other
+private fun usualScore(g: Group) = usualOf(g.counts)?.let { if (rateTone(it) == "sauce") NO - 1 else score(it) } ?: -1
 
-private fun usualScore(g: Group) = usualOf(g.counts)?.let { TONES.indexOf(rateTone(it)) } ?: -1
-
-// the tone of the bowl she usually leaves first, so the colours step down the list; then how often it went down well
+// the bowl she usually leaves first, so the bowls step down the list; then how often it went down well
 private val byBowl =
     Comparator<Group> { a, b ->
         val u = usualScore(b) - usualScore(a)
@@ -853,12 +852,13 @@ fun taste(m: Model): Taste {
         val g = list.singleOrNull() ?: return emptyList()
         val rest = wetOf(m).filter { it !in g.sorts }
         if (!enough(rest)) return emptyList()
-        return listOf(g, Group("", rest)).sortedWith(byBowl)
+        return listOf(g, Group("", rest))
     }
     return Taste(side("konsistenz"), side("geschmack"), side("marke"))
 }
 
-/** fish against meat in the wet food, varieties of both left out; clear where the gap is a finding */
+/** fish against meat in the wet food, varieties of both as fish only where fish alone is too little; clear where the gap
+ *  is a finding */
 class FishMeat(
     val fish: Side,
     val meat: Side,
@@ -877,6 +877,8 @@ fun fishOrMeat(m: Model): FishMeat? {
             n == 0 -> meat.add(e)
         }
     }
+    // with too little fish of its own, the fish that came with meat, as the Fisch row counts it
+    if (!enough(fish)) fish += wetOf(m).filter { e -> e !in fish && flavoursOf(e.product.str("variety")).any { it in FISH } }
     if (!enough(fish) || !enough(meat)) return null
     val a = tallyOf(fish, "Fisch")
     val b = tallyOf(meat, "Fleisch")

@@ -740,12 +740,14 @@ class UiEvaluationTest : ScreenTest() {
         act("open-evaluation")
         val r = phone.derive.rankingModel()
         val x = phone.derive.evaluationModel()
+        // left as a list of the page says it: what she usually leaves most of
+        val left = r.flop.filter { e -> e.verdict == "nicht" || usualOf(e.counts)?.let { score(it) < NO } == true }
         val cards = tags("", sheet = true).filter { it in setOf("lead", "favourites", "flops", "split", "taste", "feeding", "trials") }
         val want =
             listOfNotNull(
                 "lead",
                 "favourites".takeIf { r.top.isNotEmpty() },
-                "flops".takeIf { r.flop.isNotEmpty() },
+                "flops".takeIf { left.isNotEmpty() },
                 "taste",
                 "feeding".takeIf { x.insights.any { it.kind !in setOf("geschmack", "konsistenz", "marke", "sosse") } },
                 "trials".takeIf { r.trials.isNotEmpty() },
@@ -753,7 +755,7 @@ class UiEvaluationTest : ScreenTest() {
         check(cards == want, "the cards in this order, each only with something to say $cards")
         val shown = { side: List<Sort> -> (if (side.size > 4) side.take(3) else side).map { it.id } }
         check(tags("top-", within = "favourites") == shown(r.top), "the favourites in their order, three before a fold")
-        check(tags("flop-", within = "flops") == shown(r.flop), "what is left, in its order")
+        check(tags("flop-", within = "flops") == shown(left), "what is left, in its order")
         val groups = x.taste.konsistenz + x.taste.geschmack + x.taste.marke
         check(
             groups.isNotEmpty() && groups.all { labelled(", ${it.good} von ${it.n} Mal gut gefressen, Mau meistens") },
