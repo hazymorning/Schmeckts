@@ -9,9 +9,9 @@ import kotlinx.serialization.json.JsonObject
 
 // The texts of the overview card and the cat calendar, in src/main/resources (facts.json, pools.json)
 
-/** A sheet of the cat calendar. verdict, back: the stamp and the answer on the back of a Stimmt’s?. m, f: the wording
- *  for the household's one cat of that sex, {name} its name; {deine Katze} becomes „dein Kater“ for a tom. months,
- *  only in Wissen: 1-12, outside them the sheet is skipped. */
+/** A sheet of the cat calendar. verdict, back: the answer on the back of a Stimmt’s? or Warum?, led by the verdict. m, f:
+ *  the wording for the household's one cat of that sex, {name} its name; {deine Katze} becomes „dein Kater“ for a tom.
+ *  months, only in Tipp: 1-12, the sheet shows once in each run of them and never outside. */
 class Sheet(
     val id: String,
     val text: String,

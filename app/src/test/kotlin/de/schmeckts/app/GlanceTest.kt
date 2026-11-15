@@ -7,6 +7,7 @@ import de.schmeckts.app.content.NOTABLE
 import de.schmeckts.app.content.NOTED
 import de.schmeckts.app.content.Sheet
 import de.schmeckts.app.views.Card
+import de.schmeckts.app.views.WEEK
 import de.schmeckts.app.views.catOf
 import de.schmeckts.app.views.factOn
 import de.schmeckts.app.views.factsOf
@@ -25,6 +26,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
 
 // The overview card (Glance.kt, views/Overview.kt) and the cat calendar (views/Facts.kt), their texts in content/
 class GlanceTest {
@@ -582,21 +584,43 @@ class GlanceTest {
 
     private val sheets = FACTS.values.flatten()
 
+    private val flipping = listOf("Stimmt’s?", "Warum?")
+
     @Test
-    fun `the cat calendar - a format a weekday, an id prefix each, every text once, back only on Stimmt's, months only in Wissen`() {
+    fun `the cat calendar - a format a weekday, an id prefix each, every text once, answers on Stimmt's and Warum, months in Tipp`() {
         assertEquals(
-            listOf("Wissen", "Katzenlogik", "Stimmt’s?", "Kurios", "Wissen", "Flachwitz", "Sprache"),
+            listOf("Wissen", "Katzenlogik", "Stimmt’s?", "Kurios", "Tipp", "Warum?", "Sprache"),
             (0..6).map { formatOn(localTime(2026, 10, 4 + it, 12)) }, // from Sunday
         )
+        assertEquals(WEEK.toSet(), FACTS.keys)
+        assertTrue("each stamp fits beside the longest date $WEEK", WEEK.all { it.length <= 11 })
         val prefixes = FACTS.values.map { list -> list.map { it.id.replace(Regex("\\d{3}$"), "") }.toSet() }
         assertTrue("one prefix a format", prefixes.all { it.size == 1 } && prefixes.map { it.first() }.toSet().size == prefixes.size)
         assertEquals(sheets.size, sheets.map { it.id }.toSet().size)
         val texts = sheets.flatMap { listOfNotNull(it.text, it.back, it.m, it.f) }
         assertEquals(texts.size, texts.toSet().size)
         for ((format, list) in FACTS) {
+            val flips = format in flipping
             for (f in list) {
-                assertTrue(f.id, (f.back != null) == (format == "Stimmt’s?") && (f.verdict != null) == (f.back != null))
-                assertTrue(f.id, f.months == null || (format == "Wissen" && f.months.all { it in 1..12 }))
+                assertTrue(f.id, (f.back != null) == flips && (f.verdict != null) == flips)
+                assertTrue(f.id, f.months == null || (format == "Tipp" && f.months.all { it in 1..12 } && f.months.toSet().size in 1..11))
+            }
+        }
+    }
+
+    @Test
+    fun `the cat calendar - a text fits its sheet, two lines for a joke or a question to guess, three for the rest and the answer`() {
+        // about 43 characters a line at 390dp
+        for ((format, list) in FACTS) {
+            for (f in list) {
+                for (c in listOf(null, cat("f"), cat("m"))) {
+                    val front = sheetText(f, c)
+                    assertTrue("${f.id}: $front", front.length <= if (format in flipping || format == "Katzenlogik") 85 else 120)
+                    if (f.back == null) continue
+                    val verdict = f.verdict!!
+                    assertTrue("${f.id}: $verdict", verdict.length <= 16 && !Regex("[.!?]$").containsMatchIn(verdict))
+                    assertTrue("${f.id}: ${f.back}", verdict.length + 2 + sheetText(f, c, true).length <= 125)
+                }
             }
         }
     }
@@ -612,14 +636,55 @@ class GlanceTest {
             shown.getOrPut(formatOn(d)) { mutableListOf() }.add(f.id)
         }
         assertEquals(factOn(localTime(2026, 10, 6, 0, 10)), factOn(localTime(2026, 10, 6, 23, 50)))
-        for ((format, ids) in shown) {
+        for ((format, all) in shown) {
             val every = FACTS.getValue(format).filter { it.months == null }.map { it.id }
+            val ids = all.filter { it in every }
             val last = HashMap<String, Int>()
             ids.forEachIndexed { n, id ->
                 val since = if (last.containsKey(id)) ids.subList(last.getValue(id) + 1, n).toSet() else emptySet()
                 assertTrue("$format: $id again before all others", !last.containsKey(id) || every.all { it == id || it in since })
                 last[id] = n
             }
+        }
+    }
+
+    // three years of sheets from the calendar's first day, by day
+    private val years by lazy { (0 until 3 * 365).map { localTime(2026, 1, 1 + it, 12) }.associateWith { factOn(it) } }
+
+    @Test
+    fun `the cat calendar - a seasonal sheet shows once in every run of its months, each year`() {
+        val seasonal = sheets.filter { it.months != null }
+        assertTrue(seasonal.isNotEmpty())
+        for (f in seasonal) {
+            // the days in its months, cut into runs where they break off
+            val runs = mutableListOf<MutableList<Long>>()
+            var before = false
+            for (d in years.keys) {
+                val inside = monthOf(d) in f.months!!
+                if (inside && !before) runs.add(mutableListOf())
+                if (inside) runs.last().add(d)
+                before = inside
+            }
+            assertTrue(f.id, runs.size >= 3)
+            runs.forEachIndexed { n, run ->
+                val times = run.count { years.getValue(it) == f }
+                assertTrue("${f.id} $times times in the run from ${dayKey(run.first())}", times == 1 || (times == 0 && n == runs.lastIndex))
+            }
+        }
+    }
+
+    @Test
+    fun `the cat calendar - a year-round sheet comes again a year later at the soonest, its neighbours in the list not on the next turn`() {
+        for ((format, list) in FACTS) {
+            val year = list.filter { it.months == null }
+            val days = years.filter { (d, f) -> formatOn(d) == format && f.months == null }
+            val last = HashMap<String, Long>()
+            for ((d, f) in days) {
+                last[f.id]?.let { assertTrue("$format: ${f.id} again on ${dayKey(d)}", d - it >= 365 * DAY) }
+                last[f.id] = d
+            }
+            val places = days.values.map { year.indexOf(it) }
+            for ((a, b) in places.zipWithNext()) assertTrue("$format: ${year[a].id} then ${year[b].id}", abs(a - b) > 2)
         }
     }
 

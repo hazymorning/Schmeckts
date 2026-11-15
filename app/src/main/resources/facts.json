@@ -1,884 +1,1169 @@
 {
+ "Wissen": [
+  {
+   "id": "k001",
+   "text": "Katzen hören Töne, die für uns viel zu hoch sind. So hoch rufen auch viele Mäuse."
+  },
+  {
+   "id": "k002",
+   "text": "Katzen drehen jedes Ohr für sich, ohne den Kopf zu bewegen. So hören sie auch, was hinter ihnen los ist.",
+   "m": "{name} dreht jedes Ohr für sich, ohne den Kopf zu bewegen. So hört er auch, was hinter ihm los ist.",
+   "f": "{name} dreht jedes Ohr für sich, ohne den Kopf zu bewegen. So hört sie auch, was hinter ihr los ist."
+  },
+  {
+   "id": "k082",
+   "text": "Katzen hören an deinem Tonfall, ob du mit ihnen redest oder mit anderen. Bei Fremden klappt das nicht."
+  },
+  {
+   "id": "k003",
+   "text": "Was direkt vor der Nase liegt, sieht eine Katze unscharf. Auf den letzten Zentimetern tasten die Schnurrhaare."
+  },
+  {
+   "id": "k004",
+   "text": "Im Hellen wird die Katzenpupille zum Schlitz. Das schützt die Augen, die für die Dämmerung gemacht sind."
+  },
+  {
+   "id": "k006",
+   "text": "Katzen reicht etwa ein Sechstel des Lichts, das wir brauchen. Wo wir im Dunkeln tappen, sehen sie noch etwas."
+  },
+  {
+   "id": "k008",
+   "text": "Katzen sehen wohl auch ultraviolettes Licht. Ihre Augenlinse lässt es durch, unsere hält es zurück."
+  },
+  {
+   "id": "k009",
+   "text": "Auf Blitzfotos leuchten Katzenaugen oft grün. Eine Spiegelschicht hinter der Netzhaut wirft das Licht zurück."
+  },
+  {
+   "id": "k011",
+   "text": "Katzen haben weit weniger Geschmacksknospen als wir. Ob sie etwas fressen, entscheidet oft schon die Nase."
+  },
+  {
+   "id": "k147",
+   "text": "Umami, der herzhafte Geschmack von Fleisch, ist für Katzen wohl der wichtigste. Thunfisch hat viel davon."
+  },
+  {
+   "id": "k013",
+   "text": "Lässt eine Katze nach dem Schnuppern das Maul offen, flehmt sie. Ein Organ über dem Gaumen prüft den Duft."
+  },
+  {
+   "id": "k093",
+   "text": "Katzenminze hält Mücken fern. Wer sich darin wälzt, hat den Duft im Fell. Vielleicht mögen Katzen sie darum."
+  },
+  {
+   "id": "k014",
+   "text": "Katzen haben auch über den Vorderpfoten Tasthaare. Damit spüren sie, ob sich unter der Pfote etwas regt."
+  },
+  {
+   "id": "k019",
+   "text": "Das Schlüsselbein einer Katze ist winzig und steckt lose im Muskel. So passt sie auch durch schmale Spalten."
+  },
+  {
+   "id": "k039",
+   "text": "Rennt eine Katze, krümmt und streckt sie den Rücken. So wird jeder Satz weiter, als die Beine allein schaffen."
+  },
+  {
+   "id": "k041",
+   "text": "Aus dem Stand springt eine Katze gut dreimal so hoch, wie sie groß ist. Lange Hinterbeine helfen, Speck nicht."
+  },
+  {
+   "id": "k042",
+   "text": "Fällt eine Katze, dreht sie erst den Kopf, dann den Körper. Kätzchen beherrschen das mit etwa sieben Wochen."
+  },
+  {
+   "id": "k024",
+   "text": "{Deine Katze} läuft auf den Zehen. Der Knick, der am Hinterbein nach hinten zeigt, ist die Ferse, kein Knie."
+  },
+  {
+   "id": "k025",
+   "text": "Vorne hat eine Katze eine Zehe mehr als hinten. Sie sitzt höher, wie ein Daumen, und hilft beim Festhalten."
+  },
+  {
+   "id": "k148",
+   "text": "Beim Gehen setzen Katzen die Hinterpfote in die Spur der vorderen. Das ist leise und im Schnee gut zu sehen."
+  },
+  {
+   "id": "k046",
+   "text": "Kater nehmen öfter die linke Pfote, Katzen die rechte. Das sieht man, wenn sie Leckerli aus einem Glas angeln.",
+   "m": "Kater wie {name} nehmen öfter die linke Pfote. Schau mal, mit welcher er Leckerli aus einem Glas angelt.",
+   "f": "Katzen wie {name} nehmen öfter die rechte Pfote. Schau mal, mit welcher sie Leckerli aus einem Glas angelt."
+  },
+  {
+   "id": "k149",
+   "text": "Krallen wachsen in Schichten. Die alte Hülle löst sich beim Kratzen, darum liegen am Kratzbaum leere Hüllen."
+  },
+  {
+   "id": "k031",
+   "text": "Die Pfotenballen haben meist die Farbe des Fells darüber. Bei gescheckten Katzen sind sie darum oft gefleckt."
+  },
+  {
+   "id": "k028",
+   "text": "Die Katzenzunge ist rau von winzigen Häkchen. Die sind hohl und tragen beim Putzen Speichel bis auf die Haut."
+  },
+  {
+   "id": "k020",
+   "text": "Viele Katzen haben am Bauch eine lose Hautfalte. Das ist kein Fett, auch ganz schlanke Katzen haben sie."
+  },
+  {
+   "id": "k150",
+   "text": "Auch {deine Katze} hat einen Bauchnabel. Er ist eine kleine, flache Narbe und unter dem Fell kaum zu finden."
+  },
+  {
+   "id": "k151",
+   "text": "Mit 38 bis 39 Grad ist {deine Katze} wärmer als du. Auf dem Schoß wirkt das wie eine Wärmflasche."
+  },
+  {
+   "id": "k047",
+   "text": "Katzen schnurren beim Ein- und beim Ausatmen. Darum klingt es wie ein Motor, der kaum absetzt."
+  },
+  {
+   "id": "k088",
+   "text": "Katzen schlafen gut den halben Tag, meist aber nur leicht. Raschelt die Futtertüte, sind sie sofort wach."
+  },
+  {
+   "id": "k032",
+   "text": "Siamkatzen werden nur dort dunkel, wo ihr Körper kühler ist. Im warmen Bauch der Mutter bleiben sie fast weiß."
+  },
+  {
+   "id": "k152",
+   "text": "Ursprünglich sind Katzen gestreift. Marmoriertes Fell mit großen Wirbeln gibt es erst seit dem Mittelalter."
+  },
+  {
+   "id": "k153",
+   "text": "Schwarzes Fell wird manchmal rötlich braun. Das kann an viel Sonne liegen oder an zu wenig Tyrosin im Futter."
+  },
+  {
+   "id": "k154",
+   "text": "Ältere rote Katzen haben oft schwarze Pünktchen an Nase und Lippen. Das sind meist harmlose Sommersprossen."
+  },
+  {
+   "id": "k155",
+   "text": "Ab etwa drei Monaten fallen die Milchzähne aus. Gefunden wird selten einer, die meisten verschluckt das Kätzchen."
+  },
+  {
+   "id": "k156",
+   "text": "Wer ein Kätzchen bis zur siebten Woche oft streichelt, macht es zutraulich. Später geht das viel schwerer."
+  },
+  {
+   "id": "k157",
+   "text": "Die meisten Katzen sind mit einem Jahr ausgewachsen. Große Rassen wie die Maine Coon wachsen Jahre länger."
+  },
+  {
+   "id": "k044",
+   "text": "Eine Katze ist nur gut neun Wochen trächtig. So kann sie mehrmals im Jahr Junge bekommen."
+  },
+  {
+   "id": "k158",
+   "text": "Ein neugeborenes Kätzchen wiegt so viel wie eine Tafel Schokolade. Dann legt es täglich rund zehn Gramm zu."
+  },
+  {
+   "id": "k049",
+   "text": "Lebt eine Katze von der Jagd, braucht sie rund zehn Mäuse am Tag. Viele kleine Mahlzeiten sind für sie normal."
+  },
+  {
+   "id": "k159",
+   "text": "Dürfen Katzen frei wählen, kommt gut die Hälfte ihrer Energie aus Eiweiß. Bei Kohlenhydraten ist früh Schluss."
+  },
+  {
+   "id": "k051",
+   "text": "Eine neue Sorte fressen viele Katzen anfangs besonders gern. Ob sie wirklich schmeckt, zeigt sich erst später."
+  },
+  {
+   "id": "k052",
+   "text": "Wird einer Katze nach einer Sorte übel, meidet sie die oft lange. Auch wenn es an etwas ganz anderem lag."
+  },
+  {
+   "id": "k071",
+   "text": "Was die Mutter vor und nach der Geburt frisst, mögen die Kätzchen später lieber. Sie kennen den Geschmack."
+  },
+  {
+   "id": "k057",
+   "text": "Katzen tippen beim Trinken nur mit der Zungenspitze aufs Wasser. Was dabei mit hochkommt, schnappen sie ab."
+  },
+  {
+   "id": "k070",
+   "text": "Nassfutter ist zu rund drei Vierteln Wasser. Katzen, die es fressen, trinken darum oft kaum etwas dazu."
+  },
+  {
+   "id": "k058",
+   "text": "Katzen bilden selbst zu wenig Taurin. Fehlt es im Futter, werden sie mit der Zeit blind und herzkrank."
+  },
+  {
+   "id": "k059",
+   "text": "Aus Möhren können Katzen kein Vitamin A machen, ihnen fehlt das Enzym. Sie brauchen es fertig, etwa aus Leber."
+  },
+  {
+   "id": "k160",
+   "text": "Frisst eine Katze tagelang nichts, kann ihre Leber verfetten. Hungern ist für sie gefährlicher als für uns."
+  },
+  {
+   "id": "k161",
+   "text": "Ab zwölf Jahren verdauen viele Katzen Fett und Eiweiß schlechter. Manche brauchen dann mehr Futter."
+  },
+  {
+   "id": "k067",
+   "text": "Hauskatzen werden im Schnitt etwa 14 Jahre alt. Mischlinge leben meist etwas länger als Rassekatzen."
+  },
+  {
+   "id": "k084",
+   "text": "Zwei von drei Katzen sind sicher an ihren Menschen gebunden, so wie auch zwei von drei Babys an ihre Eltern."
+  },
+  {
+   "id": "k162",
+   "text": "Zeigst du auf einen von zwei Näpfen, gehen Katzen meist zum richtigen. Hunde können das nicht besser."
+  },
+  {
+   "id": "k086",
+   "text": "Katzen setzen sich gern in ein Quadrat aus Klebeband. In einem kleinen Versuch reichten schon die Ecken."
+  },
+  {
+   "id": "k163",
+   "text": "Wohnen mehrere Katzen zusammen, kennen sie wohl die Namen der anderen. Sie hören ja täglich, wer gerufen wird."
+  },
+  {
+   "id": "k101",
+   "text": "Hauskatzen stammen von der Falbkatze ab. Die kam wohl wegen der Mäuse in den Kornspeichern zu den Bauern."
+  },
+  {
+   "id": "k121",
+   "text": "Unsere Wildkatze ist nicht die Urahnin der Hauskatze. Hauskatzen kamen wohl erst mit den Römern zu uns."
+  },
+  {
+   "id": "k164",
+   "text": "Elastische Bänder halten Katzenkrallen meist eingezogen. So bleiben sie spitz und klackern kaum."
+  },
+  {
+   "id": "k165",
+   "text": "Vitamin C bildet eine Katze selbst. Anders als wir braucht sie es nicht im Futter."
+  },
+  {
+   "id": "k166",
+   "text": "Unkastrierte Kater bekommen mit den Jahren dicke Backen, das macht das Testosteron. Früh kastrierte kaum."
+  },
+  {
+   "id": "k167",
+   "text": "In den ersten Wochen können sich Kätzchen kaum selbst warm halten. Darum liegen sie so dicht aneinander."
+  },
+  {
+   "id": "k168",
+   "text": "Schon in den ersten Tagen hat fast jedes Kätzchen seine Lieblingszitze. Es findet sie blind, am Geruch."
+  },
+  {
+   "id": "k120",
+   "text": "In jedem vierten Haushalt in Deutschland lebt eine Katze. Ein Hund nur in jedem fünften."
+  }
+ ],
  "Katzenlogik": [
   {
    "id": "lo001",
-   "text": "Der beste Platz ist immer der, auf dem du gerade sitzen wolltest."
+   "text": "Die Soße ist das Essen. Die Stückchen sind nur die Verpackung."
   },
   {
    "id": "lo002",
-   "text": "Ein Karton für zwei Euro schlägt jedes Katzenbett für achtzig."
+   "text": "Ein Napf ist leer, sobald in der Mitte der Boden zu sehen ist. Der Rand zählt nicht."
   },
   {
    "id": "lo003",
-   "text": "Eine geschlossene Tür ist für jede Katze eine offene Frage."
+   "text": "Trockenfutter schmeckt erst, wenn man es mit der Pfote aus dem Napf geangelt hat."
   },
   {
    "id": "lo004",
-   "text": "Was auf dem Tisch steht, steht dort nur vorläufig, bis die Katze kommt."
-  },
-  {
-   "id": "lo005",
-   "text": "Frisch gewaschene, warme Wäsche zieht Katzen an wie sonst nichts im Haus."
+   "text": "Der Napf der anderen Katze ist immer der bessere. Auch wenn das Gleiche drin ist."
   },
   {
    "id": "lo006",
-   "text": "Sobald man den Boden sieht, gilt ein Napf bei Katzen als leer."
+   "text": "Eine Sorte bleibt Lieblingssorte genau bis zum ersten Zwölferpack."
   },
   {
    "id": "lo007",
-   "text": "Je teurer das Spielzeug, desto spannender die Verpackung."
+   "text": "Die Lieblingssorte ist immer die, die gerade aus dem Sortiment fliegt."
   },
   {
    "id": "lo008",
-   "text": "Schmusen will die Katze genau dann, wenn du gehen musst."
+   "text": "Am teuersten ist immer die Sorte, die stehen bleibt."
   },
   {
    "id": "lo009",
-   "text": "Wer sich mit Katze auf den Boden setzt, gilt ab sofort als Möbelstück."
+   "text": "Was nicht schmeckt, bleibt nicht einfach stehen. Es wird zugescharrt."
   },
   {
    "id": "lo010",
-   "text": "Eine Zeitung wird erst interessant, wenn gerade jemand darin liest."
+   "text": "Die zweite Hälfte der Dose ist nicht mehr dieselbe Sorte. Sie war im Kühlschrank."
   },
   {
    "id": "lo011",
-   "text": "Laptop auf, Katze drauf. Wärme und Aufmerksamkeit in einem."
+   "text": "Was auf der Dose als Tagesmenge steht, hält die Katze für das Minimum."
   },
   {
    "id": "lo012",
-   "text": "Um vier Uhr morgens wird Frühstück zur sehr dringenden Angelegenheit."
+   "text": "Frühstück gibt es um sieben. Erinnert wird ab vier."
   },
   {
    "id": "lo013",
-   "text": "Katzen kommen gern mit aufs Klo, denn da hast du ja endlich mal Zeit."
+   "text": "Die Katze kann die Uhr lesen. Nur die Zeitumstellung erkennt sie nicht an."
   },
   {
    "id": "lo014",
-   "text": "Jede Tür muss geöffnet werden, durchgehen ist dann optional."
+   "text": "Wer als Zweites heimkommt, trifft eine Katze, die noch nichts gekriegt hat. Sagt sie.",
+   "m": "Kommst du als Zweites heim, hat {name} noch nichts gekriegt. Sagt er.",
+   "f": "Kommst du als Zweites heim, hat {name} noch nichts gekriegt. Sagt sie."
   },
   {
    "id": "lo015",
-   "text": "Der Sonnenfleck wandert durchs Zimmer, und die Katze zieht mit um."
+   "text": "Wer füttert, ist Personal. Geschmust wird mit dem, der nie füttert."
   },
   {
    "id": "lo016",
-   "text": "Haargummis verschwinden nicht, sie werden gejagt und versteckt."
+   "text": "Eine Katze im Tiefschlaf hört nichts. Außer einer Dose, drei Zimmer weiter."
   },
   {
    "id": "lo017",
-   "text": "Ein Glas am Tischrand ist bei Katzen nur eine Frage der Zeit."
+   "text": "Auch wer nur Gemüse schneidet, wird überwacht. Es könnte ja noch Fleisch kommen."
   },
   {
    "id": "lo018",
-   "text": "Kaum liegst du auf dem Sofa, ist dein Bauch das neue Lieblingskissen."
+   "text": "Der Weg zum Napf führt zwischen deinen Füßen durch. Am liebsten auf der Treppe."
   },
   {
    "id": "lo019",
-   "text": "Katzen besuchen am liebsten Menschen, die Katzen nicht mögen."
+   "text": "Einmal ein Leckerli ist eine Ausnahme. Zweimal ist schon Gewohnheitsrecht."
   },
   {
    "id": "lo020",
-   "text": "Dasselbe Futter schmeckt frisch nachgefüllt gleich viel besser."
+   "text": "Die Tablette steckt im Leckerli. Übrig bleibt die Tablette, sauber abgeleckt."
   },
   {
    "id": "lo021",
-   "text": "Wer Gemüse schneidet, wird überwacht. Es könnte ja Fleisch werden."
+   "text": "Der Wassernapf ist frisch gefüllt. Getrunken wird am Wasserhahn."
   },
   {
    "id": "lo022",
-   "text": "Eine Dose öffnet man nie unbemerkt, auch nicht drei Zimmer weiter."
+   "text": "Die Katze will nie aufs Foto. Nur aufs Dosenfoto."
   },
   {
    "id": "lo023",
-   "text": "Ein wichtiger Videocall ist die perfekte Bühne für einen großen Auftritt."
+   "text": "Der beste Platz ist immer der, auf den du dich gerade setzen wolltest."
   },
   {
    "id": "lo024",
-   "text": "Alles, was flach auf dem Boden liegt, wird sofort zur neuen Liegefläche."
+   "text": "Das Katzenbett war teuer. Geschlafen wird im Karton, in dem es kam."
   },
   {
    "id": "lo025",
-   "text": "Ein neues Möbelstück wird zuerst von der Katze abgenommen."
+   "text": "Frische Wäsche ist erst fertig, wenn die Katze draufgelegen hat."
   },
   {
    "id": "lo026",
-   "text": "Ein Katzenbett ist ein gemütlicher Ort, an dem Katzen niemals schlafen."
+   "text": "Mit einer Katze auf dem Schoß ist Durst plötzlich gar nicht mehr so schlimm."
   },
   {
    "id": "lo027",
-   "text": "Wer ein schönes Foto machen will, bekommt garantiert den Hinterkopf."
+   "text": "Vier Kilo Katze brauchen nachts zwei Drittel vom Bett."
   },
   {
    "id": "lo028",
-   "text": "Die eigene Wasserschale ist langweilig, dein Wasserglas dagegen spannend."
+   "text": "Kein Spielzeug ist so gut wie ein Fuß, der unter der Bettdecke zuckt."
   },
   {
    "id": "lo029",
-   "text": "Je weniger du die Katze rufst, desto eher kommt sie von ganz allein."
+   "text": "Die Fernbedienung liegt da, wo sie immer liegt: unter der Katze."
   },
   {
    "id": "lo030",
-   "text": "Der Weg in die Küche führt immer zwischen deinen Füßen hindurch."
+   "text": "Der Sonnenfleck wandert durchs Zimmer. Die Katze zieht stündlich mit um."
   },
   {
    "id": "lo031",
-   "text": "Mit einer Katze auf dem Schoß wird Aufstehen verschoben."
+   "text": "Beim Yoga liegt garantiert eine Katze unter dem herabschauenden Hund."
   },
   {
    "id": "lo032",
-   "text": "Kommt ein Paket an, ist der Inhalt egal, die Katze zieht in den Karton."
+   "text": "Laptop auf, Katze drauf, Mail raus: „öööööööö“."
   },
   {
    "id": "lo033",
-   "text": "Der Morgen beginnt nicht mit dem Wecker, sondern wenn die Katze das sagt."
+   "text": "Im wichtigsten Videocall des Jahres sieht dein Chef vor allem Katzenschwanz."
   },
   {
    "id": "lo034",
-   "text": "Katzengras ist langweilig, die teure Zimmerpflanze schmeckt besser."
+   "text": "Schmusen will die Katze immer dann, wenn du schon die Jacke anhast."
   },
   {
    "id": "lo035",
-   "text": "Eine geputzte Fensterscheibe hält genau bis zur ersten Nase."
+   "text": "Die Katze begleitet dich aufs Klo. Endlich sitzt du mal still."
   },
   {
    "id": "lo036",
-   "text": "Kaum telefonierst du, hat die Katze plötzlich viel zu erzählen."
+   "text": "Die Katze folgt dir in jedes Zimmer und legt sich dann knapp außer Reichweite."
   },
   {
    "id": "lo037",
-   "text": "Ein schwarzer Pulli findet jedes weiße Katzenhaar im Umkreis."
+   "text": "Rufst du die Katze, nimmt sie das zur Kenntnis."
   },
   {
    "id": "lo038",
-   "text": "Was du gerade suchst, liegt ziemlich sicher unter der Katze."
-  },
-  {
-   "id": "lo039",
-   "text": "Draußen will die Katze rein, drinnen will sie gleich wieder raus."
+   "text": "Von allen Gästen sucht sich die Katze zielsicher den Allergiker aus."
   },
   {
    "id": "lo040",
-   "text": "Wer mit Katze ein Puzzle legt, hat am Ende garantiert ein Teil weniger."
+   "text": "Ein Katzenbauch sieht aus wie eine Einladung. Ist aber eine Falle."
+  },
+  {
+   "id": "lo041",
+   "text": "Wer den Katzenpo direkt vor die Nase bekommt, gehört zum engsten Kreis."
+  },
+  {
+   "id": "lo042",
+   "text": "Jedes Glas an der Tischkante steht nur auf Bewährung."
+  },
+  {
+   "id": "lo043",
+   "text": "Eine frisch geputzte Fensterscheibe hält genau bis zur ersten Nase."
+  },
+  {
+   "id": "lo044",
+   "text": "Ein schwarzer Pulli findet jedes weiße Katzenhaar in der Wohnung."
+  },
+  {
+   "id": "lo045",
+   "text": "Ein Puzzle mit 1000 Teilen hat mit Katze im Haus nur noch 999."
+  },
+  {
+   "id": "lo046",
+   "text": "Auf die Arbeitsplatte darf die Katze nicht. Solange jemand in der Küche ist."
+  },
+  {
+   "id": "lo047",
+   "text": "Egal, auf welcher Seite der Tür die Katze sitzt, es ist die falsche."
+  },
+  {
+   "id": "lo048",
+   "text": "Kaum kommt der Transportkorb aus dem Schrank, wohnt hier keine Katze mehr."
+  },
+  {
+   "id": "lo049",
+   "text": "Koffer packen mit Katze geht so: Pulli rein, Katze raus, Socken rein, Katze raus."
+  },
+  {
+   "id": "lo050",
+   "text": "Der Staubsauger kommt jede Woche raus. Und jede Woche ist es das erste Mal."
+  },
+  {
+   "id": "lo051",
+   "text": "Nachts um drei läuft die Katze im Flur ein Rennen. Gegner unbekannt."
+  },
+  {
+   "id": "lo052",
+   "text": "Fliegt im Fernsehen ein Vogel aus dem Bild, sucht die Katze hinter dem Fernseher."
+  },
+  {
+   "id": "lo053",
+   "text": "Starrt die Katze in eine leere Ecke, schaut man irgendwann doch selbst hin."
+  },
+  {
+   "id": "lo054",
+   "text": "Freigänger bringen Geschenke mit. Umtausch ausgeschlossen."
+  },
+  {
+   "id": "lo055",
+   "text": "Jede Katze hat einen Namen für den Impfpass und zehn für zu Hause."
+  },
+  {
+   "id": "lo056",
+   "text": "Sechzehn Stunden schläft die Katze. In den anderen acht ruht sie sich davon aus."
+  },
+  {
+   "id": "lo057",
+   "text": "Zehn Minuten bettelt die Katze um einen Bissen. Dann riecht sie dran und geht."
+  },
+  {
+   "id": "lo058",
+   "text": "Zum Spucken geht die Katze extra von den Fliesen auf den guten Teppich."
+  },
+  {
+   "id": "lo059",
+   "text": "Kaum telefonierst du, hat die Katze plötzlich viel zu erzählen."
+  },
+  {
+   "id": "lo060",
+   "text": "Unterm Sofa liegen zehn Bälle, alle Haargummis und der vermisste Ohrring."
+  },
+  {
+   "id": "lo061",
+   "text": "Regnet es vorne, will die Katze hinten raus. Vielleicht regnet es da ja nicht."
+  },
+  {
+   "id": "lo062",
+   "text": "Gekratzt wird am Kratzbaum. Am Sofa nur, wenn du hinschaust."
+  },
+  {
+   "id": "lo063",
+   "text": "Wer aus dem Urlaub kommt, wird erst mal ignoriert. Strafe muss sein."
   }
  ],
  "Stimmt’s?": [
   {
    "id": "st001",
-   "text": "Eine fallende Katze landet immer sicher auf allen vier Pfoten.",
-   "verdict": "Stimmt nicht",
-   "back": "Aus geringer Höhe fehlt ihnen oft die Zeit, sich rechtzeitig zu drehen."
+   "text": "Katzen landen immer auf den Pfoten.",
+   "verdict": "Nicht immer",
+   "back": "Aus geringer Höhe fehlt die Zeit zum Drehen. Bei tiefen Stürzen brechen trotzdem oft Kiefer oder Beine."
   },
   {
    "id": "st002",
-   "text": "Ein Schälchen Milch ist für Katzen ein gesunder Leckerbissen.",
+   "text": "Milch ist gut für Katzen.",
    "verdict": "Stimmt nicht",
-   "back": "Erwachsene Katzen vertragen Milch meist schlecht, Wasser ist besser."
+   "back": "Viele erwachsene Katzen vertragen Milchzucker schlecht und bekommen davon Durchfall. Wasser reicht."
   },
   {
    "id": "st003",
-   "text": "Katzen sind nachtaktiv und deshalb vor allem im Dunkeln unterwegs.",
-   "verdict": "Stimmt nicht",
-   "back": "Sie sind dämmerungsaktiv. Daher kommt auch das Wecken um fünf Uhr früh."
+   "text": "Katzen sind nachtaktiv.",
+   "verdict": "Teils",
+   "back": "Am muntersten sind sie in der Dämmerung, morgens und abends. Daher das Wecken um fünf."
   },
   {
    "id": "st004",
-   "text": "Wenn eine Katze schnurrt, geht es ihr immer gut, ganz ohne Ausnahme.",
-   "verdict": "Stimmt nicht",
-   "back": "Katzen schnurren auch bei Schmerzen und Angst, vermutlich zur Beruhigung."
+   "text": "Eine Katze, die schnurrt, ist zufrieden.",
+   "verdict": "Nicht immer",
+   "back": "Katzen schnurren auch bei Schmerzen, Angst oder beim Tierarzt. Vermutlich beruhigen sie sich so."
   },
   {
    "id": "st005",
-   "text": "Katzen können Süßes schmecken und mögen deshalb manchmal Kuchen.",
+   "text": "Katzen mögen Süßes.",
    "verdict": "Stimmt nicht",
-   "back": "Ihnen fehlt der Rezeptor für Süßes. Kuchen ist also reine Neugier."
+   "back": "Süß schmecken sie gar nicht. Leckt eine am Kuchen, lockt sie wohl das Fett aus Butter und Sahne."
   },
   {
    "id": "st006",
-   "text": "Katzen sehen auch in völliger Dunkelheit noch alles ganz genau.",
+   "text": "Katzen sehen auch im Stockdunkeln.",
    "verdict": "Stimmt nicht",
-   "back": "Wenig Licht genügt ihnen, aber ganz ohne sieht auch keine Katze etwas."
+   "back": "Ihnen reicht viel weniger Licht als uns. Ganz ohne Licht sieht aber auch eine Katze nichts."
   },
   {
    "id": "st007",
-   "text": "Katzen haben neun Leben, das weiß doch jedes Kind auf der Welt.",
-   "verdict": "Kommt drauf an",
-   "back": "Auf Deutsch sind es sieben Leben, auf Englisch neun, je nach Sprache."
+   "text": "Schon Blütenstaub von Lilien kann eine Katze töten.",
+   "verdict": "Stimmt",
+   "back": "Abgeleckte Pollen oder etwas Vasenwasser können Nierenversagen auslösen. Lilien also lieber nicht ins Haus."
   },
   {
    "id": "st008",
-   "text": "Eine schwarze Katze, die deinen Weg kreuzt, bringt Unglück.",
+   "text": "Ein gekipptes Fenster ist für Katzen ungefährlich.",
    "verdict": "Stimmt nicht",
-   "back": "In Großbritannien und Japan gelten sie als Glücksbringer."
+   "back": "Wer durch den Spalt will, rutscht nach unten und bleibt stecken. Das kann lähmen oder töten. Ein Gitter hilft."
   },
   {
    "id": "st009",
-   "text": "Katzen sind geborene Einzelgänger und leben am liebsten ganz allein.",
-   "verdict": "Nicht ganz",
-   "back": "Verwilderte Katzen leben oft in Gruppen verwandter Weibchen."
+   "text": "Katzen sind Einzelgänger.",
+   "verdict": "Teils",
+   "back": "Gejagt wird allein. Verwilderte Katzen leben aber oft in Gruppen verwandter Weibchen."
   },
   {
    "id": "st010",
-   "text": "Alle Katzen hassen Wasser und würden niemals freiwillig schwimmen.",
-   "verdict": "Nicht alle",
-   "back": "Türkisch-Van-Katzen gehen sogar freiwillig schwimmen, und das gern."
+   "text": "Trockenfutter putzt beim Kauen die Zähne.",
+   "verdict": "Kaum",
+   "back": "Die meisten Bröckchen zerbrechen beim ersten Biss oder werden geschluckt. Zahnpflegefutter hilft etwas."
   },
   {
    "id": "st011",
-   "text": "Alle Kätzchen haben anfangs blaue Augen, ganz gleich welcher Rasse.",
+   "text": "Alle Kätzchen haben anfangs blaue Augen.",
    "verdict": "Stimmt",
-   "back": "Die eigentliche Augenfarbe zeigt sich erst nach einigen Wochen."
+   "back": "Das Pigment bildet sich erst nach und nach. Ihre eigentliche Farbe haben die Augen mit etwa drei Monaten."
   },
   {
    "id": "st012",
-   "text": "Dreifarbige Glückskatzen sind fast immer weiblich, Kater gibt es kaum.",
+   "text": "Dreifarbige Katzen sind fast immer weiblich.",
    "verdict": "Stimmt",
-   "back": "Das liegt an den Genen für die Fellfarbe auf dem X-Chromosom."
+   "back": "Rot und Schwarz zugleich geht nur mit zwei X-Chromosomen. Dreifarbige Kater haben meist eins extra."
   },
   {
    "id": "st013",
-   "text": "Rote Katzen sind meistens Kater, rote Kätzinnen sind eher selten.",
-   "verdict": "Stimmt",
-   "back": "Etwa vier von fünf roten Katzen sind männlich, das liegt an den Genen."
+   "text": "Eine Katze sollte einmal Junge haben, bevor sie kastriert wird.",
+   "verdict": "Stimmt nicht",
+   "back": "Gesünder macht ein Wurf nicht. Früh kastrierte Katzen bekommen sogar seltener Gesäugetumoren."
   },
   {
    "id": "st014",
-   "text": "Katzen erkennen ihren eigenen Namen unter vielen anderen Wörtern.",
+   "text": "Katzen kennen ihren Namen.",
    "verdict": "Stimmt",
-   "back": "Das zeigen Studien. Ob sie auch reagieren, ist eine ganz andere Frage."
+   "back": "Sie hören ihn aus anderen Wörtern heraus, zeigten Versuche in Japan. Ob sie dann kommen, ist was anderes."
   },
   {
    "id": "st015",
-   "text": "Katzen unterhalten sich untereinander vor allem mit lautem Miauen.",
+   "text": "Katzen miauen, um sich untereinander zu verständigen.",
    "verdict": "Kaum",
-   "back": "Erwachsene Katzen miauen fast nur für uns Menschen, untereinander kaum."
+   "back": "Erwachsene Katzen miauen fast nur uns an. Untereinander reden sie mit Duft, Körpersprache und Fauchen."
   },
   {
    "id": "st016",
-   "text": "Wer gegen Katzen allergisch ist, reagiert eigentlich auf ihr Fell.",
+   "text": "Katzenallergiker reagieren auf die Haare.",
    "verdict": "Stimmt nicht",
-   "back": "Auslöser ist ein Eiweiß aus Speichel und Haut, das am Fell nur haftet."
+   "back": "Auslöser ist vor allem ein Eiweiß aus Speichel und Haut. Kurzes Fell hilft deshalb kaum."
   },
   {
    "id": "st017",
-   "text": "Katzen fressen Gras nur dann, wenn ihnen der Magen gerade wehtut.",
-   "verdict": "Meist nicht",
-   "back": "Die meisten fressen Gras ohne jedes Bauchweh. Warum, ist noch unklar."
+   "text": "Katzen fressen Gras, wenn ihnen schlecht ist.",
+   "verdict": "Kaum",
+   "back": "Fast alle wirken vorher gesund, nur etwa jede vierte erbricht danach oft. Warum, ist offen."
   },
   {
    "id": "st018",
-   "text": "Eine satte Katze hat keinen Grund mehr zu jagen und lässt es bleiben.",
+   "text": "Eine satte Katze jagt nicht.",
    "verdict": "Stimmt nicht",
-   "back": "Hunger und Jagdtrieb sind getrennt gesteuert, gejagt wird also immer."
+   "back": "Auch satte Katzen jagen. Im Versuch ließen manche für Beute sogar ihr Lieblingsfutter stehen."
   },
   {
    "id": "st019",
-   "text": "Katzen sehen die Welt nur in Schwarz, Weiß und ein paar Grautönen.",
-   "verdict": "Stimmt nicht",
-   "back": "Sie sehen Farben, nur blasser: Blau gut, Rot und Grün dagegen kaum."
+   "text": "Katzen sehen keine Farben.",
+   "verdict": "Doch",
+   "back": "Sie sehen Blau und Gelb, nur blasser als wir. Rot und Grün halten sie kaum auseinander."
   },
   {
    "id": "st020",
-   "text": "Katzen können überhaupt nicht schwitzen, an keiner Stelle des Körpers.",
+   "text": "Katzen können nicht schwitzen.",
    "verdict": "Doch",
-   "back": "Allerdings nur an den Pfoten, beim Tierarzt oft als feuchte Abdrücke."
+   "back": "An den Pfotenballen. Beim Tierarzt hinterlassen aufgeregte Katzen oft feuchte Abdrücke."
   },
   {
    "id": "st021",
-   "text": "Mit zwei Jahren gilt eine Katze bereits als vollständig erwachsen.",
-   "verdict": "Stimmt",
-   "back": "Umgerechnet ist eine zweijährige Katze etwa 24 Menschenjahre alt."
+   "text": "Ein Katzenjahr zählt so viel wie sieben Menschenjahre.",
+   "verdict": "Stimmt nicht",
+   "back": "Mit zwei ist eine Katze wie ein Mensch Mitte zwanzig. Danach zählt jedes Jahr etwa vier."
   },
   {
    "id": "st022",
-   "text": "Katzenminze wirkt bei jeder Katze, egal wie alt oder wie ruhig sie ist.",
+   "text": "Katzenminze wirkt bei jeder Katze.",
    "verdict": "Stimmt nicht",
-   "back": "Ob Katzenminze wirkt, ist erblich. Viele Katzen lässt sie völlig kalt."
+   "back": "Etwa jede dritte bleibt ungerührt, das gilt als erblich. Bei den meisten davon wirkt Matatabi."
   },
   {
    "id": "st023",
-   "text": "Katzen trinken von Natur aus viel und brauchen ständig frisches Wasser.",
-   "verdict": "Stimmt nicht",
-   "back": "Ihre Vorfahren deckten den Wasserbedarf vor allem über die Beute."
+   "text": "Katzen trinken von sich aus genug.",
+   "verdict": "Nicht immer",
+   "back": "Bei Trockenfutter trinken sie zwar mehr, gleichen das fehlende Wasser aber nicht ganz aus."
   },
   {
    "id": "st024",
-   "text": "Fisch ist für Katzen schon immer das natürlichste Futter gewesen.",
+   "text": "Fisch ist das natürliche Futter der Katze.",
    "verdict": "Stimmt nicht",
-   "back": "Ihre Vorfahren lebten in Wüste und Steppe, da gab es kaum Fisch."
+   "back": "Ihre Vorfahrin, die Falbkatze, jagt in Steppe und Halbwüste Mäuse. Fisch gibt es dort kaum."
   },
   {
    "id": "st025",
-   "text": "Katzen kauen ihr Futter gründlich, so wie wir unser Essen auch.",
-   "verdict": "Kaum",
-   "back": "Ihre Backenzähne schneiden wie Scheren, richtig gekaut wird kaum."
+   "text": "Eine warme, trockene Nase heißt Fieber.",
+   "verdict": "Stimmt nicht",
+   "back": "Die Nase wird schon im Schlaf oder in warmer Luft trocken. Fieber zeigt nur das Thermometer."
   },
   {
    "id": "st026",
-   "text": "Katzen leben erst seit den alten Ägyptern zusammen mit Menschen.",
-   "verdict": "Länger",
-   "back": "Auf Zypern lag schon vor 9500 Jahren eine Katze im Grab eines Menschen."
+   "text": "Schon eine halbe Tablette Paracetamol kann eine Katze töten.",
+   "verdict": "Stimmt",
+   "back": "Ihrer Leber fehlt ein Enzym, das es entgiftet. Schmerzmittel für Menschen darum nie geben."
   },
   {
    "id": "st027",
-   "text": "Isaac Newton hat neben der Schwerkraft auch die Katzenklappe erfunden.",
-   "verdict": "Wohl nicht",
-   "back": "Die Geschichte ist hübsch und wird gern erzählt, belegt ist sie nicht."
+   "text": "Kastrierte Katzen werden dick.",
+   "verdict": "Nicht von selbst",
+   "back": "Sie brauchen danach etwa ein Viertel weniger, wollen aber mehr. Also kleinere Portionen."
   },
   {
    "id": "st028",
-   "text": "Löwen schnurren genauso wie Hauskatzen, nur entsprechend lauter.",
-   "verdict": "Kaum",
-   "back": "Wer brüllen kann, schnurrt nicht richtig, und Hauskatzen brüllen nicht."
-  },
-  {
-   "id": "st029",
-   "text": "Katzen träumen im Schlaf, so wie wir Menschen das auch tun.",
-   "verdict": "Vermutlich",
-   "back": "Sie haben einen Traumschlaf wie wir, oft erkennbar an zuckenden Pfoten."
-  },
-  {
-   "id": "st030",
-   "text": "Katzen mögen den frischen Duft von Orangen und Zitronen besonders.",
+   "text": "Löwen schnurren wie Hauskatzen, nur lauter.",
    "verdict": "Stimmt nicht",
-   "back": "Die meisten finden Zitrusduft unangenehm, Orangen sind also sicher."
+   "back": "Löwen brüllen, schnurren aber nicht. Pumas und Geparden schnurren, können dafür nicht brüllen."
   },
   {
    "id": "st031",
-   "text": "Katzen haben mehr Knochen im Körper als ein erwachsener Mensch.",
-   "verdict": "Stimmt",
-   "back": "Rund 230 gegen 206, und allein im Schwanz steckt etwa jeder zehnte."
+   "text": "Mit acht Wochen ist ein Kätzchen bereit fürs neue Zuhause.",
+   "verdict": "Zu früh",
+   "back": "Wer länger bei Mutter und Geschwistern bleibt, wird seltener aggressiv. Forscher raten zu mindestens 14 Wochen."
   },
   {
    "id": "st032",
-   "text": "Katzen haben verschiedene Blutgruppen, ganz ähnlich wie wir Menschen.",
+   "text": "Katzen haben verschiedene Blutgruppen.",
    "verdict": "Stimmt",
-   "back": "Es gibt A, B und das seltene AB, wichtig etwa bei Bluttransfusionen."
+   "back": "A, B und selten AB. Vor einer Bluttransfusion wird getestet, falsches Blut kann tödlich sein."
   },
   {
    "id": "st033",
-   "text": "Alle Kätzchen aus einem Wurf haben ganz sicher immer denselben Vater.",
-   "verdict": "Nicht unbedingt",
-   "back": "Ein einziger Wurf kann tatsächlich Kätzchen von mehreren Vätern haben."
+   "text": "Ein kleiner Katzenbiss ist harmlos.",
+   "verdict": "Nicht immer",
+   "back": "Spitze Zähne bringen Keime tief unter die Haut. Schwillt die Stelle an oder wird rot, schnell zum Arzt."
   },
   {
    "id": "st034",
-   "text": "Getigerte Katzen tragen auf der Stirn ein deutlich sichtbares M.",
+   "text": "Getigerte Katzen tragen ein M auf der Stirn.",
    "verdict": "Stimmt",
-   "back": "Fast alle, und über die Herkunft des M gibt es viele schöne Legenden."
+   "back": "Es gehört zum Tabby-Muster. Legenden führen es auf Mohammed oder Maria zurück."
   },
   {
    "id": "st035",
-   "text": "Weiße Katzen mit blauen Augen sind auffällig oft taub geboren.",
+   "text": "Weiße Katzen mit blauen Augen sind oft taub.",
    "verdict": "Stimmt",
-   "back": "Das Gen für weißes Fell wirkt sich leider oft auch auf das Innenohr aus."
+   "back": "Das Gen für weißes Fell kann auch das Innenohr schädigen, am ehesten bei zwei blauen Augen."
   },
   {
    "id": "st036",
-   "text": "Katzen wissen nur dann, wo du bist, wenn sie dich auch sehen können.",
-   "verdict": "Stimmt nicht",
-   "back": "Sie merken sich auch, aus welcher Richtung deine Stimme zuletzt kam."
+   "text": "Katzen wissen, wo du bist, auch wenn sie dich nicht sehen.",
+   "verdict": "Stimmt",
+   "back": "Im Versuch stutzten sie, wenn deine Stimme plötzlich von woanders kam als eben noch."
   },
   {
    "id": "st037",
-   "text": "Kätzchen kommen blind zur Welt und öffnen erst nach Tagen die Augen.",
-   "verdict": "Stimmt",
-   "back": "Und taub dazu. Das Schnurren der Mutter spüren sie trotzdem."
+   "text": "Katzen putzen sich nur, wenn sie schmutzig sind.",
+   "verdict": "Stimmt nicht",
+   "back": "Putzen kühlt auch und beruhigt. Leckt sich {deine Katze} kahl, sollte ein Tierarzt nachsehen."
   },
   {
    "id": "st038",
-   "text": "Wohnungskatzen leben im Schnitt kürzer als Katzen mit Freigang.",
-   "verdict": "Stimmt nicht",
-   "back": "Im Gegenteil, Wohnungskatzen werden im Schnitt deutlich älter."
+   "text": "Wohnungskatzen leben kürzer als Freigänger.",
+   "verdict": "Eher umgekehrt",
+   "back": "Bei Katzen unter fünf Jahren sind Unfälle die häufigste Todesursache, oft im Straßenverkehr."
   },
   {
    "id": "st039",
-   "text": "Katzen erkennen sich im Spiegel und wissen, dass sie es selbst sind.",
-   "verdict": "Stimmt nicht",
-   "back": "Den Spiegeltest bestehen sie nicht, das Gegenüber bleibt verdächtig."
+   "text": "Katzen lassen sich Schmerzen kaum anmerken.",
+   "verdict": "Stimmt",
+   "back": "Oft verraten sie sich nur durch ein verändertes Gesicht, Rückzug oder weniger Appetit."
   },
   {
    "id": "st040",
-   "text": "Katzen spüren Erdbeben schon Stunden vorher und werden unruhig.",
+   "text": "Schon wenige Tage ohne Fressen können für eine Katze gefährlich sein.",
+   "verdict": "Stimmt",
+   "back": "Die Leber kann verfetten, gerade bei dicken Katzen. Frisst {deine Katze} einen Tag lang nichts, ab zum Tierarzt."
+  },
+  {
+   "id": "st041",
+   "text": "Haarballen sind normal, egal wie oft sie kommen.",
+   "verdict": "Stimmt nicht",
+   "back": "Gesunde Katzen würgen selten welche hoch. Passiert es oft, ist das ein Fall für den Tierarzt."
+  },
+  {
+   "id": "st042",
+   "text": "Katzen kann man nicht erziehen.",
+   "verdict": "Stimmt nicht",
+   "back": "Mit Leckerli und Lob lernen sie viel, etwa auf Zuruf zu kommen. Schimpfen bringt dagegen nichts."
+  },
+  {
+   "id": "st043",
+   "text": "Katzen und Hunde sind Feinde.",
+   "verdict": "Stimmt nicht",
+   "back": "Leben beide zusammen, vertragen sie sich meist. Am besten klappt es, wenn sie sich jung kennenlernen."
+  },
+  {
+   "id": "st044",
+   "text": "Katzen fressen nur so viel, wie sie brauchen.",
+   "verdict": "Nicht immer",
+   "back": "Steht immer Trockenfutter da, fressen viele zu viel. Abgewogene Portionen halten sie schlanker."
+  },
+  {
+   "id": "st045",
+   "text": "Musik lässt Katzen kalt.",
+   "verdict": "Nicht jede",
+   "back": "Unsere Musik meist schon. Bei Stücken in Katzentonlage und im Schnurrtakt horchten sie im Versuch auf."
+  },
+  {
+   "id": "st046",
+   "text": "Schnurren heilt Knochen.",
    "verdict": "Unbelegt",
-   "back": "Es gibt viele Berichte, aber bisher keinen sicheren Nachweis dafür."
+   "back": "Es schwingt etwa so schnell wie Vibrationen, die in Versuchen Knochen gestärkt haben. Mehr weiß man nicht."
+  },
+  {
+   "id": "st047",
+   "text": "Vielen Katzen ist Gesellschaft wichtiger als Futter.",
+   "verdict": "Stimmt",
+   "back": "In einem Versuch wählte die Hälfte der Katzen lieber einen Menschen als Futter, Spielzeug oder Duft."
+  },
+  {
+   "id": "st048",
+   "text": "Wer schwanger ist, muss die Katze abgeben.",
+   "verdict": "Stimmt nicht",
+   "back": "Es reicht, wenn jemand anders täglich das Katzenklo leert. Viel öfter steckt man sich an rohem Fleisch an."
+  },
+  {
+   "id": "st049",
+   "text": "Wohnungskatzen muss man nicht impfen.",
+   "verdict": "Stimmt nicht",
+   "back": "Das Virus der Katzenseuche kommt auch an Schuhen ins Haus. Dagegen sollte jede Katze geimpft sein."
+  },
+  {
+   "id": "st051",
+   "text": "Katzen pinkeln aus Rache daneben.",
+   "verdict": "Stimmt nicht",
+   "back": "Dahinter stecken meist Stress, ein unpassendes Klo oder eine Blasenentzündung."
+  },
+  {
+   "id": "st052",
+   "text": "Knoblauch im Futter hält Flöhe fern.",
+   "verdict": "Bloß nicht",
+   "back": "Gegen Flöhe ist das unbelegt. Dafür schädigt Knoblauch bei Katzen die roten Blutkörperchen."
+  },
+  {
+   "id": "st053",
+   "text": "Katzen wollen immer dieselbe Sorte.",
+   "verdict": "Teils",
+   "back": "Manche schon. Viele fressen von einer Sorte mit der Zeit weniger, eine neue weckt den Appetit."
+  },
+  {
+   "id": "st054",
+   "text": "Katzen fressen von sich aus viele kleine Mahlzeiten.",
+   "verdict": "Stimmt",
+   "back": "Steht immer Futter da, fressen sie rund ein Dutzend Mal am Tag. Eine Maus ist ja auch nur ein Happen."
+  },
+  {
+   "id": "st055",
+   "text": "Hundefutter tut es für Katzen auch.",
+   "verdict": "Nicht auf Dauer",
+   "back": "Hundefutter braucht weniger Eiweiß und kein Taurin. Fehlt Katzen Taurin, leiden Herz und Augen."
+  },
+  {
+   "id": "st056",
+   "text": "Katzen fressen lieber lauwarm als kühlschrankkalt.",
+   "verdict": "Stimmt",
+   "back": "In einem Versuch fraßen ältere Katzen körperwarmes Futter lieber als kaltes. Warm duftet es stärker."
+  },
+  {
+   "id": "st057",
+   "text": "Keine Katze geht freiwillig ins Wasser.",
+   "verdict": "Doch",
+   "back": "Türkisch-Van-Katzen etwa schwimmen gern. Die meisten anderen mögen nasses Fell aber wirklich nicht."
+  },
+  {
+   "id": "st058",
+   "text": "Rote Katzen sind meistens Kater.",
+   "verdict": "Stimmt",
+   "back": "Etwa vier von fünf sind Kater. Die brauchen die Erbanlage für Rot nur einmal, Kätzinnen zweimal."
+  },
+  {
+   "id": "st059",
+   "text": "Katzen schlucken ihr Futter fast ungekaut.",
+   "verdict": "Stimmt",
+   "back": "Ihre Backenzähne schneiden wie Scheren und können nicht mahlen. Was in den Hals passt, wird geschluckt."
+  },
+  {
+   "id": "st060",
+   "text": "Isaac Newton hat die Katzenklappe erfunden.",
+   "verdict": "Stimmt nicht",
+   "back": "Ein Loch für die Katze in der Tür beschreibt schon Chaucer um 1390, lange vor Newton."
+  },
+  {
+   "id": "st061",
+   "text": "Katzen haben mehr Knochen als wir.",
+   "verdict": "Stimmt",
+   "back": "Rund 230 gegen unsere 206. Allein im Schwanz stecken bis zu 23 Wirbel."
+  },
+  {
+   "id": "st062",
+   "text": "Kätzchen aus einem Wurf können verschiedene Väter haben.",
+   "verdict": "Stimmt",
+   "back": "Eine rollige Katze paart sich oft mit mehreren Katern, und jeder kann Vater werden."
+  },
+  {
+   "id": "st063",
+   "text": "Kätzchen kommen blind und taub zur Welt.",
+   "verdict": "Stimmt",
+   "back": "Augen und Ohren öffnen sich erst nach ein bis zwei Wochen. Zur Milch finden sie über Geruch und Wärme."
+  },
+  {
+   "id": "st064",
+   "text": "Aus einem Trinkbrunnen trinken Katzen mehr.",
+   "verdict": "Kaum",
+   "back": "In einem Versuch tranken sie daraus nur wenig mehr, ihr Urin blieb gleich konzentriert. Manche mögen Brunnen trotzdem."
   }
  ],
  "Kurios": [
   {
    "id": "ku001",
-   "text": "In Rom leben Katzen genau an der Stelle, an der Caesar ermordet wurde."
+   "text": "In Rom leben Katzen dort, wo Caesar ermordet wurde. Ein Tierheim zwischen den Ruinen kümmert sich um sie."
   },
   {
    "id": "ku002",
-   "text": "Die CIA testete in den 60ern Katzen als Wanzen. Gehorsam war das Problem."
+   "text": "Die CIA wollte in den 1960ern eine Katze als Wanze einsetzen. 1967 gab sie auf, es war zu unpraktisch."
   },
   {
    "id": "ku003",
-   "text": "Ägyptische Katzenmumien wurden im 19. Jahrhundert als Dünger verschifft."
+   "text": "1890 kamen fast 20 Tonnen Katzenmumien nach Liverpool. Sie wurden als Dünger versteigert."
   },
   {
    "id": "ku004",
-   "text": "Im mexikanischen Xalapa trat 2013 ein Kater zur Bürgermeisterwahl an."
+   "text": "Hello Kitty stammt laut Sanrio aus einem Vorort von London. Sie ist fünf Äpfel groß und drei Äpfel schwer."
   },
   {
    "id": "ku005",
-   "text": "Ein Kater namens Stubbs war 20 Jahre Ehrenbürgermeister in Alaska."
+   "text": "Talkeetna in Alaska hatte 20 Jahre lang einen Kater als Ehrenbürgermeister. Einen echten hat der Ort nicht."
   },
   {
    "id": "ku006",
-   "text": "In Japan war eine Katze namens Tama offiziell Bahnhofsvorsteherin."
+   "text": "Die Katze Tama war in Japan Bahnhofsvorsteherin. Nach ihrem Tod bekam sie einen Schrein am Bahnsteig."
   },
   {
    "id": "ku007",
-   "text": "Die erste Katze im All hieß Félicette und flog 1963 für Frankreich."
+   "text": "Die erste Katze im All hieß Félicette und flog 1963 für Frankreich. Ein Denkmal bekam sie erst 2019."
   },
   {
    "id": "ku008",
-   "text": "Auf Shackletons Schiff fuhr ein Kater mit, er hieß Mrs. Chippy."
+   "text": "Paderborn schrieb 2008 als erste deutsche Stadt vor, Freigängerkatzen zu kastrieren. Viele Orte zogen nach."
   },
   {
    "id": "ku009",
-   "text": "Der Schiffskater Simon bekam 1949 eine britische Tapferkeitsmedaille."
+   "text": "Schiffskater Simon bekam 1949 die Dickin-Medaille für tapfere Tiere. Bis heute ist er die einzige Katze damit."
   },
   {
    "id": "ku010",
-   "text": "Die Eremitage in Sankt Petersburg beschäftigt seit Langem Katzen."
+   "text": "1745 ließ Zarin Elisabeth Katzen aus Kasan gegen die Mäuse holen. Bis heute leben Katzen in der Eremitage."
   },
   {
    "id": "ku011",
-   "text": "In der Downing Street gibt es ein Amt für den obersten Mäusefänger."
+   "text": "Kater Larry kam 2011 in die Downing Street. Er hat dort schon mehrere Premierminister überdauert."
   },
   {
    "id": "ku012",
-   "text": "Auf Churchills Landsitz lebt stets ein roter Kater namens Jock."
+   "text": "Auf Churchills Landsitz Chartwell lebt immer ein roter Kater namens Jock. So wünschte es die Familie."
   },
   {
    "id": "ku013",
-   "text": "In Japan gibt es Inseln, auf denen mehr Katzen als Menschen leben."
+   "text": "Auf der japanischen Insel Aoshima leben mehr Katzen als Menschen. Fischer holten sie einst gegen die Mäuse."
   },
   {
    "id": "ku014",
-   "text": "Das erste Katzencafé eröffnete 1998 in Taipeh, nicht in Japan."
+   "text": "Das erste Katzencafé eröffnete 1998 in Taipeh. Japan, das Land der Katzencafés, zog erst 2004 nach."
   },
   {
    "id": "ku015",
-   "text": "Schon 1894 filmte das Edison-Studio zwei boxende Katzen."
+   "text": "Schon 1894 filmte Edisons Studio zwei boxende Katzen. Die ersten Kinovorführungen gab es erst 1895."
   },
   {
    "id": "ku016",
-   "text": "Die älteste bekannte Katze, Creme Puff aus Texas, wurde 38 Jahre alt."
+   "text": "Die älteste bekannte Katze, Creme Puff aus Texas, wurde 38. Ihr Besitzer hatte auch einen Kater, der 34 wurde."
   },
   {
    "id": "ku017",
-   "text": "In Hemingways Haus leben bis heute Katzen mit sechs Zehen."
+   "text": "In Hemingways Haus in Key West leben Katzen mit Extrazehen. Seeleute hielten solche Katzen für Glücksbringer."
   },
   {
    "id": "ku018",
-   "text": "Percy Shaw erfand 1934 die Katzenaugen auf Straßen, dank einer Katze."
+   "text": "Percy Shaw erfand 1934 Katzenaugen für Straßen. Ob eine Katze ihn darauf brachte, erzählte er mal so, mal so."
   },
   {
    "id": "ku019",
-   "text": "Im alten Ägypten trauerte man um die Katze mit rasierten Augenbrauen."
+   "text": "Starb im alten Ägypten die Katze, rasierten sich alle im Haus die Augenbrauen. So berichtet es Herodot."
   },
   {
    "id": "ku020",
-   "text": "Im alten Ägypten wurden Katzen millionenfach mumifiziert und bestattet."
+   "text": "Im „Reineke Fuchs“ heißt der Kater Hinze. Lange war das der übliche Name für Kater, wie Lampe für den Hasen."
   },
   {
    "id": "ku021",
-   "text": "Die nordische Göttin Freya fuhr einen Wagen, gezogen von zwei Katzen."
+   "text": "Die nordische Göttin Freya fuhr einen Wagen, den zwei Katzen zogen. Bei Thor waren es zwei Ziegenböcke."
   },
   {
    "id": "ku022",
-   "text": "Winkt die japanische Glückskatze links, lockt sie Kunden, rechts Geld."
+   "text": "Die Winkekatze winkt nicht zum Gruß. Ihre Pfote macht die Geste, mit der man in Japan „komm her“ sagt."
   },
   {
    "id": "ku023",
-   "text": "In Istanbul steht eine Bronzestatue für die Straßenkatze Tombili."
+   "text": "Istanbul gab der Straßenkatze Tombili ein Denkmal. Bald wurde es gestohlen, Tage später stand es wieder da."
   },
   {
    "id": "ku024",
-   "text": "Beim Katzenfest in Ypern werfen Narren Plüschkatzen vom Turm."
+   "text": "Beim Katzenfest im belgischen Ypern wirft ein Narr Plüschkatzen vom Turm. Bis 1817 waren es echte."
   },
   {
    "id": "ku025",
-   "text": "Ein italienischer Kater erbte 2011 rund zehn Millionen Euro."
+   "text": "Schrödingers Katze war nur ein Gedankenspiel von 1935. Eine echte Katze saß nie in der Kiste."
   },
   {
    "id": "ku026",
-   "text": "Brennereikater Towser fing in Schottland rund 29.000 Mäuse, ein Weltrekord."
+   "text": "Brennereikatze Towser fing in Schottland rund 29.000 Mäuse. Man zählte ein paar Tage und rechnete dann hoch."
   },
   {
    "id": "ku027",
-   "text": "Kater Hamlet lebte 1984 sieben Wochen versteckt in einem Flugzeug."
+   "text": "E.T.A. Hoffmanns Kater Murr wurde zum Romanhelden. Als er 1821 starb, verschickte Hoffmann eine Todesanzeige."
   },
   {
    "id": "ku028",
-   "text": "Im Tokioter Gotokuji-Tempel stehen Tausende Winkekatzen."
+   "text": "Kater Mikesch aus der Augsburger Puppenkiste kommt aus Tschechien. Josef Lada erfand ihn in den 1930ern."
   },
   {
    "id": "ku029",
-   "text": "Karl Lagerfelds Katze Choupette hatte zwei Zofen und aß mit am Tisch."
+   "text": "Ein Lied über ein Katzenklo war 1994 ein Hit: Helge Schneiders „Katzeklo“ blieb 17 Wochen in den Charts."
   },
   {
    "id": "ku030",
-   "text": "In der Altstadt von Kotor in Montenegro gibt es ein eigenes Katzenmuseum."
+   "text": "„Der gestiefelte Kater“ stand nur 1812 in Grimms Märchen. Danach war er den Brüdern zu französisch."
   },
   {
    "id": "ku031",
-   "text": "In Amsterdam gibt es ein Tierheim für Katzen auf einem Hausboot."
+   "text": "In Amsterdam schwimmt ein Tierheim für Katzen auf der Gracht. Das Haus der Gründerin war schon voller Katzen."
   },
   {
    "id": "ku032",
-   "text": "Mark Twains Katzen hießen unter anderem Beelzebub und Sour Mash."
+   "text": "Mark Twain gab Katzen Namen wie Zoroaster und Blatherskite. So sollten seine Kinder schwere Wörter üben."
   },
   {
    "id": "ku033",
-   "text": "Straßenkater Bob machte einen Londoner Musiker zum Bestsellerautor."
+   "text": "Straßenkater Bob machte einen Londoner Straßenmusiker zum Bestsellerautor. Im Film spielte Bob sich selbst."
   },
   {
    "id": "ku034",
-   "text": "Abraham Lincoln hielt im Weißen Haus zwei Katzen, Tabby und Dixie."
+   "text": "Die Bremer Stadtmusikanten kommen nie in Bremen an. Esel, Hund, Katze und Hahn bleiben im Räuberhaus."
   },
   {
    "id": "ku035",
-   "text": "In Thailand beschreibt ein uraltes Katzenbuch, welche Katzen Glück bringen."
+   "text": "Alte Handschriften aus Thailand zeigen, welche Katzen Glück bringen. Eine davon ist die Urahnin der Siamkatze."
   },
   {
    "id": "ku036",
-   "text": "Kuching auf Borneo klingt wie Malaiisch für Katze und hat ein Katzenmuseum."
+   "text": "Kuching auf Borneo heißt wie das malaiische Wort für Katze. Darum nennt sich die Stadt Katzenstadt."
   },
   {
    "id": "ku037",
-   "text": "Die Katze Trim umsegelte mit Matthew Flinders als erste Katze Australien."
+   "text": "Kater Trim fuhr mit Matthew Flinders als erste Katze um Australien. In Sydney sitzt er als Statue hinter ihm."
   },
   {
    "id": "ku038",
-   "text": "Katze Holly lief 2012 in Florida rund 300 Kilometer nach Hause."
+   "text": "Die Katzen im „Struwwelpeter“ heißen Minz und Maunz. Sie warnen Paulinchen vor den Streichhölzern, vergeblich."
   },
   {
    "id": "ku039",
-   "text": "Kater Dewey lebte fast 19 Jahre in einer Stadtbibliothek in Iowa."
+   "text": "Kater Dewey lebte fast 19 Jahre in einer Bibliothek in Iowa. Man fand ihn als Kätzchen im Rückgabekasten."
   },
   {
    "id": "ku040",
-   "text": "Kater Tiddles lebte 13 Jahre in der Damentoilette des Bahnhofs Paddington."
+   "text": "Kater Tiddles lebte 13 Jahre im Damenklo am Bahnhof Paddington. Verwöhnt, wie er war, wog er über 14 Kilo."
+  },
+  {
+   "id": "ku041",
+   "text": "Der höchste Berg im Odenwald heißt Katzenbuckel. Er ist der Rest eines uralten Vulkans."
+  },
+  {
+   "id": "ku042",
+   "text": "In der Schweiz ist Vorschrift: Eine Einzelkatze hat täglich Umgang mit Menschen oder sieht andere Katzen."
+  },
+  {
+   "id": "ku043",
+   "text": "Auf Rügen lebten zur Wikingerzeit Katzen mit ägyptischen Vorfahren. Sie kamen wohl als Mäusejäger per Schiff."
+  },
+  {
+   "id": "ku044",
+   "text": "Garfield trägt den Namen vom Opa seines Zeichners. Der war wie der Kater: groß und grantig."
+  },
+  {
+   "id": "ku045",
+   "text": "„Grinsen wie eine Cheshire-Katze“ sagte man schon 1788. Lewis Carroll machte daraus die Grinsekatze."
+  },
+  {
+   "id": "ku046",
+   "text": "Eins der ersten Fernsehbilder war 1928 Felix der Kater. Die Figur drehte sich stundenlang vor der Kamera."
+  },
+  {
+   "id": "ku047",
+   "text": "Das Musical „Cats“ beruht auf Gedichten von T. S. Eliot. Er schickte sie in Briefen an seine Patenkinder."
+  },
+  {
+   "id": "ku049",
+   "text": "Ein Physiker machte 1975 seinen Kater zum Mitautor. Er hatte „wir“ geschrieben und wollte nicht neu tippen."
+  },
+  {
+   "id": "ku050",
+   "text": "Die erste geklonte Katze kam 2001 zur Welt. Trotz gleicher Gene hatte sie ein anderes Fell als ihre Spenderin."
+  },
+  {
+   "id": "ku052",
+   "text": "Im viktorianischen London brachten Händler Katzenfutter an die Haustür. Meist war es Pferdefleisch am Spieß."
+  },
+  {
+   "id": "ku053",
+   "text": "Die britische Post stellte 1868 drei Katzen als Mäusefänger ein. Fürs Futter gab es einen Schilling pro Woche."
+  },
+  {
+   "id": "ku054",
+   "text": "Bei Nazca fand man 2020 eine 37 Meter lange Katze, in einen Hang gescharrt. Sie ist über 2.000 Jahre alt."
+  },
+  {
+   "id": "ku055",
+   "text": "Am 22. Februar ist in Japan Katzentag. Zwei heißt „ni“, und 2-2-2 klingt wie „nyan nyan nyan“, also miau."
+  },
+  {
+   "id": "ku056",
+   "text": "Kater Karlo ist älter als Micky Maus. Er trat schon 1925 auf, drei Jahre vor Micky, damals noch als Bär."
+  },
+  {
+   "id": "ku058",
+   "text": "Nikola Tesla sah als Kind Funken im Fell seines Katers. Seitdem fragte er sich, was Elektrizität ist."
+  },
+  {
+   "id": "ku059",
+   "text": "Tom aus „Tom und Jerry“ hieß in seinem ersten Film 1940 noch Jasper. Die Serie gewann später sieben Oscars."
+  },
+  {
+   "id": "ku060",
+   "text": "Scarlattis „Katzenfuge“ soll entstanden sein, als seine Katze über die Tasten lief. Belegt ist das nicht."
+  },
+  {
+   "id": "ku061",
+   "text": "Kater Hamlet büxte 1984 in einem Jumbo aus. Bis man ihn fand, war er wochenlang um die Welt geflogen."
   }
  ],
- "Wissen": [
-  {
-   "id": "k001",
-   "text": "Katzen hören Töne bis etwa 85 Kilohertz, Hunde dagegen nur bis rund 45."
-  },
-  {
-   "id": "k002",
-   "text": "Jedes Katzenohr hat 32 Muskeln und dreht sich unabhängig vom anderen."
-  },
-  {
-   "id": "k003",
-   "text": "Was direkt vor der Nase liegt, sieht eine Katze nur verschwommen."
-  },
-  {
-   "id": "k004",
-   "text": "Katzenpupillen weiten sich auf das 135-Fache, unsere auf das 15-Fache."
-  },
-  {
-   "id": "k006",
-   "text": "Katzen sehen schon bei einem Sechstel des Lichts, das wir brauchen."
-  },
-  {
-   "id": "k008",
-   "text": "Katzen sehen vermutlich UV-Licht, das für uns unsichtbar ist."
-  },
-  {
-   "id": "k009",
-   "text": "Katzenaugen leuchten im Dunkeln dank einer Spiegelschicht im Auge."
-  },
-  {
-   "id": "k011",
-   "text": "Wir haben Tausende Geschmacksknospen, Katzen dagegen nur rund 470."
-  },
-  {
-   "id": "k012",
-   "text": "Mit Schnupfen verweigern viele Katzen das Futter, sie riechen es nicht."
-  },
-  {
-   "id": "k013",
-   "text": "Beim Flehmen, dem Grimassenziehen, riechen Katzen mit dem Gaumen."
-  },
-  {
-   "id": "k014",
-   "text": "Katzen haben auch an den Vorderbeinen Tasthaare, kurz über der Pfote."
-  },
-  {
-   "id": "k015",
-   "text": "Beim Zubeißen klappen die Schnurrhaare nach vorn und tasten mit."
-  },
-  {
-   "id": "k016",
-   "text": "Jede Katzennase hat ein Muster, so einzigartig wie ein Fingerabdruck."
-  },
-  {
-   "id": "k017",
-   "text": "Scharf sehen Katzen schlechter als wir, im Dunkeln aber viel besser."
-  },
-  {
-   "id": "k018",
-   "text": "Das Blickfeld einer Katze umfasst rund 200 Grad, unseres etwa 180."
-  },
-  {
-   "id": "k019",
-   "text": "Lose Schlüsselbeine lassen Katzen durch erstaunlich enge Lücken."
-  },
-  {
-   "id": "k020",
-   "text": "Den losen Bauchbeutel, Urbeutel genannt, haben auch schlanke Katzen."
-  },
-  {
-   "id": "k021",
-   "text": "Die Falte außen am Katzenohr heißt Henry-Tasche, ihr Zweck ist unklar."
-  },
-  {
-   "id": "k024",
-   "text": "Katzen laufen auf Zehenspitzen, die Ferse sitzt weit oben am Bein."
-  },
-  {
-   "id": "k025",
-   "text": "Vorne haben Katzen fünf Zehen, hinten dagegen meist nur vier."
-  },
-  {
-   "id": "k027",
-   "text": "Kopfüber klettern Katzen schlecht, ihre Krallen zeigen nach hinten."
-  },
-  {
-   "id": "k028",
-   "text": "Hohle Häkchen auf der Zunge tragen beim Putzen Speichel ins Fell."
-  },
-  {
-   "id": "k029",
-   "text": "Ist das dritte Augenlid einer Katze zu sehen, stimmt oft etwas nicht."
-  },
-  {
-   "id": "k031",
-   "text": "Die Farbe der Pfotenballen passt meistens zur Fellfarbe direkt darüber."
-  },
-  {
-   "id": "k032",
-   "text": "Siamkatzen werden dort dunkel, wo ihr Körper am kühlsten ist."
-  },
-  {
-   "id": "k039",
-   "text": "Mit rund 50 Wirbeln ist eine Katze viel biegsamer als wir mit 33."
-  },
-  {
-   "id": "k040",
-   "text": "Im Sprint schafft eine Hauskatze kurz fast 50 Kilometer pro Stunde."
-  },
-  {
-   "id": "k041",
-   "text": "Aus dem Stand springen Katzen etwa fünfmal so hoch, wie sie groß sind."
-  },
-  {
-   "id": "k042",
-   "text": "Den Dreh im Fall beherrschen Kätzchen mit etwa sieben Wochen."
-  },
-  {
-   "id": "k044",
-   "text": "Eine Katzenschwangerschaft dauert nur gut neun Wochen."
-  },
-  {
-   "id": "k046",
-   "text": "Kater sind häufiger Linkspfoter, weibliche Katzen öfter Rechtspfoter.",
-   "m": "Kater wie {name} sind häufiger Linkspfoter, teste das ruhig mal.",
-   "f": "Katzen wie {name} sind häufiger Rechtspfoter, teste das ruhig mal."
-  },
-  {
-   "id": "k047",
-   "text": "Wie genau Katzen schnurren, ist bis heute nicht vollständig geklärt."
-  },
-  {
-   "id": "k048",
-   "text": "An der Schnauze sitzen meist 24 Schnurrhaare, in vier Reihen."
-  },
-  {
-   "id": "k049",
-   "text": "Draußen frisst eine Katze rund zehn Mäuse am Tag, jede eine Mahlzeit."
-  },
-  {
-   "id": "k050",
-   "text": "Mit vollem Napf fressen Katzen bis zu zwanzigmal am Tag ein bisschen."
-  },
-  {
-   "id": "k051",
-   "text": "Eine neue Sorte schmeckt Katzen oft am besten, bis sie nicht mehr neu ist."
-  },
-  {
-   "id": "k052",
-   "text": "Hat eine Sorte mal Übelkeit gemacht, meiden Katzen sie oft lange."
-  },
-  {
-   "id": "k053",
-   "text": "Am liebsten fressen Katzen ihr Futter etwa körperwarm, wie Beute."
-  },
-  {
-   "id": "k056",
-   "text": "Viele Katzen trinken lieber an einem Ort weit weg vom Futternapf."
-  },
-  {
-   "id": "k057",
-   "text": "Beim Trinken ziehen Katzen mit der Zungenspitze eine Wassersäule hoch."
-  },
-  {
-   "id": "k058",
-   "text": "Ohne Taurin im Futter werden Katzen blind und herzkrank."
-  },
-  {
-   "id": "k059",
-   "text": "Katzen können aus Möhren kein Vitamin A gewinnen, nur aus Fleisch."
-  },
-  {
-   "id": "k061",
-   "text": "Zwiebeln und Knoblauch sind für Katzen giftig, auch gekocht."
-  },
-  {
-   "id": "k062",
-   "text": "Schon Blütenstaub von Lilien kann für Katzen tödlich sein."
-  },
-  {
-   "id": "k063",
-   "text": "Katzen fressen am liebsten allein, sie sind geborene Einzeljäger."
-  },
-  {
-   "id": "k064",
-   "text": "Flache, breite Näpfe mögen viele Katzen lieber als tiefe, enge Schalen."
-  },
-  {
-   "id": "k066",
-   "text": "Beim Betteln mischen Katzen ins Schnurren einen Ton wie Babyweinen."
-  },
-  {
-   "id": "k067",
-   "text": "In einer Studie wählte die Hälfte der Katzen Zuwendung statt Futter."
-  },
-  {
-   "id": "k068",
-   "text": "Manche rohen Fische enthalten ein Enzym, das Vitamin B1 zerstört."
-  },
-  {
-   "id": "k070",
-   "text": "Nassfutter besteht zu vier Fünfteln aus Wasser, Trockenfutter kaum."
-  },
-  {
-   "id": "k071",
-   "text": "Was die Mutter fraß, mögen ihre Kätzchen später oft ebenfalls."
-  },
-  {
-   "id": "k074",
-   "text": "Blinzelst du langsam, blinzeln viele Katzen zurück. Das ist ein Gruß."
-  },
-  {
-   "id": "k075",
-   "text": "Ein senkrecht hochgestellter Schwanz ist ein freundliches Hallo."
-  },
-  {
-   "id": "k076",
-   "text": "Beim Köpfchengeben markiert dich {deine Katze} mit Duft aus den Wangen."
-  },
-  {
-   "id": "k077",
-   "text": "Beim Krallenwetzen hinterlassen Katzen Duftmarken aus den Pfoten."
-  },
-  {
-   "id": "k078",
-   "text": "Beim Milchtritt treten Katzen wie einst an der Zitze ihrer Mutter."
-  },
-  {
-   "id": "k079",
-   "text": "Das Keckern beim Anblick von Vögeln ist bis heute nicht ganz erklärt."
-  },
-  {
-   "id": "k080",
-   "text": "Für die plötzlichen Rennattacken gibt es einen Fachbegriff: FRAP."
-  },
-  {
-   "id": "k082",
-   "text": "Katzen erkennen die Stimme ihres Menschen unter fremden Stimmen."
-  },
-  {
-   "id": "k084",
-   "text": "Katzen binden sich an ihre Menschen ähnlich wie Babys an ihre Eltern."
-  },
-  {
-   "id": "k085",
-   "text": "Im Tierheim senkte ein simpler Karton den Stress von Katzen messbar."
-  },
-  {
-   "id": "k086",
-   "text": "Katzen setzen sich sogar in Quadrate aus Klebeband auf dem Boden."
-  },
-  {
-   "id": "k088",
-   "text": "Eine Katze verschläft rund zwei Drittel ihres ganzen Lebens."
-  },
-  {
-   "id": "k090",
-   "text": "Katzen verbringen bis zur Hälfte ihrer wachen Zeit mit Putzen."
-  },
-  {
-   "id": "k092",
-   "text": "Kätzchen unter einem halben Jahr lässt Katzenminze meist kalt."
-  },
-  {
-   "id": "k093",
-   "text": "Das Wälzen in Katzenminze schützt Katzen wohl auch vor Mücken."
-  },
-  {
-   "id": "k097",
-   "text": "Spielzeug wirkt wie Beute, wenn es sich von der Katze wegbewegt."
-  },
-  {
-   "id": "k098",
-   "text": "Dasselbe Spielzeug langweilt Katzen schon nach wenigen Minuten."
-  },
-  {
-   "id": "k101",
-   "text": "Alle Hauskatzen stammen von der Afrikanischen Wildkatze ab."
-  },
-  {
-   "id": "k120",
-   "text": "Die Katze ist Deutschlands häufigstes Haustier, klar vor dem Hund."
-  },
-  {
-   "id": "k121",
-   "text": "In Deutschland leben wieder Tausende Wildkatzen, vor allem im Wald."
-  },
-  {
-   "id": "k122",
-   "text": "Die Wildkatze hat einen buschigen Schwanz mit stumpfem schwarzem Ende."
-  },
-  {
-   "id": "k132",
-   "text": "Die Schwarzfußkatze fängt bei etwa jeder zweiten Jagd etwas."
-  },
-  {
-   "id": "k133",
-   "text": "Geparden können nicht brüllen, dafür zwitschern sie fast wie Vögel."
-  },
-  {
-   "id": "k134",
-   "text": "Tiger sind nicht nur im Fell gestreift, auch ihre Haut darunter."
-  },
-  {
-   "id": "k135",
-   "text": "Schneeleoparden wärmen sich mit ihrem langen Schwanz wie mit einem Schal."
-  },
-  {
-   "id": "k137",
-   "text": "Nach dem zweiten Jahr zählt jedes Katzenjahr etwa vier Menschenjahre."
-  },
-  {
-   "id": "k142",
-   "text": "Bei großer Hitze fressen viele Katzen weniger und lieber erst am Abend.",
+ "Tipp": [
+  {
+   "id": "ti001",
+   "text": "Tulpen und Narzissen sind für Katzen giftig, vor allem die Zwiebeln. Stell sie in ein Zimmer ohne Katze.",
+   "months": [
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "id": "ti002",
+   "text": "Schokohasen und Schokoeier nicht offen liegen lassen. Schokolade ist für Katzen giftig, dunkle noch mehr.",
+   "months": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": "ti003",
+   "text": "Vor der Zeitumstellung die Futterzeit in kleinen Schritten verschieben. Katzenmägen kennen keine Sommerzeit.",
+   "months": [
+    3,
+    10
+   ]
+  },
+  {
+   "id": "ti004",
+   "text": "Zum Fellwechsel im Frühjahr öfter bürsten. Dann schluckt {deine Katze} beim Putzen weniger Haare.",
+   "months": [
+    4,
+    5
+   ]
+  },
+  {
+   "id": "ti005",
+   "text": "Zeckenmittel für Hunde nie bei Katzen anwenden. Manche enthalten Permethrin, und das kann Katzen töten.",
+   "months": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ]
+  },
+  {
+   "id": "ti006",
+   "text": "Den Balkon mit einem Netz sichern. Auch geschickte Katzen stürzen ab, etwa beim Sprung nach einem Insekt.",
+   "months": [
+    5,
+    6,
+    7,
+    8,
+    9
+   ]
+  },
+  {
+   "id": "ti007",
+   "text": "Im Sommer fressen Katzen etwas weniger. Was an heißen Tagen stehen bleibt, sagt wenig über die Sorte.",
    "months": [
     6,
     7,
@@ -886,373 +1171,763 @@
    ]
   },
   {
-   "id": "k143",
-   "text": "Im Herbst wächst das dichtere Winterfell. Das ist kein Speck.",
+   "id": "ti008",
+   "text": "Unterm Winterfell sieht man kaum, ob eine Katze zugelegt hat. Die Rippen sollten leicht zu tasten sein.",
    "months": [
-    9,
     10,
     11
    ]
   },
   {
-   "id": "k144",
-   "text": "Im Frühjahr verlieren Katzen ihr Winterfell, Bürsten hilft.",
+   "id": "ti009",
+   "text": "Im Winter vor dem Losfahren kurz auf die Motorhaube klopfen. Katzen wärmen sich gern im Motorraum.",
    "months": [
-    3,
-    4,
-    5
+    11,
+    12,
+    1,
+    2
    ]
   },
   {
-   "id": "k146",
-   "text": "Lametta lieber weglassen, Katzen verschlucken es leicht beim Spielen.",
+   "id": "ti010",
+   "text": "Der Weihnachtsstern ist harmloser als sein Ruf, reizt aber Maul und Magen. Lieber nicht anknabbern lassen.",
+   "months": [
+    11,
+    12
+   ]
+  },
+  {
+   "id": "ti011",
+   "text": "Kühlerfrostschutz gleich aufwischen und gut verschlossen lagern. Schon wenig davon kann eine Katze töten.",
+   "months": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": "ti012",
+   "text": "Lametta lieber weglassen. Katzen spielen gern damit, und verschluckte Fäden können den Darm verletzen.",
    "months": [
     12
    ]
+  },
+  {
+   "id": "ti013",
+   "text": "Zu Silvester die Fenster schließen und ein ruhiges Versteck anbieten. Das Knallen macht vielen Katzen Angst.",
+   "months": [
+    12
+   ]
+  },
+  {
+   "id": "ti015",
+   "text": "Nassfutter, das stehen bleibt, nach ein paar Stunden wegwerfen. Im warmen Zimmer verdirbt es schnell."
+  },
+  {
+   "id": "ti016",
+   "text": "Den Napf nach jeder Mahlzeit mit heißem Wasser und Spüli waschen. In Resten vermehren sich schnell Keime."
+  },
+  {
+   "id": "ti017",
+   "text": "Trockenfutter in der Originaltüte lassen und gut verschließen. An der Luft wird das Fett mit der Zeit ranzig."
+  },
+  {
+   "id": "ti018",
+   "text": "Den Wassernapf nicht direkt neben das Futter stellen. Viele Katzen trinken lieber ein Stück entfernt davon."
+  },
+  {
+   "id": "ti019",
+   "text": "Ein Schuss Wasser unters Nassfutter, und die Katze trinkt beim Fressen mit. Gut, wenn sie sonst wenig trinkt."
+  },
+  {
+   "id": "ti020",
+   "text": "Manche Katzen fressen lieber von einem flachen Teller als aus einem tiefen Napf. Ausprobieren kostet nichts."
+  },
+  {
+   "id": "ti021",
+   "text": "Lieber mehrere kleine Portionen über den Tag verteilen als eine große. So fressen Katzen von Natur aus."
+  },
+  {
+   "id": "ti022",
+   "text": "Schlingt {deine Katze} und spuckt danach, verteil das Futter dünn auf einem großen Teller. Das bremst."
+  },
+  {
+   "id": "ti023",
+   "text": "Einen Teil des Trockenfutters in einem Fummelbrett oder Eierkarton verstecken. Suchen ersetzt ein Stück Jagd."
+  },
+  {
+   "id": "ti024",
+   "text": "Mehrere Katzen mit Abstand füttern, am besten so, dass sie sich nicht sehen. Dann frisst jede in Ruhe."
+  },
+  {
+   "id": "ti025",
+   "text": "Weckt dich die Katze früh, lieber nicht gleich füttern. Sonst lernt sie, dass Wecken sich lohnt.",
+   "m": "Weckt dich {name} früh, lieber nicht gleich füttern. Sonst lernt er, dass Wecken sich lohnt.",
+   "f": "Weckt dich {name} früh, lieber nicht gleich füttern. Sonst lernt sie, dass Wecken sich lohnt."
+  },
+  {
+   "id": "ti026",
+   "text": "Eine neue Sorte ruhig ein paar Mal anbieten, bevor du sie abschreibst. Manche Katzen brauchen Zeit für Neues."
+  },
+  {
+   "id": "ti027",
+   "text": "Auf ganz anderes Futter über etwa eine Woche umstellen, täglich etwas mehr untermischen. Das schont den Magen."
+  },
+  {
+   "id": "ti028",
+   "text": "Leckt {deine Katze} nur die Soße, probier den Geschmack mal als Pastete. Manchmal stören nur die Stückchen."
+  },
+  {
+   "id": "ti030",
+   "text": "Leckerlis zählen mit. Gibt es welche, kommt etwas weniger in den Napf, sonst nimmt {deine Katze} zu."
+  },
+  {
+   "id": "ti031",
+   "text": "Trockenfutter lieber abwiegen als mit dem Messbecher abmessen. Mit dem Becher wird es leicht zu viel."
+  },
+  {
+   "id": "ti032",
+   "text": "Die Menge auf der Packung ist nur ein Richtwert. Ob sie passt, zeigt die Figur nach ein paar Wochen."
+  },
+  {
+   "id": "ti033",
+   "text": "Einmal im Monat mit der Katze auf dem Arm auf die Waage, dann ohne. So fällt auf, wenn sie langsam abnimmt.",
+   "m": "Einmal im Monat mit {name} auf dem Arm auf die Waage, dann ohne. So fällt auf, wenn er langsam abnimmt.",
+   "f": "Einmal im Monat mit {name} auf dem Arm auf die Waage, dann ohne. So fällt auf, wenn sie langsam abnimmt."
+  },
+  {
+   "id": "ti034",
+   "text": "Soll {deine Katze} abnehmen, dann langsam, etwa ein Prozent pro Woche. Den Plan dafür macht am besten der Tierarzt."
+  },
+  {
+   "id": "ti035",
+   "text": "Mit Schnupfen riechen Katzen ihr Futter kaum. Kräftig duftendes Nassfutter lockt dann am ehesten."
+  },
+  {
+   "id": "ti036",
+   "text": "Lässt eine Katze Brocken fallen oder kaut nur auf einer Seite, tun ihr oft die Zähne weh. Ab zum Tierarzt.",
+   "m": "Lässt {name} Brocken fallen oder kaut nur auf einer Seite, tun ihm oft die Zähne weh. Ab zum Tierarzt.",
+   "f": "Lässt {name} Brocken fallen oder kaut nur auf einer Seite, tun ihr oft die Zähne weh. Ab zum Tierarzt."
+  },
+  {
+   "id": "ti037",
+   "text": "Trinkt eine Katze plötzlich viel mehr, ab zum Tierarzt. Oft stecken Nieren, Zucker oder Schilddrüse dahinter.",
+   "m": "Trinkt {name} plötzlich viel mehr, bring ihn zum Tierarzt. Oft stecken Nieren, Zucker oder Schilddrüse dahinter.",
+   "f": "Trinkt {name} plötzlich viel mehr, bring sie zum Tierarzt. Oft stecken Nieren, Zucker oder Schilddrüse dahinter."
+  },
+  {
+   "id": "ti038",
+   "text": "Frisst eine ältere Katze mehr und wird doch dünner, lass die Schilddrüse prüfen. Eine Überfunktion ist häufig."
+  },
+  {
+   "id": "ti039",
+   "text": "Ist das dritte Augenlid zu sehen, obwohl die Katze wach ist, stimmt oft etwas nicht. Ab zum Tierarzt.",
+   "m": "Ist bei {name} das dritte Augenlid zu sehen, obwohl er wach ist, stimmt oft etwas nicht. Ab zum Tierarzt.",
+   "f": "Ist bei {name} das dritte Augenlid zu sehen, obwohl sie wach ist, stimmt oft etwas nicht. Ab zum Tierarzt."
+  },
+  {
+   "id": "ti040",
+   "text": "Älteren Katzen Futter und Wasser nicht erhöht hinstellen. Viele haben Arthrose und zeigen es kaum."
+  },
+  {
+   "id": "ti041",
+   "text": "Nichts mit Zwiebeln oder Knoblauch füttern, auch nicht gekocht oder als Pulver. Beides macht Katzen blutarm."
+  },
+  {
+   "id": "ti042",
+   "text": "Kein rohes Fleisch vom Wildschwein füttern. Es kann ein Virus tragen, das für Katzen immer tödlich ist."
+  },
+  {
+   "id": "ti043",
+   "text": "Rohen Fisch nicht regelmäßig füttern. Manche Arten enthalten ein Enzym, das Vitamin B1 zerstört. Garen hilft."
+  },
+  {
+   "id": "ti044",
+   "text": "Auf dem Futter sollte „Alleinfuttermittel“ stehen. „Ergänzungsfuttermittel“ wie Leckerli reicht allein nicht."
+  },
+  {
+   "id": "ti045",
+   "text": "„Mit Huhn“ auf der Dose heißt nur: mindestens vier Prozent Huhn. „Reich an Huhn“ heißt mindestens 14 Prozent."
+  },
+  {
+   "id": "ti046",
+   "text": "Gekochte Knochen, etwa vom Hähnchen, nie füttern. Sie splittern und können Maul und Darm verletzen."
+  },
+  {
+   "id": "ti047",
+   "text": "Leber nur ab und zu füttern. Sie steckt voller Vitamin A, und zu viel davon schadet auf Dauer den Knochen."
+  },
+  {
+   "id": "ti048",
+   "text": "Atmet {deine Katze} im Schlaf öfter als 30-mal pro Minute, lass das Herz untersuchen. Zählen geht leicht mit dem Handy."
+  },
+  {
+   "id": "ti049",
+   "text": "Katzenzähne lassen sich putzen, am besten täglich und mit Zahnpasta für Katzen. Früh angefangen, klappt es leichter."
+  },
+  {
+   "id": "ti050",
+   "text": "Ätherische Öle wie Teebaumöl nie bei Katzen anwenden. Ihre Leber baut viele davon nur schlecht ab."
+  },
+  {
+   "id": "ti051",
+   "text": "Eine neue Katze erst ein paar Tage in ein eigenes Zimmer, dann langsam bekannt machen. Zu schnell gibt oft Streit."
+  },
+  {
+   "id": "ti052",
+   "text": "Nadel und Faden gleich wegräumen. Katzen spielen gern mit Fäden, und manche verschlucken dabei die Nadel."
+  },
+  {
+   "id": "ti053",
+   "text": "Vor dem Waschen und Trocknen kurz in die Trommel schauen. Katzen verkriechen sich gern darin."
+  },
+  {
+   "id": "ti054",
+   "text": "Spielzeug von der Katze wegziehen, nicht auf sie zu. Beute flieht, und genau das weckt den Jäger."
+  },
+  {
+   "id": "ti055",
+   "text": "Spielzeug im Wechsel anbieten und den Rest wegräumen. Was eine Weile weg war, ist wieder spannend."
+  },
+  {
+   "id": "ti056",
+   "text": "Den Kratzbaum in die Nähe des Schlafplatzes stellen. Katzen kratzen gern gleich nach dem Aufwachen."
+  },
+  {
+   "id": "ti057",
+   "text": "Faustregel: ein Katzenklo mehr, als Katzen da sind, jedes an einem anderen Ort. Bei einer Katze also zwei."
+  },
+  {
+   "id": "ti058",
+   "text": "Das Katzenklo jeden Tag säubern. Ist es schmutzig, gehen viele Katzen lieber woanders hin."
+  },
+  {
+   "id": "ti059",
+   "text": "Lieber Streu ohne Duftstoffe nehmen. Was für uns frisch riecht, mögen viele Katzennasen gar nicht."
+  },
+  {
+   "id": "ti060",
+   "text": "Katzenklo und Napf nicht nebeneinanderstellen. Katzen fressen ungern dort, wo sie ihr Geschäft machen."
+  },
+  {
+   "id": "ti061",
+   "text": "Presst ein Kater im Katzenklo und es kommt kaum Urin, sofort zum Tierarzt. Die Harnröhre kann verstopft sein.",
+   "m": "Presst {name} im Katzenklo und es kommt kaum Urin, sofort zum Tierarzt. Die Harnröhre kann verstopft sein."
+  },
+  {
+   "id": "ti062",
+   "text": "Den Chip der Katze bei TASSO oder FINDEFIX eintragen, das kostet nichts. Sonst führt die Nummer zu niemandem."
+  },
+  {
+   "id": "ti063",
+   "text": "Die Transportbox einfach offen im Zimmer stehen lassen. Dann bedeutet sie nicht jedes Mal Tierarzt."
+  },
+  {
+   "id": "ti064",
+   "text": "Bei älteren Katzen öfter auf die Krallen schauen. Sie nutzen sich weniger ab und können in die Ballen wachsen."
+  },
+  {
+   "id": "ti065",
+   "text": "Auch eine gesunde Katze einmal im Jahr zum Tierarzt bringen. Katzen verbergen Schmerzen und Krankheit gut."
+  },
+  {
+   "id": "ti066",
+   "text": "Den Wassernapf jeden Tag auswaschen, nicht nur nachfüllen. Sonst bildet sich ein schmieriger Belag."
+  },
+  {
+   "id": "ti067",
+   "text": "Dosenreste abgedeckt kühlen und bald aufbrauchen. Vor dem Füttern etwas anwärmen, kalt fressen Katzen schlechter."
+  },
+  {
+   "id": "ti069",
+   "text": "Füttern mehrere Leute, morgens die Tagesmenge abwiegen und bereitstellen. So füttert keiner doppelt."
+  },
+  {
+   "id": "ti070",
+   "text": "Tabletten in einem kleinen Happen verstecken, nicht im vollen Napf. Sonst bleiben sie leicht im Rest liegen."
+  },
+  {
+   "id": "ti071",
+   "text": "Krallen nur an der hellen Spitze kürzen. Im rosa Teil, dem Leben, verlaufen Nerven und Blutgefäße."
+  },
+  {
+   "id": "ti072",
+   "text": "Lieber mehrmals am Tag kurz spielen als einmal lang. Katzen jagen in kurzen Sprints, nicht ausdauernd."
+  },
+  {
+   "id": "ti073",
+   "text": "Haargummis und Gummibänder wegräumen. Mit ihrer rauen Zunge spucken Katzen so was schlecht aus."
   }
  ],
- "Flachwitz": [
+ "Warum?": [
   {
-   "id": "fw001",
-   "text": "Welche Katze sollte man besser nicht ins Haus lassen? Die Katastrophe."
+   "id": "wa001",
+   "text": "Warum gibt dir {deine Katze} Köpfchen?",
+   "verdict": "Duftpost",
+   "back": "Katzen haben an Kinn, Wangen und Schläfen Duftdrüsen. Beim Reiben bekommst du ihren Duft ab, sie deinen."
   },
   {
-   "id": "fw002",
-   "text": "Was hat ein Kater nach einer durchfeierten Nacht? Einen Kater."
+   "id": "wa002",
+   "text": "Warum kommt {deine Katze} mit steil erhobenem Schwanz auf dich zu?",
+   "verdict": "Freundschaft",
+   "back": "So gehen Katzen auf jemanden zu, den sie mögen. Schon Kätzchen laufen ihrer Mutter so entgegen."
   },
   {
-   "id": "fw003",
-   "text": "Warum liegen Katzen so gern auf der Tastatur? Von dort haben sie die Maus im Blick."
+   "id": "wa003",
+   "text": "Warum gurrt {deine Katze} „brrr“, wenn du nach Hause kommst?",
+   "verdict": "Willkommen",
+   "back": "Mit diesem Laut ruft eine Katzenmutter ihre Jungen. Erwachsene Katzen grüßen so, wen sie mögen."
   },
   {
-   "id": "fw004",
-   "text": "Wo bewahren Katzen ihre Mäuse auf? Im Mausoleum."
+   "id": "wa004",
+   "text": "Warum schnuppert {deine Katze} an deinem ausgestreckten Finger?",
+   "verdict": "Nasengruß",
+   "back": "Befreundete Katzen begrüßen sich Nase an Nase. Dein Finger ist dafür wohl die Ersatznase."
   },
   {
-   "id": "fw005",
-   "text": "Was ist ein Kater nach dem Krafttraining? Ein Muskelkater."
+   "id": "wa005",
+   "text": "Warum streckt dir {deine Katze} beim Begrüßen den Po entgegen?",
+   "verdict": "Volles Programm",
+   "back": "Zur Begrüßung schnuppern Katzen einander erst an der Nase, dann am Po."
   },
   {
-   "id": "fw006",
-   "text": "Wie nennt man eine Katze, die sich nicht bürsten lässt? Eine Kratzbürste."
+   "id": "wa006",
+   "text": "Warum blinzelt {deine Katze} dich so langsam an?",
+   "verdict": "Ein Lächeln",
+   "back": "Langsames Blinzeln ist ein freundliches Zeichen. Blinzel langsam zurück, das kommt bei Katzen gut an."
   },
   {
-   "id": "fw007",
-   "text": "Warum werfen Katzen Sachen vom Tisch? Sie prüfen, ob die Schwerkraft noch geht."
+   "id": "wa007",
+   "text": "Warum schauen Katzen weg, wenn man sie lange ansieht?",
+   "m": "Warum schaut {name} weg, wenn du ihn lange ansiehst?",
+   "f": "Warum schaut {name} weg, wenn du sie lange ansiehst?",
+   "verdict": "Höflichkeit",
+   "back": "Langes Anstarren ist unter Katzen eine Drohung. Wegschauen heißt also: Ich will keinen Streit."
   },
   {
-   "id": "fw008",
-   "text": "Was bestellt eine Katze im Café? Einen Latte Miauchiato."
+   "id": "wa008",
+   "text": "Warum leckt dir {deine Katze} die Hand oder die Haare?",
+   "verdict": "Familienpflege",
+   "back": "Katzen, die sich mögen, putzen sich gegenseitig, vor allem an Kopf und Hals. Du gehörst also dazu."
   },
   {
-   "id": "fw009",
-   "text": "Was zahlt eine Katze jeden Monat für ihr Körbchen? Mieze."
+   "id": "wa009",
+   "text": "Warum wird eine Katze, die vom Tierarzt kommt, von der anderen angefaucht?",
+   "verdict": "Fremder Geruch",
+   "back": "Katzen erkennen sich vor allem am Geruch. Wer nach Praxis riecht, ist erst mal ein Fremder."
   },
   {
-   "id": "fw010",
-   "text": "Wie nennt man eine schlecht gelaunte Katze? Miezepeter."
+   "id": "wa011",
+   "text": "Warum zeigt dir {deine Katze} den Bauch und kratzt dann, wenn du ihn streichelst?",
+   "verdict": "Vertrauen",
+   "back": "Wer sich entspannt auf den Rücken rollt, fühlt sich sicher. Eine Einladung zum Kraulen ist das aber nicht."
   },
   {
-   "id": "fw011",
-   "text": "Warum hat die Polizei die Katze im Verdacht? Sie hat schon öfter was gemaust."
+   "id": "wa012",
+   "text": "Warum beißt {deine Katze} beim Streicheln plötzlich zu, mitten im Schnurren?",
+   "verdict": "Genug gekrault",
+   "back": "Irgendwann ist es zu viel. Vorher zuckt oft das Fell, oder die Ohren gehen zur Seite."
   },
   {
-   "id": "fw012",
-   "text": "In welche Stadt fliegen Katzen am liebsten? Nach Miami."
+   "id": "wa013",
+   "text": "Warum peitscht {deine Katze} mit dem Schwanz hin und her?",
+   "verdict": "Aufregung",
+   "back": "Bei Katzen ist das kein Wedeln vor Freude. Ein peitschender Schwanz zeigt Anspannung oder Ärger."
   },
   {
-   "id": "fw013",
-   "text": "Was sagt eine Katze, wenn ihr etwas leidtut? Miau culpa."
+   "id": "wa014",
+   "text": "Warum macht {deine Katze} einen Buckel und plustert den Schwanz auf?",
+   "verdict": "Größer wirken",
+   "back": "Mit Buckel und gesträubtem Fell wirken Katzen größer, erst recht von der Seite."
   },
   {
-   "id": "fw014",
-   "text": "Welche Insel finden Katzen zum Anbeißen? Sardinien."
+   "id": "wa052",
+   "text": "Warum jaulen manche Katzen tagelang und wälzen sich am Boden?",
+   "verdict": "Rollig",
+   "back": "Unkastrierte Katzen werden ab Februar alle zwei, drei Wochen rollig, im Haus auch ganzjährig. Dann rufen sie Kater."
   },
   {
-   "id": "fw015",
-   "text": "Was bestellt eine Katze beim Griechen? Mäusaka."
+   "id": "wa015",
+   "text": "Warum putzt sich {deine Katze} sofort, wenn ein Sprung danebengeht?",
+   "verdict": "Beruhigung",
+   "back": "Fachleute nennen das Übersprungshandlung. Klappt etwas nicht, tun Katzen schnell etwas Vertrautes."
   },
   {
-   "id": "fw016",
-   "text": "Was isst eine Katze am liebsten zum Nachtisch? Mausse au Chocolat."
+   "id": "wa016",
+   "text": "Warum legt {deine Katze} vor einem Streit die Ohren flach an?",
+   "verdict": "Schutz",
+   "back": "Angelegt sind die Ohren im Kampf besser geschützt. Und sie sagen klar: Komm mir nicht zu nah."
   },
   {
-   "id": "fw017",
-   "text": "Die Maus hört draußen „Wau“ und traut sich raus. Schnapp! Sagt die Katze: „Fremdsprachen lohnen sich.“"
+   "id": "wa051",
+   "text": "Warum geht eine Katze auf die andere los, wenn draußen eine fremde Katze sitzt?",
+   "verdict": "Falsche Adresse",
+   "back": "Wer an die Fremde nicht rankommt, lässt den Ärger an dem aus, der gerade daneben sitzt."
   },
   {
-   "id": "fw018",
-   "text": "Welche Sorte mag eine Katze am liebsten? Die, von der gerade nichts mehr da ist."
+   "id": "wa017",
+   "text": "Warum hat {deine Katze} beim Spielen plötzlich riesige Pupillen?",
+   "verdict": "Adrenalin",
+   "back": "Aufregung weitet die Pupillen, auch bei hellem Licht. Oft kommt gleich danach der Sprung."
   },
   {
-   "id": "fw019",
-   "text": "Warum sitzt die Katze sonntags vor dem Fernseher? Sie wartet auf die Sendung mit der Maus."
+   "id": "wa018",
+   "text": "Warum treten Katzen auf weichen Decken herum, als würden sie Teig kneten?",
+   "m": "Warum tritt {name} auf weichen Decken herum, als würde er Teig kneten?",
+   "f": "Warum tritt {name} auf weichen Decken herum, als würde sie Teig kneten?",
+   "verdict": "Kinderstube",
+   "back": "So regen Kätzchen den Milchfluss an. Erwachsene Katzen treteln meist, wenn sie sich wohlfühlen."
   },
   {
-   "id": "fw020",
-   "text": "Wie nennt man eine Katze, die zaubern kann? Hokus Pfotus."
+   "id": "wa019",
+   "text": "Warum schläft {deine Katze} so gern auf dir?",
+   "verdict": "Wärme und Nähe",
+   "back": "Du bist warm und riechst vertraut. Wer sich so dicht an dich legt, fühlt sich vermutlich sicher."
   },
   {
-   "id": "fw021",
-   "text": "Welches Kartenspiel spielen Katzen am liebsten? Mau-Mau."
+   "id": "wa053",
+   "text": "Warum sabbern manche Katzen beim Streicheln?",
+   "m": "Warum sabbert {name}, wenn du ihn streichelst?",
+   "f": "Warum sabbert {name}, wenn du sie streichelst?",
+   "verdict": "Wohlgefühl",
+   "back": "Das kommt bei großer Entspannung vor, oft beim Treteln. Sabbert eine Katze auch sonst, ab zum Tierarzt."
   },
   {
-   "id": "fw022",
-   "text": "Wie heißt die berühmteste Detektivin unter den Katzen? Miez Marple."
+   "id": "wa020",
+   "text": "Warum legt sich {deine Katze} so gern in die pralle Sonne?",
+   "verdict": "Gratiswärme",
+   "back": "Unter etwa 30 Grad kostet Katzen das Warmhalten Energie. In der Sonne sparen sie sich das."
   },
   {
-   "id": "fw023",
-   "text": "Wie heißt der berühmteste Zauberer unter den Katzen? Harry Pfoter."
+   "id": "wa021",
+   "text": "Warum schläft {deine Katze} mal eng eingerollt und mal lang ausgestreckt?",
+   "verdict": "Wärmehaushalt",
+   "back": "Eingerollt bleibt die Wärme im Körper. Ist es warm, strecken Katzen sich lang aus und kühlen so ab."
   },
   {
-   "id": "fw024",
-   "text": "Wer ist der Lieblingsmaler der Katzen? Pablo Picatzo."
+   "id": "wa022",
+   "text": "Warum zuckt {deine Katze} im Schlaf mit Pfoten und Schnurrhaaren?",
+   "verdict": "Traumschlaf",
+   "back": "Das passiert im REM-Schlaf, in dem wir am lebhaftesten träumen. Ob Katzen träumen, weiß keiner sicher."
   },
   {
-   "id": "fw025",
-   "text": "Welches Schulfach mögen Katzen am liebsten? Mäusematik."
+   "id": "wa054",
+   "text": "Warum schlafen viele Katzen auf der linken Seite?",
+   "verdict": "Gefahr im Blick",
+   "back": "Fast zwei von drei tun das. Vermutlich erkennen sie so beim Aufwachen schneller, ob Gefahr droht."
   },
   {
-   "id": "fw026",
-   "text": "Wie geht eine Katze zum Napf? Schnurrstracks."
+   "id": "wa024",
+   "text": "Warum quetscht sich {deine Katze} in jeden Karton, auch in viel zu kleine?",
+   "verdict": "Geborgenheit",
+   "back": "Ein enges Versteck gibt Sicherheit. Im Tierheim beruhigten sich neue Katzen mit einer Box schneller."
   },
   {
-   "id": "fw027",
-   "text": "Welche Katze gibt einem Rätsel auf? Die Sphinx."
+   "id": "wa025",
+   "text": "Warum verschwindet {deine Katze} unters Bett, sobald es klingelt?",
+   "verdict": "Erst mal Abstand",
+   "back": "Klingeln heißt Besuch, und Besuch ist fremd und laut. Katzen warten das lieber im Versteck ab."
   },
   {
-   "id": "fw028",
-   "text": "Was sagt der Kater zu seinem Sohn Luke? „Ich bin dein Kater.“"
+   "id": "wa026",
+   "text": "Warum sitzt {deine Katze} am liebsten ganz oben auf dem Schrank?",
+   "verdict": "Überblick",
+   "back": "Von oben sieht man alles kommen und ist selbst schwer zu erreichen. Das beruhigt."
   },
   {
-   "id": "fw029",
-   "text": "Wo kauft eine Katze ihre Möbel? Im Kratzbaumarkt."
+   "id": "wa028",
+   "text": "Warum kratzt {deine Katze} am Sofa, obwohl der Kratzbaum daneben steht?",
+   "verdict": "Reviermarke",
+   "back": "Kratzen hinterlässt Duft und Spuren, gern da, wo viel los ist. Ein wackliger Kratzbaum taugt dafür nicht."
   },
   {
-   "id": "fw030",
-   "text": "Welchen Beruf hätte eine Katze am liebsten? Pfotograf."
+   "id": "wa055",
+   "text": "Warum spritzen manche Katzen im Stehen Urin an Wände und Möbel?",
+   "verdict": "Duftmarke",
+   "back": "Das ist eine Nachricht an andere Katzen, kein Unfall. Auch kastrierte tun das, oft aus Stress."
   },
   {
-   "id": "fw031",
-   "text": "Welchen Regisseur mögen Katzen am liebsten? Fellini."
+   "id": "wa029",
+   "text": "Warum flieht {deine Katze} schon beim Anblick des Transportkorbs?",
+   "verdict": "Erfahrung",
+   "back": "Katzen merken sich, was auf etwas folgt. Kommt der Korb nur vor dem Tierarzt raus, kündigt er den an."
   },
   {
-   "id": "fw032",
-   "text": "Wie nennt man eine Katze, die im Lotto gewonnen hat? Glückskatze."
+   "id": "wa056",
+   "text": "Warum miauen alte Katzen nachts oft so laut?",
+   "verdict": "Altersleiden",
+   "back": "Oft stecken Schilddrüse, hoher Blutdruck, Taubheit oder Demenz dahinter. Manches lässt sich behandeln."
   },
   {
-   "id": "fw033",
-   "text": "Wie viele Katzen braucht man, um eine Glühbirne zu wechseln? Keine, Katzen lassen wechseln."
+   "id": "wa030",
+   "text": "Warum rast {deine Katze} plötzlich wie wild durch die Wohnung?",
+   "verdict": "Zu viel Energie",
+   "back": "Vermutlich geht so raus, was sonst die Jagd verbraucht. Man sagt dazu: die fünf wilden Minuten."
   },
   {
-   "id": "fw034",
-   "text": "Was kann man tun, wenn die Katze Hunger hat? Thunfisch."
+   "id": "wa057",
+   "text": "Warum hechelt {deine Katze} nach dem Toben wie ein Hund?",
+   "verdict": "Außer Puste",
+   "back": "Kurz danach ist das normal. Hechelt eine Katze länger oder schon in Ruhe, ab zum Tierarzt."
   },
   {
-   "id": "fw035",
-   "text": "Wie viele Katzen passen in einen Karton? Immer eine mehr, als reinpasst."
+   "id": "wa031",
+   "text": "Warum schubst {deine Katze} Sachen vom Tisch und schaut dich dabei an?",
+   "verdict": "Pfotentest",
+   "back": "Vermutlich prüfen Katzen mit der Pfote, ob sich etwas rührt. Und sie lernen schnell: Dann kommt jemand."
   },
   {
-   "id": "fw036",
-   "text": "Welchen Käse mag eine Katze auf der Pizza? Mauzarella."
+   "id": "wa032",
+   "text": "Warum wackelt {deine Katze} vor dem Sprung mit dem Hintern?",
+   "verdict": "Fester Stand",
+   "back": "Ganz geklärt ist das nicht. Vermutlich suchen die Hinterpfoten so Halt für den Absprung."
   },
   {
-   "id": "fw037",
-   "text": "Welche Sorte ist am teuersten? Die, die stehen bleibt."
+   "id": "wa058",
+   "text": "Warum sitzt {deine Katze} ewig vor dem Sofa, unter dem der Ball verschwunden ist?",
+   "verdict": "Lauerjagd",
+   "back": "Katzen fangen Mäuse meist durch Warten. Sie sitzen still vor dem Loch, bis sich etwas rührt."
   },
   {
-   "id": "fw038",
-   "text": "Sagt die Katze zum Goldfisch: „Komm doch mal raus, ich lade dich zum Essen ein.“"
+   "id": "wa033",
+   "text": "Warum keckert {deine Katze} am Fenster, wenn draußen Vögel sind?",
+   "verdict": "Jagdfieber",
+   "back": "Genau weiß das niemand. Vielleicht ist es Aufregung über Beute, an die sie nicht herankommt."
   },
   {
-   "id": "fw039",
-   "text": "Wie nennt man eine Katze, die alles frisst? Eine Seltenheit."
+   "id": "wa034",
+   "text": "Warum spielt {deine Katze} lieber mit einer Schnur als mit dem teuren Ball?",
+   "verdict": "Wie Beute",
+   "back": "Was zuckt, flieht oder sich versteckt, wirkt wie eine Maus. Ein Ball, der daliegt, nicht."
   },
   {
-   "id": "fw040",
-   "text": "Wozu braucht eine Katze neun Leben? Acht davon verschläft sie."
+   "id": "wa035",
+   "text": "Warum hat {deine Katze} vom neuen Spielzeug schon nach Minuten genug?",
+   "verdict": "Gewöhnung",
+   "back": "Bald ist der Reiz weg. In Versuchen kam die Spiellust zurück, sobald es ein anderes Spielzeug gab."
   },
   {
-   "id": "fw041",
-   "text": "Was macht eine Katze, wenn man sie ruft? Sie nimmt es zur Kenntnis."
+   "id": "wa036",
+   "text": "Warum sucht {deine Katze} nach dem Laserspiel noch den roten Punkt?",
+   "verdict": "Kein Fang",
+   "back": "Vielleicht, weil die Jagd ohne Fang kein Ende hat. Zum Schluss lieber ein Spielzeug zum Packen geben."
   },
   {
-   "id": "fw042",
-   "text": "Welchen Komponisten hören Katzen am liebsten? Mauzart."
+   "id": "wa037",
+   "text": "Warum bringen manche Katzen ihr Spielzeug zurück, damit du es wirfst?",
+   "verdict": "Eigene Idee",
+   "back": "Fast alle haben sich das selbst beigebracht. Und Schluss macht meist die Katze."
   },
   {
-   "id": "fw043",
-   "text": "Was legt eine Katze für schlechte Zeiten beiseite? Katzengold."
+   "id": "wa038",
+   "text": "Warum greift {deine Katze} beim Spielen deine Hand an?",
+   "verdict": "Hand als Beute",
+   "back": "Durften Kätzchen mit Händen spielen, halten sie die oft für Spielzeug. Nimm lieber eine Katzenangel."
   },
   {
-   "id": "fw044",
-   "text": "Wie lange dauert eine Katzenwäsche? Bei dir zwei Minuten, bei deiner Katze zwei Stunden."
+   "id": "wa040",
+   "text": "Warum starrt {deine Katze} gebannt auf eine leere Wand?",
+   "verdict": "Gute Ohren",
+   "back": "Katzen hören viel höhere Töne als wir. Vielleicht raschelt da etwas, das wir nicht hören."
   },
   {
-   "id": "fw045",
-   "text": "Was frisst ein Kater am Neujahrsmorgen? Rollmops."
+   "id": "wa041",
+   "text": "Warum klettert {deine Katze} rückwärts vom Baum herunter?",
+   "verdict": "Krallenform",
+   "back": "Die Krallen sind nach hinten gebogen. Kopfüber rutschen sie ab, rückwärts halten sie wie Haken."
   },
   {
-   "id": "fw046",
-   "text": "Wann hat eine Katze Katzenjammer? Wenn die Dose fünf Minuten zu spät aufgeht."
+   "id": "wa042",
+   "text": "Warum spielt {deine Katze} mit einer Maus, statt sie gleich zu fressen?",
+   "verdict": "Vorsicht",
+   "back": "Beute kann zurückbeißen. Je wehrhafter sie ist, desto länger zögert die Katze."
   },
   {
-   "id": "fw047",
-   "text": "Treffen sich zwei Katzen. Sagt die eine: „Miau.“ Sagt die andere: „Das wollte ich auch gerade sagen.“"
+   "id": "wa043",
+   "text": "Warum bringt {deine Katze} eine Maus mit nach Hause und lässt sie liegen?",
+   "verdict": "Sicherer Ort",
+   "back": "Vermutlich tragen Katzen Beute dahin, wo sie in Ruhe fressen. Wer satt ist, lässt sie liegen."
   },
   {
-   "id": "fw048",
-   "text": "Welchen Philosophen lesen Katzen am liebsten? Immanuel Katz."
+   "id": "wa044",
+   "text": "Warum scharren Katzen neben dem Napf, als wollten sie das Futter vergraben?",
+   "m": "Warum scharrt {name} neben dem Napf, als wollte er das Futter vergraben?",
+   "f": "Warum scharrt {name} neben dem Napf, als wollte sie das Futter vergraben?",
+   "verdict": "Für später",
+   "back": "Verwandte wie der Luchs decken Beutereste zu und kommen später wieder. Am Napf heißt es wohl: Mir reicht’s."
   },
   {
-   "id": "fw049",
-   "text": "Wann ist eine Katze unsichtbar? Sobald der Transportkorb aus dem Schrank kommt."
+   "id": "wa046",
+   "text": "Warum klingt das Schnurren vor dem Füttern so dringend?",
+   "verdict": "Ein Weinton",
+   "back": "Ins Bettelschnurren mischt sich ein hoher Ton wie Babyweinen. Für Menschen klingt das dringend."
   },
   {
-   "id": "fw050",
-   "text": "Welche Sängerin hören Katzen am liebsten? Miauriah Carey."
+   "id": "wa047",
+   "text": "Warum frisst {deine Katze} besser, wenn du dabei bist?",
+   "verdict": "Gesellschaft",
+   "back": "Ganz geklärt ist das nicht. Viele Katzen fühlen sich sicherer, wenn ihr Mensch in der Nähe ist."
   },
   {
-   "id": "fw051",
-   "text": "Wann weckt dich deine Katze? Pünktlich, eine Stunde vor dem Wecker."
+   "id": "wa048",
+   "text": "Warum schlingt {deine Katze}, wenn eine andere Katze in der Nähe ist?",
+   "verdict": "Konkurrenz",
+   "back": "Wer fürchtet, dass ihm einer was wegfrisst, schlingt. Getrennte Futterplätze nehmen den Druck."
   },
   {
-   "id": "fw052",
-   "text": "Was isst eine Katze in Italien? Mauskaroni."
+   "id": "wa049",
+   "text": "Warum steht {deine Katze} sofort in der Küche, wenn der Kühlschrank aufgeht?",
+   "verdict": "Pawlows Katze",
+   "back": "Katzen merken sich, was vor dem Füttern passiert. Schon das Geräusch kündigt dann Futter an."
   },
   {
-   "id": "fw053",
-   "text": "Wo spielen Katzen Geige? Bei den Fellharmonikern."
+   "id": "wa050",
+   "text": "Warum wischt sich {deine Katze} nach dem Fressen mit der Pfote übers Gesicht?",
+   "verdict": "Waschlappen",
+   "back": "Die Zunge kommt nicht ans eigene Gesicht. Also wird die Pfote nass geleckt und wischt nach."
   },
   {
-   "id": "fw054",
-   "text": "Katzen haben keine Besitzer. Sie haben Personal."
+   "id": "wa059",
+   "text": "Warum wird ein Kätzchen ganz still, wenn die Mutter es im Nacken packt?",
+   "verdict": "Tragestarre",
+   "back": "So lässt es sich leicht tragen. Erwachsene Katzen sollte man aber nicht so packen, für sie ist das Stress."
+  },
+  {
+   "id": "wa060",
+   "text": "Warum frisst {deine Katze} lieber aus dem Napf als aus dem Fummelbrett?",
+   "verdict": "Lieber gratis",
+   "back": "Im Versuch fraßen die meisten Katzen, was einfach dalag. Ratten und sogar Giraffen arbeiten lieber dafür."
+  },
+  {
+   "id": "wa061",
+   "text": "Warum nimmt {deine Katze} beim Tierarzt nicht mal ein Leckerli?",
+   "verdict": "Zu viel Angst",
+   "back": "Angst verdirbt Katzen den Appetit. Frisst eine Katze dort doch etwas, ist das ein gutes Zeichen."
   }
  ],
  "Sprache": [
   {
    "id": "sp001",
-   "text": "Franzosen haben keinen Frosch im Hals, sondern eine Katze."
+   "text": "Wer heiser ist, hat bei uns einen Frosch im Hals, in Frankreich eine Katze."
   },
   {
    "id": "sp002",
-   "text": "Wer auf Japanisch eine Katzenzunge hat, verträgt kein heißes Essen."
+   "text": "Wer nichts Heißes essen kann, hat auf Japanisch eine Katzenzunge: „nekojita“."
   },
   {
    "id": "sp003",
-   "text": "Wer abwartet, der schaut auf Niederländisch die Katze aus dem Baum."
+   "text": "Erst mal abwarten heißt auf Niederländisch: die Katze aus dem Baum gucken."
   },
   {
    "id": "sp004",
-   "text": "Wer auf Spanisch Katze statt Hase gibt, haut jemanden übers Ohr."
+   "text": "Jemanden übers Ohr hauen heißt auf Spanisch: ihm Katze für Hase geben."
   },
   {
    "id": "sp005",
-   "text": "Auf Englisch regnet es Katzen und Hunde, wenn es richtig schüttet."
+   "text": "Wo es bei uns Bindfäden regnet, regnet es auf Englisch Katzen und Hunde."
   },
   {
    "id": "sp006",
-   "text": "Ist etwas großartig, nennt man es auf Englisch den Schlafanzug der Katze."
+   "text": "Katzenjammer ist das Elend nach dem Rausch. Das Wort meinte wohl zuerst das klägliche Jaulen von Katzen."
   },
   {
    "id": "sp007",
-   "text": "Der Kater am Morgen danach kommt vom Katarrh, nicht vom Tier."
+   "text": "Den Kater nach dem Feiern verdanken wir wohl Leipziger Studenten. Sie machten aus dem Katarrh einen Kater."
   },
   {
    "id": "sp008",
-   "text": "„Mieze“ war ursprünglich ein Kosename für Frauen, die Maria hießen."
+   "text": "„Mieze“ war wohl zuerst eine Koseform von Maria. Vielleicht half der Lockruf „miez, miez“ nach."
   },
   {
    "id": "sp009",
-   "text": "Auf Japanisch macht die Katze „nyan“, auf Koreanisch „yaong“."
+   "text": "„Schnurstracks“ hat nichts mit Schnurren zu tun. Gemeint ist: so gerade wie eine gespannte Schnur."
   },
   {
    "id": "sp010",
-   "text": "„Katzenwäsche“ ist eigentlich unfair, Katzen putzen sich stundenlang."
+   "text": "Katzenwäsche heißt: schnell und mit wenig Wasser. {Deine Katze} braucht gar keins und ist trotzdem gründlich."
   },
   {
    "id": "sp011",
-   "text": "Die alten Ägypter nannten die Katze „miu“. Klingt vertraut."
+   "text": "In der „Katastrophe“ steckt keine Katze. Das Wort ist griechisch und meint eigentlich: Wendung."
   },
   {
    "id": "sp012",
-   "text": "Am Katzentisch saßen früher Kinder und Gäste, die man nicht so mochte."
+   "text": "Am Katzentisch sitzt, wer abseits essen muss. Gemeint war wohl zuerst der Boden, auf dem die Katze frisst."
   },
   {
    "id": "sp013",
-   "text": "Wer katzbuckelt, verbeugt sich so tief, dass ein Katzenbuckel entsteht."
+   "text": "Wer katzbuckelt, macht sich vor Mächtigen klein. Eine Katze macht ihren Buckel eher, um größer zu wirken."
   },
   {
    "id": "sp014",
-   "text": "„Die Katze aus dem Sack lassen“ heißt auf Englisch Wort für Wort genauso."
+   "text": "Wer unbesehen kauft, kauft die Katze im Sack. Darin sollte eigentlich ein Ferkel stecken."
   },
   {
    "id": "sp015",
-   "text": "Wer auf Französisch andere Katzen zu peitschen hat, hat Besseres zu tun."
+   "text": "Wer Wichtigeres zu tun hat, hat auf Französisch andere Katzen zu peitschen."
   },
   {
    "id": "sp016",
-   "text": "Wer selbstzufrieden grinst, hat auf Englisch den Kanarienvogel gefressen."
+   "text": "Wer selbstzufrieden grinst, sieht auf Englisch aus wie die Katze, die den Kanarienvogel gefressen hat."
   },
   {
    "id": "sp017",
-   "text": "Wer auf Polnisch eine Katze hat, hat einen kleinen Knall."
+   "text": "Wer spinnt, hat bei uns einen Vogel. In Polen hat er eine Katze."
   },
   {
    "id": "sp018",
-   "text": "„Um den heißen Brei“ schlich ursprünglich die Katze herum."
+   "text": "Wer um den heißen Brei herumredet, macht es wie die Katze: Sie schleicht drumherum, weil der Brei zu heiß ist."
   },
   {
    "id": "sp019",
-   "text": "Auf Spanisch waren nur vier Katzen da, wenn kaum jemand kam."
+   "text": "Ist kaum jemand da, sind es auf Spanisch nur vier Katzen: „cuatro gatos“."
   },
   {
    "id": "sp020",
-   "text": "Wer nachmacht, ist auf Englisch eine Nachmachkatze: copycat."
+   "text": "„Für die Katz“ kommt wohl aus einer Fabel: Ein Schmied bekam nur Dank, und davon wurde seine Katze nicht satt."
   },
   {
    "id": "sp021",
-   "text": "Ein kurzes Nickerchen heißt auf Englisch Katzenschlaf, „catnap“."
+   "text": "Katzengold glänzt, ist aber nur Glimmer oder Pyrit. „Katzen-“ meint hier wohl unecht, wie bei Katzensilber."
   },
   {
    "id": "sp022",
-   "text": "Neugier bringt die Katze um, warnt ein englisches Sprichwort."
+   "text": "Auf Englisch bringt Neugier die Katze um. Bei Shakespeare war es noch die Sorge: „care killed a cat“."
   },
   {
    "id": "sp023",
-   "text": "Wenn auf Italienisch eine Katze auf etwas brütet, ist irgendwas faul."
+   "text": "Ist etwas faul, sagt man auf Italienisch: Hier brütet eine Katze, „qui gatta ci cova“."
   },
   {
    "id": "sp024",
-   "text": "In Japan leiht man sich bei viel Arbeit sogar die Pfote einer Katze."
+   "text": "Wer kaum hinterherkommt, würde sich auf Japanisch sogar die Pfote einer Katze leihen."
   },
   {
    "id": "sp025",
-   "text": "Wo wir Perlen vor die Säue werfen, geben Japaner Katzen Goldmünzen."
+   "text": "Wo wir Perlen vor die Säue werfen, geben Japaner einer Katze Goldmünzen."
   },
   {
    "id": "sp026",
-   "text": "Unser gebranntes Kind ist im Französischen eine verbrühte Katze."
+   "text": "Ein gebranntes Kind scheut das Feuer. In Frankreich fürchtet die verbrühte Katze sogar kaltes Wasser."
   },
   {
    "id": "sp027",
-   "text": "Klartext heißt auf Französisch: eine Katze eine Katze nennen."
+   "text": "Wo wir das Kind beim Namen nennen, nennen Franzosen eine Katze eine Katze."
   },
   {
    "id": "sp028",
-   "text": "Dass Mäuse tanzen, wenn die Katze weg ist, sagt man in vielen Sprachen."
+   "text": "Der Muskelkater ist nach dem Kater vom Feiern benannt. Auch er kommt erst am Tag danach."
   },
   {
    "id": "sp029",
-   "text": "Das Wort Katze kam mit den Römern zu uns, aus dem lateinischen cattus."
+   "text": "Unser Wort Katze kommt wohl vom spätlateinischen „cattus“. Im klassischen Latein hieß sie noch „feles“."
   },
   {
    "id": "sp030",
-   "text": "Die Katze heißt auf Thai „maew“ und auf Chinesisch „mao“, wie gemaunzt."
+   "text": "In manchen Sprachen heißt die Katze nach ihrem Miau: Chinesisch „mao“, Thai „maeo“, Altägyptisch „miu“."
   },
   {
    "id": "sp031",
-   "text": "Ein Fassadenkletterer ist auf Englisch ein Katzeneinbrecher."
+   "text": "Bei uns hat eine Katze sieben Leben, auf Englisch neun. Auf Italienisch und Spanisch sind es auch sieben."
   },
   {
    "id": "sp032",
@@ -1260,23 +1935,127 @@
   },
   {
    "id": "sp033",
-   "text": "Runde Pflastersteine heißen auch Katzenköpfe, wegen ihrer Größe."
+   "text": "Buckliges Pflaster aus runden Steinen heißt auch Katzenkopfpflaster. Es sieht aus wie lauter Katzenköpfe."
   },
   {
    "id": "sp034",
-   "text": "„Bei Nacht sind alle Katzen grau“ heißt: Im Dunkeln fallen Unterschiede nicht auf."
+   "text": "„Bei Nacht sind alle Katzen grau“ stimmt sogar: Bei wenig Licht sieht unser Auge kaum noch Farben."
   },
   {
    "id": "sp035",
-   "text": "Wo es eng ist, kann man auf Englisch keine Katze schwingen."
+   "text": "In der Schweiz sagt man Büsi, in Österreich gern Katzerl. Büsi kommt wohl vom Lockruf, wie englisch „puss“."
   },
   {
    "id": "sp036",
-   "text": "Gefundenes behalten heißt auf Japanisch wörtlich Katzenhaufen."
+   "text": "Gefundenes heimlich behalten heißt auf Japanisch „nekobaba“, Katzenhaufen: zuscharren und unschuldig gucken."
   },
   {
    "id": "sp037",
-   "text": "Katzenmusik nennt man schiefes Gejaule, nach verliebten Katern."
+   "text": "Katzenmusik war früher auch Protest: Man zog vors Haus eines Unbeliebten und machte dort Krach."
+  },
+  {
+   "id": "sp038",
+   "text": "Weidenkätzchen sind weich wie junge Katzen. Auch auf Englisch und Französisch heißen sie Kätzchen."
+  },
+  {
+   "id": "sp039",
+   "text": "Wer eine Sauklaue hat, schreibt auf Französisch wie eine Katze: „écrire comme un chat“."
+  },
+  {
+   "id": "sp040",
+   "text": "Ohne Erfahrung keine Stelle, ohne Stelle keine Erfahrung: Da beißt sich die Katze in den Schwanz."
+  },
+  {
+   "id": "sp041",
+   "text": "„Die eilige Katze bekommt blinde Junge“, sagt man in Italien. Dabei kommt jedes Kätzchen blind zur Welt."
+  },
+  {
+   "id": "sp042",
+   "text": "„Die Katze lässt das Mausen nicht“: Alte Gewohnheiten wird man nicht los. Mausen heißt übrigens auch klauen."
+  },
+  {
+   "id": "sp043",
+   "text": "In Finnland hebt man die Katze auf den Tisch, wenn man endlich anspricht, worüber alle schweigen."
+  },
+  {
+   "id": "sp044",
+   "text": "Wer sich katzbalgt, rauft wie zwei Katzen. Ein Katzbalger war auch das kurze Schwert der Landsknechte."
+  },
+  {
+   "id": "sp045",
+   "text": "Für ganz wenig sagt man auf Polnisch: so viel, wie die Katze geweint hat."
+  },
+  {
+   "id": "sp046",
+   "text": "Katzenzungen kennen wir meist aus Schokolade. In Frankreich sind „langues de chat“ ein dünnes Gebäck."
+  },
+  {
+   "id": "sp047",
+   "text": "Wer sich braver gibt, als er ist, hat bei uns Kreide gefressen. In Japan hat er sich eine Katze übergestülpt."
+  },
+  {
+   "id": "sp048",
+   "text": "Wer einen anderen hinhält und zappeln lässt, spielt mit ihm Katz und Maus."
+  },
+  {
+   "id": "sp049",
+   "text": "Krabbeln heißt auf Spanisch „gatear“. Darin steckt „gato“, die Katze."
+  },
+  {
+   "id": "sp050",
+   "text": "Die Angorakatze ist nach Ankara benannt. Die türkische Hauptstadt hieß bei uns früher Angora."
+  },
+  {
+   "id": "sp051",
+   "text": "Wer Leute lenken soll, die alle machen, was sie wollen, hütet einen Sack Flöhe. Auf Englisch hütet er Katzen."
+  },
+  {
+   "id": "sp052",
+   "text": "Schauen ist niemandem verboten. Ein altes Sprichwort sagt: Auch die Katze darf den Kaiser ansehen."
+  },
+  {
+   "id": "sp053",
+   "text": "Getigerte Katzen heißen auf Englisch „tabby“. So hieß ein gestreifter Seidenstoff aus Bagdad."
+  },
+  {
+   "id": "sp054",
+   "text": "Wem schwer ums Herz ist, dem kratzen auf Russisch Katzen an der Seele."
+  },
+  {
+   "id": "sp055",
+   "text": "Den Bock zum Gärtner machen heißt auf Koreanisch: der Katze den Fisch anvertrauen."
+  },
+  {
+   "id": "sp056",
+   "text": "Dem Fuchs sind die Trauben zu sauer. Auf Türkisch nennt die Katze die Leber unrein, an die sie nicht rankommt."
+  },
+  {
+   "id": "sp057",
+   "text": "Wer Krokodilstränen weint, ist auf Chinesisch die Katze, die um die Maus weint."
+  },
+  {
+   "id": "sp058",
+   "text": "Ein winziges Grundstück ist auf Japanisch so groß wie eine Katzenstirn."
+  },
+  {
+   "id": "sp059",
+   "text": "Wer es zu oft versucht, wird erwischt: In Italien geht die Katze an den Speck, bis sie die Pfote dort lässt."
+  },
+  {
+   "id": "sp060",
+   "text": "Wer keinen Hund hat, jagt mit der Katze, sagt man auf Portugiesisch. Gemeint ist: Man nimmt, was man hat."
+  },
+  {
+   "id": "sp063",
+   "text": "Ist die Katze aus dem Haus, tanzen die Mäuse auf dem Tisch. Auf Englisch spielen sie bloß."
+  },
+  {
+   "id": "sp065",
+   "text": "Wer der Katze die Schelle umhängt, wagt, wovor alle kneifen. In der alten Fabel fand sich dafür keine Maus."
+  },
+  {
+   "id": "sp066",
+   "text": "Wer sich in neuer Umgebung verloren fühlt, ist auf Niederländisch wie eine Katze im fremden Lagerhaus."
   }
  ]
 }
