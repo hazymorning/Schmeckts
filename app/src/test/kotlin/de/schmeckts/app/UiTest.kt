@@ -712,7 +712,7 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
-    fun `insights - every finding a line of the Steckbrief, buying before Beim Fuettern, each with both counts`() {
+    fun `insights - every finding a line of the Steckbrief, buying before Beim Fuettern, both counts, jelly with the favourites`() {
         val sorts =
             listOf(
                 product("a", "Sheba", "Lachs in Soße"),
@@ -737,17 +737,22 @@ class UiEvaluationTest : ScreenTest() {
         val kinds = found.map { it.kind }
         check(kinds == listOf("konsistenz", "sosse", "tageszeit", "snack"), "four findings $kinds")
         val label = top(hasText("Beim Füttern"))
+        // only the two favourites came in jelly, both from Felix, so their line tells it
+        val lines = kinds.map { if (it == "konsistenz") "liebling" else it }
         check(
-            tags("trait-", sheet = true).filter { it in kinds } == kinds &&
+            tags("trait-", sheet = true).filter { it in lines } == lines &&
                 top(hasTestTag("trait-sosse")) < label &&
                 label < top(hasTestTag("trait-tageszeit")),
             "every finding a line of the Steckbrief, buying before „Beim Füttern“",
         )
+        val counted = found.filter { it.kind !in listOf("sosse", "konsistenz") }
         check(
-            found.filter { it.kind != "sosse" }.all { x -> inSheet(times(x.a.good, x.a.n)) && inSheet(times(x.b.good, x.b.n)) } &&
+            counted.all { x -> inSheet(times(x.a.good, x.a.n)) && inSheet(times(x.b.good, x.b.n)) } &&
                 inSheet("8 Mal nur die Soße geleckt"),
             "each with both counts",
         )
+        tapTag("trait-liebling")
+        check(inSheet("8 von 8") && inSheet("0 von 8"), "the favourites open on jelly against the rest, brand by brand")
     }
 
     @Test
@@ -1038,7 +1043,6 @@ class UiEvaluationTest : ScreenTest() {
         val kept = listOf(level, tags("proof-", sheet = true))
         tapTag("trait-pack-${pack.brand}")
         val closed = tags("proof-", sheet = true)
-        tapTag("trait-appetit")
         val weeks = tags("week-", sheet = true)
         val lineIds = pack.sorts.map { it.id }
         check(
@@ -1049,7 +1053,7 @@ class UiEvaluationTest : ScreenTest() {
         )
         check(over == listOf("evaluation", listOf("product", null, null), proof[0]), "a row opens its sheet over the page $over")
         check(kept == listOf(listOf("evaluation", null, null), proof), "back returns to the page, its proof still open $kept")
-        check(closed.isEmpty() && weeks.size >= 2, "a second tap folds it, another opens $weeks")
+        check(closed.isEmpty() && weeks.size >= 2, "a second tap folds it; the weeks show without one $weeks")
         tapTag("trait-liebling")
         check(level == listOf("product", null, null) && sheet?.id == favourite.id, "a line about one variety opens that variety")
     }

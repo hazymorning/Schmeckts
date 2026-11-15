@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -834,7 +835,7 @@ fun DotRow(
 }
 
 /** A variety's ratings: one row for one cat, else a row for each cat that rated it, led by its picture. of: which of a
- cat's ratings, newest first. */
+ cat's ratings, newest first; said: a cat's verdict in words, after its dots. */
 @Composable
 fun DotLines(
     m: Model,
@@ -843,6 +844,7 @@ fun DotLines(
     open: Int = 0,
     pets: List<String> = m.pets,
     of: (Stat) -> List<Pt> = { it.window },
+    said: ((String) -> String?)? = null,
 ) {
     watch()
     val lines =
@@ -863,6 +865,10 @@ fun DotLines(
                 Avatar(d.getPet(pid), Av.XS)
                 Gap(Space.s2)
                 DotRow(keys, more = more)
+                said?.invoke(pid)?.let {
+                    Gap(Space.s2)
+                    T(it, Type.small, color = colors.muted)
+                }
             }
         }
     }
@@ -876,17 +882,26 @@ private fun bands(s: Shelf) =
         Triple(s.open, "noch offen", null),
     )
 
-/** a band's square in its tone; still open in the quiet tone of decoration */
+// a square drawn as its outline, the line inside its bounds
+private fun DrawScope.outline(
+    c: Color,
+    at: Offset,
+    side: Float,
+) {
+    val w = Size.hairline.toPx()
+    drawRect(c, at + Offset(w / 2, w / 2), Area(side - w, side - w), style = Stroke(w))
+}
+
+/** a band's square in its tone; still open an outline */
 @Composable
 fun Swatch(tone: String?) {
     watch()
     val p = colors
-    val c = p.tone(tone)?.c ?: p.faint
-    Canvas(Modifier.size(Size.dot)) { drawRect(c) }
+    val c = p.tone(tone)?.c
+    Canvas(Modifier.size(Size.dot)) { if (c != null) drawRect(c) else outline(p.muted, Offset.Zero, size.minDimension) }
 }
 
-/** The decided varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines;
- *  those still open only in the legend */
+/** The varieties of Einkaufen by band, a square each, or one bar where they would take more than two lines */
 @Composable
 fun ShelfBar(
     shelf: Shelf,
@@ -899,38 +914,48 @@ fun ShelfBar(
     if (total == 0) return
     val p = colors
     val said = "Von $total Sorten: ${list.filter { it.first > 0 }.joinToString(", ") { "${it.first} ${it.second}" }}."
-    val decided = list.filter { it.third != null && it.first > 0 }.map { it.first to p.tone(it.third)!!.c }
-    val shown = decided.sumOf { it.first }
+    // null: still open
+    val marks = list.filter { it.first > 0 }.map { it.first to p.tone(it.third)?.c }
     Column(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = said }) {
-        if (shown > 0) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
-                if (shown > 2 * per) {
-                    Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
-                        val gap = Space.hair.toPx()
-                        val h = size.height
-                        clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
-                            var x = 0f
-                            decided.forEachIndexed { i, (k, c) ->
-                                val seg = size.width * k / shown
-                                drawRect(c, Offset(x, 0f), Area(seg - if (i < decided.size - 1) gap else 0f, h))
-                                x += seg
-                            }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val per = ((maxWidth + Space.s1) / (Size.dot + Space.s1)).toInt().coerceAtLeast(1)
+            if (total > 2 * per) {
+                Canvas(Modifier.fillMaxWidth().height(Size.meter)) {
+                    val gap = Space.hair.toPx()
+                    val h = size.height
+                    var x = 0f
+                    clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, h, CornerRadius(h / 2))) }) {
+                        marks.forEachIndexed { i, (k, c) ->
+                            val seg = size.width * k / total
+                            if (c != null) drawRect(c, Offset(x, 0f), Area(seg - if (i < marks.size - 1) gap else 0f, h))
+                            if (c != null) x += seg
                         }
                     }
-                } else {
-                    val rows = (shown + per - 1) / per
-                    val fills = decided.flatMap { (k, c) -> List(k) { c } }
-                    Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
-                        val d = Size.dot.toPx()
-                        val step = d + Space.s1.toPx()
-                        fills.forEachIndexed { i, c -> drawRect(c, Offset(i % per * step, i / per * step), Area(d, d)) }
+                    if (marks.last().second == null) {
+                        val w = Size.hairline.toPx()
+                        clipRect(left = x) {
+                            drawRoundRect(p.muted, Offset(w / 2, w / 2), Area(size.width - w, h - w), CornerRadius((h - w) / 2), Stroke(w))
+                        }
+                        if (x > 0f) drawLine(p.muted, Offset(x + w / 2, 0f), Offset(x + w / 2, h), w)
+                    }
+                }
+            } else {
+                val rows = (total + per - 1) / per
+                val cells = marks.flatMap { (k, c) -> List(k) { c } }
+                Canvas(Modifier.fillMaxWidth().height(Size.dot * rows + Space.s1 * (rows - 1))) {
+                    val d = Size.dot.toPx()
+                    val step = d + Space.s1.toPx()
+                    cells.forEachIndexed { i, c ->
+                        val at = Offset(i % per * step, i / per * step)
+                        if (c != null) drawRect(c, at, Area(d, d)) else outline(p.muted, at, d)
                     }
                 }
             }
-            if (legend) Gap(Space.s2)
         }
-        if (legend) ShelfLegend(shelf)
+        if (legend) {
+            Gap(Space.s2)
+            ShelfLegend(shelf)
+        }
     }
 }
 
@@ -943,7 +968,7 @@ fun ShelfLegend(shelf: Shelf?) {
         if (shelf != null) {
             bands(shelf).filter { it.first > 0 }
         } else {
-            bands(Shelf(0, 0, 0, 0)).map { if (it.third == null) it.copy(second = "offen") else it }
+            bands(Shelf(0, 0, 0, 0))
         }
     FlowRow(
         Modifier.fillMaxWidth(),
@@ -1024,8 +1049,9 @@ private fun weekSaid(w: Block): String {
             val label = observationOf(k).label
             w.seen[k]?.let { "${often(it)} ${if (k == "stink") label else lower(label)}" }
         }
-    return head + ate.joinToString(", ") + ". Zu erwarten waren etwa ${jsRound(w.expected)}." +
-        (if (noted.isNotEmpty()) " Notiert: ${noted.joinToString(", ")}." else "")
+    val e = jsRound(w.expected).toInt()
+    val expected = if (w.judged) " Zu erwarten war ${if (e == 0) "fast nie" else "etwa ${often(e)}"} gut gefressen." else ""
+    return head + ate.joinToString(", ") + "." + expected + (if (noted.isNotEmpty()) " Notiert: ${noted.joinToString(", ")}." else "")
 }
 
 // bottom up good, mid, sauce, bad, as tall as its share of the busiest week; the line what its varieties led to expect
@@ -1045,23 +1071,25 @@ private fun DrawScope.drawWeek(
         drawRect(c, Offset(0f, y - s), Area(size.width, s))
         y -= s + gap
     }
-    if (!w.judged && w.n > 0) {
-        val l = Size.hairline.toPx()
-        val top = h - h * w.n / most
-        drawRect(p.muted, Offset(l / 2, top + l / 2), Area(size.width - l, h - top - l), style = Stroke(l))
+    if (!w.judged) {
+        if (w.n > 0) {
+            val l = Size.hairline.toPx()
+            val top = h - h * w.n / most
+            drawRect(p.muted, Offset(l / 2, top + l / 2), Area(size.width - l, h - top - l), style = Stroke(l))
+        }
+        return
     }
-    if (w.n == 0) return
     val at = h - (h * w.expected / most).toFloat()
-    val over = Space.s1.toPx()
+    val over = Space.hair.toPx()
     val st = Size.stroke.toPx()
-    drawLine(ground, Offset(-over, at), Offset(size.width + over, at), st + 2 * Size.hairline.toPx())
+    drawLine(ground, Offset(-over, at), Offset(size.width + over, at), st + Size.hairline.toPx())
     drawLine(p.ink, Offset(-over, at), Offset(size.width + over, at), st)
 }
 
-/** the first day of a week, as under its column: „27.9.“ */
-private fun weekDay(w: Block) = "${dateOf(w.start)}.${monthOf(w.start)}."
+/** the first day of a week, as under its column: „27.9.“, „ab 1.11.“ for one cut short by the first rating */
+private fun weekDay(w: Block) = "${if (w.start > w.from) "ab " else ""}${dateOf(w.start)}.${monthOf(w.start)}."
 
-/** a column a week across the width, oldest first, the notes of each and the day it starts under it */
+/** a column a week, oldest first, the notes of each and the day it starts under it */
 @Composable
 fun WeekChart(
     weeks: List<Block>,
@@ -1076,22 +1104,23 @@ fun WeekChart(
     val widest =
         with(LocalDensity.current) {
             measure
-                .measure("30.12.", day)
+                .measure(if (weeks[0].start > weeks[0].from) "ab 30.12." else "30.12.", day)
                 .size.width
                 .toDp()
         }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val k = weeks.size
-        val col = (maxWidth - Space.s2 * (k - 1)) / k
+        val gap = Space.s2
+        val col = minOf(Size.picXl, (maxWidth - gap * (k - 1)) / k)
+        val each = Modifier.width(col)
         // a day under every column it fits beside, from the oldest; never past the end
-        val step = ceil((widest + Space.s1) / (col + Space.s2)).toInt().coerceAtLeast(1)
-        val dated = { i: Int -> i % step == 0 && (col + Space.s2) * (k - i) - Space.s2 >= widest }
-        Column(Modifier.fillMaxWidth()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+        val step = ceil((widest + Space.s1) / (col + gap)).toInt().coerceAtLeast(1)
+        val dated = { i: Int -> i % step == 0 && (col + gap) * (k - i) - gap >= widest }
+        Column(Modifier.width(col * k + gap * (k - 1))) {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                 weeks.forEachIndexed { i, w ->
                     Canvas(
-                        Modifier
-                            .weight(1f)
+                        each
                             .height(Size.chart)
                             .testTag("week-${k - 1 - i}")
                             .semantics { contentDescription = weekSaid(w) },
@@ -1100,10 +1129,10 @@ fun WeekChart(
             }
             Box(Modifier.fillMaxWidth().height(Size.hairline).background(p.line))
             if (weeks.any { it.seen.isNotEmpty() }) {
-                Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+                Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
                     for (w in weeks) {
                         Column(
-                            Modifier.weight(1f),
+                            each,
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(Space.hair),
                         ) {
@@ -1121,10 +1150,12 @@ fun WeekChart(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+            Row(Modifier.padding(top = Space.s1), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                // under its column while it fits there, else from the column's start on
+                val align = if (widest <= col) Alignment.CenterHorizontally else Alignment.Start
                 weeks.forEachIndexed { i, w ->
-                    Box(Modifier.weight(1f)) {
-                        if (dated(i)) T(weekDay(w), day, Modifier.wrapContentWidth(Alignment.Start, unbounded = true), p.muted)
+                    Box(each) {
+                        if (dated(i)) T(weekDay(w), day, Modifier.wrapContentWidth(align, unbounded = true), p.muted)
                     }
                 }
             }
@@ -1143,6 +1174,8 @@ fun PackThumbs(
     watch()
     val d = LocalUi.current.phone.derive
     val list = ids.take(PACK_SHOWN)
+    // without photos the hidden packagings show as blank edges, so the last one says how many there are
+    val bare = list.none { imageOf(d.getProduct(it)?.str("thumb")) != null }
     Box(Modifier.clearAndSetSemantics {}) {
         list.forEachIndexed { i, id ->
             Thumb(
@@ -1151,7 +1184,7 @@ fun PackThumbs(
                 Th.M,
                 Modifier
                     .zIndex((list.size - i).toFloat())
-                    .padding(start = Space.s3 * i)
+                    .padding(start = Space.s4 * i)
                     .drawBehind {
                         val st = Size.stroke.toPx()
                         drawRoundRect(
@@ -1165,6 +1198,15 @@ fun PackThumbs(
                     },
                 letter = i == 0,
             )
+        }
+        if (bare && list.size > 1) {
+            Box(
+                Modifier
+                    .zIndex(list.size + 1f)
+                    .padding(start = Space.s4 * (list.size - 1) + Th.M.side - Space.s4)
+                    .size(Space.s4, Th.M.side),
+                contentAlignment = Alignment.Center,
+            ) { T("${ids.size}", Type.captionStrong, color = colors.muted) }
         }
     }
 }

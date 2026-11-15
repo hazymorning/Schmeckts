@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -69,6 +70,7 @@ import de.schmeckts.app.Time
 import de.schmeckts.app.Trait
 import de.schmeckts.app.Trend
 import de.schmeckts.app.Vorlieben
+import de.schmeckts.app.allGood
 import de.schmeckts.app.andList
 import de.schmeckts.app.cap
 import de.schmeckts.app.cardTraits
@@ -86,7 +88,6 @@ import de.schmeckts.app.shopGroups
 import de.schmeckts.app.tallyOf
 import de.schmeckts.app.trialOf
 import de.schmeckts.app.typeOf
-import de.schmeckts.app.ui.Badge
 import de.schmeckts.app.ui.Btn
 import de.schmeckts.app.ui.BtnKind
 import de.schmeckts.app.ui.Card
@@ -100,6 +101,7 @@ import de.schmeckts.app.ui.Divider
 import de.schmeckts.app.ui.Gap
 import de.schmeckts.app.ui.Hint
 import de.schmeckts.app.ui.Icon
+import de.schmeckts.app.ui.IconBtn
 import de.schmeckts.app.ui.Label
 import de.schmeckts.app.ui.Link
 import de.schmeckts.app.ui.ListRow
@@ -254,7 +256,7 @@ private class Ctx(
 )
 
 /** A line of the Steckbrief in words: label and value plain, sub and note as markup, the sides it compares; brand: the
- value names a brand */
+ value names a brand; more: the varieties the value only counts, also said on the home card */
 private class Said(
     val label: String,
     val value: String,
@@ -264,6 +266,7 @@ private class Said(
     val quiet: Boolean = false,
     val note: String = "",
     val brand: Boolean = false,
+    val more: String = "",
 )
 
 private fun side(
@@ -291,7 +294,7 @@ private fun lineSaid(
     val o = tallyOf(others)
     val who = andList(others.map(::brand).filter { it.isNotEmpty() }.distinct())
     return if (o.good * 2 < o.n) {
-        "Auch $who ${ph.inside} ${if (o.good > 0) "nur " else ""}${times(o.good, o.n)} gut gefressen, $maybe$licked"
+        "Auch $who ${ph.inside} ${if (o.good > 0) "nur " else ""}${times(o.good, o.n)}, $maybe$licked"
     } else {
         "$who ${ph.inside} dagegen ${times(o.good, o.n)} gut gefressen.$licked"
     }
@@ -344,8 +347,49 @@ private fun Phone.groupSaid(
         k == 1 -> list[0].let { e -> Said(one, nameOf(e), esc(joined(brand(e), lower(whyOf(e)) + if (liked) away(e, c) else ""))) }
         k == 2 -> Said(many, "${nameOf(list[0])} und ${nameOf(list[1])}", esc(brandsOf(list)))
         whole != null ->
-            Said(many, whole, "${bigWord(k)} Sorten, jede meistens ${if (liked) "gut" else "kaum"} gefressen.", brand = true)
+            Said(
+                many,
+                "${bigWord(k)} Sorten von $whole",
+                "Alle meist ${if (liked) "gut" else "kaum"} gefressen.",
+                brand = true,
+            )
+        k == 3 -> {
+            val more = esc("Dazu ${nameOf(list[1])} und ${nameOf(list[2])}.")
+            Said(many, "${nameOf(list[0])} und zwei weitere", more, more = more)
+        }
         else -> Said(many, "${nameOf(list[0])} und ${word(k - 1)} weitere", esc(brandsOf(list)))
+    }
+}
+
+// the favourites' consistency, where only they came in it and it cannot be told from their brand; named: the value
+// names the brand already
+private fun keptSaid(
+    x: Insight,
+    mixed: List<String>,
+    k: Int,
+    named: Boolean,
+): String {
+    val ph = PHRASES[x.a.key as? String] ?: return ""
+    val g = x.sorts.size
+    val all = if (k == 2) "Beide" else "Alle ${word(k)}"
+    val head =
+        when {
+            named -> "${if (g == k) all else "${bigWord(g)} davon"} ${ph.inside}"
+            g == k -> "$all ${ph.inside} von ${andList(mixed)}"
+            else -> "Die ${word(g)} ${ph.inside} sind von ${andList(mixed)}"
+        }
+    return "$head; ob es ${ph.on} liegt oder an der Marke, ist offen."
+}
+
+private fun Said.with(sub: String) = Said(label, value, sub, a, b, quiet, note, brand, more)
+
+// what the appetite counts leave out, where the cat has ratings of it
+private fun Ctx.scope(): String {
+    val rated = { type: String -> m.sorts.any { typeOf(it.product) == type && it.total > 0 } }
+    return when {
+        !rated("Snack") && !rated("Trockenfutter") -> ""
+        rated("Sonstiges") -> " ohne Snacks und Trockenfutter"
+        else -> " beim Nassfutter"
     }
 }
 
@@ -354,18 +398,19 @@ private fun moveSaid(mv: Move) =
 
 private fun Phone.trendSaid(
     t: Trend,
-    m: Model,
+    c: Ctx,
 ): String {
-    val counts = "<b>${times(t.recent.good, t.recent.n)}</b> gut gefressen, in den acht davor ${times(t.before.good, t.before.n)}."
-    val names = t.behind.mapNotNull { id -> m.byId[id]?.let { nameOf(it) } }
+    val counts =
+        "${c.scope()} <b>${times(t.recent.good, t.recent.n)}</b> gut gefressen, in den acht davor ${times(t.before.good, t.before.n)}."
+    val names = t.behind.mapNotNull { id -> c.m.byId[id]?.let { nameOf(it) } }
     return when {
-        t.cause == "tier" -> "Auch bei den gewohnten Sorten: in den letzten vier Wochen $counts"
+        t.cause == "tier" -> "Auch bei den gewohnten Sorten: in den letzten vier Wochen$counts"
         t.cause == "futter" && names.isNotEmpty() ->
             "Bei den gewohnten Sorten wie vorher, ${if (t.dir < 0) "schlechter" else "besser"} nur bei neuen wie <b>${esc(
                 andList(names),
             )}</b>."
         t.cause == "futter" -> "Bei den gewohnten Sorten wie vorher, anders nur bei neuen Sorten."
-        else -> "In den letzten vier Wochen $counts"
+        else -> "In den letzten vier Wochen$counts"
     }
 }
 
@@ -387,13 +432,13 @@ private fun Phone.appetiteSaid(
                     )}</b> gut gefressen, in den 30 Tagen davor ${times(h.goodBefore, h.before)}.",
                 )
             }
-        "schlechter" -> a.trend?.let { said("Deutlich schlechter", trendSaid(it, c.m)) }
-        "besser" -> a.trend?.let { said("Deutlich besser", trendSaid(it, c.m)) }
+        "schlechter" -> a.trend?.let { said("Deutlich schlechter", trendSaid(it, c)) }
+        "besser" -> a.trend?.let { said("Deutlich besser", trendSaid(it, c)) }
         "zuletzt-schwaecher", "zuletzt-besser" ->
             w?.let {
                 said(
                     if (a.state == "zuletzt-besser") "Zuletzt besser" else "Zuletzt schwächer",
-                    "Vom ${spanOf(w.from, w.to)} <b>${times(w.good, w.n)}</b> gut gefressen, " +
+                    "Vom ${spanOf(w.from, w.to)}${c.scope()} <b>${times(w.good, w.n)}</b> gut gefressen, " +
                         "bei diesen Sorten wären etwa ${jsRound(w.expected)} zu erwarten gewesen.",
                 )
             }
@@ -401,8 +446,8 @@ private fun Phone.appetiteSaid(
             w?.let {
                 said(
                     "Wieder wie gewohnt",
-                    "Vom ${spanOf(w.from, w.to)} ${if (a.dir < 0) "schwächer" else "besser"}, als es die Sorten erwarten ließen, " +
-                        "seitdem wieder im Rahmen.",
+                    "Vom ${spanOf(w.from, w.to)}${c.scope()} ${if (a.dir < 0) "schwächer" else "besser"} als bei diesen Sorten üblich, " +
+                        "seitdem wieder wie gewohnt.",
                 )
             }
         "unauffaellig" -> {
@@ -414,8 +459,8 @@ private fun Phone.appetiteSaid(
                 val span = if (first.start > first.from) "Seit dem ${since(first.start)}" else "In den letzten ${word(c.weeks.size)} Wochen"
                 said(
                     "Wie gewohnt",
-                    "$span <b>${times(c.weeks.sumOf { it.good }, c.weeks.sumOf { it.n })}</b> " +
-                        "gut gefressen, keine Woche schlechter oder besser, als es die Sorten erwarten ließen.",
+                    "$span${c.scope()} <b>${times(c.weeks.sumOf { it.good }, c.weeks.sumOf { it.n })}</b> " +
+                        "gut gefressen, jede Woche etwa so, wie es bei diesen Sorten zu erwarten war.",
                 )
             }
         }
@@ -442,7 +487,9 @@ private fun Phone.traitSaid(
                     quiet = true,
                 )
             } else if (sorts.isNotEmpty()) {
-                groupSaid("Lieblingssorte", "Lieblingssorten", sorts, c, true)
+                val s = groupSaid("Lieblingssorte", "Lieblingssorten", sorts, c, true)
+                val kept = x?.let { esc(keptSaid(it, t.mixed, sorts.size, s.brand)) }
+                if (kept == null) s else s.with(if (sorts.size == 2) kept else "${s.sub} $kept")
             } else {
                 null
             }
@@ -495,10 +542,14 @@ private fun Phone.traitSaid(
                         ""
                     }
                 val sauce = if (it.n > 0) "Oft nur die Soße geleckt: ${it.k} von ${it.n} Mal." else ""
+                val left = t.left.mapNotNull { id -> m.byId[id] }
+                val he = m.pets.singleOrNull()?.let { pid -> derive.getPet(pid)?.str("sex") } == "m"
+                val who = if (he) "er" else "sie"
+                val leaves = left.firstOrNull()?.let { "Dafür lässt $who ${word(left.size)} Sorten von ${brand(it)} meist stehen." } ?: ""
                 Said(
                     better(it.gap),
                     TEXTURE_SAID[key] ?: cap(key),
-                    esc(listOf(mixed, sauce).filter { s -> s.isNotEmpty() }.joinToString(" ")),
+                    esc(listOf(mixed, sauce, leaves).filter { s -> s.isNotEmpty() }.joinToString(" ")),
                     side("<b>${esc(textureLabel(key))}</b>", it.a),
                     side(esc(otherLabel(it)), it.b),
                 )
@@ -519,8 +570,8 @@ private fun Phone.traitSaid(
                 Said(
                     "Bei Soße",
                     "Leckt oft nur die Soße",
-                    "${cap(times(it.k, it.n))} nur die Soße geleckt.",
-                    side("<b>In Soße</b>", it.a),
+                    "",
+                    Compared("<b>In Soße</b>: ${times(it.k, it.n)} nur die Soße geleckt", it.a),
                     it.instead?.let { i -> side(esc(textureLabel(i.key)), it.b) },
                 )
             }
@@ -626,6 +677,7 @@ private fun <T> Folded(
     items: List<T>,
     key: String,
     at: Dp,
+    sep: @Composable (T?, T) -> Unit = { was, _ -> if (was != null) Divider(at) },
     row: @Composable (T) -> Unit,
 ) {
     watch()
@@ -633,14 +685,14 @@ private fun <T> Folded(
     val folds = items.size >= FOLD_AT
     val open = folds && isOpen(key)
     (if (folds) items.take(FOLD_SHOWN) else items).forEachIndexed { i, x ->
-        if (i > 0) Divider(at)
+        sep(items.getOrNull(i - 1), x)
         row(x)
     }
     if (!folds) return
     Column(Modifier.fillMaxWidth().animateContentSize(unfold())) {
         if (open) {
-            for (x in items.drop(FOLD_SHOWN)) {
-                Divider(at)
+            items.drop(FOLD_SHOWN).forEachIndexed { i, x ->
+                sep(items[FOLD_SHOWN + i - 1], x)
                 row(x)
             }
         }
@@ -740,7 +792,8 @@ private fun TraitRow(
     }
 }
 
-/** a row of a variety: its packaging, name, ratings, then what its dots cannot say; extra: what goes under that */
+/** a row of a variety: its packaging, name, ratings, then what its dots cannot say; said: each cat's verdict after its
+ dots */
 @Composable
 private fun SortRow(
     m: Model,
@@ -748,24 +801,32 @@ private fun SortRow(
     sub: String,
     label: String,
     tag: String = "sort-${e.id}",
-    extra: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    said: ((String) -> String?)? = null,
 ) {
     watch()
     val ui = LocalUi.current
-    ListRow(Modifier.testTag(tag), onClick = ui.on("open-product", "id" to e.id), top = true, label = label) {
-        Thumb(null, e.product, Th.M)
+    ListRow(modifier.testTag(tag), onClick = ui.on("open-product", "id" to e.id), top = true, label = label) {
+        Thumb(null, e.product, Th.L)
         Column(Modifier.weight(1f)) {
             T(ui.phone.nameOf(e), Type.bodyStrong, maxLines = 2)
-            DotLines(m, e, Modifier.padding(top = Space.s1))
+            DotLines(m, e, Modifier.padding(top = Space.s1), said = said)
             if (sub.isNotEmpty()) T(sub, Type.small, Modifier.padding(top = Space.s1), colors.muted)
-            extra?.invoke()
         }
         if (e.kaufen != null) Icon("pin", size = Size.iconS, color = colors.muted)
     }
 }
 
-// where a row's text starts, for its divider and its button
-private val rowIndent = Size.picM + Space.s3
+// where a row's text starts, for its divider
+private val rowIndent = Size.picL + Space.s3
+
+/** feeds the variety at once, beside its row and outside the row's press area */
+@Composable
+private fun FeedBtn(e: Sort) {
+    watch()
+    val ui = LocalUi.current
+    IconBtn("feed", "${ui.phone.nameOf(e)} füttern", Modifier.testTag("feed-${e.id}"), colors.ink, ui.on("serve", "id" to e.id))
+}
 
 private class RowSaid(
     val sub: String,
@@ -778,8 +839,7 @@ private fun after(
     extra: String,
 ) = if (head.isNotEmpty()) head + extra else cap(extra.removePrefix(", ").removePrefix(". "))
 
-// band: the Einkaufen group the row stands in, empty elsewhere; the brand is left out where the rows share it. The
-// ratings are told in the label; the row shows them as dots and says only what they cannot.
+// band: the Einkaufen group the row stands in, empty elsewhere; the brand is left out where the rows share it
 private fun Phone.rowSaid(
     e: Sort,
     c: Ctx,
@@ -793,10 +853,19 @@ private fun Phone.rowSaid(
             else -> lower(whyOf(e))
         }
     val at = c.last[e.id] ?: 0L
+    val own =
+        if (db.pets.size > 1) {
+            c.m.pets
+                .singleOrNull()
+                ?.let { derive.getPet(it)?.str("name") }
+        } else {
+            null
+        }
     val extra =
         when {
             e.kaufen == null && e.choice == "gemischt" -> ", nur für ${derive.petNames(e.yes)}"
             band == "nachkaufen" && at > 0 && c.now - at >= AWAY -> ", zuletzt vor ${lapse(at, c.now)}"
+            e.kaufen == "immer" && e.verdict == "nicht" && own != null -> ". Steht auf deiner Liste, $own lässt sie aber stehen."
             e.kaufen == "immer" && e.verdict == "nicht" -> ". Steht auf deiner Liste, kam zuletzt aber nicht gut an."
             e.kaufen == "nicht" && e.verdict == "nachkaufen" -> ". Von dir gestrichen, kommt inzwischen aber gut an."
             else -> ""
@@ -805,7 +874,9 @@ private fun Phone.rowSaid(
     val label =
         sentence("${nameOf(e)}${if (b.isNotEmpty()) " von $b" else ""}. ${cap(evidence)}$extra") +
             if (e.kaufen != null) " Von dir festgelegt." else ""
-    return RowSaid(after(joined(if (branded) lead(e) else "", if (e.n == 0) evidence else ""), extra), label)
+    // beside other cats each cat's dots carry its verdict, the words would only repeat them
+    val words = if (c.m.pets.size > 1 && e.n > 0) "" else evidence
+    return RowSaid(after(joined(if (branded) lead(e) else "", words), extra), label)
 }
 
 @Composable
@@ -847,17 +918,18 @@ private fun MixGrid(x: Insight) {
     val cellsOf = { b: String -> sides.map { s -> s[b]?.let { tallyOf(it) }?.takeIf { it.n > 0 } } }
     // a bar as long as its cell has meals, so one meal does not weigh like twenty
     val most = brands.flatMap(cellsOf).maxOfOrNull { it?.n ?: 0 }?.coerceAtLeast(1) ?: 1
-    Column(Modifier.fillMaxWidth().padding(bottom = Space.s3)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = Space.s2), verticalAlignment = Alignment.Bottom) {
+    Column(Modifier.fillMaxWidth().padding(bottom = Space.s3), verticalArrangement = Arrangement.spacedBy(Space.hair)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = Space.s2)) {
             Spacer(Modifier.weight(1.2f))
-            Column(Modifier.weight(1f)) {
-                T(heads[0], Type.smallStrong, Modifier.padding(horizontal = Space.s2), p.ink)
-                Gap(Space.s1)
-                Box(Modifier.fillMaxWidth().height(Size.stroke).background(tone.c))
+            heads.forEachIndexed { j, h ->
+                Column(Modifier.weight(1f)) {
+                    T(h, Type.smallStrong, Modifier.padding(horizontal = Space.s2), if (j == 0) p.ink else p.muted)
+                    Gap(Space.s1)
+                    Box(Modifier.fillMaxWidth().height(Size.stroke).background(if (j == 0) tone.c else Color.Transparent))
+                }
             }
-            T(heads[1], Type.smallStrong, Modifier.weight(1f).padding(horizontal = Space.s2), p.muted)
         }
-        brands.forEachIndexed { i, b ->
+        for (b in brands) {
             val cells = cellsOf(b)
             val name = b.ifEmpty { "Ohne Marke" }
             var named = false
@@ -869,8 +941,6 @@ private fun MixGrid(x: Insight) {
                         "${said[j]} ${s.good} von ${s.n} Mal" + if (named) "" else " gut gefressen".also { named = true }
                     }
                 }
-            val top = if (i == 0) Radius.s else 0.dp
-            val bottom = if (i == brands.size - 1) Radius.s else 0.dp
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -886,8 +956,8 @@ private fun MixGrid(x: Insight) {
                             .weight(1f)
                             .fillMaxHeight()
                             .then(
-                                if (j == 0) {
-                                    Modifier.clip(RoundedCornerShape(top, top, bottom, bottom)).background(tone.cs)
+                                if (j == 0 && s != null) {
+                                    Modifier.clip(RoundedCornerShape(Radius.s)).background(tone.cs)
                                 } else {
                                     Modifier
                                 },
@@ -905,6 +975,7 @@ private fun MixGrid(x: Insight) {
                 }
             }
         }
+        T("Verglichen sind nur die zwei Spalten, nicht die Marken untereinander.", Type.small, Modifier.padding(top = Space.s2), p.muted)
     }
 }
 
@@ -956,13 +1027,13 @@ private fun AppetiteChart(weeks: List<Block>) {
 // what a line's proof lists, so a later one leaves out what an earlier one showed
 private fun listed(t: Trait): List<String> =
     when {
-        t.pack != null ->
+        t.pack != null || t.kind == "liebling" ->
             t.ids +
                 t.insight
                     ?.sorts
                     .orEmpty()
                     .map { it.id }
-        t.insight != null -> t.insight.sorts.map { it.id }
+        t.insight != null -> t.insight.sorts.map { it.id } + t.left
         grouped(t) -> t.ids
         else -> emptyList()
     }
@@ -981,9 +1052,7 @@ private fun TraitBlock(
     val one = c.oneOf(t)
     val key = foldOf(t)
     val chart = t.kind == "appetit" && c.weeks.count { it.judged } >= 2
-    // nothing unusual keeps its weeks behind a tap
-    val quiet = chart && t.key == "unauffaellig"
-    val open = if (grouped(t) || quiet) isOpen(key) else null
+    val open = if (grouped(t)) isOpen(key) else null
     val fresh = { l: List<Sort> -> l.filter { it.id !in shown } }
     val sorts = t.ids.mapNotNull { m.byId[it] }
     val worstFirst = compareBy<Sort> { likingOf(it) }
@@ -1018,7 +1087,7 @@ private fun TraitBlock(
             }
         }
     val stop = pack != null && pack.sorts.any { ph.derive.getProduct(it.id)?.str("kaufen") != "nicht" }
-    val test = c.experiment?.takeIf { x != null && t.kind in setOf("konsistenz", "pack") && it.texture == x.a.key }
+    val test = c.experiment?.takeIf { x != null && t.kind in setOf("konsistenz", "pack", "liebling") && it.texture == x.a.key }
     val action: (@Composable () -> Unit)? =
         if (stop && pack != null) {
             {
@@ -1043,12 +1112,16 @@ private fun TraitBlock(
     val proof: (@Composable () -> Unit)? =
         when {
             open == null -> null
-            quiet -> {
-                { AppetiteChart(c.weeks) }
-            }
             else -> {
                 {
                     when {
+                        t.kind == "liebling" -> {
+                            ProofRows(c, fresh(sorts))
+                            if (x != null) {
+                                Gap(Space.s3)
+                                MixGrid(x)
+                            }
+                        }
                         pack != null -> {
                             ProofRows(c, fresh(pack.sorts.sortedWith(worstFirst)), branded = false)
                             if (x != null) {
@@ -1093,6 +1166,11 @@ private fun TraitBlock(
                                 )
                             }
                             ProofRows(c, list, branded = t.kind != "marke")
+                            val left = fresh(t.left.mapNotNull { m.byId[it] }.sortedWith(worstFirst))
+                            if (left.isNotEmpty()) {
+                                Label("Die ${word(left.size)} Sorten von ${brand(left[0])}", top = Space.s2)
+                                ProofRows(c, left, branded = false)
+                            }
                         }
                         else -> ProofRows(c, fresh(sorts))
                     }
@@ -1112,7 +1190,7 @@ private fun TraitBlock(
         end = end,
         visual = visual,
         chart =
-            if (chart && !quiet) {
+            if (chart) {
                 { AppetiteChart(c.weeks) }
             } else {
                 null
@@ -1165,22 +1243,22 @@ private fun Traits(
             .filter { typeOf(it.product) == TYPES[0] }
             .sumOf { it.n }
     val kinds =
-        said.map { it.first.kind }.toSet() + (if (said.any { it.second.brand }) setOf("marke") else emptySet()) +
-            if (said.any { it.first.kind == "pack" && it.first.insight != null }) setOf("konsistenz") else emptySet()
+        said.map { it.first.kind }.toSet() + said.mapNotNull { it.first.insight?.kind } +
+            if (said.any { it.second.brand }) setOf("marke") else emptySet()
     val topics =
         listOf(
             "Marke" to setOf("marke", "pack"),
             "Konsistenz" to setOf("konsistenz", "sosse"),
             "Geschmack" to setOf("geschmack"),
             "Tageszeit" to setOf("tageszeit"),
-            "Neuem" to setOf("neu"),
+            "neuen Sorten" to setOf("neu"),
         )
     val missing = topics.filter { (_, k) -> k.none { it in kinds } }.map { it.first }
     val end =
         when {
             !last -> ""
             wet < CLEAR -> "Für mehr reicht es noch nicht. Mit jeder Bewertung kommt etwas dazu."
-            missing.isNotEmpty() -> "Noch nichts Deutliches bei ${andList(missing)}."
+            missing.isNotEmpty() -> "Bei ${andList(missing)} zeigt sich noch nichts."
             else -> ""
         }
     if (end.isNotEmpty()) T(end, Type.small, Modifier.padding(top = Space.s3), colors.muted)
@@ -1233,17 +1311,14 @@ private fun Steckbrief(
         Header(pet, s.diary)
         Gap(Space.s4)
         if (s.diary.n == 0) {
+            M(
+                "Bewerte nach dem Füttern, wie viel $name gefressen hat. Ab drei Bewertungen einer Sorte steht hier, ob sie ankommt.",
+                Type.body,
+                color = colors.ink,
+            )
             if (household) {
-                M(
-                    "Bewerte nach dem Füttern, wie viel $name gefressen hat. Ab drei Bewertungen einer Sorte steht hier, ob sie ankommt.",
-                    Type.body,
-                    color = colors.ink,
-                )
                 Gap(Space.s4)
                 Btn("Füttern", BtnKind.PRIMARY, icon = "feed", onClick = ui.on("feed"))
-            } else {
-                val it = if (pet?.str("sex") == "m") "er" else "sie"
-                M("Trag nach dem Füttern ein, wie viel $name gefressen hat, dann steht hier, was $it mag.", Type.body, color = colors.ink)
             }
         } else {
             ShelfBar(s.shelf, legend = true)
@@ -1269,17 +1344,18 @@ private fun Steckbrief(
     }
 }
 
-/** rest: the ratings in words, for the label; the row shows them as dots */
+/** group: what the rows under one label share; status: the same as a sentence for one row on its own; label: the row
+ read aloud */
 private class PickSaid(
     val e: Sort,
-    val rest: String,
+    val group: String,
+    val sub: String,
     val status: String,
+    val label: String,
     val open: Int,
     val pets: List<String>,
     val of: (Stat) -> List<Pt>,
-) {
-    val sub get() = lead(e)
-}
+)
 
 private fun Phone.pickSaid(
     m: Model,
@@ -1288,40 +1364,63 @@ private fun Phone.pickSaid(
 ): PickSaid? {
     val several = m.pets.size > 1
     val e = m.byId[p.id] ?: return null
+    val b = brand(e)
+    val head = "${nameOf(e)}${if (b.isNotEmpty()) " von $b" else ""}."
     p.trial?.let { t ->
-        val then = if (t.need == 1 && goodOf(e.counts) == e.n) "kommt die Sorte auf die Einkaufsliste" else "steht’s fest"
+        val list = t.need == 1 && allGood(t)
         val again = if (t.need == 1) "einmal" else "zweimal"
-        val status =
-            if (several) {
-                "Für ${derive.getPet(
-                    t.pet,
-                )?.str("name")} noch $again füttern, dann $then."
-            } else {
-                "Noch $again füttern, dann $then."
+        // when every cat that rated it is as far along, one meal settles it for all and no name is needed
+        val rated = m.pets.map { pid -> e.pets[pid]?.n ?: 0 }.filter { it > 0 }
+        val alike = !t.handed && rated.all { it == e.pets[t.pet]?.n }
+        val name = if (several && !alike) derive.getPet(t.pet)?.str("name") else null
+        val all =
+            when {
+                !alike || rated.size < 2 -> ""
+                rated.size == 2 -> "für beide "
+                else -> "für alle "
             }
-        return PickSaid(e, lower(whyOf(e, true)), status, if (several) 0 else t.need, m.pets) { it.window }
+        val then = if (list) "kommt die Sorte auf die Einkaufsliste" else "steht’s ${all}fest"
+        val status = "${if (name != null) "Für $name noch" else "Noch"} $again füttern, dann $then."
+        val group = "Noch $again, dann ${if (list) "auf die Einkaufsliste" else "steht’s fest"}"
+        val sub = joined(lead(e), if (name != null) "für $name" else "")
+        return PickSaid(
+            e,
+            group,
+            sub,
+            status,
+            "$head ${sentence(cap(lower(whyOf(e, true))))} $status",
+            if (several) 0 else t.need,
+            m.pets,
+        ) {
+            it.window
+        }
     }
     p.missed?.let { v ->
         val rated = m.pets.count { pid -> (e.pets[pid]?.list?.size ?: 0) > 0 }
         val by = if (several && v.by.size < rated) "bei ${derive.petNames(v.by)} " else ""
-        return PickSaid(e, "davor $by${lower(evidenceOf(v))}", "Gab es seit ${lapse(v.at, now)} nicht mehr.", 0, v.by) {
-            it.list.take(NEXT_NEWEST)
-        }
+        val status = "Gab es seit ${lapse(v.at, now)} nicht mehr."
+        return PickSaid(
+            e,
+            "Gern gefressen, lange nicht gefüttert",
+            joined(lead(e), "zuletzt vor ${lapse(v.at, now)}"),
+            status,
+            "$head Davor $by${lower(evidenceOf(v))}. $status",
+            0,
+            v.by,
+        ) { it.list.take(NEXT_NEWEST) }
     }
     p.retry?.let { x ->
         val first = e.pets[x.pet] ?: return null
-        return PickSaid(
-            e,
-            "beim ersten Mal ${lower(evidenceOf(first))}",
-            "${petName(m, x.pet, "next")} braucht bei Neuem oft einen zweiten Versuch.",
-            0,
-            listOf(x.pet),
-        ) { it.list.take(1) }
+        val status = "${petName(m, x.pet, "next")} braucht bei Neuem oft einen zweiten Versuch."
+        val was = "beim ersten Mal ${lower(evidenceOf(first))}"
+        return PickSaid(e, status.removeSuffix("."), joined(lead(e), was), status, "$head ${cap(was)}. $status", 0, listOf(x.pet)) {
+            it.list.take(1)
+        }
     }
     return null
 }
 
-/** what to feed next and why, with its button under the text; dots: as on the page, else the card's short form */
+/** what to feed next, its button beside it; dots: as on the page, else the card's short form with the status */
 @Composable
 private fun NextRow(
     m: Model,
@@ -1332,37 +1431,25 @@ private fun NextRow(
     watch()
     val ui = LocalUi.current
     val e = s.e
-    val name = ui.phone.nameOf(e)
-    val b = brand(e)
-    Column(Modifier.fillMaxWidth()) {
+    Row(Modifier.fillMaxWidth()) {
         ListRow(
-            Modifier.testTag(tag + e.id),
+            Modifier.weight(1f).testTag(tag + e.id),
             onClick = ui.on("open-product", "id" to e.id),
             top = true,
-            label = "$name${if (b.isNotEmpty()) " von $b" else ""}. ${sentence(cap(s.rest))} ${s.status}",
+            label = s.label,
         ) {
             Thumb(null, e.product, Th.L)
             Column(Modifier.weight(1f)) {
-                T(name, Type.bodyStrong, maxLines = 2)
+                T(ui.phone.nameOf(e), Type.bodyStrong, maxLines = 2)
                 if (dots) {
                     DotLines(m, e, Modifier.padding(top = Space.s1), s.open, s.pets, s.of)
                     if (s.sub.isNotEmpty()) T(s.sub, Type.small, Modifier.padding(top = Space.s1), colors.muted)
+                } else {
+                    T(s.status, Type.small, Modifier.padding(top = Space.hair), colors.muted)
                 }
-                T(s.status, Type.small, Modifier.padding(top = Space.hair), if (dots) colors.ink else colors.muted)
             }
         }
-        Btn(
-            "Füttern",
-            BtnKind.SOFT,
-            Modifier
-                .padding(start = Size.picL + Space.s3, bottom = Space.s3)
-                .testTag("feed-${e.id}")
-                .semantics { contentDescription = "$name füttern" },
-            icon = "feed",
-            fill = false,
-            nowrap = true,
-            onClick = ui.on("serve", "id" to e.id),
-        )
+        FeedBtn(e)
     }
 }
 
@@ -1378,29 +1465,21 @@ private fun TestMeal(
     val brands = andList(x.brands, "oder")
     val body =
         if (x.worse) {
-            "Mal eine Sorte ${ph.without} von $brands${x.liked?.let { ", oder eine ${ph.inside} von $it" } ?: ""}."
+            "Probier mal eine Sorte von $brands ${ph.without}${x.liked?.let { " oder eine von $it ${ph.inside}" } ?: ""}."
         } else {
-            "Mal eine Sorte ${ph.inside} von einer anderen Marke als $brands, oder eine von ${x.brands[0]} ${ph.without}."
+            "Probier mal eine Sorte ${ph.inside} von einer anderen Marke als $brands, oder eine von ${x.brands[0]} ${ph.without}."
         }
     val e = trialOf(x, c.m)
     Column(Modifier.fillMaxWidth().padding(bottom = Space.s3).testTag("next-versuch")) {
-        Label("Ein Versuch", top = Space.s2)
-        T(body, Type.body, color = colors.ink)
+        Label("Ein Versuch", top = Space.s3)
+        T(body, Type.small, color = colors.ink)
+        T("Dann zeigt sich, ob es ${ph.on} liegt oder an der Marke.", Type.small, Modifier.padding(top = Space.hair), colors.muted)
         if (e != null) {
             val said = ui.phone.rowSaid(e, c)
-            SortRow(c.m, e, said.sub, said.label, "versuch-${e.id}")
-            Btn(
-                "Füttern",
-                BtnKind.SOFT,
-                Modifier
-                    .padding(start = rowIndent)
-                    .testTag("feed-${e.id}")
-                    .semantics { contentDescription = "${ui.phone.nameOf(e)} füttern" },
-                icon = "feed",
-                fill = false,
-                nowrap = true,
-                onClick = ui.on("serve", "id" to e.id),
-            )
+            Row(Modifier.fillMaxWidth()) {
+                SortRow(c.m, e, said.sub, said.label, "versuch-${e.id}", Modifier.weight(1f))
+                FeedBtn(e)
+            }
         }
     }
 }
@@ -1413,7 +1492,10 @@ private fun NextCard(
     watch()
     Card(Modifier.testTag("next")) {
         CardTitle("Als Nächstes füttern")
-        Folded(picks, "next", Size.picL + Space.s3) { NextRow(m, it, "next-") }
+        // rows that need the same go under one label, so it is said once
+        Folded(picks, "next", rowIndent, { was, x ->
+            if (was?.group == x.group) Divider(rowIndent) else Label(x.group, top = if (was == null) Space.s2 else Space.s5)
+        }) { NextRow(m, it, "next-") }
     }
 }
 
@@ -1435,11 +1517,13 @@ private fun BandLabel(
     }
 }
 
+/** beside: the varieties still open that Als Nächstes holds */
 private class Bands(
     val buy: List<Sort>,
     val meh: List<Sort>,
     val stop: List<Sort>,
     val open: List<Sort>,
+    val beside: Int,
 ) {
     val empty get() = buy.isEmpty() && meh.isEmpty() && stop.isEmpty() && open.isEmpty()
 }
@@ -1456,6 +1540,7 @@ private fun bandsOf(
         g.geht.sortedWith(type.thenByDescending { likingOf(it) }),
         g.nicht.sortedWith(type),
         g.neu.filter { it.id !in shown }.sortedWith(type.thenByDescending { v.last[it.id] ?: 0L }),
+        g.neu.count { it.id in shown },
     )
 }
 
@@ -1463,7 +1548,6 @@ private fun bandsOf(
 private fun ShopCard(
     c: Ctx,
     g: Bands,
-    next: Boolean,
 ) {
     watch()
     val ui = LocalUi.current
@@ -1471,7 +1555,7 @@ private fun ShopCard(
     val at = rowIndent
     val row: @Composable (Sort, String) -> Unit = { e, band ->
         val x = ph.rowSaid(e, c, band)
-        SortRow(c.m, e, x.sub, x.label)
+        SortRow(c.m, e, x.sub, x.label, said = if (c.m.pets.size > 1) verdicts(e) else null)
     }
     Card(Modifier.testTag("shop")) {
         CardTitle("Einkaufen")
@@ -1495,7 +1579,9 @@ private fun ShopCard(
             BandLabel("Noch offen", null)
             Hint(
                 when {
-                    next -> "Dazu ${word(n)} weitere, noch zu wenig bewertet."
+                    g.beside > 0 ->
+                        "${if (n == 1) "Eine weitere" else "${bigWord(n)} weitere"} neben " +
+                            "${if (g.beside == 1) "der einen" else "den ${word(g.beside)}"} oben, noch zu wenig bewertet."
                     n == 1 -> "Eine Sorte, noch zu wenig bewertet."
                     else -> "${bigWord(n)} Sorten, noch zu wenig bewertet."
                 },
@@ -1547,19 +1633,24 @@ private fun CatsBlock(sum: Summary) {
             val name = pet?.str("name") ?: ""
             val c = Ctx(d.modelFor(s.pet))
             val lines = cardTraits(s.traits, null).mapNotNull { ph.traitSaid(it, c) }
-            val counts = s.shelf.let { "${it.buy} nachkaufen, ${it.meh} geht so, ${it.stop} nicht mehr kaufen, ${it.open} noch offen" }
-            val said = lines.joinToString(" ") { "${it.label}: ${it.value}." }.ifEmpty { "Noch steht nichts fest." }
+            val counts =
+                s.shelf
+                    .let { listOf(it.buy to "nachkaufen", it.meh to "geht so", it.stop to "nicht mehr kaufen", it.open to "noch offen") }
+                    .filter { it.first > 0 }
+                    .joinToString(", ") { "${it.first} ${it.second}" }
+            val none = if (s.diary.n == 0) "Noch nichts bewertet." else "Noch steht nichts fest."
+            val said = lines.joinToString(" ") { "${it.label}: ${it.value}." }.ifEmpty { none }
             ListRow(
                 Modifier.testTag("cat-${s.pet}"),
                 onClick = ui.on("filter", "id" to s.pet),
                 top = true,
-                label = "$name: $counts. $said Ansehen.",
+                label = "$name: ${if (counts.isEmpty()) "" else "$counts. "}$said Ansehen.",
             ) {
                 Avatar(pet, Av.M)
                 Column(Modifier.weight(1f)) {
                     T(name, Type.subheading, color = colors.ink)
                     if (lines.isEmpty()) {
-                        T("Noch steht nichts fest.", Type.small, Modifier.padding(top = Space.hair), colors.muted)
+                        T(none, Type.small, Modifier.padding(top = Space.hair), colors.muted)
                     } else {
                         for (l in lines) T(saidLine(l, colors.muted), Type.small, Modifier.padding(top = Space.hair), colors.ink)
                     }
@@ -1608,29 +1699,6 @@ private fun DifferRow(x: Differ) {
     )
 }
 
-// a badge for each cat with ratings of its own, the verdict in its words
-@Composable
-private fun Verdicts(
-    m: Model,
-    e: Sort,
-) {
-    watch()
-    val d = LocalUi.current.phone.derive
-    Chips(Modifier.padding(top = Space.s2)) {
-        for (pid in m.pets) {
-            val x = e.pets[pid]?.takeIf { it.n > 0 } ?: continue
-            val name = d.getPet(pid)?.str("name") ?: continue
-            val w = verdictWord(name, x.verdict)
-            when (x.verdict) {
-                "nachkaufen" -> Badge(w, icon = "champ", tone = colors.tone("good"))
-                "nicht" -> Badge(w, icon = "flop", tone = colors.tone("bad"))
-                "geht" -> Badge(w, icon = "r_mittel", tone = colors.tone("mid"))
-                else -> Badge(w)
-            }
-        }
-    }
-}
-
 private fun verdictWords(
     ph: Phone,
     m: Model,
@@ -1644,12 +1712,17 @@ private fun verdictWords(
 private fun verdictWord(
     name: String,
     verdict: String,
-) = when (verdict) {
-    "nachkaufen" -> "$name mag sie"
-    "nicht" -> "$name lässt sie stehen"
-    "geht" -> "$name: geht so"
-    else -> "$name: noch offen"
-}
+) = "$name ${verdictOf(verdict)}"
+
+private fun verdicts(e: Sort): (String) -> String? = { pid -> e.pets[pid]?.takeIf { it.n > 0 }?.let { verdictOf(it.verdict) } }
+
+private fun verdictOf(verdict: String) =
+    when (verdict) {
+        "nachkaufen" -> "mag sie"
+        "nicht" -> "lässt sie stehen"
+        "geht" -> "geht so"
+        else -> "noch offen"
+    }
 
 private fun agrees(m: Model) = m.sorts.count { e -> m.pets.count { pid -> (e.pets[pid]?.verdict ?: "neu") != "neu" } >= 2 } >= 3
 
@@ -1677,7 +1750,7 @@ private fun DifferCard(
                     val b = brand(e)
                     val label =
                         sentence("${ph.nameOf(e)}${if (b.isNotEmpty()) " von $b" else ""}. ${verdictWords(ph, m, e).joinToString(", ")}")
-                    SortRow(m, e, lead(e), label) { Verdicts(m, e) }
+                    SortRow(m, e, lead(e), label, said = verdicts(e))
                 }
             }
         }
@@ -1723,23 +1796,23 @@ fun Phone.hasEvaluationCard(m: Model): Boolean {
 @Composable
 fun hasEvaluationCard(m: Model) = LocalUi.current.phone.hasEvaluationCard(m)
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CardTrait(
     kind: String,
     s: Said,
 ) {
     watch()
-    FlowRow(
+    Column(
         Modifier
             .fillMaxWidth()
             .testTag("card-trait-$kind")
             .padding(top = Space.s1)
-            .semantics(mergeDescendants = true) { contentDescription = "${s.label}: ${s.value}" },
-        horizontalArrangement = Arrangement.spacedBy(Space.s2),
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${s.label}: ${s.value}" + if (s.more.isNotEmpty()) ". ${plainOf(s.more)}" else ""
+            },
     ) {
-        T(s.label, Type.small, Modifier.alignByBaseline(), colors.muted)
-        T(s.value, Type.bodyStrong, Modifier.alignByBaseline(), if (s.quiet) colors.muted else colors.ink)
+        T(saidLine(s, colors.muted), Type.body, color = if (s.quiet) colors.muted else colors.ink)
+        if (s.more.isNotEmpty()) M(s.more, Type.small, Modifier.padding(top = Space.hair), colors.muted)
     }
 }
 
@@ -1769,8 +1842,13 @@ fun EvaluationCard(
                     cardTraits(s.traits, hintId)
                         .mapNotNull { ph.traitSaid(it, c) }
                         .joinToString(" ") { "${it.label}: ${it.value}." }
-                        .ifEmpty { "Noch steht nichts fest." }
-                ListRow(Modifier.testTag("card-cat-${s.pet}"), onClick = ui.on("open-evaluation", "pet" to s.pet), label = "$name. $said") {
+                        .ifEmpty { if (s.diary.n == 0) "Noch nichts bewertet." else "Noch steht nichts fest." }
+                ListRow(
+                    Modifier.testTag("card-cat-${s.pet}"),
+                    onClick = ui.on("open-evaluation", "pet" to s.pet),
+                    label = "$name. $said",
+                    top = true,
+                ) {
                     Avatar(pet, Av.M)
                     TMain(esc(name), esc(said))
                     Chevron()
@@ -1838,7 +1916,8 @@ fun EvaluationPage() {
     val v = d.vorliebenModel()
     val sum = d.summaryModel()
     val one = sum.pets.singleOrNull()
-    val c = Ctx(m, r, v.weeks, v.last, experiment = if (one != null) v.experiment else null)
+    // the first weeks, before there were ratings enough to judge one, would only look like a poor start
+    val c = Ctx(m, r, v.weeks.dropWhile { !it.judged }, v.last, experiment = if (one != null) v.experiment else null)
     val scroll = rememberScrollState()
     val still = reduceMotion
     LaunchedEffect(ph.prefs.activePet) { if (still) scroll.scrollTo(0) else scroll.animateScrollTo(0) }
@@ -1862,7 +1941,7 @@ fun EvaluationPage() {
             when (k) {
                 "differ" -> DifferCard(c, r, v.differ)
                 "next" -> NextCard(m, picks)
-                else -> ShopCard(c, bands, picks.isNotEmpty())
+                else -> ShopCard(c, bands)
             }
         }
     }
