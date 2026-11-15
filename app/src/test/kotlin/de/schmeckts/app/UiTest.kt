@@ -1016,6 +1016,22 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
+    fun `Vorlieben - a test meal to buy stands with Einkaufen, one at home with what to feed next`() {
+        mau()
+        act("open-evaluation")
+        val bought = listOf(within("shop", "Ein Versuch"), tags("next-versuch", within = "next").isEmpty())
+        act("settings-back")
+        db.products.add(Rec(j(product("bozpastete", "Bozita", "Huhn Pastete", "Nassfutter", "texture" to "pastete")).obj()))
+        phone.store.save()
+        ui.update()
+        idle()
+        act("open-evaluation")
+        val fed = listOf(tags("versuch-", within = "next"), within("shop", "Ein Versuch"))
+        check(bought == listOf(true, true), "nothing at home answers it: something to buy $bought")
+        check(fed == listOf(listOf("bozpastete"), false), "a variety at home answers it: something to feed $fed")
+    }
+
+    @Test
     fun `Vorlieben - a meal one cat still needs is said as hers and fed to her alone`() {
         val now = at("2026-06-12T12:00")
         val tiger = "tigerpet01"
