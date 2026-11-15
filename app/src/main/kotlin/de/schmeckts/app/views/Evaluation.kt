@@ -1721,7 +1721,7 @@ fun EvaluationPage() {
             listOfNotNull(
                 if (one == null && (v.differ.isNotEmpty() || r.split.isNotEmpty() || agrees(m))) "differ" else null,
                 if (picks.isNotEmpty() || experiment != null) "next" else null,
-                if (!bands.empty) "shop" else null,
+                if (!bands.empty && !(household && one != null)) "shop" else null,
             )
         cards.forEachIndexed { i, k ->
             Gap(if (i == 0) Space.s6 else Space.s4)
