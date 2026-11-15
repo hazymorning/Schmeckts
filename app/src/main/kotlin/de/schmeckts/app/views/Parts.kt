@@ -299,12 +299,14 @@ enum class Th(
     XL(Size.picXl),
 }
 
+/** letter: the brand's initial where there is no photo; off where another packaging covers it */
 @Composable
 fun Thumb(
     s: Rec?,
     p: Rec?,
     th: Th = Th.L,
     modifier: Modifier = Modifier,
+    letter: Boolean = true,
 ) {
     watch()
     val src = p?.str("thumb")?.ifEmpty { null } ?: s?.str("thumb")
@@ -319,6 +321,7 @@ fun Thumb(
         when {
             img != null -> Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             p == null -> Icon("camera", size = th.side * 0.46f, color = colors.faint)
+            !letter -> {}
             else ->
                 T(
                     (p.str("brand")?.ifEmpty { null } ?: p.str("variety")?.ifEmpty { null } ?: "?").trim().take(1).uppercase(),
@@ -1125,6 +1128,7 @@ fun PackThumbs(
                             ),
                         )
                     },
+                letter = i == 0,
             )
         }
     }
