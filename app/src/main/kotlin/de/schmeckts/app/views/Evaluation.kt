@@ -578,6 +578,7 @@ private fun <T> Folded(
     at: Dp,
     row: @Composable (T) -> Unit,
 ) {
+    watch()
     val ui = LocalUi.current
     val folds = items.size >= FOLD_AT
     val open = folds && isOpen(key)
@@ -619,6 +620,7 @@ private fun TraitRow(
     action: (@Composable () -> Unit)? = null,
     proof: (@Composable () -> Unit)? = null,
 ) {
+    watch()
     val words =
         (
             listOf("${said.label}: ${said.value}.", sentence(plainOf(said.sub)), sentence(plainOf(said.note))) +
@@ -695,6 +697,7 @@ private fun SortRow(
     th: Th = Th.L,
     extra: (@Composable () -> Unit)? = null,
 ) {
+    watch()
     val ui = LocalUi.current
     ListRow(Modifier.testTag(tag), onClick = ui.on("open-product", "id" to e.id), label = label) {
         Thumb(null, e.product, th)
@@ -750,6 +753,7 @@ private fun ProofRows(
     branded: Boolean = true,
     sub: ((Sort) -> String)? = null,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     list.forEachIndexed { i, e ->
         if (i > 0) Divider(Size.picM + Space.s3)
@@ -761,6 +765,7 @@ private fun ProofRows(
 /** brand by consistency: the varieties of a texture finding and the rest, so a brand that never came without it shows */
 @Composable
 private fun MixGrid(x: Insight) {
+    watch()
     val p = colors
     val tone = p.tone(if (x.gap < 0) "bad" else "good")!!
     val key = x.a.key as? String
@@ -847,6 +852,7 @@ private fun MixGrid(x: Insight) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WeekLegend() {
+    watch()
     val p = colors
     FlowRow(
         Modifier.fillMaxWidth().padding(top = Space.s2),
@@ -878,6 +884,7 @@ private fun AppetiteChart(
     weeks: List<Block>,
     m: Model,
 ) {
+    watch()
     val p = colors
     Column(Modifier.fillMaxWidth().padding(bottom = Space.s3)) {
         WeekChart(weeks)
@@ -903,6 +910,7 @@ private fun TraitBlock(
     said: Said,
     c: Ctx,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val m = c.m
@@ -1019,6 +1027,7 @@ private fun Traits(
     traits: List<Trait>,
     c: Ctx,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val said = traits.mapNotNull { t -> ph.traitSaid(t, c)?.let { t to it } }
     var feeding = false
@@ -1063,6 +1072,7 @@ private fun Header(
     pet: de.schmeckts.app.Rec?,
     d: de.schmeckts.app.Diary,
 ) {
+    watch()
     val name = pet?.str("name") ?: ""
     val said =
         when (d.n) {
@@ -1092,6 +1102,7 @@ private fun Steckbrief(
     r: Ranking,
     household: Boolean,
 ) {
+    watch()
     val ui = LocalUi.current
     val pet = ui.phone.derive.getPet(s.pet)
     val name = esc(pet?.str("name") ?: "")
@@ -1194,6 +1205,7 @@ private fun NextRow(
     tag: String,
     dots: Boolean = true,
 ) {
+    watch()
     val ui = LocalUi.current
     val e = s.e
     val name = ui.phone.nameOf(e)
@@ -1238,6 +1250,7 @@ private fun NextRow(
 
 @Composable
 private fun TestMeal(x: Experiment) {
+    watch()
     val ph = PHRASES[x.texture] ?: return
     val brands = andList(x.brands, "oder")
     val body =
@@ -1261,6 +1274,7 @@ private fun NextCard(
     picks: List<PickSaid>,
     x: Experiment?,
 ) {
+    watch()
     Card(Modifier.testTag("next")) {
         CardTitle("Als Nächstes füttern")
         Folded(picks, "next", Size.picL + Space.s3) { NextRow(m, it, "next-") }
@@ -1279,6 +1293,7 @@ private fun BandLabel(
     tone: String?,
     first: Boolean = false,
 ) {
+    watch()
     Row(
         Modifier.padding(top = if (first) Space.s2 else Space.s5).semantics(mergeDescendants = true) { heading() },
         verticalAlignment = Alignment.CenterVertically,
@@ -1319,6 +1334,7 @@ private fun ShopCard(
     g: Bands,
     next: Boolean,
 ) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val at = Size.picL + Space.s3
@@ -1389,6 +1405,7 @@ private fun saidLine(
 /** each cat in short: two lines of its Steckbrief and its tally; a tap shows the cat's page */
 @Composable
 private fun CatsBlock(sum: Summary) {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
@@ -1428,6 +1445,7 @@ private fun CatsBlock(sum: Summary) {
 
 @Composable
 private fun DifferRow(x: Differ) {
+    watch()
     val d = LocalUi.current.phone.derive
     val a = d.getPet(x.a)?.str("name") ?: ""
     val b = d.getPet(x.b)?.str("name") ?: ""
@@ -1465,6 +1483,7 @@ private fun Verdicts(
     m: Model,
     e: Sort,
 ) {
+    watch()
     val d = LocalUi.current.phone.derive
     Chips(Modifier.padding(top = Space.s2)) {
         for (pid in m.pets) {
@@ -1503,6 +1522,7 @@ private fun DifferCard(
     r: Ranking,
     differ: List<Differ>,
 ) {
+    watch()
     val ph = LocalUi.current.phone
     val m = c.m
     Card(Modifier.testTag("differ")) {
@@ -1529,6 +1549,7 @@ private fun DifferCard(
 
 @Composable
 private fun CatChips() {
+    watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val cur = ph.prefs.activePet.takeIf { ph.derive.getPet(it) != null } ?: "all"
@@ -1571,6 +1592,7 @@ private fun CardTrait(
     kind: String,
     s: Said,
 ) {
+    watch()
     FlowRow(
         Modifier
             .fillMaxWidth()

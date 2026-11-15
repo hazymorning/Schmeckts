@@ -755,6 +755,7 @@ private val groundColor: Color
 /** r: null for a rating still to come */
 @Composable
 fun RatingDot(r: String?) {
+    watch()
     val p = colors
     val c = r?.let { p.tone(rateTone(it))?.c }
     val share = if (r != null) score(r) / 100f else 0f
@@ -788,6 +789,7 @@ fun DotRow(
     said: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     if (keys.isEmpty() && open == 0) return
     val words =
         if (said) {
@@ -819,6 +821,7 @@ fun DotLines(
     pets: List<String> = m.pets,
     of: (Stat) -> List<Pt> = { it.window },
 ) {
+    watch()
     val lines =
         pets.mapNotNull { pid ->
             val x = e.pets[pid] ?: return@mapNotNull null
@@ -853,6 +856,7 @@ private fun bands(s: Shelf) =
 /** a band's square, filled in its tone, or an open outline */
 @Composable
 fun Swatch(tone: String?) {
+    watch()
     val p = colors
     val c = p.tone(tone)?.c
     Canvas(Modifier.size(Size.dot)) {
@@ -872,6 +876,7 @@ fun ShelfBar(
     legend: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val list = bands(shelf)
     val total = list.sumOf { it.first }
     if (total == 0) return
@@ -926,6 +931,7 @@ fun ShelfBar(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ShelfLegend(shelf: Shelf?) {
+    watch()
     val list =
         if (shelf != null) {
             bands(shelf).filter { it.first > 0 }
@@ -956,6 +962,7 @@ fun OutcomeBar(
     x: Side,
     modifier: Modifier = Modifier,
 ) {
+    watch()
     val p = colors
     val parts = listOf(x.good to p.good, x.mid to p.mid, x.sauce to p.sauce, x.bad to p.bad).filter { it.first > 0 }
     Canvas(modifier.fillMaxWidth().height(Size.meter).clip(RoundedCornerShape(50))) {
@@ -983,6 +990,7 @@ fun CompareBars(
     a: Compared,
     b: Compared?,
 ) {
+    watch()
     Column(verticalArrangement = Arrangement.spacedBy(Space.s3)) {
         for (l in listOfNotNull(a, b)) {
             Column {
@@ -1048,6 +1056,7 @@ fun WeekChart(
     weeks: List<Block>,
     ground: Color = groundColor,
 ) {
+    watch()
     if (weeks.isEmpty()) return
     val p = colors
     val most = weeks.maxOf { it.n }.coerceAtLeast(1)
@@ -1106,6 +1115,7 @@ fun PackThumbs(
     ids: List<String>,
     ground: Color = groundColor,
 ) {
+    watch()
     val d = LocalUi.current.phone.derive
     val list = ids.take(PACK_SHOWN)
     Box(Modifier.clearAndSetSemantics {}) {
