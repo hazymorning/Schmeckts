@@ -566,6 +566,13 @@ class UiKeyboardTest : ScreenTest() {
         return (root - field(label).fetchSemanticsNode().boundsInRoot.bottom) / rule.density.density
     }
 
+    // with the clock held, n frames drawn
+    private fun frames(n: Int) =
+        repeat(n) {
+            rule.mainClock.advanceTimeByFrame()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+
     @Test
     fun `keyboard - the field typed in stays above it, a new variety and a new cat start typing`() {
         open()
@@ -605,10 +612,24 @@ class UiKeyboardTest : ScreenTest() {
     }
 
     @Test
-    fun `keyboard - goes down with the sheet, and before the camera or the photo opens`() {
+    fun `keyboard - goes down with the level or the sheet, and before the camera or the photo opens`() {
         platform.camera = true
         open(reduce = false)
         act("demo")
+        act("open-settings")
+        idle(600)
+        act("add-pet")
+        idle(600)
+        val cat = focused()
+        rule.mainClock.autoAdvance = false
+        ui.sheets.backPage()
+        frames(2)
+        val back = listOf(level, focused())
+        rule.mainClock.autoAdvance = true
+        idle(600)
+        check(cat == listOf("Name") && back == listOf(listOf("settings", null, null), emptyList<String>()), "and as a level goes $back")
+        act("close")
+        idle(600)
         act("feed")
         idle(600)
         ui.focus("f-search")
@@ -616,10 +637,7 @@ class UiKeyboardTest : ScreenTest() {
         val typing = focused()
         rule.mainClock.autoAdvance = false
         ui.act("close")
-        repeat(2) {
-            rule.mainClock.advanceTimeByFrame()
-            shadowOf(Looper.getMainLooper()).idle()
-        }
+        frames(2)
         val closing = listOf(ui.sheets.base.closing != null, focused().isEmpty())
         rule.mainClock.autoAdvance = true
         idle(600)

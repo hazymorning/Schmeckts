@@ -502,6 +502,11 @@ private fun ColumnScope.Levels(
     val n = layer.level
     val rise = with(LocalDensity.current) { 10.dp.roundToPx() }
     val target = remember(n) { Level(layer.key, n, state.copy(), layer.slide.also { layer.slide = null }) }
+    val focus = LocalFocusManager.current
+    DisposableEffect(target) {
+        if (target.slide == "back") focus.clearFocus() // the keyboard goes with the level it was for
+        onDispose {}
+    }
     AnimatedContent(
         target,
         Modifier.weight(1f, fill = page),
