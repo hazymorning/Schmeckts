@@ -454,14 +454,6 @@ private fun Phone.appetiteSaid(
                         "bei diesen Sorten wären etwa ${jsRound(w.expected)} zu erwarten gewesen.",
                 )
             }
-        "wieder" ->
-            w?.let {
-                said(
-                    "Wieder wie gewohnt",
-                    "Vom ${spanOf(w.from, w.to)}${c.scope()} ${if (a.dir < 0) "schwächer" else "besser"} als bei diesen Sorten üblich, " +
-                        "seitdem wieder wie gewohnt.",
-                )
-            }
         "unauffaellig" -> {
             val first = c.weeks.firstOrNull()
             if (c.weeks.size < 2 || first == null) {
