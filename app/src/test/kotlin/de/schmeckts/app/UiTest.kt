@@ -118,7 +118,7 @@ class UiTest : ScreenTest() {
         idle(400)
         check((s.pets.values.first() as JsonObject)["r"].asString == "gut", "rated with one tap")
         act("open-evaluation")
-        check(tags("said-", within = "taste").isNotEmpty(), "„Vorlieben“ says what goes down better")
+        check(tags("group-", within = "taste").isNotEmpty(), "„Vorlieben“ compares flavours, consistencies and brands")
         tapTag("cart")
         val buy = shopGroups(phone.derive.model()).nachkaufen.map { it.id }
         check(buy.size >= 3 && tags("shop-", within = "buy").count { it in buy } >= 3, "the cart leads to the varieties to buy")
@@ -729,7 +729,7 @@ class UiEvaluationTest : ScreenTest() {
             r.top.isNotEmpty() && r.flop.isNotEmpty() && card == r.top.take(2).map { it.id } + r.flop.take(2).map { it.id },
             "the first two of each side in their order $card",
         )
-        check(within("sec-evaluation", "Am liebsten") && within("sec-evaluation", "Kommt nicht an"), "each side named")
+        check(within("sec-evaluation", "Am liebsten") && within("sec-evaluation", "Lässt sie stehen"), "each side named")
         tapTag("card-${card[0]}")
         check(sheet?.kind == "product" && sheet?.id == card[0], "a row opens its food sheet")
     }
@@ -740,13 +740,14 @@ class UiEvaluationTest : ScreenTest() {
         act("open-evaluation")
         val r = phone.derive.rankingModel()
         val x = phone.derive.evaluationModel()
-        val cards = tags("", sheet = true).filter { it in setOf("head", "favourites", "taste", "flops", "split", "trials") }
+        val cards = tags("", sheet = true).filter { it in setOf("head", "favourites", "flops", "split", "taste", "feeding", "trials") }
         val want =
             listOfNotNull(
                 "head",
                 "favourites".takeIf { r.top.isNotEmpty() },
-                "taste".takeIf { x.insights.isNotEmpty() || x.taste.konsistenz.isNotEmpty() },
                 "flops".takeIf { r.flop.isNotEmpty() },
+                "taste",
+                "feeding".takeIf { x.insights.any { it.kind !in setOf("geschmack", "konsistenz", "marke", "sosse") } },
                 "trials".takeIf { r.trials.isNotEmpty() },
             )
         check(cards == want, "the cards in this order, each only with something to say $cards")
@@ -758,7 +759,6 @@ class UiEvaluationTest : ScreenTest() {
             groups.isNotEmpty() && groups.all { labelled(": ${it.good} von ${it.n} Mal gut gefressen") },
             "each consistency, flavour and brand with its count",
         )
-        check(tags("said-", within = "taste").size == minOf(3, x.insights.size), "at most three findings over the bars")
         check(within("head", "Mau") && inSheet("Bewertungen seit dem"), "the head names the cat, the foot what it rests on")
     }
 
@@ -781,7 +781,7 @@ class UiEvaluationTest : ScreenTest() {
     }
 
     @Test
-    fun `taste - jelly against sauce as bars, the finding said above them with both counts`() {
+    fun `taste - jelly against sauce as bars, the finding said under both, each the right way round`() {
         val now = at("2025-06-17T12:00")
         val sauce = listOf("lachs", "huhn")
         val jelly = listOf("rind", "pute")
@@ -800,8 +800,9 @@ class UiEvaluationTest : ScreenTest() {
             "both consistencies with their counts",
         )
         check(
-            tags("said-", within = "taste").isNotEmpty() && within("said-0", "kommt") && within("said-0", "Stückchen in"),
-            "the finding over the bars",
+            within("group-Stückchen in Gelee", "Kommt deutlich besser an") &&
+                within("group-Stückchen in Soße", "Kommt deutlich schlechter an"),
+            "a clear finding said under the bar it is about, each the right way round",
         )
     }
 
@@ -818,7 +819,7 @@ class UiEvaluationTest : ScreenTest() {
             now,
         )
         check(
-            tags("card-", within = "sec-evaluation") == listOf("ladenhueter") && within("sec-evaluation", "Kommt nicht an"),
+            tags("card-", within = "sec-evaluation") == listOf("ladenhueter") && within("sec-evaluation", "Lässt sie stehen"),
             "the card shows what is left",
         )
         act("open-evaluation")
@@ -907,12 +908,12 @@ class UiEvaluationTest : ScreenTest() {
             }
         load(two, byWho)
         act("open-evaluation")
-        val line = within("taste", "Wenn Anna füttert") && within("taste", "Von Anna gefüttert 14 von 14 Mal gut gefressen")
+        val line = within("feeding", "Wenn Anna füttert") && within("feeding", "Von Anna gefüttert 14 von 14 Mal gut gefressen")
         act("settings-back")
         load(two, byWho.map { it + ("by" to "Anna") })
         act("open-evaluation")
         check(
-            line && !within("taste", "Wenn Anna füttert"),
+            line && !within("feeding", "Wenn Anna füttert"),
             "who serves among the findings where several people feed and one clearly does better, never with one person",
         )
     }

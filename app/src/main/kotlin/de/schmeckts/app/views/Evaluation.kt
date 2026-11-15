@@ -28,7 +28,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import de.schmeckts.app.DAY
 import de.schmeckts.app.Evaluation
 import de.schmeckts.app.Group
@@ -81,7 +80,6 @@ import de.schmeckts.app.yearOf
 
 private const val SHOWN = 3 // rows a list shows before the rest unfolds
 private const val CARD_ROWS = 2 // rows of a side on the home card
-private const val SAID = 3 // statements over the bars
 private const val JUDGE = 4 // settled varieties before the head calls a cat picky or easy to please
 private const val AWAY = 42 * DAY // a favourite unserved this long says since when
 
@@ -114,7 +112,7 @@ private fun lapse(
     }
 }
 
-// == What the statements say: a sentence and the counts behind it ==
+// == What the feeding findings say: a sentence and the counts behind it ==
 
 private class Said(
     val say: String,
@@ -126,38 +124,14 @@ private fun ofN(
     n: Int,
 ) = "$good von $n Mal"
 
-private fun better(gap: Double) = if (gap > 0) "besser" else "schlechter"
-
-// a group against the rest, which is named where it is one group
-private val REST = mapOf("marke" to "andere Marken", "konsistenz" to "anderes Nassfutter")
-
-private fun compared(x: Insight): Said {
-    val name = { key: Any? -> esc(if (x.kind == "konsistenz") textureName(key) else key as? String) }
-    val a = name(x.a.key)
-    val b = if (x.b.key != null) name(x.b.key) else REST.getValue(x.kind)
-    return Said("<b>$a</b> kommt ${better(x.gap)} an als $b.", "") // the bars below hold the counts
-}
-
 @Suppress("UNCHECKED_CAST")
 private fun saidOf(x: Insight): Said {
     val a = x.a
     val b = x.b
     return when (x.kind) {
-        "marke", "konsistenz" -> compared(x)
-        "geschmack" ->
-            Said(
-                "Sorten mit <b>${esc(a.key as String)}</b> kommen ${better(x.gap)} an als ohne, bei gleicher Marke und Konsistenz.",
-                "Mit ${esc(a.key)} ${ofN(a.good, a.n)} gut gefressen, ohne ${ofN(b.good, b.n)}.",
-            )
-        "sosse" ->
-            Said(
-                "Bei <b>Stückchen in Soße</b> wird oft nur die Soße geleckt.",
-                "${x.k} von ${x.n} Mal nur die Soße." +
-                    (x.instead?.let { " ${textureName(it.key)} dagegen ${ofN(it.good, it.n)} gut gefressen." } ?: ""),
-            )
         "wiederholung" ->
             Said(
-                "Zweimal hintereinander dieselbe Sorte kommt <b>schlechter</b> an.",
+                "<b>Abwechslung</b> lohnt sich: zweimal hintereinander dieselbe Sorte kommt schlechter an.",
                 "Beim zweiten Mal ${ofN(a.good, a.n)} gut gefressen, sonst ${ofN(b.good, b.n)}.",
             )
         "neu" ->
@@ -306,6 +280,14 @@ private fun Head(
             M(esc(said), Type.body, Modifier.padding(top = Space.hair), colors.ink)
         }
     }
+    // the appetite rule already weighs each variety by what it got before, so a drop it finds is not the food
+    for (h in m.hints.filter { it.kind == "appetit" }) {
+        val who = if (several) "${ph.petName(h.pet ?: "")} frisst" else "Frisst"
+        val said =
+            "$who seit ein paar Tagen schlechter als sonst: zuletzt ${times(h.good, h.n)} gut gefressen, " +
+                "davor ${times(h.goodBefore, h.before)}. An den Sorten liegt es nicht, die kamen vorher besser an."
+        M(esc(said), Type.body, Modifier.fillMaxWidth().padding(top = Space.s4).testTag("appetite"), colors.ink)
+    }
 }
 
 @Composable
@@ -348,8 +330,15 @@ private fun Flops(
 ) {
     watch()
     if (r.flop.isEmpty()) return
-    ListCard("Kommt nicht an", "flops") { Folded(r.flop, "flop") { e -> SortRow(m, e, "flop") } }
+    ListCard(LocalUi.current.phone.leaves(m), "flops") { Folded(r.flop, "flop") { e -> SortRow(m, e, "flop") } }
 }
+
+private fun Phone.leaves(m: Model) =
+    when {
+        m.pets.size > 1 -> "Lassen sie stehen"
+        derive.getPet(m.pets.firstOrNull())?.str("sex") == "m" -> "Lässt er stehen"
+        else -> "Lässt sie stehen"
+    }
 
 // where a kind of note follows one variety clearly more often than the others, as after food that upsets the stomach
 @Composable
@@ -410,19 +399,24 @@ private fun Trials(
     }
 }
 
-/** one group: its name, how often it went down well, as a bar */
+/** one group: its name, how often it went down well as a bar, and what a clear finding says of it */
 @Composable
 private fun GroupBar(
     name: String,
     g: Group,
+    said: List<Pair<String, String>>,
 ) {
     watch()
     val good = colors.good
+    val verdict = said.joinToString(", ") { it.first }
     Column(
         Modifier
             .fillMaxWidth()
             .padding(bottom = Space.s3)
-            .semantics(mergeDescendants = true) { contentDescription = "$name: ${g.good} von ${g.n} Mal gut gefressen" },
+            .testTag("group-$name")
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$name: ${g.good} von ${g.n} Mal gut gefressen" + if (verdict.isNotEmpty()) ", $verdict" else ""
+            },
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.s3)) {
             T(name, Type.body, Modifier.weight(1f), colors.ink)
@@ -439,43 +433,95 @@ private fun GroupBar(
                     drawRoundRect(good, size = size.copy(width = size.width * g.good / g.n), cornerRadius = CornerRadius(size.height / 2))
                 },
         )
+        if (said.isNotEmpty()) {
+            T(cap(verdict), Type.smallStrong, Modifier.padding(top = Space.s1), colors.tone(said[0].second)!!.c)
+        }
     }
 }
 
-private val OTHERS = mapOf("Konsistenz" to "Anderes Nassfutter", "Geschmack" to "Andere Sorten", "Marke" to "Andere Marken")
+private val OTHERS = mapOf("geschmack" to "Andere Sorten", "konsistenz" to "Anderes Nassfutter", "marke" to "Andere Marken")
+private val DIMENSIONS = listOf("geschmack" to "Geschmack", "konsistenz" to "Konsistenz", "marke" to "Marke")
+private val BUYING = setOf("geschmack", "konsistenz", "marke", "sosse")
 
-@Composable
-private fun Groups(
-    title: String,
-    list: List<Group>,
-    name: (String) -> String,
-) {
-    watch()
-    if (list.isEmpty()) return
-    Row(Modifier.fillMaxWidth().padding(top = Space.s4, bottom = Space.s3), horizontalArrangement = Arrangement.SpaceBetween) {
-        T(title, Type.smallStrong, color = colors.muted)
-        T("gut gefressen", Type.smallStrong, color = colors.muted)
+// what a clear finding says of a group under its bar, and in which tone: of the group it is about, and of the other
+// side where that is one group too, the other way round
+private fun verdictOf(
+    x: Insight,
+    key: String,
+): Pair<String, String>? {
+    val better =
+        if (x.kind == "sosse" || x.a.key == key) {
+            x.gap > 0
+        } else if (x.b.key == key) {
+            x.gap < 0
+        } else {
+            return null
+        }
+    return when {
+        x.kind == "sosse" -> if (key == "sosse") "oft nur die Soße geleckt" to "sauce" else null
+        better -> "kommt deutlich besser an" to "good"
+        else -> "kommt deutlich schlechter an" to "bad"
     }
-    for (g in list) GroupBar(if (g.key.isEmpty()) OTHERS.getValue(title) else name(g.key), g)
 }
 
-// what the statements conclude, then each consistency, flavour and brand as a bar
+// each flavour, consistency and brand with how often it went down well, the best first; a clear finding under its bar
 @Composable
 private fun Taste(x: Evaluation) {
     watch()
     val t = x.taste
-    val said = x.insights.take(SAID).map(::saidOf)
-    if (said.isEmpty() && t.konsistenz.isEmpty() && t.geschmack.isEmpty() && t.marke.isEmpty()) return
-    ListCard("Was besser ankommt", "taste") {
-        said.forEachIndexed { i, s ->
-            Column(Modifier.fillMaxWidth().padding(top = if (i > 0) Space.s3 else 0.dp, bottom = Space.s1).testTag("said-$i")) {
-                M(s.say, Type.body, color = colors.ink)
-                if (s.why.isNotEmpty()) M(s.why, Type.small, Modifier.padding(top = Space.hair), colors.muted)
+    val lists = listOf(t.geschmack, t.konsistenz, t.marke)
+    if (lists.all { it.isEmpty() }) return
+    val found = x.insights.filter { it.kind in BUYING }
+    ListCard("Was wie ankommt", "taste") {
+        DIMENSIONS.forEachIndexed { i, (kind, title) ->
+            if (lists[i].isEmpty()) return@forEachIndexed
+            Row(Modifier.fillMaxWidth().padding(top = Space.s4, bottom = Space.s3), horizontalArrangement = Arrangement.SpaceBetween) {
+                T(title, Type.smallStrong, color = colors.muted)
+                T("gut gefressen", Type.smallStrong, color = colors.muted)
+            }
+            for (g in lists[i]) {
+                val said =
+                    if (g.key.isEmpty()) {
+                        emptyList()
+                    } else {
+                        found
+                            .filter {
+                                dimensionOf(
+                                    it,
+                                ) == kind
+                            }.mapNotNull { verdictOf(it, g.key) }
+                    }
+                GroupBar(groupName(kind, g.key), g, said)
             }
         }
-        Groups("Konsistenz", t.konsistenz, ::textureName)
-        Groups("Geschmack", t.geschmack) { it }
-        Groups("Marke", t.marke) { it }
+    }
+}
+
+private fun dimensionOf(x: Insight) = if (x.kind == "sosse") "konsistenz" else x.kind
+
+private fun groupName(
+    kind: String,
+    key: String,
+) = when {
+    key.isEmpty() -> OTHERS.getValue(kind)
+    kind == "konsistenz" -> textureName(key)
+    else -> key
+}
+
+// what holds for feeding rather than buying: the same variety twice, new ones, the time of day, snacks, who feeds
+@Composable
+private fun Feeding(x: Evaluation) {
+    watch()
+    val said = x.insights.filter { it.kind !in BUYING }.map(::saidOf)
+    if (said.isEmpty()) return
+    ListCard("Beim Füttern", "feeding") {
+        said.forEachIndexed { i, s ->
+            if (i > 0) Divider()
+            Column(Modifier.fillMaxWidth().padding(vertical = Space.s3).testTag("said-$i")) {
+                M(s.say, Type.body, color = colors.ink)
+                M(s.why, Type.small, Modifier.padding(top = Space.hair), colors.muted)
+            }
+        }
     }
 }
 
@@ -552,10 +598,11 @@ fun EvaluationPage() {
         }
         Head(m, r)
         Favourites(m, r, x.last)
-        Taste(x)
         Flops(m, r)
-        Observed(m, x)
         Split(m, r)
+        Taste(x)
+        Feeding(x)
+        Observed(m, x)
         Trials(m, r)
         Foot(x)
     }
@@ -656,7 +703,7 @@ fun EvaluationCard(m: Model) {
             r.top.isNotEmpty() || r.flop.isNotEmpty() -> {
                 for ((side, list) in listOf("good" to r.top, "bad" to r.flop)) {
                     if (list.isEmpty()) continue
-                    SideLabel(if (side == "good") "Am liebsten" else "Kommt nicht an", side)
+                    SideLabel(if (side == "good") "Am liebsten" else ph.leaves(m), side)
                     list.take(CARD_ROWS).forEachIndexed { i, e ->
                         if (i > 0) Divider(Size.picL + Space.s3)
                         SortRow(m, e, "card")

@@ -748,10 +748,13 @@ private fun worse(x: Insight?) = x?.takeIf { it.gap < 0 } // where only that way
 
 fun textureKey(p: Rec): String = textureOf(p, p.str("texture"))?.key ?: guessTexture(p) ?: ""
 
+// every fish is one flavour beside the meats, as fish or meat is what people ask
+private val FISH = setOf("Thunfisch", "Lachs", "Garnele", "Fisch")
+
 private val GROUPS: Map<String, (Rec) -> List<String>> =
     mapOf(
         "marke" to { p -> listOf((p.str("brand") ?: "").trim()) },
-        "geschmack" to { p -> flavoursOf(p.str("variety")) },
+        "geschmack" to { p -> flavoursOf(p.str("variety")).map { if (it in FISH) "Fisch" else it }.distinct() },
         "konsistenz" to { p -> listOf(textureKey(p)) },
     )
 
