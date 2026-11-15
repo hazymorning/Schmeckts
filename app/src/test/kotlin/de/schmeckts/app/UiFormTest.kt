@@ -1,6 +1,9 @@
 package de.schmeckts.app
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -336,9 +339,18 @@ class UiToastSwipeTest : ScreenTest() {
 
         b = show()
         drag(b.left + 20, b.center.y, 20f)
-        val back = listOf(shown, ui.toasts.swipe)
+        var back = listOf(shown, ui.toasts.swipe)
+        val dp = rule.density.density
+        root().performTouchInput {
+            down(Offset(b.left + 20, b.center.y))
+            repeat(10) { moveBy(Offset(6 * dp, 0f), 50) }
+            repeat(4) { moveBy(Offset(-10 * dp, 0f), 4) }
+            up()
+        }
+        idle(400)
+        back += listOf(shown, ui.toasts.swipe)
         drag(b.left + 20, b.center.y, b.width / 2)
-        check(back == listOf(true, 0f) && !shown, "a short move snaps back, a long one sends it away $back")
+        check(back == listOf(true, 0f, true, 0f) && !shown, "a short move or one thrown back snaps back, a long one sends it away $back")
 
         show()
         rule
@@ -360,6 +372,148 @@ class UiToastSwipeTest : ScreenTest() {
                 .boundsInRoot
         drag(button.center.x, button.center.y, -b.width / 2)
         check(tapped == 1 && undone == 1 && !shown, "a tap on its button undoes, a swipe that begins there does not")
+    }
+
+    @Test
+    fun `toast_swipe - the point from where letting go sends it away is felt`() {
+        open()
+        val b = show()
+        root().performTouchInput {
+            down(Offset(b.left + 20, b.center.y))
+            repeat(20) { moveBy(Offset(b.width / 20, 0f), 40) }
+            up()
+        }
+        idle(400)
+        val felt = calls("haptic").filter { it == "threshold" || it == "threshold-off" }
+        check(felt == listOf("threshold") && !shown && undone == 0, "a slow swipe past a third: one bump, then it goes $felt")
+    }
+
+    private fun steps(ys: List<Float>) = ys.zipWithNext { a, b -> kotlin.math.abs(b - a) }
+
+    // the toast's bottom frame by frame after the action
+    private fun frames(action: () -> Unit): List<Float> {
+        rule.mainClock.autoAdvance = false
+        val before = box().bottom
+        action()
+        val ys =
+            listOf(before) +
+                List(40) {
+                    androidx.compose.runtime.snapshots.Snapshot
+                        .sendApplyNotifications()
+                    rule.mainClock.advanceTimeByFrame()
+                    box().bottom
+                }
+        rule.mainClock.autoAdvance = true
+        idle(400)
+        return ys
+    }
+
+    // how far the toast goes in the first frames after a swipe of half its width that took ms
+    private fun travel(ms: Long): Float {
+        val b = show()
+        val undo =
+            rule.onNode(
+                androidx.compose.ui.test
+                    .hasText("Rückgängig"),
+                useUnmergedTree = true,
+            )
+        rule.mainClock.autoAdvance = false
+        root().performTouchInput {
+            down(Offset(b.left + 20, b.center.y))
+            repeat(10) { moveBy(Offset(b.width / 20, 0f), ms / 10) }
+            up()
+        }
+        val from = undo.fetchSemanticsNode().positionInRoot.x
+        repeat(4) { rule.mainClock.advanceTimeByFrame() }
+        val went = undo.fetchSemanticsNode().positionInRoot.x - from
+        rule.mainClock.autoAdvance = true
+        idle(1000)
+        return went
+    }
+
+    @Test
+    fun `toast_swipe - it rises with a closing sheet, a flick sends it off at its speed, a new one takes its place without a blink`() {
+        val now = at("2025-06-17T12:00")
+        val meal = meal("meal0001", "sorte001", now - 3_600_000, mapOf("minka001" to null))
+        open(mapOf("db" to dbOf(listOf(pet("minka001")), listOf(product("sorte001")), listOf(meal))), now, reduce = false)
+        val dp = rule.density.density
+        act("open-serving", "id" to "meal0001")
+        idle(600)
+        act("rate", "s" to "meal0001", "p" to "minka001", "r" to "gut")
+        idle(400)
+        val ys = frames { ui.act("close") }
+        val home = show().bottom
+        val rose = ys.first() - ys.last()
+        check(
+            rose > 40 * dp && steps(ys).max() < rose / 3 && ys.last() == home,
+            "it rises over frames to where it sits on the home page ${ys.map { (it / dp).toInt() }}",
+        )
+
+        val slow = travel(1000)
+        val fast = travel(60)
+        check(fast > slow * 1.5f && slow > 0f, "flicked it goes off faster than let go after a slow pull: $fast $slow")
+
+        show("Hunger notiert.")
+        rule.mainClock.autoAdvance = false
+        ui.toast("Stunk notiert.", {})
+        val pixels =
+            List(5) {
+                androidx.compose.runtime.snapshots.Snapshot
+                    .sendApplyNotifications()
+                rule.mainClock.advanceTimeByFrame()
+                val b = box()
+                root()
+                    .captureToImage()
+                    .asAndroidBitmap()
+                    .getPixel((b.left + 4 * dp).toInt(), b.center.y.toInt())
+            }
+        rule.mainClock.autoAdvance = true
+        idle(400)
+        val ink = de.schmeckts.app.ui.LIGHT.ink
+        check(pixels.all { it == ink.toArgb() }, "the new text shows in the same toast, which never vanishes for a frame")
+    }
+
+    @Test
+    fun `toast_swipe - with the keyboard open it shows above it`() {
+        onePet()
+        act("open-settings")
+        act("edit-pet", "id" to db.pets[0].id)
+        idle(400)
+        for (n in 1..6) {
+            type("Spitzname", "Mieze $n")
+            act("add-nick")
+        }
+        val keyboard = 300 * rule.density.density
+        val insets =
+            androidx.core.view.WindowInsetsCompat
+                .Builder()
+                .setInsets(
+                    androidx.core.view.WindowInsetsCompat.Type
+                        .ime(),
+                    androidx.core.graphics.Insets
+                        .of(0, 0, 0, keyboard.toInt()),
+                ).setVisible(
+                    androidx.core.view.WindowInsetsCompat.Type
+                        .ime(),
+                    true,
+                ).build()
+        val content = rule.activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+        rule.runOnUiThread {
+            androidx.core.view.ViewCompat
+                .dispatchApplyWindowInsets(content.getChildAt(0), insets)
+        }
+        idle(400)
+        type("Spitzname", "Mieze 7")
+        act("add-nick")
+        idle(400)
+        val height =
+            root()
+                .fetchSemanticsNode()
+                .size.height
+        check(
+            toast != null && box().bottom <= height - keyboard,
+            "the toast above the keyboard ${box().bottom} ${height - keyboard}",
+        )
     }
 
     // lines of the toast's text, and whether its button stands under it

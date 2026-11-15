@@ -118,6 +118,49 @@ class DeriveTest {
     }
 
     @Test
+    fun `Vorlieben - each cat's own model and summary, the Steckbrief for one cat, where they differ for all`() {
+        household(
+            listOf(
+                listOf("lachs", "Sheba", "Lachs in Soße", "Nassfutter"),
+                listOf("huhn", "Sheba", "Huhn in Soße", "Nassfutter"),
+                listOf("rind", "Felix", "Rind in Gelee", "Nassfutter"),
+                listOf("pute", "Felix", "Pute in Gelee", "Nassfutter"),
+                listOf("neu", "Animonda", "Ente Pastete", "Nassfutter"),
+            ),
+            listOf("neu" to mapOf("minka" to "top")) +
+                List(10) { (if (it % 2 == 0) "lachs" else "huhn") to mapOf("minka" to "top", "tiger" to "schlecht") } +
+                List(6) { (if (it % 2 == 0) "rind" else "pute") to mapOf("minka" to "top", "tiger" to "top") },
+        )
+        phone.prefs.activePet = "all"
+        val all = derive.vorliebenModel()
+        assertEquals(
+            listOf(listOf("alles", null, "minka00001"), listOf("konsistenz", "sosse", "minka00001")),
+            all.differ.map {
+                listOf(it.kind, it.key, it.a)
+            },
+        )
+        assertTrue("the Steckbrief is one cat's", all.traits.isEmpty() && all.weeks.isEmpty())
+        assertEquals(listOf("neu"), all.picks.map { it.id })
+        val summary = derive.summaryModel()
+        assertEquals(
+            listOf(listOf("minka00001", 17, 4, 0, 0, 1), listOf("tiger00001", 16, 2, 0, 2, 0)),
+            summary.pets.map { listOf(it.pet, it.diary.n, it.shelf.buy, it.shelf.meh, it.shelf.stop, it.shelf.open) },
+        )
+        assertTrue(
+            "Tiger eats the jelly, said with his favourites, the only varieties in it",
+            summary.pets[1].traits.any { it.kind == "liebling" && it.insight?.a?.key == "gelee" },
+        )
+        assertEquals("neu", summary.picks.firstOrNull()?.id)
+        val own = derive.modelFor("tiger00001")
+        phone.prefs.activePet = "tiger00001"
+        assertEquals(derive.model().sorts.map { listOf(it.id, it.verdict, it.n) }, own.sorts.map { listOf(it.id, it.verdict, it.n) })
+        val tiger = derive.vorliebenModel()
+        assertEquals(listOf("liebling", "stehen"), tiger.traits.map { it.kind }.take(2))
+        assertTrue(tiger.weeks.isNotEmpty() && tiger.differ.isEmpty())
+        assertEquals(listOf("tiger00001"), derive.summaryModel().pets.map { it.pet })
+    }
+
+    @Test
     fun `nicknames - a pet on its own goes by each of its names in turn, the same in one place all day`() {
         val db = Db()
         db.pets.add(

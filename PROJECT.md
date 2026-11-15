@@ -208,7 +208,8 @@ are named constants at the top of `Smart.kt` and `views/Overview.kt`.
   exports a new one from the phone. `tests/fixtures/household/` holds a real diary, names changed, that
   `HouseholdTest` replays as it grew. `tests/fixtures/files-0.42/` are the files 0.42 wrote, which the app must read
   and write back unchanged.
-- **CI:** `.github/workflows/tests.yml` on pull requests and on `main`, jobs `lint` and `test`.
+- **CI:** `.github/workflows/tests.yml` on pull requests and on `main`, jobs `lint` and `test`. Dependabot's monthly
+  pull requests are merged by `dependabot.yml` once their tests pass; major Gradle updates are left to be done by hand.
 - **Release:** raise the version in `app/gradle.properties` (and the server's in `server/VERSION`, `debian/changelog`
   and the metainfo when it changed), merge, publish a GitHub release tagged `v<version>`.
   `release.yml` runs the tests, builds the signed APK (secret `SCHMECKTS_SIGNING_KEY`) as `schmeckts.apk` and the

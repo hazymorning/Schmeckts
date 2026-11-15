@@ -41,9 +41,14 @@ class Products(
     fun setKaufen(
         id: String,
         v: String?,
-    ) {
-        val p = d.getProduct(id) ?: return
-        if (v == "immer" || v == "nicht") p.put("kaufen", v) else p.remove("kaufen")
+    ) = setKaufen(mapOf(id to v))
+
+    /** several at once, saved once */
+    fun setKaufen(choices: Map<String, String?>) {
+        for ((id, v) in choices) {
+            val p = d.getProduct(id) ?: continue
+            if (v == "immer" || v == "nicht") p.put("kaufen", v) else p.remove("kaufen")
+        }
         save()
     }
 
@@ -53,7 +58,7 @@ class Products(
             if (ph.platform.shareText(list.title, list.text) == "copied") toast("Liste kopiert")
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            toast("Die Liste konnte nicht geteilt werden.") // shareText() already swallows a cancel
+            fail("Die Liste konnte nicht geteilt werden.") // shareText() already swallows a cancel
         }
     }
 

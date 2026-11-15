@@ -25,11 +25,12 @@ class Rating(
     private val holds = HashMap<String, Int>() // meal id → its newest hold, so an older one ending does nothing
     private var lastHold = 0
 
-    /** a level the meal already holds stays as it is (a second tap, Enter twice) */
+    /** a level the meal already holds stays as it is (a second tap, Enter twice); feel: false where the tap was not in the app */
     fun rateMeal(
         sid: String,
         pid: String,
         r: String,
+        feel: Boolean = true,
     ): Boolean {
         val s = d.getServing(sid) ?: return false
         val cur = s.pets[pid] as? JsonObject ?: return false
@@ -38,7 +39,7 @@ class Rating(
         val pet = d.getPet(pid)
         s["pets"] = JsonObject(s.pets + (pid to jsonObject("r" to JsonPrimitive(r), "at" to num(Time.now()), "by" to d.byMe())))
         save()
-        haptic("success")
+        if (feel) haptic("confirm")
         val rt = RATINGS.getValue(r)
         toast(
             "${rt.label}${if (db.pets.size > 1 && pet != null) " für " + pet.str("name") else ""}. ${rt.cheer}",

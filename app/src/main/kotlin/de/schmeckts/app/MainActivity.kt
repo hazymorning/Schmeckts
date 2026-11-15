@@ -17,6 +17,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
@@ -30,6 +31,7 @@ import de.schmeckts.app.ui.SheetHost
 import de.schmeckts.app.ui.ToastHost
 import de.schmeckts.app.ui.ViewerHost
 import de.schmeckts.app.ui.isDark
+import de.schmeckts.app.ui.isPage
 import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.views.HomeScreen
 import de.schmeckts.app.views.SheetView
@@ -89,10 +91,18 @@ fun AppScreen(main: Main) {
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                HomeScreen()
+                // under a page the home page steps aside, and a back gesture that closes the page draws it back in
+                Box(
+                    Modifier.graphicsLayer {
+                        val l = ui.sheets.base
+                        val b = if (l.leaving) l.back else 0f
+                        translationX = if (still || !isPage(l.state)) 0f else -size.width / 4 * (l.shown.value * (1f - b)).coerceIn(0f, 1f)
+                    },
+                ) { HomeScreen() }
                 SheetHost(ui.sheets, ui.sheets.base) { SheetView(it) }
                 SheetHost(ui.sheets, ui.sheets.over) { SheetView(it) }
-                ToastHost(ui.toasts, ui.sheets.anyOpen()) { ui.haptic("select") }
+                // the toast rises over the feeding button as the sheet goes, not after
+                ToastHost(ui.toasts, ui.sheets.anyOpen() && ui.sheets.base.closing == null) { ui.haptic(it) }
                 ViewerHost(ui.viewer)
                 CameraHost(ui.camera)
             }
@@ -123,14 +133,15 @@ class MainActivity : ComponentActivity() {
         }
         super.onCreate(savedInstanceState)
         setContent {
-            val dark =
+            val chosen =
                 isDark(
                     main.phone.prefs
                         .also { main.ui.tick }
                         .theme,
-                ) ||
-                    main.ui.dark > 0
+                )
+            val dark = chosen || main.ui.dark > 0
             LaunchedEffect(dark) { bars(dark) }
+            LaunchedEffect(chosen) { app.platform.dark = chosen }
             SideEffect { main.ui.splashGone = true } // the home page is laid out: its first frame ends the splash
             AppScreen(main)
             // with nothing left to close, back sends the app to the background as other apps do

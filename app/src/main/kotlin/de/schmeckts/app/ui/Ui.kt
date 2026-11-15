@@ -34,7 +34,7 @@ class Ui(
         Sheets(onOpen = {
             viewer.dropViewer() // opened from a link or notification over the photo viewer
             toasts.hidePlain()
-        })
+        }, haptic = { haptic(it) })
 
     /** bumped by update(): the home page draws anew */
     var tick by mutableIntStateOf(0)
@@ -128,6 +128,16 @@ class Typed(
     initial: String,
 ) {
     var value by mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
+
+    // a field redrawn on its own still gets the stored value its caller had before the last key, so only a change counts
+    var seen: String? = initial
+    var focused = false
+
+    /** typing ended: the next draw shows the value in effect, such as the hours a number out of range did not change */
+    fun leave() {
+        focused = false
+        seen = null
+    }
 }
 
 @Composable
@@ -137,15 +147,21 @@ fun rememberTyped(
     stored: String,
 ): Typed {
     val t = remember(owner, key) { Typed(stored) }
-    if (t.value.text != stored) t.value = TextFieldValue(stored, TextRange(stored.length))
+    if (stored != t.seen) {
+        t.seen = stored
+        // some are stored trimmed, so a space just typed stays
+        if (t.value.text.trim() != stored.trim()) t.value = TextFieldValue(stored, TextRange(stored.length))
+    }
     return t
 }
 
-/** fresh: entry to slide in on the next draw; held: rated meals kept in the card a moment longer, with their pets;
- leaving: meals on their way out of it; turned: the Stimmt’s? sheet showing its back; filled: the feeding button's
+/** fresh: the entry just made; arriving: where its row has yet to open, once each ("pend:<id>", "hist:<id>");
+ held: rated meals kept in the card a moment longer, with their pets;
+ leaving: meals on their way out of it; turned: the flip sheet showing its back; filled: the feeding button's
  bowl fills, once per serving */
 class HomeState {
     var fresh by mutableStateOf<String?>(null)
+    val arriving = HashSet<String>()
     val held = HashMap<String, MutableSet<String>>()
     val leaving = mutableStateMapOf<String, () -> Unit>()
     var turned by mutableStateOf<String?>(null)
@@ -158,4 +174,10 @@ class HomeState {
     var kept: String? = null
     val tops = HashMap<String, Float>()
     var scroll: androidx.compose.foundation.ScrollState? = null
+
+    fun made(id: String) {
+        fresh = id
+        arriving.clear()
+        arriving += listOf("pend:$id", "hist:$id")
+    }
 }

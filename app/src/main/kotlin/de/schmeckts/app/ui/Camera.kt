@@ -14,8 +14,11 @@ import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -34,11 +37,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +61,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import java.io.File
 
 /* Own camera for packaging photos: resolves to the JPEG, or null when cancelled; throws without camera or permission,
@@ -67,6 +81,9 @@ class Camera(
     var open by mutableStateOf(false)
         private set
     var hosted = false
+
+    // set while the camera is shown, for its button and the volume keys; a test counts shots through it
+    internal var shutter: (() -> Unit)? = null
 
     /** for the back button */
     fun closeCamera(): Boolean {
@@ -118,6 +135,8 @@ fun CameraHost(camera: Camera) {
         onDispose { camera.hosted = false }
     }
     if (!camera.open) return
+    val focus = LocalFocusManager.current
+    LaunchedEffect(Unit) { focus.clearFocus() } // the keyboard would cover the shutter
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var allowed by remember {
@@ -163,10 +182,71 @@ fun CameraHost(camera: Camera) {
             onDispose { provider?.unbindAll() }
         }
     }
+    val ui = LocalUi.current
+    val still = reduceMotion
+    val scope = rememberCoroutineScope()
+    val shown = remember { Animatable(if (still) 1f else 0f) }
+    LaunchedEffect(Unit) { shown.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut)) }
+    val flash = remember { Animatable(0f) }
     var taking by remember { mutableStateOf(false) }
+
+    fun shoot() {
+        if (taking || request == null) return
+        taking = true
+        val out = File(context.cacheDir, "camera.jpg")
+        capture.takePicture(
+            ImageCapture.OutputFileOptions.Builder(out).build(),
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                // the sensor has it: the phone may move now
+                override fun onCaptureStarted() {
+                    ui.haptic("tap")
+                    if (!still) {
+                        scope.launch {
+                            flash.snapTo(0.6f)
+                            flash.animateTo(0f, tween(Motion.FADE))
+                        }
+                    }
+                }
+
+                override fun onImageSaved(r: ImageCapture.OutputFileResults) {
+                    val bytes = runCatching { out.readBytes() }.getOrNull()
+                    out.delete()
+                    taking = false
+                    camera.close(bytes)
+                }
+
+                override fun onError(e: ImageCaptureException) {
+                    taking = false
+                    de.schmeckts.app.report("the photo from the sensor", e)
+                    camera.fail(CameraFailed("Das Foto ließ sich nicht aufnehmen."))
+                }
+            },
+        )
+    }
+    DisposableEffect(Unit) {
+        camera.shutter = ::shoot
+        onDispose { camera.shutter = null }
+    }
+    val keys = remember { FocusRequester() }
+    LaunchedEffect(Unit) { keys.requestFocus() }
     SchmecktsTheme("dark") {
-        Box(Modifier.fillMaxSize().background(colors.bg).semantics { paneTitle = "camera" }) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = shown.value }
+                .background(colors.bg)
+                .semantics { paneTitle = "camera" }
+                .focusRequester(keys)
+                .onPreviewKeyEvent { e ->
+                    // a volume key is the shutter, as in the phone's own camera; held down it still takes one photo
+                    val volume = e.key == Key.VolumeUp || e.key == Key.VolumeDown
+                    if (volume && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) camera.shutter?.invoke()
+                    volume
+                }.focusable(),
+        ) {
             request?.let { CameraXViewfinder(it, Modifier.fillMaxSize()) }
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = flash.value }.background(colors.bg))
             camera.hint?.let { hint ->
                 M(
                     hint,
@@ -196,29 +276,8 @@ fun CameraHost(camera: Camera) {
                     Modifier
                         .align(Alignment.Center)
                         .size(94.dp) // 78 and the two rings around it
-                        .press({
-                            if (taking || request == null) return@press
-                            taking = true
-                            val out = File(context.cacheDir, "camera.jpg")
-                            capture.takePicture(
-                                ImageCapture.OutputFileOptions.Builder(out).build(),
-                                ContextCompat.getMainExecutor(context),
-                                object : ImageCapture.OnImageSavedCallback {
-                                    override fun onImageSaved(r: ImageCapture.OutputFileResults) {
-                                        val bytes = runCatching { out.readBytes() }.getOrNull()
-                                        out.delete()
-                                        taking = false
-                                        camera.close(bytes)
-                                    }
-
-                                    override fun onError(e: ImageCaptureException) {
-                                        taking = false
-                                        de.schmeckts.app.report("the photo from the sensor", e)
-                                        camera.fail(CameraFailed("Das Foto ließ sich nicht aufnehmen."))
-                                    }
-                                },
-                            )
-                        }, label = "Auslösen")
+                        .graphicsLayer { alpha = if (taking) Alpha.BUSY else 1f }
+                        .press({ camera.shutter?.invoke() }, label = "Auslösen")
                         .border(Size.stroke * 2, colors.ink, CircleShape)
                         .padding(Size.stroke * 2)
                         .border(Size.stroke * 2, colors.bg, CircleShape)

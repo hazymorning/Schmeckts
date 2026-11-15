@@ -12,65 +12,62 @@ import de.schmeckts.app.sexOf
 import java.util.Calendar
 import java.util.GregorianCalendar
 import java.util.TimeZone
+import kotlin.math.roundToInt
 
 // The cat calendar's turn of sheets and what the overview card and the calendar share; the texts are in content/
 
 // Sunday first, as getDay() counts
-val WEEK = listOf("Wissen", "Katzenlogik", "Stimmt’s?", "Kurios", "Wissen", "Flachwitz", "Sprache")
+val WEEK = listOf("Wissen", "Katzenlogik", "Stimmt’s?", "Kurios", "Tipp", "Warum?", "Sprache")
 
-// mixed once with a fixed seed, the same order on every phone
-private fun shuffled(
-    list: List<Sheet>,
-    seed0: Long,
-): List<Sheet> {
-    val out = list.toMutableList()
-    var seed = seed0
-    for (i in out.size - 1 downTo 1) {
-        seed = ((seed.toInt() * 1664525).toLong() + 1013904223L) and 0xffffffffL
-        val j = Math.floor((seed / 4294967296.0) * (i + 1)).toInt()
-        val x = out[i]
-        out[i] = out[j]
-        out[j] = x
-    }
-    return out
+// Turn k takes the sheet k * step along the list, the same order on every phone. A step of about 0.38 of the list,
+// sharing no divisor with its size, keeps sheets close in the list, often on the same theme, off turns in a row.
+private fun spread(list: List<Sheet>): List<Sheet> {
+    var step = maxOf(1, (list.size * 0.382).roundToInt())
+    while ((2..step).any { step % it == 0 && list.size % it == 0 }) step++
+    return List(list.size) { list[(it * step) % list.size] }
 }
 
-// the seed keeps sheets up to two apart in a list, often on the same theme, off turns in a row
-private val ORDERS by lazy { FACTS.mapValues { (_, list) -> shuffled(list, 90950) } }
+private val ORDERS by lazy { FACTS.mapValues { (_, list) -> spread(list.filter { it.months == null }) } }
+private val SEASONAL by lazy { FACTS.mapValues { (_, list) -> list.filter { it.months != null } } }
 private const val START = 20454L // 1 January 2026 as dayNumber() counts it
-
-private fun inSeason(
-    f: Sheet,
-    month: Int,
-) = f.months == null || month in f.months
 
 // dayNumber() counts a local date as UTC counts the same date
 private fun utcOf(day: Long) = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply { timeInMillis = ((day + 0.5) * DAY).toLong() }
 
-private fun monthOf(day: Long) = utcOf(day).get(Calendar.MONTH) + 1
-
-private fun formatOf(day: Long) = WEEK[utcOf(day).get(Calendar.DAY_OF_WEEK) - 1]
+private fun formatOf(day: Long) = WEEK[Math.floorMod(day + 4, 7L).toInt()] // 1 January 1970 was a Thursday
 
 fun formatOn(date: Long) = formatOf(dayNumber(date))
 
-// The days of a format from START on take its sheets in turn; one out of season is skipped, so none comes twice
-// before the others have had their turn.
+// the season of a sheet around a day: the first month of its run of months there, counted from year 0
+private fun seasonOf(
+    f: Sheet,
+    day: Long,
+): Int {
+    val c = utcOf(day)
+    var at = c.get(Calendar.YEAR) * 12 + c.get(Calendar.MONTH)
+    repeat(11) { if (Math.floorMod(at - 1, 12) + 1 in f.months!!) at-- }
+    return at
+}
+
+// A format's seasonal sheets each take its first day in their months once a season, in list order. The other days
+// take the year-round sheets in turn, so none comes twice before the others have had their turn.
 fun factOn(date: Long): Sheet {
     val today = dayNumber(date)
     val format = formatOf(today)
     val order = ORDERS.getValue(format)
+    val seasonal = SEASONAL.getValue(format)
+    val shown = HashMap<String, Int>()
     var at = 0
     var day = minOf(START, today)
     while (true) {
         if (formatOf(day) == format) {
-            val month = monthOf(day)
-            while (!inSeason(order[at % order.size], month)) at++
-            if (day == today) break
-            at++
+            val month = utcOf(day).get(Calendar.MONTH) + 1
+            val due = seasonal.firstOrNull { month in it.months!! && shown[it.id] != seasonOf(it, day) }
+            if (day == today) return due ?: order[at % order.size]
+            if (due != null) shown[due.id] = seasonOf(due, day) else at++
         }
         day++
     }
-    return order[at % order.size]
 }
 
 class SheetOn(

@@ -34,6 +34,11 @@ class Actions(
         undo: (() -> Unit)? = null,
     ) = ui.toast(text, undo)
 
+    private fun fail(text: String) {
+        haptic("reject")
+        toast(text)
+    }
+
     private suspend fun connectServer() {
         val s = sheet ?: return
         if (s.kind != "settings" || s.bool("connecting")) return
@@ -103,7 +108,7 @@ class Actions(
         ai.model = ""
         ai.name = ""
         ai.save()
-        haptic("select")
+        haptic("heavy")
         ui.renderSheet()
         ui.toast("Schlüssel gelöscht", {
             ai.key = was[0]
@@ -117,6 +122,7 @@ class Actions(
 
     private fun disconnectServer() {
         ph.sync.disconnect()
+        haptic("heavy")
         ui.renderSheet()
         ui.update()
         toast("Verbindung getrennt. Die Daten bleiben auf diesem Handy.")
@@ -140,6 +146,7 @@ class Actions(
         ui.renderSheet()
         try {
             ph.sync.retrySync().await()
+            haptic(if (ph.sync.status.state == "ok") "confirm" else "reject")
         } finally {
             s["syncing"] = ""
             if (sheet === s) ui.renderSheet()
@@ -190,6 +197,12 @@ class Actions(
 
     private fun petState(p: Rec?) = l.pets.petState(p)
 
+    /** the option of the reminder's segments that shows as chosen */
+    private fun remindShown(): String {
+        val own = prefs.remind > 0 && (sheet?.bool("ownRemind") == true || prefs.remind !in REMIND)
+        return if (own) "own" else "${prefs.remind}"
+    }
+
     private fun redrawAll() {
         ui.renderSheet()
         ui.update()
@@ -202,9 +215,9 @@ class Actions(
                 if (id != "all" && (db.pets.size == 1 || prefs.activePet == id)) {
                     l.pets.openPet(id) // tapping again edits
                 } else {
+                    if (prefs.activePet != id) haptic("tap")
                     prefs.activePet = id
                     ph.store.savePrefs()
-                    haptic("select")
                     ui.update()
                 }
             },
@@ -216,6 +229,7 @@ class Actions(
                 } else {
                     ui.sheets.openSheet(SheetState("pet", *petState(null)))
                 }
+                ui.focus("f-name")
             },
             "edit-pet" to { x -> l.pets.openPet(x["id"] ?: "", true) },
             "open-pet" to { x -> l.pets.openPet(x["id"] ?: "") },
@@ -226,48 +240,47 @@ class Actions(
             "toggle-observation-pet" to { x -> l.observations.toggleObservationPet(x["id"] ?: "") },
             "delete-observation" to { x -> l.observations.deleteObservation(x["id"] ?: "") },
             "open-settings" to { _ -> ui.sheets.openSheet(SheetState("settings")) },
-            "settings-page" to { x ->
-                haptic("select")
-                ui.sheets.openPage(x["v"] ?: "")
-            },
-            "settings-back" to { _ ->
-                haptic("select")
-                ui.sheets.sheetBack()
-            },
+            "settings-page" to { x -> ui.sheets.openPage(x["v"] ?: "") },
+            "settings-back" to { _ -> ui.sheets.sheetBack() },
             "open-report" to { x -> ui.sheets.openSheet(reportState(x["v"])) },
-            "open-evaluation" to { _ -> ui.sheets.openSheet(SheetState("evaluation")) },
-            // the shopping list's folds start closed each time
-            "open-level" to { x -> ui.sheets.openPage(x["v"] ?: "", "open" to null) },
+            // pet: shows that cat, also on home afterwards
+            "open-evaluation" to { x ->
+                val pet = x["pet"]
+                if (pet != null && d.getPet(pet) != null && prefs.activePet != pet) {
+                    prefs.activePet = pet
+                    ph.store.savePrefs()
+                    haptic("select")
+                    ui.update()
+                }
+                ui.sheets.openSheet(SheetState("evaluation"))
+            },
             "open-server" to { _ -> ui.sheets.openSheet(SheetState("settings", "page" to "house")) },
             "connect" to { _ -> launch { connectServer() } },
-            "connect-form" to { _ ->
-                haptic("select")
-                openConnect()
-            },
+            "connect-form" to { _ -> openConnect() },
             "edit-server" to { _ ->
                 sheet?.set("editServer", true)
                 ui.renderSheet()
                 ui.focus("f-server")
             },
-            "sync-now" to { _ ->
-                haptic("select")
-                launch { syncByHand() }
-            },
+            "sync-now" to { _ -> launch { syncByHand() } },
             "close" to { _ -> ui.sheets.closeSheet() },
             "feed" to { _ -> ui.sheets.openSheet(SheetState("feed")) },
             "serve" to { x ->
                 val id = x["id"] ?: ""
                 val code = x["code"] ?: ""
+                val pets = listOfNotNull(x["pet"])
                 val gone = ui.sheets.closeAll()
                 launch {
                     gone.await()
-                    l.feeding.serveProduct(id, code) // the meal is rated on the home page
+                    l.feeding.serveProduct(id, code, pets) // the meal is rated on the home page
                 }
             },
             "scan" to { _ -> launch { l.scan.scan() } },
             "photo" to { _ -> launch { l.feeding.shootPhoto("", if (sheet?.kind == "feed") sheet!!.str("code") else "") } },
-            "new-product" to
-                { x -> ui.sheets.openSheet(SheetState("new", "brand" to "", "variety" to (x["v"] ?: ""), "type" to "Nassfutter")) },
+            "new-product" to { x ->
+                ui.sheets.openSheet(SheetState("new", "brand" to "", "variety" to (x["v"] ?: ""), "type" to "Nassfutter"))
+                ui.focus("f-brand")
+            },
             "rate" to { x -> l.rating.rate(x["s"] ?: "", x["p"] ?: "", x["r"] ?: "") },
             // a photo found nowhere is let go, and so is a sharedPhoto mark the server cannot back up
             "view-photo" to { x -> launch { viewPhoto(x["s"] ?: "", x["p"] ?: "") } },
@@ -307,6 +320,7 @@ class Actions(
             "set-type" to { x ->
                 val sh = sheet
                 if (sh != null) {
+                    if (sh.str("type") != x["v"]) haptic("tap")
                     sh["type"] = x["v"]
                     if (textureOf(Rec().apply { put("type", x["v"]) }, sh.str("texture").ifEmpty { null }) == null) sh.remove("texture")
                     ui.renderSheet()
@@ -317,13 +331,16 @@ class Actions(
                 val sh = sheet
                 val v = x["v"] ?: ""
                 if (sh != null) {
-                    if (sh.kind == "product" && sh.step != "name") {
-                        l.products.toggleTexture(sh.id!!, v)
-                        ui.update()
-                    } else {
-                        sh["texture"] = if (sh.str("texture") == v) "" else v
-                    }
-                    haptic("select")
+                    val now =
+                        if (sh.kind == "product" && sh.step != "name") {
+                            l.products.toggleTexture(sh.id!!, v)
+                            ui.update()
+                            d.getProduct(sh.id)?.str("texture")
+                        } else {
+                            sh["texture"] = if (sh.str("texture") == v) "" else v
+                            sh.str("texture")
+                        }
+                    haptic(if (now == v) "on" else "off")
                     ui.renderSheet()
                 }
             },
@@ -333,13 +350,17 @@ class Actions(
             "open-product" to { x -> ui.sheets.openSheet(SheetState("product", "id" to x["id"])) },
             "remove-code" to { x -> l.editing.removeCode(x["code"] ?: "") },
             "buy" to { x ->
-                sheet?.id?.let { l.products.setKaufen(it, x["v"]) }
-                haptic("select")
+                val p = d.getProduct(sheet?.id)
+                if (p != null) {
+                    val was = p.str("kaufen")
+                    l.products.setKaufen(p.id, x["v"])
+                    if (p.str("kaufen") != was) haptic("tap")
+                }
                 redrawAll()
             },
             "hint-buy" to { x -> hintBuy(x["id"] ?: "", x["v"] ?: "") },
+            "stop-many" to { x -> stopMany((x["ids"] ?: "").split(",").filter { it.isNotEmpty() }, x["label"] ?: "") },
             "remind-yes" to { _ ->
-                haptic("select")
                 launch {
                     l.reminders.setRemind(REMIND_DEFAULT)
                     ui.update()
@@ -373,7 +394,9 @@ class Actions(
                 armed[then]?.let { run -> arm(then + (if (id != null) ":$id" else "")) { run(x) } }
             },
             "set-sex" to { x ->
-                sheet?.set("sex", x["v"] ?: "")
+                val v = x["v"] ?: ""
+                if (sheet?.str("sex") != v) haptic("tap")
+                sheet?.set("sex", v)
                 ui.renderSheet()
             },
             "save-pet" to { _ -> l.pets.savePet() },
@@ -382,61 +405,53 @@ class Actions(
             "pet-photo" to { _ -> launch { l.pets.pickPhoto() } },
             "crop-apply" to { _ -> l.pets.closeCrop(true) },
             "crop-cancel" to { _ -> l.pets.closeCrop(false) },
-            "lookup" to { _ -> toggle { prefs.lookup = !prefs.lookup } },
-            "server-photo" to { _ -> toggle { prefs.serverPhoto = !prefs.serverPhoto } },
+            "lookup" to { _ -> toggle { (!prefs.lookup).also { prefs.lookup = it } } },
+            "server-photo" to { _ -> toggle { (!prefs.serverPhoto).also { prefs.serverPhoto = it } } },
             "ai-photo" to { _ ->
                 ph.ai.on = !ph.ai.on
                 ph.ai.save()
-                haptic("select")
+                haptic(if (ph.ai.on) "on" else "off")
                 ui.renderSheet()
                 if (ph.ai.on && ph.ai.key.isEmpty()) ui.focus("f-ai")
             },
             "ai-forget" to { _ -> forgetAiKey() },
-            "update-check" to { _ ->
-                haptic("select")
-                launch { ph.release.check() }
-            },
+            "update-check" to { _ -> launch { ph.release.check() } },
             "update-install" to { _ ->
-                haptic("select")
                 launch {
                     try {
                         ph.release.install()
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         report("update", e)
-                        toast("Das Update ließ sich nicht laden. Versuch es später noch mal.")
+                        fail("Das Update ließ sich nicht laden. Versuch es später noch mal.")
                     }
                 }
             },
             "update-later" to { _ ->
                 ph.release.later = true
-                haptic("select")
                 ui.update()
             },
-            "update-auto" to { _ -> toggle { prefs.updates = !prefs.updates } },
+            "update-auto" to { _ -> toggle { (!prefs.updates).also { prefs.updates = it } } },
             "calendar" to { _ ->
-                toggle { prefs.calendar = !prefs.calendar }
+                toggle { (!prefs.calendar).also { prefs.calendar = it } }
                 ui.update()
             },
             "tear" to { _ -> tearSheet() },
             "turn" to { _ -> turnSheet() },
-            "feed-remind" to { _ ->
-                haptic("select")
-                launch { l.reminders.setFeedRemind(!prefs.feedRemind) }
-            },
+            "feed-remind" to { _ -> launch { l.reminders.setFeedRemind(!prefs.feedRemind) } },
             "remind-on" to { _ ->
-                haptic("select")
                 sheet?.set("ownRemind", false)
                 launch { l.reminders.setRemind(if (prefs.remind > 0) 0 else l.reminders.remindStep()) }
             },
             "remind" to { x ->
-                haptic("select")
+                val v = x["v"]?.toIntOrNull() ?: 0
+                if (remindShown() != v.toString()) haptic("tap")
                 sheet?.set("ownRemind", false)
-                launch { l.reminders.setRemind(x["v"]?.toIntOrNull() ?: 0) }
+                launch { l.reminders.setRemind(v) }
             },
             // minutes; 2 h when coming from off
             "remind-own" to { _ ->
-                haptic("select")
+                if (remindShown() != "own") haptic("tap")
                 sheet?.set("ownRemind", true)
                 launch {
                     l.reminders.setRemind(if (prefs.remind > 0) prefs.remind else 120)
@@ -444,26 +459,22 @@ class Actions(
                 }
             },
             "theme" to { x ->
-                prefs.theme = x["v"] ?: "system"
+                val v = x["v"] ?: "system"
+                if (prefs.theme != v) haptic("tap")
+                prefs.theme = v
                 ph.store.savePrefs()
                 ui.renderSheet()
-                haptic("select")
             },
             "export" to { _ -> launch { l.data.exportData() } },
             "import" to { _ -> launch { l.data.importData() } },
-            "share-changes" to { _ ->
-                haptic("select")
-                launch { l.exchange.shareChanges() }
-            },
+            "share-changes" to { _ -> launch { l.exchange.shareChanges() } },
             "receive" to { _ -> launch { l.exchange.receiveFile() } },
             "send-answer" to { _ ->
-                haptic("select")
                 val peer = (sheet?.get("exchange") as? de.schmeckts.app.views.Exchanged)?.peer
                 launch { l.exchange.shareChanges(l.exchange.peerOf(peer)) }
             },
             "demo" to { _ -> l.data.loadDemo() },
             "fold" to { x ->
-                haptic("select")
                 val sh = sheet
                 val key = x["v"] ?: ""
                 if (sh != null) {
@@ -473,26 +484,27 @@ class Actions(
                 }
             },
             "jump-day" to { x ->
-                haptic("select")
                 val day = x["day"] ?: ""
                 if (sheet?.kind == "report") ui.jump = day else ui.sheets.openSheet(reportState("d-$day"))
             },
             "undo" to { _ -> ui.toasts.undoNow { haptic("select") } },
         )
 
-    private fun toggle(flip: () -> Unit) {
-        flip()
+    /** flip returns the new value */
+    private fun toggle(flip: () -> Boolean) {
+        val on = flip()
         ph.store.savePrefs()
-        haptic("select")
+        haptic(if (on) "on" else "off")
         ui.renderSheet()
     }
 
     private fun toggleServingPet(id: String) {
         val s = d.getServing(sheet?.id) ?: return
         val pets = s.pets
-        if (pets.containsKey(id)) {
+        val added = !pets.containsKey(id)
+        if (!added) {
             if (pets.size == 1) {
-                toast("Mindestens eine Katze muss dabei sein.")
+                fail("Mindestens eine Katze muss dabei sein.")
                 return
             }
             s["pets"] = JsonObject(pets - id)
@@ -506,7 +518,7 @@ class Actions(
         prefs.lastPets = ids
         ph.store.save()
         ph.store.savePrefs()
-        haptic("select")
+        haptic(if (added) "on" else "off")
         redrawAll()
     }
 
@@ -531,6 +543,22 @@ class Actions(
             l.products.setKaufen(id, was)
             redrawAll()
         }, ic, tone)
+    }
+
+    // a whole line at once, one undo for all of it
+    private fun stopMany(
+        ids: List<String>,
+        label: String,
+    ) {
+        val was = ids.mapNotNull { id -> d.getProduct(id)?.let { id to it.str("kaufen") } }.filter { it.second != "nicht" }
+        if (was.isEmpty()) return
+        l.products.setKaufen(was.associate { it.first to "nicht" })
+        haptic("success")
+        redrawAll()
+        ui.toast("$label wird nicht mehr gekauft.", {
+            l.products.setKaufen(was.toMap())
+            redrawAll()
+        }, "flop", "r-bad")
     }
 
     private suspend fun viewPhoto(
@@ -561,15 +589,15 @@ class Actions(
             return
         }
         away?.let {
-            toast(if (it.kind == "offline") "Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar." else it.message)
+            fail(if (it.kind == "offline") "Das Foto liegt auf dem Server, und der ist gerade nicht erreichbar." else it.message)
             return
         }
-        if (!missing) return toast("Das Foto ließ sich nicht öffnen.")
+        if (!missing) return fail("Das Foto ließ sich nicht öffnen.")
         if (p != null) {
             ph.photos.forgetPhoto(p.id)
             if (p["sharedPhoto"].truthy && ph.sync.isConnected()) l.products.unsharePhoto(p)
         }
-        toast("Das Foto ist nicht mehr da.")
+        fail("Das Foto ist nicht mehr da.")
         if (sheet != null) ui.renderSheet() else ui.update()
     }
 
@@ -603,13 +631,16 @@ class Actions(
         if (!ui.hosted || ui.reduced) ui.update() else ui.home.tearing = true
     }
 
-    // today's Stimmt’s? turns over and back
+    // the flip sheet on top turns over and back, the one left hanging too, so a missed answer is not torn off unseen
     private fun turnSheet() {
+        val now = Time.now()
         val sheet =
             de.schmeckts.app.views
-                .sheetOn(Time.now())
-                .sheet
-        if (sheet.back == null) return // only a Stimmt’s? has a back
+                .sheetOn(
+                    de.schmeckts.app.views
+                        .hangingDay(prefs.sheetDay, now) ?: now,
+                ).sheet
+        if (sheet.back == null) return
         ui.home.turned = if (ui.home.turned == sheet.id) null else sheet.id
         haptic()
         ui.update()
@@ -671,14 +702,11 @@ class Actions(
         when {
             id == "f-server" && s.str("code").isEmpty() -> ui.focus("f-code")
             id == "f-code" || id == "f-server" -> launch { connectServer() }
-            id == "f-remind" -> {
-                ui.blurField()
-                ui.renderSheet()
-            }
             id == "f-ai" -> launch { checkAiKey() }
             id == "f-nick" -> l.pets.addNick()
             l.pets.editing(s) -> l.pets.savePet()
             s.step == "name" || s.kind == "new" -> if (id == "f-brand") ui.focus("f-variety") else nameOrMerge()
+            else -> ui.blurField()
         }
     }
 

@@ -1,5 +1,15 @@
 [
  {
+  "v": "0.44.0",
+  "title": "Vorlieben neu",
+  "say": "„Vorlieben“ zeigt jetzt zuerst, was deine Katze mag und was gar nicht ankommt, jeweils mit den Zahlen dazu. Was als Nächstes dran ist, fütterst du dort mit einem Tipp.",
+  "why": "Außerdem hat der Kalender neue Blätter, und Fenster wie das zum Füttern lassen sich nach unten wegwischen.",
+  "go": [
+   "evaluation",
+   "Vorlieben ansehen"
+  ]
+ },
+ {
   "v": "0.43.0",
   "title": "Direkt für Android",
   "say": "Die App ist jetzt direkt für Android gebaut. Sie startet schneller, und Wischen und Zurückgehen fühlen sich an wie in anderen Android-Apps.",

@@ -4,4 +4,9 @@
     <color name="splash_background">#EEEDE7</color>
     <!-- the accent of both reminders -->
     <color name="notification">#58603F</color>
+    <!-- the palette's accent and surface for the system's date and time pickers, light and dark -->
+    <color name="picker_accent">#58603F</color>
+    <color name="picker_surface">#FAFAF6</color>
+    <color name="picker_accent_dark">#A9B283</color>
+    <color name="picker_surface_dark">#25261F</color>
 </resources>

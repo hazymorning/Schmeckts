@@ -44,6 +44,12 @@ abstract class Part(
         html: Boolean = false,
     ) = ui.toast(text, undo, icon, tone, html)
 
+    /** a tap that cannot do what it asked */
+    protected fun fail(text: String) {
+        haptic("reject")
+        toast(text)
+    }
+
     protected fun update() = ui.update()
 
     protected fun renderSheet() = ui.renderSheet()

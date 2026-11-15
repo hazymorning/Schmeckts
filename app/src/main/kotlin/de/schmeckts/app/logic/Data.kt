@@ -64,7 +64,7 @@ class Data(
         prefs.activePet = "all"
         save()
         savePrefs()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast(if (house) "Alle Daten im Haushalt gelöscht" else "Alle Daten gelöscht")
@@ -81,7 +81,7 @@ class Data(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             report("backup", e)
-            toast("Das Backup konnte nicht geteilt werden.")
+            fail("Das Backup konnte nicht geteilt werden.")
         }
     }
 
@@ -172,6 +172,7 @@ class Data(
             ph.store.replaceDb(tidy(d))
             save()
             val msg = if (ph.sync.isConnected()) "Backup in den Haushalt importiert" else "Backup importiert"
+            haptic("confirm")
             afterClose {
                 update()
                 toast(msg, {
@@ -181,7 +182,7 @@ class Data(
                 })
             }
         } catch (e: Exception) {
-            toast("Diese Datei ist kein gültiges Backup.")
+            fail("Diese Datei ist kein gültiges Backup.")
         }
     }
 

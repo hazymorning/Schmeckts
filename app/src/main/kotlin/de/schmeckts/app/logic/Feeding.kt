@@ -72,16 +72,19 @@ class Feeding(
         return s
     }
 
+    /** pets: for these cats only, which leaves the cats meals usually go to as they were; else for those */
     fun serveProduct(
         pid: String,
         scanCode: String = "",
+        pets: List<String> = emptyList(),
     ) {
         val p = d.getProduct(pid) ?: return
-        val ids = d.defaultPets(p).ids
+        val chosen = pets.filter { d.getPet(it) != null }
+        val ids = chosen.ifEmpty { d.defaultPets(p).ids }
         val s = meal(ids, scanCode)
         db.servings.add(0, s)
         l.products.linkProduct(s, p)
-        prefs.lastPets = ids
+        if (chosen.isEmpty()) prefs.lastPets = ids
         save()
         savePrefs()
         served(s.id)
@@ -105,8 +108,8 @@ class Feeding(
     }
 
     private fun served(id: String) {
-        haptic("success")
-        ui.home.fresh = id
+        haptic("confirm")
+        ui.home.made(id)
         ui.home.fills++
         l.reminders.syncReminders()
     }
@@ -137,7 +140,7 @@ class Feeding(
                 ph.platform.takePhoto(hint)
             } catch (err: Exception) {
                 if (err is CancellationException) throw err
-                toast("Die Kamera ließ sich nicht öffnen. Ist sie in den Android-Einstellungen erlaubt?")
+                fail("Die Kamera ließ sich nicht öffnen. Ist sie in den Android-Einstellungen erlaubt?")
                 null
             }
         }
@@ -159,7 +162,7 @@ class Feeding(
 
     private fun decode(photo: ByteArray): Picture? {
         val img = ph.platform.pictures.decode(bytesOf(photo))
-        if (img == null) toast("Das Foto ließ sich nicht lesen.")
+        if (img == null) fail("Das Foto ließ sich nicht lesen.")
         return img
     }
 

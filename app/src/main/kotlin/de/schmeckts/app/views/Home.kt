@@ -1,6 +1,12 @@
 package de.schmeckts.app.views
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
@@ -8,9 +14,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,8 +28,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,7 +53,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -57,13 +69,16 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -73,7 +88,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.zIndex
 import de.schmeckts.app.DEMO
-import de.schmeckts.app.Model
 import de.schmeckts.app.NEWS
 import de.schmeckts.app.R
 import de.schmeckts.app.RATINGS
@@ -128,6 +142,7 @@ import de.schmeckts.app.ui.shadowHigh
 import de.schmeckts.app.ui.shadowLow
 import de.schmeckts.app.ui.watch
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Size as Area
 
 // The home page: the header, the pets, the cards and the feeding button
@@ -439,7 +454,7 @@ private fun Fab(modifier: Modifier) {
     }
 }
 
-/** one question at a time, then the history and „Vorlieben“ */
+/** one question at a time, then „Vorlieben“ and the history */
 @Composable
 private fun ColumnScope.HomeContent() {
     watch()
@@ -454,84 +469,138 @@ private fun ColumnScope.HomeContent() {
     if (ph.db.pets.isEmpty()) return Welcome()
     val open = d.pendingServings().toSet()
     val pend = ph.db.servings.filter { it in open || (home.held.containsKey(it.id) && rateRows(ui, it).isNotEmpty()) }
-    val m = if (ph.db.servings.isNotEmpty()) d.model() else null
-    var prev = ""
-    val gap = { kind: String ->
-        val g =
-            when {
-                prev == "" -> 0.dp
-                prev == "overview" -> Space.s2
-                prev == "calpad" -> Space.s3 + Space.s4
-                kind == "calpad" -> Space.s4
-                else -> Space.s4
-            }
-        prev = kind
-        g
+    // the card closes with the rows it last had, after the last one has left
+    val lastPend = remember { ArrayList<Rec>() }
+    if (pend.isNotEmpty()) {
+        lastPend.clear()
+        lastPend.addAll(pend)
     }
+    val m = if (ph.db.servings.isNotEmpty()) d.model() else null
+    // each card brings the gap below it, so one coming or going moves only what follows
     if (m != null) {
         Arrive(n++, "overview") { Overview(m, home.fresh) }
-        gap("overview")
+        Gap(Space.s2)
     }
-    if (pend.isNotEmpty()) {
-        Gap(gap("card"))
-        Arrive(n++, "pend") { Pending(pend) }
+    Optional(pend.isNotEmpty()) {
+        Arrive(n, "pend", rise = false) { Pending(pend.ifEmpty { lastPend }) }
+        Gap(Space.s4)
     }
+    if (pend.isNotEmpty()) n++
     if (m == null) {
-        Gap(gap("card"))
-        Arrive(n++, "steps") { Steps() }
+        Arrive(n, "steps") { Steps() }
         return
     }
     if (ph.prefs.calendar) {
-        Gap(gap("calpad"))
         Arrive(n++, "cal", if (home.tearing) 1f else 0f) { CalPad() } // the sheet torn off falls over the cards below
+        Gap(Space.s3 + Space.s4)
     }
-    val question: (@Composable () -> Unit)? =
+    val ask =
         when {
-            updateShown(ui) -> {
-                { UpdateCard() }
-            }
-            remindShown(ui) -> {
-                { RemindCard() }
-            }
-            newsShown(ui) -> {
-                { NewsCard() }
-            }
-            m.hints.isNotEmpty() -> {
-                { HintCard(m) }
-            }
+            updateShown(ui) -> Ask("update")
+            remindShown(ui) -> Ask("remind")
+            newsShown(ui) -> Ask("news")
+            m.hints.isNotEmpty() -> m.hints[0].let { Ask(hintKey(it), it, it.id?.let(m.byId::get)) }
             else -> null
         }
-    if (question != null) {
-        Gap(gap("card"))
-        Arrive(n++, "question") { question() }
+    // what each card last asked, so one on its way out still shows it
+    val asked = remember { HashMap<String, Ask>() }
+    val lastAsk = remember { arrayOfNulls<Ask>(1) }
+    if (ask != null) {
+        asked[ask.key] = ask
+        lastAsk[0] = ask
     }
-    Gap(gap("card"))
-    Arrive(n++, "hist") {
+    Optional(ask != null) {
+        Arrive(n, "question", rise = false) { (ask ?: lastAsk[0])?.let { Question(it, asked) } }
+        Gap(Space.s4)
+    }
+    if (ask != null) n++
+    if (hasEvaluationCard(m)) {
+        // what the hint card says is not said again right under it
+        Arrive(n++, "evaluation") { EvaluationCard(m, ask?.hint) }
+        Gap(Space.s4)
+    }
+    Arrive(n, "hist") {
         Card {
             CardHead("Verlauf", label = "Alle Einträge", onMore = ui.on("open-report"))
             History()
         }
     }
-    if (hasEvaluationCard(m)) {
-        Gap(gap("card"))
-        Arrive(n, "evaluation") { EvaluationCard(m) }
+}
+
+/** the one card that asks: a new version, the reminder, news or a hint with its variety, by its key */
+private class Ask(
+    val key: String,
+    val hint: de.schmeckts.app.Hint? = null,
+    val sort: de.schmeckts.app.Sort? = null,
+)
+
+// a card that comes or goes makes room or closes the gap, rather than the page jumping
+@Composable
+private fun ColumnScope.Optional(
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val still = reduceMotion
+    AnimatedVisibility(
+        visible,
+        enter =
+            if (still) {
+                EnterTransition.None
+            } else {
+                arriving
+            },
+        exit =
+            if (still) {
+                ExitTransition.None
+            } else {
+                shrinkVertically(tween(Motion.STEP, easing = Motion.easeIn), shrinkTowards = Alignment.Top) + fadeOut(tween(Motion.FADE))
+            },
+    ) { Column { content() } }
+}
+
+// one question replaces another in place, the card taking the new one's height
+@Composable
+private fun Question(
+    ask: Ask,
+    asked: Map<String, Ask>,
+) {
+    val still = reduceMotion
+    AnimatedContent(ask.key, transitionSpec = { swap(still) }, label = "question") { k ->
+        val a = if (k == ask.key) ask else asked[k]
+        when (k) {
+            "update" -> UpdateCard()
+            "remind" -> RemindCard()
+            "news" -> NewsCard()
+            else -> a?.hint?.let { HintCard(it, a.sort) }
+        }
     }
 }
 
-// the cards rise in turn as the splash fades
+// one content gives way to another in place, the card taking the new one's height
+private fun AnimatedContentTransitionScope<*>.swap(still: Boolean) =
+    if (still) {
+        ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = null)
+    } else {
+        fadeIn(tween(Motion.FADE)) togetherWith fadeOut(tween(Motion.FADE)) using
+            SizeTransform { _, _ -> tween(Motion.STEP, easing = Motion.easeOut) }
+    }
+
+// the cards rise in turn as the splash fades, and one that comes later rises too, unless it opens its own room (rise)
 @Composable
 private fun Arrive(
     i: Int,
     sec: String,
     z: Float = 0f,
+    rise: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     watch()
     val ui = LocalUi.current
     val still = reduceMotion
-    val f = remember { Animatable(if (ui.arrive && !still) 0f else 1f) }
+    val splash = remember { !ui.arrive }
+    val f = remember { Animatable(if (rise && ui.arrive && !still) 0f else 1f) }
     LaunchedEffect(ui.arrive) {
-        if (ui.arrive && !still) {
+        if (ui.arrive && (splash || rise) && !still) {
             f.snapTo(0f)
             f.animateTo(1f, tween(Motion.STEP, Motion.STAGGER * minOf(i, 3), Motion.easeOut))
         } else {
@@ -647,30 +716,32 @@ private fun Pending(list: List<Rec>) {
     Card {
         CardTitle("Wie war’s?")
         list.forEachIndexed { i, s ->
-            Leaving(s.id) {
-                val scope = androidx.compose.runtime.rememberCoroutineScope()
-                Column(
-                    Modifier
-                        .testTag("pend-${s.id}")
-                        .onGloballyPositioned { c ->
-                            // a rating changes the text above its row; to the eye the row stays where it was
-                            val top = c.positionInRoot().y
-                            val was = ui.home.tops.put(s.id, top)
-                            if (ui.home.kept == s.id && was != null && kotlin.math.abs(top - was) > 0.5f) {
-                                ui.home.kept = null
-                                scope.launch { ui.home.scroll?.scrollBy(top - was) }
-                            }
-                        },
-                ) {
-                    if (i > 0) Divider(Size.picL + Space.s3)
-                    PendItem(s)
+            key(s.id) {
+                Leaving(s.id) {
+                    val scope = androidx.compose.runtime.rememberCoroutineScope()
+                    Column(
+                        Modifier
+                            .testTag("pend-${s.id}")
+                            .onGloballyPositioned { c ->
+                                // a rating changes the text above its row; to the eye the row stays where it was
+                                val top = c.positionInRoot().y
+                                val was = ui.home.tops.put(s.id, top)
+                                if (ui.home.kept == s.id && was != null && kotlin.math.abs(top - was) > 0.5f) {
+                                    ui.home.kept = null
+                                    scope.launch { ui.home.scroll?.scrollBy(top - was) }
+                                }
+                            },
+                    ) {
+                        if (i > 0) Divider(Size.picL + Space.s3)
+                        PendItem(s)
+                    }
                 }
             }
         }
     }
 }
 
-// a meal rated in full leaves its card with a short movement
+// a meal just fed opens its place in the card; rated in full it leaves with a short movement
 @Composable
 private fun Leaving(
     id: String,
@@ -679,7 +750,8 @@ private fun Leaving(
     watch()
     val ui = LocalUi.current
     val gone = ui.home.leaving[id]
-    val state = remember(id) { MutableTransitionState(true) }
+    val still = reduceMotion
+    val state = remember(id) { MutableTransitionState(!ui.home.arriving.remove("pend:$id") || still).apply { targetState = true } }
     if (gone != null) state.targetState = false
     LaunchedEffect(state.isIdle, state.currentState) {
         if (!state.currentState && state.isIdle) {
@@ -688,7 +760,7 @@ private fun Leaving(
                 ?.invoke()
         }
     }
-    if (reduceMotion && gone != null) {
+    if (still && gone != null) {
         LaunchedEffect(id) {
             ui.home.leaving
                 .remove(id)
@@ -697,6 +769,7 @@ private fun Leaving(
     }
     AnimatedVisibility(
         state,
+        enter = if (still) EnterTransition.None else arriving,
         exit =
             fadeOut(tween(Motion.STEP, easing = Motion.easeIn)) +
                 slideOutVertically(tween(Motion.STEP, easing = Motion.easeIn)) { -it / 20 } +
@@ -799,13 +872,14 @@ private val HINT_TITLES =
     mapOf("appetit" to "Appetit", "stop" to "Nicht mehr kaufen?", "sosse" to "Frisst meist nur die Soße", "liebling" to "Nachkaufen?")
 
 @Composable
-private fun HintCard(m: Model) {
+private fun HintCard(
+    h: de.schmeckts.app.Hint,
+    e: de.schmeckts.app.Sort?,
+) {
     watch()
     val ui = LocalUi.current
     val ph = ui.phone
     val d = ph.derive
-    val h = m.hints[0]
-    val e = h.id?.let { m.byId[it] }
     val pet = h.pet?.let { d.getPet(it) }
     val hide: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit = {
         RowBtn("Ausblenden", BtnKind.SOFT, onClick = ui.on("hide-hint", "v" to hintKey(h)))
@@ -949,20 +1023,35 @@ private fun History() {
     val day = if (days.getValue(today).isNotEmpty() || seen.getValue(today).isNotEmpty()) today else yesterday
     val shown = diary(days.getValue(day), seen.getValue(day))
     val multiHouse = ph.db.pets.size > 1 && ph.prefs.activePet == "all"
+    val fed = recent.isNotEmpty() || ph.db.servings.any { d.servingPets(it).isNotEmpty() }
+    // the day on its way out keeps what it showed; the first entry of a new day comes in with it, not opening a place too
+    val last = remember { HashMap<String, List<Rec>>() }
+    val was = remember { arrayOf(day) }
+    if (was[0] != day) {
+        was[0] = day
+        ui.home.arriving.removeAll { it.startsWith("hist:") }
+    }
+    last[day] = shown
+    val still = reduceMotion
     Calendar(recent, week = true)
-    if (shown.isNotEmpty()) {
-        for (g in dayGroups(shown)) {
-            DayLine(g)
-            DayItems(g, multiHouse, plain = true)
+    AnimatedContent(day, transitionSpec = { swap(still) }, label = "history") { k ->
+        val list = if (k == day) shown else last[k].orEmpty()
+        Column {
+            if (list.isNotEmpty()) {
+                for (g in dayGroups(list)) {
+                    DayLine(g)
+                    DayItems(g, multiHouse, plain = true)
+                }
+            } else if (fed) {
+                de.schmeckts.app.ui
+                    .Hint("Heute noch nicht gefüttert, der Napf langweilt sich.", Modifier.padding(top = Space.hair))
+            } else {
+                de.schmeckts.app.ui.Empty(
+                    "Noch nichts eingetragen, der Napf wartet auf seine Premiere.",
+                    modifier = Modifier.padding(top = Space.hair),
+                )
+            }
         }
-    } else if (recent.isNotEmpty() || ph.db.servings.any { d.servingPets(it).isNotEmpty() }) {
-        de.schmeckts.app.ui
-            .Hint("Heute noch nicht gefüttert, der Napf langweilt sich.", Modifier.padding(top = Space.hair))
-    } else {
-        de.schmeckts.app.ui.Empty(
-            "Noch nichts eingetragen, der Napf wartet auf seine Premiere.",
-            modifier = Modifier.padding(top = Space.hair),
-        )
     }
 }
 
@@ -980,14 +1069,16 @@ private val tornPath by lazy { PathParser().parsePathString(TORN).toPath() }
 
 private class Face(
     val label: String,
+    val action: String,
     val date: String,
     val stamp: String,
     val text: String,
-    val hanging: Boolean,
+    val other: String?,
+    val foot: String?,
 )
 
-// A day's sheet: the date as its heading, its format stamped beside it, then the fact. Today's Stimmt’s? turns over on a
-// tap, its answer led by the verdict.
+// A day's sheet: the date as its heading, its format stamped beside it, then the fact. A Stimmt’s? or Warum? turns over
+// on a tap, its answer led by the verdict; left hanging, it is turned before it is torn off.
 private fun face(
     ui: Ui,
     date: Long,
@@ -995,27 +1086,34 @@ private fun face(
 ): Face {
     val on = sheetOn(date)
     val sheet = on.sheet
-    val back = !hanging && sheet.back != null && ui.home.turned == sheet.id
-    val lead = if (back) "<b>${sheet.verdict}.</b> " else ""
+    val flips = sheet.back != null
+    val back = flips && ui.home.turned == sheet.id
+    val tear = hanging && (back || !flips)
+
+    fun side(answer: Boolean) = (if (answer) "<b>${sheet.verdict}.</b> " else "") + sheetText(sheet, catOf(ui.phone.db.pets), answer)
     // the day and its month stay together when the date needs two lines
     val day =
         de.schmeckts.app
             .weekdayDayMonth(date)
             .replaceFirst(". ", ". ")
     return Face(
-        if (hanging) {
-            "Gestriges Blatt abreißen"
-        } else if (sheet.back !=
-            null
-        ) {
-            (if (back) "Behauptung zeigen" else "Auflösung zeigen")
-        } else {
-            ""
+        when {
+            tear -> "Gestriges Blatt abreißen"
+            !flips -> ""
+            !back -> "Auflösung zeigen"
+            on.format == "Warum?" -> "Frage zeigen"
+            else -> "Behauptung zeigen"
         },
+        if (tear) "tear" else "turn",
         day,
         on.format,
-        lead + sheetText(sheet, catOf(ui.phone.db.pets), back),
-        hanging,
+        side(back),
+        if (flips) side(!back) else null,
+        when {
+            tear -> "Zum Abreißen tippen"
+            flips -> "Zum Umdrehen tippen"
+            else -> null
+        },
     )
 }
 
@@ -1037,9 +1135,28 @@ private fun CalPad() {
     val day = hangingDay(if (stored == null || stored > today) today else stored, now)
     val p = colors
     val shade = p.paperShade
+    val still = reduceMotion
+    val scope = rememberCoroutineScope()
+    // the pad's height: it grows with a taller sheet at once and shrinks to a shorter one slowly, so once a sheet is
+    // torn off the cards below move up instead of jumping
+    val room = remember { Animatable(0f) }
     Box(
         Modifier
             .fillMaxWidth()
+            .layout { m, c ->
+                val h = m.maxIntrinsicHeight(c.maxWidth)
+                if (h.toFloat() != room.targetValue) {
+                    scope.launch {
+                        val to = h.toFloat()
+                        if (still || to > room.value) room.snapTo(to) else room.animateTo(to, tween(Motion.STEP, easing = Motion.easeOut))
+                    }
+                }
+                val shown = if (still) h else maxOf(h, room.value.roundToInt())
+                val pad = m.measure(c.copy(minHeight = shown, maxHeight = shown))
+                layout(pad.width, pad.height) { pad.place(0, 0) }
+            }
+            // a sheet left hanging and today's under it are as tall as the taller one, as on a real pad
+            .height(IntrinsicSize.Max)
             .drawBehind {
                 // six sheet edges under the pad
                 val edge = Space.s3.toPx()
@@ -1090,7 +1207,7 @@ private fun CalPad() {
     ) {
         val c = face(ui, now)
         val old = day?.let { face(ui, it, true) }
-        CalSheet(c, if (c.label.isNotEmpty() && old == null) ui.on("turn") else null, turnable = true)
+        CalSheet(c, if (c.label.isNotEmpty() && old == null) ui.on(c.action) else null)
         if (old != null) Tearable(old)
         CalTop()
     }
@@ -1107,14 +1224,17 @@ private fun CalTop() {
             .height(Space.s2 + Space.s3)
             .drawBehind {
                 val torn = Space.s1.toPx()
-                val h = size.height - torn
-                val k = h / 14f
-                val tile = 300f * k
+                val k = (size.height - torn) / 14f
+                // the tiles in one path, so no seam shows where two meet
+                val edge = Path()
                 var x = 0f
                 while (x < size.width) {
-                    translate(x, torn + 1.dp.toPx()) { drawPath(tornPath.scaled(k), p.paperShade) }
-                    translate(x, torn) { drawPath(tornPath.scaled(k), p.paperTorn) }
-                    x += tile
+                    edge.addPath(tornPath.scaled(k), Offset(x, 0f))
+                    x += 300f * k
+                }
+                clipRect {
+                    translate(0f, torn + 1.dp.toPx()) { drawPath(edge, p.paperShade) }
+                    translate(0f, torn) { drawPath(edge, p.paperTorn) }
                 }
                 val r = Radius.paperTop.toPx()
                 drawRoundRect(
@@ -1154,7 +1274,7 @@ private fun Tearable(old: Face) {
         }
     }
     Box(
-        Modifier.graphicsLayer {
+        Modifier.fillMaxHeight().graphicsLayer {
             val f = fall.value
             transformOrigin = TransformOrigin(0.85f, 0f)
             if (f < 0.18f) {
@@ -1166,10 +1286,11 @@ private fun Tearable(old: Face) {
                 translationX = -18.dp.toPx() * g
                 translationY = 3.dp.toPx() + (size.height * 1.2f - 3.dp.toPx()) * g
                 rotationZ = -2.5f - 8.5f * g
-                alpha = 1f - g
+                // mostly gone before it lies over the text of the card below
+                alpha = (1f - g) * (1f - g)
             }
         },
-    ) { CalSheet(old, if (ui.home.tearing) null else ui.on("tear")) }
+    ) { CalSheet(old, if (ui.home.tearing) null else ui.on(old.action)) }
 }
 
 /** as wide as a card and set like one; the corner cut away for the curl */
@@ -1177,7 +1298,6 @@ private fun Tearable(old: Face) {
 private fun CalSheet(
     c: Face,
     onClick: (() -> Unit)?,
-    turnable: Boolean = false,
 ) {
     watch()
     val p = colors
@@ -1185,7 +1305,7 @@ private fun CalSheet(
     val turn = remember { Animatable(0f) }
     val shownText = remember { androidx.compose.runtime.mutableStateOf(c) }
     LaunchedEffect(c.text) {
-        if (!turnable || shownText.value.text == c.text) {
+        if (shownText.value.text == c.text || shownText.value.other != c.text) {
             shownText.value = c
             return@LaunchedEffect
         }
@@ -1204,8 +1324,11 @@ private fun CalSheet(
     Column(
         Modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .graphicsLayer {
-                rotationY = 90f * turn.value
+                // turned over the binding, as a calendar sheet is
+                transformOrigin = TransformOrigin(0.5f, 0f)
+                rotationX = 90f * turn.value
                 cameraDistance = 600.dp.toPx() / density * 8
             }.then(if (onClick != null) Modifier.press(onClick, Motion.PRESS_WIDE, label = c.label) else Modifier)
             .drawWithContent {
@@ -1257,21 +1380,27 @@ private fun CalSheet(
             T(f.date, Type.heading, Modifier.weight(1f), p.paperInk, balance = true)
             Stamp(f.stamp)
         }
-        M(f.text, Type.body, color = p.paperInk)
-        if (f.hanging) {
+        Box {
+            M(f.text, Type.body, color = p.paperInk)
+            // the other side, unseen, keeps the sheet as tall as its taller side, so turning it moves nothing below
+            if (f.other != null) M(f.other, Type.body, Modifier.alpha(0f).clearAndSetSemantics {}, p.paperInk)
+        }
+        if (f.foot != null) {
             Row(
                 Modifier.padding(top = Space.s3),
                 horizontalArrangement = Arrangement.spacedBy(Space.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Ink(p.paperMuted) {
-                    Icon("down", size = Size.iconS)
-                    T("Zum Abreißen tippen", Type.smallStrong)
+                    Icon(if (f.action == "tear") "down" else "repeat", size = Size.iconS)
+                    T(f.foot, Type.smallStrong)
                 }
             }
         }
     }
 }
+
+private const val STAMP_SCALE = 0.8f
 
 // the rubric, pressed on a little askew in worn ink: a heavy frame and a fine one inside it
 @Composable
@@ -1282,10 +1411,16 @@ private fun Stamp(text: String) {
         text.uppercase(),
         Type.captionStrong.copy(letterSpacing = Type.TRACK_STAMP.em),
         Modifier
-            .graphicsLayer {
+            .layout { m, c ->
+                // as wide as it is drawn, so the date has the room the scale leaves
+                val stamp = m.measure(c.copy(minWidth = 0, minHeight = 0))
+                val w = (stamp.width * STAMP_SCALE).roundToInt()
+                val h = (stamp.height * STAMP_SCALE).roundToInt()
+                layout(w, h) { stamp.place(w - stamp.width, (h - stamp.height) / 2) }
+            }.graphicsLayer {
                 rotationZ = -4f
-                scaleX = 0.8f
-                scaleY = 0.8f
+                scaleX = STAMP_SCALE
+                scaleY = STAMP_SCALE
                 transformOrigin = TransformOrigin(1f, 0.5f)
             }.border(Size.stroke, p.paperMuted, RoundedCornerShape(Radius.stamp))
             .padding(Space.hair)

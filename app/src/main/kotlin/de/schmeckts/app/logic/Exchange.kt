@@ -76,7 +76,7 @@ class Exchange(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             report("exchange file", e)
-            toast("Die Datei konnte nicht geteilt werden.")
+            fail("Die Datei konnte nicht geteilt werden.")
             return
         }
         haptic("success")
@@ -101,7 +101,7 @@ class Exchange(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 report("exchange file", e)
-                toast("Die Datei ließ sich nicht öffnen.")
+                fail("Die Datei ließ sich nicht öffnen.")
                 return
             }
         apply(text)
@@ -111,8 +111,7 @@ class Exchange(
         val file = runCatching { parseJson(text) }.getOrNull() as? JsonObject
         val bad = check(file)
         if (bad.isNotEmpty()) {
-            haptic("strong")
-            toast(bad)
+            fail(bad)
             return
         }
         val records = file!!["records"].asArray!!.mapNotNull { Remote.of(it) }

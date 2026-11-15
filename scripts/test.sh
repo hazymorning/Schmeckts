@@ -19,7 +19,12 @@ GO="$(command -v go || echo /usr/local/go/bin/go)"
 for suite in "${SUITES[@]}"; do
   case "$suite" in
     go) (cd "$ROOT/server" && "$GO" test -count=1 ./...) ;;
-    app) (cd "$ROOT/app" && PATH="$PATH:$(dirname "$GO")" ./gradlew testDebugUnitTest --console=plain -q) ;;
+    app)
+      # quiet Gradle names no failing test, so print them from the results
+      (cd "$ROOT/app" && PATH="$PATH:$(dirname "$GO")" ./gradlew testDebugUnitTest --console=plain -q) || {
+        grep -h -B1 -A4 '<failure' "$ROOT"/app/build/test-results/testDebugUnitTest/*.xml | cut -c1-400 >&2
+        exit 1
+      } ;;
     files) python3 "$ROOT/tests/files_test.py" ;;
   esac
 done

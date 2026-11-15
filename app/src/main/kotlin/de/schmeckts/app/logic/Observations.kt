@@ -40,7 +40,7 @@ class Observations(
         db.observations.add(0, o)
         save()
         haptic("success")
-        ui.home.fresh = o.id
+        ui.home.made(o.id)
         update()
         val seen = observationOf(kind)
         val said = if (db.pets.size > 1) seen.said.replace("Notiert", "Notiert bei ${ph.whoObserved(ids)}") else seen.said
@@ -70,9 +70,10 @@ class Observations(
     /** several pets mean it is unclear which one it was */
     fun toggleObservationPet(pid: String) {
         val o = d.getObservation(sheet?.id) ?: return
-        if (o.pets.containsKey(pid)) {
+        val added = !o.pets.containsKey(pid)
+        if (!added) {
             if (o.pets.size == 1) {
-                toast("Mindestens eine Katze muss dabei sein.")
+                fail("Mindestens eine Katze muss dabei sein.")
                 return
             }
             o["pets"] = JsonObject(o.pets - pid)
@@ -80,7 +81,7 @@ class Observations(
             o["pets"] = JsonObject(o.pets + (pid to JsonPrimitive(true)))
         }
         save()
-        haptic("select")
+        haptic(if (added) "on" else "off")
         renderSheet()
         update()
     }
@@ -102,7 +103,7 @@ class Observations(
         val o = d.getObservation(id) ?: return
         db.observations.removeAll { it === o }
         save()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast("Eintrag gelöscht", {

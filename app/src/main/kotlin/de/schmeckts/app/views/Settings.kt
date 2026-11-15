@@ -46,6 +46,7 @@ import de.schmeckts.app.ui.ListRow
 import de.schmeckts.app.ui.LocalUi
 import de.schmeckts.app.ui.M
 import de.schmeckts.app.ui.SheetBody
+import de.schmeckts.app.ui.SheetState
 import de.schmeckts.app.ui.Sign
 import de.schmeckts.app.ui.Size
 import de.schmeckts.app.ui.Space
@@ -250,7 +251,7 @@ private fun Overview() {
                 "name",
                 kind = FieldKind.IN_ROW,
                 placeholder = "z. B. Anna",
-                keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                keyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                 label = "Dein Name",
                 initial = ph.prefs.name,
                 channel = "setting",
@@ -600,13 +601,11 @@ private fun Addr(
 private val PAGES = mapOf("house" to "Haushalt", "exchange" to "Austausch von Hand", "backup" to "Backup", "privacy" to "Datenschutz")
 
 @Composable
-fun SettingsView() {
+fun SettingsView(state: SheetState) {
     watch()
     val ui = LocalUi.current
-    val s = ui.sheet ?: return
-    val title = PAGES[s.page]
-    SheetBody(title ?: "Einstellungen", ui.sheets, onBack = ui.on("settings-back")) {
-        when (s.page) {
+    SheetBody(PAGES[state.page] ?: "Einstellungen", ui.sheets, onBack = ui.on("settings-back")) {
+        when (state.page) {
             "house" -> ServerSection()
             "exchange" -> ExchangePage()
             "backup" -> BackupPage()

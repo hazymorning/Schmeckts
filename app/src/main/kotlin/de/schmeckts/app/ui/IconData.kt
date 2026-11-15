@@ -299,18 +299,6 @@ val ICONS: Map<String, List<Stroke>> =
                 Stroke("M9.2 3.5h5.6l-.9 5.6 3.1 3.3v1.4H7v-1.4l3.1-3.3z"),
                 Stroke("M12 13.8v6.7"),
             ),
-        "layers" to
-            listOf(
-                Stroke("M12 4.5l8 4-8 4-8-4z"),
-                Stroke("M4 12.3l8 4 8-4"),
-                Stroke("M4 16.1l8 4 8-4"),
-            ),
-        "fish" to
-            listOf(
-                Stroke("M21 12c-1.7 3-4.5 5-7.8 5-3.4 0-6.1-2-7.7-5 1.6-3 4.3-5 7.7-5 3.3 0 6.1 2 7.8 5z"),
-                Stroke("M5.5 12L2.5 8.8v6.4z"),
-                Stroke("M16.6 10.9v.2"),
-            ),
         "o_stink" to
             listOf(
                 Stroke("M6.8 20h10a3 3 0 0 0 .3-6 4.3 4.3 0 0 0-8.3-1A3.5 3.5 0 0 0 6.8 20z"),
@@ -359,34 +347,6 @@ val ICONS: Map<String, List<Stroke>> =
             listOf(
                 Stroke("M12 19.3s-7.2-4.4-7.2-9.4A4 4 0 0 1 12 7.6a4 4 0 0 1 7.2 2.3c0 5-7.2 9.4-7.2 9.4z"),
             ),
-        "tag" to
-            listOf(
-                Stroke("M3.8 11.9V5.3c0-.8.7-1.5 1.5-1.5h6.6l8.4 8.4a1.5 1.5 0 0 1 0 2.1l-6.3 6.3a1.5 1.5 0 0 1-2.1 0z"),
-                Stroke("M6.8 8.3a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0z"),
-            ),
-        "rise" to
-            listOf(
-                Stroke("M4 16.5l5-5 3.5 3.5L19.5 8"),
-                Stroke("M14.5 8h5v5"),
-            ),
-        "fall" to
-            listOf(
-                Stroke("M4 7.5l5 5 3.5-3.5 7 7"),
-                Stroke("M19.5 11v5h-5"),
-            ),
-        "drop" to
-            listOf(
-                Stroke("M12 3.8c3.1 3.7 5.6 6.8 5.6 9.9a5.6 5.6 0 0 1-11.2 0c0-3.1 2.5-6.2 5.6-9.9z"),
-            ),
-        "sun" to
-            listOf(
-                Stroke("M8.2 12a3.8 3.8 0 1 0 7.6 0a3.8 3.8 0 1 0 -7.6 0z"),
-                Stroke("M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3"),
-            ),
-        "moon" to
-            listOf(
-                Stroke("M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z"),
-            ),
         "auto" to
             listOf(
                 Stroke("M4.2 12a7.8 7.8 0 1 0 15.6 0a7.8 7.8 0 1 0 -15.6 0z"),
@@ -406,12 +366,6 @@ val ICONS: Map<String, List<Stroke>> =
         "upload" to
             listOf(
                 Stroke("M12 15V4.5M7.5 9L12 4.5 16.5 9M5 19.5h14"),
-            ),
-        "cart" to
-            listOf(
-                Stroke("M3.5 4.5h1.6a1 1 0 0 1 1 .8l1.8 9.4a1.6 1.6 0 0 0 1.6 1.3h7.6a1.6 1.6 0 0 0 1.55-1.2l1.5-6.2a.8.8 0 0 0-.8-1H6.4"),
-                Stroke("M8.35 19.5a1.25 1.25 0 1 0 2.5 0a1.25 1.25 0 1 0 -2.5 0z"),
-                Stroke("M15.35 19.5a1.25 1.25 0 1 0 2.5 0a1.25 1.25 0 1 0 -2.5 0z"),
             ),
         "sparkle" to
             listOf(

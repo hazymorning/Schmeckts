@@ -235,7 +235,6 @@ object Radius {
 }
 
 object Size {
-    val iconXs = 12.dp // in a medal
     val iconS = 20.dp // inside controls
     val icon = 24.dp // on its own
     val iconM = 28.dp // a level on the rating slider
@@ -247,7 +246,6 @@ object Size {
     val control = 52.dp
     val controlL = 56.dp // feeding button, settings row
     val bar = 56.dp
-    val picBadge = 18.dp
     val picXs = 24.dp
     val picS = 32.dp
     val picM = 40.dp
@@ -257,6 +255,8 @@ object Size {
     val picXxxl = 112.dp
     val meter = 16.dp
     val meterW = 4.dp
+    val dot = 12.dp // a rating, a variety on the shelf
+    val chart = 80.dp // the week chart
     val hairline = 1.dp
     val stroke = 2.dp // every emphasised line
     val fieldRoom = 44.dp // the side of a field that holds an icon
@@ -278,6 +278,7 @@ object Motion {
     val easeOut = CubicBezierEasing(0.22f, 1f, 0.36f, 1f) // to arrive
     val easeIn = CubicBezierEasing(0.5f, 0f, 0.75f, 0f) // to leave
     val spring = CubicBezierEasing(0.34f, 1.45f, 0.64f, 1f) // to confirm
+    val back = CubicBezierEasing(0.1f, 0.1f, 0f, 1f) // the back gesture's share, quick at first as on Android
 }
 
 val Figtree =

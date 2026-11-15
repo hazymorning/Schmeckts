@@ -287,7 +287,7 @@ class UiPopupTest : ScreenTest() {
         idle(600)
         act("open-evaluation")
         idle(600)
-        val first = tags("pick-", sheet = true).ifEmpty { tags("place-", sheet = true) }.first()
+        val first = tags("sort-", sheet = true).first()
         act("open-product", "id" to first)
         idle(600)
         val product = layers
@@ -305,9 +305,7 @@ class UiPopupTest : ScreenTest() {
         )
         act("open-evaluation")
         idle(600)
-        act("open-level", "v" to "shop")
-        idle(600)
-        act("open-product", "id" to tags("shop-", sheet = true).first())
+        act("open-product", "id" to tags("sort-", sheet = true).last())
         idle(600)
         openSheet(
             de.schmeckts.app.ui
@@ -436,7 +434,11 @@ class UiObservationsTest : ScreenTest() {
         check(gone == listOf(true, false) && db.observations.find { it.id == mine }?.str("kind") == "tired", "deleted, undone $gone")
         act("open-report")
         idle(400)
-        val first = tags("row-", sheet = true).first { id -> db.observations.any { it.id == id } }
+        val newest = db.observations.maxBy { it.at }
+        ui.jump = dayKey(newest.at)
+        idle(1000)
+        val first = newest.id
+        check(first in tags("row-", sheet = true), "the history page shows it")
         act("open-observation", "id" to first)
         idle(400)
         val over =

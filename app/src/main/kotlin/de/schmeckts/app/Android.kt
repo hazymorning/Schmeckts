@@ -1,5 +1,6 @@
 package de.schmeckts.app
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.app.DatePickerDialog
@@ -12,6 +13,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
 import com.google.android.gms.common.moduleinstall.InstallStatusListener
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
@@ -114,10 +117,31 @@ class AndroidNotifications(
     }
 }
 
+/** the system's feedback for a level of Platform.haptic on this Android version; null: none fits */
+@SuppressLint("InlinedApi")
+internal fun hapticOf(
+    level: String,
+    sdk: Int,
+): Int? {
+    val tap = if (sdk >= 26) HapticFeedbackConstants.CONTEXT_CLICK else HapticFeedbackConstants.VIRTUAL_KEY
+    return when (level) {
+        "tick" -> if (sdk >= 34) HapticFeedbackConstants.SEGMENT_TICK else HapticFeedbackConstants.CLOCK_TICK.takeIf { sdk >= 26 }
+        "on" -> if (sdk >= 34) HapticFeedbackConstants.TOGGLE_ON else tap
+        "off" -> if (sdk >= 34) HapticFeedbackConstants.TOGGLE_OFF else tap
+        "threshold" -> if (sdk >= 34) HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE else tap
+        "threshold-off" -> if (sdk >= 34) HapticFeedbackConstants.GESTURE_THRESHOLD_DEACTIVATE else null
+        "confirm", "success" -> if (sdk >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
+        "reject", "strong" -> if (sdk >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
+        "heavy" -> HapticFeedbackConstants.LONG_PRESS
+        else -> tap
+    }
+}
+
 class AndroidPlatform(
     private val app: Application,
 ) : Platform {
     var activity: ComponentActivity? = null
+    var dark = false // the app's colour scheme as chosen, for the system's own dialogs
     private val keys = AtomicInteger()
 
     override val version: String =
@@ -151,15 +175,18 @@ class AndroidPlatform(
             }
         }
 
+    private var lastTick = 0L
+
     override fun haptic(level: String) {
-        val view = activity?.window?.decorView ?: return
-        val kind =
-            when (level) {
-                "success" -> if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
-                "strong" -> if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
-                else -> HapticFeedbackConstants.CLOCK_TICK
-            }
-        view.performHapticFeedback(kind) // nothing depends on it, a phone that cannot vibrate is ignored
+        val act = activity ?: return
+        if (!act.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return // a result landing after the user left
+        val kind = hapticOf(level, Build.VERSION.SDK_INT) ?: return
+        if (level == "tick") {
+            val now = SystemClock.uptimeMillis()
+            if (now - lastTick < 30) return // a fast slide would buzz instead of ticking
+            lastTick = now
+        }
+        act.window?.decorView?.performHapticFeedback(kind) // nothing depends on it, a phone that cannot vibrate is ignored
     }
 
     override suspend fun shareText(
@@ -368,11 +395,13 @@ class AndroidPlatform(
         withContext(Dispatchers.Main) {
             val act: Activity = activity ?: return@withContext null
             val c = Calendar.getInstance().apply { timeInMillis = t }
+            val theme = if (dark) R.style.Picker_Dark else R.style.Picker
             val day =
                 suspendCancellableCoroutine<Triple<Int, Int, Int>?> { k ->
                     val d =
                         DatePickerDialog(
                             act,
+                            theme,
                             { _, y, m, dd -> k.resume(Triple(y, m, dd)) },
                             c.get(Calendar.YEAR),
                             c.get(Calendar.MONTH),
@@ -385,7 +414,14 @@ class AndroidPlatform(
             val time =
                 suspendCancellableCoroutine<Pair<Int, Int>?> { k ->
                     val d =
-                        TimePickerDialog(act, { _, h, m -> k.resume(h to m) }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true)
+                        TimePickerDialog(
+                            act,
+                            theme,
+                            { _, h, m -> k.resume(h to m) },
+                            c.get(Calendar.HOUR_OF_DAY),
+                            c.get(Calendar.MINUTE),
+                            true,
+                        )
                     d.setOnCancelListener { if (k.isActive) k.resume(null) }
                     d.show()
                 } ?: return@withContext null

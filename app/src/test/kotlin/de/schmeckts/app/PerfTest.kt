@@ -103,6 +103,7 @@ class PerfTest : ScreenTest() {
                 t
             }
         val draw = median(draws.drop(2))
+        check(prefs.activePet == "all" && tags("card-cat-", within = "sec-evaluation").size == 2, "the home card on both cats")
         check(draw < LIMIT_MS, "redraw after a rating ${draw.toInt()} ms (limit $LIMIT_MS)")
         val opens =
             (0 until 5).map {
@@ -134,7 +135,7 @@ class PerfTest : ScreenTest() {
                         )
                         rule.waitForIdle()
                     }
-                t to tags("place-", sheet = true).size
+                t to tags("sort-", sheet = true).size
             }
         val eval = median(evals.drop(1).map { it.first })
         check(eval < REPORT_MS && evals[1].second > 0, "„Vorlieben“ opens in ${eval.toInt()} ms (limit $REPORT_MS)")
