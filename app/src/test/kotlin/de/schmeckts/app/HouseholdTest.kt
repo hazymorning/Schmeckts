@@ -66,15 +66,6 @@ class HouseholdTest {
     }
     private val last get() = said.last()
 
-    private val pet = diary.pets[0].id
-    private val db0 by lazy { asOf(end) }
-    private val m0 by lazy { analyze(db0, Filter(), end) }
-    private val r0 by lazy { ranking(m0, end) }
-
-    private fun names(ids: List<String>) = ids.map { id -> diary.products.first { it.id == id }.str("variety") }
-
-    private fun tones(x: Side) = listOf(x.good, x.mid, x.sauce, x.bad)
-
     @Test
     fun `four days of food in sauce she leaves are the food, not the cat - never an appetite alarm`() {
         assertEquals(emptyList<Long>(), said.filter { x -> x.m.hints.any { it.kind == "appetit" } }.map { it.t })
@@ -106,62 +97,6 @@ class HouseholdTest {
                         .verdict == "nicht",
             )
         }
-        assertEquals(
-            listOf(listOf("Miamor", "sosse", 4, 0, 9)),
-            packs(m0).map { listOf(it.brand, it.texture, it.sorts.size, it.a.good, it.a.n) },
-        )
-        assertEquals(
-            emptyList<Long>(),
-            said
-                .filter { x ->
-                    packs(x.m).any { it.brand == "Catz Finefood" || it.brand == "Bozita" }
-                }.map { it.t },
-        )
-    }
-
-    @Test
-    fun `the whole Miamor line fails, and sauce cannot yet be told from the brand`() {
-        val traits =
-            profile(db0, m0, r0, weeks(db0, m0, pet, end), trend(db0, m0, end), moves(m0, end, r0), observed(db0, m0.pets, end), end)
-        assertEquals(listOf("liebling", "pack", "appetit", "snacks"), traits.map { it.kind })
-        assertEquals(listOf("Lamm mit Nachtkerzenöl"), names(traits[0].ids))
-        val pack = traits[1].pack!!
-        assertEquals(listOf(listOf(0, 3, 4, 2), listOf(16, 5, 8, 2)), listOf(tones(pack.a), tones(pack.b)))
-        val sauce = traits[1]
-        assertEquals("sosse", sauce.insight?.a?.key)
-        assertEquals(listOf(listOf(2, 4, 8, 2), listOf(14, 4, 4, 2)), listOf(tones(sauce.insight!!.a), tones(sauce.insight.b)))
-        assertEquals(listOf("Miamor", "Bozita"), sauce.mixed)
-        assertEquals("Catz Finefood", experimentOf(sauce.insight, sauce.mixed)?.liked)
-        assertEquals(10, traits[3].treats?.n)
-    }
-
-    @Test
-    fun `her appetite is unauffaellig, and no week is ever flagged on the way`() {
-        val weeks = weeks(db0, m0, pet, end)
-        assertEquals(
-            listOf(listOf(13, 5, 5, 2, 1), listOf(14, 6, 1, 4, 3), listOf(13, 5, 2, 6, 0)),
-            weeks.map { listOf(it.n, it.good, it.mid, it.sauce, it.bad) },
-        )
-        assertEquals(listOf(5.25, 5.37, 5.39), weeks.map { Math.round(it.expected * 100) / 100.0 })
-        assertEquals(listOf(emptyMap(), mapOf("tired" to 1, "happy" to 2), mapOf("happy" to 1)), weeks.map { it.seen })
-        assertEquals(at("2026-09-20"), weeks[0].from)
-        assertEquals("unauffaellig", appetiteOf(m0, pet, trend(db0, m0, end), weeks)?.state)
-        val flagged =
-            said.filter { x ->
-                appetiteOf(x.m, pet, trend(x.db, x.m, x.t), weeks(x.db, x.m, pet, x.t))?.state?.startsWith("zuletzt") == true
-            }
-        assertEquals(emptyList<Long>(), flagged.map { it.t })
-    }
-
-    @Test
-    fun `the shelf and what to feed next`() {
-        val shelf = shelf(m0)
-        assertEquals(listOf(2, 2, 4, 20), listOf(shelf.buy, shelf.meh, shelf.stop, shelf.open))
-        val last = LinkedHashMap<String, Long>()
-        for (s in db0.servings) s.str("productId")?.let { if (!last.containsKey(it)) last[it] = s.servedAt }
-        val picks = nextPicks(r0, nextUp(m0, end, r0, last, slowStarters(m0)))
-        assertEquals(8, picks.size)
-        assertEquals(listOf("Pute mit Reis Pastete", "Wildschwein mit Nachtkerzenöl"), names(picks.take(2).map { it.id }))
-        assertEquals(listOf<Any>(51, at("2026-09-20")), diary(m0).let { listOf(it.n, dayStart(it.first)) })
+        assertEquals(listOf("Catz Finefood", "Bozita", "Miamor"), taste(last.m).marke.map { it.key })
     }
 }

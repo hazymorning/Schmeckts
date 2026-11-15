@@ -68,28 +68,13 @@ fun petMap(ids: List<String>) =
         },
     )
 
-class PetSummary(
-    val pet: String,
-    val traits: List<Trait>,
-    val shelf: Shelf,
-    val diary: Diary,
-)
-
-/** pets: the cat chosen, or every cat; picks: what to feed next in the filter */
-class Summary(
-    val pets: List<PetSummary>,
-    val picks: List<Pick>,
-)
-
-/** traits and weeks for one cat only, differ for several */
-class Vorlieben(
-    val traits: List<Trait>,
-    val weeks: List<Block>,
-    val picks: List<Pick>,
-    val experiment: Experiment?,
-    val shop: ShopGroups,
-    val differ: List<Differ>,
+/** what the page shows beside the ranking */
+class Evaluation(
+    val taste: Taste,
+    val insights: List<Insight>,
+    val basis: Basis,
     val last: Map<String, Long>,
+    val observed: List<Link>,
 )
 
 class Listed(
@@ -199,64 +184,10 @@ class Derive(
     // the home card needs only the ranking; the rest waits until the page opens
     fun rankingModel(): Ranking = cached("ranking", listOf(prefs.activePet)) { now -> ranking(model(), now) }
 
-    private fun petsShown(): List<String> {
-        val pet = prefs.activePet.takeIf { getPet(it) != null }
-        return if (pet != null) listOf(pet) else db.pets.map { it.id }
-    }
-
-    private fun profileOf(
-        pid: String,
-        now: Long,
-        light: Boolean,
-        weeks: List<Block> = weeks(db, modelFor(pid), pid, now),
-    ): List<Trait> {
-        val m = modelFor(pid)
-        val r = ranking(m, now)
-        return profile(db, m, r, weeks, trend(db, m, now), moves(m, now, r), observed(db, listOf(pid), now), now, light)
-    }
-
-    private fun picks(
-        now: Long,
-        last: Map<String, Long> = lastServed(),
-    ): List<Pick> {
-        val m = model()
-        val r = rankingModel()
-        val lines = m.pets.associateWith { pid -> packs(modelFor(pid)).flatMap { p -> p.sorts.map { it.id } }.toSet() }
-        return nextPicks(r, nextUp(m, now, r, last, slowStarters(m)), lines)
-    }
-
-    fun summaryModel(): Summary =
-        cached("summary", listOf(prefs.activePet, prefs.hiddenHints.joinToString(","))) { now ->
-            Summary(
-                petsShown().map { pid ->
-                    val m = modelFor(pid)
-                    PetSummary(pid, profileOf(pid, now, true), shelf(m, db.pets.size), diary(m))
-                },
-                picks(now),
-            )
-        }
-
-    fun vorliebenModel(): Vorlieben =
-        cached("vorlieben", listOf(prefs.activePet, prefs.hiddenHints.joinToString(","))) { now ->
+    fun evaluationModel(): Evaluation =
+        cached("evaluation", listOf(prefs.activePet)) { now ->
             val m = model()
-            val one = petsShown().singleOrNull()
-            val weeks = if (one != null) weeks(db, modelFor(one), one, now) else emptyList()
-            val traits = if (one != null) profileOf(one, now, false, weeks) else emptyList()
-            val last = lastServed()
-            Vorlieben(
-                traits = traits,
-                weeks = weeks,
-                picks = picks(now, last),
-                experiment =
-                    traits.firstNotNullOfOrNull { t ->
-                        // a failing line is not the one to try again
-                        val mixed = t.pack?.let { p -> (t.mixed - p.brand).ifEmpty { t.mixed } } ?: t.mixed
-                        t.insight?.takeIf { t.kind in setOf("konsistenz", "pack", "liebling") }?.let { experimentOf(it, mixed) }
-                    },
-                shop = ownGroups(m, db.pets.size),
-                differ = if (m.pets.size >= 2) differ(db, m.pets, now) else emptyList(),
-                last = last,
-            )
+            Evaluation(taste(m), insights(db, m, now), basis(m), lastServed(), observed(db, m.pets, now))
         }
 
     fun sortOf(id: String) = model().byId[id]

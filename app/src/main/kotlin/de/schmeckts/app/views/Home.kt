@@ -515,8 +515,7 @@ private fun ColumnScope.HomeContent() {
     }
     if (ask != null) n++
     if (hasEvaluationCard(m)) {
-        // what the hint card says is not said again right under it
-        Arrive(n++, "evaluation") { EvaluationCard(m, ask?.hint) }
+        Arrive(n++, "evaluation") { EvaluationCard(m) }
         Gap(Space.s4)
     }
     Arrive(n, "hist") {

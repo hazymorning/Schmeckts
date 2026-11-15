@@ -136,7 +136,8 @@ fun SheetView(state: SheetState) {
         "pet" -> PetView(state)
         "settings" -> if (state.page == "pet") PetView(state) else SettingsView(state)
         "report" -> ReportView(state)
-        "evaluation" -> EvaluationPage()
+        // the shopping list is a level of the page, so back returns there
+        "evaluation" -> if (state.page == "shop") ShopPage() else EvaluationPage()
     }
 }
 
