@@ -18,6 +18,7 @@ import de.schmeckts.app.ui.Faustina
 import de.schmeckts.app.ui.Figtree
 import de.schmeckts.app.ui.LIGHT
 import de.schmeckts.app.ui.Palette
+import kotlinx.coroutines.launch
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -443,6 +444,61 @@ abstract class DesignViews : ScreenTest() {
         check(until { toast?.startsWith("Der Speicher ist voll") == true }, "a full storage told")
         bad += scanText()
         check(bad.isEmpty(), "all visible text at 4.5:1, in Figtree or Faustina, at most one bold per sentence ($scheme) ${bad.distinct()}")
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+class DesignPickerTest {
+    private fun colours(d: android.app.Dialog) =
+        listOf(android.R.attr.colorAccent, android.R.attr.colorBackground).map { a ->
+            android.util
+                .TypedValue()
+                .also { d.context.theme.resolveAttribute(a, it, true) }
+                .data
+        }
+
+    private fun latest() =
+        org.robolectric.shadows.ShadowDialog
+            .getLatestDialog() as android.app.AlertDialog
+
+    private fun idle() =
+        org.robolectric.Shadows
+            .shadowOf(android.os.Looper.getMainLooper())
+            .idle()
+
+    @Test
+    fun `pickers - date and time in the app's accent and surface, as light or dark as the app`() {
+        val app =
+            androidx.test.core.app.ApplicationProvider
+                .getApplicationContext<android.app.Application>()
+        val platform = AndroidPlatform(app)
+        platform.activity =
+            org.robolectric.Robolectric
+                .buildActivity(androidx.activity.ComponentActivity::class.java)
+                .setup()
+                .get()
+        for ((dark, p) in listOf(false to LIGHT, true to DARK)) {
+            platform.dark = dark
+            var picked: Long? = null
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                picked = platform.pickDateTime(at("2025-06-17T12:00"), at("2025-06-18T00:00"))
+            }
+            idle()
+            val date = latest()
+            val onDate = colours(date)
+            date.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick()
+            idle()
+            val time = latest()
+            val onTime = colours(time)
+            time.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick()
+            idle()
+            val want = listOf(p.accent.toArgb(), p.surface.toArgb())
+            check(
+                date is android.app.DatePickerDialog && time is android.app.TimePickerDialog && onDate == want && onTime == want,
+                "${if (dark) "dark" else "light"}: the palette's accent and surface $onDate $onTime $want",
+            )
+            check(picked == at("2025-06-17T12:00"), "and the time picked still comes back $picked")
+        }
     }
 }
 

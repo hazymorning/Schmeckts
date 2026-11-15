@@ -105,8 +105,8 @@ class Feeding(
     }
 
     private fun served(id: String) {
-        haptic("success")
-        ui.home.fresh = id
+        haptic("confirm")
+        ui.home.made(id)
         ui.home.fills++
         l.reminders.syncReminders()
     }
@@ -137,7 +137,7 @@ class Feeding(
                 ph.platform.takePhoto(hint)
             } catch (err: Exception) {
                 if (err is CancellationException) throw err
-                toast("Die Kamera ließ sich nicht öffnen. Ist sie in den Android-Einstellungen erlaubt?")
+                fail("Die Kamera ließ sich nicht öffnen. Ist sie in den Android-Einstellungen erlaubt?")
                 null
             }
         }
@@ -159,7 +159,7 @@ class Feeding(
 
     private fun decode(photo: ByteArray): Picture? {
         val img = ph.platform.pictures.decode(bytesOf(photo))
-        if (img == null) toast("Das Foto ließ sich nicht lesen.")
+        if (img == null) fail("Das Foto ließ sich nicht lesen.")
         return img
     }
 

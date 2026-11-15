@@ -139,7 +139,7 @@ fun SheetView(state: SheetState) {
         "new" -> NameView(state)
         "product" -> ProductView(state)
         "pet" -> PetView(state)
-        "settings" -> if (state.page == "pet") PetView(state) else SettingsView()
+        "settings" -> if (state.page == "pet") PetView(state) else SettingsView(state)
         "report" -> ReportView(state)
         // insights and shopping list are levels of the evaluation, so back returns there
         "evaluation" ->
@@ -1053,6 +1053,8 @@ private fun ReportView(state: SheetState) {
     val pet = d.model().pet
     val all = d.servingsInFilter()
     val days = dayGroups(diary(all, d.observationsInFilter()))
+    // where each day's line is in the list, after the title and the calendar
+    val heads = days.runningFold(2) { at, g -> at + 1 + g.items.size }
     val list = rememberLazyListState()
     val multiHouse = ph.db.pets.size > 1 && pet == null
     // the first day line under the bar draws the edge itself
@@ -1061,7 +1063,7 @@ private fun ReportView(state: SheetState) {
         val at = state["at"] as? String ?: return@LaunchedEffect
         state["at"] = null
         val i = days.indexOfFirst { "d-" + it.key == at }
-        if (i >= 0) list.scrollToItem(2 + i * 2)
+        if (i >= 0) list.scrollToItem(heads[i])
     }
     val still = reduceMotion
     LaunchedEffect(ui.jump) {
@@ -1069,9 +1071,12 @@ private fun ReportView(state: SheetState) {
         ui.jump = null
         val i = days.indexOfFirst { it.key == key }
         if (i >= 0) {
-            if (still) list.scrollToItem(2 + i * 2) else list.animateScrollToItem(2 + i * 2)
+            if (still) list.scrollToItem(heads[i]) else list.animateScrollToItem(heads[i])
         }
     }
+    // entries glide into place when one comes or goes
+    val fade = if (still) null else tween<Float>(Motion.FADE)
+    val place = if (still) null else tween<androidx.compose.ui.unit.IntOffset>(Motion.STEP, easing = Motion.easeOut)
     PageList("Verlauf" + ph.forWhom(pet), ui.on("settings-back"), list, stuck) {
         item(key = "cal") {
             Calendar(all.filter { it.servedAt >= addDays(weekStart(Time.now()), -7) }, top = 0.dp)
@@ -1080,7 +1085,7 @@ private fun ReportView(state: SheetState) {
         days.forEachIndexed { i, g ->
             stickyHeader(key = "d-" + g.key) {
                 // the fade hangs below the stuck line and takes no room of its own
-                Box {
+                Box(Modifier.animateItem(fade, place, fade)) {
                     Column(Modifier.testTag("d-${g.key}").background(colors.bg)) {
                         if (i > 0) {
                             Gap(Space.s1)
@@ -1088,10 +1093,12 @@ private fun ReportView(state: SheetState) {
                         }
                         DayLine(g)
                     }
-                    FadeEdge(stuck && list.firstVisibleItemIndex == 2 + i * 2, Modifier.align(Alignment.BottomCenter).offset(y = Space.s5))
+                    FadeEdge(stuck && list.firstVisibleItemIndex == heads[i], Modifier.align(Alignment.BottomCenter).offset(y = Space.s5))
                 }
             }
-            item(key = "i-" + g.key) { DayItems(g, multiHouse) }
+            items(g.items.size, key = { j -> "i-" + g.items[j].id }) { j ->
+                Box(Modifier.animateItem(fade, place, fade)) { DayItem(g, j, multiHouse) }
+            }
         }
     }
 }

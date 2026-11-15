@@ -1,5 +1,11 @@
 package de.schmeckts.app.views
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -79,6 +87,7 @@ import de.schmeckts.app.ui.Icon
 import de.schmeckts.app.ui.ListRow
 import de.schmeckts.app.ui.LocalUi
 import de.schmeckts.app.ui.M
+import de.schmeckts.app.ui.Motion
 import de.schmeckts.app.ui.Radius
 import de.schmeckts.app.ui.RateSlider
 import de.schmeckts.app.ui.Seg
@@ -93,6 +102,7 @@ import de.schmeckts.app.ui.Type
 import de.schmeckts.app.ui.colors
 import de.schmeckts.app.ui.photoSource
 import de.schmeckts.app.ui.press
+import de.schmeckts.app.ui.reduceMotion
 import de.schmeckts.app.ui.tone
 import de.schmeckts.app.ui.watch
 import de.schmeckts.app.whenStr
@@ -415,7 +425,7 @@ fun RateSliderFor(
     val cur = rOf(s.pets[pid])
     val pet = if (ui.phone.db.pets.size > 1) d.getPet(pid) else null
     if (cur != null && cur !in scale) RateBadge(cur)
-    RateSlider(scale, cur, if (pet != null) "Bewertung für ${pet.str("name")}" else "Bewertung", { ui.haptic("select") }) { r ->
+    RateSlider(scale, cur, if (pet != null) "Bewertung für ${pet.str("name")}" else "Bewertung", { ui.haptic("tick") }) { r ->
         ui.act("rate", "s" to s.id, "p" to pid, "r" to r)
     }
 }
@@ -747,27 +757,56 @@ fun DayItems(
     plain: Boolean = false,
 ) {
     watch()
-    val p = colors
-    val x0 = tlTime + tlNode / 2
     Column {
-        g.items.forEachIndexed { i, x ->
-            if (plain && i > 0) Divider(Size.picM + Space.s3)
-            val line =
-                if (plain) {
-                    Modifier
-                } else {
-                    Modifier.drawBehind {
-                        val mid = x0.toPx()
-                        val w = Size.stroke.toPx()
-                        if (i > 0) drawLine(p.line, Offset(mid, 0f), Offset(mid, size.height / 2), w)
-                        if (i < g.items.size - 1) drawLine(p.line, Offset(mid, size.height / 2), Offset(mid, size.height), w)
-                    }
-                }
-            Box(line) {
-                if (isObservation(x)) ObservationItem(x, multiHouse, plain) else ServingItem(x, multiHouse, plain)
+        g.items.forEachIndexed { i, x -> key(x.id) { DayItem(g, i, multiHouse, plain) } }
+    }
+}
+
+/** the day's entry at i, as DayItems draws it */
+@Composable
+fun DayItem(
+    g: DayGroup,
+    i: Int,
+    multiHouse: Boolean = false,
+    plain: Boolean = false,
+) {
+    val p = colors
+    val x = g.items[i]
+    val x0 = tlTime + tlNode / 2
+    if (plain && i > 0) Divider(Size.picM + Space.s3)
+    val line =
+        if (plain) {
+            Modifier
+        } else {
+            Modifier.drawBehind {
+                val mid = x0.toPx()
+                val w = Size.stroke.toPx()
+                if (i > 0) drawLine(p.line, Offset(mid, 0f), Offset(mid, size.height / 2), w)
+                if (i < g.items.size - 1) drawLine(p.line, Offset(mid, size.height / 2), Offset(mid, size.height), w)
             }
         }
+    Arriving(x.id, plain) {
+        Box(line) {
+            if (isObservation(x)) ObservationItem(x, multiHouse, plain) else ServingItem(x, multiHouse, plain)
+        }
     }
+}
+
+/** how an entry just made comes into its list */
+val arriving = expandVertically(tween(Motion.STEP, easing = Motion.easeOut), expandFrom = Alignment.Top) + fadeIn(tween(Motion.FADE))
+
+// on: the entry just made, by its id, opens its place in the list
+@Composable
+private fun Arriving(
+    id: String,
+    on: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (!on) return content()
+    val ui = LocalUi.current
+    val still = reduceMotion
+    val state = remember { MutableTransitionState(!ui.home.arriving.remove("hist:$id") || still).apply { targetState = true } }
+    AnimatedVisibility(state, enter = if (still) EnterTransition.None else arriving) { content() }
 }
 
 @Composable

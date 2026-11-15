@@ -1,23 +1,26 @@
 package de.schmeckts.app.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -47,6 +50,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -85,6 +89,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 // The recipes of the old css/app.css: each sets its box, type and colour, and nothing else does.
 
@@ -116,15 +122,31 @@ fun Modifier.press(
     } else {
         composed {
             val source = remember { MutableInteractionSource() }
-            val pressed by source.collectIsPressedAsState()
-            val k by animateFloatAsState(
-                if (pressed && enabled) scale else 1f,
-                if (reduceMotion) snap() else tween(Motion.FADE, easing = Motion.easeOut),
-                label = "press",
-            )
+            val k = remember { Animatable(1f) }
+            val still = reduceMotion
+            LaunchedEffect(source, still, scale) {
+                var run: Job? = null
+                source.interactions.collect { i ->
+                    val down = i is PressInteraction.Press
+                    if (!down && i !is PressInteraction.Release && i !is PressInteraction.Cancel) return@collect
+                    run?.cancel()
+                    run =
+                        launch {
+                            if (still) {
+                                k.snapTo(if (down) scale else 1f)
+                            } else if (down) {
+                                k.animateTo(scale, tween(Motion.FADE / 2, easing = Motion.easeOut))
+                            } else {
+                                // in a scrolling list a quick tap comes as press and release at once: the dip shows first
+                                if (k.value > 1f - 0.6f * (1f - scale)) k.animateTo(scale, tween(60))
+                                k.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
+                            }
+                        }
+                }
+            }
             graphicsLayer {
-                scaleX = k
-                scaleY = k
+                scaleX = k.value
+                scaleY = k.value
             }.clickable(source, null, enabled, role = role, onClick = onClick)
                 .then(if (label != null) Modifier.semantics { contentDescription = label } else Modifier)
         }

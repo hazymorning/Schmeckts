@@ -83,7 +83,7 @@ interface Platform {
     val pictures: Pictures
     val notifications: Notifications
 
-    /** select, success, strong, or threshold and threshold-off as a drag crosses the point where letting go acts */
+    /** tick, tap, on, off, threshold, threshold-off, confirm, reject or heavy; select, success and strong are tap, confirm and reject */
     fun haptic(level: String = "select")
 
     /** shared or copied; cancelling is not an error */

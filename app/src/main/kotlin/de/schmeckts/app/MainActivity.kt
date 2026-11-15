@@ -101,7 +101,8 @@ fun AppScreen(main: Main) {
                 ) { HomeScreen() }
                 SheetHost(ui.sheets, ui.sheets.base) { SheetView(it) }
                 SheetHost(ui.sheets, ui.sheets.over) { SheetView(it) }
-                ToastHost(ui.toasts, ui.sheets.anyOpen()) { ui.haptic(it) }
+                // the toast rises over the feeding button as the sheet goes, not after
+                ToastHost(ui.toasts, ui.sheets.anyOpen() && ui.sheets.base.closing == null) { ui.haptic(it) }
                 ViewerHost(ui.viewer)
                 CameraHost(ui.camera)
             }
@@ -132,14 +133,15 @@ class MainActivity : ComponentActivity() {
         }
         super.onCreate(savedInstanceState)
         setContent {
-            val dark =
+            val chosen =
                 isDark(
                     main.phone.prefs
                         .also { main.ui.tick }
                         .theme,
-                ) ||
-                    main.ui.dark > 0
+                )
+            val dark = chosen || main.ui.dark > 0
             LaunchedEffect(dark) { bars(dark) }
+            LaunchedEffect(chosen) { app.platform.dark = chosen }
             SideEffect { main.ui.splashGone = true } // the home page is laid out: its first frame ends the splash
             AppScreen(main)
             // with nothing left to close, back sends the app to the background as other apps do

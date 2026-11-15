@@ -27,11 +27,12 @@ class Editing(
         val s = sheet ?: return
         val details = detailsOfSheet()
         if (details.brand.isEmpty() && details.variety.isEmpty()) {
+            haptic("reject")
             showError("Bitte Marke oder Sorte eintragen.")
             ui.focus("f-brand")
             return
         }
-        haptic("success")
+        if (s.kind != "new") haptic("confirm") // a new variety is felt once it is served
         when (s.kind) {
             "serving" -> nameServing(s.id!!, details)
             "new" -> serveNewProduct(details)
@@ -106,8 +107,8 @@ class Editing(
     ) {
         val s = sheet ?: return
         if (field != "brand" && field != "variety") return
-        haptic("select")
         s[field] = if (hasLine(s.str(field), line)) "" else line
+        haptic(if (s.str(field) == line) "on" else "off")
         if (s.str(field).isNotEmpty()) s["error"] = ""
         renderSheet()
     }
@@ -115,10 +116,10 @@ class Editing(
     fun useProduct(pid: String) {
         val p = d.getProduct(pid) ?: return
         val s = sheet ?: return
-        haptic("select")
         when (s.kind) {
             "serving" -> {
                 val sv = d.getServing(s.id) ?: return
+                haptic("confirm")
                 l.feeding.refinePets(sv, p)
                 l.products.linkProduct(sv, p)
                 save()
@@ -128,6 +129,7 @@ class Editing(
             "product" -> {
                 val cur = d.getProduct(s.id)
                 if (cur != null && cur.id != p.id) {
+                    haptic("confirm")
                     l.products.mergeProducts(cur, p)
                     save()
                     s.id = p.id
@@ -151,7 +153,7 @@ class Editing(
             db.products.removeAll { it === p }
         }
         save()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast("Eintrag gelöscht", {
@@ -173,7 +175,7 @@ class Editing(
         if (p.obj("codes")?.containsKey(code) != true) return
         p["codes"] = JsonObject(p.obj("codes")!! - code)
         save()
-        haptic("strong")
+        haptic("heavy")
         renderSheet()
         toast("Barcode entfernt", {
             val cur = d.getProduct(p.id)
@@ -191,7 +193,7 @@ class Editing(
         db.products.removeAll { it.id == id }
         db.servings.removeAll { it.str("productId") == id }
         save()
-        haptic("strong")
+        haptic("heavy")
         afterClose {
             update()
             toast("${pname(p)} gelöscht")
