@@ -155,7 +155,7 @@ class Toasts(
         down = false
         flung = if (swiped) vx else null
         dragging = false
-        if (swiped && (abs(dx) > width / 3 || (abs(vx) / density > 500 && abs(dx) > 24f))) {
+        if (swiped && (abs(dx) > width / 3 || (dx * vx > 0 && abs(vx) / density > 500 && abs(dx) > 24f))) {
             swipe = sign(dx) * screen
             hideToast()
         } else {

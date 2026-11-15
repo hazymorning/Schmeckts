@@ -144,11 +144,11 @@ fun Modifier.photoSource(
 ) = onGloballyPositioned { viewer.thumbs[key] = it.boundsInWindow() }
     .graphicsLayer { alpha = if (viewer.image != null && viewer.from == key) 0f else 1f }
 
-/** Let go after this far or this fast, the photo goes back to its thumbnail; otherwise it springs back. In dp and dp/s. */
+/** Let go this far, or this fast away from its place, the photo goes back to its thumbnail; otherwise it springs back. In dp, dp/s. */
 private fun photoLetGo(
     dy: Float,
     v: Float,
-) = abs(dy) > 96 || (abs(v) > 1000 && abs(dy) > 24)
+) = abs(dy) > 96 || (dy * v > 0 && abs(v) > 1000 && abs(dy) > 24)
 
 @Composable
 fun ViewerHost(viewer: Viewer) {
@@ -162,8 +162,11 @@ fun ViewerHost(viewer: Viewer) {
     DisposableHosted(viewer)
     LaunchedEffect(viewer.level, viewer.closing) {
         if (viewer.closing) {
-            if (!still) zoom.animateTo(0f, tween(Motion.STEP, easing = Motion.easeOut))
-            viewer.shut()
+            try {
+                if (!still) zoom.animateTo(0f, tween(Motion.STEP, easing = Motion.easeOut))
+            } finally {
+                if (viewer.closing) viewer.shut()
+            }
         } else if (still) {
             zoom.snapTo(1f)
         } else {
@@ -176,7 +179,9 @@ fun ViewerHost(viewer: Viewer) {
             events.collect { e -> if (!viewer.closing) zoom.snapTo(1f - 0.3f * e.progress) }
             viewer.closeViewer()
         } catch (e: CancellationException) {
-            scope.launch { if (still) zoom.snapTo(1f) else zoom.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut)) }
+            if (!viewer.closing) {
+                scope.launch { if (still) zoom.snapTo(1f) else zoom.animateTo(1f, tween(Motion.STEP, easing = Motion.easeOut)) }
+            }
             throw e
         }
     }

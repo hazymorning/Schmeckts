@@ -3,6 +3,8 @@ package de.schmeckts.app
 import android.app.Application
 import android.content.pm.PackageManager
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -13,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import de.schmeckts.app.views.syncChip
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
 
 // Scanning, reading and the phone on its own: the old ui_test.py from test_local on.
 
@@ -1767,6 +1770,24 @@ class UiPhotoViewerTest : ScreenTest() {
             .last()
             .boundsInRoot
 
+    // pixels of the test photo's orange on screen within r
+    private fun photoIn(r: androidx.compose.ui.geometry.Rect): Int {
+        val b = rule.onRoot().captureToImage().asAndroidBitmap()
+        var n = 0
+        for (x in r.left.toInt() until r.right.toInt()) {
+            for (y in r.top.toInt() until r.bottom.toInt()) {
+                val c = b.getPixel(x, y)
+                if (abs(android.graphics.Color.red(c) - 214) < 24 &&
+                    abs(android.graphics.Color.green(c) - 120) < 24 &&
+                    abs(android.graphics.Color.blue(c) - 60) < 24
+                ) {
+                    n++
+                }
+            }
+        }
+        return n
+    }
+
     // the back gesture begun and drawn this far, not yet let go
     private fun gesture(vararg progress: Float) {
         val d = rule.activity.onBackPressedDispatcher
@@ -1801,6 +1822,28 @@ class UiPhotoViewerTest : ScreenTest() {
         rule.onRoot().performTouchInput { up() }
         idle(800)
         check(held > 10 * dp && viewer && shown() == rest, "a slow short pull: the photo follows and comes back ${held / dp}")
+        rule.onRoot().performTouchInput {
+            down(center)
+            repeat(10) { moveBy(Offset(0f, 7 * dp), 60) }
+            repeat(5) { moveBy(Offset(0f, -5 * dp), 4) }
+            up()
+        }
+        idle(800)
+        check(viewer && shown() == rest, "pulled down, then thrown back up: it stays")
+        val thumb = photoButton(inPend).fetchSemanticsNodes()[0].boundsInRoot
+        rule.onRoot().performTouchInput {
+            down(Offset(centerX, height * 0.3f))
+            repeat(10) { moveBy(Offset(0f, 45 * dp), 60) }
+        }
+        idle(10)
+        val pulled = photoIn(thumb)
+        rule.onRoot().performTouchInput { up() }
+        idle(800)
+        check(
+            pulled == 0 && !viewer && photoIn(thumb) > 0,
+            "pulled far, the thumbnail stays empty beside it, closed it shows again $pulled",
+        )
+        viewed(photoButton(inPend))
         rule.onRoot().performTouchInput { swipe(center, center + Offset(0f, 300 * dp), 300) }
         idle(800)
         check(!viewer, "swiped down: it goes")
@@ -1817,5 +1860,13 @@ class UiPhotoViewerTest : ScreenTest() {
         viewed(photoButton(inPend))
         tapViewer()
         check(!viewer, "a tap still closes it")
+        viewed(photoButton(inPend))
+        rule.mainClock.autoAdvance = false
+        rule.onRoot().performTouchInput { click(center) }
+        rule.mainClock.advanceTimeBy(100)
+        gesture(0.3f)
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.dispatchOnBackCancelled() }
+        rule.mainClock.autoAdvance = true
+        check(until { !viewer }, "a back gesture called off while it closes does not hold it")
     }
 }
