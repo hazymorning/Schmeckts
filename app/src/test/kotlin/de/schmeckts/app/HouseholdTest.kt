@@ -123,7 +123,7 @@ class HouseholdTest {
     fun `the whole Miamor line fails, and sauce cannot yet be told from the brand`() {
         val traits =
             profile(db0, m0, r0, weeks(db0, m0, pet, end), trend(db0, m0, end), moves(m0, end, r0), observed(db0, m0.pets, end), end)
-        assertEquals(listOf("liebling", "pack", "snacks", "appetit"), traits.map { it.kind })
+        assertEquals(listOf("liebling", "pack", "appetit", "snacks"), traits.map { it.kind })
         assertEquals(listOf("Lamm mit Nachtkerzenöl"), names(traits[0].ids))
         val pack = traits[1].pack!!
         assertEquals(listOf(listOf(0, 3, 4, 2), listOf(16, 5, 8, 2)), listOf(tones(pack.a), tones(pack.b)))
@@ -132,7 +132,7 @@ class HouseholdTest {
         assertEquals(listOf(listOf(2, 4, 8, 2), listOf(14, 4, 4, 2)), listOf(tones(sauce.insight!!.a), tones(sauce.insight.b)))
         assertEquals(listOf("Miamor", "Bozita"), sauce.mixed)
         assertEquals("Catz Finefood", experimentOf(sauce.insight, sauce.mixed)?.liked)
-        assertEquals(10, traits[2].treats?.n)
+        assertEquals(10, traits[3].treats?.n)
     }
 
     @Test

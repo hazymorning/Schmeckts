@@ -537,10 +537,12 @@ private fun sided(
     if (a.id < b.id) -1 else 1
 }
 
+/** handed: taken over from a cat whose failing line holds the variety */
 class Trial(
     val e: Sort,
     val need: Int,
     val pet: String,
+    val handed: Boolean = false,
 )
 
 class Ranking(
@@ -1942,13 +1944,33 @@ class Pick(
     val retry: Retry? = null,
 )
 
+/** every rating so far of the cat the trial is for went down well */
+fun allGood(t: Trial) = (t.e.pets[t.pet] ?: t.e).let { goodOf(it.counts) == it.n }
+
+// a cat's trial of a variety from its own failing line goes to another cat still trying it, or goes
+private fun handOver(
+    t: Trial,
+    lines: Map<String, Set<String>>,
+): Trial? {
+    if (t.e.id !in lines[t.pet].orEmpty()) return t
+    return t.e.pets.entries
+        .filter { (pid, x) -> pid != t.pet && t.e.id !in lines[pid].orEmpty() && x.n in 1 until TRIAL_NEED && goodOf(x.counts) * 2 >= x.n }
+        .maxByOrNull { it.value.n }
+        ?.let { (pid, x) -> Trial(t.e, TRIAL_NEED - x.n, pid, true) }
+}
+
 // a trial one good meal from the shopping list first, then favourites long missed, the other trials, second tries; no
-// trial the owner has already put on the list or struck
+// trial the owner has already put on the list or struck. lines: per cat, the varieties of its failing lines.
 fun nextPicks(
     r: Ranking,
     next: NextUp,
+    lines: Map<String, Set<String>> = emptyMap(),
 ): List<Pick> {
-    val (near, other) = r.trials.filter { it.e.kaufen == null }.partition { it.need == 1 && goodOf(it.e.counts) == it.e.n }
+    val (near, other) =
+        r.trials
+            .filter { it.e.kaufen == null }
+            .mapNotNull { handOver(it, lines) }
+            .partition { it.need == 1 && allGood(it) }
     val trial = { t: Trial -> Pick(t.e.id, "trial", trial = t) }
     return (
         near.map(trial) + next.missed.map { Pick(it.id, "missed", missed = it) } + other.map(trial) +
@@ -2039,18 +2061,22 @@ fun differ(
             val textures = both.filter { it.texture.isNotEmpty() }.groupBy { it.texture }
             val found =
                 listOfNotNull(differOf(a, b, "alles", null, both)) + textures.mapNotNull { (k, l) -> differOf(a, b, "konsistenz", k, l) }
-            val apart = found.mapNotNull { it.key }.toSet()
+            val apart = found.filter { it.key != null }
             out += found
             for ((brand, l) in both.filter { it.brand.isNotEmpty() }.groupBy { it.brand }) {
-                val one = l.map { it.texture }.toSet().singleOrNull()
-                if (one == null || one !in apart) differOf(a, b, "marke", brand, l)?.let { out.add(it) }
+                val keys = l.map { it.texture }.toSet()
+                val d = differOf(a, b, "marke", brand, l) ?: continue
+                // all in a consistency they differ on, or all outside one the other cat prefers: the same split
+                if (apart.any { x -> keys == setOf(x.key) || (x.key !in keys && x.a == d.b) }) continue
+                out.add(d)
             }
         }
     }
     return out.sortedByDescending { abs(it.ab - it.ba) }
 }
 
-/** A line of the Steckbrief: kind as in the catalogue, the varieties behind it in ids, and what it rests on. */
+/** A line of the Steckbrief: kind as in the catalogue, the varieties behind it in ids, and what it rests on; left: the
+ *  varieties of one brand the cat leaves, all outside the consistency it prefers. */
 class Trait(
     val kind: String,
     val key: String? = null,
@@ -2063,6 +2089,7 @@ class Trait(
     val warmed: Boolean = false,
     val link: Link? = null,
     val treats: Counted? = null,
+    val left: List<String> = emptyList(),
 )
 
 private val BUYING = setOf("pack", "marke", "konsistenz", "geschmack", "sosse")
@@ -2138,22 +2165,38 @@ fun profile(
     val appetite = pet?.let { appetiteOf(m, it, trend, weeks) }?.let { Trait("appetit", it.state, appetite = it) }
     val worry = appetite?.key in WORRY
     val found = findings(db, m, now, !light)
-    val buying = found.filter { it.kind in BUYING }
     val out = mutableListOf<Trait>()
     if (worry) out.add(appetite!!)
     val favourites = favourites(r)
+    val ids = favourites.map { it.id }
+    // a consistency only favourites came in, that cannot be told from their brand, is told with them
+    val liked =
+        found.firstOrNull { t ->
+            !r.flat && t.kind == "konsistenz" && gapOf(t) > 0 && t.mixed.isNotEmpty() && t.insight?.n == 0 && ids.containsAll(t.ids)
+        }
     when {
         r.flat -> out.add(Trait("sorten"))
-        favourites.isNotEmpty() -> out.add(Trait("liebling", ids = favourites.map { it.id }))
+        favourites.isNotEmpty() -> out.add(Trait("liebling", ids = ids, insight = liked?.insight, mixed = liked?.mixed.orEmpty()))
     }
+    val buying = found.filter { it.kind in BUYING && it !== liked }
     out += buying
     val left = r.flop.filter { it.verdict == "nicht" }
     val licked = buying.filter { it.kind == "sosse" }.flatMap { it.ids }.toSet()
     if (left.isNotEmpty() && buying.none(::negative) && left.count { it.id in licked } * 2 < left.size) {
-        out.add(Trait("stehen", ids = left.map { it.id }))
+        // one brand left that never came in the consistency the cat prefers is the other side of that line
+        val brand = brandOf(left[0]).takeIf { b -> left.size > 1 && b.isNotEmpty() && left.all { brandOf(it) == b } }
+        val i =
+            out.indexOfFirst { t ->
+                brand != null && t.kind == "konsistenz" && gapOf(t) > 0 && t.insight!!.sorts.none { brandOf(it) == brand }
+            }
+        if (i >= 0) {
+            out[i] = out[i].let { t -> Trait(t.kind, t.key, t.ids, t.insight, mixed = t.mixed, left = left.map { it.id }) }
+        } else {
+            out.add(Trait("stehen", ids = left.map { it.id }))
+        }
     }
-    treats(m)?.let { out.add(Trait("snacks", treats = it)) }
     if (appetite != null && !worry) out.add(appetite)
+    treats(m)?.let { out.add(Trait("snacks", treats = it)) }
     // a move the cat's own change explains is no news of the variety
     val own = { dir: Int -> trend.any { it.cause == "tier" && it.dir == dir && (pet == null || it.pet == pet) } }
     val moved = (if (own(-1)) emptyList() else moves.cooled) + (if (own(1)) emptyList() else moves.warmed)
@@ -2201,7 +2244,21 @@ class Shelf(
     val open: Int,
 )
 
-fun shelf(m: Model): Shelf = shopGroups(m).let { Shelf(it.nachkaufen.size, it.geht.size, it.nicht.size, it.neu.size) }
+/** Einkaufen for one cat beside others: a variety set to always that this cat leaves stands with what it leaves */
+fun ownGroups(
+    m: Model,
+    cats: Int = 1,
+): ShopGroups {
+    val g = shopGroups(m)
+    if (cats < 2 || m.pets.size != 1) return g
+    val (left, buy) = g.nachkaufen.partition { it.kaufen == "immer" && it.verdict == "nicht" }
+    return ShopGroups(buy, g.nicht + left, g.geht, g.neu)
+}
+
+fun shelf(
+    m: Model,
+    cats: Int = 1,
+): Shelf = ownGroups(m, cats).let { Shelf(it.nachkaufen.size, it.geht.size, it.nicht.size, it.neu.size) }
 
 /** Every rating in the filter, of every type, and when the first was given; first is 0 without one. */
 class Diary(

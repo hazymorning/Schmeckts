@@ -221,7 +221,8 @@ class Derive(
     ): List<Pick> {
         val m = model()
         val r = rankingModel()
-        return nextPicks(r, nextUp(m, now, r, last, slowStarters(m)))
+        val lines = m.pets.associateWith { pid -> packs(modelFor(pid)).flatMap { p -> p.sorts.map { it.id } }.toSet() }
+        return nextPicks(r, nextUp(m, now, r, last, slowStarters(m)), lines)
     }
 
     fun summaryModel(): Summary =
@@ -229,7 +230,7 @@ class Derive(
             Summary(
                 petsShown().map { pid ->
                     val m = modelFor(pid)
-                    PetSummary(pid, profileOf(pid, now, true), shelf(m), diary(m))
+                    PetSummary(pid, profileOf(pid, now, true), shelf(m, db.pets.size), diary(m))
                 },
                 picks(now).firstOrNull(),
             )
@@ -250,9 +251,9 @@ class Derive(
                     traits.firstNotNullOfOrNull { t ->
                         // a failing line is not the one to try again
                         val mixed = t.pack?.let { p -> (t.mixed - p.brand).ifEmpty { t.mixed } } ?: t.mixed
-                        t.insight?.takeIf { t.kind == "konsistenz" || t.kind == "pack" }?.let { experimentOf(it, mixed) }
+                        t.insight?.takeIf { t.kind in setOf("konsistenz", "pack", "liebling") }?.let { experimentOf(it, mixed) }
                     },
-                shop = shopGroups(m),
+                shop = ownGroups(m, db.pets.size),
                 differ = if (m.pets.size >= 2) differ(db, m.pets, now) else emptyList(),
                 last = last,
             )
